@@ -188,13 +188,6 @@ export async function buildFinanceCorporateKpis(
         }
         overdueKpi.helper = "Vencidas a la fecha (día calendario UTC)";
       }
-
-      if (summary.overdueByCurrency.length > 0) {
-        pushUniqueFinanceAlert(alerts, {
-          variant: "warning",
-          message: "Hay obligaciones corporativas vencidas pendientes de pago.",
-        });
-      }
     } catch {
       corporatePayables = null;
       pushUniqueFinanceAlert(alerts, {
@@ -232,13 +225,6 @@ export async function buildFinanceCorporateKpis(
           arOverdueKpi.tone = "warning";
         }
         arOverdueKpi.helper = "Vencidas a la fecha (día calendario UTC)";
-      }
-
-      if (arSummary.overdueByCurrency.length > 0) {
-        pushUniqueFinanceAlert(alerts, {
-          variant: "warning",
-          message: "Hay cuentas por cobrar vencidas pendientes de cobro.",
-        });
       }
     } catch {
       pushUniqueFinanceAlert(alerts, {
