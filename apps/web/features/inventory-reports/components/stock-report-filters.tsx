@@ -74,32 +74,32 @@ export function StockReportFilters({ mode }: StockReportFiltersProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="space-y-1">
+    <div className="grid min-w-0 grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="min-w-0 space-y-1">
         <Label className="text-xs text-muted-foreground">Desde</Label>
         <Input
           type="date"
-          defaultValue={sp.get("dateFrom") ?? ""}
+          value={sp.get("dateFrom") ?? ""}
           onChange={(e) => update("dateFrom", e.target.value)}
-          className="w-36"
+          className="w-full min-w-0"
         />
       </div>
-      <div className="space-y-1">
+      <div className="min-w-0 space-y-1">
         <Label className="text-xs text-muted-foreground">Hasta</Label>
         <Input
           type="date"
-          defaultValue={sp.get("dateTo") ?? ""}
+          value={sp.get("dateTo") ?? ""}
           onChange={(e) => update("dateTo", e.target.value)}
-          className="w-36"
+          className="w-full min-w-0"
         />
       </div>
-      <div className="space-y-1">
+      <div className="min-w-0 space-y-1">
         <Label className="text-xs text-muted-foreground">Tipo</Label>
         <Select
           value={sp.get("movementType") ?? "_all"}
           onValueChange={(v) => update("movementType", v === "_all" ? "" : v)}
         >
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             {TYPE_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -107,13 +107,13 @@ export function StockReportFilters({ mode }: StockReportFiltersProps) {
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1">
+      <div className="min-w-0 space-y-1">
         <Label className="text-xs text-muted-foreground">Origen</Label>
         <Select
           value={sp.get("sourceType") ?? "_all"}
           onValueChange={(v) => update("sourceType", v === "_all" ? "" : v)}
         >
-          <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
           <SelectContent>
             {SOURCE_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -125,7 +125,7 @@ export function StockReportFilters({ mode }: StockReportFiltersProps) {
         variant="ghost"
         size="sm"
         onClick={() => router.push(pathname)}
-        className="self-end"
+        className="justify-self-start"
       >
         Limpiar
       </Button>

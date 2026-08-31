@@ -1,3 +1,5 @@
+export { InventarioHubCards } from "./components/inventario-hub-cards";
+export type { InventarioHubCard } from "./components/inventario-hub-cards";
 export { ProductStatusBadge } from "./components/product-status-badge";
 export { WarehouseStatusBadge } from "./components/warehouse-status-badge";
 export { StockMovementTypeBadge } from "./components/stock-movement-type-badge";

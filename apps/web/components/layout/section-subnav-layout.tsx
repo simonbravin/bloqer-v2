@@ -12,7 +12,7 @@ export function SectionSubnavLayout({
   children: ReactNode;
 }) {
   return (
-    <div className="min-h-0">
+    <div className="min-h-0 min-w-0 w-full">
       <div className="shell-page space-y-0 pb-2 pt-5">{subnav}</div>
       {children}
     </div>

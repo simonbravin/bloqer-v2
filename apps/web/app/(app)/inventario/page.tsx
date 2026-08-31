@@ -1,6 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  ArrowLeftRight,
+  BarChart3,
+  Package,
+  ScrollText,
+  Warehouse,
+} from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
+import { InventarioHubCards } from "@/features/inventory";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default async function InventarioPage() {
@@ -11,38 +18,40 @@ export default async function InventarioPage() {
     <PageShell variant="default" className="space-y-6">
       <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link
-          href="/inventario/productos"
-          className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
-        >
-          <h2 className="font-semibold">Productos</h2>
-        </Link>
-        <Link
-          href="/inventario/depositos"
-          className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
-        >
-          <h2 className="font-semibold">Depósitos</h2>
-        </Link>
-        <Link
-          href="/inventario/movimientos"
-          className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
-        >
-          <h2 className="font-semibold">Movimientos</h2>
-        </Link>
-        <Link
-          href="/inventario/transferencias"
-          className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
-        >
-          <h2 className="font-semibold">Transferencias</h2>
-        </Link>
-        <Link
-          href="/inventario/reportes"
-          className="rounded-lg border bg-card p-6 hover:bg-accent transition-colors"
-        >
-          <h2 className="font-semibold">Reportes</h2>
-        </Link>
-      </div>
+      <InventarioHubCards
+        cards={[
+          {
+            href: "/inventario/productos",
+            title: "Productos",
+            description: "Catálogo con SKU, unidad y categoría.",
+            icon: Package,
+          },
+          {
+            href: "/inventario/depositos",
+            title: "Depósitos",
+            description: "Ubicaciones y stock por depósito.",
+            icon: Warehouse,
+          },
+          {
+            href: "/inventario/movimientos",
+            title: "Movimientos",
+            description: "Kardex de ingresos, egresos y ajustes.",
+            icon: ScrollText,
+          },
+          {
+            href: "/inventario/transferencias",
+            title: "Transferencias",
+            description: "Traslado de stock entre depósitos.",
+            icon: ArrowLeftRight,
+          },
+          {
+            href: "/inventario/reportes",
+            title: "Reportes",
+            description: "Stock actual y movimientos confirmados.",
+            icon: BarChart3,
+          },
+        ]}
+      />
     </PageShell>
   );
 }

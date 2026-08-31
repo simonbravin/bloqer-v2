@@ -49,7 +49,7 @@ export default async function MovimientosInventarioPage({ searchParams }: PagePr
   );
 
   return (
-    <PageShell variant="wide" className="space-y-6">
+    <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight">Movimientos de inventario</h1>
@@ -65,7 +65,7 @@ export default async function MovimientosInventarioPage({ searchParams }: PagePr
         </div>
       </div>
 
-      <div className="rounded-lg border bg-card p-4">
+      <div className="min-w-0 rounded-lg border bg-card p-4">
         <Suspense>
           <StockReportFilters mode="movements" />
         </Suspense>
