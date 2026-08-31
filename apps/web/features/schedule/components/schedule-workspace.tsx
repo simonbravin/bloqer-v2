@@ -20,12 +20,11 @@ import {
 } from "./schedule-item-dialog";
 import { ScheduleFilters } from "./schedule-filters";
 import { ScheduleCreateDialog } from "./schedule-create-dialog";
-import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 import { ScheduleFieldItemSheet } from "./schedule-field-item-sheet";
 import { ScheduleFieldView, ScheduleFieldViewSkeleton } from "./schedule-field-view";
 import { filterScheduleItemsForDisplay } from "../adapters/schedule-view-types";
 import { useHasMounted, useIsLgUp } from "@/lib/media-query";
-import { ReportExportActions } from "@/features/reports/report-export-actions";
+import { ScheduleExportDialog } from "./schedule-export-dialog";
 
 type ViewId = "gantt" | "calendar" | "kanban" | "table";
 
@@ -116,9 +115,6 @@ export function ScheduleWorkspace({
     searchParams.get("status") != null ||
     searchParams.get("delayedOnly") === "1" ||
     searchParams.get("type") != null;
-
-  const cancelledHidden =
-    !statusFilter && workspace.items.some((i) => i.status === "CANCELLED");
 
   function replaceParams(mutate: (params: URLSearchParams) => void) {
     const params = new URLSearchParams(searchParams.toString());
@@ -283,13 +279,6 @@ export function ScheduleWorkspace({
             </div>
           )}
 
-          {cancelledHidden && (
-            <p className="text-xs text-muted-foreground">
-              Las tareas canceladas están ocultas. Para verlas, filtrá por estado{" "}
-              <strong className="font-medium text-foreground">Cancelado</strong>.
-            </p>
-          )}
-
           {workspace.baselineBudgetMismatch && (
             <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
               El presupuesto de control de costos no coincide con la base del cronograma.
@@ -315,17 +304,15 @@ export function ScheduleWorkspace({
                 />
               </>
             )}
-            <ReportExportActions
-              exportPath={`/api/reports/proyectos/${projectId}/cronograma`}
-              params={{
+            <ScheduleExportDialog
+              projectId={projectId}
+              defaultView={view}
+              filters={{
                 budgetId: workspace.budgetId,
                 status: searchParams.get("status") ?? undefined,
                 delayedOnly: searchParams.get("delayedOnly") === "1" ? "1" : undefined,
                 type: searchParams.get("type") ?? undefined,
               }}
-              pdf
-              xlsx
-              csv={false}
             />
             <div className="ml-auto flex flex-wrap gap-1 rounded-lg border p-1">
               {VIEWS.map((v) => (
@@ -340,15 +327,6 @@ export function ScheduleWorkspace({
               ))}
             </div>
           </div>
-
-          <details className="rounded-lg border bg-card px-4 py-2 text-sm">
-            <summary className="cursor-pointer font-medium text-muted-foreground py-1">
-              Leyenda de avances
-            </summary>
-            <div className="pt-2 pb-1">
-              <ScheduleProgressLegend />
-            </div>
-          </details>
 
           {view === "table" && (
             <ScheduleTableView

@@ -411,39 +411,52 @@ function ganttDataRow(
   return `<row r="${r}" ht="16">${cells.join("")}</row>`;
 }
 
-const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+function contentTypesXml(sheetCount: number): string {
+  const sheets = Array.from({ length: sheetCount }, (_, i) =>
+    `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,
+  ).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
   <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
-  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
-  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  ${sheets}
 </Types>`;
+}
 
 const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
 </Relationships>`;
 
-const WB_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+function workbookRelsXml(sheetCount: number): string {
+  const sheetRels = Array.from({ length: sheetCount }, (_, i) =>
+    `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`,
+  ).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
-  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
-  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  ${sheetRels}
+  <Relationship Id="rId${sheetCount + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`;
+}
 
-const WORKBOOK = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+function workbookXml(sheets: Array<{ name: string; printTitles: string }>): string {
+  const sheetEls = sheets
+    .map((s, i) => `<sheet name="${s.name}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+    .join("");
+  const names = sheets
+    .map(
+      (s, i) =>
+        `<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${s.printTitles}</definedName>`,
+    )
+    .join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets>
-    <sheet name="Tabla" sheetId="1" r:id="rId1"/>
-    <sheet name="Gantt" sheetId="2" r:id="rId2"/>
-  </sheets>
-  <definedNames>
-    <definedName name="_xlnm.Print_Titles" localSheetId="0">Tabla!$1:$8</definedName>
-    <definedName name="_xlnm.Print_Titles" localSheetId="1">Gantt!$A:$E,Gantt!$9:$9</definedName>
-  </definedNames>
+  <sheets>${sheetEls}</sheets>
+  <definedNames>${names}</definedNames>
 </workbook>`;
+}
 
 export function buildStyledScheduleXlsx(payload: ScheduleExportPayload): Buffer {
   const hexes = [
@@ -453,13 +466,28 @@ export function buildStyledScheduleXlsx(payload: ScheduleExportPayload): Buffer 
   ];
   const styles = buildStyles(hexes);
   const utf8 = (s: string) => Buffer.from(s, "utf8");
-  return zipStore([
-    { path: "[Content_Types].xml", body: utf8(CONTENT_TYPES) },
+  const includeTable = payload.view !== "gantt";
+  const includeGantt = payload.view !== "table";
+  const sheets: Array<{ name: string; printTitles: string; xml: string }> = [];
+  if (includeTable) {
+    sheets.push({ name: "Tabla", printTitles: "Tabla!$1:$8", xml: tableSheet(payload, styles) });
+  }
+  if (includeGantt) {
+    sheets.push({
+      name: "Gantt",
+      printTitles: "Gantt!$A:$E,Gantt!$9:$9",
+      xml: ganttSheet(payload, styles),
+    });
+  }
+  const files: Array<{ path: string; body: Buffer }> = [
+    { path: "[Content_Types].xml", body: utf8(contentTypesXml(sheets.length)) },
     { path: "_rels/.rels", body: utf8(ROOT_RELS) },
-    { path: "xl/workbook.xml", body: utf8(WORKBOOK) },
-    { path: "xl/_rels/workbook.xml.rels", body: utf8(WB_RELS) },
+    { path: "xl/workbook.xml", body: utf8(workbookXml(sheets)) },
+    { path: "xl/_rels/workbook.xml.rels", body: utf8(workbookRelsXml(sheets.length)) },
     { path: "xl/styles.xml", body: utf8(styles.stylesXml) },
-    { path: "xl/worksheets/sheet1.xml", body: utf8(tableSheet(payload, styles)) },
-    { path: "xl/worksheets/sheet2.xml", body: utf8(ganttSheet(payload, styles)) },
-  ]);
+  ];
+  sheets.forEach((sheet, i) => {
+    files.push({ path: `xl/worksheets/sheet${i + 1}.xml`, body: utf8(sheet.xml) });
+  });
+  return zipStore(files);
 }

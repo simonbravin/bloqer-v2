@@ -9,8 +9,11 @@ import {
   formatScheduleExportDate,
   ganttBarFraction,
   indentScheduleExportName,
+  keepScheduleItemsOverlappingRange,
+  parseScheduleExportIsoDate,
   parseScheduleExportView,
   periodOverlapsItem,
+  resolveExportGanttRange,
   scheduleExportTypeLabel,
   splitGanttPdfWindows,
   todayMarkerFraction,
@@ -90,6 +93,70 @@ test("buildGanttPeriods weekly starts on Monday and covers the range", () => {
   assert.ok(periodOverlapsItem(periods[0]!, "2026-03-04", "2026-03-05"));
 });
 
+test("parseScheduleExportIsoDate accepts date-only and rejects datetimes", () => {
+  assert.equal(parseScheduleExportIsoDate("2026-03-15"), "2026-03-15");
+  assert.equal(parseScheduleExportIsoDate(" 2026-03-15 "), "2026-03-15");
+  assert.equal(parseScheduleExportIsoDate("2026-03-15T12:00:00Z"), undefined);
+  assert.equal(parseScheduleExportIsoDate("15/03/2026"), undefined);
+  assert.equal(parseScheduleExportIsoDate("2026-02-31"), undefined);
+  assert.equal(parseScheduleExportIsoDate(""), undefined);
+});
+
+test("resolveExportGanttRange uses custom bounds and swaps inverted dates", () => {
+  const auto = { startIso: "2026-01-01", endIso: "2026-12-31" };
+  assert.deepEqual(resolveExportGanttRange(auto, "2026-03-01", "2026-03-31"), {
+    startIso: "2026-03-01",
+    endIso: "2026-03-31",
+  });
+  assert.deepEqual(resolveExportGanttRange(auto, "2026-12-01", "2026-01-15"), {
+    startIso: "2026-01-15",
+    endIso: "2026-12-01",
+  });
+  assert.deepEqual(resolveExportGanttRange(auto, "2026-06-01", undefined), {
+    startIso: "2026-06-01",
+    endIso: "2026-12-31",
+  });
+  assert.deepEqual(resolveExportGanttRange(auto, undefined, "2026-02-01"), {
+    startIso: "2026-01-01",
+    endIso: "2026-02-01",
+  });
+  assert.deepEqual(resolveExportGanttRange(null, "2026-03-01", undefined), {
+    startIso: "2026-03-01",
+    endIso: "2026-03-01",
+  });
+  assert.deepEqual(resolveExportGanttRange(auto, undefined, undefined), auto);
+});
+
+test("periodOverlapsItem excludes items without dates", () => {
+  const range = { startIso: "2026-03-01", endIso: "2026-03-31" };
+  assert.equal(periodOverlapsItem(range, "2026-03-10", "2026-03-20"), true);
+  assert.equal(periodOverlapsItem(range, "2026-01-01", "2026-01-31"), false);
+  assert.equal(periodOverlapsItem(range, null, null), false);
+});
+
+test("keepScheduleItemsOverlappingRange keeps ancestors without dates", () => {
+  const items = [
+    { id: "p", parentId: null, startDate: null, endDate: null },
+    { id: "c", parentId: "p", startDate: "2026-03-10", endDate: "2026-03-20" },
+    { id: "o", parentId: null, startDate: "2026-01-01", endDate: "2026-01-31" },
+  ];
+  assert.deepEqual(
+    keepScheduleItemsOverlappingRange(items, "2026-03-01", "2026-03-31").map((i) => i.id),
+    ["p", "c"],
+  );
+});
+
+test("keepScheduleItemsOverlappingRange keeps a parent that itself overlaps", () => {
+  const items = [
+    { id: "p", parentId: null, startDate: "2026-01-01", endDate: "2026-12-31" },
+    { id: "c", parentId: "p", startDate: "2026-06-01", endDate: "2026-06-15" },
+  ];
+  assert.deepEqual(
+    keepScheduleItemsOverlappingRange(items, "2026-03-01", "2026-03-31").map((i) => i.id),
+    ["p"],
+  );
+});
+
 test("parseScheduleExportView maps calendar/kanban to both", () => {
   assert.equal(parseScheduleExportView("gantt"), "gantt");
   assert.equal(parseScheduleExportView("table"), "table");
@@ -120,9 +187,14 @@ test("filter line describes active filters in Spanish", () => {
     budgetName: "Base 2026",
     itemType: "TASK",
     delayedOnly: true,
+    view: "gantt",
+    fromIso: "2026-03-01",
+    toIso: "2026-03-31",
   });
   assert.match(line, /Presupuesto: Base 2026/);
   assert.match(line, /Tipo: Tareas/);
   assert.match(line, /Solo atrasados/);
   assert.match(line, /Activos/);
+  assert.match(line, /Contenido: Gantt/);
+  assert.match(line, /Lapso: 01\/03\/2026 → 31\/03\/2026/);
 });

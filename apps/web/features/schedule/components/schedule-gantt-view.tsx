@@ -24,6 +24,7 @@ import type { ScheduleGanttEntry } from "../adapters/schedule-view-types";
 import {
   CONTAINER_COLOR,
   countScheduleItemsWithoutDates,
+  hasPrimaryWbsLink,
   mapScheduleItemsToGanttEntries,
   scheduleItemBarColor,
 } from "../adapters/schedule-view-types";
@@ -43,6 +44,11 @@ import type { ScheduleItemDialogTab } from "./schedule-item-dialog";
 function collapsedStorageKey(projectId: string) {
   return `bloqer.schedule.collapsed.${projectId}`;
 }
+
+/** Shared with the sidebar header so Días / ⋮ / FS stay on one grid. */
+const META_DURATION = "w-9";
+const META_MENU = "w-5";
+const META_FS = "w-7";
 
 function readCollapsedIds(projectId: string): Set<string> {
   if (typeof window === "undefined") return new Set();
@@ -117,39 +123,63 @@ function ScheduleGanttSidebarRow({
   const hasDeps =
     item.predecessorDependencies.length > 0 || item.successorIds.length > 0;
 
-  const extras = (
-    <div className="flex shrink-0 items-center justify-end gap-0.5">
-      {canEdit && (
-        <ScheduleReorderControls
-          projectId={projectId}
-          itemId={item.id}
-          items={items}
-          treeItems={treeItems}
-          size="xs"
-          layout="menu"
-        />
-      )}
-      <ScheduleMissingEdtBadge item={item} />
-      {item.metrics?.overBudget && (
-        <span className="rounded bg-amber-500/15 px-1 text-[9px] text-amber-700 dark:text-amber-400">
-          PPTO
-        </span>
-      )}
-      {hasDeps && (
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-5 shrink-0 px-1 text-[9px]"
-          title="Editar dependencias FS"
-          onClick={(e) => {
-            e.stopPropagation();
-            onOpenDeps(item.id);
-          }}
-        >
-          FS
-        </Button>
-      )}
+  const showMissingEdt =
+    item.status !== "CANCELLED" && item.isLeaf && !hasPrimaryWbsLink(item);
+  const showOverBudget = Boolean(item.metrics?.overBudget);
+  const nameEnd =
+    showMissingEdt || showOverBudget ? (
+      <>
+        {showMissingEdt ? (
+          <ScheduleMissingEdtBadge item={item} className="px-1 py-0 text-[9px] leading-4" />
+        ) : null}
+        {showOverBudget ? (
+          <span className="rounded bg-amber-500/15 px-1 text-[9px] leading-4 text-amber-700 dark:text-amber-400">
+            PPTO
+          </span>
+        ) : null}
+      </>
+    ) : undefined;
+
+  const durationShort =
+    item.durationDays != null && item.durationDays > 0 ? `${item.durationDays}d` : "—";
+
+  const meta = (
+    <div className="flex shrink-0 items-center">
+      <span
+        className={cn(META_DURATION, "truncate text-right text-[10px] tabular-nums text-muted-foreground")}
+        title={durationShort}
+      >
+        {durationShort}
+      </span>
+      <div className={cn(META_MENU, "flex items-center justify-center")}>
+        {canEdit ? (
+          <ScheduleReorderControls
+            projectId={projectId}
+            itemId={item.id}
+            items={items}
+            treeItems={treeItems}
+            size="xs"
+            layout="menu"
+          />
+        ) : null}
+      </div>
+      <div className={cn(META_FS, "flex items-center justify-center")}>
+        {hasDeps ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            className="h-5 w-7 shrink-0 px-0 text-[9px]"
+            title="Editar dependencias FS"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDeps(item.id);
+            }}
+          >
+            FS
+          </Button>
+        ) : null}
+      </div>
     </div>
   );
 
@@ -172,26 +202,25 @@ function ScheduleGanttSidebarRow({
     <span className="inline-block w-3.5 shrink-0" aria-hidden />
   );
 
-  const durationShort =
-    item.durationDays != null && item.durationDays > 0 ? `${item.durationDays}d` : "—";
-
   if (entry) {
     return (
       <div
         className="min-w-0"
         style={{ paddingLeft: depth > 0 ? depth * 8 + 4 : 4 }}
       >
-        <div className="flex min-w-0 items-center gap-0.5 pr-0.5">
+        <div className="flex min-w-0 items-center gap-0.5 pr-1.5">
           {collapseBtn}
           <div className="min-w-0 flex-1">
             <GanttSidebarItem
               feature={entry.feature}
-              durationLabel={durationShort}
+              showDuration={false}
+              nameEnd={nameEnd}
               onSelectItem={onSelect}
               className="gap-1 px-1 py-0"
+              title={showMissingEdt ? `${item.name} · Sin EDT` : item.name}
             />
           </div>
-          {extras}
+          {meta}
         </div>
       </div>
     );
@@ -199,30 +228,37 @@ function ScheduleGanttSidebarRow({
 
   return (
     <div
-      className={cn(
-        "flex min-w-0 items-center gap-1 px-1 text-xs text-muted-foreground hover:bg-secondary cursor-pointer",
-        isSummary && "italic",
-      )}
-      style={{
-        height: "var(--gantt-row-height)",
-        paddingLeft: depth > 0 ? depth * 8 + 4 : 4,
-      }}
-      role="button"
-      tabIndex={0}
-      title={item.name}
-      onClick={() => onSelect(item.id)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") onSelect(item.id);
-      }}
+      className="min-w-0"
+      style={{ paddingLeft: depth > 0 ? depth * 8 + 4 : 4 }}
     >
-      {collapseBtn}
-      <div
-        className="h-2 w-2 shrink-0 rounded-full border border-dashed border-muted-foreground/50"
-        style={isSummary ? { backgroundColor: CONTAINER_COLOR } : undefined}
-      />
-      <p className="min-w-0 flex-1 truncate text-left font-medium">{item.name}</p>
-      {extras}
-      <p className="shrink-0 text-[10px]">{durationShort}</p>
+      <div className="flex min-w-0 items-center gap-0.5 pr-1.5">
+        {collapseBtn}
+        <div
+          className={cn(
+            "flex min-w-0 flex-1 cursor-pointer items-center gap-1 px-1 text-xs text-muted-foreground hover:bg-secondary",
+            isSummary && "italic",
+          )}
+          style={{ height: "var(--gantt-row-height)" }}
+          role="button"
+          tabIndex={0}
+          title={showMissingEdt ? `${item.name} · Sin EDT` : item.name}
+          onClick={() => onSelect(item.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect(item.id);
+            }
+          }}
+        >
+          <div
+            className="h-2 w-2 shrink-0 rounded-full border border-dashed border-muted-foreground/50"
+            style={isSummary ? { backgroundColor: CONTAINER_COLOR } : undefined}
+          />
+          <p className="min-w-0 flex-1 truncate text-left font-medium">{item.name}</p>
+          {nameEnd ? <div className="flex shrink-0 items-center gap-0.5">{nameEnd}</div> : null}
+        </div>
+        {meta}
+      </div>
     </div>
   );
 }
@@ -428,7 +464,16 @@ export function ScheduleGanttView({
           )}
         >
           {sidebarOpen ? (
-            <GanttSidebar className="w-[min(38vw,400px)] min-w-[260px]">
+            <GanttSidebar
+              className="w-[min(38vw,400px)] min-w-[260px]"
+              headerEnd={
+                <div className="flex shrink-0 items-end">
+                  <span className={cn(META_DURATION, "whitespace-nowrap text-right")}>Días</span>
+                  <span className={META_MENU} aria-hidden />
+                  <span className={META_FS} aria-hidden />
+                </div>
+              }
+            >
               {visibleItems.map((item) => (
                 <ScheduleGanttSidebarRow
                   key={item.id}

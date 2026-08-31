@@ -1,8 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -13,6 +18,7 @@ import {
 import type { AvailableBudget } from "@bloqer/services";
 import type { ScheduleItemStatus } from "@bloqer/database";
 import { STATUS_LABELS } from "../adapters/schedule-view-types";
+import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 
 const STATUS_OPTIONS: (ScheduleItemStatus | "ALL")[] = [
   "ALL",
@@ -127,6 +133,16 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
       >
         {delayedOnly ? "Solo atrasados ✓" : "Solo atrasados"}
       </Button>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-muted-foreground">
+            Leyenda de avances
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-[min(24rem,90vw)] text-sm">
+          <ScheduleProgressLegend />
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

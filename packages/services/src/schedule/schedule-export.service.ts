@@ -18,6 +18,10 @@ import {
   formatScheduleExportDate,
   formatScheduleExportPct,
   indentScheduleExportName,
+  keepScheduleItemsOverlappingRange,
+  parseScheduleExportIsoDate,
+  parseScheduleExportView,
+  resolveExportGanttRange,
   SCHEDULE_EXPORT_STATUS_LABELS,
   scheduleExportTypeLabel,
   todayMarkerFraction,
@@ -41,6 +45,8 @@ const STATUS_VALUES: ScheduleItemStatus[] = [
 
 export type ScheduleExportFilters = ScheduleWorkspaceFilters & {
   view?: string;
+  from?: string;
+  to?: string;
 };
 
 export type { ScheduleExportGantt, ScheduleExportPayload, ScheduleExportRow } from "./schedule-export-pure";
@@ -58,6 +64,8 @@ export function parseScheduleExportFilters(
     status,
     itemType,
     view: sp.view,
+    from: parseScheduleExportIsoDate(sp.from),
+    to: parseScheduleExportIsoDate(sp.to),
   };
 }
 
@@ -180,34 +188,49 @@ export async function buildScheduleExportPayload(
 
   const items = filterScheduleItemsForExport(workspace.items, filters.status);
   const currency = workspace.budgetCurrency;
-  const rows = items.map((item) => mapRow(item, currency));
+  const customFrom = parseScheduleExportIsoDate(filters.from);
+  const customTo = parseScheduleExportIsoDate(filters.to);
+  const hasCustomRange = Boolean(customFrom || customTo);
+  const view = parseScheduleExportView(filters.view);
+
+  const autoRange = computeExportDateRange(items, hasCustomRange ? 0 : 7);
+  const range = resolveExportGanttRange(autoRange, customFrom, customTo);
+  const scopedItems =
+    hasCustomRange && range
+      ? keepScheduleItemsOverlappingRange(items, range.startIso, range.endIso)
+      : items;
+  const rows = scopedItems.map((item) => mapRow(item, currency));
+
   const filterLine = buildScheduleExportFilterLine({
     budgetName: workspace.budgetName,
     status: filters.status,
     delayedOnly: filters.delayedOnly,
     itemType: filters.itemType,
+    view,
+    fromIso: hasCustomRange ? range?.startIso : undefined,
+    toIso: hasCustomRange ? range?.endIso : undefined,
   });
   const org = await resolveOrgMeta(projectId, ctx);
   const generatedAtIso = new Date().toISOString();
   const todayIso = toIsoDateInTimeZone();
-  const range = computeExportDateRange(rows);
   const scale = range ? chooseGanttScale(range.startIso, range.endIso) : "monthly";
-  const gantt: ScheduleExportGantt | null = range
-    ? {
-        rangeStartIso: range.startIso,
-        rangeEndIso: range.endIso,
-        todayIso,
-        todayLeft: todayMarkerFraction(range.startIso, range.endIso, todayIso),
-        axisTicks: buildGanttAxisTicks(range.startIso, range.endIso),
-        scale,
-        periods: buildGanttPeriods(range.startIso, range.endIso, scale),
-      }
-    : null;
+  const gantt: ScheduleExportGantt | null =
+    range && view !== "table"
+      ? {
+          rangeStartIso: range.startIso,
+          rangeEndIso: range.endIso,
+          todayIso,
+          todayLeft: todayMarkerFraction(range.startIso, range.endIso, todayIso),
+          axisTicks: buildGanttAxisTicks(range.startIso, range.endIso),
+          scale,
+          periods: buildGanttPeriods(range.startIso, range.endIso, scale),
+        }
+      : null;
 
   const delayedCount = rows.filter((r) => r.alerts.startsWith("Atrasado")).length;
   const summaryBits = [
     `${rows.length} ítem${rows.length === 1 ? "" : "s"}`,
-    workspace.summary.scheduleProgressPct
+    !hasCustomRange && workspace.summary.scheduleProgressPct
       ? `Avance ponderado ${formatScheduleExportPct(workspace.summary.scheduleProgressPct)}`
       : null,
     delayedCount > 0 ? `${delayedCount} atrasado${delayedCount === 1 ? "" : "s"}` : null,
@@ -218,7 +241,7 @@ export async function buildScheduleExportPayload(
     budgetName: workspace.budgetName,
     budgetCurrency: currency,
     filterLine,
-    view: "both",
+    view,
     orgLine: org.orgLine,
     projectLabel: org.projectLabel,
     generatedAtIso,
@@ -236,8 +259,9 @@ export async function exportScheduleXlsx(
   const payload = await buildScheduleExportPayload(projectId, filters, ctx);
   const buffer = buildStyledScheduleXlsx(payload);
   const slug = payload.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 60);
+  const viewSuffix = payload.view === "both" ? "" : `_${payload.view}`;
   return {
     buffer,
-    filename: safeReportFilename(`cronograma_${slug}`, "xlsx"),
+    filename: safeReportFilename(`cronograma_${slug}${viewSuffix}`, "xlsx"),
   };
 }

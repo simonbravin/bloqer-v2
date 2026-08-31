@@ -857,7 +857,8 @@ export async function exportSchedulePdf(
 ): Promise<ReportPdfPayload> {
   const payload = await buildScheduleExportPayload(projectId, filters, ctx);
   const slug = payload.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(0, 60);
-  return exportPdfDocument(ctx, { projectId }, `cronograma_${slug}`, (branding) => (
+  const viewSuffix = payload.view === "both" ? "" : `_${payload.view}`;
+  return exportPdfDocument(ctx, { projectId }, `cronograma_${slug}${viewSuffix}`, (branding) => (
     <SchedulePdfDocument payload={payload} branding={branding} />
   ));
 }

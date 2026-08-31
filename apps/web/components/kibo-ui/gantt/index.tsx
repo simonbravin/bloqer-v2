@@ -476,6 +476,12 @@ export type GanttSidebarItemProps = {
   className?: string;
   /** When set, replaces computed English formatDistance label. */
   durationLabel?: string;
+  /** Hide the trailing duration (when the host renders its own aligned column). */
+  showDuration?: boolean;
+  /** Inline after the truncated name (badges). */
+  nameEnd?: ReactNode;
+  /** Tooltip; defaults to the feature name. */
+  title?: string;
 };
 
 export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
@@ -483,17 +489,22 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
   onSelectItem,
   className,
   durationLabel,
+  showDuration = true,
+  nameEnd,
+  title,
 }) => {
   const gantt = useContext(GanttContext);
-  const tempEndAt =
-    feature.endAt && isSameDay(feature.startAt, feature.endAt)
-      ? addDays(feature.endAt, 1)
-      : feature.endAt;
-  const duration =
-    durationLabel ??
-    (tempEndAt
-      ? formatDurationDaysFromRange(feature.startAt, tempEndAt)
-      : "En curso");
+  const duration = showDuration
+    ? (durationLabel ??
+      (feature.endAt
+        ? formatDurationDaysFromRange(
+            feature.startAt,
+            isSameDay(feature.startAt, feature.endAt)
+              ? addDays(feature.endAt, 1)
+              : feature.endAt,
+          )
+        : "En curso"))
+    : null;
 
   const handleClick: MouseEventHandler<HTMLDivElement> = () => {
     gantt.scrollToFeature?.(feature);
@@ -501,7 +512,8 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
   };
 
   const handleKeyDown: KeyboardEventHandler<HTMLDivElement> = (event) => {
-    if (event.key === "Enter") {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
       gantt.scrollToFeature?.(feature);
       onSelectItem?.(feature.id);
     }
@@ -513,7 +525,6 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
         "relative flex min-w-0 items-center gap-1 px-1 py-0 text-xs hover:bg-secondary",
         className
       )}
-      key={feature.id}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       // biome-ignore lint/a11y/useSemanticElements: "This is a clickable item"
@@ -522,7 +533,7 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
         height: "var(--gantt-row-height)",
       }}
       tabIndex={0}
-      title={feature.name}
+      title={title ?? feature.name}
     >
       {/* <Checkbox onCheckedChange={handleCheck} className="shrink-0" /> */}
       <div
@@ -537,21 +548,26 @@ export const GanttSidebarItem: FC<GanttSidebarItemProps> = ({
       >
         {feature.name}
       </p>
-      <p className="pointer-events-none shrink-0 text-[10px] text-muted-foreground">
-        {duration}
-      </p>
+      {nameEnd ? (
+        <div className="flex shrink-0 items-center gap-0.5">{nameEnd}</div>
+      ) : null}
+      {showDuration ? (
+        <p className="pointer-events-none shrink-0 text-[10px] text-muted-foreground">
+          {duration}
+        </p>
+      ) : null}
     </div>
   );
 };
 
-export const GanttSidebarHeader: FC = () => (
+export const GanttSidebarHeader: FC<{ end?: ReactNode }> = ({ end }) => (
   <div
     className="sticky top-0 z-10 flex shrink-0 items-end justify-between gap-1 border-border/50 border-b bg-backdrop/90 px-1.5 py-2 font-medium text-muted-foreground text-xs backdrop-blur-sm"
     style={{ height: "var(--gantt-header-height)" }}
   >
     {/* <Checkbox className="shrink-0" /> */}
     <p className="min-w-0 flex-1 truncate text-left">Tarea</p>
-    <p className="shrink-0">Días</p>
+    {end ?? <p className="shrink-0">Días</p>}
   </div>
 );
 
@@ -580,11 +596,14 @@ export const GanttSidebarGroup: FC<GanttSidebarGroupProps> = ({
 export type GanttSidebarProps = {
   children: ReactNode;
   className?: string;
+  /** Replaces the default «Días» header cell (aligned meta columns). */
+  headerEnd?: ReactNode;
 };
 
 export const GanttSidebar: FC<GanttSidebarProps> = ({
   children,
   className,
+  headerEnd,
 }) => (
   <div
     className={cn(
@@ -593,7 +612,7 @@ export const GanttSidebar: FC<GanttSidebarProps> = ({
     )}
     data-roadmap-ui="gantt-sidebar"
   >
-    <GanttSidebarHeader />
+    <GanttSidebarHeader end={headerEnd} />
     <div className="space-y-0">{children}</div>
   </div>
 );

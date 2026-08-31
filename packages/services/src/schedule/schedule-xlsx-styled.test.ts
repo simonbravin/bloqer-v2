@@ -64,3 +64,17 @@ test("styled schedule xlsx is a zip with fills", () => {
   assert.match(asText, /<sheet name="Tabla"/);
   assert.match(asText, /<sheet name="Gantt"/);
 });
+
+test("table-only xlsx omits the Gantt sheet", () => {
+  const buf = buildStyledScheduleXlsx({ ...payload, view: "table" });
+  const asText = buf.toString("utf8");
+  assert.match(asText, /<sheet name="Tabla"/);
+  assert.doesNotMatch(asText, /<sheet name="Gantt"/);
+});
+
+test("gantt-only xlsx omits the Tabla sheet", () => {
+  const buf = buildStyledScheduleXlsx({ ...payload, view: "gantt" });
+  const asText = buf.toString("utf8");
+  assert.match(asText, /<sheet name="Gantt"/);
+  assert.doesNotMatch(asText, /<sheet name="Tabla"/);
+});

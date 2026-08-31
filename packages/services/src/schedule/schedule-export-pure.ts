@@ -58,6 +58,22 @@ export function parseScheduleExportView(raw: string | undefined | null): Schedul
   return "both";
 }
 
+/** YYYY-MM-DD only. Rejects datetimes and invalid calendar dates. */
+export function parseScheduleExportIsoDate(raw: string | undefined | null): string | undefined {
+  if (!raw) return undefined;
+  const t = raw.trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(t)) return undefined;
+  const d = utcDateFromIsoDateOnly(t);
+  if (!d) return undefined;
+  return isoDateOnlyFromUtc(d) === t ? t : undefined;
+}
+
+export function scheduleExportViewLabel(view: ScheduleExportView): string {
+  if (view === "gantt") return "Gantt";
+  if (view === "table") return "Tabla";
+  return "Tabla y Gantt";
+}
+
 export function scheduleExportTypeLabel(item: { type: string; isLeaf: boolean }): string {
   if (item.type === "MILESTONE") return "Hito";
   if (!item.isLeaf) return "Contenedor";
@@ -132,6 +148,76 @@ export function computeExportDateRange(
     startIso: isoDateOnlyFromUtc(addUtcDays(min, -padDays)),
     endIso: isoDateOnlyFromUtc(addUtcDays(max, padDays)),
   };
+}
+
+function laterIso(a: string, b: string): string {
+  return a >= b ? a : b;
+}
+
+function earlierIso(a: string, b: string): string {
+  return a <= b ? a : b;
+}
+
+/**
+ * User From/To clip the auto range (item min/max ± pad).
+ * If both bounds are set, they are the window (swapped if inverted). No extra pad.
+ */
+export function resolveExportGanttRange(
+  auto: { startIso: string; endIso: string } | null,
+  fromIso?: string | null,
+  toIso?: string | null,
+): { startIso: string; endIso: string } | null {
+  const from = fromIso ? parseScheduleExportIsoDate(fromIso) : undefined;
+  const to = toIso ? parseScheduleExportIsoDate(toIso) : undefined;
+  if (from && to) {
+    return from <= to ? { startIso: from, endIso: to } : { startIso: to, endIso: from };
+  }
+  if (from && to == null) {
+    if (!auto) return { startIso: from, endIso: from };
+    return { startIso: from, endIso: laterIso(from, auto.endIso) };
+  }
+  if (to && from == null) {
+    if (!auto) return { startIso: to, endIso: to };
+    return { startIso: earlierIso(to, auto.startIso), endIso: to };
+  }
+  return auto;
+}
+
+export function scheduleItemOverlapsRange(
+  startIso: string | null,
+  endIso: string | null,
+  rangeStartIso: string,
+  rangeEndIso: string,
+): boolean {
+  return periodOverlapsItem(
+    { startIso: rangeStartIso, endIso: rangeEndIso },
+    startIso,
+    endIso,
+  );
+}
+
+/**
+ * Keep items that overlap [rangeStart, rangeEnd] plus their ancestors so the
+ * exported tree still has container context (parents without dates stay in).
+ */
+export function keepScheduleItemsOverlappingRange<
+  T extends { id: string; parentId: string | null; startDate: string | null; endDate: string | null },
+>(items: T[], rangeStartIso: string, rangeEndIso: string): T[] {
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const keep = new Set<string>();
+  for (const item of items) {
+    if (!scheduleItemOverlapsRange(item.startDate, item.endDate, rangeStartIso, rangeEndIso)) {
+      continue;
+    }
+    let current: string | null = item.id;
+    const seen = new Set<string>();
+    while (current && !seen.has(current)) {
+      seen.add(current);
+      keep.add(current);
+      current = byId.get(current)?.parentId ?? null;
+    }
+  }
+  return items.filter((item) => keep.has(item.id));
 }
 
 /**
@@ -347,6 +433,9 @@ export function buildScheduleExportFilterLine(input: {
   status?: string;
   delayedOnly?: boolean;
   itemType?: string;
+  view?: ScheduleExportView;
+  fromIso?: string;
+  toIso?: string;
 }): string {
   const parts: string[] = [];
   if (input.budgetName) parts.push(`Presupuesto: ${input.budgetName}`);
@@ -358,6 +447,14 @@ export function buildScheduleExportFilterLine(input: {
     parts.push("Estado: Activos (sin canceladas)");
   }
   if (input.delayedOnly) parts.push("Solo atrasados");
+  if (input.view && input.view !== "both") {
+    parts.push(`Contenido: ${scheduleExportViewLabel(input.view)}`);
+  }
+  if (input.fromIso || input.toIso) {
+    parts.push(
+      `Lapso: ${formatScheduleExportDate(input.fromIso)} → ${formatScheduleExportDate(input.toIso)}`,
+    );
+  }
   return parts.join(" · ");
 }
 
