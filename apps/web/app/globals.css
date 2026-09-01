@@ -159,9 +159,7 @@
   /**
    * Click-to-enlarge image (help maps, future posters).
    * Pair with `<ImageLightbox>` — do not copy these classes into a one-off overlay.
-   *
-   * Do not flex-center the scrollport: overflow + align-items:center clips the start
-   * of tall/wide posters. Center with margin on the stage instead.
+   * The open image fits the viewport (object-contain); no 1:1 pixel zoom.
    */
   .image-lightbox-trigger {
     @apply relative block w-full cursor-zoom-in border-0 bg-transparent p-0 text-left;
@@ -184,7 +182,7 @@
   }
 
   .image-lightbox-panel {
-    @apply fixed inset-0 z-50 overflow-auto outline-none;
+    @apply fixed inset-0 z-50 flex flex-col items-center justify-center outline-none;
     overscroll-behavior: contain;
     padding: 3.5rem 1rem 1.5rem;
     padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3rem));
@@ -201,17 +199,25 @@
   }
 
   .image-lightbox-stage {
-    width: max-content;
-    max-width: none;
-    margin-inline: auto;
+    display: flex;
+    max-width: 100%;
+    max-height: 100%;
+    min-height: 0;
+    flex-direction: column;
+    align-items: center;
   }
 
   .image-lightbox-img {
-    @apply block h-auto w-auto rounded-md bg-background shadow-lg;
-    max-width: min(1600px, max-content);
+    @apply block rounded-md bg-background shadow-lg;
+    width: auto;
+    height: auto;
+    max-width: min(96vw, 100%);
+    max-height: calc(100dvh - 7.5rem);
+    object-fit: contain;
   }
 
   .image-lightbox-caption {
-    @apply mt-2 max-w-[1600px] text-center text-xs text-white/80;
+    @apply mt-2 text-center text-xs text-white/80;
+    max-width: min(96vw, 48rem);
   }
 }
