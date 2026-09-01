@@ -191,11 +191,10 @@
     padding-right: max(1rem, env(safe-area-inset-right, 0px));
     padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
     padding-left: max(1rem, env(safe-area-inset-left, 0px));
-    @apply data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0;
   }
 
   .image-lightbox-close {
-    @apply fixed z-[60] inline-flex h-10 w-10 items-center justify-center rounded-full bg-background text-foreground shadow-md ring-1 ring-border;
+    @apply fixed inline-flex h-10 w-10 items-center justify-center rounded-full bg-background text-foreground shadow-md ring-1 ring-border;
     @apply transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
     top: max(0.75rem, env(safe-area-inset-top, 0px));
     right: max(0.75rem, env(safe-area-inset-right, 0px));
