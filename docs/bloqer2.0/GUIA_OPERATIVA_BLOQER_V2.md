@@ -878,7 +878,7 @@ flowchart TD
 **Ruta:** Compras → **Solicitudes de compra**
 
 1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales → **Pedir**.
-2. Líneas: cantidad, unidad, descripción y **partida EDT obligatoria**.
+2. En **Nueva solicitud**: primero **Dónde se usa** (partida EDT obligatoria, ordenada por código — 1.2 antes que 19.1). Después **Qué necesito**: podés agregar **varias líneas** de la misma partida con **+ Agregar insumo** o **Agregar faltantes (N)** (insumos APU con faltante según necesidad − ya pedido). Cada línea puede ligarse a un insumo APU distinto (no repetible en la misma SC); al elegirlo se precarga descripción, unidad y cantidad faltante. Luego **Cuándo**.
 3. **Fecha requerida obligatoria** ([BR-PUR-017] · [D-096]): cuándo se necesita el material en obra. El formulario no deja guardar la SC sin ese dato. Sirve para priorizar cotizaciones y entregas, y aparece como **Necesaria para** en el listado y **Pendientes**.
 4. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
 5. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA) + **plazo de entrega en días** + validez. En el listado de cotizaciones se ve el total y, debajo del proveedor, cada línea con precio de lista y **Desc. %**. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).

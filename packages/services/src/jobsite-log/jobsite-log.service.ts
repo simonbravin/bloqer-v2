@@ -28,8 +28,8 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
-import { isRichNoteEmpty, normalizeRichNote, sortTreeOrder, toIsoDateInTimeZone } from "@bloqer/utils";
-import { compareWbsCodes } from "../budget/wbs-code-rules";
+import { isRichNoteEmpty, normalizeRichNote, toIsoDateInTimeZone } from "@bloqer/utils";
+import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
   canMutateJobsiteLogAsContributor,
@@ -1296,10 +1296,8 @@ export async function listProjectWbsItemsForLog(projectId: string, ctx: ServiceC
       id: true,
       code: true,
       name: true,
-      parentId: true,
-      sortOrder: true,
       costItem: { select: { unit: true, quantity: true } },
     },
   });
-  return sortTreeOrder(nodes, (a, b) => compareWbsCodes(a.code, b.code));
+  return sortByWbsCode(nodes);
 }

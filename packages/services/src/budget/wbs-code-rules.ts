@@ -206,6 +206,18 @@ export function compareWbsCodes(a: string, b: string): number {
   return 0;
 }
 
+/**
+ * Sort WBS ITEM leaves by canonical code (1.2 before 19.1).
+ * Do not use `sortTreeOrder` on ITEM-only lists: missing GROUP parents make
+ * `sortOrder` group every first child before every second child.
+ */
+export function sortByWbsCode<T extends { code: string }>(
+  items: T[],
+  tieBreak: (a: T, b: T) => number = () => 0,
+): T[] {
+  return [...items].sort((a, b) => compareWbsCodes(a.code, b.code) || tieBreak(a, b));
+}
+
 export function detectProfileFromImportRows(
   rows: ReadonlyArray<{ code: string }>,
 ): WbsImportProfile {

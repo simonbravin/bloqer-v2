@@ -15,6 +15,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { consumptionReplayMatches, requireIdempotencyKey, withIdempotentCreate } from "../idempotency/idempotency";
 import { consumptionWarehouseScopeConflict } from "./consumption-warehouse-scope";
+import { sortByWbsCode } from "../budget/wbs-code-rules";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export async function listInventoryConsumptionWbsOptions(
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   }
 
-  return prisma.wbsNode.findMany({
+  const nodes = await prisma.wbsNode.findMany({
     where: {
       type: "ITEM",
       budget: {
@@ -135,8 +136,8 @@ export async function listInventoryConsumptionWbsOptions(
       },
     },
     select: { id: true, code: true, name: true },
-    orderBy: [{ code: "asc" }, { sortOrder: "asc" }],
   });
+  return sortByWbsCode(nodes);
 }
 
 // ─── Consumption (OUT) ────────────────────────────────────────────────────────

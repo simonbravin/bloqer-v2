@@ -4,6 +4,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
@@ -369,16 +370,17 @@ export async function getCertificationEvolutionReport(
     };
   });
 
-  const wbsLeaves = await prisma.wbsNode.findMany({
-    where: { budgetId: budget.id, type: "ITEM" },
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      costItem: { select: { totalSalePrice: true } },
-    },
-    orderBy: { code: "asc" },
-  });
+  const wbsLeaves = sortByWbsCode(
+    await prisma.wbsNode.findMany({
+      where: { budgetId: budget.id, type: "ITEM" },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        costItem: { select: { totalSalePrice: true } },
+      },
+    }),
+  );
 
   const certifiedByWbs = new Map<string, Prisma.Decimal>();
   for (const cert of certifications) {

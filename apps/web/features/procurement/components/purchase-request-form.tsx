@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,17 +13,21 @@ import { SEARCHABLE_NONE, toSearchableOptions, withNoneOption, wbsToSearchableOp
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatDecimalArFromString, formatQtyDisplay, isPositiveQty } from "@/lib/format-money";
+import { formatDecimalArFromString, formatQtyDisplay } from "@/lib/format-money";
 import type { WbsApuOption, WbsOption } from "./purchase-order-lines-editor";
 import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
-
-function apuCommitmentHint(apu: WbsApuOption): string {
-  const u = budgetUnitLabel(apu.unit);
-  if (apu.needQty != null || apu.orderedQty != null) {
-    return `Necesidad ${formatQtyDisplay(apu.needQty)} · Pedido ${formatQtyDisplay(apu.orderedQty)} · Faltante ${formatQtyDisplay(apu.shortfallQty ?? apu.quantity)} ${u}`;
-  }
-  return `Ref. APU: ${formatQtyDisplay(apu.quantity)} ${u}`;
-}
+import {
+  apuCommitmentHintText,
+  applyApuToPurchaseRequestLine,
+  availableApuLinesForRow,
+  computeApuCoverage,
+  createEmptyPurchaseRequestLine,
+  createPurchaseRequestLineFromInitial,
+  formatApuCoverageHint,
+  mergeApuShortfallLines,
+  preparePurchaseRequestLinesForSubmit,
+  type PurchaseRequestLineDraft,
+} from "../lib/purchase-request-form-lines";
 
 interface PurchaseRequestFormProps {
   projectId: string;
@@ -43,6 +48,23 @@ interface PurchaseRequestFormProps {
   onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
 }
 
+function apuComboboxOptions(apuLines: WbsApuOption[]) {
+  return withNoneOption(
+    toSearchableOptions(
+      apuLines.map((a) => ({
+        id: a.id,
+        label:
+          a.shortfallQty != null || a.quantity != null
+            ? `${a.description} (faltante ${formatQtyDisplay(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
+            : `${a.description} (${budgetUnitLabel(a.unit)})`,
+      })),
+    ),
+    { label: "Sin insumo APU" },
+  );
+}
+
+const EMPTY_APU_LINES: WbsApuOption[] = [];
+
 export function PurchaseRequestForm({
   projectId,
   wbsOptions,
@@ -58,73 +80,72 @@ export function PurchaseRequestForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [wbsNodeId, setWbsNodeId] = useState<string>(initialLine?.wbsNodeId ?? "");
-  const [costAnalysisLineId, setCostAnalysisLineId] = useState<string | null>(
-    initialLine?.costAnalysisLineId ?? null,
-  );
-  const [description, setDescription] = useState(initialLine?.description ?? "");
-  const [quantity, setQuantity] = useState(initialLine?.quantity ?? "1");
-  const [unit, setUnit] = useState(initialLine?.unit ?? "");
-  const [productId, setProductId] = useState<string | null>(initialLine?.productId ?? null);
-  const [apuHint, setApuHint] = useState<string | null>(null);
+  const [lines, setLines] = useState<PurchaseRequestLineDraft[]>(() => {
+    const base =
+      initialLine?.description || initialLine?.costAnalysisLineId
+        ? createPurchaseRequestLineFromInitial(initialLine)
+        : createEmptyPurchaseRequestLine(initialLine?.unit ?? "");
+    if (initialLine?.costAnalysisLineId && initialLine.wbsNodeId) {
+      const wbs = wbsOptions.find((w) => w.id === initialLine.wbsNodeId);
+      const apu = wbs?.apuLines?.find((a) => a.id === initialLine.costAnalysisLineId);
+      if (apu) {
+        return [
+          applyApuToPurchaseRequestLine(base, apu, {
+            keepQuantity: Boolean(initialLine.quantity),
+          }),
+        ];
+      }
+    }
+    return [base];
+  });
 
   const wbsComboboxOptions = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
-  const selectedWbs = wbsOptions.find((w) => w.id === wbsNodeId);
-  const apuOptions = useMemo(
-    () =>
-      withNoneOption(
-        toSearchableOptions(
-          (selectedWbs?.apuLines ?? []).map((a) => ({
-            id: a.id,
-            label:
-              a.shortfallQty != null || a.quantity != null
-                ? `${a.description} (faltante ${formatQtyDisplay(a.shortfallQty ?? a.quantity)} ${budgetUnitLabel(a.unit)})`
-                : `${a.description} (${budgetUnitLabel(a.unit)})`,
-          })),
-        ),
-        { label: "Sin insumo APU" },
-      ),
-    [selectedWbs],
+  const selectedWbs = useMemo(
+    () => wbsOptions.find((w) => w.id === wbsNodeId),
+    [wbsOptions, wbsNodeId],
   );
-
-  function applyApu(apuId: string | null, opts?: { keepQuantity?: boolean }) {
-    if (!apuId) {
-      setCostAnalysisLineId(null);
-      setApuHint(null);
-      return;
-    }
-    const apu = selectedWbs?.apuLines?.find((a) => a.id === apuId);
-    if (!apu) {
-      setCostAnalysisLineId(apuId);
-      setApuHint(null);
-      return;
-    }
-    setCostAnalysisLineId(apu.id);
-    setDescription(apu.description);
-    setUnit(apu.unit);
-    setProductId(apu.productId);
-    if (!opts?.keepQuantity && isPositiveQty(apu.quantity)) {
-      setQuantity(apu.quantity ?? "");
-    }
-    setApuHint(apuCommitmentHint(apu));
-  }
+  const apuCatalog = selectedWbs?.apuLines ?? EMPTY_APU_LINES;
+  const apuCoverage = useMemo(
+    () => computeApuCoverage(apuCatalog, lines),
+    [apuCatalog, lines],
+  );
+  const coverageHint = formatApuCoverageHint(apuCoverage);
 
   function onWbsChange(nextWbsId: string) {
     setWbsNodeId(nextWbsId);
-    setCostAnalysisLineId(null);
-    setApuHint(null);
     const wbs = wbsOptions.find((w) => w.id === nextWbsId);
-    if (wbs?.budgetUnit && !unit) setUnit(wbs.budgetUnit);
+    setLines([createEmptyPurchaseRequestLine(wbs?.budgetUnit ?? "")]);
   }
 
-  useEffect(() => {
-    if (!initialLine?.costAnalysisLineId || !wbsNodeId) return;
-    const wbs = wbsOptions.find((w) => w.id === wbsNodeId);
-    const apu = wbs?.apuLines?.find((a) => a.id === initialLine.costAnalysisLineId);
-    if (!apu) return;
-    if (!unit) setUnit(apu.unit || initialLine.unit || "");
-    setApuHint(apuCommitmentHint(apu));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only on mount / initial APU
-  }, [initialLine?.costAnalysisLineId, wbsNodeId, wbsOptions]);
+  function updateLine(rowKey: string, patch: Partial<PurchaseRequestLineDraft>) {
+    setLines((prev) => prev.map((l) => (l.rowKey === rowKey ? { ...l, ...patch } : l)));
+  }
+
+  function applyApuOnLine(rowKey: string, apuId: string | null) {
+    const apu = apuId ? apuCatalog.find((a) => a.id === apuId) : null;
+    setLines((prev) =>
+      prev.map((l) =>
+        l.rowKey === rowKey ? applyApuToPurchaseRequestLine(l, apu ?? undefined) : l,
+      ),
+    );
+  }
+
+  function addEmptyLine() {
+    setLines((prev) => [...prev, createEmptyPurchaseRequestLine(selectedWbs?.budgetUnit ?? "")]);
+  }
+
+  function addShortfallLines() {
+    setLines((prev) =>
+      mergeApuShortfallLines(apuCatalog, prev, selectedWbs?.budgetUnit ?? ""),
+    );
+  }
+
+  function removeLine(rowKey: string) {
+    setLines((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((l) => l.rowKey !== rowKey);
+    });
+  }
 
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
@@ -137,31 +158,25 @@ export function PurchaseRequestForm({
               setError("Seleccioná un ítem EDT");
               return;
             }
-            if (!isPositiveQty(quantity)) {
-              setError("La cantidad debe ser mayor a cero");
-              return;
-            }
             const neededByDate = fd.get("neededByDate")?.toString() ?? "";
             if (!/^\d{4}-\d{2}-\d{2}$/.test(neededByDate)) {
               setError("La fecha requerida es obligatoria");
+              return;
+            }
+            const prepared = preparePurchaseRequestLinesForSubmit(
+              lines,
+              wbsNodeId,
+              selectedWbs?.budgetUnit ?? "un",
+            );
+            if (!prepared.ok) {
+              setError(prepared.error);
               return;
             }
             const result = await createPurchaseRequestAction(projectId, {
               projectId,
               neededByDate,
               notes: fd.get("notes")?.toString() || null,
-              lines: [
-                {
-                  wbsNodeId,
-                  lineType: "MATERIAL",
-                  productId,
-                  costAnalysisLineId,
-                  description: description.trim() || (fd.get("description")?.toString() ?? ""),
-                  unit: unit || selectedWbs?.budgetUnit || "un",
-                  quantity,
-                  sortOrder: 0,
-                },
-              ],
+              lines: prepared.lines,
             });
             if ("error" in result) {
               setError(result.error);
@@ -192,7 +207,7 @@ export function PurchaseRequestForm({
       >
         {prefilledFromMaterials ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
-            Prefill desde Materiales (faltante). Revisá cantidad y partida antes de crear.
+            Prefill desde Materiales (faltante). Revisá cantidad y partida antes de crear. Podés agregar más insumos de la misma partida.
           </p>
         ) : null}
 
@@ -201,43 +216,6 @@ export function PurchaseRequestForm({
             {error}
           </p>
         ) : null}
-
-        <section className="space-y-4">
-          <h2 className="text-sm font-semibold">Qué necesito</h2>
-          <div className="space-y-2">
-            <Label htmlFor="description">Descripción / material</Label>
-            <Input
-              id="description"
-              name="description"
-              required
-              className="min-h-11 md:min-h-9"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Cantidad</Label>
-              <DecimalInput
-                id="quantity"
-                name="quantity"
-                className="min-h-11 md:min-h-9"
-                value={quantity}
-                onValueChange={setQuantity}
-                placeholder="1,00"
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="unit">Unidad</Label>
-              <UnitSelect
-                value={unit || selectedWbs?.budgetUnit || "un"}
-                onChange={setUnit}
-              />
-            </div>
-          </div>
-          {apuHint ? <p className="text-xs text-muted-foreground">{apuHint}</p> : null}
-        </section>
 
         <section className="space-y-4">
           <h2 className="text-sm font-semibold">Dónde se usa</h2>
@@ -272,22 +250,137 @@ export function PurchaseRequestForm({
               </p>
             ) : null}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="pr-apu">Insumo APU (opcional)</Label>
-            <SearchableCombobox
-              id="pr-apu"
-              popoverWidth="wide"
-              options={apuOptions}
-              value={costAnalysisLineId ?? SEARCHABLE_NONE}
-              onValueChange={(v) => applyApu(v === SEARCHABLE_NONE ? null : v)}
-              placeholder="Elegir material del APU…"
-              searchPlaceholder="Buscar insumo…"
-              disabled={!wbsNodeId || (selectedWbs?.apuLines?.length ?? 0) === 0}
-            />
-            <p className="text-xs text-muted-foreground">
-              Al elegir un insumo se precarga el faltante (necesidad − ya pedido). Editable.
-            </p>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <h2 className="text-sm font-semibold">Qué necesito</h2>
+            <div className="flex flex-wrap gap-2">
+              {apuCoverage.remainingWithShortfallCount > 0 ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-9"
+                  disabled={!wbsNodeId}
+                  onClick={addShortfallLines}
+                >
+                  Agregar faltantes ({apuCoverage.remainingWithShortfallCount})
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-9"
+                disabled={!wbsNodeId}
+                onClick={addEmptyLine}
+              >
+                + Agregar insumo
+              </Button>
+            </div>
           </div>
+
+          {wbsNodeId && coverageHint ? (
+            <p className="text-xs text-muted-foreground">{coverageHint}</p>
+          ) : null}
+
+          {!wbsNodeId ? (
+            <p className="text-sm text-muted-foreground">Elegí primero un ítem EDT.</p>
+          ) : (
+            <div className="space-y-4">
+              {lines.map((line, index) => {
+                const rowApuOptions = availableApuLinesForRow(apuCatalog, lines, line.rowKey);
+                const boundApu = line.costAnalysisLineId
+                  ? apuCatalog.find((a) => a.id === line.costAnalysisLineId)
+                  : null;
+                const hint = boundApu
+                  ? apuCommitmentHintText(
+                      boundApu,
+                      formatQtyDisplay,
+                      budgetUnitLabel,
+                    )
+                  : null;
+
+                return (
+                  <div
+                    key={line.rowKey}
+                    className="space-y-3 rounded-lg border bg-muted/20 p-3 sm:p-4"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Línea {index + 1}
+                      </span>
+                      {lines.length > 1 ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="min-h-9 text-destructive hover:text-destructive"
+                          onClick={() => removeLine(line.rowKey)}
+                          aria-label={`Quitar línea ${index + 1}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`pr-apu-${line.rowKey}`}>Insumo APU (opcional)</Label>
+                      <SearchableCombobox
+                        id={`pr-apu-${line.rowKey}`}
+                        popoverWidth="wide"
+                        options={apuComboboxOptions(rowApuOptions)}
+                        value={line.costAnalysisLineId ?? SEARCHABLE_NONE}
+                        onValueChange={(v) =>
+                          applyApuOnLine(line.rowKey, v === SEARCHABLE_NONE ? null : v)
+                        }
+                        placeholder="Elegir material del APU…"
+                        searchPlaceholder="Buscar insumo…"
+                        disabled={apuCatalog.length === 0}
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`description-${line.rowKey}`}>Descripción / material</Label>
+                      <Input
+                        id={`description-${line.rowKey}`}
+                        className="min-h-11 md:min-h-9"
+                        value={line.description}
+                        onChange={(e) => updateLine(line.rowKey, { description: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor={`quantity-${line.rowKey}`}>Cantidad</Label>
+                        <DecimalInput
+                          id={`quantity-${line.rowKey}`}
+                          className="min-h-11 md:min-h-9"
+                          value={line.quantity}
+                          onValueChange={(v) => updateLine(line.rowKey, { quantity: v })}
+                          placeholder="1,00"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`unit-${line.rowKey}`}>Unidad</Label>
+                        <UnitSelect
+                          value={line.unit || selectedWbs?.budgetUnit || "un"}
+                          onChange={(v) => updateLine(line.rowKey, { unit: v })}
+                        />
+                      </div>
+                    </div>
+
+                    {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            Al elegir un insumo se precarga descripción, unidad y faltante (necesidad − ya pedido). Podés agregar varios insumos de la misma partida en una sola solicitud.
+          </p>
         </section>
 
         <section className="space-y-4">
@@ -333,7 +426,7 @@ export function PurchaseRequestForm({
             type="submit"
             className="min-h-11 md:min-h-9"
             data-testid="purchase-request-create-submit"
-            disabled={pending || wbsOptions.length === 0}
+            disabled={pending || wbsOptions.length === 0 || !wbsNodeId}
           >
             {pending ? "Guardando…" : "Crear solicitud"}
           </Button>

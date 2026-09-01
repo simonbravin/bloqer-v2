@@ -2,7 +2,7 @@ import { Prisma, prisma, Subcontract } from "@bloqer/database";
 import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-access";
 import type { CreateSubcontractInput, UpdateSubcontractInput, UpdateSubcontractMetaInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
-import { compareWbsCodes } from "../budget/wbs-code-rules";
+import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -147,14 +147,15 @@ export async function getSubcontractFormWbsPickList(
     );
   }
 
-  const wbsNodes = await prisma.wbsNode.findMany({
-    where: {
-      type: "ITEM",
-      budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
-    },
-    select: { id: true, code: true, name: true, costItem: { select: { unit: true } } },
-  });
-  wbsNodes.sort((a, b) => compareWbsCodes(a.code, b.code));
+  const wbsNodes = sortByWbsCode(
+    await prisma.wbsNode.findMany({
+      where: {
+        type: "ITEM",
+        budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
+      },
+      select: { id: true, code: true, name: true, costItem: { select: { unit: true } } },
+    }),
+  );
 
   return {
     companyId,

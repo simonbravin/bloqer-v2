@@ -1,4 +1,11 @@
-/** Depth-first tree order by parentId + sortOrder (orphans appended at end). */
+/**
+ * Depth-first tree order by parentId + sortOrder (orphans appended at end).
+ *
+ * Parents must be in `nodes`. If you pass only WBS ITEM leaves, every parent
+ * GROUP is missing, so all items become roots and `sortOrder` groups every
+ * first child (1.1, 19.1, 20.1…) before every second child (1.2, 4.2…).
+ * For ITEM-only pickers use `sortByWbsCode` / `compareWbsCodes` in services.
+ */
 export function sortTreeOrder<T extends { id: string; parentId?: string | null; sortOrder: number }>(
   nodes: T[],
   tieBreak: (a: T, b: T) => number = () => 0,

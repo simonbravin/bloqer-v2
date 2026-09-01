@@ -4,6 +4,7 @@ import { isDisciplineRootCode, isMultiStyleCode } from "./wbs-code-rules";
 export {
   countCodeSegments,
   compareWbsCodes,
+  sortByWbsCode,
   isMultiStyleCode,
   isDisciplineRootCode,
   WBS_MAX_CODE_SEGMENTS_SIMPLE,

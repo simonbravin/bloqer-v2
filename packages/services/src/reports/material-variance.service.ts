@@ -6,6 +6,7 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveApprovedBudgetForProject } from "./report-budget-resolve";
+import { sortByWbsCode } from "../budget/wbs-code-rules";
 
 export type MaterialReportFilters = {
   budgetId?: string;
@@ -74,11 +75,12 @@ export async function getMaterialVarianceReport(
     throw new ServiceError("FORBIDDEN", "Presupuestos deshabilitado");
   }
 
-  const wbsLeaves = await prisma.wbsNode.findMany({
-    where: { budgetId: budget.id, type: "ITEM" },
-    select: { id: true, code: true, name: true },
-    orderBy: { code: "asc" },
-  });
+  const wbsLeaves = sortByWbsCode(
+    await prisma.wbsNode.findMany({
+      where: { budgetId: budget.id, type: "ITEM" },
+      select: { id: true, code: true, name: true },
+    }),
+  );
 
   const costItems = await prisma.costItem.findMany({
     where: { budgetId: budget.id, wbsNode: { type: "ITEM" } },

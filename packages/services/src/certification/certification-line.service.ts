@@ -7,6 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { assertCertificationEditable } from "./certification.service";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
+import { sortByWbsCode } from "../budget/wbs-code-rules";
 
 export type CertificationWbsHint = {
   id: string;
@@ -37,16 +38,17 @@ export async function listCertificationWbsHints(
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const nodes = await prisma.wbsNode.findMany({
-    where: { budgetId: cert.budgetId, type: "ITEM", costItem: { isNot: null } },
-    select: {
-      id: true,
-      code: true,
-      name: true,
-      costItem: { select: { unit: true, quantity: true, unitSalePrice: true } },
-    },
-    orderBy: { code: "asc" },
-  });
+  const nodes = sortByWbsCode(
+    await prisma.wbsNode.findMany({
+      where: { budgetId: cert.budgetId, type: "ITEM", costItem: { isNot: null } },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        costItem: { select: { unit: true, quantity: true, unitSalePrice: true } },
+      },
+    }),
+  );
 
   const nodeIds = nodes.map((n) => n.id);
   const previousRows =

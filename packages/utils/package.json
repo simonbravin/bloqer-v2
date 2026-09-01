@@ -9,7 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/money.test.ts src/line-amounts.test.ts src/timezones.test.ts src/calendar-date.test.ts src/rich-note.test.ts"
+    "test": "node --import tsx --test src/money.test.ts src/line-amounts.test.ts src/timezones.test.ts src/calendar-date.test.ts src/rich-note.test.ts src/sort-tree-order.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

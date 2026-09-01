@@ -7,6 +7,7 @@ import {
   isStructuralLeafByCode,
   parseCellA,
   reconcileImportRowTypes,
+  sortByWbsCode,
   validateManualNodeCode,
 } from "./wbs-code-rules";
 
@@ -107,5 +108,33 @@ describe("compareWbsCodes", () => {
     const codes = ["EST.2.1", "ARQ.1.8", "ARQ.2.1"];
     codes.sort(compareWbsCodes);
     assert.deepEqual(codes, ["ARQ.1.8", "ARQ.2.1", "EST.2.1"]);
+  });
+
+  it("no agrupa por sufijo (.1 luego .2) como un sortOrder de hermanos sueltos", () => {
+    const codes = ["19.1", "20.1", "21.1", "24.1", "1.2", "4.2", "7.2", "11.2", "16.2"];
+    codes.sort(compareWbsCodes);
+    assert.deepEqual(codes, ["1.2", "4.2", "7.2", "11.2", "16.2", "19.1", "20.1", "21.1", "24.1"]);
+  });
+
+  it("sortByWbsCode no muta el array original", () => {
+    const items = [{ code: "19.1" }, { code: "1.2" }];
+    const sorted = sortByWbsCode(items);
+    assert.equal(items[0]?.code, "19.1");
+    assert.deepEqual(
+      sorted.map((i) => i.code),
+      ["1.2", "19.1"],
+    );
+  });
+
+  it("sortByWbsCode usa tieBreak cuando el código coincide", () => {
+    const items = [
+      { code: "1.2", budget: "B" },
+      { code: "1.2", budget: "A" },
+    ];
+    const sorted = sortByWbsCode(items, (a, b) => a.budget.localeCompare(b.budget, "es"));
+    assert.deepEqual(
+      sorted.map((i) => i.budget),
+      ["A", "B"],
+    );
   });
 });

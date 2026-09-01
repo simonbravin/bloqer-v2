@@ -1,7 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { ScheduleItemStatus, ScheduleItemType } from "@bloqer/database";
-import { sortTreeOrder } from "@bloqer/utils";
-import { compareWbsCodes } from "../budget/wbs-code-rules";
+import { compareWbsCodes, sortByWbsCode } from "../budget/wbs-code-rules";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -1287,9 +1286,9 @@ export async function listScheduleLinkableWbsOptions(
       type: "ITEM",
       budgetId: schedule.baselineBudgetId,
     },
-    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
+    select: { id: true, code: true, name: true },
   });
-  const ordered = sortTreeOrder(nodes, (a, b) => compareWbsCodes(a.code, b.code));
+  const ordered = sortByWbsCode(nodes);
   return ordered.map((n) => ({ id: n.id, code: n.code, name: n.name }));
 }
 
