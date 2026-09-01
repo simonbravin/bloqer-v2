@@ -7,10 +7,19 @@ export type PurchaseRequestLineForList = {
   wbsNodeId: string | null;
   wbsNodeCode: string | null;
   wbsNodeName: string | null;
+  costAnalysisLineId: string | null;
   description: string;
   quantity: string;
   budgetUnitCostSnapshot: string | null;
+  /** Live APU unit cost when snapshot not yet captured (DRAFT). */
+  apuUnitCost: string | null;
 };
+
+function resolveApuLineUnitCost(line: PurchaseRequestLineForList): string | null {
+  if (line.budgetUnitCostSnapshot != null) return line.budgetUnitCostSnapshot;
+  if (line.costAnalysisLineId && line.apuUnitCost != null) return line.apuUnitCost;
+  return null;
+}
 
 export function computeLineSummaries(lines: PurchaseRequestLineForList[]): {
   primaryWbsNodeCode: string | null;
@@ -56,14 +65,21 @@ export function computeEstimatedAmount(
     return { estimatedAmount: null, estimatedAmountCurrency: null, estimatedAmountSource: null };
   }
 
-  const allHaveSnapshot = lines.every((l) => l.budgetUnitCostSnapshot != null);
-  if (!allHaveSnapshot) {
+  // Only APU-bound lines count — not the aggregated WBS item cost ([D-068]).
+  const apuLines = lines.filter((l) => l.costAnalysisLineId);
+  if (apuLines.length === 0) {
+    return { estimatedAmount: null, estimatedAmountCurrency: null, estimatedAmountSource: null };
+  }
+
+  const allHaveUnitCost = apuLines.every((l) => resolveApuLineUnitCost(l) != null);
+  if (!allHaveUnitCost) {
     return { estimatedAmount: null, estimatedAmountCurrency: null, estimatedAmountSource: null };
   }
 
   let total = "0";
-  for (const line of lines) {
-    const lineTotal = multiplyDecimal(line.quantity, line.budgetUnitCostSnapshot!);
+  for (const line of apuLines) {
+    const unitCost = resolveApuLineUnitCost(line)!;
+    const lineTotal = multiplyDecimal(line.quantity, unitCost);
     total = addDecimal(total, lineTotal);
   }
 

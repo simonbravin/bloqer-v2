@@ -21,11 +21,14 @@ import {
   applyApuToPurchaseRequestLine,
   availableApuLinesForRow,
   computeApuCoverage,
+  computeApuLineEstimatedAmount,
   createEmptyPurchaseRequestLine,
   createPurchaseRequestLineFromInitial,
   formatApuCoverageHint,
   mergeApuShortfallLines,
   preparePurchaseRequestLinesForSubmit,
+  sumPurchaseRequestApuEstimates,
+  type PurchaseRequestApuLine,
   type PurchaseRequestLineDraft,
 } from "../lib/purchase-request-form-lines";
 
@@ -48,7 +51,7 @@ interface PurchaseRequestFormProps {
   onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
 }
 
-function apuComboboxOptions(apuLines: WbsApuOption[]) {
+function apuComboboxOptions(apuLines: PurchaseRequestApuLine[]) {
   return withNoneOption(
     toSearchableOptions(
       apuLines.map((a) => ({
@@ -110,6 +113,10 @@ export function PurchaseRequestForm({
     [apuCatalog, lines],
   );
   const coverageHint = formatApuCoverageHint(apuCoverage);
+  const draftEstimateTotal = useMemo(
+    () => sumPurchaseRequestApuEstimates(lines, apuCatalog),
+    [lines, apuCatalog],
+  );
 
   function onWbsChange(nextWbsId: string) {
     setWbsNodeId(nextWbsId);
@@ -236,12 +243,9 @@ export function PurchaseRequestForm({
                 searchPlaceholder="Buscar partida…"
               />
             )}
-            {selectedWbs?.budgetUnitCost != null ? (
+            {selectedWbs?.availableSaldo != null ? (
               <p className="text-xs text-muted-foreground">
-                Costo ref. materiales: {formatDecimalArFromString(selectedWbs.budgetUnitCost)}
-                {selectedWbs?.availableSaldo != null
-                  ? ` · Saldo disponible: ${formatDecimalArFromString(selectedWbs.availableSaldo)}`
-                  : ""}
+                Saldo disponible partida: {formatDecimalArFromString(selectedWbs.availableSaldo)}
               </p>
             ) : null}
             {selectedWbs?.wouldExceedBudget ? (
@@ -284,6 +288,11 @@ export function PurchaseRequestForm({
           {wbsNodeId && coverageHint ? (
             <p className="text-xs text-muted-foreground">{coverageHint}</p>
           ) : null}
+          {wbsNodeId && draftEstimateTotal ? (
+            <p className="text-xs font-medium text-muted-foreground">
+              Monto est. solicitud (insumos APU): {formatDecimalArFromString(draftEstimateTotal)}
+            </p>
+          ) : null}
 
           {!wbsNodeId ? (
             <p className="text-sm text-muted-foreground">Elegí primero un ítem EDT.</p>
@@ -301,6 +310,10 @@ export function PurchaseRequestForm({
                       budgetUnitLabel,
                     )
                   : null;
+                const lineEstimate =
+                  boundApu != null
+                    ? computeApuLineEstimatedAmount(line.quantity, boundApu.unitCost)
+                    : null;
 
                 return (
                   <div
@@ -372,6 +385,12 @@ export function PurchaseRequestForm({
                     </div>
 
                     {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
+                    {boundApu?.unitCost ? (
+                      <p className="text-xs text-muted-foreground">
+                        Ref. presup.: {formatDecimalArFromString(boundApu.unitCost)}/u
+                        {lineEstimate ? ` · Monto est.: ${formatDecimalArFromString(lineEstimate)}` : ""}
+                      </p>
+                    ) : null}
                   </div>
                 );
               })}

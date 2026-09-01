@@ -1,10 +1,12 @@
-import { roundQty } from "@bloqer/utils";
+import { addDecimal, multiplyDecimal, roundMoney, roundQty } from "@bloqer/utils";
 
 /** Minimal APU shape for form helpers (matches WbsApuOption). */
 export type PurchaseRequestApuLine = {
   id: string;
   description: string;
   unit: string;
+  /** APU unit cost (resource $/u), not whole WBS item cost. */
+  unitCost: string;
   productId: string | null;
   quantity: string | null;
   needQty?: string | null;
@@ -95,6 +97,36 @@ export function apuPrefillQuantity(apu: PurchaseRequestApuLine): string {
 export function apuHasShortfall(apu: PurchaseRequestApuLine): boolean {
   const raw = apu.shortfallQty ?? apu.quantity;
   return isPositiveQtyString(raw);
+}
+
+/** Line budget estimate = qty × APU unit cost (2 dp). */
+export function computeApuLineEstimatedAmount(
+  quantity: string,
+  unitCost: string | null | undefined,
+): string | null {
+  if (unitCost == null || unitCost === "" || !isPositiveQtyString(quantity)) return null;
+  try {
+    return roundMoney(multiplyDecimal(quantity, unitCost));
+  } catch {
+    return null;
+  }
+}
+
+/** Σ monto est. of APU-bound draft lines (matches list Monto est. Presup. logic). */
+export function sumPurchaseRequestApuEstimates(
+  lines: PurchaseRequestLineDraft[],
+  apuLines: PurchaseRequestApuLine[],
+): string | null {
+  const apuById = new Map(apuLines.map((a) => [a.id, a]));
+  let total: string | null = null;
+  for (const line of lines) {
+    if (!line.costAnalysisLineId) continue;
+    const apu = apuById.get(line.costAnalysisLineId);
+    const lineAmt = computeApuLineEstimatedAmount(line.quantity, apu?.unitCost);
+    if (!lineAmt) continue;
+    total = total == null ? lineAmt : addDecimal(total, lineAmt);
+  }
+  return total;
 }
 
 export function selectedApuIds(lines: PurchaseRequestLineDraft[]): Set<string> {

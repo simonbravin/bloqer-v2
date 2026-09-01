@@ -13,18 +13,30 @@ function line(
     wbsNodeId: null,
     wbsNodeCode: null,
     wbsNodeName: null,
+    costAnalysisLineId: null,
     quantity: "1.0000",
     budgetUnitCostSnapshot: null,
+    apuUnitCost: null,
     ...partial,
   };
 }
 
-test("computeEstimatedAmount sums budget snapshots when all lines have ref", () => {
+test("computeEstimatedAmount sums APU line snapshots", () => {
   const r = computeEstimatedAmount(
     { status: "SUBMITTED" },
     [
-      line({ description: "A", quantity: "10.0000", budgetUnitCostSnapshot: "100.0000" }),
-      line({ description: "B", quantity: "2.0000", budgetUnitCostSnapshot: "50.0000" }),
+      line({
+        description: "A",
+        costAnalysisLineId: "apu-a",
+        quantity: "10.0000",
+        budgetUnitCostSnapshot: "100.0000",
+      }),
+      line({
+        description: "B",
+        costAnalysisLineId: "apu-b",
+        quantity: "2.0000",
+        budgetUnitCostSnapshot: "50.0000",
+      }),
     ],
     null,
   );
@@ -33,23 +45,73 @@ test("computeEstimatedAmount sums budget snapshots when all lines have ref", () 
   assert.equal(r.estimatedAmount, "1100.00");
 });
 
-test("computeEstimatedAmount returns null when any line lacks budget snapshot", () => {
+test("computeEstimatedAmount uses live APU unit cost on DRAFT lines", () => {
+  const r = computeEstimatedAmount(
+    { status: "DRAFT" },
+    [
+      line({
+        description: "Cemento",
+        costAnalysisLineId: "apu-a",
+        quantity: "5.0000",
+        apuUnitCost: "120000.0000",
+      }),
+    ],
+    null,
+  );
+  assert.equal(r.estimatedAmountSource, "budget");
+  assert.equal(r.estimatedAmount, "600000.00");
+});
+
+test("computeEstimatedAmount ignores lines without APU binding", () => {
   const r = computeEstimatedAmount(
     { status: "SUBMITTED" },
     [
-      line({ description: "A", budgetUnitCostSnapshot: "100.0000" }),
-      line({ description: "B", budgetUnitCostSnapshot: null }),
+      line({
+        description: "A",
+        costAnalysisLineId: "apu-a",
+        quantity: "1.0000",
+        budgetUnitCostSnapshot: "100.0000",
+      }),
+      line({
+        description: "Manual",
+        quantity: "99.0000",
+        budgetUnitCostSnapshot: "99999.0000",
+      }),
     ],
+    null,
+  );
+  assert.equal(r.estimatedAmount, "100.00");
+});
+
+test("computeEstimatedAmount returns null when APU line lacks unit cost", () => {
+  const r = computeEstimatedAmount(
+    { status: "DRAFT" },
+    [line({ description: "A", costAnalysisLineId: "apu-a" })],
     null,
   );
   assert.equal(r.estimatedAmount, null);
   assert.equal(r.estimatedAmountSource, null);
 });
 
+test("computeEstimatedAmount returns null when no APU-bound lines", () => {
+  const r = computeEstimatedAmount(
+    { status: "SUBMITTED" },
+    [line({ description: "Manual", budgetUnitCostSnapshot: "100.0000" })],
+    null,
+  );
+  assert.equal(r.estimatedAmount, null);
+});
+
 test("computeEstimatedAmount prefers selected quote when status is QUOTE_SELECTED", () => {
   const r = computeEstimatedAmount(
     { status: "QUOTE_SELECTED" },
-    [line({ description: "A", budgetUnitCostSnapshot: "100.0000" })],
+    [
+      line({
+        description: "A",
+        costAnalysisLineId: "apu-a",
+        budgetUnitCostSnapshot: "100.0000",
+      }),
+    ],
     { totalAmount: "646918.39", currency: "ARS" },
   );
   assert.equal(r.estimatedAmountSource, "quote");

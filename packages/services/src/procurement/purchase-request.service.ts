@@ -41,6 +41,8 @@ export type PurchaseRequestLineView = {
   unit: string;
   quantity: string;
   budgetUnitCostSnapshot: string | null;
+  /** APU unit cost from costAnalysisLine (for DRAFT estimate before submit snapshot). */
+  apuUnitCost: string | null;
 };
 
 export type { PurchaseRequestEstimatedAmountSource };
@@ -50,7 +52,7 @@ export type PurchaseRequestView = Omit<PurchaseRequest, never> & {
   requestedByName: string | null;
   selectedSupplierName: string | null;
   lines: PurchaseRequestLineView[];
-  /** Σ qty × ref. presup. or selected quote total when available. */
+  /** Σ qty × ref. APU (insumos ligados) or selected quote total when available. */
   estimatedAmount: string | null;
   estimatedAmountCurrency: string | null;
   estimatedAmountSource: PurchaseRequestEstimatedAmountSource | null;
@@ -101,7 +103,16 @@ function serialize(
   const summaries = computeLineSummaries(pr.lines);
   const estimated = computeEstimatedAmount(
     pr,
-    pr.lines,
+    pr.lines.map((l) => ({
+      wbsNodeId: l.wbsNodeId,
+      wbsNodeCode: l.wbsNodeCode,
+      wbsNodeName: l.wbsNodeName,
+      costAnalysisLineId: l.costAnalysisLineId,
+      description: l.description,
+      quantity: l.quantity,
+      budgetUnitCostSnapshot: l.budgetUnitCostSnapshot,
+      apuUnitCost: l.apuUnitCost,
+    })),
     selectedQuote
       ? {
           totalAmount: serializeMoneyDecimal(selectedQuote.totalAmount),
@@ -122,7 +133,10 @@ function serialize(
 
 const prLineInclude = {
   orderBy: { sortOrder: "asc" as const },
-  include: { wbsNode: { select: { code: true, name: true } } },
+  include: {
+    wbsNode: { select: { code: true, name: true } },
+    costAnalysisLine: { select: { unitCost: true } },
+  },
 };
 
 const selectedQuoteInclude = {
@@ -148,6 +162,7 @@ function mapPrLines(
     quantity: Prisma.Decimal;
     budgetUnitCostSnapshot: Prisma.Decimal | null;
     wbsNode: { code: string; name: string } | null;
+    costAnalysisLine: { unitCost: Prisma.Decimal } | null;
   }>,
 ): PurchaseRequestLineView[] {
   return lines.map((l) => ({
@@ -163,6 +178,10 @@ function mapPrLines(
     unit: l.unit,
     quantity: serializeQtyDecimal(l.quantity),
     budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
+    apuUnitCost:
+      l.costAnalysisLine?.unitCost != null
+        ? serializeUnitPriceDecimal(l.costAnalysisLine.unitCost)
+        : null,
   }));
 }
 

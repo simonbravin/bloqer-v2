@@ -4,11 +4,13 @@ import {
   applyApuToPurchaseRequestLine,
   buildLinesFromApuShortfalls,
   computeApuCoverage,
+  computeApuLineEstimatedAmount,
   createEmptyPurchaseRequestLine,
   formatApuCoverageHint,
   mergeApuShortfallLines,
   preparePurchaseRequestLinesForSubmit,
   selectedApuIds,
+  sumPurchaseRequestApuEstimates,
   validatePurchaseRequestLines,
   type PurchaseRequestApuLine,
   type PurchaseRequestLineDraft,
@@ -20,6 +22,7 @@ const apuA: PurchaseRequestApuLine = {
   id: "apu-a",
   description: "Cemento",
   unit: "tn",
+  unitCost: "120000.0000",
   productId: null,
   quantity: "5",
   needQty: "10",
@@ -31,6 +34,7 @@ const apuB: PurchaseRequestApuLine = {
   id: "apu-b",
   description: "Arena",
   unit: "m3",
+  unitCost: "8000.0000",
   productId: null,
   quantity: "0",
   needQty: "20",
@@ -42,6 +46,7 @@ const apuC: PurchaseRequestApuLine = {
   id: "apu-c",
   description: "Hierro",
   unit: "kg",
+  unitCost: "1500.0000",
   productId: null,
   quantity: "100",
   shortfallQty: "100",
@@ -97,6 +102,23 @@ test("applyApu prefills shortfall quantity", () => {
   assert.equal(next.description, "Cemento");
   assert.equal(next.quantity, "5");
   assert.equal(next.unit, "tn");
+});
+
+test("computeApuLineEstimatedAmount multiplies qty by APU unit cost", () => {
+  assert.equal(computeApuLineEstimatedAmount("5", "120000.0000"), "600000.00");
+  assert.equal(computeApuLineEstimatedAmount("1", ""), null);
+});
+
+test("sumPurchaseRequestApuEstimates sums only APU-bound lines", () => {
+  const total = sumPurchaseRequestApuEstimates(
+    [
+      line({ costAnalysisLineId: "apu-a", quantity: "5" }),
+      line({ rowKey: "manual", description: "Varios", quantity: "99" }),
+      line({ rowKey: "row-2", costAnalysisLineId: "apu-c", quantity: "2" }),
+    ],
+    [apuA, apuC],
+  );
+  assert.equal(total, "603000.00");
 });
 
 test("buildLinesFromApuShortfalls skips selected and zero shortfall", () => {
