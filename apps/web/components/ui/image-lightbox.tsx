@@ -58,13 +58,6 @@ export function ImageLightbox({
         <DialogOverlay className="image-lightbox-overlay" />
         <DialogPrimitive.Content
           className="image-lightbox-panel data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-          onOpenAutoFocus={(event) => {
-            const close = event.currentTarget.querySelector<HTMLElement>("[data-lightbox-close]");
-            if (close) {
-              event.preventDefault();
-              close.focus();
-            }
-          }}
           onClick={(event) => {
             if (event.target === event.currentTarget) setOpen(false);
           }}
@@ -73,7 +66,6 @@ export function ImageLightbox({
           <DialogPrimitive.Close
             className="image-lightbox-close z-[60]"
             aria-label="Cerrar"
-            data-lightbox-close=""
           >
             <X className="h-5 w-5" aria-hidden />
           </DialogPrimitive.Close>
