@@ -316,9 +316,10 @@ export function PurchaseRequestForm({
                     : null;
 
                 return (
-                  <div
+                  <section
                     key={line.rowKey}
-                    className="space-y-3 rounded-lg border bg-muted/20 p-3 sm:p-4"
+                    aria-label={`Línea ${index + 1}`}
+                    className="form-section space-y-3 p-3 sm:p-4"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-xs font-medium text-muted-foreground">
@@ -391,7 +392,7 @@ export function PurchaseRequestForm({
                         {lineEstimate ? ` · Monto est.: ${formatDecimalArFromString(lineEstimate)}` : ""}
                       </p>
                     ) : null}
-                  </div>
+                  </section>
                 );
               })}
             </div>
