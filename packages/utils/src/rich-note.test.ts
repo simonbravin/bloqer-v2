@@ -4,6 +4,7 @@ import {
   isRichNoteEmpty,
   normalizeRichNote,
   parseRichNote,
+  resolveRichNoteSubmitValue,
   richNoteToPlainText,
   serializeRichNote,
 } from "./rich-note";
@@ -89,5 +90,25 @@ describe("richNoteToPlainText", () => {
   it("renders list markers for PDF / emails", () => {
     const html = "<ul><li>A</li><li>B</li></ul><ol><li>C</li></ol>";
     assert.equal(richNoteToPlainText(html), "• A\n• B\n1. C");
+  });
+});
+
+describe("resolveRichNoteSubmitValue", () => {
+  it("keeps fallback when DOM is empty but hidden already has content", () => {
+    const saved = "<p>Notas del día</p>";
+    assert.equal(resolveRichNoteSubmitValue("", saved), saved);
+    assert.equal(resolveRichNoteSubmitValue("<div><br></div>", saved), saved);
+  });
+
+  it("prefers DOM when user edited content", () => {
+    assert.equal(
+      resolveRichNoteSubmitValue("<p>Nuevo texto</p>", "<p>Viejo</p>"),
+      "<p>Nuevo texto</p>",
+    );
+  });
+
+  it("returns empty when user cleared notes", () => {
+    assert.equal(resolveRichNoteSubmitValue("", ""), "");
+    assert.equal(resolveRichNoteSubmitValue("<p></p>", ""), "");
   });
 });

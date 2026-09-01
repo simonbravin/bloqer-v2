@@ -7,7 +7,7 @@ import { Button }   from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input }    from "@/components/ui/input";
 import { Label }    from "@/components/ui/label";
-import { RichNoteEditor } from "@/components/ui/rich-note-editor";
+import { RichNoteEditor, type RichNoteEditorHandle } from "@/components/ui/rich-note-editor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import {
@@ -198,6 +198,7 @@ export function JobsiteLogForm({
 }: Props) {
   const router = useRouter();
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
+  const generalNotesRef = useRef<RichNoteEditorHandle>(null);
 
   const [progress,  setProgress, progressRef]  = useSyncedList<ProgressLine>(withRowKeys(defaultValues?.progress  ?? []));
   const [labor,     setLabor, laborRef]        = useSyncedList<LaborLine>(withRowKeys(defaultValues?.labor     ?? []));
@@ -342,6 +343,8 @@ export function JobsiteLogForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    // React onSubmit runs before our capture-phase submit listener on the form; sync first.
+    const generalNotesSerialized = generalNotesRef.current?.sync() ?? "";
     if (stockExceeded) {
       setError("Una o más líneas de material superan el stock disponible.");
       return;
@@ -351,12 +354,6 @@ export function JobsiteLogForm({
       setError(prepared.error);
       return;
     }
-    setProgress(
-      prepared.filled.map((line, i) => ({
-        ...line,
-        rowKey: progressRef.current[i]?.rowKey ?? newRowKey(),
-      })),
-    );
 
     const preparedMaterials = prepareMaterialLinesForSubmit(materialsRef.current);
     if ("error" in preparedMaterials) {
@@ -377,6 +374,7 @@ export function JobsiteLogForm({
     setPending(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
+    fd.set("generalNotes", generalNotesSerialized);
     fd.set("projectId", projectId);
     fd.set("companyId", companyId);
     if (mode !== "edit") {
@@ -408,6 +406,12 @@ export function JobsiteLogForm({
       if ("error" in result) {
         setError(result.error);
       } else {
+        setProgress(
+          prepared.filled.map((line, i) => ({
+            ...line,
+            rowKey: progressRef.current[i]?.rowKey ?? newRowKey(),
+          })),
+        );
         let created: { navigate?: boolean; message?: string } | void = undefined;
         try {
           created = await onCreated?.(result.id);
@@ -536,6 +540,7 @@ export function JobsiteLogForm({
         <div className="space-y-1">
           <Label htmlFor="generalNotes">Notas generales</Label>
           <RichNoteEditor
+            ref={generalNotesRef}
             id="generalNotes"
             name="generalNotes"
             defaultValue={defaultValues?.generalNotes}

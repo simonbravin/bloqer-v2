@@ -39,6 +39,14 @@ function handle(err: unknown): Err {
   return { error: "Error inesperado" };
 }
 
+/** On update: missing key → leave DB value; present empty → clear field. */
+function optionalFormText(fd: FormData, key: string): string | null | undefined {
+  if (!fd.has(key)) return undefined;
+  const raw = fd.get(key);
+  if (raw == null || raw === "") return null;
+  return String(raw);
+}
+
 function parseJsonArray(fd: FormData, key: string): unknown[] {
   const raw = fd.get(key);
   if (raw == null || raw === "") return [];
@@ -165,11 +173,11 @@ export async function updateJobsiteLogAction(
     // Do NOT send blockers/incidents/safetyNotes — omitting keeps legacy values (service undefined → existing).
     const parsed = updateJobsiteLogSchema.safeParse({
       logDate: (fd.get("logDate") as string) || undefined,
-      title: (fd.get("title") as string) || null,
-      workFront: (fd.get("workFront") as string) || null,
-      shift: (fd.get("shift") as string) || null,
-      weather: (fd.get("weather") as string) || null,
-      generalNotes: (fd.get("generalNotes") as string) || null,
+      title: optionalFormText(fd, "title"),
+      workFront: optionalFormText(fd, "workFront"),
+      shift: optionalFormText(fd, "shift"),
+      weather: optionalFormText(fd, "weather"),
+      generalNotes: optionalFormText(fd, "generalNotes"),
       progress,
       labor,
       materials,

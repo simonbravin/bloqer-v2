@@ -86,6 +86,7 @@ export {
   isRichNoteEmpty,
   normalizeRichNote,
   parseRichNote,
+  resolveRichNoteSubmitValue,
   richNoteToPlainText,
   serializeRichNote,
   type RichNoteBlock,

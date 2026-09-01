@@ -346,6 +346,20 @@ export function isRichNoteEmpty(input: string | null | undefined): boolean {
   return normalizeRichNote(input) == null;
 }
 
+/**
+ * Resolve rich-note value on form submit when the contenteditable DOM may not be
+ * hydrated yet (edit mode) but the hidden field already holds the last serialized value.
+ */
+export function resolveRichNoteSubmitValue(
+  domHtml: string,
+  fallbackSerialized: string,
+): string {
+  if (isRichNoteEmpty(domHtml) && !isRichNoteEmpty(fallbackSerialized)) {
+    return normalizeRichNote(fallbackSerialized) ?? "";
+  }
+  return normalizeRichNote(domHtml) ?? "";
+}
+
 function inlinesToPlain(inlines: RichNoteInline[]): string {
   return inlines
     .map((node) => {

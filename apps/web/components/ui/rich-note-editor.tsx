@@ -1,8 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useId, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type ReactNode,
+} from "react";
 import { Bold, List, ListOrdered } from "lucide-react";
-import { isRichNoteEmpty, normalizeRichNote } from "@bloqer/utils";
+import { isRichNoteEmpty, normalizeRichNote, resolveRichNoteSubmitValue } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { textareaClassName } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -14,6 +25,11 @@ type Props = {
   disabled?: boolean;
   placeholder?: string;
   "aria-label"?: string;
+};
+
+export type RichNoteEditorHandle = {
+  /** Flush contenteditable → hidden field. Call before FormData on programmatic submit. */
+  sync: () => string;
 };
 
 function runEditorCommand(command: string) {
@@ -28,50 +44,68 @@ function queryCommandOn(command: string): boolean {
   }
 }
 
-export function RichNoteEditor({
-  name,
-  id,
-  defaultValue,
-  disabled,
-  placeholder = "Tareas del día, pendientes, problemas…",
-  "aria-label": ariaLabel,
-}: Props) {
+export const RichNoteEditor = forwardRef<RichNoteEditorHandle, Props>(function RichNoteEditor(
+  {
+    name,
+    id,
+    defaultValue,
+    disabled,
+    placeholder = "Tareas del día, pendientes, problemas…",
+    "aria-label": ariaLabel,
+  },
+  ref,
+) {
   const generatedId = useId();
   const editorId = id ?? generatedId;
   const editorRef = useRef<HTMLDivElement>(null);
-  const hiddenRef = useRef<HTMLInputElement>(null);
   const appliedDefault = useRef<string | null | undefined | symbol>(Symbol("unset"));
   const initialHtml = normalizeRichNote(defaultValue) ?? "";
+  const serializedRef = useRef(initialHtml);
+  const [serialized, setSerialized] = useState(initialHtml);
   const [empty, setEmpty] = useState(() => isRichNoteEmpty(defaultValue));
   const [boldOn, setBoldOn] = useState(false);
   const [ulOn, setUlOn] = useState(false);
   const [olOn, setOlOn] = useState(false);
 
-  const syncFromEditor = useCallback(() => {
-    const raw = editorRef.current?.innerHTML ?? "";
-    const next = normalizeRichNote(raw) ?? "";
-    if (hiddenRef.current) hiddenRef.current.value = next;
-    setEmpty(isRichNoteEmpty(raw));
+  const applySerialized = useCallback((next: string, rawForEmptyCheck: string) => {
+    serializedRef.current = next;
+    setSerialized(next);
+    setEmpty(isRichNoteEmpty(rawForEmptyCheck));
   }, []);
 
-  useEffect(() => {
+  const flushEditor = useCallback((): string => {
+    const raw = editorRef.current?.innerHTML ?? "";
+    const next = normalizeRichNote(raw) ?? "";
+    applySerialized(next, raw);
+    return next;
+  }, [applySerialized]);
+
+  const syncForSubmit = useCallback((): string => {
+    const raw = editorRef.current?.innerHTML ?? "";
+    const next = resolveRichNoteSubmitValue(raw, serializedRef.current);
+    applySerialized(next, next || raw);
+    return next;
+  }, [applySerialized]);
+
+  useImperativeHandle(ref, () => ({ sync: syncForSubmit }), [syncForSubmit]);
+
+  useLayoutEffect(() => {
     const el = editorRef.current;
     if (!el) return;
     if (appliedDefault.current === defaultValue) return;
     appliedDefault.current = defaultValue;
     const initial = normalizeRichNote(defaultValue) ?? "";
     if (el.innerHTML !== initial) el.innerHTML = initial;
-    if (hiddenRef.current) hiddenRef.current.value = initial;
-    setEmpty(isRichNoteEmpty(defaultValue));
-  }, [defaultValue]);
+    applySerialized(initial, initial);
+  }, [applySerialized, defaultValue]);
 
   useEffect(() => {
     const form = editorRef.current?.closest("form");
     if (!form) return;
-    const onSubmit = () => syncFromEditor();
+    const onSubmit = () => syncForSubmit();
     form.addEventListener("submit", onSubmit, true);
     return () => form.removeEventListener("submit", onSubmit, true);
-  }, [syncFromEditor]);
+  }, [syncForSubmit]);
 
   const refreshToolbar = useCallback(() => {
     if (disabled) return;
@@ -85,10 +119,10 @@ export function RichNoteEditor({
       if (disabled) return;
       editorRef.current?.focus();
       runEditorCommand(command);
-      syncFromEditor();
+      flushEditor();
       refreshToolbar();
     },
-    [disabled, refreshToolbar, syncFromEditor],
+    [disabled, flushEditor, refreshToolbar],
   );
 
   const onPaste = useCallback(
@@ -101,9 +135,9 @@ export function RichNoteEditor({
       if (!normalized) return;
       const inserted = document.execCommand("insertHTML", false, normalized);
       if (!inserted) document.execCommand("insertText", false, pastedText);
-      syncFromEditor();
+      flushEditor();
     },
-    [disabled, syncFromEditor],
+    [disabled, flushEditor],
   );
 
   return (
@@ -140,7 +174,7 @@ export function RichNoteEditor({
           "flex-col p-0 [outline:none] focus-visible:ring-0 focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
         )}
       >
-        <input type="hidden" name={name} ref={hiddenRef} defaultValue={initialHtml} />
+        <input type="hidden" name={name} value={serialized} readOnly />
         <div className="relative min-h-[80px]">
           {empty ? (
             <p className="pointer-events-none absolute left-3 top-2 text-base text-muted-foreground md:text-sm">
@@ -164,20 +198,22 @@ export function RichNoteEditor({
               "[&_p]:my-0 [&_p+p]:mt-2 [&_strong]:font-semibold [&_b]:font-semibold",
             )}
             onInput={() => {
-              syncFromEditor();
+              flushEditor();
               refreshToolbar();
             }}
             onKeyUp={refreshToolbar}
             onMouseUp={refreshToolbar}
             onFocus={refreshToolbar}
-            onBlur={syncFromEditor}
+            onBlur={flushEditor}
             onPaste={onPaste}
           />
         </div>
       </div>
     </div>
   );
-}
+});
+
+RichNoteEditor.displayName = "RichNoteEditor";
 
 function ToolbarButton({
   label,
