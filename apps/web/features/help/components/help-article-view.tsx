@@ -8,6 +8,7 @@ import { resolveHelpHref } from "@/features/help/lib/search";
 import { useFieldProjectContext } from "@/lib/field-project-context";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import {
   Card,
   CardContent,
@@ -43,10 +44,13 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
       </div>
 
       {article.figure ? (
-        <figure className="overflow-hidden rounded-lg border bg-muted/30">
-          {/* Static process maps from /public/help; keep intrinsic ratio. */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={article.figure.src} alt={article.figure.alt} className="h-auto w-full" />
+        <figure className="rounded-lg border bg-muted/30">
+          <ImageLightbox
+            src={article.figure.src}
+            alt={article.figure.alt}
+            caption={article.figure.caption}
+            imgClassName="rounded-t-lg"
+          />
           {article.figure.caption ? (
             <figcaption className="border-t px-3 py-2 text-xs text-muted-foreground">
               {article.figure.caption}

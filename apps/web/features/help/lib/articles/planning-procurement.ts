@@ -20,13 +20,18 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     ],
     effects: ["Baseline para certificaciones y control de costos."],
     pitfalls: ["Los insumos (hierros, etc.) van en el APU, no como hijos EDT."],
+    figure: {
+      src: "/help/mapa-cargar-edt-apu.png",
+      alt: "Bloqer — Cargar EDT y APU",
+      caption: "Excel o a mano, reordenar partidas y armar el análisis de precio. Insumos en el APU, no como hijos EDT.",
+    },
     relatedSlugs: [
       "insumos-en-apu-no-hijos-edt",
       "aprobar-el-presupuesto",
       "editar-presupuesto-aprobado",
       "importar-cronograma",
     ],
-    keywords: ["presupuesto", "edt", "apu", "wbs", "partidas"],
+    keywords: ["presupuesto", "edt", "apu", "wbs", "partidas", "cargar edt"],
     guideRef: "§6",
   },
   {
@@ -131,8 +136,13 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Planificación → Cronograma → Importar desde presupuesto.",
       "Completá fechas en las hojas (no edites fechas de contenedores a mano: se pisan con el rollup).",
-      "Agregá dependencias FS donde haga falta.",
+      "Agregá dependencias FS donde haga falta. El Gantt abre en hoy; Ir a hoy vuelve a esa fecha.",
     ],
+    figure: {
+      src: "/help/mapa-armar-cronograma.png",
+      alt: "Bloqer — Armar el cronograma",
+      caption: "Importar EDT, fechas, dependencias FS, hitos y reordenar. Completar un hito a mano o al confirmar una recepción de la misma EDT.",
+    },
     relatedSlugs: [
       "aprobar-el-presupuesto",
       "cargar-libro-de-obra",
@@ -140,7 +150,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "agregar-hito-al-cronograma",
       "exportar-cronograma",
     ],
-    keywords: ["cronograma", "gantt", "importar", "fechas"],
+    keywords: ["cronograma", "gantt", "importar", "fechas", "armar cronograma"],
     guideRef: "§7",
   },
   {

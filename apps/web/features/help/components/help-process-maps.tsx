@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
+import { ImageLightbox } from "@/components/ui/image-lightbox";
 import {
   HELP_PROCESS_MAP_KIND_LABEL,
   HELP_PROCESS_MAP_LEVEL_LABEL,
@@ -14,20 +15,22 @@ import {
 function MapCard({ map }: { map: HelpProcessMap }) {
   return (
     <li>
-      <Link
-        href={`/ayuda/${map.articleSlug}`}
-        className="block overflow-hidden rounded-lg border bg-card transition-colors hover:bg-muted/40"
-      >
-        <div className="relative aspect-[16/11] bg-muted/40">
-          <Image
-            src={map.imageSrc}
-            alt={map.title}
-            fill
-            sizes="(min-width: 768px) 360px, 100vw"
-            className="object-cover object-top"
-          />
-        </div>
-        <div className="space-y-1.5 px-3 py-3">
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <ImageLightbox src={map.imageSrc} alt={map.title}>
+          <div className="relative aspect-[16/11] bg-muted/40">
+            <Image
+              src={map.imageSrc}
+              alt=""
+              fill
+              sizes="(min-width: 768px) 360px, 100vw"
+              className="object-cover object-top"
+            />
+          </div>
+        </ImageLightbox>
+        <Link
+          href={`/ayuda/${map.articleSlug}`}
+          className="block space-y-1.5 px-3 py-3 transition-colors hover:bg-muted/40"
+        >
           <div className="flex items-start justify-between gap-2">
             <h3 className="text-sm font-semibold leading-snug">{map.title}</h3>
             <Badge variant="secondary" className="shrink-0 font-normal">
@@ -35,8 +38,8 @@ function MapCard({ map }: { map: HelpProcessMap }) {
             </Badge>
           </div>
           <p className="text-xs leading-relaxed text-muted-foreground">{map.summary}</p>
-        </div>
-      </Link>
+        </Link>
+      </div>
     </li>
   );
 }
@@ -53,26 +56,30 @@ function KindBlock({ kind, blurb }: { kind: HelpProcessMapKind; blurb: string })
         <p className="mt-0.5 text-xs text-muted-foreground">{blurb}</p>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Nivel empresa
-          </p>
-          <ul className="space-y-3">
-            {company.map((map) => (
-              <MapCard key={map.id} map={map} />
-            ))}
-          </ul>
-        </div>
-        <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Nivel obra
-          </p>
-          <ul className="space-y-3">
-            {project.map((map) => (
-              <MapCard key={map.id} map={map} />
-            ))}
-          </ul>
-        </div>
+        {company.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Nivel empresa
+            </p>
+            <ul className="space-y-3">
+              {company.map((map) => (
+                <MapCard key={map.id} map={map} />
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {project.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Nivel obra
+            </p>
+            <ul className="space-y-3">
+              {project.map((map) => (
+                <MapCard key={map.id} map={map} />
+              ))}
+            </ul>
+          </div>
+        ) : null}
       </div>
     </div>
   );

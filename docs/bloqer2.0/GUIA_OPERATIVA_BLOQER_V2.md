@@ -122,7 +122,7 @@ El resto de bloques `📷` del documento (login, presupuesto, OC, certificacione
 
 ### 0.4 Mapas de proceso (guía visual)
 
-Dos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primero caminitos, después láminas).
+Dos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primero caminitos, después láminas). Clic en el mapa para verlo a pantalla completa (X o Escape para cerrar); el título de la card abre el procedimiento.
 
 | Carpeta | Qué es |
 |---------|--------|
@@ -207,8 +207,10 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 | General | Inicio → `/dashboard` · **Pendientes** → `/pendientes` · Proyectos → `/proyectos` · **Reportes** → `/reportes` · Directorio → `/directorio` · Inventario → `/inventario` |
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
 | Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Flujo de caja → `/tesoreria/flujo-caja` · **Conciliación** → `/tesoreria/conciliacion` |
-| Contabilidad | Resumen → `/contabilidad` · Cuentas → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` · Libro diario → `/contabilidad/libro-diario` · Sumas y saldos → `/contabilidad/sumas-y-saldos` · Situación → `/contabilidad/situacion-patrimonial` · Resultados → `/contabilidad/estado-resultados` |
-| Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
+| Contabilidad | Resumen → `/contabilidad` · **Plan de cuentas** → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` |
+| Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · **Políticas** → `/configuracion/politicas` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
+
+> **Contabilidad — libros:** Libro diario, Sumas y saldos, Situación y Resultados no están en el menú izquierdo: se llegan desde la **subnav** del hub (§15.1). En esa barra, Plan de cuentas aparece como **Cuentas**.
 
 > **Visibilidad (D-056):** las secciones **Finanzas**, **Tesorería** y **Contabilidad** del menú de empresa solo aparecen para roles de **company finance**: `OWNER`, `ADMIN`, `FINANCE`, `TREASURER` y `VIEWER` (lectura). Roles operativos (`PROJECT_MANAGER`, `PROCUREMENT`, `SALES`, `PROJECT_FINANCE`, etc.) trabajan finanzas desde el **proyecto**, no desde el hub corporativo.
 

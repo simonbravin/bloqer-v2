@@ -155,4 +155,64 @@
   .switch-field-description {
     @apply text-xs leading-relaxed text-muted-foreground;
   }
+
+  /**
+   * Click-to-enlarge image (help maps, future posters).
+   * Pair with `<ImageLightbox>` — do not copy these classes into a one-off overlay.
+   *
+   * Do not flex-center the scrollport: overflow + align-items:center clips the start
+   * of tall/wide posters. Center with margin on the stage instead.
+   */
+  .image-lightbox-trigger {
+    @apply relative block w-full cursor-zoom-in border-0 bg-transparent p-0 text-left;
+  }
+
+  .image-lightbox-trigger:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  .image-lightbox-thumb {
+    @apply block h-auto w-full;
+  }
+
+  .image-lightbox-hint {
+    @apply pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1.5 rounded-md bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm ring-1 ring-border;
+  }
+
+  .image-lightbox-overlay {
+    @apply bg-black/85;
+  }
+
+  .image-lightbox-panel {
+    @apply fixed inset-0 z-50 overflow-auto outline-none;
+    overscroll-behavior: contain;
+    padding: 3.5rem 1rem 1.5rem;
+    padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3rem));
+    padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(1rem, env(safe-area-inset-left, 0px));
+    @apply data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0;
+  }
+
+  .image-lightbox-close {
+    @apply fixed z-[60] inline-flex h-10 w-10 items-center justify-center rounded-full bg-background text-foreground shadow-md ring-1 ring-border;
+    @apply transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    top: max(0.75rem, env(safe-area-inset-top, 0px));
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+
+  .image-lightbox-stage {
+    width: max-content;
+    max-width: none;
+    margin-inline: auto;
+  }
+
+  .image-lightbox-img {
+    @apply block h-auto w-auto rounded-md bg-background shadow-lg;
+    max-width: min(1600px, max-content);
+  }
+
+  .image-lightbox-caption {
+    @apply mt-2 max-w-[1600px] text-center text-xs text-white/80;
+  }
 }

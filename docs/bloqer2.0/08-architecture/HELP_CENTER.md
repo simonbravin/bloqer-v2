@@ -29,7 +29,7 @@ Acceso: membresía activa; **sin** permiso de módulo. Deep links a pantallas de
 - Una ficha = un **objetivo** (ej. “Cargar un proveedor”), no un capítulo de la guía.
 - Incluye fichas conceptuales (afectaciones, dimensiones de avance), reportes de obra (hub, presupuesto vs real, rentabilidad, export PDF/CSV), excepciones (anular/devolver), setup contable y limitaciones (§19).
 - `guideRef` apunta a la sección de [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md).
-- `figure` es opcional: mapa o esquema en `apps/web/public/help/` (URL `/help/…`). No usar capturas de pantalla de producto.
+- `figure` es opcional: mapa o esquema en `apps/web/public/help/` (URL `/help/…`). No usar capturas de pantalla de producto. Clic abre `<ImageLightbox>` (clases `.image-lightbox-*` en `globals.css`); no navega.
 - Home sin búsqueda: **Mapas de proceso** (`HELP_PROCESS_MAPS`, empresa / obra) y debajo los **destacados** (`HELP_FEATURED_SLUGS`). El mapa no reemplaza la ficha: cada card abre el procedimiento con el texto + la figura.
 - Un mismo flujo puede tener **caminito** (si/si no, figura principal de la ficha) y **lámina** (roles y detalle) en la galería. La figura de la ficha debe ser uno de esos mapas.
 - Fuentes: `docs/bloqer2.0/guides/assets/flujos/` (caminitos) y `docs/bloqer2.0/guides/assets/laminas/` (láminas). En la app se copian planos a `/help/`.
