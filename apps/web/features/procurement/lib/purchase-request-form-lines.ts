@@ -268,17 +268,22 @@ export function preparePurchaseRequestLinesForSubmit(
   wbsNodeId: string,
   budgetUnit: string,
   apuCatalog: PurchaseRequestApuLine[] = [],
+  opts?: {
+    /** When line has no APU category (free text), inherit board/prefill costType. */
+    defaultCostType?: PurchaseRequestSubmitLine["costType"];
+  },
 ): { ok: true; lines: PurchaseRequestSubmitLine[] } | { ok: false; error: string } {
   const validationError = validatePurchaseRequestLines(lines);
   if (validationError) return { ok: false, error: validationError };
 
   const apuById = new Map(apuCatalog.map((a) => [a.id, a]));
   const substantive = lines.filter((l) => !isBlankPurchaseRequestLine(l));
+  const fallbackType = opts?.defaultCostType ?? undefined;
   return {
     ok: true,
     lines: substantive.map((line, i) => {
       const apu = line.costAnalysisLineId ? apuById.get(line.costAnalysisLineId) : undefined;
-      const category = apu?.category;
+      const category = apu?.category ?? fallbackType ?? undefined;
       const isServiceNature = category === "LABOR" || category === "EQUIPMENT";
       const costType =
         category === "MATERIAL" ||

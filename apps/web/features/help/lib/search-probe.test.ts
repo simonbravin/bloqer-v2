@@ -100,6 +100,8 @@ test("new concept/report articles are findable", () => {
     { q: "tablero materiales", expectSlugIncludes: "tablero-materiales" },
     { q: "tablero mano de obra", expectSlugIncludes: "tablero-mano-obra" },
     { q: "tablero equipos", expectSlugIncludes: "tablero-equipos" },
+    { q: "pedir mano de obra", expectSlugIncludes: "pedir-material" },
+    { q: "varianza equipos", expectSlugIncludes: "tablero-equipos" },
     { q: "justificacion desvio", expectSlugIncludes: "orden-de-compra" },
   ];
   for (const c of cases) {

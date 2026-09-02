@@ -16,6 +16,7 @@ type Props = {
     productId?: string;
     costAnalysisLineId?: string;
     unit?: string;
+    costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
   };
   prefilledFromMaterials?: boolean;
   /** Origin board for banner copy (`materiales` | `mano-obra` | `equipos`). */

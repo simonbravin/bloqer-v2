@@ -51,7 +51,7 @@ export const HELP_PROCESS_MAPS: readonly HelpProcessMap[] = [
     kind: "flow",
     level: "project",
     title: "Mano de obra y equipos: si esto, entonces aquello",
-    summary: "Pedir o facturar. Paquete con contrato va a Subcontratos.",
+    summary: "Pedir tipado LAB/EQP o facturar con vínculo APU. Paquete con contrato → Subcontratos.",
     articleSlug: "tablero-mano-obra",
     imageSrc: "/help/mapa-flujo-mano-obra-equipos-si-no.png",
     guideRef: "§9.0.1 · §9.0.2",

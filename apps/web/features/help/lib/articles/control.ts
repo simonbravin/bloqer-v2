@@ -20,7 +20,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Arriba de la tabla ves dos gráficos lado a lado: **Composición del presupuesto** (torta APU planificada) y **Gasto por tipo** (barras Presup / Devengado / Exposición por MAT · LAB · EQP · SUB · OTHER).",
       "Filtro **Tipo de costo** en la barra: al elegir MAT / LAB / EQP / SUB / OTHER, la tabla muestra solo ese bucket por partida y los totales del proyecto se recalculan para ese tipo. El CSV / PDF respeta el filtro.",
       "En una partida hoja, el chevron a la izquierda del código abre el desglose por tipo de costo (solo cuando el filtro está en Todos los tipos).",
-      "Tocá una fila (código o nombre, p. ej. 1.1 Replanteo de Obra) para abrir el detalle en un diálogo; ahí también está la sección Por tipo de costo.",
+      "Tocá una fila (código o nombre, p. ej. 1.1 Replanteo de Obra) para abrir el detalle en un diálogo; ahí también está la sección Por tipo de costo y atajos a cobertura Materiales / Mano de obra / Equipos de esa partida.",
       "Desde el diálogo hay links a OC, facturas y pagos de esa partida.",
     ],
     pitfalls: [
@@ -28,7 +28,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Presupuesto vs real ya no es una pantalla aparte: vivía acá ([D-098]).",
       "**% recepción ≠ % avance libro**: recepción = costo recibido (cant. × PU de la OC) / presupuesto; avance libro = suma del % del día de partes APPROVED. Recibir toda una OC chica no da 100% de la partida. Si el capataz cargó 95% pero no hay OC recibida, % recepción queda en 0 y eso es correcto ([D-045]). Un parte solo enviado (SUBMITTED) no mueve % avance libro. Facturas emitidas sin vincular a la OC no bajan el comprometido abierto. La vista *Financiero* no muestra esas columnas: usá *Cantidades* o *% Avance*.",
       "Al elegir la partida en una OC / factura, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico = EQP, excavación con retro = EQP, etc.). Podés cambiarla en el selector; si lo hacés a mano, no la pisamos cuando cambies la partida.",
-      "**Mano de obra en factura de proveedor**: si contratás una cuadrilla externa o pagás un jornal como AP, tipá la línea como **LAB** — no hace falta que sea subcontrato. Subcontrato = módulo Subcontratos con certificación (SUB).",
+      "**Mano de obra en factura de proveedor**: si contratás una cuadrilla externa o pagás un jornal como AP, tipá la línea como **LAB** — no hace falta que sea subcontrato. Subcontrato = módulo Subcontratos con certificación (SUB). El vínculo APU en la factura ([D-110]) hace que el tablero Operación → Mano de obra baje el faltante de esa fila.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",

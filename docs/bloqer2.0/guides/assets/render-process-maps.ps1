@@ -23,7 +23,9 @@ $jobs = @(
     "mapa-flujo-gasto-empresa-si-no",
     "mapa-flujo-costo-obra-si-no",
     "mapa-flujo-subcontrato-si-no",
-    "mapa-flujo-certificar-cobrar-si-no"
+    "mapa-flujo-certificar-cobrar-si-no",
+    "mapa-flujo-desvio-oc-si-no",
+    "mapa-flujo-mano-obra-equipos-si-no"
   )}
 )
 

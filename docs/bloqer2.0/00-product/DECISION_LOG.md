@@ -1689,7 +1689,7 @@
   4. **Nav:** Materiales → Mano de obra → Equipos bajo Operación. **Subcontratos permanece en Compras** (compromiso contractual; patrón Procore Commitments / Odoo Purchase+cert).
   5. Sin timesheets, nómina ni equipment logs (refuerza [D-099] y `PRODUCT_SCOPE` sueldos).
 - **Implicancias:** EDT drilldown muestra secciones LAB/EQP; hub de reportes enlaza ambos tableros; catálogo APU de SC incluye LABOR/EQUIPMENT además de MATERIAL.
-- **Documentos afectados:** [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §5 · §9.0.1–§9.0.2 · §13, help `tablero-mano-obra` / `tablero-equipos`, [D-099](./DECISION_LOG.md).
+- **Documentos afectados:** [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §5 · §9.0.1–§9.0.2 · §9.1 · §13, help `tablero-mano-obra` / `tablero-equipos` / `pedir-material-desde-faltante` / `solicitud-de-compra`, caminito `mapa-flujo-mano-obra-equipos-si-no`, [D-099](./DECISION_LOG.md).
 
 ---
 
@@ -1705,7 +1705,7 @@
   3. Prefill desde tableros / OC copia el hint; al cambiar partida en UI se limpia el vínculo APU.
   4. Tableros LAB/EQP (y matching de facturado) priorizan `costAnalysisLineId` sobre descripción / OC.
 - **Implicancias:** migración Prisma; validators AP; create/update FP; draft desde OC puede heredar el hint de la línea OC.
-- **Documentos afectados:** guía §9.0.1–§9.0.2 · facturas proveedor, help tableros MO/Equipos y factura tipada, [D-068](./DECISION_LOG.md), [D-109](./DECISION_LOG.md).
+- **Documentos afectados:** guía §9.0.1–§9.0.2 · §9.1 · §12.2 · §13, help tableros MO/Equipos · `factura-desde-oc` · `gasto-de-obra-sin-oc`, caminito MO/EQP, [D-068](./DECISION_LOG.md), [D-109](./DECISION_LOG.md).
 
 ---
 

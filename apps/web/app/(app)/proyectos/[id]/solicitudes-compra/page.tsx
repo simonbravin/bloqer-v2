@@ -37,6 +37,7 @@ interface PageProps {
     productId?: string;
     costAnalysisLineId?: string;
     unit?: string;
+    costType?: string;
     from?: string;
   }>;
 }
@@ -106,6 +107,14 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           productId: sp.productId,
           costAnalysisLineId: sp.costAnalysisLineId,
           unit: sp.unit,
+          costType:
+            sp.costType === "MATERIAL" ||
+            sp.costType === "LABOR" ||
+            sp.costType === "EQUIPMENT" ||
+            sp.costType === "SUBCONTRACT" ||
+            sp.costType === "OTHER"
+              ? sp.costType
+              : undefined,
         }}
         prefilledFromMaterials={
           sp.from === "materiales" || sp.from === "mano-obra" || sp.from === "equipos"

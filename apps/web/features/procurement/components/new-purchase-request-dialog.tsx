@@ -30,6 +30,7 @@ interface Props {
     productId?: string;
     costAnalysisLineId?: string;
     unit?: string;
+    costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
   };
   prefilledFromMaterials?: boolean;
   /** Preserves `from=mano-obra|equipos|materiales` on mobile redirect to /nueva. */
@@ -61,6 +62,7 @@ export function NewPurchaseRequestDialog({
     if (initialLine?.productId) next.set("productId", initialLine.productId);
     if (initialLine?.costAnalysisLineId) next.set("costAnalysisLineId", initialLine.costAnalysisLineId);
     if (initialLine?.unit) next.set("unit", initialLine.unit);
+    if (initialLine?.costType) next.set("costType", initialLine.costType);
     const from = prefillFrom ?? (prefilledFromMaterials ? "materiales" : undefined);
     if (from) next.set("from", from);
     const query = next.toString();
@@ -85,7 +87,8 @@ export function NewPurchaseRequestDialog({
       Boolean(searchParams.get("quantity")) ||
       Boolean(searchParams.get("productId")) ||
       Boolean(searchParams.get("costAnalysisLineId")) ||
-      Boolean(searchParams.get("unit"));
+      Boolean(searchParams.get("unit")) ||
+      Boolean(searchParams.get("costType"));
     if (!hasCreate && !hasPrefill) return;
 
     const next = new URLSearchParams(searchParams.toString());
@@ -97,6 +100,7 @@ export function NewPurchaseRequestDialog({
     next.delete("productId");
     next.delete("costAnalysisLineId");
     next.delete("unit");
+    next.delete("costType");
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }

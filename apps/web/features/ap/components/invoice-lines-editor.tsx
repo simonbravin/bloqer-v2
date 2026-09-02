@@ -111,31 +111,26 @@ export function InvoiceLinesEditor({
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const [headerDiscount, setHeaderDiscount] = useState("");
-  const [lineKeys, setLineKeys] = useState<string[]>(() =>
-    Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
-  );
-  // Track which lines had their `costType` set by the user in this session so
-  // partida changes don't stomp on it ([D-099]).
-  const [manualCostTypeKeys, setManualCostTypeKeys] = useState<Set<string>>(() => {
-    if (!seedFirstLineCostTypeAsManual) return new Set();
-    // lineKeys[0] is created in the previous useState — mirror with a stable seed
-    // by reading the same initial array length pattern after first paint.
-    return new Set();
+  const [{ lineKeys, manualCostTypeKeys }, setLineState] = useState(() => {
+    const keys = Array.from({ length: Math.max(lines.length, 1) }, createLineKey);
+    const manual =
+      seedFirstLineCostTypeAsManual && keys[0]
+        ? new Set<string>([keys[0]!])
+        : new Set<string>();
+    return { lineKeys: keys, manualCostTypeKeys: manual };
   });
 
-  useEffect(() => {
-    if (!seedFirstLineCostTypeAsManual) return;
-    const first = lineKeys[0];
-    if (!first) return;
-    setManualCostTypeKeys((prev) => {
-      if (prev.has(first)) return prev;
-      const next = new Set(prev);
-      next.add(first);
-      return next;
-    });
-    // Only seed once from prefill; do not re-run when lineKeys grow.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount seed
-  }, [seedFirstLineCostTypeAsManual]);
+  function setLineKeys(updater: (prev: string[]) => string[]) {
+    setLineState((prev) => ({ ...prev, lineKeys: updater(prev.lineKeys) }));
+  }
+
+  function setManualCostTypeKeys(updater: (prev: Set<string>) => Set<string>) {
+    setLineState((prev) => ({
+      ...prev,
+      manualCostTypeKeys: updater(prev.manualCostTypeKeys),
+    }));
+  }
+
   // Keep React keys aligned when the parent replaces lines (PO import, form reset, etc.).
   useEffect(() => {
     setLineKeys((prev) => {
@@ -146,11 +141,10 @@ export function InvoiceLinesEditor({
           ...Array.from({ length: lines.length - prev.length }, createLineKey),
         ];
       }
-      if (lines.length <= 1) return [createLineKey()];
-      return prev.slice(0, lines.length);
+      // Preserve existing keys (incl. manual costType seed) when shrinking.
+      return prev.slice(0, Math.max(lines.length, 1));
     });
   }, [lines.length]);
-
   function update(i: number, field: keyof InvoiceLine, value: string | null) {
     const lineKey = lineKeys[i] ?? String(i);
     const next = lines.map((l, idx) => {
@@ -195,7 +189,16 @@ export function InvoiceLinesEditor({
 
   function removeLine(i: number) {
     if (lines.length <= 1) return;
+    const removedKey = lineKeys[i];
     setLineKeys((keys) => keys.filter((_, idx) => idx !== i));
+    if (removedKey) {
+      setManualCostTypeKeys((prev) => {
+        if (!prev.has(removedKey)) return prev;
+        const next = new Set(prev);
+        next.delete(removedKey);
+        return next;
+      });
+    }
     onChange(lines.filter((_, idx) => idx !== i));
   }
 

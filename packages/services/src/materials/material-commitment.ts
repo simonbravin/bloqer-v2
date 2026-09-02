@@ -36,20 +36,22 @@ export type LoadMaterialApuCommitmentsOpts = {
   categories?: CostCategory[];
 };
 
-async function resolveBudgetId(
+async function resolveBudgetIds(
   projectId: string,
   tenantId: string,
   budgetId?: string,
-): Promise<string | null> {
-  // Same selection rule as resolveApprovedBudgetForProject (updatedAt desc).
+): Promise<string[]> {
   const budgets = await prisma.budget.findMany({
     where: { projectId, tenantId, status: { in: ["APPROVED", "CLOSED"] } },
     select: { id: true },
     orderBy: { updatedAt: "desc" },
   });
-  if (budgets.length === 0) return null;
-  if (budgetId) return budgets.find((b) => b.id === budgetId)?.id ?? null;
-  return budgets[0]!.id;
+  if (budgets.length === 0) return [];
+  if (budgetId) {
+    return budgets.some((b) => b.id === budgetId) ? [budgetId] : [];
+  }
+  // SC catalog / multi-budget: seed from all APPROVED/CLOSED (not only latest).
+  return budgets.map((b) => b.id);
 }
 
 /**
@@ -61,8 +63,8 @@ export async function loadMaterialApuCommitments(
   tenantId: string,
   opts: LoadMaterialApuCommitmentsOpts = {},
 ): Promise<MaterialApuCommitmentView[]> {
-  const budgetId = await resolveBudgetId(projectId, tenantId, opts.budgetId);
-  if (!budgetId) return [];
+  const budgetIds = await resolveBudgetIds(projectId, tenantId, opts.budgetId);
+  if (budgetIds.length === 0) return [];
 
   const categories =
     opts.categories && opts.categories.length > 0
@@ -71,7 +73,7 @@ export async function loadMaterialApuCommitments(
 
   const costItems = await prisma.costItem.findMany({
     where: {
-      budgetId,
+      budgetId: { in: budgetIds },
       wbsNode: {
         type: "ITEM",
         ...(opts.wbsNodeIds?.length ? { id: { in: opts.wbsNodeIds } } : {}),
@@ -96,6 +98,7 @@ export async function loadMaterialApuCommitments(
       },
     },
   });
+
   const seeds: MaterialNeedSeed[] = [];
   for (const item of costItems) {
     const itemQty = Number(item.quantity.toString());
@@ -141,6 +144,12 @@ export async function loadMaterialApuCommitments(
         wbsNodeId: opts.wbsNodeIds?.length
           ? { in: opts.wbsNodeIds }
           : { not: null },
+        OR: [
+          { costType: { in: categories } },
+          { costAnalysisLine: { category: { in: categories } } },
+          // Legacy free-text (no type, no APU) — same attribution as materials board.
+          { AND: [{ costType: null }, { costAnalysisLineId: null }] },
+        ],
       },
       select: {
         wbsNodeId: true,
@@ -160,6 +169,11 @@ export async function loadMaterialApuCommitments(
         wbsNodeId: opts.wbsNodeIds?.length
           ? { in: opts.wbsNodeIds }
           : { not: null },
+        OR: [
+          { costType: { in: categories } },
+          { costAnalysisLine: { category: { in: categories } } },
+          { AND: [{ costType: null }, { costAnalysisLineId: null }] },
+        ],
       },
       select: {
         wbsNodeId: true,

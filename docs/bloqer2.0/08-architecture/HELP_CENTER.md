@@ -32,7 +32,7 @@ Acceso: membresía activa; **sin** permiso de módulo. Deep links a pantallas de
 - `figure` es opcional: mapa o esquema en `apps/web/public/help/` (URL `/help/…`). No usar capturas de pantalla de producto. Clic abre `<ImageLightbox>` (clases `.image-lightbox-*` en `globals.css`); no navega.
 - Home sin búsqueda: **Mapas de proceso** (`HELP_PROCESS_MAPS`, empresa / obra) y debajo los **destacados** (`HELP_FEATURED_SLUGS`). El mapa no reemplaza la ficha: cada card abre el procedimiento con el texto + la figura.
 - Un mismo flujo puede tener **caminito** (si/si no, figura principal de la ficha) y **lámina** (roles y detalle) en la galería. La figura de la ficha debe ser uno de esos mapas.
-- Fuentes: `docs/bloqer2.0/guides/assets/flujos/` (caminitos) y `docs/bloqer2.0/guides/assets/laminas/` (láminas). En la app se copian planos a `/help/`.
+- Fuentes: `docs/bloqer2.0/guides/assets/flujos/` (caminitos) y `docs/bloqer2.0/guides/assets/laminas/` (láminas). En la app se copian planos a `/help/` (p. ej. `mapa-flujo-mano-obra-equipos-si-no.png`). Render: `docs/bloqer2.0/guides/assets/render-process-maps.ps1`.
 - Búsqueda: normalización es-AR, stopwords, aliases de frases/modismos AR, AND por tokens, tope de 8 resultados y corte por score relativo (evitar listados largos).
 - Tokens genéricos y acrónimos cortos (`compra`, `pagar`, `obra`, `oc`, `pdf`…) solo matchean título/keywords.
 - Chips de objetivo: solo intents con label curado (los nicho siguen en fichas/keywords).

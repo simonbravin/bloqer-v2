@@ -881,15 +881,16 @@ flowchart TD
 
 **Rol:** tablero de **cantidades** APU `LABOR` (necesidad vs pedido vs facturado). El **$** por tipo está en Planificación → **EDT y costos** (filtro *Mano de obra*).
 
-**Prerrequisito:** presupuesto `APPROVED`/`CLOSED` con líneas **LABOR** en APU (no `gl` / lump sin necesidad física).
+**Prerrequisito:** presupuesto `APPROVED`/`CLOSED` con líneas **LABOR** en APU (no `gl` / lump sin necesidad física). Con **varios presupuestos** aprobados, el tablero usa el baseline elegido (o el más reciente); al abrir una partida desde EDT, Bloqer resuelve el presupuesto dueño de ese nodo EDT.
 
-1. Vista **Operativo** (default). Misma ventana de cronograma que Materiales.
+1. Vista **Operativo** (default). Misma ventana de cronograma que Materiales. Si el módulo de cronograma está off o entrás desde EDT (drilldown), se muestra en ventana **todas** (solo cantidades).
 2. Columnas: EDT · Insumo APU · Necesidad · $ Presup. · Pedido · Facturado · Faltante.
 3. **Faltante** = necesidad − max(pedido, facturado). Así una liquidación directa (sin OC) también cierra el faltante.
-4. **Pedir** abre SC prellenada (insumo APU + tipo LAB vía categoría APU). Camino SC → OC → factura tipada.
-5. **Factura** / **Registrar factura** abre factura de proveedor en modo costo directo tipada **Mano de obra** (liquidación, jornal, empleado [D-089]). El prefill conserva el **insumo APU** (`costAnalysisLineId`) para que el tablero matchee el facturado sin depender solo de la descripción ([D-110]).
-6. Vista **Varianza ($)**: presupuesto APU LAB vs facturas emitidas tipadas LAB (**montos netos sin IVA**). **Exportar** CSV en esa vista.
-7. Atajos: **EDT y costos** · **Tablero de compras** · **Facturas proveedor**.
+4. **Pedido** cuenta SC enviada (sin OC confirmada) y OC confirmada/recibida tipadas **LAB** o ligadas a APU LABOR. **Facturado** cuenta facturas **emitidas** tipadas LAB (o heredadas de OC tipada LAB); si el módulo AP está off, Facturado queda en 0 y el tablero avisa.
+5. **Pedir** / **Pedir resto** abre SC prellenada: partida, cantidad faltante, insumo APU si la fila lo tiene, y **tipo Mano de obra** (`costType=LABOR`) aunque la línea sea texto libre. Camino SC → OC → factura tipada ([D-109]).
+6. **Factura** / **Registrar factura** abre factura de proveedor en modo costo directo tipada **Mano de obra** (liquidación, jornal, empleado [D-089]). El prefill guarda el **insumo APU** en la línea (`costAnalysisLineId`) para que el tablero baje el facturado de **esa** fila; no se matchea solo por descripción ([D-110]). Si cambiás la partida EDT, se limpia el vínculo APU: revisá tipado e insumo.
+7. Vista **Varianza ($)**: presupuesto APU LAB vs facturas emitidas tipadas LAB (**montos netos sin IVA**, misma base que EDT). **Exportar** CSV en esa vista (rango de fechas inclusivo).
+8. Atajos: **EDT y costos** · **Tablero de compras** · **Facturas proveedor**.
 
 > **No es subcontrato.** Paquete con contrato + certificación → Compras → **Subcontratos** (§10). Cuadrilla/jornal/empleado facturado → este tablero + tipo LAB.
 
@@ -901,14 +902,14 @@ flowchart TD
 
 **Ruta:** Operación → **Equipos** → `/proyectos/[id]/equipos`
 
-Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** → SC/OC tipada EQP; **Factura** → AP tipada **Equipos**. Varianza y export CSV igual que §9.0.1 (neto sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]). Mismo caminito que §9.0.1.
+Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** lleva `costType=EQUIPMENT`; **Factura** → AP tipada **Equipos** con vínculo APU ([D-110]). Varianza y export CSV: presupuesto EQP vs facturado **neto** (sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]). Mismo caminito que §9.0.1.
 
 ### 9.1 Procedimiento — Solicitud de compra (SC)
 
 **Ruta:** Compras → **Solicitudes de compra**
 
-1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales / Mano de obra / Equipos → **Pedir**.
-2. En **Nueva solicitud**: primero **Dónde se usa** (partida EDT obligatoria, ordenada por código — 1.2 antes que 19.1). Después **Qué necesito**: podés agregar **varias líneas** de la misma partida con **+ Agregar insumo** o **Agregar faltantes (N)** (insumos APU **materiales, mano de obra o equipos** con faltante según necesidad − ya pedido). Cada línea puede ligarse a un insumo APU distinto (no repetible en la misma SC); al elegirlo se precarga descripción, unidad, cantidad faltante y **monto est.** de ese insumo (cant. × ref. presup. del APU, no del ítem EDT completo). Luego **Cuándo**.
+1. **Nueva solicitud** (diálogo / `?create=1`) desde **Solicitudes de compra** o **Tablero de compras** (**Nueva solicitud** / **Todas las solicitudes**), o llegar prellenada desde Materiales / Mano de obra / Equipos → **Pedir** (`from=materiales|mano-obra|equipos` + `costType` + insumo APU si aplica).
+2. En **Nueva solicitud**: primero **Dónde se usa** (partida EDT obligatoria, ordenada por código — 1.2 antes que 19.1). Después **Qué necesito**: podés agregar **varias líneas** de la misma partida con **+ Agregar insumo** o **Agregar faltantes (N)** (insumos APU **materiales, mano de obra o equipos** con faltante según necesidad − ya pedido, sumando todos los presupuestos `APPROVED`/`CLOSED` del proyecto). Cada línea puede ligarse a un **insumo APU** distinto (placeholder *Elegir insumo APU…*; no repetible en la misma SC); al elegirlo se precarga descripción, unidad, cantidad faltante, **monto est.** y, al guardar, **tipo de costo** + línea `SERVICE` si es LABOR/EQUIPMENT. Sin APU, el tipo se hereda del tablero de origen (`costType` / `from`). Luego **Cuándo**.
 3. **Fecha requerida obligatoria** ([BR-PUR-017] · [D-096]): cuándo se necesita el material en obra. El formulario no deja guardar la SC sin ese dato. Sirve para priorizar cotizaciones y entregas, y aparece como **Necesaria para** en el listado y **Pendientes**.
 4. Guardar `DRAFT` → **Enviar** → `SUBMITTED` (snapshot de costo presupuestario / cantidad por partida EDT).
 5. Cargar **Cotizaciones**: elegí proveedor (buscador: razón social o nombre fantasía), **precio unit.**, **Desc. %** (opcional, antes de IVA), **alícuota IVA** y, si el proveedor te pasó el **precio final con IVA** (Factura B), marcá **El precio unitario incluye IVA**. El formulario muestra neto, IVA y total por línea antes de guardar. También **plazo de entrega en días** + validez. En el listado se ve el total y, debajo del proveedor, cada línea con precio neto y **Desc. %**. Mientras la SC esté enviada y la cotización **Recibida** (sin seleccionar), podés **Editar** o **Eliminar** una cotización cargada de más. **Cotizaciones ya guardadas no se recalculan**: quedan con los importes que tienen; el checkbox aplica al cargar/editar de acá en más. Cumplir mínimo de cotizaciones de `/configuracion/politicas`. El umbral que obliga SC+cotizaciones vs OC directa lo setea cada empresa en políticas de compras (no es un monto fijo del producto).
@@ -1128,9 +1129,9 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 **Alta en obra (`/nueva`):**
 
-1. Elegí el modo **Contra orden de compra** o **Costo directo** ([D-102]). Contra OC: picker de OC + “Traer líneas” (baja el comprometido abierto). Costo directo: sin OC; imputá partida y tipo de costo (no reduce comprometido). El chip **Clase** muestra Compra comprometida o Costo directo de obra.
-2. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), **adjunto** opcional (foto/PDF del comprobante).
-3. Desde OC / recepción: botón **Registrar factura** del panel Facturación abre en modo Contra OC y copia la partida EDT de cada línea.
+1. Elegí el modo **Contra orden de compra** o **Costo directo** ([D-102]). Contra OC: picker de OC + “Traer líneas” (baja el comprometido abierto; copia partida EDT, tipo de costo e **insumo APU** de la OC si había, [D-110]). Costo directo: sin OC; imputá partida y tipo de costo (no reduce comprometido). Desde Operación → **Mano de obra** / **Equipos** → **Factura**, el alta llega tipada LAB/EQP con vínculo APU prellenado. El chip **Clase** muestra Compra comprometida o Costo directo de obra.
+2. **A quién se le paga** (proveedor o empleado si no hay OC), fechas, líneas (cada línea con **partida EDT obligatoria**, D-055; **Tipo de costo**; **insumo APU** opcional — se limpia si cambiás la partida; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), **adjunto** opcional (foto/PDF del comprobante).
+3. Desde OC / recepción: botón **Registrar factura** del panel Facturación abre en modo Contra OC y copia la partida EDT (y APU) de cada línea.
 4. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).
 5. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.
 
@@ -1216,8 +1217,8 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 - **Menú:** Planificación → **EDT y costos**.
 - **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**).
-- **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic o desde Materiales / reportes).
-- Es el **tablero de control de costos** del proyecto. Materiales (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
+- **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic o desde Materiales / Mano de obra / Equipos / reportes). En el detalle, secciones de cobertura APU **Materiales / Mano de obra / Equipos** enlazan al tablero operativo de esa partida (cantidades; el presupuesto dueño del nodo EDT se resuelve solo).
+- Es el **tablero de control de costos** del proyecto. Materiales / Mano de obra / Equipos (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
 - Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2). Arriba de la tabla, dos gráficos lado a lado: **Composición del presupuesto** (torta APU planificada) y **Gasto por tipo** (barras Presup / Devengado / Exposición por categoría, [D-099]). Y **vistas de columnas** (Financiero / Compacto / Cantidades / % Avance / Personalizado; preferencia en el navegador).
 - **Filtro por tipo de costo ([D-099]):** en la barra superior, selector *Tipo de costo* (Todos / Materiales / Mano de obra / Equipos / Subcontratos / Otros). Al elegir un tipo, la tabla reemplaza los importes por los del bucket, oculta columnas de cantidad / recepción / avance libro / certificado (son atributos de la partida entera, no de un tipo), y los totales del proyecto se recalculan para ese tipo. El CSV / PDF respeta el filtro (queda en la URL como `?costType=`).
 - **Desglose por tipo de costo ([D-099]):** en partidas hoja, el chevron junto al código EDT abre filas de solo lectura por categoría presente (Materiales / Mano de obra / Equipos / Subcontratos / Otros). El presupuesto por tipo viene del APU; el gasto tipado de OC, factura, subcontrato y consumo. Categorías vacías se ocultan. En el diálogo de partida, sección **Por tipo de costo**. El chevron se desactiva cuando el filtro por tipo está activo (redundante).
@@ -1229,7 +1230,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Vista de columnas:** *Financiero* solo muestra montos ($), *Cantidades* separa qty y % avance libro / recepción, *% Avance* combina capas + %, *Compacto* deja lo mínimo (presupuesto, exposición, variación, %).
 - **Detalle de partida (diálogo):** links a OC, subcontratos, facturas de proveedor y pagos (trazabilidad partida → documento); desglose por tipo.
 - **Matching 3 vías (compras):** en detalle de OC, avisos si facturado supera recibido ± tolerancia de empresa ([D-067]); la recepción respeta tolerancia de sobrecantidad (0–5%).
-- **Insumo APU en OC / factura tipada (opcional):** se puede ligar un insumo del APU de la partida para prellenar y para matchear cobertura en tableros; la imputación de $ sigue en la partida EDT ([D-068] / [D-110] / [D-057]); el tipo de costo se sugiere desde la categoría APU ([D-099]).
+- **Insumo APU en OC / factura tipada (opcional):** se puede ligar un insumo del APU de la partida para prellenar y para matchear cobertura en tableros MAT/LAB/EQP; la imputación de $ sigue en la partida EDT ([D-068] / [D-110] / [D-057]). En factura, el match de **cantidad facturada** prioriza `costAnalysisLineId` (no solo la descripción). El tipo de costo se sugiere desde la categoría APU ([D-099]).
 - La ruta antigua `/reportes/presupuesto-vs-real` redirige acá ([D-098]).
 
 **Smoke manual — trazabilidad partida → pago**
@@ -1607,4 +1608,4 @@ flowchart LR
 
 ---
 
-*Documento vivo. Actualizado agosto 2026: descuento % en líneas de OC/facturas/cotizaciones ([D-093]); centro de ayuda in-app `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Antes: julio 2026 (zona horaria, EDT/APU, contabilidad D-061…D-063, auth). Actualizar en el mismo PR que el cambio de producto.*
+*Documento vivo. Actualizado septiembre 2026: tableros Mano de obra / Equipos ([D-109]), vínculo APU en factura ([D-110]), caminito MO/EQP, Pedir tipado desde faltante, varianza CSV neto. Antes: agosto 2026 — descuento % en líneas ([D-093]); centro de ayuda `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Actualizar en el mismo PR que el cambio de producto.*

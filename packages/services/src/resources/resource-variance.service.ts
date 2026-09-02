@@ -5,6 +5,7 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveApprovedBudgetForProject } from "../reports/report-budget-resolve";
+import { parseFilterDate } from "../reports/report-month";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import {
@@ -55,8 +56,9 @@ export type ResourceVarianceResult = ResourceVarianceReport | ResourceVarianceEm
 function dateWhere(from?: string, to?: string) {
   if (!from && !to) return undefined;
   return {
-    ...(from ? { gte: new Date(from) } : {}),
-    ...(to ? { lte: new Date(to) } : {}),
+    ...(from ? { gte: parseFilterDate(from, false) } : {}),
+    // Inclusive end-of-day (UTC) — bare `new Date(YYYY-MM-DD)` cuts off the last day.
+    ...(to ? { lte: parseFilterDate(to, true) } : {}),
   };
 }
 
@@ -157,12 +159,15 @@ export async function getResourceVarianceReport(
 
     for (const line of lines) {
       if (!line.wbsNodeId) continue;
-      const resolved: string =
-        line.costType ??
-        line.purchaseOrderLine?.costType ??
-        line.purchaseOrderLine?.costAnalysisLine?.category ??
-        "";
-      if (resolved !== category) continue;
+      // Align with board: explicit costType, else OC type or OC APU category.
+      if (line.costType) {
+        if (line.costType !== category) continue;
+      } else {
+        const po = line.purchaseOrderLine;
+        const ok =
+          po?.costType === category || po?.costAnalysisLine?.category === category;
+        if (!ok) continue;
+      }
       accruedMap.set(
         line.wbsNodeId,
         (accruedMap.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).plus(line.lineSubtotal),

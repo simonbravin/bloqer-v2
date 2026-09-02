@@ -42,6 +42,8 @@ interface PurchaseRequestFormProps {
     productId?: string;
     costAnalysisLineId?: string;
     unit?: string;
+    /** Board costType when Pedir without APU ([D-109]). */
+    costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
   };
   prefilledFromMaterials?: boolean;
   /** Origin board for banner (`materiales` | `mano-obra` | `equipos`). */
@@ -178,6 +180,17 @@ export function PurchaseRequestForm({
               wbsNodeId,
               selectedWbs?.budgetUnit ?? "un",
               apuCatalog,
+              {
+                defaultCostType:
+                  initialLine?.costType ??
+                  (prefillFrom === "mano-obra"
+                    ? "LABOR"
+                    : prefillFrom === "equipos"
+                      ? "EQUIPMENT"
+                      : prefillFrom === "materiales"
+                        ? "MATERIAL"
+                        : undefined),
+              },
             );
             if (!prepared.ok) {
               setError(prepared.error);
@@ -359,7 +372,7 @@ export function PurchaseRequestForm({
                         onValueChange={(v) =>
                           applyApuOnLine(line.rowKey, v === SEARCHABLE_NONE ? null : v)
                         }
-                        placeholder="Elegir material del APU…"
+                        placeholder="Elegir insumo APU…"
                         searchPlaceholder="Buscar insumo…"
                         disabled={apuCatalog.length === 0}
                       />

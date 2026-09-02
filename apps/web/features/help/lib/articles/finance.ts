@@ -291,7 +291,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     steps: [
       "¿Es material con OC o un paquete de ejecución? Si sí → usá el caminito de compras o el de subcontrato. Este camino es gasto directo.",
       "Facturas proveedor → Nueva → modo Costo directo. ¿Cada línea tiene partida hoja EDT? Si no → no se guarda.",
-      "Payee: Proveedor o Empleado. Tipo de costo en cada línea. No baja el comprometido de una OC.",
+      "Payee: Proveedor o Empleado. Tipo de costo en cada línea. Desde Mano de obra / Equipos → Factura llega tipado + insumo APU ([D-110]).",
       "Crear → Emitir = Devengado + CxP. ¿Pagar ahora? Si sí, hace falta fondos y mes abierto; si no, Bloqer bloquea. Si no pagás ahora, queda CxP.",
     ],
     figure: {
@@ -302,6 +302,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     pitfalls: [
       "Costo directo no reduce el comprometido de una OC. Si compraste contra OC, usá Contra orden de compra.",
       "No uses Solo caja para reintegrar al capataz.",
+      "Si cambiás la partida EDT, se limpia el vínculo APU: el tablero de MO/Equipos deja de matchear esa fila por id.",
     ],
     relatedSlugs: [
       "reintegrar-gasto-a-empleado",

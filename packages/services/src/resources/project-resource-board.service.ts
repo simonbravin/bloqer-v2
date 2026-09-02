@@ -185,10 +185,27 @@ export async function getProjectResourceBoard(
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
 
   const category = asCostCategory(costCategory);
-  const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
+
+  // When filtering by WBS without budgetId, resolve the budget that owns that node
+  // (multi-budget projects [D-002] — latest APPROVED alone would miss the item).
+  let budgetIdHint = filters.budgetId;
+  if (!budgetIdHint && filters.wbsNodeId) {
+    const wbs = await prisma.wbsNode.findFirst({
+      where: {
+        id: filters.wbsNodeId,
+        type: "ITEM",
+        budget: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
+      },
+      select: { budgetId: true },
+    });
+    budgetIdHint = wbs?.budgetId;
+  }
+
+  const budget = await resolveApprovedBudgetForProject(projectId, budgetIdHint, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS", costCategory };
 
-  const window = filters.window ?? "next_14_days";
+  // skipSchedule is qty-only (EDT drilldown); forcing `all` avoids empty schedule ⇒ false "in window".
+  const window = filters.skipSchedule ? "all" : (filters.window ?? "next_14_days");
   const { start: winStart, end: winEnd } = resolveWindow(window);
   const warnings: string[] = [];
   const scopeWbsId = filters.wbsNodeId;
@@ -369,48 +386,52 @@ export async function getProjectResourceBoard(
         purchaseOrder: { select: { id: true, number: true } },
       },
     }),
-    prisma.supplierInvoiceLine.findMany({
-      where: {
-        invoice: {
-          projectId,
-          tenantId: ctx.tenantId,
-          status: "ISSUED",
-          // Subcontract cert invoices are always SUB — exclude for safety.
-          subcontractCertificationId: null,
-        },
-        wbsNodeId: scopeWbsId ? scopeWbsId : { not: null },
-        OR: [
-          { costType: category },
-          // Inherit from OC only when the invoice line has no explicit costType
-          // (avoids attributing MATERIAL invoices onto LABOR/EQUIPMENT boards).
-          {
-            AND: [
-              { costType: null },
+    gate.isEnabled("AP")
+      ? prisma.supplierInvoiceLine.findMany({
+          where: {
+            invoice: {
+              projectId,
+              tenantId: ctx.tenantId,
+              status: "ISSUED",
+              // Subcontract cert invoices are always SUB — exclude for safety.
+              subcontractCertificationId: null,
+            },
+            wbsNodeId: scopeWbsId ? scopeWbsId : { not: null },
+            OR: [
+              { costType: category },
+              // Inherit from OC only when the invoice line has no explicit costType
+              // (avoids attributing MATERIAL invoices onto LABOR/EQUIPMENT boards).
               {
-                purchaseOrderLine: {
-                  OR: [{ costType: category }, { costAnalysisLine: { category } }],
-                },
+                AND: [
+                  { costType: null },
+                  {
+                    purchaseOrderLine: {
+                      OR: [{ costType: category }, { costAnalysisLine: { category } }],
+                    },
+                  },
+                ],
               },
             ],
           },
-        ],
-      },
-      select: {
-        wbsNodeId: true,
-        description: true,
-        quantity: true,
-        costAnalysisLineId: true,
-        purchaseOrderLineId: true,
-        purchaseOrderLine: {
-          select: { costAnalysisLineId: true, description: true },
-        },
-        invoice: { select: { id: true, number: true } },
-      },
-    }),
-    gate.isEnabled("SCHEDULE") && !filters.skipSchedule && !scopeWbsId
+          select: {
+            wbsNodeId: true,
+            description: true,
+            quantity: true,
+            costAnalysisLineId: true,
+            purchaseOrderLineId: true,
+            purchaseOrderLine: {
+              select: { costAnalysisLineId: true, description: true },
+            },
+            invoice: { select: { id: true, number: true } },
+          },
+        })
+      : Promise.resolve([]),
+    gate.isEnabled("SCHEDULE") && !filters.skipSchedule
       ? prisma.scheduleItemWbsLink.findMany({
           where: {
-            wbsNode: { budgetId: budget.id },
+            ...(scopeWbsId
+              ? { wbsNodeId: scopeWbsId }
+              : { wbsNode: { budgetId: budget.id } }),
             scheduleItem: {
               schedule: { projectId, tenantId: ctx.tenantId },
               status: { not: "CANCELLED" },
@@ -421,22 +442,12 @@ export async function getProjectResourceBoard(
             scheduleItem: { select: { startDate: true, endDate: true } },
           },
         })
-      : gate.isEnabled("SCHEDULE") && !filters.skipSchedule && scopeWbsId
-        ? prisma.scheduleItemWbsLink.findMany({
-            where: {
-              wbsNodeId: scopeWbsId,
-              scheduleItem: {
-                schedule: { projectId, tenantId: ctx.tenantId },
-                status: { not: "CANCELLED" },
-              },
-            },
-            select: {
-              wbsNodeId: true,
-              scheduleItem: { select: { startDate: true, endDate: true } },
-            },
-          })
-        : Promise.resolve([]),
+      : Promise.resolve([]),
   ]);
+
+  if (!gate.isEnabled("AP")) {
+    warnings.push("Módulo AP deshabilitado: no se cuenta cantidad facturada.");
+  }
 
   const prIdsByCal = new Map<string, string[]>();
   const prNumberById = new Map<string, number>();
@@ -448,7 +459,9 @@ export async function getProjectResourceBoard(
 
   for (const line of prLines) {
     if (!line.wbsNodeId) continue;
-    const row = ensureOrphan(line.wbsNodeId, line.description, line.costAnalysisLineId);
+    let apuId = line.costAnalysisLineId;
+    if (apuId && !byApuId.has(apuId)) apuId = null;
+    const row = ensureOrphan(line.wbsNodeId, line.description, apuId);
     row.orderedQty = row.orderedQty.add(line.quantity);
     if (row.costAnalysisLineId) {
       const list = prIdsByCal.get(row.costAnalysisLineId) ?? [];
@@ -460,9 +473,12 @@ export async function getProjectResourceBoard(
 
   for (const line of poLines) {
     if (!line.wbsNodeId) continue;
-    const row = ensureOrphan(line.wbsNodeId, line.description, line.costAnalysisLineId);
+    let apuId = line.costAnalysisLineId;
+    if (apuId && !byApuId.has(apuId)) apuId = null;
+    const row = ensureOrphan(line.wbsNodeId, line.description, apuId);
     row.orderedQty = row.orderedQty.add(line.quantity);
-    poLineToApu.set(line.id, row.costAnalysisLineId);
+    // Only propagate a board-valid APU id to invoices — not a description fuzzy match.
+    poLineToApu.set(line.id, apuId);
     if (row.costAnalysisLineId) {
       const list = poIdsByCal.get(row.costAnalysisLineId) ?? [];
       list.push(line.purchaseOrder.id);
@@ -479,10 +495,35 @@ export async function getProjectResourceBoard(
           line.purchaseOrderLine?.costAnalysisLineId ??
           null)
         : null;
-    // Prefer explicit APU hint on the invoice line ([D-110]).
-    const apuId = line.costAnalysisLineId ?? fromPo;
+    // Prefer explicit APU hint ([D-110]), else OC APU — only if that APU is already
+    // on this board (same CostCategory). Never invent a row keyed by a foreign APU.
+    let apuId = line.costAnalysisLineId ?? fromPo;
+    if (apuId && !byApuId.has(apuId)) {
+      apuId = null;
+    }
     const desc = line.purchaseOrderLine?.description ?? line.description;
-    const row = ensureOrphan(line.wbsNodeId, desc, apuId);
+    // Invoice qty: never fuzzy-match onto an APU by description alone (wrong row risk).
+    let row: Agg;
+    if (apuId) {
+      row = ensureOrphan(line.wbsNodeId, desc, apuId);
+    } else {
+      const key = resourceRowKey(line.wbsNodeId, null, desc);
+      let orphan = map.get(key);
+      if (!orphan) {
+        orphan = {
+          wbsNodeId: line.wbsNodeId,
+          costAnalysisLineId: null,
+          description: desc,
+          unit: null,
+          needQty: ZERO,
+          needCost: ZERO,
+          orderedQty: ZERO,
+          invoicedQty: ZERO,
+        };
+        map.set(key, orphan);
+      }
+      row = orphan;
+    }
     row.invoicedQty = row.invoicedQty.add(line.quantity);
     if (row.costAnalysisLineId) {
       const list = invIdsByCal.get(row.costAnalysisLineId) ?? [];

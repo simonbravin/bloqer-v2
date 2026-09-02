@@ -388,6 +388,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "En sumas y saldos / diario / ESP / EERR también hay XLSX cuando la pantalla lo ofrece.",
       "Presupuesto EDT: export desde el detalle del presupuesto.",
       "Materiales → Varianza ($): Exportar (CSV/PDF) en la misma fila que Operativo / Varianza.",
+      "Mano de obra / Equipos → Varianza ($): Exportar CSV (presupuesto APU vs facturado neto, sin IVA).",
       "Libro de obra (parte): Exportar PDF del parte (embebe fotos jpeg/png/webp).",
       "Cronograma: Exportar abre un diálogo (Tabla / Gantt / Ambos y lapso opcional) y después Excel o PDF.",
       "Registro de actividad: CSV/PDF en zona horaria de la empresa.",
@@ -407,6 +408,9 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "ver-registro-de-actividad",
       "ver-rentabilidad-de-obra",
       "presupuesto-vs-real",
+      "tablero-mano-obra",
+      "tablero-equipos",
+      "tablero-materiales",
     ],
     keywords: [
       "exportar",
