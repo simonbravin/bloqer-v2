@@ -20,7 +20,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
-import { assertWbsLineForProject } from "../procurement/procurement-wbs";
+import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "../procurement/procurement-wbs";
 import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
 import { ensureDraftJournalFromSupplierInvoice } from "../accounting/accounting-auto-draft.service";
 import {
@@ -41,6 +41,7 @@ export async function resolveInvoiceLineCostTypes(
   lines: Array<{
     costType?: CostCategory | null;
     purchaseOrderLineId?: string | null;
+    costAnalysisLineId?: string | null;
     wbsNodeId?: string | null;
   }>,
   tenantId?: string,
@@ -58,6 +59,19 @@ export async function resolveInvoiceLineCostTypes(
       if (pl.costType) poCostById.set(pl.id, pl.costType);
     }
   }
+  const apuIds = [
+    ...new Set(lines.map((l) => l.costAnalysisLineId).filter((id): id is string => Boolean(id))),
+  ];
+  const apuCategoryById = new Map<string, CostCategory>();
+  if (apuIds.length > 0 && tenantId) {
+    const apuLines = await prisma.costAnalysisLine.findMany({
+      where: { id: { in: apuIds }, budget: { tenantId } },
+      select: { id: true, category: true },
+    });
+    for (const al of apuLines) {
+      apuCategoryById.set(al.id, al.category);
+    }
+  }
   // APU-derived dominant CostCategory used when neither the caller nor the OC
   // line provide a costType. Requires tenantId because we cross project boundaries
   // for the WBS lookup.
@@ -68,6 +82,7 @@ export async function resolveInvoiceLineCostTypes(
             .filter(
               (l) =>
                 !l.costType &&
+                !(l.costAnalysisLineId && apuCategoryById.has(l.costAnalysisLineId)) &&
                 !(l.purchaseOrderLineId && poCostById.has(l.purchaseOrderLineId)) &&
                 l.wbsNodeId,
             )
@@ -84,9 +99,12 @@ export async function resolveInvoiceLineCostTypes(
     const fromPo = line.purchaseOrderLineId
       ? (poCostById.get(line.purchaseOrderLineId) ?? null)
       : null;
+    const fromApu = line.costAnalysisLineId
+      ? (apuCategoryById.get(line.costAnalysisLineId) ?? null)
+      : null;
     return resolveLineCostType({
       costType: line.costType ?? null,
-      apuCategory: fromPo,
+      apuCategory: fromApu ?? fromPo,
       wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
     });
   });
@@ -112,6 +130,7 @@ export type SupplierInvoiceLineView = {
   invoiceId: string;
   wbsNodeId: string | null;
   purchaseOrderLineId: string | null;
+  costAnalysisLineId: string | null;
   costType: string | null;
   description: string;
   quantity: string;
@@ -168,6 +187,33 @@ export async function assertSupplierInvoiceLinesWbs(
       );
     }
     await assertWbsLineForProject(line.wbsNodeId, projectId, tenantId);
+  }
+}
+
+/**
+ * [D-110] When a line references an APU, it must belong to the line's WBS ITEM.
+ * Corporate invoices cannot carry costAnalysisLineId.
+ */
+export async function assertSupplierInvoiceLinesApu(
+  projectId: string | null,
+  lines: Array<{ costAnalysisLineId?: string | null; wbsNodeId?: string | null }>,
+  tenantId: string,
+): Promise<void> {
+  for (const line of lines) {
+    if (!line.costAnalysisLineId) continue;
+    if (!projectId) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Las facturas corporativas (sin proyecto) no llevan insumo APU",
+      );
+    }
+    if (!line.wbsNodeId) {
+      throw new ServiceError(
+        "VALIDATION",
+        "El insumo APU requiere una partida EDT en la misma línea",
+      );
+    }
+    await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, tenantId);
   }
 }
 
@@ -614,6 +660,7 @@ export async function createSupplierInvoice(
     input.lines,
     ctx.tenantId,
   );
+  await assertSupplierInvoiceLinesApu(projectId, input.lines, ctx.tenantId);
   const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
   const maxNum = await prisma.supplierInvoice.aggregate({
@@ -660,6 +707,7 @@ export async function createSupplierInvoice(
           invoiceId:   created.id,
           wbsNodeId:   line.wbsNodeId ?? null,
           purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+          costAnalysisLineId: line.costAnalysisLineId ?? null,
           costType: lineCostTypes[i] ?? "MATERIAL",
           description: line.description,
           quantity:    qty,
@@ -771,6 +819,7 @@ export async function updateSupplierInvoice(
         input.lines,
         ctx.tenantId,
       );
+      await assertSupplierInvoiceLinesApu(existing.projectId, input.lines, ctx.tenantId);
     } else if (
       input.purchaseOrderId !== undefined &&
       input.purchaseOrderId !== existing.purchaseOrderId
@@ -851,6 +900,7 @@ export async function updateSupplierInvoice(
             invoiceId: id,
             wbsNodeId: line.wbsNodeId ?? null,
             purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+            costAnalysisLineId: line.costAnalysisLineId ?? null,
             costType: updateLineCostTypes[i] ?? "MATERIAL",
             description: line.description,
             quantity: qty,
@@ -1221,6 +1271,7 @@ type RawInvoice = SupplierInvoice & {
     invoiceId: string;
     wbsNodeId: string | null;
     purchaseOrderLineId: string | null;
+    costAnalysisLineId: string | null;
     costType: CostCategory | null;
     description: string;
     quantity: Prisma.Decimal;
@@ -1292,6 +1343,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
       invoiceId:   l.invoiceId,
       wbsNodeId:   l.wbsNodeId,
       purchaseOrderLineId: l.purchaseOrderLineId,
+      costAnalysisLineId: l.costAnalysisLineId ?? null,
       costType:    l.costType ?? null,
       description: l.description,
       quantity:    serializeQtyDecimal(l.quantity),

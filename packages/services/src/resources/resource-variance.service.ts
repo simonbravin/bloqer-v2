@@ -89,7 +89,7 @@ export async function getResourceVarianceReport(
 
   const category = asCostCategory(costCategory);
   const warnings: string[] = [
-    `Presupuesto APU ${RESOURCE_BOARD_LABELS_ES[costCategory]} vs facturas proveedor emitidas tipadas (${category}).`,
+    `Presupuesto APU ${RESOURCE_BOARD_LABELS_ES[costCategory]} vs facturas proveedor emitidas tipadas (${category}), montos netos sin IVA (lineSubtotal; misma base que EDT / D-095).`,
   ];
 
   const wbsLeaves = sortByWbsCode(
@@ -134,9 +134,14 @@ export async function getResourceVarianceReport(
         OR: [
           { costType: category },
           {
-            purchaseOrderLine: {
-              OR: [{ costType: category }, { costAnalysisLine: { category } }],
-            },
+            AND: [
+              { costType: null },
+              {
+                purchaseOrderLine: {
+                  OR: [{ costType: category }, { costAnalysisLine: { category } }],
+                },
+              },
+            ],
           },
         ],
       },

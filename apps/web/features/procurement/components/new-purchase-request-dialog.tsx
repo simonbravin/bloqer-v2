@@ -32,6 +32,8 @@ interface Props {
     unit?: string;
   };
   prefilledFromMaterials?: boolean;
+  /** Preserves `from=mano-obra|equipos|materiales` on mobile redirect to /nueva. */
+  prefillFrom?: "materiales" | "mano-obra" | "equipos";
 }
 
 export function NewPurchaseRequestDialog({
@@ -42,6 +44,7 @@ export function NewPurchaseRequestDialog({
   triggerVariant = "default",
   initialLine,
   prefilledFromMaterials = false,
+  prefillFrom,
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -58,10 +61,11 @@ export function NewPurchaseRequestDialog({
     if (initialLine?.productId) next.set("productId", initialLine.productId);
     if (initialLine?.costAnalysisLineId) next.set("costAnalysisLineId", initialLine.costAnalysisLineId);
     if (initialLine?.unit) next.set("unit", initialLine.unit);
-    if (prefilledFromMaterials) next.set("from", "materiales");
+    const from = prefillFrom ?? (prefilledFromMaterials ? "materiales" : undefined);
+    if (from) next.set("from", from);
     const query = next.toString();
     return `/proyectos/${projectId}/solicitudes-compra/nueva${query ? `?${query}` : ""}`;
-  }, [projectId, initialLine, prefilledFromMaterials]);
+  }, [projectId, initialLine, prefilledFromMaterials, prefillFrom]);
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
@@ -146,6 +150,7 @@ export function NewPurchaseRequestDialog({
             wbsOptions={wbsOptions}
             initialLine={initialLine}
             prefilledFromMaterials={prefilledFromMaterials}
+            prefillFrom={prefillFrom}
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}

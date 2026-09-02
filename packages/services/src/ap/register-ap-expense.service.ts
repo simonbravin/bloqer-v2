@@ -28,6 +28,7 @@ import {
   assertPurchaseOrderLinkableForAp,
   assertSupplierInvoiceLinesPoLink,
   assertSupplierInvoiceLinesWbs,
+  assertSupplierInvoiceLinesApu,
   resolveCompanyIdForAp,
   resolveInvoiceLineCostTypes,
 } from "./supplier-invoice.service";
@@ -369,6 +370,7 @@ export async function registerApExpense(
     input.lines,
     ctx.tenantId,
   );
+  await assertSupplierInvoiceLinesApu(projectId, input.lines, ctx.tenantId);
   const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
@@ -460,6 +462,7 @@ export async function registerApExpense(
                   invoiceId: created.id,
                   wbsNodeId: line.wbsNodeId ?? null,
                   purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+                  costAnalysisLineId: line.costAnalysisLineId ?? null,
                   costType: lineCostTypes[i] ?? "MATERIAL",
                   description: line.description,
                   quantity: qty,

@@ -30,6 +30,14 @@ interface Props {
   canPayNow?: boolean;
   storageConfigured?: boolean;
   defaultOpen?: boolean;
+  initialLine?: {
+    wbsNodeId?: string;
+    description?: string;
+    quantity?: string;
+    unit?: string;
+    costType?: string;
+    costAnalysisLineId?: string;
+  };
 }
 
 export function NewProjectSupplierInvoiceDialog({
@@ -43,6 +51,7 @@ export function NewProjectSupplierInvoiceDialog({
   canPayNow = false,
   storageConfigured = false,
   defaultOpen = false,
+  initialLine,
 }: Props) {
   const pathname = usePathname();
   const router = useRouter();
@@ -56,11 +65,26 @@ export function NewProjectSupplierInvoiceDialog({
   function clearCreateQueryParams() {
     const hasCreate = searchParams.get("create") === "1";
     const hasError = Boolean(searchParams.get("error"));
-    if (!hasCreate && !hasError) return;
+    const hasPrefill =
+      Boolean(searchParams.get("from")) ||
+      Boolean(searchParams.get("wbsNodeId")) ||
+      Boolean(searchParams.get("description")) ||
+      Boolean(searchParams.get("quantity")) ||
+      Boolean(searchParams.get("costType")) ||
+      Boolean(searchParams.get("costAnalysisLineId")) ||
+      Boolean(searchParams.get("unit"));
+    if (!hasCreate && !hasError && !hasPrefill) return;
 
     const next = new URLSearchParams(searchParams.toString());
     next.delete("create");
     next.delete("error");
+    next.delete("from");
+    next.delete("wbsNodeId");
+    next.delete("description");
+    next.delete("quantity");
+    next.delete("costType");
+    next.delete("costAnalysisLineId");
+    next.delete("unit");
     const query = next.toString();
     router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
   }
@@ -107,6 +131,7 @@ export function NewProjectSupplierInvoiceDialog({
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}
+            initialLine={initialLine}
           />
         ) : null}
       </DialogContent>

@@ -1404,6 +1404,7 @@ model CostAnalysisLine {
   budget               Budget                @relation(fields: [budgetId], references: [id])
   purchaseOrderLines   PurchaseOrderLine[]
   purchaseRequestLines PurchaseRequestLine[]
+  supplierInvoiceLines SupplierInvoiceLine[]
 
   @@index([costItemId])
   @@index([budgetId])
@@ -2018,6 +2019,8 @@ model SupplierInvoiceLine {
   wbsNodeId           String?
   /// Optional link to PO line for 3-way / exposure anti-double-count ([D-066]).
   purchaseOrderLineId String?
+  /// Optional APU hint under the ITEM ([D-110] / D-068); cost still imputes to wbsNodeId ([D-057]).
+  costAnalysisLineId  String?
   /// Job-cost nature for EDT partida × cost type ([D-099]).
   costType            CostCategory?
   description         String
@@ -2033,13 +2036,15 @@ model SupplierInvoiceLine {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  invoice           SupplierInvoice    @relation(fields: [invoiceId], references: [id])
-  wbsNode           WbsNode?           @relation(fields: [wbsNodeId], references: [id])
-  purchaseOrderLine PurchaseOrderLine? @relation(fields: [purchaseOrderLineId], references: [id], onDelete: SetNull)
+  invoice            SupplierInvoice     @relation(fields: [invoiceId], references: [id])
+  wbsNode            WbsNode?            @relation(fields: [wbsNodeId], references: [id])
+  purchaseOrderLine  PurchaseOrderLine?  @relation(fields: [purchaseOrderLineId], references: [id], onDelete: SetNull)
+  costAnalysisLine   CostAnalysisLine?   @relation(fields: [costAnalysisLineId], references: [id], onDelete: SetNull)
 
   @@index([invoiceId])
   @@index([wbsNodeId])
   @@index([purchaseOrderLineId])
+  @@index([costAnalysisLineId])
   @@index([costType])
   @@map("supplier_invoice_lines")
 }

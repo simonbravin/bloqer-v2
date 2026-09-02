@@ -33,6 +33,8 @@ export type ResourceBoardFilters = {
   window?: ResourceBoardWindow;
   wbsNodeId?: string;
   search?: string;
+  /** Skip cronograma links (EDT drilldown qty-only path). */
+  skipSchedule?: boolean;
 };
 
 export type ResourceBoardRow = {
@@ -189,19 +191,26 @@ export async function getProjectResourceBoard(
   const window = filters.window ?? "next_14_days";
   const { start: winStart, end: winEnd } = resolveWindow(window);
   const warnings: string[] = [];
+  const scopeWbsId = filters.wbsNodeId;
 
   const wbsLeaves = await prisma.wbsNode.findMany({
     where: {
       budgetId: budget.id,
       type: "ITEM",
-      ...(filters.wbsNodeId ? { id: filters.wbsNodeId } : {}),
+      ...(scopeWbsId ? { id: scopeWbsId } : {}),
     },
     select: { id: true, code: true, name: true },
     orderBy: { code: "asc" },
   });
 
   const costItems = await prisma.costItem.findMany({
-    where: { budgetId: budget.id, wbsNode: { type: "ITEM" } },
+    where: {
+      budgetId: budget.id,
+      wbsNode: {
+        type: "ITEM",
+        ...(scopeWbsId ? { id: scopeWbsId } : {}),
+      },
+    },
     select: {
       wbsNodeId: true,
       quantity: true,
@@ -324,7 +333,7 @@ export async function getProjectResourceBoard(
             none: { status: { in: [...ORDERED_PO_STATUSES] } },
           },
         },
-        wbsNodeId: { not: null },
+        wbsNodeId: scopeWbsId ? scopeWbsId : { not: null },
         OR: [
           { costType: category },
           { costAnalysisLine: { category } },
@@ -345,7 +354,7 @@ export async function getProjectResourceBoard(
           tenantId: ctx.tenantId,
           status: { in: [...ORDERED_PO_STATUSES] },
         },
-        wbsNodeId: { not: null },
+        wbsNodeId: scopeWbsId ? scopeWbsId : { not: null },
         OR: [
           { costType: category },
           { costAnalysisLine: { category } },
@@ -369,7 +378,7 @@ export async function getProjectResourceBoard(
           // Subcontract cert invoices are always SUB — exclude for safety.
           subcontractCertificationId: null,
         },
-        wbsNodeId: { not: null },
+        wbsNodeId: scopeWbsId ? scopeWbsId : { not: null },
         OR: [
           { costType: category },
           // Inherit from OC only when the invoice line has no explicit costType
@@ -390,6 +399,7 @@ export async function getProjectResourceBoard(
         wbsNodeId: true,
         description: true,
         quantity: true,
+        costAnalysisLineId: true,
         purchaseOrderLineId: true,
         purchaseOrderLine: {
           select: { costAnalysisLineId: true, description: true },
@@ -397,7 +407,7 @@ export async function getProjectResourceBoard(
         invoice: { select: { id: true, number: true } },
       },
     }),
-    gate.isEnabled("SCHEDULE")
+    gate.isEnabled("SCHEDULE") && !filters.skipSchedule && !scopeWbsId
       ? prisma.scheduleItemWbsLink.findMany({
           where: {
             wbsNode: { budgetId: budget.id },
@@ -411,7 +421,21 @@ export async function getProjectResourceBoard(
             scheduleItem: { select: { startDate: true, endDate: true } },
           },
         })
-      : Promise.resolve([]),
+      : gate.isEnabled("SCHEDULE") && !filters.skipSchedule && scopeWbsId
+        ? prisma.scheduleItemWbsLink.findMany({
+            where: {
+              wbsNodeId: scopeWbsId,
+              scheduleItem: {
+                schedule: { projectId, tenantId: ctx.tenantId },
+                status: { not: "CANCELLED" },
+              },
+            },
+            select: {
+              wbsNodeId: true,
+              scheduleItem: { select: { startDate: true, endDate: true } },
+            },
+          })
+        : Promise.resolve([]),
   ]);
 
   const prIdsByCal = new Map<string, string[]>();
@@ -455,8 +479,10 @@ export async function getProjectResourceBoard(
           line.purchaseOrderLine?.costAnalysisLineId ??
           null)
         : null;
+    // Prefer explicit APU hint on the invoice line ([D-110]).
+    const apuId = line.costAnalysisLineId ?? fromPo;
     const desc = line.purchaseOrderLine?.description ?? line.description;
-    const row = ensureOrphan(line.wbsNodeId, desc, fromPo);
+    const row = ensureOrphan(line.wbsNodeId, desc, apuId);
     row.invoicedQty = row.invoicedQty.add(line.quantity);
     if (row.costAnalysisLineId) {
       const list = invIdsByCal.get(row.costAnalysisLineId) ?? [];
@@ -627,10 +653,11 @@ export async function getResourceApuCommitmentsForWbs(
     overCommitted: boolean;
   }>
 > {
+  // Scoped to one WBS + skip cronograma — avoids two full-project board loads in drilldown.
   const board = await getProjectResourceBoard(
     projectId,
     costCategory,
-    { window: "all", wbsNodeId },
+    { window: "all", wbsNodeId, skipSchedule: true },
     ctx,
   );
   if (board.type !== "REPORT") return [];

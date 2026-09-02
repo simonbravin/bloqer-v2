@@ -48,6 +48,13 @@ interface PageProps {
     create?: string;
     error?: string;
     class?: string;
+    wbsNodeId?: string;
+    description?: string;
+    quantity?: string;
+    costAnalysisLineId?: string;
+    unit?: string;
+    costType?: string;
+    from?: string;
   }>;
 }
 
@@ -191,6 +198,14 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
                     canPayNow={canPayNow}
                     storageConfigured={isStorageConfigured()}
                     defaultOpen={sp.create === "1"}
+                    initialLine={{
+                      wbsNodeId: sp.wbsNodeId,
+                      description: sp.description,
+                      quantity: sp.quantity,
+                      unit: sp.unit,
+                      costType: sp.costType,
+                      costAnalysisLineId: sp.costAnalysisLineId,
+                    }}
                   />
                 </Suspense>
               ) : null

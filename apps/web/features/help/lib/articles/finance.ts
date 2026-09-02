@@ -14,7 +14,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     steps: [
       "Prerrequisito: contacto con rol Subcontratista.",
       "Compras → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
-      "Alcance e imputación a partidas (categoría SUB en APU cuando corresponda).",
+      "Alcance e imputación: cada línea con partida EDT (obligatoria antes de aprobar certificaciones).",
     ],
     relatedSlugs: ["cargar-un-subcontratista", "certificar-y-pagar-subcontrato"],
     keywords: ["subcontrato", "crear subcontrato", "paquete", "compromisos"],
@@ -35,12 +35,15 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     ],
     stepsTitle: "Caminito",
     steps: [
-      "¿Hay subcontratista en Directorio? Si no → cargalo con ese rol. Si sí → Nuevo subcontrato (alcance + partidas SUB).",
-      "Certificación del período → Emitir. ¿Aprueba? Si no → Rechazada, no hay CxP.",
-      "Si aprueba → factura AP en borrador (payee = subcontratista). ¿Emitís? Si no → no hay CxP ni se paga.",
+      "¿Hay subcontratista en Directorio? Si no → cargalo con ese rol. Si sí → Nuevo subcontrato (alcance + partidas EDT en cada línea).",
+      "Certificación del período → Emitir. ¿Aprueba? Si falta partida EDT en el subcontrato, Aprobar falla. Si no aprueba → Rechazada, no hay CxP.",
+      "Si aprueba → factura AP en borrador con las partidas EDT (payee = subcontratista). ¿Emitís? Si no → no hay CxP ni se paga.",
       "Emitir = Devengado + CxP. ¿Hay fondos y mes abierto? Si sí → Pagado. Si no → Bloqer bloquea.",
     ],
-    pitfalls: ["No pagues el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico."],
+    pitfalls: [
+      "No pagues el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico.",
+      "Completá la partida EDT en cada línea del subcontrato antes de aprobar la certificación.",
+    ],
     figure: {
       src: "/help/mapa-flujo-subcontrato-si-no.png",
       alt: "Bloqer — Subcontrato: si esto, entonces aquello",

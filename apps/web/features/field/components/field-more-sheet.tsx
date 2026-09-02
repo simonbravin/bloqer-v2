@@ -24,6 +24,8 @@ const PROJECT_HREF_SUFFIXES = [
   { suffix: "/pendientes", labelMatch: "Pendientes" },
   { suffix: "/libro-obra", labelMatch: "Libro de obra" },
   { suffix: "/materiales", labelMatch: "Materiales" },
+  { suffix: "/mano-obra", labelMatch: "Mano de obra" },
+  { suffix: "/equipos", labelMatch: "Equipos" },
   { suffix: "/compras", labelMatch: "Tablero de compras" },
   { suffix: "/documentos", labelMatch: "Documentos" },
   { suffix: "/cronograma", labelMatch: "Cronograma" },

@@ -10,6 +10,7 @@ import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succe
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { subcontractCostType } from "../cost-control/cost-type";
+import { assertSubcontractCertificationLinesHaveWbs } from "./subcontract-cert-approve-guards";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -417,7 +418,12 @@ export async function approveSubcontractCertification(
     where: { id },
     include: {
       lines: {
-        include: { subcontractLine: { select: { unitPrice: true, description: true } } },
+        include: {
+          subcontractLine: {
+            // wbsNodeId required on issue ([D-055]); copy onto draft AP lines.
+            select: { unitPrice: true, description: true, wbsNodeId: true },
+          },
+        },
       },
       subcontract: { select: { companyId: true, currency: true, number: true } },
       subcontractorContact: { select: { legalName: true, fantasyName: true } },
@@ -428,6 +434,8 @@ export async function approveSubcontractCertification(
   if (existing.status !== "ISSUED") {
     throw new ServiceError("CONFLICT", `La certificación en estado "${existing.status}" no puede aprobarse. Debe estar emitida (ISSUED).`);
   }
+
+  assertSubcontractCertificationLinesHaveWbs(existing.lines);
 
   const companyId = existing.companyId;
 
@@ -500,6 +508,8 @@ export async function approveSubcontractCertification(
           unitPrice:   line.unitPriceSnapshot,
           taxRate:     new Prisma.Decimal(0),
           costType:    subcontractCostType(),
+          // Project AP issue requires EDT on every line ([D-055]).
+          wbsNodeId:   line.subcontractLine.wbsNodeId ?? null,
           lineSubtotal: line.lineTotal,
           lineTax:     new Prisma.Decimal(0),
           lineTotal:   line.lineTotal,

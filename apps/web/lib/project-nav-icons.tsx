@@ -20,7 +20,9 @@ import {
   ShoppingBag,
   ShoppingCart,
   TrendingUp,
+  Truck,
   Users,
+  UserRound,
   Wallet,
 } from "lucide-react";
 
@@ -37,6 +39,8 @@ const PROJECT_NAV_ICON_BY_LABEL: Record<string, LucideIcon> = {
   Certificaciones: ClipboardList,
   Inventario: Package,
   Materiales: Boxes,
+  "Mano de obra": UserRound,
+  Equipos: Truck,
   Documentos: FileText,
   "Tablero de compras": ShoppingCart,
   "Solicitudes de compra": ListOrdered,

@@ -25,6 +25,8 @@ const supplierInvoiceLineSchema = z.object({
   wbsNodeId:   z.string().uuid().optional().nullable(),
   /** Optional link to PO line when invoice is tied to an OC ([D-066]). */
   purchaseOrderLineId: z.string().uuid().optional().nullable(),
+  /** Optional APU hint ([D-110] / D-068); does not change EDT imputation. */
+  costAnalysisLineId: z.string().uuid().optional().nullable(),
   /** Job-cost nature ([D-099]). Required for project invoices without PO line inherit; default MATERIAL. */
   costType: z
     .enum(["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT", "OTHER"])

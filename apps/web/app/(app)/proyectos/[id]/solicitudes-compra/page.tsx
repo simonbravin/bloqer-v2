@@ -107,7 +107,14 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
           costAnalysisLineId: sp.costAnalysisLineId,
           unit: sp.unit,
         }}
-        prefilledFromMaterials={sp.from === "materiales"}
+        prefilledFromMaterials={
+          sp.from === "materiales" || sp.from === "mano-obra" || sp.from === "equipos"
+        }
+        prefillFrom={
+          sp.from === "materiales" || sp.from === "mano-obra" || sp.from === "equipos"
+            ? sp.from
+            : undefined
+        }
       />
     </Suspense>
   ) : null;
@@ -126,6 +133,12 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
             </Button>
             <Button asChild variant="outline" size="sm">
               <Link href={`/proyectos/${id}/materiales`}>Materiales</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/mano-obra`}>Mano de obra</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/proyectos/${id}/equipos`}>Equipos</Link>
             </Button>
             {createDialog}
           </div>

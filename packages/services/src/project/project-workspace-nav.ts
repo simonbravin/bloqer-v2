@@ -70,6 +70,9 @@ export function buildProjectWorkspaceNavSections(
     (canViewProjectCostControlReport(roles) || can(roles, "VIEW", "PROJECTS"))
   ) {
     operacion.push({ label: "Materiales", href: `${base}/materiales` });
+    // APU LAB/EQP boards — same gate as Materiales ([D-099] operational surfaces).
+    operacion.push({ label: "Mano de obra", href: `${base}/mano-obra` });
+    operacion.push({ label: "Equipos", href: `${base}/equipos` });
   }
   if (gate.isEnabled("INVENTORY") && can(roles, "VIEW", "INVENTORY")) {
     operacion.push({ label: "Inventario", href: `${base}/inventario` });

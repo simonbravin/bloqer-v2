@@ -326,9 +326,9 @@ export async function listProcurementWbsOptions(
       costItem: {
         select: {
           // We fetch all analysisLines (all categories) so we can compute the
-          // dominant CostCategory for the ITEM ([D-099]). The MATERIAL, non
-          // lump-sum ones are the only ones exposed as `apuLines` (existing
-          // insumo picker behaviour, [D-068]).
+          // dominant CostCategory for the ITEM ([D-099]). Purchasable natures
+          // (MATERIAL / LABOR / EQUIPMENT, non lump-sum) are exposed as `apuLines`
+          // for Pedir from Materiales / Mano de obra / Equipos ([D-068]).
           analysisLines: {
             orderBy: { sortOrder: "asc" },
             select: {
@@ -353,7 +353,9 @@ export async function listProcurementWbsOptions(
       a.budget.name.localeCompare(b.budget.name, "es") ||
       a.budget.versionNumber - b.budget.versionNumber,
   );
-  const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx.tenantId);
+  const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx.tenantId, {
+    categories: ["MATERIAL", "LABOR", "EQUIPMENT"],
+  });
 
   const refs = await Promise.all(ordered.map((n) => getWbsBudgetReference(n.id, ctx.tenantId)));
 
@@ -362,7 +364,12 @@ export async function listProcurementWbsOptions(
     const n = ordered[i]!;
     const ref = refs[i]!;
     const allLines = n.costItem?.analysisLines ?? [];
-    const materialLines = allLines.filter((l) => l.category === "MATERIAL" && !l.isLumpSum);
+    // Purchasable APU natures for Pedir / OC tipado ([D-068] + [D-099] LAB/EQP boards).
+    const purchasableLines = allLines.filter(
+      (l) =>
+        (l.category === "MATERIAL" || l.category === "LABOR" || l.category === "EQUIPMENT") &&
+        !l.isLumpSum,
+    );
     result.push({
       id: n.id,
       code: n.code,
@@ -373,7 +380,7 @@ export async function listProcurementWbsOptions(
       availableSaldo: ref.availableSaldo,
       wouldExceedBudget: ref.wouldExceedBudget,
       dominantCostType: computeDominantCostTypeFromApuLines(allLines),
-      apuLines: materialLines.map((l) => {
+      apuLines: purchasableLines.map((l) => {
         const c = commitments.get(l.id);
         return {
           id: l.id,

@@ -53,6 +53,18 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             >
               Materiales
             </Link>
+            <Link
+              href={`/proyectos/${projectId}/mano-obra?wbsNodeId=${encodeURIComponent(detail.wbsNodeId)}`}
+              className="text-primary hover:underline"
+            >
+              Mano de obra
+            </Link>
+            <Link
+              href={`/proyectos/${projectId}/equipos?wbsNodeId=${encodeURIComponent(detail.wbsNodeId)}`}
+              className="text-primary hover:underline"
+            >
+              Equipos
+            </Link>
           </div>
         }
       >
@@ -205,6 +217,86 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
         )}
       </Section>
 
+      <Section
+        title="Mano de obra APU"
+        action={
+          <Link
+            href={`/proyectos/${projectId}/mano-obra?wbsNodeId=${encodeURIComponent(detail.wbsNodeId)}`}
+            className="text-xs text-primary hover:underline"
+          >
+            Ver en Mano de obra
+          </Link>
+        }
+      >
+        {detail.laborCommitments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin líneas de mano de obra comprables en el APU de esta partida.
+          </p>
+        ) : (
+          <SimpleTable
+            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Facturado", "Faltante"]}
+            rows={detail.laborCommitments.map((m) => [
+              m.description,
+              budgetUnitLabel(m.unit) || m.unit,
+              fmtQty(m.needQty),
+              fmtQty(m.orderedQty),
+              fmtQty(m.invoicedQty),
+              <span
+                key={m.costAnalysisLineId}
+                className={
+                  !/^-?0+(\.0+)?$/.test(m.shortfallQty.trim())
+                    ? "font-medium text-amber-700 dark:text-amber-400"
+                    : undefined
+                }
+              >
+                {fmtQty(m.shortfallQty)}
+                {m.overCommitted ? " (sobre)" : ""}
+              </span>,
+            ])}
+          />
+        )}
+      </Section>
+
+      <Section
+        title="Equipos APU"
+        action={
+          <Link
+            href={`/proyectos/${projectId}/equipos?wbsNodeId=${encodeURIComponent(detail.wbsNodeId)}`}
+            className="text-xs text-primary hover:underline"
+          >
+            Ver en Equipos
+          </Link>
+        }
+      >
+        {detail.equipmentCommitments.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Sin líneas de equipos comprables en el APU de esta partida.
+          </p>
+        ) : (
+          <SimpleTable
+            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Facturado", "Faltante"]}
+            rows={detail.equipmentCommitments.map((m) => [
+              m.description,
+              budgetUnitLabel(m.unit) || m.unit,
+              fmtQty(m.needQty),
+              fmtQty(m.orderedQty),
+              fmtQty(m.invoicedQty),
+              <span
+                key={m.costAnalysisLineId}
+                className={
+                  !/^-?0+(\.0+)?$/.test(m.shortfallQty.trim())
+                    ? "font-medium text-amber-700 dark:text-amber-400"
+                    : undefined
+                }
+              >
+                {fmtQty(m.shortfallQty)}
+                {m.overCommitted ? " (sobre)" : ""}
+              </span>,
+            ])}
+          />
+        )}
+      </Section>
+
       {detail.certificationLines.length > 0 && (
         <Section title="Certificaciones de cliente">
           <SimpleTable
@@ -222,7 +314,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
       {detail.purchaseOrderLines.length > 0 && (
         <Section title="Órdenes de compra">
           <SimpleTable
-            headers={["OC N°", "Estado", "Descripción", "Cant.", "PU", "Total", "Recibido"]}
+            headers={["OC N°", "Estado", "Tipo", "Descripción", "Cant.", "PU", "Total", "Recibido"]}
             rows={detail.purchaseOrderLines.map((pol, idx) => [
               <Link
                 key={`${pol.poId}-${idx}`}
@@ -232,6 +324,15 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
                 {String(pol.poNumber)}
               </Link>,
               pol.poStatus,
+              pol.costType
+                ? ({
+                    MATERIAL: "Materiales",
+                    LABOR: "Mano de obra",
+                    EQUIPMENT: "Equipos",
+                    SUBCONTRACT: "Subcontratos",
+                    OTHER: "Otros",
+                  }[pol.costType] ?? pol.costType)
+                : "—",
               pol.description,
               fmtQty(pol.quantity),
               fmt(pol.unitPrice),
@@ -289,7 +390,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
       {detail.supplierInvoices.length > 0 && (
         <Section title="Facturas de proveedor">
           <SimpleTable
-            headers={["Factura", "Estado", "Fecha", "Total", "OC"]}
+            headers={["Factura", "Estado", "Tipo", "Fecha", "Total", "OC"]}
             rows={detail.supplierInvoices.map((inv) => [
               <Link
                 key={inv.invoiceId}
@@ -299,6 +400,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
                 {`FP-${String(inv.invoiceNumber).padStart(5, "0")}`}
               </Link>,
               inv.status,
+              inv.costTypeLabel ?? "—",
               fmtDate(inv.issueDate),
               fmt(inv.totalAmount),
               inv.purchaseOrderId ? (

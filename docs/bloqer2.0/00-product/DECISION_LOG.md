@@ -1676,6 +1676,39 @@
 
 ---
 
+### D-109 — Tableros operativos APU Mano de obra y Equipos
+
+- **Fecha:** 2026-09-02
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** [D-099] tipa LAB/EQP en OC/factura y parte EDT por `CostCategory`, pero solo Materiales tenía tablero de cobertura APU. El usuario necesitaba ver necesidad vs pedido/facturado y CTAs de pago sin inventar timesheets ni clonar Subcontratos.
+- **Decisión:**
+  1. **Operación → Mano de obra** (`/mano-obra`) y **Operación → Equipos** (`/equipos`): tableros de cantidades desde `CostAnalysisLine` `LABOR` / `EQUIPMENT` (necesidad, pedido SC/OC, facturado AP, faltante = need − max(ordered, invoiced)).
+  2. **Pedir** → SC prellenada con `costAnalysisLineId` (tipo vía categoría APU). **Registrar factura** → factura AP directa tipada LAB/EQP.
+  3. **Varianza ($)** = presupuesto APU del tipo vs facturas ISSUED tipadas (sin eje inventario).
+  4. **Nav:** Materiales → Mano de obra → Equipos bajo Operación. **Subcontratos permanece en Compras** (compromiso contractual; patrón Procore Commitments / Odoo Purchase+cert).
+  5. Sin timesheets, nómina ni equipment logs (refuerza [D-099] y `PRODUCT_SCOPE` sueldos).
+- **Implicancias:** EDT drilldown muestra secciones LAB/EQP; hub de reportes enlaza ambos tableros; catálogo APU de SC incluye LABOR/EQUIPMENT además de MATERIAL.
+- **Documentos afectados:** [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §5 · §9.0.1–§9.0.2 · §13, help `tablero-mano-obra` / `tablero-equipos`, [D-099](./DECISION_LOG.md).
+
+---
+
+### D-110 — `costAnalysisLineId` opcional en líneas de factura de proveedor
+
+- **Fecha:** 2026-09-02
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** [D-068] ya vincula SC/OC a un insumo APU; [D-109] Factura tipada desde Mano de obra / Equipos enviaba `costAnalysisLineId` en la URL pero `SupplierInvoiceLine` no lo persistía → tableros matcheaban por descripción.
+- **Decisión:**
+  1. `SupplierInvoiceLine.costAnalysisLineId` **nullable** (mismo espíritu que [D-068]): hint APU; imputación de $ sigue en `wbsNodeId` ([D-057]).
+  2. Validar en service que el APU pertenece a la partida elegida cuando ambos están set.
+  3. Prefill desde tableros / OC copia el hint; al cambiar partida en UI se limpia el vínculo APU.
+  4. Tableros LAB/EQP (y matching de facturado) priorizan `costAnalysisLineId` sobre descripción / OC.
+- **Implicancias:** migración Prisma; validators AP; create/update FP; draft desde OC puede heredar el hint de la línea OC.
+- **Documentos afectados:** guía §9.0.1–§9.0.2 · facturas proveedor, help tableros MO/Equipos y factura tipada, [D-068](./DECISION_LOG.md), [D-109](./DECISION_LOG.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

@@ -82,9 +82,10 @@ export function SupplierInvoiceEditForm({
           discountPct: l.discountPct ?? "0",
           wbsNodeId:   l.wbsNodeId,
           purchaseOrderLineId: l.purchaseOrderLineId,
+          costAnalysisLineId: l.costAnalysisLineId ?? null,
           costType: (l.costType as InvoiceLine["costType"]) ?? "MATERIAL",
         }))
-      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0", wbsNodeId: null, purchaseOrderLineId: null, costType: "MATERIAL" }],
+      : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0", wbsNodeId: null, purchaseOrderLineId: null, costAnalysisLineId: null, costType: "MATERIAL" }],
   );
 
   function onPurchaseOrderChange(nextId: string | null) {

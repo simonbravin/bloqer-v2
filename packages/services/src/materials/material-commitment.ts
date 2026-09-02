@@ -1,4 +1,4 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { Prisma, prisma, type CostCategory } from "@bloqer/database";
 import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import {
   applyOrderedToApuMap,
@@ -22,11 +22,18 @@ export {
   serializeApuCommitment,
 } from "./material-commitment-pure";
 
+const DEFAULT_COMMITMENT_CATEGORIES: CostCategory[] = ["MATERIAL"];
+
 export type LoadMaterialApuCommitmentsOpts = {
   /** When set, only this budget; otherwise latest APPROVED/CLOSED for project. */
   budgetId?: string;
   /** Restrict to one or more WBS ITEM ids. */
   wbsNodeIds?: string[];
+  /**
+   * APU CostCategory filter (default MATERIAL only).
+   * SC catalog uses MATERIAL|LABOR|EQUIPMENT ([D-109]).
+   */
+  categories?: CostCategory[];
 };
 
 async function resolveBudgetId(
@@ -46,7 +53,7 @@ async function resolveBudgetId(
 }
 
 /**
- * Need / ordered / shortfall per MATERIAL CostAnalysisLine for a project.
+ * Need / ordered / shortfall per CostAnalysisLine for a project (default MATERIAL).
  * Same commitment semantics as the materials board (CONFIRMED+ OC; SC without OC).
  */
 export async function loadMaterialApuCommitments(
@@ -56,6 +63,11 @@ export async function loadMaterialApuCommitments(
 ): Promise<MaterialApuCommitmentView[]> {
   const budgetId = await resolveBudgetId(projectId, tenantId, opts.budgetId);
   if (!budgetId) return [];
+
+  const categories =
+    opts.categories && opts.categories.length > 0
+      ? opts.categories
+      : DEFAULT_COMMITMENT_CATEGORIES;
 
   const costItems = await prisma.costItem.findMany({
     where: {
@@ -69,7 +81,7 @@ export async function loadMaterialApuCommitments(
       wbsNodeId: true,
       quantity: true,
       analysisLines: {
-        where: { category: "MATERIAL", isLumpSum: false },
+        where: { category: { in: categories }, isLumpSum: false },
         select: {
           id: true,
           productId: true,
@@ -84,7 +96,6 @@ export async function loadMaterialApuCommitments(
       },
     },
   });
-
   const seeds: MaterialNeedSeed[] = [];
   for (const item of costItems) {
     const itemQty = Number(item.quantity.toString());

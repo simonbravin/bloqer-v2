@@ -92,6 +92,7 @@ function toPoLineDraft(
     lineTotal: Prisma.Decimal;
     receivedQuantity: Prisma.Decimal;
     wbsNodeId: string | null;
+    costAnalysisLineId?: string | null;
     costType?: CostCategoryCode | null;
   },
 ): PoLineForInvoiceDraft {
@@ -105,6 +106,7 @@ function toPoLineDraft(
     receivedQuantity: serializeQtyDecimal(line.receivedQuantity),
     lineTotal: serializeMoneyDecimal(line.lineTotal),
     wbsNodeId: line.wbsNodeId,
+    costAnalysisLineId: line.costAnalysisLineId ?? null,
     costType: line.costType ?? "MATERIAL",
   };
 }

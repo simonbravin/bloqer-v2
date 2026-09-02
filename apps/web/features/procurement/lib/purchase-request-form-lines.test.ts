@@ -92,7 +92,7 @@ test("formatApuCoverageHint messages", () => {
   );
   assert.equal(
     formatApuCoverageHint(computeApuCoverage([], [])),
-    "Esta partida no tiene insumos APU de materiales. Cargá descripción a mano.",
+    "Esta partida no tiene insumos APU comprables (materiales, mano de obra o equipos). Cargá descripción a mano.",
   );
 });
 
@@ -167,6 +167,7 @@ test("preparePurchaseRequestLinesForSubmit builds payload", () => {
     ],
     WBS,
     "un",
+    [apuA],
   );
   assert.equal(prepared.ok, true);
   if (!prepared.ok) return;
@@ -174,6 +175,29 @@ test("preparePurchaseRequestLinesForSubmit builds payload", () => {
   assert.equal(prepared.lines[0]?.wbsNodeId, WBS);
   assert.equal(prepared.lines[0]?.costAnalysisLineId, "apu-a");
   assert.equal(prepared.lines[0]?.sortOrder, 0);
+  assert.equal(prepared.lines[0]?.lineType, "MATERIAL");
+});
+
+test("preparePurchaseRequestLinesForSubmit uses SERVICE + LABOR costType for labor APU", () => {
+  const laborApu: PurchaseRequestApuLine = {
+    id: "apu-lab",
+    description: "Ayudante",
+    unit: "hs",
+    unitCost: "5000.0000",
+    productId: null,
+    quantity: "8",
+    category: "LABOR",
+  };
+  const prepared = preparePurchaseRequestLinesForSubmit(
+    [line({ costAnalysisLineId: "apu-lab", description: "Ayudante", quantity: "8", unit: "hs" })],
+    WBS,
+    "hs",
+    [laborApu],
+  );
+  assert.equal(prepared.ok, true);
+  if (!prepared.ok) return;
+  assert.equal(prepared.lines[0]?.lineType, "SERVICE");
+  assert.equal(prepared.lines[0]?.costType, "LABOR");
 });
 
 test("selectedApuIds collects bound lines", () => {

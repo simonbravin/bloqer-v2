@@ -60,6 +60,15 @@ interface Props {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  /** Prefill from Mano de obra / Equipos boards ([D-099] / [D-110]). */
+  initialLine?: {
+    wbsNodeId?: string;
+    description?: string;
+    quantity?: string;
+    unit?: string;
+    costType?: string;
+    costAnalysisLineId?: string;
+  };
 }
 
 const DEFAULT_LINE: InvoiceLine = {
@@ -70,9 +79,41 @@ const DEFAULT_LINE: InvoiceLine = {
   discountPct: "0",
   wbsNodeId: null,
   purchaseOrderLineId: null,
+  costAnalysisLineId: null,
   costType: "MATERIAL",
 };
 const INVOICE_CURRENCY = "ARS";
+
+function buildInitialLines(
+  initialLine?: Props["initialLine"],
+): InvoiceLine[] {
+  if (
+    !initialLine?.wbsNodeId &&
+    !initialLine?.description &&
+    !initialLine?.costType &&
+    !initialLine?.costAnalysisLineId
+  ) {
+    return [{ ...DEFAULT_LINE }];
+  }
+  const costType =
+    initialLine.costType === "LABOR" ||
+    initialLine.costType === "EQUIPMENT" ||
+    initialLine.costType === "MATERIAL" ||
+    initialLine.costType === "SUBCONTRACT" ||
+    initialLine.costType === "OTHER"
+      ? initialLine.costType
+      : "MATERIAL";
+  return [
+    {
+      ...DEFAULT_LINE,
+      description: initialLine.description ?? "",
+      quantity: initialLine.quantity ?? "1",
+      wbsNodeId: initialLine.wbsNodeId ?? null,
+      costAnalysisLineId: initialLine.costAnalysisLineId ?? null,
+      costType,
+    },
+  ];
+}
 
 export function SupplierInvoiceForm({
   projectId,
@@ -88,6 +129,7 @@ export function SupplierInvoiceForm({
   variant = "card",
   onCancel,
   onSuccess,
+  initialLine,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -100,7 +142,7 @@ export function SupplierInvoiceForm({
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(null);
   /** Project AP: explicit commitment vs direct cost ([D-102] / Phase 1). */
   const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">("DIRECT");
-  const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
+  const [lines, setLines] = useState<InvoiceLine[]>(() => buildInitialLines(initialLine));
   const [payNow, setPayNow] = useState(false);
   const [payAccountId, setPayAccountId] = useState("");
   const [payMethod, setPayMethod] = useState<SettlementMethodValue | "">("");
@@ -190,6 +232,7 @@ export function SupplierInvoiceForm({
         discountPct: l.discountPct ?? "0",
         wbsNodeId: l.wbsNodeId ?? null,
         purchaseOrderLineId: l.purchaseOrderLineId ?? null,
+        costAnalysisLineId: l.costAnalysisLineId ?? null,
         costType: (l.costType as InvoiceLine["costType"]) ?? "MATERIAL",
       })),
     );
@@ -608,6 +651,13 @@ export function SupplierInvoiceForm({
           requireWbs={Boolean(projectId) && !companyFinanzas}
           wbsOptions={wbsOptions}
           pricesIncludeTax={pricesIncludeTax}
+          seedFirstLineCostTypeAsManual={Boolean(
+            initialLine?.costType === "LABOR" ||
+              initialLine?.costType === "EQUIPMENT" ||
+              initialLine?.costType === "MATERIAL" ||
+              initialLine?.costType === "SUBCONTRACT" ||
+              initialLine?.costType === "OTHER",
+          )}
         />
 
         <hr />

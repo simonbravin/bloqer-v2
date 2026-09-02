@@ -80,6 +80,18 @@ test("buildInvoiceDraftLinesFromPo uses received quantities", () => {
   assert.equal(lines[0]!.discountPct, "0");
 });
 
+test("buildInvoiceDraftLinesFromPo copies costAnalysisLineId [D-110]", () => {
+  const lines = buildInvoiceDraftLinesFromPo(
+    [{ ...sampleLine, costAnalysisLineId: "apu-1" }],
+    {
+      basis: "received",
+      receivedAmount: new Prisma.Decimal(605),
+      invoicedAmount: new Prisma.Decimal(0),
+    },
+  );
+  assert.equal(lines[0]!.costAnalysisLineId, "apu-1");
+});
+
 test("buildInvoiceDraftLinesFromPo scales remaining basis", () => {
   const lines = buildInvoiceDraftLinesFromPo([sampleLine], {
     basis: "remaining",

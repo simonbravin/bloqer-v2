@@ -17,6 +17,7 @@ export type PoLineForInvoiceDraft = {
   receivedQuantity: string;
   lineTotal: string;
   wbsNodeId: string | null;
+  costAnalysisLineId?: string | null;
   costType: CostCategoryCode | null;
 };
 
@@ -28,6 +29,7 @@ export type InvoiceDraftLineInput = {
   discountPct: string;
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
+  costAnalysisLineId?: string | null;
   costType?: CostCategoryCode | null;
 };
 
@@ -144,6 +146,7 @@ export function buildInvoiceDraftLinesFromPo(
       discountPct: line.discountPct,
       wbsNodeId: line.wbsNodeId,
       purchaseOrderLineId: line.id,
+      costAnalysisLineId: line.costAnalysisLineId ?? null,
       costType: line.costType ?? "MATERIAL",
     });
   }

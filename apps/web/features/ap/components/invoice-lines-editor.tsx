@@ -34,6 +34,8 @@ export type InvoiceLine = {
   wbsNodeId?: string | null;
   /** Set when line comes from OC draft ([D-066]); kept for submit. */
   purchaseOrderLineId?: string | null;
+  /** Optional APU hint ([D-110]); cleared when partida changes. */
+  costAnalysisLineId?: string | null;
   /** Job-cost nature ([D-099]). */
   costType?: CostCategoryOptionValue | null;
 };
@@ -64,6 +66,7 @@ const EMPTY_LINE: InvoiceLine = {
   discountPct: "0",
   wbsNodeId: null,
   purchaseOrderLineId: null,
+  costAnalysisLineId: null,
   costType: "MATERIAL",
 };
 
@@ -91,6 +94,11 @@ interface Props {
   wbsOptions?: InvoiceWbsOption[];
   /** Factura B: unit price is gross ([D-086]). */
   pricesIncludeTax?: boolean;
+  /**
+   * Treat the first line's costType as user-chosen so changing partida does not
+   * restomp LABOR/EQUIPMENT prefill from Mano de obra / Equipos ([D-099]).
+   */
+  seedFirstLineCostTypeAsManual?: boolean;
 }
 
 export function InvoiceLinesEditor({
@@ -99,6 +107,7 @@ export function InvoiceLinesEditor({
   requireWbs = false,
   wbsOptions = [],
   pricesIncludeTax = false,
+  seedFirstLineCostTypeAsManual = false,
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const [headerDiscount, setHeaderDiscount] = useState("");
@@ -107,8 +116,26 @@ export function InvoiceLinesEditor({
   );
   // Track which lines had their `costType` set by the user in this session so
   // partida changes don't stomp on it ([D-099]).
-  const [manualCostTypeKeys, setManualCostTypeKeys] = useState<Set<string>>(() => new Set());
+  const [manualCostTypeKeys, setManualCostTypeKeys] = useState<Set<string>>(() => {
+    if (!seedFirstLineCostTypeAsManual) return new Set();
+    // lineKeys[0] is created in the previous useState — mirror with a stable seed
+    // by reading the same initial array length pattern after first paint.
+    return new Set();
+  });
 
+  useEffect(() => {
+    if (!seedFirstLineCostTypeAsManual) return;
+    const first = lineKeys[0];
+    if (!first) return;
+    setManualCostTypeKeys((prev) => {
+      if (prev.has(first)) return prev;
+      const next = new Set(prev);
+      next.add(first);
+      return next;
+    });
+    // Only seed once from prefill; do not re-run when lineKeys grow.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount seed
+  }, [seedFirstLineCostTypeAsManual]);
   // Keep React keys aligned when the parent replaces lines (PO import, form reset, etc.).
   useEffect(() => {
     setLineKeys((prev) => {
@@ -132,6 +159,7 @@ export function InvoiceLinesEditor({
       // Changing EDT breaks the OC-line link only when the partida actually changes ([D-066]).
       if (field === "wbsNodeId" && value !== l.wbsNodeId) {
         patched.purchaseOrderLineId = null;
+        patched.costAnalysisLineId = null;
         // Auto-type from APU dominant when the user has not overridden `costType`.
         if (!manualCostTypeKeys.has(lineKey)) {
           const wbs = wbsOptions.find((w) => w.id === value);

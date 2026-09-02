@@ -57,12 +57,19 @@ test("project nav hides Compras when PROCUREMENT module is off (Subcontratos may
   assert.equal(sections.some((s) => s.title === "Compromisos"), false);
 });
 
-test("project nav includes Materiales and Consumos under Operación", () => {
+test("project nav includes Materiales, Mano de obra, Equipos and Consumos under Operación", () => {
   const sections = buildProjectWorkspaceNavSections("proj-1", allOnGate, ["PROJECT_MANAGER"]);
   const operacion = sections.find((s) => s.title === "Operación");
   assert.ok(operacion);
   assert.equal(operacion!.items.find((i) => i.label === "Materiales")!.href, "/proyectos/proj-1/materiales");
+  assert.equal(operacion!.items.find((i) => i.label === "Mano de obra")!.href, "/proyectos/proj-1/mano-obra");
+  assert.equal(operacion!.items.find((i) => i.label === "Equipos")!.href, "/proyectos/proj-1/equipos");
   assert.equal(operacion!.items.find((i) => i.label === "Consumos")!.href, "/proyectos/proj-1/consumos");
+  const labels = operacion!.items.map((i) => i.label);
+  const matIdx = labels.indexOf("Materiales");
+  const labIdx = labels.indexOf("Mano de obra");
+  const eqIdx = labels.indexOf("Equipos");
+  assert.ok(matIdx >= 0 && labIdx === matIdx + 1 && eqIdx === labIdx + 1);
 });
 
 test("project nav hides Consumos when INVENTORY module is off", () => {

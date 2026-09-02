@@ -44,6 +44,8 @@ interface PurchaseRequestFormProps {
     unit?: string;
   };
   prefilledFromMaterials?: boolean;
+  /** Origin board for banner (`materiales` | `mano-obra` | `equipos`). */
+  prefillFrom?: "materiales" | "mano-obra" | "equipos";
   variant?: "card" | "plain";
   extraSections?: React.ReactNode;
   onCancel?: () => void;
@@ -73,6 +75,7 @@ export function PurchaseRequestForm({
   wbsOptions,
   initialLine,
   prefilledFromMaterials = false,
+  prefillFrom,
   variant = "card",
   extraSections,
   onCancel,
@@ -174,6 +177,7 @@ export function PurchaseRequestForm({
               lines,
               wbsNodeId,
               selectedWbs?.budgetUnit ?? "un",
+              apuCatalog,
             );
             if (!prepared.ok) {
               setError(prepared.error);
@@ -214,7 +218,13 @@ export function PurchaseRequestForm({
       >
         {prefilledFromMaterials ? (
           <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
-            Prefill desde Materiales (faltante). Revisá cantidad y partida antes de crear. Podés agregar más insumos de la misma partida.
+            Prefill desde{" "}
+            {prefillFrom === "mano-obra"
+              ? "Mano de obra"
+              : prefillFrom === "equipos"
+                ? "Equipos"
+                : "Materiales"}{" "}
+            (faltante). Revisá cantidad y partida antes de crear. Podés agregar más insumos de la misma partida.
           </p>
         ) : null}
 

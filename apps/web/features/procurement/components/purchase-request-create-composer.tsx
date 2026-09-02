@@ -18,6 +18,8 @@ type Props = {
     unit?: string;
   };
   prefilledFromMaterials?: boolean;
+  /** Origin board for banner copy (`materiales` | `mano-obra` | `equipos`). */
+  prefillFrom?: "materiales" | "mano-obra" | "equipos";
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
@@ -28,6 +30,7 @@ export function PurchaseRequestCreateComposer({
   wbsOptions,
   initialLine,
   prefilledFromMaterials,
+  prefillFrom,
   variant = "plain",
   onCancel,
   onSuccess,
@@ -74,6 +77,7 @@ export function PurchaseRequestCreateComposer({
       wbsOptions={wbsOptions}
       initialLine={initialLine}
       prefilledFromMaterials={prefilledFromMaterials}
+      prefillFrom={prefillFrom}
       variant={variant}
       onCancel={onCancel}
       onSuccess={onSuccess}

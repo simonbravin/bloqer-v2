@@ -12,6 +12,8 @@ export type PurchaseRequestApuLine = {
   needQty?: string | null;
   orderedQty?: string | null;
   shortfallQty?: string | null;
+  /** CostCategory of the APU line (MATERIAL / LABOR / EQUIPMENT). */
+  category?: string | null;
 };
 
 export type PurchaseRequestLineDraft = {
@@ -25,13 +27,14 @@ export type PurchaseRequestLineDraft = {
 
 export type PurchaseRequestSubmitLine = {
   wbsNodeId: string;
-  lineType: "MATERIAL";
+  lineType: "MATERIAL" | "SERVICE" | "OTHER";
   productId: string | null;
   costAnalysisLineId: string | null;
   description: string;
   unit: string;
   quantity: string;
   sortOrder: number;
+  costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER" | null;
 };
 
 export type ApuCoverage = {
@@ -158,7 +161,7 @@ export function computeApuCoverage(
 
 export function formatApuCoverageHint(coverage: ApuCoverage): string | null {
   if (!coverage.hasApuCatalog) {
-    return "Esta partida no tiene insumos APU de materiales. Cargá descripción a mano.";
+    return "Esta partida no tiene insumos APU comprables (materiales, mano de obra o equipos). Cargá descripción a mano.";
   }
   if (coverage.allSelected) {
     return "Están todos los insumos APU de esta partida en la solicitud.";
@@ -264,23 +267,39 @@ export function preparePurchaseRequestLinesForSubmit(
   lines: PurchaseRequestLineDraft[],
   wbsNodeId: string,
   budgetUnit: string,
+  apuCatalog: PurchaseRequestApuLine[] = [],
 ): { ok: true; lines: PurchaseRequestSubmitLine[] } | { ok: false; error: string } {
   const validationError = validatePurchaseRequestLines(lines);
   if (validationError) return { ok: false, error: validationError };
 
+  const apuById = new Map(apuCatalog.map((a) => [a.id, a]));
   const substantive = lines.filter((l) => !isBlankPurchaseRequestLine(l));
   return {
     ok: true,
-    lines: substantive.map((line, i) => ({
-      wbsNodeId,
-      lineType: "MATERIAL" as const,
-      productId: line.productId,
-      costAnalysisLineId: line.costAnalysisLineId,
-      description: line.description.trim(),
-      unit: line.unit.trim() || budgetUnit || "un",
-      quantity: line.quantity,
-      sortOrder: i,
-    })),
+    lines: substantive.map((line, i) => {
+      const apu = line.costAnalysisLineId ? apuById.get(line.costAnalysisLineId) : undefined;
+      const category = apu?.category;
+      const isServiceNature = category === "LABOR" || category === "EQUIPMENT";
+      const costType =
+        category === "MATERIAL" ||
+        category === "LABOR" ||
+        category === "EQUIPMENT" ||
+        category === "SUBCONTRACT" ||
+        category === "OTHER"
+          ? category
+          : undefined;
+      return {
+        wbsNodeId,
+        lineType: (isServiceNature ? "SERVICE" : "MATERIAL") as PurchaseRequestSubmitLine["lineType"],
+        productId: line.productId,
+        costAnalysisLineId: line.costAnalysisLineId,
+        description: line.description.trim(),
+        unit: line.unit.trim() || budgetUnit || "un",
+        quantity: line.quantity,
+        sortOrder: i,
+        ...(costType ? { costType } : {}),
+      };
+    }),
   };
 }
 

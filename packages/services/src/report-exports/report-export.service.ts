@@ -36,6 +36,13 @@ import type { SubcontractReportFilters } from "../reports/subcontract-variance.s
 import { getSubcontractVarianceReport } from "../reports/subcontract-variance.service";
 import type { MaterialReportFilters } from "../reports/material-variance.service";
 import { getMaterialVarianceReport } from "../reports/material-variance.service";
+import type { ResourceVarianceFilters } from "../resources/resource-variance.service";
+import { getResourceVarianceReport } from "../resources/resource-variance.service";
+import {
+  RESOURCE_BOARD_LABELS_ES,
+  RESOURCE_BOARD_ROUTE_SEGMENT,
+  type ResourceBoardCategory,
+} from "../resources/resource-board-pure";
 import type { ProjectCashFlowFilters } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import type { IncomeExpenseFilters } from "../reports/project-income-expense.service";
@@ -1287,6 +1294,48 @@ export async function exportMaterialVarianceCsv(
     "",
   ]);
   const fname = `materiales_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportResourceVarianceCsv(
+  projectId: string,
+  costCategory: ResourceBoardCategory,
+  filters: ResourceVarianceFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const result = await getResourceVarianceReport(projectId, costCategory, filters, ctx);
+  if (result.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError(
+      "CONFLICT",
+      `No hay presupuesto aprobado para exportar ${RESOURCE_BOARD_LABELS_ES[costCategory].toLowerCase()}`,
+    );
+  }
+  const headers = [
+    "CodigoWBS",
+    "NombreWBS",
+    "Presupuesto",
+    "FacturadoNeto",
+    "Variacion",
+    "VariacionPct",
+  ];
+  const rows = result.byWbs.map((r) => [
+    r.wbsCode,
+    r.wbsName,
+    r.budgetCost,
+    r.accruedCost,
+    r.variance,
+    r.variancePct ?? "",
+  ]);
+  rows.push([
+    "TOTAL",
+    "",
+    result.totals.budgetCost,
+    result.totals.accruedCost,
+    result.totals.variance,
+    "",
+  ]);
+  const segment = RESOURCE_BOARD_ROUTE_SEGMENT[costCategory];
+  const fname = `${segment}_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
 }
 

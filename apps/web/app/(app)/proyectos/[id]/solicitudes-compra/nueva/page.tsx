@@ -86,7 +86,14 @@ export default async function NuevaSolicitudCompraPage({ params, searchParams }:
             costAnalysisLineId: sp.costAnalysisLineId,
             unit: sp.unit,
           }}
-          prefilledFromMaterials={sp.from === "materiales"}
+          prefilledFromMaterials={
+            sp.from === "materiales" || sp.from === "mano-obra" || sp.from === "equipos"
+          }
+          prefillFrom={
+            sp.from === "materiales" || sp.from === "mano-obra" || sp.from === "equipos"
+              ? sp.from
+              : undefined
+          }
         />
       </div>
     </PageShell>

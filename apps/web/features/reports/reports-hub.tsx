@@ -129,6 +129,22 @@ export function ReportsHub({
       available: canCostReports,
     },
     {
+      title: "Mano de obra",
+      description:
+        "APU de mano de obra vs pedido y facturado tipado. Pagá por SC/OC o factura AP (no es subcontrato).",
+      href: `/proyectos/${projectId}/mano-obra`,
+      icon: <Users className="h-5 w-5" />,
+      available: canCostReports,
+    },
+    {
+      title: "Equipos",
+      description:
+        "APU de equipos vs pedido y facturado tipado (alquileres). El $ vive en EDT y costos.",
+      href: `/proyectos/${projectId}/equipos`,
+      icon: <Truck className="h-5 w-5" />,
+      available: canCostReports,
+    },
+    {
       title: "Subcontratos",
       description: "Varianza SUB por partida, contratos activos y evolución certificado vs pagado.",
       href: `${base}/subcontratos`,
@@ -147,7 +163,8 @@ export function ReportsHub({
         },
         {
           title: "Operativos",
-          description: "Costos por partida, proveedores, compras, materiales y avance certificado.",
+          description:
+            "Costos por partida, proveedores, compras, materiales, mano de obra, equipos y avance certificado.",
           cards: operational,
         },
       ]}
