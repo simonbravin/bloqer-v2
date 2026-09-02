@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8" />
+  <title>Bloqer — Mano de obra y equipos: si esto, entonces aquello</title>
+  <link rel="stylesheet" href="../flujo-poster.css" />
+</head>
+<body>
+  <div class="poster">
+    <header>
+      <img src="../bloqer-logo.png" alt="Bloqer" />
+      <div class="header-copy">
+        <p>Nivel obra · el caminito</p>
+        <h1>Mano de obra y equipos: si esto, entonces aquello</h1>
+      </div>
+    </header>
+    <div class="lede">
+      <p>
+        Operación → <strong>Mano de obra</strong> o <strong>Equipos</strong> es cobertura APU
+        (necesidad vs pedido vs facturado). <strong>No</strong> es subcontrato ni timesheet.
+        El $ por tipo está en Planificación → <strong>EDT y costos</strong>.
+      </p>
+      <div class="legend">
+        <span class="chip go">Sigue</span>
+        <span class="chip ask">¿Pregunta?</span>
+        <span class="chip stop">No sigue</span>
+        <span class="chip money">Impacta $</span>
+      </div>
+    </div>
+    <svg viewBox="0 0 1600 900" width="1600" height="900" role="img" aria-label="Flujo condicional de mano de obra y equipos">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#1d4ed8"/></marker>
+        <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#047857"/></marker>
+        <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#be123c"/></marker>
+      </defs>
+
+      <rect x="24" y="18" width="1552" height="400" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="44" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">1 · ¿QUÉ CAMINO ES?</text>
+
+      <rect x="48" y="86" rx="16" width="200" height="72" fill="#1d4ed8"/>
+      <text x="148" y="114" text-anchor="middle" fill="#fff" font-size="14" font-weight="700">Operación</text>
+      <text x="148" y="134" text-anchor="middle" fill="#dbeafe" font-size="12">Mano de obra / Equipos</text>
+
+      <line x1="248" y1="122" x2="292" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <polygon points="392,62 512,122 392,182 272,122" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="392" y="108" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Paquete con contrato</text>
+      <text x="392" y="126" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">+ certificación?</text>
+
+      <line x1="392" y1="62" x2="392" y2="28" stroke="#be123c" stroke-width="2"/>
+      <line x1="392" y1="28" x2="560" y2="28" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="564" y="8" rx="10" width="300" height="40" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="714" y="25" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">SÍ → Compras → Subcontratos</text>
+      <text x="714" y="40" text-anchor="middle" fill="#9f1239" font-size="11">otro caminito · no este tablero</text>
+
+      <line x1="512" y1="122" x2="600" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="524" y="112" fill="#1d4ed8" font-size="12" font-weight="800">NO</text>
+      <polygon points="720,72 840,122 720,172 600,122" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="720" y="110" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">¿Hay APU LABOR / EQP</text>
+      <text x="720" y="128" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">físico (no gl)?</text>
+
+      <line x1="720" y1="172" x2="720" y2="230" stroke="#be123c" stroke-width="2" marker-end="url(#arrR)"/>
+      <rect x="572" y="234" rx="10" width="296" height="52" fill="#ffe4ea" stroke="#be123c"/>
+      <text x="720" y="256" text-anchor="middle" fill="#9f1239" font-size="12" font-weight="800">NO → completar el presupuesto</text>
+      <text x="720" y="274" text-anchor="middle" fill="#9f1239" font-size="11">partida APPROVED con insumos APU</text>
+
+      <line x1="840" y1="122" x2="960" y2="122" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="856" y="112" fill="#1d4ed8" font-size="12" font-weight="800">SÍ</text>
+      <rect x="964" y="90" rx="12" width="280" height="64" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="1104" y="116" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Vista Operativo</text>
+      <text x="1104" y="136" text-anchor="middle" fill="#64748b" font-size="11">Faltante = need − max(pedido, facturado)</text>
+
+      <rect x="1280" y="90" rx="10" width="272" height="64" fill="#e8effc" stroke="#1d4ed8"/>
+      <text x="1416" y="116" text-anchor="middle" fill="#1d4ed8" font-size="12" font-weight="800">El $ no vive acá</text>
+      <text x="1416" y="136" text-anchor="middle" fill="#334155" font-size="11">EDT y costos · filtro tipo</text>
+
+      <rect x="48" y="320" rx="10" width="520" height="72" fill="#fff4e5" stroke="#b45309"/>
+      <text x="308" y="348" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">Cuadrilla / jornal / alquiler facturado = este tablero + tipo LAB o EQP</text>
+      <text x="308" y="368" text-anchor="middle" fill="#92400e" font-size="11">No hay timesheet ni log de horas de equipo en v1</text>
+
+      <rect x="24" y="438" width="1552" height="430" rx="16" fill="#fff" stroke="#e2e8f0"/>
+      <text x="44" y="464" fill="#1d4ed8" font-size="12" font-weight="800" letter-spacing="1.6">2 · ¿CÓMO LO CUBRÍS?</text>
+
+      <rect x="48" y="520" rx="12" width="176" height="56" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="136" y="544" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Hay faltante</text>
+      <text x="136" y="562" text-anchor="middle" fill="#64748b" font-size="11">insumo APU en la fila</text>
+
+      <line x1="224" y1="548" x2="272" y2="548" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <polygon points="372,498 472,548 372,598 272,548" fill="#fffbeb" stroke="#b45309" stroke-width="2"/>
+      <text x="372" y="536" text-anchor="middle" fill="#92400e" font-size="13" font-weight="800">¿Pedir o</text>
+      <text x="372" y="556" text-anchor="middle" fill="#92400e" font-size="13" font-weight="800">liquidar ahora?</text>
+
+      <line x1="372" y1="598" x2="372" y2="656" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="248" y="660" rx="12" width="248" height="64" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="372" y="684" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Pedir / Pedir resto</text>
+      <text x="372" y="704" text-anchor="middle" fill="#64748b" font-size="11">SC prellenada → caminito compras</text>
+
+      <line x1="472" y1="548" x2="560" y2="548" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <text x="484" y="538" fill="#1d4ed8" font-size="12" font-weight="800">Factura</text>
+      <rect x="564" y="516" rx="12" width="268" height="64" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="698" y="540" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Factura / Registrar factura</text>
+      <text x="698" y="560" text-anchor="middle" fill="#64748b" font-size="11">AP costo directo · tipada LAB/EQP</text>
+
+      <line x1="832" y1="548" x2="880" y2="548" stroke="#1d4ed8" stroke-width="2" marker-end="url(#arr)"/>
+      <rect x="884" y="516" rx="12" width="260" height="64" fill="#fff" stroke="#1d4ed8" stroke-width="1.6"/>
+      <text x="1014" y="540" text-anchor="middle" fill="#0f172a" font-size="13" font-weight="700">Insumo APU se guarda</text>
+      <text x="1014" y="560" text-anchor="middle" fill="#64748b" font-size="11">el tablero matchea el facturado</text>
+
+      <line x1="1144" y1="548" x2="1192" y2="548" stroke="#047857" stroke-width="2" marker-end="url(#arrG)"/>
+      <rect x="1196" y="516" rx="14" width="240" height="64" fill="#047857"/>
+      <text x="1316" y="544" text-anchor="middle" fill="#fff" font-size="15" font-weight="800">Emitir</text>
+      <text x="1316" y="564" text-anchor="middle" fill="#d1fae5" font-size="11">Devengado + CxP · baja faltante</text>
+
+      <rect x="564" y="660" rx="10" width="580" height="72" fill="#e8effc" stroke="#1d4ed8"/>
+      <text x="854" y="688" text-anchor="middle" fill="#1d4ed8" font-size="13" font-weight="800">Varianza ($) = presupuesto APU vs facturado neto (sin IVA)</text>
+      <text x="854" y="710" text-anchor="middle" fill="#334155" font-size="12">Exportar CSV en esa vista · atajos: EDT y costos · Tablero de compras · Facturas proveedor</text>
+
+      <rect x="1168" y="660" rx="10" width="368" height="72" fill="#fff4e5" stroke="#b45309"/>
+      <text x="1352" y="688" text-anchor="middle" fill="#92400e" font-size="12" font-weight="800">Si cambiás la partida EDT</text>
+      <text x="1352" y="708" text-anchor="middle" fill="#92400e" font-size="11">se limpia el vínculo APU · revisá el tipo</text>
+    </svg>
+    <footer>
+      <span>Bloqer · Flujo condicional de mano de obra y equipos · Guía operativa §9.0.1 · §9.0.2</span>
+      <span>Subcontrato y compras tienen su propio caminito</span>
+    </footer>
+  </div>
+</body>
+</html>

@@ -137,6 +137,8 @@ Dos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primer
 | Pagar un sueldo | [`flujos/mapa-flujo-sueldo-si-no.png`](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png) | §12.2.1 |
 | Costo de empresa | [`flujos/mapa-flujo-gasto-empresa-si-no.png`](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png) | §12.2 · §14 |
 | Compra | [`flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png) | §9 |
+| Mano de obra y equipos | [`flujos/mapa-flujo-mano-obra-equipos-si-no.png`](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png) | §9.0.1 · §9.0.2 |
+| Desvío de OC | [`flujos/mapa-flujo-desvio-oc-si-no.png`](./guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png) | §9.2 |
 | Costo de obra | [`flujos/mapa-flujo-costo-obra-si-no.png`](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png) | §12.2 |
 | Subcontrato | [`flujos/mapa-flujo-subcontrato-si-no.png`](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png) | §10 |
 | Certificar y cobrar | [`flujos/mapa-flujo-certificar-cobrar-si-no.png`](./guides/assets/flujos/mapa-flujo-certificar-cobrar-si-no.png) | §11 · §12.1 |
@@ -891,11 +893,15 @@ flowchart TD
 
 > **No es subcontrato.** Paquete con contrato + certificación → Compras → **Subcontratos** (§10). Cuadrilla/jornal/empleado facturado → este tablero + tipo LAB.
 
+**Cómo se mueve el flujo** (si esto, entonces aquello). El caminito: [`guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png`](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png).
+
+![Bloqer — Mano de obra y equipos: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png)
+
 ### 9.0.2 Procedimiento — Equipos del proyecto
 
 **Ruta:** Operación → **Equipos** → `/proyectos/[id]/equipos`
 
-Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** → SC/OC tipada EQP; **Factura** → AP tipada **Equipos**. Varianza y export CSV igual que §9.0.1 (neto sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]).
+Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** → SC/OC tipada EQP; **Factura** → AP tipada **Equipos**. Varianza y export CSV igual que §9.0.1 (neto sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]). Mismo caminito que §9.0.1.
 
 ### 9.1 Procedimiento — Solicitud de compra (SC)
 
@@ -931,7 +937,9 @@ Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño 
 10. **Entrega prevista vencida sin recepción** ([BR-PUR-018] · [D-097]): mientras la OC esté `CONFIRMED` o `PARTIALLY_RECEIVED` con `expectedDeliveryDate` pasada, en el listado y en **Pendientes** aparece el badge rojo **Vencida N d** junto a **Entrega prevista**. Se envía notificación diaria a quien puede recepcionar con deep-link al form (CTA **Registrar recepción**), CC OWNER/ADMIN, dedup 7 días. Ajustable con `deliveryOverdueGraceDays` y toggle `deliveryAlertsEnabled` por empresa.
 11. Con cantidades recibidas: panel **Facturación de la OC** → botón **Registrar factura** (o alta manual en Facturas proveedor). Si ya hay borrador (p. ej. [D-108]), Pendientes dice **Completar factura**.
 12. **OC recibida sin factura registrada** ([BR-PUR-020] · [D-097]): apenas hay recepción confirmada y la OC no tiene factura de proveedor `ISSUED`, aparece en **Pendientes** (grupo Compras → Facturar) para quien tiene `EDIT AP`, con CTA **Registrar factura** (abre la OC con el panel destacado vía `?siguiente=facturar`) o **Completar factura** si hay borrador. La **alerta/campana diaria** espera `receiptToInvoiceSlaDays` (default **5**) desde la primera recepción confirmada, CC OWNER/ADMIN, dedup 7 días. Toggle `receiptToInvoiceAlertsEnabled` por empresa. Es la señal que evita que la CxP nunca se genere y que el pago quede en el aire.
-13. Desvíos de precio vs referencia: la ficha **siempre** muestra **Ref. presup.** y **Desvío** por línea (también en celular). Si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío** en **Editar**; el aviso lista las líneas. Comprar por debajo no exige nota (el % sale en verde). Partida en **global** vs línea física: Ref. = — con texto «no es un $/u» y, si hay un insumo APU en la misma unidad, lo sugiere; Desvío = «Sin $/u comparable»; no bloquea. En **Editar** cada línea muestra PU · Ref · Desvío. Sin referencial comparable (APU y costo dir. /u en cero, unidad física) sí pide justificación.
+13. Desvíos de precio vs referencia: la ficha **siempre** muestra **Ref. presup.** y **Desvío** por línea (también en celular). Si el PU **supera** el referencial (umbrales de políticas), pide **Justificación desvío** en **Editar**; el aviso lista las líneas. Comprar por debajo no exige nota (el % sale en verde). Partida en **global** vs línea física: Ref. = — con texto «no es un $/u» y, si hay un insumo APU en la misma unidad, lo sugiere; Desvío = «Sin $/u comparable»; no bloquea. En **Editar** cada línea muestra PU · Ref · Desvío. Sin referencial comparable (APU y costo dir. /u en cero, unidad física) sí pide justificación. El caminito: [`guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png`](./guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png).
+
+![Bloqer — Desvío de OC: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png)
 14. **OC directa** (sin SC): solo si la política de compras lo habilita; umbrales altos pueden exigir motivo de emergencia (`OWNER`/`ADMIN`).
 
 | Hito | Impacto |

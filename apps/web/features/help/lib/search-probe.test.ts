@@ -98,6 +98,9 @@ test("new concept/report articles are findable", () => {
     { q: "checklist", expectSlugIncludes: "checklist" },
     { q: "puesta en marcha contable", expectSlugIncludes: "puesta-en-marcha" },
     { q: "tablero materiales", expectSlugIncludes: "tablero-materiales" },
+    { q: "tablero mano de obra", expectSlugIncludes: "tablero-mano-obra" },
+    { q: "tablero equipos", expectSlugIncludes: "tablero-equipos" },
+    { q: "justificacion desvio", expectSlugIncludes: "orden-de-compra" },
   ];
   for (const c of cases) {
     const hits = searchHelpArticles(HELP_ARTICLES, { query: c.q });

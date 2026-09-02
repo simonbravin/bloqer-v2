@@ -16,7 +16,11 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Compras → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
       "Alcance e imputación: cada línea con partida EDT (obligatoria antes de aprobar certificaciones).",
     ],
-    relatedSlugs: ["cargar-un-subcontratista", "certificar-y-pagar-subcontrato"],
+    relatedSlugs: [
+      "cargar-un-subcontratista",
+      "certificar-y-pagar-subcontrato",
+      "tablero-mano-obra",
+    ],
     keywords: ["subcontrato", "crear subcontrato", "paquete", "compromisos"],
     guideRef: "§10",
   },
@@ -231,6 +235,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "cargar-un-empleado",
       "reintegrar-gasto-a-empleado",
       "proveedor-empleado-o-subcontratista",
+      "tablero-mano-obra",
     ],
     keywords: [
       "sueldo",
@@ -303,6 +308,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       "circuito-comprar-material-hasta-pagarlo",
       "descuento-porcentual-en-lineas",
       "clase-de-documento-financiero",
+      "tablero-mano-obra",
+      "tablero-equipos",
     ],
     keywords: [
       "gasto obra",

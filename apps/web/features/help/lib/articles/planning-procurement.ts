@@ -375,6 +375,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "registrar-consumo-materiales",
       "circuito-comprar-material-hasta-pagarlo",
       "leer-edt-y-costos",
+      "tablero-mano-obra",
+      "tablero-equipos",
     ],
     keywords: [
       "tablero materiales",
@@ -412,6 +414,12 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "OC confirmada tipada LAB → Comprometido en bucket Mano de obra.",
       "Factura emitida tipada LAB → Devengado + CxP; el faltante del tablero baja por el APU vinculado.",
     ],
+    figure: {
+      src: "/help/mapa-flujo-mano-obra-equipos-si-no.png",
+      alt: "Bloqer — Mano de obra y equipos: si esto, entonces aquello",
+      caption:
+        "Pedir o facturar. Paquete con contrato → Subcontratos. El $ está en EDT y costos.",
+    },
     pitfalls: [
       "Paquete con contrato y certificación no va acá: usá Compras → Subcontratos.",
       "Bloqer no liquida nóminas: el sueldo se registra como factura/gasto tipado.",
@@ -424,6 +432,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "certificar-y-pagar-subcontrato",
       "leer-edt-y-costos",
       "pagar-un-sueldo",
+      "gasto-de-obra-sin-oc",
+      "orden-de-compra-y-afectar-edt",
     ],
     keywords: [
       "mano de obra",
@@ -457,6 +467,12 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Varianza ($) compara presupuesto APU vs facturado neto (sin IVA); Exportar CSV en esa vista.",
       "Controlá el $ en EDT y costos con filtro Equipos.",
     ],
+    figure: {
+      src: "/help/mapa-flujo-mano-obra-equipos-si-no.png",
+      alt: "Bloqer — Mano de obra y equipos: si esto, entonces aquello",
+      caption:
+        "Mismo caminito que Mano de obra, con APU EQUIPMENT. Pedir o Registrar factura tipada Equipos.",
+    },
     pitfalls: [
       "No hay parte de horas de equipo en v1: el costo entra por OC o factura tipada.",
     ],
@@ -465,10 +481,17 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "tablero-materiales",
       "leer-edt-y-costos",
       "circuito-comprar-material-hasta-pagarlo",
+      "gasto-de-obra-sin-oc",
+      "orden-de-compra-y-afectar-edt",
+    ],
+    effects: [
+      "OC confirmada tipada EQP → Comprometido en bucket Equipos.",
+      "Factura emitida tipada EQP → Devengado + CxP; el faltante del tablero baja por el APU vinculado.",
     ],
     keywords: [
       "equipos",
       "alquiler",
+      "alquiler de equipos",
       "baño químico",
       "andamio",
       "tablero equipos",
@@ -621,6 +644,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     relatedSlugs: [
       "tablero-materiales",
+      "tablero-mano-obra",
+      "tablero-equipos",
       "orden-de-compra-y-afectar-edt",
       "politicas-de-compras",
       "descuento-porcentual-en-lineas",
@@ -649,7 +674,6 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "fecha requerida",
       "necesaria para",
       "item edt",
-      "ítem edt",
       "partida edt",
       "dónde se usa",
       "que necesito",
@@ -686,6 +710,12 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Al recibir: panel Facturación arriba. Con política [D-108] puede crearse borrador de factura automáticamente (emitir = CxP). Pendientes muestra **Registrar factura** o **Completar factura** hasta ISSUED.",
       "Luego recepción y factura (el tipo se hereda de la línea de OC).",
     ],
+    figure: {
+      src: "/help/mapa-flujo-desvio-oc-si-no.png",
+      alt: "Bloqer — Desvío de OC: si esto, entonces aquello",
+      caption:
+        "Justificación solo si el PU supera un $/u comparable. Partida global no bloquea: elegí Insumo APU en Editar.",
+    },
     effects: [
       "APPROVED = control interno (sin $), salvo auto-confirm ON. CONFIRMED = Comprometido. El atajo escribe ambos en un acto.",
     ],
@@ -708,6 +738,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "descuento-porcentual-en-lineas",
       "revisar-pendientes",
       "politicas-de-compras",
+      "tablero-mano-obra",
+      "tablero-equipos",
     ],
     keywords: [
       "orden de compra",
@@ -807,7 +839,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Desde Pendientes (**Registrar factura** o **Completar factura**) aterrizás en la OC / borrador; desde recepción confirmada u OC: panel Facturación → **Registrar factura**.",
-      "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta) y adjunto del comprobante.",
+      "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta), el **insumo APU** si venía de la OC y el adjunto del comprobante.",
       "Crear → borrador → Emitir (o Emitir y pagar ahora).",
       "**Sin OC**: al elegir la partida, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico → EQP; excavación con retro → EQP). Si es mixto, queda Materiales con hint.",
     ],
@@ -824,6 +856,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "leer-edt-y-costos",
       "revisar-pendientes",
       "recibir-una-oc",
+      "tablero-mano-obra",
+      "tablero-equipos",
     ],
     keywords: [
       "factura desde oc",
