@@ -59,5 +59,10 @@ test("buildProgressSnapshotEntry includes remaining and qty", () => {
   const e = buildProgressSnapshotEntry("70.00", "8.5");
   assert.equal(e.approvedIncrementalPct, "70.00");
   assert.equal(e.remainingPct, "30.00");
-  assert.equal(e.approvedQty, "8.5");
+  assert.equal(e.approvedQty, "8.5000");
+});
+
+test("remainingPhysicalPct does not use IEEE float", () => {
+  assert.equal(remainingPhysicalPct("10.1"), "89.90");
+  assert.equal(remainingPhysicalPct("99.996"), "0.00");
 });

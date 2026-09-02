@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   capSyncProgressPct,
+  resolveJobsitePhysicalPctForSync,
   resolveScheduleStatusAfterProgressSync,
   serializeProgressPct,
 } from "./schedule-progress-sync-pure";
@@ -28,6 +29,44 @@ describe("capSyncProgressPct", () => {
   it("caps at 100 with two decimals as string", () => {
     assert.equal(capSyncProgressPct(99.996), "100.00");
     assert.equal(capSyncProgressPct(42.5), "42.50");
+  });
+});
+
+describe("resolveJobsitePhysicalPctForSync", () => {
+  it("keeps approved % when this log has no physicalPct (does not fall back to qty)", () => {
+    assert.equal(
+      resolveJobsitePhysicalPctForSync({
+        approvedIncrementalPct: "50",
+        approvedHasPhysicalPct: true,
+        thisLogIncrementalPct: null,
+        qtyFallbackPct: "200",
+      }),
+      "50",
+    );
+  });
+
+  it("adds this log incremental % to approved", () => {
+    assert.equal(
+      resolveJobsitePhysicalPctForSync({
+        approvedIncrementalPct: "50",
+        approvedHasPhysicalPct: true,
+        thisLogIncrementalPct: "10",
+        qtyFallbackPct: "200",
+      }),
+      "60",
+    );
+  });
+
+  it("uses qty fallback only when the WBS never recorded physicalPct", () => {
+    assert.equal(
+      resolveJobsitePhysicalPctForSync({
+        approvedIncrementalPct: "0",
+        approvedHasPhysicalPct: false,
+        thisLogIncrementalPct: null,
+        qtyFallbackPct: "40",
+      }),
+      "40",
+    );
   });
 });
 

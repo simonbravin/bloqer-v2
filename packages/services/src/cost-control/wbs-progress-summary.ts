@@ -65,7 +65,7 @@ export function buildWbsProgressSummary(input: {
   return {
     physicalPctAcum: roundToDecimals(physPct.toString(), 2),
     physicalQtyAcum: serializeQtyDecimal(physQty),
-    physicalRemainingPct: remainingPhysicalPct(physPct.toFixed(2)),
+    physicalRemainingPct: remainingPhysicalPct(physPct.toString()),
     certifiedQty: serializeQtyDecimal(certQty),
     certifiedAmount: serializeMoneyDecimal(certAmt),
     economicPctOfSale: pctOf(certAmt, sale),

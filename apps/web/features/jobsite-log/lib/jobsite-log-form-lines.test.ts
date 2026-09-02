@@ -4,6 +4,8 @@ import {
   applyProgressPctChange,
   applyProgressQtyChange,
   applyProgressWbsSelection,
+  cumulativePhysicalPctFromDrafts,
+  fillProgressPhysicalPct,
   fillProgressQuantity,
   isBlankProgressLine,
   isValidProgressLine,
@@ -108,6 +110,43 @@ test("suggestedPctFromQty is the inverse of qty = budget × %", () => {
   assert.equal(suggestedPctFromQty("50", "5.0000"), "10.00");
   assert.equal(suggestedPctFromQty("1.0000", "1.0000"), "100.00");
   assert.equal(suggestedPctFromQty(undefined, "5"), "");
+});
+
+test("fillProgressPhysicalPct derives % when only qty is present", () => {
+  const filled = fillProgressPhysicalPct(
+    {
+      ...blank,
+      wbsNodeId: "11111111-1111-4111-8111-111111111111",
+      quantityCompleted: "0.1000",
+    },
+    "1.0000",
+  );
+  assert.equal(filled.physicalPct, "10.00");
+});
+
+test("prepareProgressLinesForSubmit fills % from qty (Casa Hogar gl partidas)", () => {
+  const wbsId = "075e9b6d-fded-4dcd-814d-e82b4660cbe0";
+  const prepared = prepareProgressLinesForSubmit(
+    [
+      {
+        ...blank,
+        wbsNodeId: wbsId,
+        description: "3.2 — Movimiento de suelo",
+        quantityCompleted: "0.1000",
+      },
+    ],
+    [{ id: wbsId, budgetQty: "1.0000" }],
+  );
+  assert.equal("payload" in prepared, true);
+  if (!("payload" in prepared)) return;
+  assert.equal(prepared.payload[0]?.physicalPct, "10.00");
+  assert.equal(prepared.payload[0]?.quantityCompleted, "0.1000");
+});
+
+test("cumulativePhysicalPctFromDrafts sums approved + draft incrementals", () => {
+  assert.equal(cumulativePhysicalPctFromDrafts("50.00", ["10", "10"]), "70.00");
+  assert.equal(cumulativePhysicalPctFromDrafts("50.00", ["10", ""]), "60.00");
+  assert.equal(cumulativePhysicalPctFromDrafts("50.00", ["nope"]), "50.00");
 });
 
 test("editing % del día rewrites the suggested qty (keeps libro and EDT aligned)", () => {

@@ -32,6 +32,7 @@ import {
   applyProgressPctChange,
   applyProgressQtyChange,
   applyProgressWbsSelection,
+  cumulativePhysicalPctFromDrafts,
   JOBSITE_PROGRESS_NONE,
   JOBSITE_QTY_RE,
   prepareMaterialLinesForSubmit,
@@ -110,11 +111,15 @@ function remainingPctForWbs(
       if (excludeIndex != null && i === excludeIndex) continue;
       const row = draftProgress[i]!;
       if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
-      rem = addDecimal(rem, multiplyDecimal(row.physicalPct, "-1"));
+      try {
+        rem = addDecimal(rem, multiplyDecimal(row.physicalPct, "-1"));
+      } catch {
+        /* skip invalid token while typing */
+      }
     }
   }
-  if (compareDecimal(rem, "0") < 0) rem = "0";
   try {
+    if (compareDecimal(rem, "0") < 0) rem = "0";
     return roundToDecimals(rem, DISPLAY_DECIMALS);
   } catch {
     return rem;
@@ -135,11 +140,10 @@ function cumulativePctLabel(
   snapshot: WbsIncrementalProgressSnapshot,
 ): string {
   if (wbsNodeId === JOBSITE_PROGRESS_NONE) return "— / 100";
-  let total = approvedPctForWbs(wbsNodeId, snapshot);
-  for (const row of progress) {
-    if (row.wbsNodeId !== wbsNodeId || !row.physicalPct) continue;
-    total = addDecimal(total, row.physicalPct);
-  }
+  const total = cumulativePhysicalPctFromDrafts(
+    approvedPctForWbs(wbsNodeId, snapshot),
+    progress.filter((row) => row.wbsNodeId === wbsNodeId).map((row) => row.physicalPct),
+  );
   return `${formatRatePctFromString(total)} / 100`;
 }
 

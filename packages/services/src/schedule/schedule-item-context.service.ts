@@ -45,7 +45,7 @@ async function getWbsIncrementalPhysicalPctSum(
   if (rows.length === 0) return null;
   let sum = new Prisma.Decimal(0);
   for (const r of rows) {
-    if (r.physicalPct) sum = sum.add(r.physicalPct);
+    if (r.physicalPct != null) sum = sum.add(r.physicalPct);
   }
   // Cap at 100 for schedule copy / display (over-allocation is a jobsite data issue).
   if (sum.greaterThan(100)) return "100.00";
@@ -112,7 +112,7 @@ export async function getScheduleItemContext(
       quantityCompleted: p.quantityCompleted
         ? serializeQtyDecimal(p.quantityCompleted)
         : null,
-      physicalPct: p.physicalPct ? serializeProgressPct(p.physicalPct.toString()) : null,
+      physicalPct: p.physicalPct != null ? serializeProgressPct(p.physicalPct.toString()) : null,
       href: `${base}/libro-obra/${p.jobsiteLog.id}`,
     })),
     certificationEntries: certLines.map((l) => ({

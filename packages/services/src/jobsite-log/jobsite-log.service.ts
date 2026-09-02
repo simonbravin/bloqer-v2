@@ -28,7 +28,7 @@ import { assertProjectAllowsOperationalMutation } from "../project/project-opera
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
-import { isRichNoteEmpty, normalizeRichNote, toIsoDateInTimeZone } from "@bloqer/utils";
+import { isRichNoteEmpty, normalizeRichNote, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
@@ -294,7 +294,7 @@ export async function getWbsIncrementalProgressSnapshot(
   const pctSums = new Map<string, Prisma.Decimal>();
   const qtySums = new Map<string, Prisma.Decimal>();
   for (const row of rows) {
-    if (row.physicalPct) {
+    if (row.physicalPct != null) {
       const prev = pctSums.get(row.wbsNodeId) ?? new Prisma.Decimal(0);
       pctSums.set(row.wbsNodeId, prev.add(row.physicalPct));
     }
@@ -307,7 +307,10 @@ export async function getWbsIncrementalProgressSnapshot(
   for (const wbsNodeId of wbsIds) {
     const pct = pctSums.get(wbsNodeId) ?? new Prisma.Decimal(0);
     const qty = qtySums.get(wbsNodeId) ?? new Prisma.Decimal(0);
-    out[wbsNodeId] = buildProgressSnapshotEntry(pct.toFixed(2), qty.toFixed(4));
+    out[wbsNodeId] = buildProgressSnapshotEntry(
+      roundToDecimals(pct.toString(), 2),
+      serializeQtyDecimal(qty),
+    );
   }
   return out;
 }
@@ -538,8 +541,10 @@ async function writeChildren(
         jobsiteLogId:      logId,
         wbsNodeId:         p.wbsNodeId,
         description:       p.description ?? null,
-        quantityCompleted: new Prisma.Decimal(p.quantityCompleted),
-        physicalPct:       p.physicalPct ? new Prisma.Decimal(p.physicalPct) : null,
+        quantityCompleted: new Prisma.Decimal(serializeQtyDecimal(p.quantityCompleted)),
+        physicalPct:       p.physicalPct
+          ? new Prisma.Decimal(serializeRatePctDecimal(p.physicalPct))
+          : null,
         notes:             p.notes ?? null,
         sortOrder:         p.sortOrder ?? i,
       },

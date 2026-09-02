@@ -1,4 +1,4 @@
-import { DISPLAY_DECIMALS, divideDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
+import { addDecimal, DISPLAY_DECIMALS, divideDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
 
 export type JobsiteLogProgressDraft = {
   wbsNodeId: string;
@@ -56,6 +56,45 @@ export function fillProgressQuantity(
   const suggested = suggestedQuantityFromPct(budgetQty, line.physicalPct);
   if (!suggested) return line;
   return { ...line, quantityCompleted: suggested };
+}
+
+/** % implied by qty / budget when the user typed cantidad and left % empty. */
+export function fillProgressPhysicalPct(
+  line: JobsiteLogProgressDraft,
+  budgetQty: string | undefined,
+): JobsiteLogProgressDraft {
+  if (JOBSITE_QTY_RE.test(line.physicalPct.trim())) return line;
+  const suggested = suggestedPctFromQty(budgetQty, line.quantityCompleted);
+  if (!suggested) return line;
+  return { ...line, physicalPct: suggested };
+}
+
+/** Qty from % first, then % from qty — never overwrite a field the user already typed. */
+export function fillProgressDerivedFields(
+  line: JobsiteLogProgressDraft,
+  budgetQty: string | undefined,
+): JobsiteLogProgressDraft {
+  return fillProgressPhysicalPct(fillProgressQuantity(line, budgetQty), budgetQty);
+}
+
+/** Add a draft % onto a running total; skip blank/invalid tokens (form live input). */
+export function addPhysicalPctSafe(base: string, increment: string): string {
+  const inc = increment.trim();
+  if (!inc || !JOBSITE_QTY_RE.test(inc)) return base;
+  try {
+    return addDecimal(base, inc);
+  } catch {
+    return base;
+  }
+}
+
+export function cumulativePhysicalPctFromDrafts(
+  approvedPct: string,
+  draftPcts: string[],
+): string {
+  let total = approvedPct;
+  for (const pct of draftPcts) total = addPhysicalPctSafe(total, pct);
+  return total;
 }
 
 /** % del día implied by qty / budgetQty × 100 (2 dp, same as the form display). */
@@ -137,7 +176,7 @@ export function prepareProgressLinesForSubmit(
 ): { error: string } | { filled: JobsiteLogProgressDraft[]; payload: JobsiteLogProgressPayloadLine[] } {
   const filled = lines.map((p) => {
     const wbs = wbsOptions.find((w) => w.id === p.wbsNodeId);
-    return fillProgressQuantity(p, wbs?.budgetQty);
+    return fillProgressDerivedFields(p, wbs?.budgetQty);
   });
   const error = progressLinesSubmitError(filled);
   if (error) return { error };

@@ -5,6 +5,7 @@ import { SCHEDULE_ITEM_ENTITY, scheduleItemSnapshot } from "./schedule-audit";
 import { assertScheduleStatusTransition, isScheduleLeafItem } from "./schedule-helpers";
 import {
   capSyncProgressPct,
+  resolveJobsitePhysicalPctForSync,
   resolveScheduleStatusAfterProgressSync,
 } from "./schedule-progress-sync-pure";
 import { shouldSyncProgressFromJobsite } from "./schedule-placement";
@@ -20,7 +21,7 @@ async function sumApprovedPhysicalPct(
   tenantId: string,
   excludeLogId: string,
   tx: TxClient,
-): Promise<Prisma.Decimal> {
+): Promise<{ sum: Prisma.Decimal; hasPhysicalPct: boolean }> {
   const rows = await tx.jobsiteLogProgress.findMany({
     where: {
       wbsNodeId,
@@ -36,9 +37,9 @@ async function sumApprovedPhysicalPct(
   });
   let sum = new Prisma.Decimal(0);
   for (const r of rows) {
-    if (r.physicalPct) sum = sum.add(r.physicalPct);
+    if (r.physicalPct != null) sum = sum.add(r.physicalPct);
   }
-  return sum;
+  return { sum, hasPhysicalPct: rows.length > 0 };
 }
 
 async function resolveWbsPhysicalPct(
@@ -67,56 +68,62 @@ async function resolveWbsPhysicalPct(
   let incremental = new Prisma.Decimal(0);
   let hasPhysical = false;
   for (const line of logLines) {
-    if (line.physicalPct) {
+    if (line.physicalPct != null) {
       incremental = incremental.add(line.physicalPct);
       hasPhysical = true;
     }
   }
 
-  if (hasPhysical) {
-    return approvedBase.add(incremental);
+  let qtyFallbackPct: string | null = null;
+  if (!hasPhysical && !approvedBase.hasPhysicalPct) {
+    // [D-045] Use schedule baseline budget qty — never latest DRAFT versionNumber.
+    const schedule = await tx.schedule.findFirst({
+      where: { projectId, tenantId: ctx.tenantId },
+      select: { baselineBudgetId: true },
+    });
+    const costItem = await tx.costItem.findFirst({
+      where: {
+        wbsNodeId,
+        ...(schedule?.baselineBudgetId
+          ? { budgetId: schedule.baselineBudgetId }
+          : {
+              budget: {
+                projectId,
+                tenantId: ctx.tenantId,
+                status: { in: ["APPROVED", "CLOSED"] },
+              },
+            }),
+      },
+      orderBy: { budget: { versionNumber: "desc" } },
+      select: { quantity: true },
+    });
+    if (costItem && costItem.quantity.gt(0)) {
+      const approvedQtyRows = await tx.jobsiteLogProgress.findMany({
+        where: {
+          wbsNodeId,
+          jobsiteLog: {
+            tenantId: ctx.tenantId,
+            projectId,
+            status: "APPROVED",
+            id: { not: jobsiteLogId },
+          },
+        },
+        select: { quantityCompleted: true },
+      });
+      let qtySum = new Prisma.Decimal(0);
+      for (const r of approvedQtyRows) qtySum = qtySum.add(r.quantityCompleted);
+      for (const line of logLines) qtySum = qtySum.add(line.quantityCompleted);
+      qtyFallbackPct = qtySum.div(costItem.quantity).mul(100).toString();
+    }
   }
 
-  // [D-045] Use schedule baseline budget qty — never latest DRAFT versionNumber.
-  const schedule = await tx.schedule.findFirst({
-    where: { projectId, tenantId: ctx.tenantId },
-    select: { baselineBudgetId: true },
+  const resolved = resolveJobsitePhysicalPctForSync({
+    approvedIncrementalPct: approvedBase.sum.toString(),
+    approvedHasPhysicalPct: approvedBase.hasPhysicalPct,
+    thisLogIncrementalPct: hasPhysical ? incremental.toString() : null,
+    qtyFallbackPct,
   });
-  const costItem = await tx.costItem.findFirst({
-    where: {
-      wbsNodeId,
-      ...(schedule?.baselineBudgetId
-        ? { budgetId: schedule.baselineBudgetId }
-        : {
-            budget: {
-              projectId,
-              tenantId: ctx.tenantId,
-              status: { in: ["APPROVED", "CLOSED"] },
-            },
-          }),
-    },
-    orderBy: { budget: { versionNumber: "desc" } },
-    select: { quantity: true },
-  });
-  if (!costItem || costItem.quantity.lte(0)) return null;
-
-  const approvedQtyRows = await tx.jobsiteLogProgress.findMany({
-    where: {
-      wbsNodeId,
-      jobsiteLog: {
-        tenantId: ctx.tenantId,
-        projectId,
-        status: "APPROVED",
-        id: { not: jobsiteLogId },
-      },
-    },
-    select: { quantityCompleted: true },
-  });
-  let qtySum = new Prisma.Decimal(0);
-  for (const r of approvedQtyRows) qtySum = qtySum.add(r.quantityCompleted);
-  for (const line of logLines) qtySum = qtySum.add(line.quantityCompleted);
-
-  return qtySum.div(costItem.quantity).mul(100);
+  return resolved == null ? null : new Prisma.Decimal(resolved);
 }
 
 /**
