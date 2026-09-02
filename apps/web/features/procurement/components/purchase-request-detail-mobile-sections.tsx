@@ -99,7 +99,7 @@ export function PurchaseRequestDetailMobileSections({
                 <ul className="text-xs text-muted-foreground space-y-0.5">
                   {q.lines.map((l, i) => (
                     <li key={`${q.id}-${i}`}>
-                      {l.description}: {formatUnitPriceFromString(l.unitPrice)}
+                      {l.description}: {formatUnitPriceFromString(l.unitPrice)} neto
                       {!isZeroRatePct(l.discountPct)
                         ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
                         : ""}

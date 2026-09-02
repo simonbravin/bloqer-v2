@@ -5,14 +5,18 @@ import {
   submitPurchaseRequest,
   cancelPurchaseRequest,
   createProcurementQuote,
+  updateProcurementQuote,
+  deleteProcurementQuote,
   selectProcurementQuoteAndCreatePo,
   ServiceError,
 } from "@bloqer/services";
 import {
   createPurchaseRequestSchema,
   createProcurementQuoteSchema,
+  updateProcurementQuoteSchema,
   type CreatePurchaseRequestInput,
   type CreateProcurementQuoteInput,
+  type UpdateProcurementQuoteInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -94,6 +98,39 @@ export async function createProcurementQuoteAction(
     const quote = await createProcurementQuote(parsed.data, ctx);
     revalidatePr(projectId, parsed.data.purchaseRequestId);
     return { id: quote.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function updateProcurementQuoteAction(
+  projectId: string,
+  quoteId: string,
+  purchaseRequestId: string,
+  data: UpdateProcurementQuoteInput,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = updateProcurementQuoteSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const quote = await updateProcurementQuote(quoteId, purchaseRequestId, parsed.data, ctx);
+    revalidatePr(projectId, purchaseRequestId);
+    return { id: quote.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function deleteProcurementQuoteAction(
+  quoteId: string,
+  projectId: string,
+  purchaseRequestId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await deleteProcurementQuote(quoteId, purchaseRequestId, ctx);
+    revalidatePr(projectId, purchaseRequestId);
+    return { ok: true };
   } catch (err) {
     return handle(err);
   }

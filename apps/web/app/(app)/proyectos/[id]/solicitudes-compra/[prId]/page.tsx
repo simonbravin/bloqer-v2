@@ -11,13 +11,12 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
 import {
-  ProcurementQuoteForm,
-  SelectQuoteButton,
-} from "@/features/procurement/components/procurement-quote-form";
+  ProcurementQuotesSection,
+} from "@/features/procurement/components/procurement-quotes-section";
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
+import { formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
@@ -27,14 +26,13 @@ import {
   listAllContacts,
   ServiceError,
 } from "@bloqer/services";
-import { ProcurementQuoteStatusBadge } from "@/features/procurement/components/procurement-quote-status-badge";
+import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
 import { toContactPickerOption } from "@/lib/searchable-options";
 import { Button } from "@/components/ui/button";
 import { EntityDocumentsPanel } from "@/features/documents";
-import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
 import { isStorageConfigured } from "@bloqer/config";
 import { listEntityDocuments } from "@bloqer/services";
 import {
@@ -253,89 +251,18 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
       </div>
 
       {showQuotes && (
-        <div className="hidden md:block space-y-4">
-          <h2 className="text-lg font-semibold">Cotizaciones</h2>
-          <TableScroll>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Proveedor</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="text-right">Plazo (días)</TableHead>
-                  <TableHead>Vigencia</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {quotes.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground py-6">
-                      Sin cotizaciones cargadas.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  quotes.map((q) => (
-                    <TableRow key={q.id}>
-                      <TableCell>
-                        <p>{q.supplierName}</p>
-                        {q.lines.length > 0 ? (
-                          <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                            {q.lines.map((l, i) => (
-                              <li key={`${q.id}-${i}`}>
-                                {l.description}: {formatUnitPriceFromString(l.unitPrice)}
-                                {!isZeroRatePct(l.discountPct)
-                                  ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
-                                  : ""}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </TableCell>
-                      <TableCell>
-                        <ProcurementQuoteStatusBadge status={q.status} />
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {formatMoneyAmount(q.totalAmount, q.currency)}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {q.leadTimeDays ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {q.validUntil ?? "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {q.status === "RECEIVED" && canQuote && (
-                          <SelectQuoteButton
-                            quoteId={q.id}
-                            projectId={id}
-                            purchaseRequestId={prId}
-                          />
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableScroll>
-
-          {canQuote && suppliers.length > 0 && (
-            <ProcurementQuoteForm
-              projectId={id}
-              purchaseRequestId={prId}
-              suppliers={suppliers}
-              lines={pr.lines}
-            />
-          )}
-          {canQuote && suppliers.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              No hay proveedores activos para cargar cotizaciones.
-            </p>
-          )}
+        <>
+          <ProcurementQuotesSection
+            projectId={id}
+            purchaseRequestId={prId}
+            prLines={pr.lines}
+            suppliers={suppliers}
+            quotes={quotes}
+            canQuote={canQuote}
+          />
 
           {quotes.length > 0 && (
-            <div className="space-y-4">
+            <div className="hidden md:block space-y-4">
               <h3 className="text-sm font-medium">Adjuntos por cotización</h3>
               {quoteAttachments.map((qa) => (
                 <div key={qa.quoteId} className="rounded-lg border p-4 space-y-2">
@@ -351,7 +278,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
               ))}
             </div>
           )}
-        </div>
+        </>
       )}
 
       <div className="hidden md:block">

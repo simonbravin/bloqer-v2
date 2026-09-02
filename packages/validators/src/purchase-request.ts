@@ -49,7 +49,14 @@ export const createProcurementQuoteSchema = z.object({
   validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   leadTimeDays: z.coerce.number().int().min(0).max(3650).optional().nullable(),
   notes: z.string().optional().nullable(),
+  /** Ephemeral input flag [D-086]: unit price is gross (Factura B). Not persisted. */
+  pricesIncludeTax: z.boolean().optional(),
   lines: z.array(quoteLineSchema).min(1),
+});
+
+export const updateProcurementQuoteSchema = createProcurementQuoteSchema.omit({
+  purchaseRequestId: true,
+  supplierContactId: true,
 });
 
 export const confirmPurchaseOrderSchema = z.object({
@@ -59,3 +66,4 @@ export const confirmPurchaseOrderSchema = z.object({
 export type CreatePurchaseRequestInput = z.infer<typeof createPurchaseRequestSchema>;
 export type UpdatePurchaseRequestInput = z.infer<typeof updatePurchaseRequestSchema>;
 export type CreateProcurementQuoteInput = z.infer<typeof createProcurementQuoteSchema>;
+export type UpdateProcurementQuoteInput = z.infer<typeof updateProcurementQuoteSchema>;

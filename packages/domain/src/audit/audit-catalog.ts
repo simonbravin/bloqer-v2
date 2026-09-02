@@ -101,6 +101,8 @@ export const AUDIT_ACTION_LABELS_ES: Record<string, string> = {
   "purchase_request.cancelled": "Solicitud de compra anulada",
   "procurement_quote.received": "Cotización recibida",
   "procurement_quote.selected": "Cotización seleccionada",
+  "procurement_quote.updated": "Cotización actualizada",
+  "procurement_quote.deleted": "Cotización eliminada",
   PURCHASE_RECEIPT_CREATED: "Recepción creada",
   PURCHASE_RECEIPT_CONFIRMED: "Recepción confirmada",
   PURCHASE_RECEIPT_CANCELLED: "Recepción anulada",

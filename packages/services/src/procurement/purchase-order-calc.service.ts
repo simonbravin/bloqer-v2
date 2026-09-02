@@ -3,20 +3,22 @@ import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
-/** Canonical line math [D-053]/[D-093]: discount on rounded subtotal, then IVA; header = sum. */
+/** Canonical line math [D-053]/[D-093]/[D-086]: discount on rounded subtotal, then IVA; header = sum. */
 export function calcLine(
   quantity: Prisma.Decimal,
   unitPrice: Prisma.Decimal,
   taxRate: Prisma.Decimal,
   discountPct: Prisma.Decimal = new Prisma.Decimal(0),
+  pricesIncludeTax?: boolean,
 ) {
-  const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+  const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
     quantity,
     unitPrice,
     taxRate,
     discountPct,
+    pricesIncludeTax,
   });
-  return { lineSubtotal, lineTax, lineTotal };
+  return { unitPriceNet, lineSubtotal, lineTax, lineTotal };
 }
 
 export async function recalcPurchaseOrderTotals(tx: TxClient, purchaseOrderId: string): Promise<void> {
