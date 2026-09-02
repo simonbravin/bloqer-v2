@@ -40,7 +40,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyDisplay } from "@/lib/format-money";
+import { addDecimal, compareDecimal } from "@bloqer/utils";
 import { cn } from "@/lib/utils";
 import { CostVarianceBadge } from "./cost-variance-badge";
 import { WbsItemDrilldownDialog } from "./wbs-item-drilldown-dialog";
@@ -72,8 +73,8 @@ const COLUMN_HINTS: Partial<Record<EdtColumnId, string>> = {
   exposure:
     "Exposición esperada = Devengado + Comprometido abierto (anti doble conteo). No suma OC + factura en bruto.",
   pctPurchased: "Comprometido ÷ presupuesto de costo × 100.",
-  pctReceived: "Cantidad recibida en compras ÷ cantidad presupuestada × 100. Cobertura física de la compra, no del avance de obra.",
-  pctPhysicalProgress: "Cantidad ejecutada según libro de obra aprobado ÷ cantidad presupuestada × 100. Es el avance real de obra.",
+  pctReceived: "Costo recibido (cant. × PU neto de la OC) ÷ presupuesto de costo × 100. Misma base que % compra: no usa la cantidad presupuestada (en partidas gl eso marcaba 100% al recibir 1).",
+  pctPhysicalProgress: "Suma del % del día de partes APPROVED. Si la partida nunca registró %, se usa cantidad ejecutada ÷ cantidad presupuestada.",
   physicalProgress: "Cantidad ejecutada acumulada según partes de libro APPROVED.",
   pctEconomic: "Devengado ÷ presupuesto de costo × 100.",
   pctExposure: "Exposición esperada ÷ presupuesto de costo × 100.",
@@ -99,11 +100,10 @@ function HintHead({ label, hint }: { label: string; hint?: string }) {
 
 function PctPill({ value }: { value: string | null }) {
   if (value == null) return <span className="text-muted-foreground">—</span>;
-  const n = Number(value);
   const tone =
-    n > 105
+    compareDecimal(value, "105") > 0
       ? "bg-red-100 text-red-800 dark:bg-red-950/40 dark:text-red-300"
-      : n >= 90
+      : compareDecimal(value, "90") >= 0
         ? "bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
         : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300";
   return (
@@ -167,15 +167,15 @@ function cellValue(row: CostControlRow, col: EdtColumnId): ReactNode {
         <CostVarianceBadge variance={row.costVariance} label={formatMoneyAmount(row.costVariance)} />
       );
     case "physicalProgress":
-      return row.operationalProgressQty;
+      return formatQtyDisplay(row.operationalProgressQty);
     case "qtyBudgeted":
-      return row.budgetQty;
+      return formatQtyDisplay(row.budgetQty);
     case "qtyCommitted":
-      return row.qtyCommitted;
+      return formatQtyDisplay(row.qtyCommitted);
     case "qtyReceived":
-      return row.qtyReceived;
+      return formatQtyDisplay(row.qtyReceived);
     case "qtyConsumed":
-      return row.qtyConsumed;
+      return formatQtyDisplay(row.qtyConsumed);
     case "pctPurchased":
       return <PctPill value={row.pctPurchased} />;
     case "pctReceived":
@@ -250,6 +250,18 @@ function bucketCellValue(bucket: CostTypeBucket, col: EdtColumnId): ReactNode {
   }
 }
 
+function sumQtyDisplay(rows: CostControlRow[], pick: (r: CostControlRow) => string): string {
+  let total = "0";
+  for (const row of rows) {
+    try {
+      total = addDecimal(total, pick(row) || "0");
+    } catch {
+      /* skip malformed qty */
+    }
+  }
+  return formatQtyDisplay(total);
+}
+
 function totalValue(
   totals: CostControlTotals,
   col: EdtColumnId,
@@ -279,23 +291,15 @@ function totalValue(
     case "variance":
       return formatMoneyAmount(totals.costVariance);
     case "physicalProgress":
-      return totals.operationalProgressQty;
-    case "qtyBudgeted": {
-      const s = rows.reduce((a, r) => a + Number(r.budgetQty || 0), 0);
-      return s.toFixed(4);
-    }
-    case "qtyCommitted": {
-      const s = rows.reduce((a, r) => a + Number(r.qtyCommitted || 0), 0);
-      return s.toFixed(4);
-    }
-    case "qtyReceived": {
-      const s = rows.reduce((a, r) => a + Number(r.qtyReceived || 0), 0);
-      return s.toFixed(4);
-    }
-    case "qtyConsumed": {
-      const s = rows.reduce((a, r) => a + Number(r.qtyConsumed || 0), 0);
-      return s.toFixed(4);
-    }
+      return formatQtyDisplay(totals.operationalProgressQty);
+    case "qtyBudgeted":
+      return sumQtyDisplay(rows, (r) => r.budgetQty);
+    case "qtyCommitted":
+      return sumQtyDisplay(rows, (r) => r.qtyCommitted);
+    case "qtyReceived":
+      return sumQtyDisplay(rows, (r) => r.qtyReceived);
+    case "qtyConsumed":
+      return sumQtyDisplay(rows, (r) => r.qtyConsumed);
     default:
       // % columns: footer blank (sum of % is meaningless)
       return null;

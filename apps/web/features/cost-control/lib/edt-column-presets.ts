@@ -18,9 +18,9 @@ export type EdtColumnId =
   | "qtyReceived"
   | "qtyConsumed"
   | "pctPurchased"
-  /** Cantidad recibida ÷ cantidad presupuestada. Antes "pctPhysical" ([D-098] rename). */
+  /** Costo recibido ÷ presupuesto de costo. Antes "pctPhysical" ([D-098] rename). */
   | "pctReceived"
-  /** Avance real desde libro APPROVED ÷ cantidad presupuestada ([D-045]). */
+  /** Suma de physicalPct de libro APPROVED; si la partida nunca tuvo %, qty/presup. ([D-045]). */
   | "pctPhysicalProgress"
   | "pctEconomic"
   | "pctExposure";

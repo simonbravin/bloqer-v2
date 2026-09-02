@@ -26,13 +26,15 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     pitfalls: [
       "No sumes OC + factura como costo total (doble conteo): mirá exposición esperada.",
       "Presupuesto vs real ya no es una pantalla aparte: vivía acá ([D-098]).",
-      "**% recepción ≠ % avance libro**: recepción mide cobertura física de la compra (qty recibida / presup.); avance libro mide qty ejecutada en partes APPROVED. Si el capataz cargó 95% pero no hay OC recibida, % recepción queda en 0 y eso es correcto ([D-045]). Un parte solo enviado (SUBMITTED) no mueve % avance libro. La vista *Financiero* no muestra esas columnas: usá *Cantidades* o *% Avance*.",
+      "**% recepción ≠ % avance libro**: recepción = costo recibido (cant. × PU de la OC) / presupuesto; avance libro = suma del % del día de partes APPROVED. Recibir toda una OC chica no da 100% de la partida. Si el capataz cargó 95% pero no hay OC recibida, % recepción queda en 0 y eso es correcto ([D-045]). Un parte solo enviado (SUBMITTED) no mueve % avance libro. Facturas emitidas sin vincular a la OC no bajan el comprometido abierto. La vista *Financiero* no muestra esas columnas: usá *Cantidades* o *% Avance*.",
       "Al elegir la partida en una OC / factura, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico = EQP, excavación con retro = EQP, etc.). Podés cambiarla en el selector; si lo hacés a mano, no la pisamos cuando cambies la partida.",
       "**Mano de obra en factura de proveedor**: si contratás una cuadrilla externa o pagás un jornal como AP, tipá la línea como **LAB** — no hace falta que sea subcontrato. Subcontrato = módulo Subcontratos con certificación (SUB).",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
       "tablero-materiales",
+      "tablero-mano-obra",
+      "tablero-equipos",
       "orden-de-compra-y-afectar-edt",
       "afectaciones-comprometido-devengado-pagado",
       "presupuesto-vs-real",

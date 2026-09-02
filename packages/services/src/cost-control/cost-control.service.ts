@@ -9,11 +9,24 @@ import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { requireProjectInTenant } from "../project/require-project-in-tenant";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { computeCostExposureLayers } from "./cost-exposure";
+import { pctOfBudget, pctPhysicalProgressFromLibro, shouldWarnUnlinkedInvoiceAgainstPo } from "./cost-control-pct";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import {
   loadMaterialApuCommitments,
   type MaterialApuCommitmentView,
 } from "../materials/material-commitment";
+import { getResourceApuCommitmentsForWbs } from "../resources/project-resource-board.service";
+
+export type ResourceApuCommitmentView = {
+  costAnalysisLineId: string;
+  description: string;
+  unit: string;
+  needQty: string;
+  orderedQty: string;
+  invoicedQty: string;
+  shortfallQty: string;
+  overCommitted: boolean;
+};
 import {
   buildWbsProgressSummary,
   type WbsProgressSummary,
@@ -92,7 +105,10 @@ type WbsAcc = {
   qtyReceived: Prisma.Decimal;
   qtyConsumed: Prisma.Decimal;
   operationalProgressQty: Prisma.Decimal;
+  operationalProgressPct: Prisma.Decimal;
   submittedProgressQty: Prisma.Decimal;
+  /** Committed from PO lines only — subcontract does not imply “vincular a la OC”. */
+  poCommittedCost: Prisma.Decimal;
 };
 
 /** Per-category money layers ([D-099]). */
@@ -112,7 +128,8 @@ function newAcc(): WbsAcc {
     committedCost: ZERO, receivedCost: ZERO, accruedCost: ZERO, accruedLinkedCost: ZERO,
     paidCost: ZERO, inventoryConsumedCost: ZERO,
     qtyCommitted: ZERO, qtyReceived: ZERO, qtyConsumed: ZERO,
-    operationalProgressQty: ZERO, submittedProgressQty: ZERO,
+    operationalProgressQty: ZERO, operationalProgressPct: ZERO, submittedProgressQty: ZERO,
+    poCommittedCost: ZERO,
   };
 }
 
@@ -192,11 +209,6 @@ function add(map: Map<string, WbsAcc>, wbsId: string, field: keyof WbsAcc, amoun
   (acc[field] as Prisma.Decimal) = (acc[field] as Prisma.Decimal).add(amount);
 }
 
-/** Percent of numerator/denominator × 100, or null when denominator is zero. */
-function pctOfBudget(num: Prisma.Decimal, den: Prisma.Decimal): string | null {
-  if (den.isZero()) return null;
-  return serializePct2(num.div(den).times(100).toString());
-}
 
 // ─── Main function ────────────────────────────────────────────────────────────
 
@@ -488,7 +500,7 @@ export async function getProjectCostControl(
               ...(dateWhere(dateFrom, dateTo) ? { logDate: dateWhere(dateFrom, dateTo) } : {}),
             },
           },
-          select: { wbsNodeId: true, quantityCompleted: true },
+          select: { wbsNodeId: true, quantityCompleted: true, physicalPct: true },
         })
       : Promise.resolve([]),
     incJl
@@ -544,6 +556,7 @@ export async function getProjectCostControl(
     // Committed
     if (inBudget) {
       add(accMap, wbsId!, "committedCost", new Prisma.Decimal(pol.lineSubtotal));
+      add(accMap, wbsId!, "poCommittedCost", new Prisma.Decimal(pol.lineSubtotal));
       add(accMap, wbsId!, "qtyCommitted", new Prisma.Decimal(pol.quantity));
       addTyped(typeAccMap, wbsId!, costType, "committedCost", new Prisma.Decimal(pol.lineSubtotal));
     } else {
@@ -780,8 +793,14 @@ export async function getProjectCostControl(
   }
 
   // I. Operational progress (APPROVED logs)
+  const wbsWithPhysicalPct = new Set<string>();
   for (const p of approvedProgress) {
-    if (wbsNodeIds.has(p.wbsNodeId)) add(accMap, p.wbsNodeId, "operationalProgressQty", p.quantityCompleted);
+    if (!wbsNodeIds.has(p.wbsNodeId)) continue;
+    add(accMap, p.wbsNodeId, "operationalProgressQty", p.quantityCompleted);
+    if (p.physicalPct != null) {
+      add(accMap, p.wbsNodeId, "operationalProgressPct", p.physicalPct);
+      wbsWithPhysicalPct.add(p.wbsNodeId);
+    }
   }
 
   // J. Submitted progress (informational)
@@ -894,8 +913,13 @@ export async function getProjectCostControl(
       costVariance:         serializeMoneyDecimal(variance),
       projectedMargin:      serializeMoneyDecimal(margin),
       pctPurchased:        pctOfBudget(committed, bCost),
-      pctReceived:         pctOfBudget(acc.qtyReceived, bQty),
-      pctPhysicalProgress: pctOfBudget(acc.operationalProgressQty, bQty),
+      pctReceived:         pctOfBudget(received, bCost),
+      pctPhysicalProgress: pctPhysicalProgressFromLibro({
+        hasPhysicalPct: wbsWithPhysicalPct.has(node.id),
+        physicalPctAcum: acc.operationalProgressPct,
+        operationalQty: acc.operationalProgressQty,
+        budgetQty: bQty,
+      }),
       pctEconomic:         pctOfBudget(accrued, bCost),
       pctExposure:         pctOfBudget(expected, bCost),
       flags,
@@ -912,6 +936,13 @@ export async function getProjectCostControl(
     totOpenCommitted = totOpenCommitted.add(openCommitted);
     for (const k of Object.keys(acc) as (keyof WbsAcc)[]) {
       (totAcc[k] as Prisma.Decimal) = (totAcc[k] as Prisma.Decimal).add(acc[k] as Prisma.Decimal);
+    }
+
+    const unlinkedAccrued = acc.accruedCost.sub(acc.accruedLinkedCost);
+    if (shouldWarnUnlinkedInvoiceAgainstPo(acc.poCommittedCost, unlinkedAccrued)) {
+      warnings.push(
+        `Partida ${node.code}: hay facturas emitidas sin vincular a la OC (${serializeMoneyDecimal(unlinkedAccrued)}). La exposición suma ese devengado más el comprometido abierto.`,
+      );
     }
   }
 
@@ -970,6 +1001,7 @@ export type WbsItemCostDetail = {
     poId: string; poNumber: number; poStatus: string;
     description: string; quantity: string; unitPrice: string; lineTotal: string;
     receivedQty: string;
+    costType: string | null;
   }>;
   subcontractLines: Array<{
     subcontractId: string; subcontractNumber: number; subcontractTitle: string; subcontractStatus: string;
@@ -983,6 +1015,8 @@ export type WbsItemCostDetail = {
   supplierInvoices: Array<{
     invoiceId: string; invoiceNumber: number; status: string;
     issueDate: Date; totalAmount: string; purchaseOrderId: string | null;
+    /** Distinct cost types on lines imputing this WBS (es-AR labels joined). */
+    costTypeLabel: string | null;
   }>;
   payments: Array<{
     paymentId: string; paymentDate: Date; amount: string; status: string;
@@ -998,6 +1032,10 @@ export type WbsItemCostDetail = {
   }>;
   /** MATERIAL APU need / ordered / shortfall for this ITEM. */
   materialCommitments: MaterialApuCommitmentView[];
+  /** LABOR APU need / ordered / invoiced / shortfall for this ITEM. */
+  laborCommitments: ResourceApuCommitmentView[];
+  /** EQUIPMENT APU need / ordered / invoiced / shortfall for this ITEM. */
+  equipmentCommitments: ResourceApuCommitmentView[];
   /** Derived físico / económico / costo % — not persisted. */
   progressSummary: WbsProgressSummary;
   /** Partida × CostCategory buckets ([D-099]); empty if no typed spend/budget. */
@@ -1161,9 +1199,15 @@ export async function getWbsItemCostDetail(
   const invoiceById = new Map<string, {
     invoiceId: string; invoiceNumber: number; status: string;
     issueDate: Date; totalAmount: string; purchaseOrderId: string | null;
+    costTypes: Set<string>;
   }>();
   for (const row of [...invoiceLinesDirect, ...invoiceLinesViaPo]) {
-    if (!invoiceById.has(row.invoice.id)) {
+    const existing = invoiceById.get(row.invoice.id);
+    const lineType =
+      "costType" in row && row.costType
+        ? String(row.costType)
+        : null;
+    if (!existing) {
       invoiceById.set(row.invoice.id, {
         invoiceId: row.invoice.id,
         invoiceNumber: row.invoice.number,
@@ -1171,7 +1215,10 @@ export async function getWbsItemCostDetail(
         issueDate: row.invoice.issueDate,
         totalAmount: serializeMoneyDecimal(row.invoice.totalAmount),
         purchaseOrderId: row.invoice.purchaseOrderId,
+        costTypes: new Set(lineType ? [lineType] : []),
       });
+    } else if (lineType) {
+      existing.costTypes.add(lineType);
     }
   }
   for (const inv of invoicesViaPoHeader) {
@@ -1183,10 +1230,24 @@ export async function getWbsItemCostDetail(
         issueDate: inv.issueDate,
         totalAmount: serializeMoneyDecimal(inv.totalAmount),
         purchaseOrderId: inv.purchaseOrderId,
+        costTypes: new Set(),
       });
     }
   }
-  const supplierInvoices = Array.from(invoiceById.values());
+  const supplierInvoices = Array.from(invoiceById.values()).map((inv) => ({
+    invoiceId: inv.invoiceId,
+    invoiceNumber: inv.invoiceNumber,
+    status: inv.status,
+    issueDate: inv.issueDate,
+    totalAmount: inv.totalAmount,
+    purchaseOrderId: inv.purchaseOrderId,
+    costTypeLabel:
+      inv.costTypes.size > 0
+        ? [...inv.costTypes]
+            .map((t) => COST_TYPE_LABELS_ES[t as CostCategory] ?? t)
+            .join(", ")
+        : null,
+  }));
 
   const invoiceIds = supplierInvoices.map((i) => i.invoiceId);
   const paymentRows = incAp && invoiceIds.length > 0
@@ -1206,9 +1267,19 @@ export async function getWbsItemCostDetail(
     : [];
 
   const ci = node.costItem;
-  const materialCommitments = await loadMaterialApuCommitments(projectId, ctx.tenantId, {
-    wbsNodeIds: [wbsNodeId],
-  });
+  const [materialCommitments, laborCommitments, equipmentCommitments] = await Promise.all([
+    loadMaterialApuCommitments(projectId, ctx.tenantId, {
+      wbsNodeIds: [wbsNodeId],
+    }),
+    getResourceApuCommitmentsForWbs(projectId, wbsNodeId, "LABOR", ctx).catch((err) => {
+      if (err instanceof ServiceError) return [] as ResourceApuCommitmentView[];
+      throw err;
+    }),
+    getResourceApuCommitmentsForWbs(projectId, wbsNodeId, "EQUIPMENT", ctx).catch((err) => {
+      if (err instanceof ServiceError) return [] as ResourceApuCommitmentView[];
+      throw err;
+    }),
+  ]);
 
   // Physical acum: APPROVED libro only (same as getWbsIncrementalProgressSnapshot).
   let physicalPctAcum = ZERO;
@@ -1292,6 +1363,7 @@ export async function getWbsItemCostDetail(
       unitPrice: serializeUnitPriceDecimal(pol.unitPrice),
       lineTotal: serializeMoneyDecimal(pol.lineTotal),
       receivedQty: serializeQtyDecimal(pol.receivedQuantity),
+      costType: pol.costType,
     })),
     subcontractLines: subLines.map((sl) => ({
       subcontractId: sl.subcontract.id,
@@ -1338,6 +1410,8 @@ export async function getWbsItemCostDetail(
       physicalPct: p.physicalPct != null ? serializePct2(p.physicalPct.toString()) : null,
     })),
     materialCommitments,
+    laborCommitments,
+    equipmentCommitments,
     progressSummary,
     byCostType,
   };
