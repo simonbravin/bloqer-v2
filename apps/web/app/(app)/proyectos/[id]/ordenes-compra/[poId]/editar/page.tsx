@@ -73,11 +73,16 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
   }));
 
   let allowEmergency = false;
+  let varianceSettings: { varianceSoftAlertPct: string; varianceExtraApprovalPct: string } | undefined;
   try {
     const settings = await getCompanyProcurementSettingsForProject(id, ctx);
     allowEmergency =
       settings.allowEmergencyDirectPo &&
       current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
+    varianceSettings = {
+      varianceSoftAlertPct: settings.varianceSoftAlertPct,
+      varianceExtraApprovalPct: settings.varianceExtraApprovalPct,
+    };
   } catch {
     allowEmergency = false;
   }
@@ -95,6 +100,7 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
         wbsOptions={wbsOptions}
         productOptions={productOptions}
         allowEmergencyDirectPo={allowEmergency}
+        varianceSettings={varianceSettings}
       />
     </PageShell>
   );

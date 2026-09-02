@@ -22,7 +22,13 @@ import {
   isSelfApprovalAllowed,
   isStandardApprover,
 } from "./procurement-policy.service";
-import { evaluateLineVariance, poRequiresHighLevelApproval } from "./purchase-variance.service";
+import {
+  evaluateLineVariance,
+  formatMissingVarianceJustificationError,
+  isComparablePurchaseBaseline,
+  poRequiresHighLevelApproval,
+  varianceJustificationReasonEs,
+} from "./purchase-variance.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import {
   assertPoLinesWithinSelectedQuote,
@@ -68,6 +74,7 @@ async function applyVarianceSnapshots(
 ): Promise<{
   requiresExtraApproval: boolean;
   requiresJustification: boolean;
+  missingJustification: string[];
   saldoWarnings: string[];
 }> {
   const lines = await tx.purchaseOrderLine.findMany({
@@ -77,6 +84,7 @@ async function applyVarianceSnapshots(
 
   let requiresExtraApproval = false;
   let requiresJustification = false;
+  const missingJustification: string[] = [];
   const saldoWarnings: string[] = [];
 
   const pendingByWbs = new Map<string, Prisma.Decimal>();
@@ -104,14 +112,9 @@ async function applyVarianceSnapshots(
       },
       tx,
     );
-    let budgetUnitCost = line.budgetUnitCostSnapshot;
-    if (!budgetUnitCost && baseline.unitCost) {
-      budgetUnitCost = baseline.unitCost;
-      await tx.purchaseOrderLine.update({
-        where: { id: line.id },
-        data: { budgetUnitCostSnapshot: budgetUnitCost },
-      });
-    }
+    const comparable = isComparablePurchaseBaseline(line.unit, baseline.unit);
+    // Never reuse a stored lump-sum snapshot as $/u (e.g. partida `gl` total).
+    const budgetUnitCost = comparable ? baseline.unitCost : null;
 
     const result = evaluateLineVariance(
       {
@@ -127,10 +130,14 @@ async function applyVarianceSnapshots(
     if (result.requiresExtraApproval) requiresExtraApproval = true;
     if (result.requiresJustification && !line.varianceJustification?.trim()) {
       requiresJustification = true;
+      missingJustification.push(
+        `${line.description} (${varianceJustificationReasonEs(result.varianceTier)})`,
+      );
     }
     await tx.purchaseOrderLine.update({
       where: { id: line.id },
       data: {
+        budgetUnitCostSnapshot: budgetUnitCost,
         variancePct: result.variancePct ? new Prisma.Decimal(result.variancePct) : null,
         varianceTier: result.varianceTier,
         varianceUnitMismatch: result.varianceUnitMismatch,
@@ -151,7 +158,7 @@ async function applyVarianceSnapshots(
     }
   }
 
-  return { requiresExtraApproval, requiresJustification, saldoWarnings };
+  return { requiresExtraApproval, requiresJustification, missingJustification, saldoWarnings };
 }
 
 function resolveOriginUserId(po: {
@@ -333,16 +340,12 @@ export async function authorizeAndCommitPurchaseOrder(
     });
     await assertPoLinesWithinSelectedQuote(id, currentLines, ctx.tenantId, tx);
 
-    const { requiresExtraApproval, requiresJustification } = await applyVarianceSnapshots(
-      tx,
-      id,
-      ctx.tenantId,
-      settings,
-    );
+    const { requiresExtraApproval, requiresJustification, missingJustification } =
+      await applyVarianceSnapshots(tx, id, ctx.tenantId, settings);
     if (requiresJustification) {
       throw new ServiceError(
         "CONFLICT",
-        "Completá la justificación de desvío presupuestario en las líneas",
+        formatMissingVarianceJustificationError(missingJustification),
       );
     }
 
@@ -497,10 +500,10 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
     });
     await assertPoLinesWithinSelectedQuote(id, currentLines, ctx.tenantId, tx);
 
-    const { requiresExtraApproval, requiresJustification, saldoWarnings } =
+    const { requiresExtraApproval, requiresJustification, missingJustification, saldoWarnings } =
       await applyVarianceSnapshots(tx, id, ctx.tenantId, settings);
     if (requiresJustification) {
-      throw new ServiceError("CONFLICT", "Completá la justificación de desvío presupuestario en las líneas");
+      throw new ServiceError("CONFLICT", formatMissingVarianceJustificationError(missingJustification));
     }
 
     const highLevel = poRequiresHighLevelApproval(totalArs, settings) || requiresExtraApproval;

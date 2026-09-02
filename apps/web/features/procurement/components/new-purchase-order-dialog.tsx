@@ -13,6 +13,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { PurchaseOrderForm, type SupplierOption } from "./purchase-order-form";
+import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import type { ProductOption, WbsOption } from "./purchase-order-lines-editor";
 import { PROCUREMENT_FORM_DIALOG_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import { useHasMounted, useIsMdUp } from "@/lib/media-query";
@@ -23,6 +24,7 @@ interface Props {
   wbsOptions: WbsOption[];
   productOptions: ProductOption[];
   allowEmergencyDirectPo?: boolean;
+  varianceSettings?: VarianceSettings;
   defaultOpen?: boolean;
   triggerLabel?: string;
   triggerVariant?: "default" | "outline";
@@ -34,6 +36,7 @@ export function NewPurchaseOrderDialog({
   wbsOptions,
   productOptions,
   allowEmergencyDirectPo = false,
+  varianceSettings,
   defaultOpen = false,
   triggerLabel = "Nueva OC",
   triggerVariant = "default",
@@ -114,6 +117,7 @@ export function NewPurchaseOrderDialog({
             wbsOptions={wbsOptions}
             productOptions={productOptions}
             allowEmergencyDirectPo={allowEmergencyDirectPo}
+            varianceSettings={varianceSettings}
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}

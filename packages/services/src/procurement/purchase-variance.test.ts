@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Prisma } from "@bloqer/database";
-import { evaluateLineVariance, poRequiresHighLevelApproval } from "./purchase-variance.service";
+import {
+  evaluateLineVariance,
+  evaluateLineVarianceLenient,
+  formatMissingVarianceJustificationError,
+  isComparablePurchaseBaseline,
+  poRequiresHighLevelApproval,
+  resolveBudgetRefKind,
+} from "./purchase-variance.service";
 
 const settings = {
   varianceSoftAlertPct: "10",
@@ -65,6 +72,59 @@ test("evaluateLineVariance returns UNIT_MISMATCH when units differ", () => {
   );
   assert.equal(r.varianceTier, "UNIT_MISMATCH");
   assert.equal(r.varianceUnitMismatch, true);
+});
+
+test("resolveBudgetRefKind marks gl partida as GLOBAL_PARTIDA", () => {
+  assert.equal(resolveBudgetRefKind("un", "gl", null), "GLOBAL_PARTIDA");
+  assert.equal(resolveBudgetRefKind("un", "un", "200000"), "UNIT_PRICE");
+  assert.equal(resolveBudgetRefKind("un", "un", null), "NONE");
+});
+
+test("isComparablePurchaseBaseline is false for gl partida vs physical line", () => {
+  assert.equal(isComparablePurchaseBaseline("un", "gl"), false);
+  assert.equal(isComparablePurchaseBaseline("gl", "gl"), true);
+  assert.equal(isComparablePurchaseBaseline("m2", "m2"), true);
+});
+
+test("formatMissingVarianceJustificationError lists lines and points to Editar", () => {
+  const msg = formatMissingVarianceJustificationError([
+    "Perfil C 140 (unidad distinta al presupuesto)",
+  ]);
+  assert.match(msg, /Perfil C 140/);
+  assert.match(msg, /Editar/);
+});
+
+test("evaluateLineVarianceLenient does not throw on incomplete unit price", () => {
+  const r = evaluateLineVarianceLenient(
+    { unit: "un", unitPrice: "12.", budgetUnitCost: "100", budgetUnit: "un" },
+    settings,
+  );
+  assert.equal(r.varianceTier, "NONE");
+  assert.equal(r.requiresJustification, false);
+});
+
+test("evaluateLineVariance throws on incomplete unit price (submit must not skip the gate)", () => {
+  assert.throws(() =>
+    evaluateLineVariance(
+      { unit: "un", unitPrice: "12.", budgetUnitCost: "100", budgetUnit: "un" },
+      settings,
+    ),
+  );
+});
+
+test("evaluateLineVariance does not treat global partida vs physical line as a desvío", () => {
+  const r = evaluateLineVariance(
+    {
+      unit: "un",
+      unitPrice: "107452.35",
+      budgetUnitCost: "158669372",
+      budgetUnit: "gl",
+    },
+    settings,
+  );
+  assert.equal(r.varianceTier, "NONE");
+  assert.equal(r.requiresJustification, false);
+  assert.equal(r.varianceUnitMismatch, false);
 });
 
 test("poRequiresHighLevelApproval is true at threshold", () => {

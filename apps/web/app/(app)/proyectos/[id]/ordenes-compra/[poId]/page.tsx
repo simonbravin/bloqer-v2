@@ -34,6 +34,7 @@ import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purc
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
 import { AuthorizeAndCommitPoButton } from "@/features/procurement/components/authorize-and-commit-po-button";
 import { PurchaseOrderVarianceReadout } from "@/features/procurement/components/purchase-order-variance-readout";
+import { PoLineBudgetRef } from "@/features/procurement/components/po-line-budget-ref";
 import { SupplierInvoiceTable } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
@@ -64,6 +65,7 @@ import {
   confirmPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import { Button } from "@/components/ui/button";
+import { varianceJustificationReasonEs } from "@bloqer/services/purchase-variance-pure";
 
 interface PageProps {
   params: Promise<{ id: string; poId: string }>;
@@ -177,15 +179,17 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     ) : null;
   const showReceiptQty = showBilling;
   const showDiscountCol = order.lines.some((l) => !isZeroRatePct(l.discountPct));
-  const showVarianceCols = order.lines.some(
-    (l) =>
-      (l.variancePct != null && l.variancePct !== "" && !isZeroRatePct(l.variancePct)) ||
-      Boolean(l.varianceJustification?.trim()) ||
-      l.varianceTier === "UNIT_MISMATCH" ||
-      l.varianceTier === "NO_BUDGET_BASELINE" ||
-      l.varianceTier === "EXTRA_APPROVAL" ||
-      l.varianceTier === "NOTE_REQUIRED",
-  );
+  const linesNeedingJustification = order.lines
+    .filter(
+      (l) =>
+        !l.varianceJustification?.trim() &&
+        (l.varianceTier === "UNIT_MISMATCH" ||
+          l.varianceTier === "NO_BUDGET_BASELINE" ||
+          l.varianceTier === "NOTE_REQUIRED" ||
+          l.varianceTier === "EXTRA_APPROVAL"),
+    )
+    .map((l) => `${l.description} (${varianceJustificationReasonEs(l.varianceTier)})`);
+  const globalRefLines = order.lines.filter((l) => l.budgetRefKind === "GLOBAL_PARTIDA");
   const canCancel =
     !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const hasActions =
@@ -312,6 +316,35 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
       <ActionErrorBanner message={sp.actionError} />
       <ActionErrorBanner message={sp.invoiceError} />
+      {isDraft && canEditPo && linesNeedingJustification.length > 0 ? (
+        <ProcurementAmberCallout>
+          <p>
+            Desvío en{" "}
+            {linesNeedingJustification.join("; ")}. Completá <strong>Justificación desvío</strong> en{" "}
+            <Link href={`/proyectos/${id}/ordenes-compra/${poId}/editar`} className="underline">
+              Editar
+            </Link>
+            .
+          </p>
+        </ProcurementAmberCallout>
+      ) : isDraft && canEditPo && globalRefLines.length > 0 ? (
+        <ProcurementAmberCallout>
+          <p>
+            {globalRefLines.length === 1 ? "La línea" : "Las líneas"}{" "}
+            {globalRefLines.map((l) => l.description).join("; ")} no tienen $/u comparable: la
+            partida está en <strong>global</strong>. No hay desvío unitario que justifique. Para ver
+            un referencial, en{" "}
+            <Link href={`/proyectos/${id}/ordenes-compra/${poId}/editar`} className="underline">
+              Editar
+            </Link>{" "}
+            elegí un <strong>Insumo APU</strong>
+            {globalRefLines[0]?.suggestedApu
+              ? ` (p. ej. ${globalRefLines[0].suggestedApu.description})`
+              : ""}
+            .
+          </p>
+        </ProcurementAmberCallout>
+      ) : null}
 
       {billingPanel}
       {highlightBilling ? <ScrollToElement id="facturar" /> : null}
@@ -373,7 +406,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                 <TableHead className="text-right">Precio unit.</TableHead>
                 {showDiscountCol && <TableHead className="text-right">Desc. %</TableHead>}
                 <TableHead className="text-right">Ref. presup.</TableHead>
-                {showVarianceCols && <TableHead>Desvío</TableHead>}
+                <TableHead>Desvío</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
@@ -407,20 +440,22 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                       {formatRatePctFromString(line.discountPct)}
                     </TableCell>
                   )}
-                  <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {line.budgetUnitCostSnapshot
-                      ? formatUnitPriceFromString(line.budgetUnitCostSnapshot)
-                      : "—"}
+                  <TableCell className="text-right text-muted-foreground">
+                    <PoLineBudgetRef
+                      unitCost={line.budgetUnitCostSnapshot}
+                      unit={line.budgetUnit}
+                      refKind={line.budgetRefKind}
+                      suggestedApu={line.suggestedApu}
+                    />
                   </TableCell>
-                  {showVarianceCols && (
-                    <TableCell>
-                      <PurchaseOrderVarianceReadout
-                        variancePct={line.variancePct}
-                        varianceTier={line.varianceTier}
-                        justification={line.varianceJustification}
-                      />
-                    </TableCell>
-                  )}
+                  <TableCell>
+                    <PurchaseOrderVarianceReadout
+                      variancePct={line.variancePct}
+                      varianceTier={line.varianceTier}
+                      justification={line.varianceJustification}
+                      refKind={line.budgetRefKind}
+                    />
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
                 </TableRow>
               ))}

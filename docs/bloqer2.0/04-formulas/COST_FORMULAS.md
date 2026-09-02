@@ -161,7 +161,7 @@ descuento = round(grossSubtotal \times discountPct / 100)
 
 (`unitPrice` es list net; el descuento % baja el PU efectivo comparado con el APU.)
 
-Si la partida no tiene insumo MATERIAL comprable, el referencial es `CostItem.unitCostDirect` (costo dir. /u de la partida, incluye MO/equipos/subcontrato). `NO_BUDGET_BASELINE` aplica solo cuando ese costo también es 0 o no hay CostItem.
+Si la partida no tiene insumo MATERIAL comprable, el referencial es `CostItem.unitCostDirect` (costo dir. /u de la partida, incluye MO/equipos/subcontrato) **solo cuando esa unidad es comparable** a la de la línea. Si la partida está en `gl` (global) y la línea en unidad física, no hay referencial unitario: no se compara el total de la partida contra el PU ni se pide justificación de desvío. `NO_BUDGET_BASELINE` aplica solo cuando no hay CostItem o el costo dir. /u comparable es 0.
 
 Tiers sobre **desvío con signo** (umbrales en `CompanyProcurementSettings`): ahorro (`variance_pct` &lt; soft, incluido negativo) = `NONE`; `NOTE_REQUIRED` entre soft y extra % de **sobrecosto**; `EXTRA_APPROVAL` ≥ extra % de sobrecosto; casos especiales `UNIT_MISMATCH` y `NO_BUDGET_BASELINE`. La justificación se pide cuando el PU **supera** el referencial, no cuando está por debajo.
 

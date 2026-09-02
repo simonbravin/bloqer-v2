@@ -42,6 +42,12 @@ import {
   getWbsBudgetReference,
 } from "./procurement-budget-baseline";
 import {
+  evaluateLineVarianceLenient,
+  isComparablePurchaseBaseline,
+  resolveBudgetRefKind,
+  type BudgetRefKind,
+} from "./purchase-variance.service";
+import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
@@ -81,6 +87,9 @@ export type PurchaseOrderLineView = {
   remainingQuantity: string;
   sortOrder: number;
   budgetUnitCostSnapshot: string | null;
+  budgetUnit: string | null;
+  budgetRefKind: BudgetRefKind;
+  suggestedApu: { description: string; unit: string; unitCost: string } | null;
   varianceTier: string;
   variancePct: string | null;
   varianceJustification: string | null;
@@ -145,6 +154,9 @@ function serializeLine(
     remainingQuantity: remaining.lessThan(0) ? serializeQtyDecimal(0) : serializeQtyDecimal(remaining),
     sortOrder:         l.sortOrder,
     budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
+    budgetUnit:        null,
+    budgetRefKind:     l.budgetUnitCostSnapshot != null ? "UNIT_PRICE" : "NONE",
+    suggestedApu:      null,
     varianceTier:      l.varianceTier,
     variancePct:       l.variancePct != null ? serializeRatePctDecimal(l.variancePct) : null,
     varianceJustification: l.varianceJustification,
@@ -418,24 +430,69 @@ export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Pro
   const po = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  return hydrateLiveBudgetRefs(await toPurchaseOrderView(po));
+  return hydrateLiveBudgetRefs(await toPurchaseOrderView(po), ctx);
 }
 
-/** Fill Ref. presup. on read when the stored snapshot was empty (labor-only APU, etc.). */
-async function hydrateLiveBudgetRefs(view: PurchaseOrderView): Promise<PurchaseOrderView> {
+/** Fill Ref. presup. + live variance on DRAFT; never rewrite stored variance after submit. */
+async function hydrateLiveBudgetRefs(
+  view: PurchaseOrderView,
+  ctx: ServiceContext,
+): Promise<PurchaseOrderView> {
+  const isDraft = view.status === "DRAFT";
+  const settings = isDraft
+    ? await getCompanyProcurementSettingsForProject(view.projectId, ctx)
+    : null;
   const lines = await Promise.all(
     view.lines.map(async (line) => {
-      if (line.budgetUnitCostSnapshot != null || !line.wbsNodeId) return line;
+      if (!line.wbsNodeId) return line;
       const baseline = await budgetBaselineForPurchaseLine(line.wbsNodeId, {
         productId: line.productId,
         description: line.description,
         unit: line.unit,
         costAnalysisLineId: line.costAnalysisLineId,
       });
-      if (!baseline.unitCost) return line;
+      const comparable = isComparablePurchaseBaseline(line.unit, baseline.unit);
+      const liveCost =
+        comparable && baseline.unitCost ? serializeUnitPriceDecimal(baseline.unitCost) : null;
+      const snapshot = isDraft
+        ? liveCost
+        : comparable
+          ? line.budgetUnitCostSnapshot ?? liveCost
+          : null;
+      const budgetRefKind = resolveBudgetRefKind(line.unit, baseline.unit, snapshot);
+      const suggestedApu =
+        budgetRefKind === "UNIT_PRICE" ? null : (baseline.suggestedApu ?? null);
+
+      if (!isDraft || !settings) {
+        return {
+          ...line,
+          budgetUnitCostSnapshot: snapshot,
+          budgetUnit: baseline.unit,
+          budgetRefKind,
+          suggestedApu,
+        };
+      }
+
+      const result = evaluateLineVarianceLenient(
+        {
+          unit: line.unit,
+          unitPrice: line.unitPrice,
+          discountPct: line.discountPct,
+          budgetUnitCost: snapshot,
+          budgetUnit: baseline.unit,
+          varianceJustification: line.varianceJustification,
+        },
+        settings,
+      );
       return {
         ...line,
-        budgetUnitCostSnapshot: serializeUnitPriceDecimal(baseline.unitCost),
+        budgetUnitCostSnapshot: snapshot,
+        budgetUnit: baseline.unit,
+        budgetRefKind,
+        suggestedApu,
+        variancePct: result.variancePct,
+        varianceTier: result.varianceTier,
+        varianceUnitMismatch: result.varianceUnitMismatch,
       };
     }),
   );
@@ -589,7 +646,9 @@ export async function createPurchaseOrder(
           lineSubtotal,
           lineTax,
           lineTotal,
-          budgetUnitCostSnapshot: baseline.unitCost,
+          budgetUnitCostSnapshot: isComparablePurchaseBaseline(line.unit ?? "", baseline.unit)
+            ? baseline.unitCost
+            : null,
           varianceJustification: line.varianceJustification?.trim() || null,
           sortOrder: line.sortOrder ?? 0,
         },
@@ -721,12 +780,8 @@ export async function updatePurchaseOrder(
           },
           tx,
         );
-        const budgetSnapshot =
-          prev?.wbsNodeId === line.wbsNodeId &&
-          prev.description === line.description &&
-          prev.budgetUnitCostSnapshot
-            ? prev.budgetUnitCostSnapshot
-            : baseline.unitCost;
+        const comparable = isComparablePurchaseBaseline(line.unit ?? "", baseline.unit);
+        const budgetSnapshot = comparable ? baseline.unitCost : null;
         const costType = resolveLineCostType({
           costType: line.costType ?? null,
           apuCategory: apuCategoryByIdx.get(i) ?? null,

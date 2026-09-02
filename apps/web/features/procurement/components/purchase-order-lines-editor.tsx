@@ -3,6 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { addDecimal, divideDecimal, roundMoney, roundQty, QTY_DECIMALS, resolveDocumentLineAmounts, effectiveUnitPriceNet, normalizeDiscountPct } from "@bloqer/utils";
+import { isGlobalUnit, IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
+import {
+  DEFAULT_VARIANCE_SETTINGS,
+  evaluateLineVarianceLenient,
+  varianceJustificationReasonEs,
+  type VarianceSettings,
+} from "@bloqer/services/purchase-variance-pure";
+import {
+  formatDecimalArFromString,
+  formatQtyDisplay,
+  formatRatePctWithSymbol,
+  formatUnitPriceFromString,
+  isPositiveMoneyAmount,
+  isPositiveQty,
+  variancePctTone,
+} from "@/lib/format-money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -18,8 +34,6 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, productsToSearchableOptions, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
-import { formatDecimalArFromString, formatQtyDisplay, isPositiveMoneyAmount, isPositiveQty } from "@/lib/format-money";
-import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
 import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type PurchaseOrderLine = {
@@ -86,6 +100,7 @@ interface Props {
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
   showVarianceJustification?: boolean;
+  varianceSettings?: VarianceSettings;
 }
 
 export const DEFAULT_PURCHASE_ORDER_LINE: PurchaseOrderLine = {
@@ -113,6 +128,7 @@ export function PurchaseOrderLinesEditor({
   wbsOptions,
   productOptions = [],
   showVarianceJustification = false,
+  varianceSettings = DEFAULT_VARIANCE_SETTINGS,
 }: Props) {
   const wbsComboboxOptions = useMemo(
     () => wbsToSearchableOptions(wbsOptions),
@@ -355,6 +371,33 @@ export function PurchaseOrderLinesEditor({
           const p = linePreview(line);
           const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
           const selectedApu = wbs?.apuLines?.find((a) => a.id === line.costAnalysisLineId);
+          const budgetUnit = selectedApu?.unit ?? wbs?.budgetUnit ?? null;
+          const sameUnitApus = (wbs?.apuLines ?? []).filter(
+            (a) => a.unit.trim().toLowerCase() === line.unit.trim().toLowerCase(),
+          );
+          const partidaRefIsGlobal =
+            !selectedApu && isGlobalUnit(wbs?.budgetUnit) && !isGlobalUnit(line.unit);
+          const budgetUnitCost = selectedApu?.unitCost
+            ? selectedApu.unitCost
+            : partidaRefIsGlobal
+              ? null
+              : (wbs?.budgetUnitCost ?? null);
+          const liveVariance = evaluateLineVarianceLenient(
+            {
+              unit: line.unit,
+              unitPrice: line.unitPrice.trim() || "0",
+              discountPct: line.discountPct?.trim() || "0",
+              budgetUnitCost,
+              budgetUnit,
+            },
+            varianceSettings,
+          );
+          const justificationRequired = Boolean(
+            liveVariance.requiresJustification && !line.varianceJustification?.trim(),
+          );
+          const varianceTone = liveVariance.variancePct
+            ? variancePctTone(liveVariance.variancePct)
+            : "muted";
           return (
             <section
               key={lineKey}
@@ -538,22 +581,68 @@ export function PurchaseOrderLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Ref. presupuesto</Label>
                   <div className="flex min-h-11 items-center text-sm tabular-nums text-muted-foreground md:min-h-9">
-                    {wbs?.budgetUnitCost != null ? (
+                    {budgetUnitCost != null ? (
                       <button
                         type="button"
-                        onClick={() => fillBudgetUnitPrice(i, wbs)}
+                        onClick={() => {
+                          if (selectedApu?.unitCost) {
+                            update(i, "unitPrice", selectedApu.unitCost);
+                            toast.success("Precio unitario completado con el referencial del insumo APU.");
+                            return;
+                          }
+                          fillBudgetUnitPrice(i, wbs);
+                        }}
                         title="Usar este costo como precio unitario"
                         className="max-w-full truncate text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
                       >
-                        {formatDecimalArFromString(wbs.budgetUnitCost)}
-                        {wbs.budgetUnit ? ` / ${budgetUnitLabel(wbs.budgetUnit) || wbs.budgetUnit}` : ""}
+                        {formatDecimalArFromString(budgetUnitCost)}
+                        {budgetUnit ? ` / ${budgetUnitLabel(budgetUnit) || budgetUnit}` : ""}
                       </button>
                     ) : (
                       "—"
                     )}
                   </div>
+                  {partidaRefIsGlobal ? (
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Partida en global: el total no es un $/u.
+                      {sameUnitApus.length > 0
+                        ? ` Insumo APU en ${budgetUnitLabel(line.unit) || line.unit}: ${sameUnitApus
+                            .map((a) => `${a.description} (${formatDecimalArFromString(a.unitCost)})`)
+                            .join("; ")}.`
+                        : " Elegí un insumo APU para tomar su referencial."}
+                    </p>
+                  ) : null}
                 </div>
               </div>
+
+              <p className="text-[11px] text-muted-foreground">
+                PU {line.unitPrice.trim() ? formatUnitPriceFromString(line.unitPrice) : "—"}
+                {" · "}
+                Ref {budgetUnitCost ? formatUnitPriceFromString(budgetUnitCost) : "—"}
+                {" · "}
+                Desvío{" "}
+                {liveVariance.variancePct ? (
+                  <span
+                    className={
+                      varianceTone === "success"
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : varianceTone === "danger"
+                          ? "text-destructive"
+                          : undefined
+                    }
+                  >
+                    {formatRatePctWithSymbol(liveVariance.variancePct)}
+                  </span>
+                ) : partidaRefIsGlobal ? (
+                  "no aplica (partida global)"
+                ) : liveVariance.varianceTier === "UNIT_MISMATCH" ? (
+                  "unidad distinta"
+                ) : liveVariance.varianceTier === "NO_BUDGET_BASELINE" ? (
+                  "sin referencial"
+                ) : (
+                  "—"
+                )}
+              </p>
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1 min-w-0">
@@ -594,13 +683,36 @@ export function PurchaseOrderLinesEditor({
               {/* Row 3: variance justification */}
               {showVarianceJustification && (
                 <div className="space-y-1">
-                  <Label className="text-xs">Justificación desvío</Label>
+                  <Label className="text-xs">
+                    Justificación desvío
+                    {justificationRequired ? " (obligatoria)" : ""}
+                  </Label>
                   <Input
                     value={line.varianceJustification ?? ""}
                     onChange={(e) => update(i, "varianceJustification", e.target.value)}
-                    placeholder="Si supera presupuesto…"
-                    className={LINE_FIELD_CLASS}
+                    placeholder={
+                      justificationRequired
+                        ? "Completá por qué se desvía esta línea…"
+                        : "Si el precio supera el referencial…"
+                    }
+                    aria-invalid={justificationRequired || undefined}
+                    className={
+                      justificationRequired
+                        ? `${LINE_FIELD_CLASS} border-destructive`
+                        : LINE_FIELD_CLASS
+                    }
                   />
+                  {justificationRequired && liveVariance ? (
+                    <p className="text-[10px] text-destructive leading-snug">
+                      Esta línea pide nota ({varianceJustificationReasonEs(liveVariance.varianceTier)})
+                      antes de enviar a aprobación.
+                    </p>
+                  ) : liveVariance?.varianceTier === "NONE" && partidaRefIsGlobal ? (
+                    <p className="text-[10px] text-muted-foreground leading-snug">
+                      Sin referencial unitario no hay desvío que justificar. El saldo de la partida sigue
+                      siendo un aviso al enviar.
+                    </p>
+                  ) : null}
                 </div>
               )}
             </section>

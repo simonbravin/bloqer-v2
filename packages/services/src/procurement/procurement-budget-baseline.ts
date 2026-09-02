@@ -8,11 +8,35 @@ function normalizeDesc(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+export type SuggestedApuRef = {
+  description: string;
+  unit: string;
+  unitCost: string;
+};
+
 export type BudgetLineBaseline = {
   unitCost: Prisma.Decimal | null;
   unit: string | null;
   quantity: Prisma.Decimal | null;
+  /** Same-unit purchasable APU when the line did not match one (display only). */
+  suggestedApu?: SuggestedApuRef | null;
 };
+
+function suggestedApuForUnmatched(
+  purchasable: AnalysisLineRow[],
+  lineUnit: string,
+): SuggestedApuRef | null {
+  const unit = lineUnit.trim().toLowerCase();
+  if (!unit) return null;
+  const sameUnit = purchasable.filter((l) => l.unit.trim().toLowerCase() === unit);
+  if (sameUnit.length !== 1) return null;
+  const hit = sameUnit[0]!;
+  return {
+    description: hit.description,
+    unit: hit.unit,
+    unitCost: hit.unitCost.toFixed(4),
+  };
+}
 
 type AnalysisLineRow = {
   productId: string | null;
@@ -41,6 +65,22 @@ export function fallbackBudgetFromCostItem(item: CostItemDirectFields): BudgetLi
     unit: item.unit?.trim() ? item.unit : null,
     quantity: item.quantity,
   };
+}
+
+/**
+ * When no APU insumo matches the PO line: use CostItem $/u only if that unit is
+ * comparable (not a lump-sum `gl` total). Keep `unit: gl` so variance can skip
+ * the false UNIT_MISMATCH of un/kg vs global.
+ */
+export function unmatchedPurchaseLineBaseline(item: CostItemDirectFields): BudgetLineBaseline {
+  if (isGlobalUnit(item.unit)) {
+    return {
+      unitCost: null,
+      unit: item.unit,
+      quantity: item.quantity,
+    };
+  }
+  return fallbackBudgetFromCostItem(item);
 }
 
 /**
@@ -129,7 +169,10 @@ export async function budgetBaselineForPurchaseLine(
 
   const line = pick(purchasable) ?? pick(item.analysisLines);
   if (!line) {
-    return fallbackBudgetFromCostItem(item);
+    return {
+      ...unmatchedPurchaseLineBaseline(item),
+      suggestedApu: suggestedApuForUnmatched(purchasable, match.unit),
+    };
   }
 
   const need = physicalNeedQty(

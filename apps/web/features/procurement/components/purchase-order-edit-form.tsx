@@ -18,6 +18,7 @@ import {
 } from "./purchase-order-lines-editor";
 import { updatePurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import type { PurchaseOrderView } from "@bloqer/services";
+import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import type { SupplierOption } from "./purchase-order-form";
 import { toDateInput } from "@/lib/date-input";
 
@@ -29,6 +30,7 @@ interface Props {
   productOptions?: ProductOption[];
   /** Show emergency reason only for direct OC when policy + OWNER/ADMIN. */
   allowEmergencyDirectPo?: boolean;
+  varianceSettings?: VarianceSettings;
 }
 
 export function PurchaseOrderEditForm({
@@ -38,6 +40,7 @@ export function PurchaseOrderEditForm({
   wbsOptions,
   productOptions = [],
   allowEmergencyDirectPo = false,
+  varianceSettings,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -172,6 +175,7 @@ export function PurchaseOrderEditForm({
           wbsOptions={wbsOptions}
           productOptions={productOptions}
           showVarianceJustification
+          varianceSettings={varianceSettings}
         />
 
         <hr />

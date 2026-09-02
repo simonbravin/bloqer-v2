@@ -84,6 +84,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
   let wbsOptions: WbsOption[] = [];
   let productOptions: ProductOption[] = [];
   let allowEmergency = false;
+  let varianceSettings: { varianceSoftAlertPct: string; varianceExtraApprovalPct: string } | undefined;
 
   if (canCreatePo) {
     try {
@@ -121,6 +122,10 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
       allowEmergency =
         settings.allowEmergencyDirectPo &&
         current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
+      varianceSettings = {
+        varianceSoftAlertPct: settings.varianceSoftAlertPct,
+        varianceExtraApprovalPct: settings.varianceExtraApprovalPct,
+      };
     } catch {
       allowEmergency = false;
     }
@@ -167,6 +172,7 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
                   wbsOptions={wbsOptions}
                   productOptions={productOptions}
                   allowEmergencyDirectPo={allowEmergency}
+                  varianceSettings={varianceSettings}
                   defaultOpen={sp.create === "1"}
                 />
               </Suspense>

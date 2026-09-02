@@ -7,6 +7,7 @@ import {
   isZeroRatePct,
 } from "@/lib/format-money";
 import { PurchaseOrderVarianceReadout } from "./purchase-order-variance-readout";
+import { PoLineBudgetRef } from "./po-line-budget-ref";
 import { ProcurementAmberCallout } from "./procurement-amber-callout";
 import type { PurchaseOrderView } from "@bloqer/services";
 import type { ReactNode } from "react";
@@ -145,15 +146,21 @@ export function PurchaseOrderMobileFiche({
                 {line.wbsNodeName ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : line.wbsNodeCode}
               </p>
             ) : null}
-            {line.budgetUnitCostSnapshot ? (
-              <p className="text-xs text-muted-foreground">
-                Ref. {formatUnitPriceFromString(line.budgetUnitCostSnapshot)}
-              </p>
-            ) : null}
+            <div className="text-xs">
+              <p className="text-muted-foreground">Ref. presup.</p>
+              <PoLineBudgetRef
+                unitCost={line.budgetUnitCostSnapshot}
+                unit={line.budgetUnit}
+                refKind={line.budgetRefKind}
+                suggestedApu={line.suggestedApu}
+                compact
+              />
+            </div>
             <PurchaseOrderVarianceReadout
               variancePct={line.variancePct}
               varianceTier={line.varianceTier}
               justification={line.varianceJustification}
+              refKind={line.budgetRefKind}
               compact
             />
           </article>

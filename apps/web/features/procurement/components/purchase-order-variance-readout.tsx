@@ -7,9 +7,13 @@ const TONE_CLASS = {
   muted: "text-muted-foreground",
 } as const;
 
-function extraHint(tier: string | null | undefined): string | null {
+function extraHint(
+  tier: string | null | undefined,
+  refKind?: string | null,
+): string | null {
   if (tier === "UNIT_MISMATCH") return "Unidad distinta";
   if (tier === "NO_BUDGET_BASELINE") return "Sin referencial";
+  if (tier === "NONE" && refKind === "GLOBAL_PARTIDA") return "Sin $/u comparable";
   return null;
 }
 
@@ -18,14 +22,16 @@ export function PurchaseOrderVarianceReadout({
   variancePct,
   varianceTier,
   justification,
+  refKind,
   compact = false,
 }: {
   variancePct?: string | null;
   varianceTier?: string | null;
   justification?: string | null;
+  refKind?: string | null;
   compact?: boolean;
 }) {
-  const hint = extraHint(varianceTier);
+  const hint = extraHint(varianceTier, refKind);
   const hasPct = variancePct != null && variancePct !== "" && !isZeroRatePct(variancePct);
   const note = justification?.trim() || null;
   if (!hasPct && !hint && !note) {

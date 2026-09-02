@@ -15,6 +15,7 @@ import {
   type ProductOption,
   type WbsOption,
 } from "./purchase-order-lines-editor";
+import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import { createPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 
 export type SupplierOption = { id: string; label: string; searchValue?: string };
@@ -26,6 +27,7 @@ interface Props {
   productOptions?: ProductOption[];
   /** Show emergency reason only when policy allows AND actor is OWNER/ADMIN. */
   allowEmergencyDirectPo?: boolean;
+  varianceSettings?: VarianceSettings;
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
@@ -37,6 +39,7 @@ export function PurchaseOrderForm({
   wbsOptions,
   productOptions = [],
   allowEmergencyDirectPo = false,
+  varianceSettings,
   variant = "card",
   onCancel,
   onSuccess,
@@ -159,6 +162,7 @@ export function PurchaseOrderForm({
           wbsOptions={wbsOptions}
           productOptions={productOptions}
           showVarianceJustification
+          varianceSettings={varianceSettings}
         />
 
         <hr />
