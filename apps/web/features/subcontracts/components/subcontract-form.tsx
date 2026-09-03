@@ -27,6 +27,13 @@ import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@blo
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { SubcontractBudgetHints } from "./subcontract-budget-hints";
+import {
+  CREATE_ATTACHMENT_TOTAL_MB,
+  MAX_CREATE_ATTACHMENT_FILES,
+  MAX_CREATE_ATTACHMENT_TOTAL_BYTES,
+  createAttachmentLimitHint,
+} from "../lib/create-attachment-limits";
+import { resolveAllowedMimeType } from "@bloqer/validators";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
 export type WbsOption           = { id: string; code: string; name: string; unit: string };
@@ -50,7 +57,9 @@ type Props = {
   budgetHints?:          WbsSubcontractBudgetHint[];
   /** Pre-select WBS from report deep-link (R-SUB-01). */
   initialWbsNodeId?:     string;
-  action: (fd: FormData) => Promise<{ error: string } | { id: string }>;
+  action: (fd: FormData) => Promise<{ error: string } | { id: string; attachmentWarning?: string }>;
+  /** Only on create: edit uses the detail Adjuntos panel. */
+  allowAttachments?: boolean;
   defaultValues?: {
     subcontractorContactId: string;
     title:       string;
@@ -68,13 +77,14 @@ type Props = {
 
 export function SubcontractForm({
   projectId, companyId, subcontractorOptions, wbsOptions, budgetHints, initialWbsNodeId, action,
-  defaultValues, submitLabel = "Crear subcontrato",
+  defaultValues, submitLabel = "Crear subcontrato", allowAttachments = false,
 }: Props) {
   const router = useRouter();
   const [lines, setLines]                 = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
   const [subcontractorId, setSubcontractorId] = useState(defaultValues?.subcontractorContactId ?? "");
   const [currency, setCurrency] = useState(defaultValues?.currency ?? "ARS");
   const [error, setError]                 = useState<string | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
   const [attachments, setAttachments]     = useState<File[]>([]);
   const fileInputRef                      = useRef<HTMLInputElement>(null);
@@ -147,15 +157,43 @@ export function SubcontractForm({
     "0",
   );
 
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
-    setAttachments((prev) => {
-      const existing = new Set(prev.map((f) => `${f.name}-${f.size}`));
-      const deduped = picked.filter((f) => !existing.has(`${f.name}-${f.size}`));
-      return [...prev, ...deduped];
-    });
-    // Reset so the same file can be re-picked if removed
     if (fileInputRef.current) fileInputRef.current.value = "";
+    if (picked.length === 0) return;
+
+    const existing = new Set(attachments.map((f) => `${f.name}-${f.size}-${f.lastModified}`));
+    const next = [...attachments];
+    const rejected: string[] = [];
+    for (const file of picked) {
+      if (existing.has(`${file.name}-${file.size}-${file.lastModified}`)) continue;
+      if (file.size <= 0) {
+        rejected.push(`${file.name}: archivo vacío`);
+        continue;
+      }
+      if (!resolveAllowedMimeType(file.name, file.type)) {
+        rejected.push(`${file.name}: tipo no permitido`);
+        continue;
+      }
+      if (next.length >= MAX_CREATE_ATTACHMENT_FILES) {
+        rejected.push(`${file.name}: máximo ${MAX_CREATE_ATTACHMENT_FILES} archivos`);
+        continue;
+      }
+      const total = next.reduce((sum, f) => sum + f.size, 0) + file.size;
+      if (total > MAX_CREATE_ATTACHMENT_TOTAL_BYTES) {
+        rejected.push(`${file.name}: el conjunto supera ${CREATE_ATTACHMENT_TOTAL_MB} MB`);
+        continue;
+      }
+      next.push(file);
+    }
+    setAttachments(next);
+    setAttachmentError(rejected.length > 0 ? rejected.join(". ") : null);
   }
 
   function removeAttachment(idx: number) {
@@ -166,6 +204,7 @@ export function SubcontractForm({
     e.preventDefault();
     setPending(true);
     setError(null);
+    setAttachmentError(null);
     const fd = new FormData(e.currentTarget);
     fd.set("projectId",  projectId);
     fd.set("companyId",  companyId);
@@ -184,18 +223,37 @@ export function SubcontractForm({
       unitPrice:   l.unitPrice,
       notes:       l.notes || null,
     }))));
-    // Attach files so the server action can upload them after creating the subcontract
-    attachments.forEach((file) => fd.append("attachments", file));
-    const res = await action(fd);
-    setPending(false);
-    if ("error" in res) { setError(res.error ?? null); return; }
-    toast.success("Subcontrato guardado.");
-    router.push(`/proyectos/${projectId}/subcontratos/${res.id}`);
+    if (allowAttachments) {
+      const total = attachments.reduce((sum, file) => sum + file.size, 0);
+      if (attachments.length > MAX_CREATE_ATTACHMENT_FILES || total > MAX_CREATE_ATTACHMENT_TOTAL_BYTES) {
+        setAttachmentError(`Revisá los adjuntos: ${createAttachmentLimitHint()}.`);
+        setPending(false);
+        return;
+      }
+      attachments.forEach((file) => fd.append("attachments", file));
+    }
+    try {
+      const res = await action(fd);
+      if ("error" in res) {
+        setError(res.error ?? null);
+        return;
+      }
+      if (res.attachmentWarning) {
+        toast.warning(res.attachmentWarning);
+      } else {
+        toast.success("Subcontrato guardado.");
+      }
+      router.push(`/proyectos/${projectId}/subcontratos/${res.id}`);
+    } catch {
+      setError("Error inesperado. Intentá de nuevo.");
+    } finally {
+      setPending(false);
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2 space-y-1">
@@ -334,13 +392,13 @@ export function SubcontractForm({
         </TableScroll>
       </div>
 
-      {/* Attachments (optional, uploaded after creation) */}
+      {allowAttachments ? (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="font-medium">Adjuntos</h3>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Opcional — podés adjuntar el contrato firmado u otros documentos.
+              Opcional — contrato firmado u otros documentos ({createAttachmentLimitHint()}).
             </p>
           </div>
           <Button
@@ -348,8 +406,9 @@ export function SubcontractForm({
             variant="outline"
             size="sm"
             onClick={() => fileInputRef.current?.click()}
+            disabled={pending}
           >
-            <Paperclip className="mr-1.5 h-3.5 w-3.5" />
+            <Paperclip className="mr-1.5 h-3.5 w-3.5" aria-hidden />
             Adjuntar
           </Button>
           <input
@@ -357,24 +416,27 @@ export function SubcontractForm({
             type="file"
             multiple
             accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.docx,.doc,.xlsx,.xls,.csv,.txt"
-            className="hidden"
+            className="sr-only"
             onChange={handleFilePick}
+            aria-label="Seleccionar archivos para adjuntar"
           />
         </div>
+
+        {attachmentError ? (
+          <p role="alert" className="text-sm text-destructive">{attachmentError}</p>
+        ) : null}
 
         {attachments.length > 0 && (
           <ul className="space-y-1.5">
             {attachments.map((file, idx) => (
               <li
-                key={idx}
+                key={`${file.name}-${file.size}-${file.lastModified}`}
                 className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm"
               >
-                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
                 <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {file.size < 1024 * 1024
-                    ? `${(file.size / 1024).toFixed(1)} KB`
-                    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                  {formatFileSize(file.size)}
                 </span>
                 <button
                   type="button"
@@ -389,9 +451,10 @@ export function SubcontractForm({
           </ul>
         )}
       </div>
+      ) : null}
 
       <div className="flex gap-2 justify-end">
-        <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+        <Button type="button" variant="outline" onClick={() => router.back()} disabled={pending}>Cancelar</Button>
         <Button type="submit" disabled={pending}>{pending ? "Guardando..." : submitLabel}</Button>
       </div>
     </form>

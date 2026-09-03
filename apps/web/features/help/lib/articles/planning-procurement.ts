@@ -307,7 +307,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Operación → Documentos.",
       "En la columna Acciones: el icono de ojo abre el archivo en una pestaña nueva (PDF e imágenes); el icono de descarga baja el archivo.",
       "El nombre del archivo abre el detalle (ficha, archivar; eliminar solo si no está ligado a un comprobante).",
-      "En los adjuntos de un parte, OC o factura: los mismos iconos de ver y descargar, más caja (archivar). Esos adjuntos no se pueden eliminar.",
+      "En los adjuntos de un parte, OC, factura o subcontrato: los mismos iconos de ver y descargar, más caja (archivar). Esos adjuntos no se pueden eliminar.",
     ],
     pitfalls: [
       "Si ves un icono de archivo tachado, no hay binario almacenado (almacenamiento no configurado al subir).",

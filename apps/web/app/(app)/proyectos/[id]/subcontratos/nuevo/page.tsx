@@ -79,6 +79,7 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
             budgetHints={budgetHints}
             initialWbsNodeId={sp.wbsNodeId}
             action={createSubcontractAction}
+            allowAttachments
           />
         </div>
       ) : null}

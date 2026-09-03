@@ -15,13 +15,19 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Prerrequisito: contacto con rol Subcontratista.",
       "Compras → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
       "Alcance e imputación: cada línea con partida EDT (obligatoria antes de aprobar certificaciones).",
+      "Opcional: Adjuntar el contrato u otros documentos (máx. 8 archivos, 45 MB en total). Después también desde el detalle → Adjuntos.",
     ],
+    pitfalls: [
+      "Si un adjunto no se sube, el subcontrato igual queda creado: reintentá en el detalle.",
+      "En Editar no se adjuntan archivos; usá el panel Adjuntos del detalle.",
+    ],
+    keywords: ["subcontrato", "crear subcontrato", "paquete", "compromisos", "adjuntar contrato", "adjuntos subcontrato"],
     relatedSlugs: [
       "cargar-un-subcontratista",
       "certificar-y-pagar-subcontrato",
       "tablero-mano-obra",
+      "ver-y-descargar-documento",
     ],
-    keywords: ["subcontrato", "crear subcontrato", "paquete", "compromisos"],
     guideRef: "§10",
   },
   {
