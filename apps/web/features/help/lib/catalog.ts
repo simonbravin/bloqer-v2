@@ -22,6 +22,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
 /** Home browse (no query/chips): keep the list scannable as the catalog grows. */
 export const HELP_FEATURED_SLUGS: readonly string[] = [
   "cargar-un-proveedor",
+  "elegir-camino-egreso-obra",
   "circuito-comprar-material-hasta-pagarlo",
   "orden-de-compra-y-afectar-edt",
   "pagar-un-sueldo",

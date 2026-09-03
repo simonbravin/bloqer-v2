@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, type MouseEvent } from "react";
 import Link from "next/link";
 import type { ResourceBoardRow } from "@bloqer/services";
 import type { ResourceBoardCategory } from "@bloqer/services/resource-board-pure";
@@ -21,14 +22,24 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { Button } from "@/components/ui/button";
+import { WbsItemDrilldownDialog } from "@/features/cost-control";
+import { controlCostosItemHref } from "@/lib/control-costos-href";
 import { formatDecimalArFromString, formatQtyFromString } from "@/lib/format-money";
+
+type OpenWbs = { wbsNodeId: string; wbsCode: string; wbsName: string };
+
+function isModifiedClick(e: MouseEvent) {
+  return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+}
 
 type Props = {
   rows: ResourceBoardRow[];
   projectId: string;
   costCategory: ResourceBoardCategory;
+  /** Hide Pedir / Factura CTAs when the user lacks permission. */
   canRequest?: boolean;
   canInvoice?: boolean;
+  budgetId?: string;
 };
 
 export function ResourceBoardTable({
@@ -37,7 +48,10 @@ export function ResourceBoardTable({
   costCategory,
   canRequest = true,
   canInvoice = true,
+  budgetId,
 }: Props) {
+  const [openItem, setOpenItem] = useState<OpenWbs | null>(null);
+
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground p-4">
@@ -79,16 +93,29 @@ export function ResourceBoardTable({
               const hasShortfall = isResourceFieldShortage(row);
               const showPedir = canShowResourcePedir(canRequest, row);
               const showInvoice = canShowResourceInvoice(canInvoice, row);
+              const detailHref = controlCostosItemHref(projectId, row.wbsNodeId, { budgetId });
 
               return (
                 <TableRow key={row.rowKey}>
                   <TableCell className="font-mono">
-                    <Link
-                      href={`/proyectos/${projectId}/control-costos/${row.wbsNodeId}`}
+                    <a
+                      href={detailHref}
                       className="text-primary hover:underline"
+                      aria-haspopup="dialog"
+                      aria-expanded={openItem?.wbsNodeId === row.wbsNodeId}
+                      title="Ver detalle de la partida (Ctrl/Cmd+clic abre EDT completo)"
+                      onClick={(e) => {
+                        if (isModifiedClick(e)) return;
+                        e.preventDefault();
+                        setOpenItem({
+                          wbsNodeId: row.wbsNodeId,
+                          wbsCode: row.wbsCode,
+                          wbsName: row.wbsName,
+                        });
+                      }}
                     >
                       {row.wbsCode}
-                    </Link>
+                    </a>
                     {row.unscheduled ? (
                       <span className="ml-1 text-[10px] text-muted-foreground">(sin fecha)</span>
                     ) : null}
@@ -177,6 +204,18 @@ export function ResourceBoardTable({
           </TableBody>
         </Table>
       </TableScroll>
+
+      <WbsItemDrilldownDialog
+        open={openItem !== null}
+        onOpenChange={(next) => {
+          if (!next) setOpenItem(null);
+        }}
+        projectId={projectId}
+        wbsNodeId={openItem?.wbsNodeId ?? null}
+        wbsCode={openItem?.wbsCode ?? ""}
+        wbsName={openItem?.wbsName ?? ""}
+        filters={{ budgetId }}
+      />
     </div>
   );
 }

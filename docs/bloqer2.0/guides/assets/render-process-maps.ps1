@@ -25,7 +25,8 @@ $jobs = @(
     "mapa-flujo-subcontrato-si-no",
     "mapa-flujo-certificar-cobrar-si-no",
     "mapa-flujo-desvio-oc-si-no",
-    "mapa-flujo-mano-obra-equipos-si-no"
+    "mapa-flujo-mano-obra-equipos-si-no",
+    "mapa-flujo-egresos-obra-comparacion"
   )}
 )
 

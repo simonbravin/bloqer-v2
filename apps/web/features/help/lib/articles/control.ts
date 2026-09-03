@@ -20,7 +20,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Arriba de la tabla ves dos gráficos lado a lado: **Composición del presupuesto** (torta APU planificada) y **Gasto por tipo** (barras Presup / Devengado / Exposición por MAT · LAB · EQP · SUB · OTHER).",
       "Filtro **Tipo de costo** en la barra: al elegir MAT / LAB / EQP / SUB / OTHER, la tabla muestra solo ese bucket por partida y los totales del proyecto se recalculan para ese tipo. El CSV / PDF respeta el filtro.",
       "En una partida hoja, el chevron a la izquierda del código abre el desglose por tipo de costo (solo cuando el filtro está en Todos los tipos).",
-      "Tocá una fila (código o nombre, p. ej. 1.1 Replanteo de Obra) para abrir el detalle en un diálogo; ahí también está la sección Por tipo de costo y atajos a cobertura Materiales / Mano de obra / Equipos de esa partida.",
+      "Tocá una fila (código o nombre, p. ej. 1.1 Replanteo de Obra) para abrir el detalle en un diálogo; ahí también está la sección Por tipo de costo y atajos a cobertura Materiales / Mano de obra / Equipos de esa partida. El mismo diálogo se abre al tocar el código EDT en esos tableros de Operación.",
       "Desde el diálogo hay links a OC, facturas y pagos de esa partida.",
     ],
     pitfalls: [
@@ -392,7 +392,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Imputá / cerrá según el flujo de la pantalla.",
       "No es el cierre de período contable.",
     ],
-    relatedSlugs: ["cerrar-el-mes", "gasto-corporativo", "ver-rentabilidad-de-obra"],
+    relatedSlugs: ["cerrar-el-mes", "gasto-corporativo", "ver-rentabilidad-de-obra", "gastos-generales-de-obra"],
     keywords: ["gastos generales", "gg", "overhead", "imputacion"],
     guideRef: "§14 · §16",
   },

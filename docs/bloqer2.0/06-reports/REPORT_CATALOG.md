@@ -55,6 +55,7 @@
 | R-006 | Proyección de caja | Sí | `/reportes/caja` |
 | R-003 | Rentabilidad bruta | Sí | `/reportes/rentabilidad` |
 | R-004 | Rentabilidad neta | Completo (GG manual + % empresa [D-040]) | `/reportes/rentabilidad` |
+| R-GG-OBRA | GG de obra (presup. vs gastado) | Sí | `/reportes/gastos-generales` (partidas GG por nombre + sin EDT + GG empresa; CSV) |
 | — | Ingresos vs gastos | Sí | `/reportes/ingresos-gastos` |
 
 **R-001 / EDT ([D-098] · [D-099]):** tablero único `/proyectos/[id]/control-costos` — capas de costo, composición APU (torta) + **gasto por tipo** (barras Presup/Devengado/Exposición), presets de columnas (incl. % y cantidades), expand por `CostCategory` en partidas hoja, **filtro por tipo de costo** (query `?costType=MATERIAL|LABOR|EQUIPMENT|SUBCONTRACT|OTHER`) que reemplaza importes y totales por el bucket y se propaga al CSV/PDF. La ruta `presupuesto-vs-real` redirige acá.
@@ -98,6 +99,7 @@ Solo asientos `POSTED`; saldos naturales; multi-moneda por bloque; gerencial (no
 | R-012, R-CERT-* | `/api/reports/proyectos/[projectId]/certificaciones.csv` |
 | R-AP-01…02 + resumen legado | `/api/reports/proyectos/[projectId]/compras-proveedores.csv` |
 | R-AP-03 | `/api/reports/proyectos/[projectId]/proveedores.csv` |
+| R-GG-OBRA | `/api/reports/proyectos/[projectId]/gastos-generales.csv` |
 | R-SCC-*, R-SUB-* | `/api/reports/proyectos/[projectId]/subcontratos.csv` |
 | Control costos (detalle) | `/api/reports/proyectos/[projectId]/control-costos.csv` |
 | R-005 | `/api/reports/proyectos/[projectId]/flujo-caja.csv` |

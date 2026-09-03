@@ -138,6 +138,7 @@ Dos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primer
 | Costo de empresa | [`flujos/mapa-flujo-gasto-empresa-si-no.png`](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png) | §12.2 · §14 |
 | Compra | [`flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png) | §9 |
 | Mano de obra y equipos | [`flujos/mapa-flujo-mano-obra-equipos-si-no.png`](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png) | §9.0.1 · §9.0.2 |
+| Egresos de obra (comparación) | [`flujos/mapa-flujo-egresos-obra-comparacion.png`](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png) | §9.0 · §10 · §12.2 |
 | Desvío de OC | [`flujos/mapa-flujo-desvio-oc-si-no.png`](./guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png) | §9.2 |
 | Costo de obra | [`flujos/mapa-flujo-costo-obra-si-no.png`](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png) | §12.2 |
 | Subcontrato | [`flujos/mapa-flujo-subcontrato-si-no.png`](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png) | §10 |
@@ -838,7 +839,7 @@ En obra **no todo pasa por OC**. Tres caminos de egreso:
 
 1. Abrir vista **Operativo** (default). Ventana temporal: Esta semana · **Próximos 14 días** (default) · Este mes · Todo.
 2. Revisar KPIs: Presupuesto MAT · Filas con faltante · Cant. recibida · Cant. consumida.
-3. Columnas: EDT · Material · Necesidad · $ Presup. · Pedido · Recibido · Consumido · Faltante.
+3. Columnas: EDT · Material · Necesidad · $ Presup. · Pedido · Recibido · Consumido · Faltante. Tocá el **código EDT** para abrir el **detalle de la partida en un diálogo** (mismo que EDT y costos); cerrá para volver al tablero. Ctrl/Cmd+clic sigue abriendo la ruta `/control-costos/[wbsNodeId]`.
 4. En una fila con **faltante** (necesidad − ya pedido), **Pedir** (o **Pedir resto** si ya hay SC/OC de esa línea) prellena una **solicitud de compra** con la cantidad restante. Si ya hay una solicitud u orden inequívoca, también aparece el atajo.
 5. **$ Presup.** es el costo APU presupuestado de la línea (total); **no** baja con lo ya pedido. **Pedido** = SC enviada sin OC confirmada + cantidades de OC confirmada/recibida. **Varianza ($)** es presupuesto MAT vs consumo de stock, no vs pedido.
 6. Vista **Varianza ($)** (`?tab=varianza`): desvío monetario. **Exportar** (CSV/PDF) aparece en esa vista.
@@ -884,7 +885,7 @@ flowchart TD
 **Prerrequisito:** presupuesto `APPROVED`/`CLOSED` con líneas **LABOR** en APU (no `gl` / lump sin necesidad física). Con **varios presupuestos** aprobados, el tablero usa el baseline elegido (o el más reciente); al abrir una partida desde EDT, Bloqer resuelve el presupuesto dueño de ese nodo EDT.
 
 1. Vista **Operativo** (default). Misma ventana de cronograma que Materiales. Si el módulo de cronograma está off o entrás desde EDT (drilldown), se muestra en ventana **todas** (solo cantidades).
-2. Columnas: EDT · Insumo APU · Necesidad · $ Presup. · Pedido · Facturado · Faltante.
+2. Columnas: EDT · Insumo APU · Necesidad · $ Presup. · Pedido · Facturado · Faltante. Tocá el **código EDT** → diálogo de detalle de partida (cerrar para volver); Ctrl/Cmd+clic = página completa.
 3. **Faltante** = necesidad − max(pedido, facturado). Así una liquidación directa (sin OC) también cierra el faltante.
 4. **Pedido** cuenta SC enviada (sin OC confirmada) y OC confirmada/recibida tipadas **LAB** o ligadas a APU LABOR. **Facturado** cuenta facturas **emitidas** tipadas LAB (o heredadas de OC tipada LAB); si el módulo AP está off, Facturado queda en 0 y el tablero avisa.
 5. **Pedir** / **Pedir resto** abre SC prellenada: partida, cantidad faltante, insumo APU si la fila lo tiene, y **tipo Mano de obra** (`costType=LABOR`) aunque la línea sea texto libre. Camino SC → OC → factura tipada ([D-109]).
@@ -903,6 +904,10 @@ flowchart TD
 **Ruta:** Operación → **Equipos** → `/proyectos/[id]/equipos`
 
 Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** lleva `costType=EQUIPMENT`; **Factura** → AP tipada **Equipos** con vínculo APU ([D-110]). Varianza y export CSV: presupuesto EQP vs facturado **neto** (sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]). Mismo caminito que §9.0.1.
+
+**Comparación de caminos** (Materiales / MO / Equipos / Subcontrato / gasto directo): [`guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png`](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png) · Ayuda → *Elegir el camino…*.
+
+![Bloqer — Cinco caminos de egreso en obra](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png)
 
 ### 9.1 Procedimiento — Solicitud de compra (SC)
 
@@ -1217,8 +1222,8 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 - **Menú:** Planificación → **EDT y costos**.
 - **Ruta:** `/proyectos/[id]/control-costos` (título de pantalla: **Estructura de Desglose de Trabajo y Costos**).
-- **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic o desde Materiales / Mano de obra / Equipos / reportes). En el detalle, secciones de cobertura APU **Materiales / Mano de obra / Equipos** enlazan al tablero operativo de esa partida (cantidades; el presupuesto dueño del nodo EDT se resuelve solo).
-- Es el **tablero de control de costos** del proyecto. Materiales / Mano de obra / Equipos (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan.
+- **Detalle de partida:** en el listado, tocá una fila (código o nombre, p. ej. `1.1 Replanteo de Obra`) para abrir el detalle en un **diálogo**, sin salir del tablero. La misma UX aplica al tocar el código EDT en **Materiales / Mano de obra / Equipos** (Operativo y Varianza). La ruta directa `/control-costos/[wbsNodeId]` sigue disponible (p. ej. Ctrl+clic). En el detalle, secciones de cobertura APU **Materiales / Mano de obra / Equipos** enlazan al tablero operativo de esa partida (cantidades; el presupuesto dueño del nodo EDT se resuelve solo).
+- Es el **tablero de control de costos** del proyecto. Materiales / Mano de obra / Equipos (cantidades) y Compras (documentos) alimentan este tablero; no lo reemplazan. **Subcontratos** (Compras) es el listado de paquetes contractuales — no es un tablero de cobertura APU como Materiales/MO/Equipos.
 - Compara **presupuesto baseline vs. real** por partida EDT, en capas: **comprometido**, **recibido** (informativo), **devengado**, **pagado**, más **certificado acumulado**. Es el tablero de **afectaciones** por partida (§0.2). Arriba de la tabla, dos gráficos lado a lado: **Composición del presupuesto** (torta APU planificada) y **Gasto por tipo** (barras Presup / Devengado / Exposición por categoría, [D-099]). Y **vistas de columnas** (Financiero / Compacto / Cantidades / % Avance / Personalizado; preferencia en el navegador).
 - **Filtro por tipo de costo ([D-099]):** en la barra superior, selector *Tipo de costo* (Todos / Materiales / Mano de obra / Equipos / Subcontratos / Otros). Al elegir un tipo, la tabla reemplaza los importes por los del bucket, oculta columnas de cantidad / recepción / avance libro / certificado (son atributos de la partida entera, no de un tipo), y los totales del proyecto se recalculan para ese tipo. El CSV / PDF respeta el filtro (queda en la URL como `?costType=`).
 - **Desglose por tipo de costo ([D-099]):** en partidas hoja, el chevron junto al código EDT abre filas de solo lectura por categoría presente (Materiales / Mano de obra / Equipos / Subcontratos / Otros). El presupuesto por tipo viene del APU; el gasto tipado de OC, factura, subcontrato y consumo. Categorías vacías se ocultan. En el diálogo de partida, sección **Por tipo de costo**. El chevron se desactiva cuando el filtro por tipo está activo (redundante).
@@ -1255,6 +1260,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Operativos:** **EDT y costos** (control $ por partida + composición APU + gasto por tipo + filtro por tipo de costo, [D-099]), **Certificaciones**, **Proveedores** (`/reportes/proveedores`: tabla, líderes por pedidos/monto/saldo CxP, concentración), **Análisis de compras** (varianza OC vs APU, [D-044]; **no** solapa con EDT), **Materiales**, **Subcontratos**.
 - **Proveedores de la obra:** `/proyectos/[id]/reportes/proveedores`. Resumen (cantidad, comprometido, exposición, pagado, saldo CxP, concentración top 3), líderes por **monto**, **pedidos** y **saldo a pagar**, y tabla por proveedor. El filtro Desde/Hasta recorta OC, facturas y recepciones; el **saldo CxP** es el abierto de hoy. Las certificaciones de subcontrato no entran (van a **Subcontratos**). Exportar CSV / PDF.
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
+- **Gastos generales de obra:** `/proyectos/[id]/reportes/gastos-generales` — compara **presupuesto GG** (partidas cuyo nombre/grupo sugiere «Gastos generales», «Indirectos» o código `GG…`) vs **gastado** = **devengado** en esas partidas + **devengado** sin partida EDT + **GG de empresa imputados** (OWNER/ADMIN; solo si la moneda coincide). El comprometido abierto se muestra aparte. Si hay varios presupuestos aprobados/cerrados, hay que elegir uno (igual que EDT). Export CSV. Requiere permiso de control de costos. No reemplaza EDT y costos ni la Imputación GG corporativa.
 - **Hub de empresa:** General → **Reportes** → `/reportes` — mismas secciones **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario) ([D-098]).
 - **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
 - **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y Configuración → **Reportes programados** → `/configuracion/reportes`. El listado muestra el catálogo por alcance (**Empresa general** / **Un proyecto**) y por sección (**Financieros** / **Operativos**). En el alta, elegí el alcance con las dos tarjetas. Formato **PDF** o **CSV (Excel)** según el reporte. *Presupuesto vs real* quedó absorbido por **EDT y costos** y no se ofrece en envíos nuevos. **Libro de obra — parte del día** ([D-100]): solo en alcance empresa, solo PDF, multi-obra ACTIVE, un adjunto por parte del día de la corrida (no aparece en el catálogo de una sola obra). En el detalle de un envío **Activo**, **Enviar ahora** (junto a Volver / Pausar / Eliminar) genera y manda el correo de inmediato; pide confirmación y **no** mueve la próxima ejecución programada. El job automático en Vercel Hobby corre **una vez al día** (05:05 UTC); si necesitás el adjunto ya, usá **Enviar ahora**.

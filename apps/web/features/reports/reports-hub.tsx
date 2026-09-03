@@ -84,6 +84,15 @@ export function ReportsHub({
       available: canProfitability,
       badge: "R-003",
     },
+    {
+      title: "Gastos generales de obra",
+      description:
+        "Presupuesto GG (partidas indirectos) vs gastado: partidas + docs sin EDT + GG empresa imputados.",
+      href: `${base}/gastos-generales`,
+      icon: <Percent className="h-5 w-5" />,
+      available: canCostReports,
+      badge: "GG obra",
+    },
   ];
 
   const operational: ReportHubCard[] = [

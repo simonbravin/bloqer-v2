@@ -12,6 +12,7 @@ export * from "./company-income-expense.service";
 export * from "./project-profitability.service";
 export * from "./project-portfolio.service";
 export * from "./overhead-by-project.service";
+export * from "./project-gg-overview.service";
 export * from "./report-budget-resolve";
 export * from "./report-month";
 export * from "./report-currency-view";

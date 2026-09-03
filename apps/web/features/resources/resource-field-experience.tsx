@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, type MouseEvent } from "react";
 import Link from "next/link";
 import type { ResourceBoardCategory } from "@bloqer/services/resource-board-pure";
 import type { ResourceFieldRow } from "@bloqer/services/resource-field";
@@ -13,7 +14,15 @@ import {
 } from "@bloqer/services/resource-field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { WbsItemDrilldownDialog } from "@/features/cost-control";
+import { controlCostosItemHref } from "@/lib/control-costos-href";
 import { formatQtyFromString } from "@/lib/format-money";
+
+type OpenWbs = { wbsNodeId: string; wbsCode: string; wbsName: string };
+
+function isModifiedClick(e: MouseEvent) {
+  return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
+}
 
 type Props = {
   projectId: string;
@@ -21,6 +30,7 @@ type Props = {
   rows: ResourceFieldRow[];
   canRequest: boolean;
   canInvoice: boolean;
+  budgetId?: string;
 };
 
 export function ResourceFieldExperience({
@@ -29,7 +39,9 @@ export function ResourceFieldExperience({
   rows,
   canRequest,
   canInvoice,
+  budgetId,
 }: Props) {
+  const [openItem, setOpenItem] = useState<OpenWbs | null>(null);
   const shortfallRows = rows.filter((r) => isResourceFieldShortage(r));
   const display = shortfallRows.length > 0 ? shortfallRows : rows;
 
@@ -55,18 +67,31 @@ export function ResourceFieldExperience({
         {display.map((row) => {
           const showPedir = canShowResourcePedir(canRequest, row);
           const showInvoice = canShowResourceInvoice(canInvoice, row);
+          const detailHref = controlCostosItemHref(projectId, row.wbsNodeId, { budgetId });
           return (
             <li key={row.rowKey}>
               <Card>
                 <CardContent className="space-y-2 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <Link
-                        href={`/proyectos/${projectId}/control-costos/${row.wbsNodeId}`}
+                      <a
+                        href={detailHref}
                         className="font-mono text-xs text-primary hover:underline"
+                        aria-haspopup="dialog"
+                        aria-expanded={openItem?.wbsNodeId === row.wbsNodeId}
+                        title="Ver detalle de la partida (Ctrl/Cmd+clic abre EDT completo)"
+                        onClick={(e) => {
+                          if (isModifiedClick(e)) return;
+                          e.preventDefault();
+                          setOpenItem({
+                            wbsNodeId: row.wbsNodeId,
+                            wbsCode: row.wbsCode,
+                            wbsName: row.wbsName,
+                          });
+                        }}
                       >
                         {row.wbsCode}
-                      </Link>
+                      </a>
                       <p className="truncate text-sm font-medium" title={row.description}>
                         {row.description}
                       </p>
@@ -104,7 +129,7 @@ export function ResourceFieldExperience({
                       {showInvoice ? (
                         <Button asChild size="sm" variant="outline" className="min-h-11 flex-1">
                           <Link href={resourceInvoiceHref(projectId, row, costCategory)}>
-                            Registrar factura
+                            Factura
                           </Link>
                         </Button>
                       ) : null}
@@ -116,6 +141,18 @@ export function ResourceFieldExperience({
           );
         })}
       </ul>
+
+      <WbsItemDrilldownDialog
+        open={openItem !== null}
+        onOpenChange={(next) => {
+          if (!next) setOpenItem(null);
+        }}
+        projectId={projectId}
+        wbsNodeId={openItem?.wbsNodeId ?? null}
+        wbsCode={openItem?.wbsCode ?? ""}
+        wbsName={openItem?.wbsName ?? ""}
+        filters={{ budgetId }}
+      />
     </div>
   );
 }

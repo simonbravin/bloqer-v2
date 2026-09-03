@@ -344,6 +344,7 @@ export function materialsPedirQuery(row: MaterialsPedirPrefillRow): URLSearchPar
   if (row.productId) q.set("productId", row.productId);
   if (row.costAnalysisLineId) q.set("costAnalysisLineId", row.costAnalysisLineId);
   if (row.unit) q.set("unit", row.unit);
+  q.set("costType", "MATERIAL");
   q.set("from", "materiales");
   return q;
 }

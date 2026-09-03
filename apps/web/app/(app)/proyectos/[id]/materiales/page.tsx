@@ -338,7 +338,7 @@ async function OperativoTab({
       <KpiStatGrid title={null} columns={4}>
         <KpiStatCard
           label="Presupuesto MAT"
-          value={formatMoneyAmount(board.totals.needCost, "ARS")}
+          value={formatMoneyAmount(board.totals.needCost, board.currency)}
         />
         <KpiStatCard label="Filas con faltante" value={String(board.totals.shortfallRows)} />
         <KpiStatCard label="Cant. recibida" value={fmtQtyKpi(board.totals.receivedQty)} />
@@ -350,7 +350,12 @@ async function OperativoTab({
           <CardTitle className="text-base">Cobertura por partida</CardTitle>
         </CardHeader>
         <CardContent>
-          <MaterialsBoardTable rows={board.rows} projectId={projectId} canRequest={canRequest} />
+          <MaterialsBoardTable
+            rows={board.rows}
+            projectId={projectId}
+            canRequest={canRequest}
+            budgetId={board.budgetId}
+          />
         </CardContent>
       </Card>
     </>

@@ -66,6 +66,7 @@ export type MaterialsBoardReport = {
   projectId: string;
   budgetId: string;
   budgetName: string;
+  currency: string;
   window: MaterialsBoardWindow;
   windowStart: string | null;
   windowEnd: string | null;
@@ -330,6 +331,12 @@ export async function getProjectMaterialsBoard(
           },
         },
         wbsNodeId: { not: null },
+        OR: [
+          { costType: "MATERIAL" },
+          { costAnalysisLine: { category: "MATERIAL" } },
+          // No legacy free-text branch: orphans with null type+APU create phantom need=0
+          // rows via ensureRow. Align with resource boards ([D-109]).
+        ],
       },
       select: {
         wbsNodeId: true,
@@ -348,6 +355,10 @@ export async function getProjectMaterialsBoard(
           status: { in: [...ORDERED_PO_STATUSES] },
         },
         wbsNodeId: { not: null },
+        OR: [
+          { costType: "MATERIAL" },
+          { costAnalysisLine: { category: "MATERIAL" } },
+        ],
       },
       select: {
         wbsNodeId: true,
@@ -598,6 +609,7 @@ export async function getProjectMaterialsBoard(
     projectId,
     budgetId: budget.id,
     budgetName: budget.name,
+    currency: budget.currency,
     window,
     windowStart: winStart?.toISOString().slice(0, 10) ?? null,
     windowEnd: winEnd?.toISOString().slice(0, 10) ?? null,

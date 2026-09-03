@@ -294,6 +294,7 @@ describe("Pedir CTA", () => {
     assert.match(href, /description=Hormig/);
     assert.match(href, /quantity=80/);
     assert.match(href, /from=materiales/);
+    assert.match(href, /costType=MATERIAL/);
     assert.match(href, /costAnalysisLineId=apu-1/);
     const desktop = materialsBoardPedirHref("proj", {
       wbsNodeId: "wbs-1",
@@ -306,6 +307,7 @@ describe("Pedir CTA", () => {
     assert.match(desktop, /\/proyectos\/proj\/solicitudes-compra\?create=1/);
     assert.match(desktop, /quantity=2/);
     assert.match(desktop, /from=materiales/);
+    assert.match(desktop, /costType=MATERIAL/);
   });
   it("labels remainder Pedir when a unique SC or OC exists", () => {
     assert.equal(materialsPedirCtaLabel(row({ rowKey: "p", description: "P" })), "Pedir");

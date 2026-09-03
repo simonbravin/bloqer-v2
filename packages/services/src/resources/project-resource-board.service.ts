@@ -69,6 +69,7 @@ export type ResourceBoardReport = {
   projectId: string;
   budgetId: string;
   budgetName: string;
+  currency: string;
   window: ResourceBoardWindow;
   windowStart: string | null;
   windowEnd: string | null;
@@ -662,6 +663,7 @@ export async function getProjectResourceBoard(
     projectId,
     budgetId: budget.id,
     budgetName: budget.name,
+    currency: budget.currency,
     window,
     windowStart: winStart?.toISOString().slice(0, 10) ?? null,
     windowEnd: winEnd?.toISOString().slice(0, 10) ?? null,

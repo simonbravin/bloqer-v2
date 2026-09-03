@@ -53,7 +53,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       alt: "Bloqer — Subcontrato: si esto, entonces aquello",
       caption: "No es una OC. La lámina con roles está en Ayuda → Mapas.",
     },
-    relatedSlugs: ["crear-un-subcontrato", "pagar-una-cuenta-por-pagar"],
+    relatedSlugs: ["crear-un-subcontrato", "pagar-una-cuenta-por-pagar", "elegir-camino-egreso-obra"],
     keywords: ["certificar subcontrato", "pagar subcontrato", "certificacion sub"],
     guideRef: "§10",
   },
@@ -307,6 +307,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     relatedSlugs: [
       "reintegrar-gasto-a-empleado",
       "circuito-comprar-material-hasta-pagarlo",
+      "elegir-camino-egreso-obra",
       "descuento-porcentual-en-lineas",
       "clase-de-documento-financiero",
       "tablero-mano-obra",

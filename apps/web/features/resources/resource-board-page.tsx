@@ -180,6 +180,7 @@ export async function ResourceBoardPage({
             rows={rows}
             canRequest={canRequest}
             canInvoice={canInvoice}
+            budgetId={board.budgetId}
           />
         )}
       </PageShell>
@@ -343,7 +344,7 @@ async function OperativoTab({
       <KpiStatGrid title={null} columns={4}>
         <KpiStatCard
           label={`Presupuesto ${costCategory === "LABOR" ? "MO" : "EQ"}`}
-          value={formatMoneyAmount(board.totals.needCost, "ARS")}
+          value={formatMoneyAmount(board.totals.needCost, board.currency)}
         />
         <KpiStatCard label="Filas con faltante" value={String(board.totals.shortfallRows)} />
         <KpiStatCard label="Cant. pedida" value={fmtQtyKpi(board.totals.orderedQty)} />
@@ -354,13 +355,14 @@ async function OperativoTab({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Cobertura APU</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           <ResourceBoardTable
             rows={board.rows}
             projectId={projectId}
             costCategory={costCategory}
             canRequest={canRequest}
             canInvoice={canInvoice}
+            budgetId={board.budgetId}
           />
         </CardContent>
       </Card>
@@ -417,15 +419,15 @@ async function VarianzaTab({
       <KpiStatGrid title={null} columns={3}>
         <KpiStatCard
           label="Presupuesto"
-          value={formatMoneyAmount(report.totals.budgetCost, "ARS")}
+          value={formatMoneyAmount(report.totals.budgetCost, report.currency)}
         />
         <KpiStatCard
           label="Facturado"
-          value={formatMoneyAmount(report.totals.accruedCost, "ARS")}
+          value={formatMoneyAmount(report.totals.accruedCost, report.currency)}
         />
         <KpiStatCard
           label="Variación"
-          value={formatMoneyAmount(report.totals.variance, "ARS")}
+          value={formatMoneyAmount(report.totals.variance, report.currency)}
         />
       </KpiStatGrid>
 
@@ -433,8 +435,15 @@ async function VarianzaTab({
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Por partida</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
-          <ResourceWbsVarianceTable rows={report.byWbs} />
+        <CardContent>
+          <ResourceWbsVarianceTable
+            rows={report.byWbs}
+            projectId={projectId}
+            budgetId={report.budgetId}
+            dateFrom={sp.dateFrom}
+            dateTo={sp.dateTo}
+            currency={report.currency}
+          />
         </CardContent>
       </Card>
     </>

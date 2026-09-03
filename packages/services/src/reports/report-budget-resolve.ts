@@ -5,6 +5,7 @@ export type ResolvedApprovedBudget = {
   id: string;
   name: string;
   status: string;
+  currency: string;
 };
 
 export async function resolveApprovedBudgetForProject(
@@ -14,7 +15,7 @@ export async function resolveApprovedBudgetForProject(
 ): Promise<ResolvedApprovedBudget | null> {
   const budgets = await prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, currency: true },
     orderBy: { updatedAt: "desc" },
   });
   if (budgets.length === 0) return null;
@@ -28,7 +29,7 @@ export async function listApprovedBudgetsForProject(
 ): Promise<ResolvedApprovedBudget[]> {
   return prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
-    select: { id: true, name: true, status: true },
+    select: { id: true, name: true, status: true, currency: true },
     orderBy: { updatedAt: "desc" },
   });
 }

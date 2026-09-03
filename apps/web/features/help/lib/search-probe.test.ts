@@ -34,6 +34,9 @@ const TIGHT_QUERIES: { q: string; max: number; topSlugIncludes?: string }[] = [
   { q: "pedido de compra", max: 5, topSlugIncludes: "solicitud" },
   { q: "certificado de avance", max: 5, topSlugIncludes: "certificacion" },
   { q: "cuenta corriente", max: 6 },
+  { q: "gastos generales de obra", max: 5, topSlugIncludes: "gastos-generales" },
+  { q: "gg obra", max: 5, topSlugIncludes: "gastos-generales" },
+  { q: "cinco caminos", max: 4, topSlugIncludes: "elegir-camino" },
   { q: "factura proveedor", max: 8 },
   { q: "gasto ferreteria", max: 5 },
 ];
@@ -102,6 +105,8 @@ test("new concept/report articles are findable", () => {
     { q: "tablero equipos", expectSlugIncludes: "tablero-equipos" },
     { q: "pedir mano de obra", expectSlugIncludes: "pedir-material" },
     { q: "varianza equipos", expectSlugIncludes: "tablero-equipos" },
+    { q: "cinco caminos", expectSlugIncludes: "elegir-camino" },
+    { q: "materiales vs mano de obra", expectSlugIncludes: "elegir-camino" },
     { q: "justificacion desvio", expectSlugIncludes: "orden-de-compra" },
   ];
   for (const c of cases) {

@@ -363,7 +363,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Operación → Materiales.",
       "En escritorio: a la izquierda Operativo / Varianza ($); a la derecha EDT y costos, Tablero de compras y Consumos (Exportar solo en Varianza).",
-      "Operativo es cantidades (faltante → Pedir). Varianza ($) es desvío de $ vs consumo de stock.",
+      "Operativo es cantidades (faltante → Pedir). Tocá el código EDT para abrir el detalle de la partida en un diálogo (cerrar para volver).",
+      "Varianza ($) es desvío de $ vs consumo de stock.",
       "Para ver o crear solicitudes, entrá a Tablero de compras (Nueva solicitud / Todas las solicitudes). No hay atajo Solicitudes en Materiales.",
       "En celular o tablet chica: tarjetas de necesidad/faltante (sin Operativo/Varianza). Los mismos atajos quedan en una franja que se desplaza de costado; las etiquetas se acortan (EDT, Compras).",
     ],
@@ -374,6 +375,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "pedir-material-desde-faltante",
       "registrar-consumo-materiales",
       "circuito-comprar-material-hasta-pagarlo",
+      "elegir-camino-egreso-obra",
       "leer-edt-y-costos",
       "tablero-mano-obra",
       "tablero-equipos",
@@ -405,9 +407,10 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Operación → Mano de obra (presupuesto aprobado con líneas LABOR en el APU).",
       "Operativo: revisá faltante = necesidad − max(pedido, facturado). Pedido = SC/OC tipadas LAB; Facturado = facturas emitidas tipadas LAB (si AP está off, Facturado = 0).",
+      "Tocá el código EDT → diálogo de detalle de partida (cerrar para volver al tablero).",
       "Pedir → SC prellenada (partida, faltante, insumo APU si hay, tipo Mano de obra aunque sea texto libre) → cotizar → OC → factura.",
       "O Registrar factura → factura AP directa tipada Mano de obra (jornal / cuadrilla / empleado); el vínculo al insumo APU se guarda ([D-110]) para bajar el faltante de esa fila.",
-      "Varianza ($): presupuesto vs facturado neto (sin IVA); Exportar CSV en esa vista.",
+      "Varianza ($): presupuesto vs facturado neto (sin IVA); Exportar CSV en esa vista. El código de partida también abre el diálogo.",
       "Desde EDT y costos → detalle de partida podés abrir el drilldown de esta partida (mismas cantidades, presupuesto dueño del nodo).",
       "El $ se ve en Planificación → EDT y costos con filtro Mano de obra.",
     ],
@@ -432,6 +435,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "tablero-materiales",
       "solicitud-de-compra",
       "pedir-material-desde-faltante",
+      "elegir-camino-egreso-obra",
       "crear-un-subcontrato",
       "certificar-y-pagar-subcontrato",
       "leer-edt-y-costos",
@@ -471,7 +475,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Operación → Equipos (presupuesto aprobado con líneas EQUIPMENT en el APU).",
-      "Operativo: faltante = necesidad − max(pedido, facturado).",
+      "Operativo: faltante = necesidad − max(pedido, facturado). Tocá el código EDT para el detalle en diálogo.",
       "Pedir → SC tipada Equipos (costType=EQUIPMENT + APU si hay), o Registrar factura mensual tipada Equipos con vínculo APU ([D-110]).",
       "Varianza ($) compara presupuesto APU vs facturado neto (sin IVA); Exportar CSV en esa vista.",
       "Controlá el $ en EDT y costos con filtro Equipos.",
@@ -516,6 +520,71 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
 ];
 
 export const PROCUREMENT_ARTICLES: HelpArticle[] = [
+  {
+    slug: "elegir-camino-egreso-obra",
+    title: "Elegir el camino: materiales, MO, equipos, subcontrato o gasto directo",
+    summary:
+      "Compará los cinco caminitos de egreso en obra: tableros APU, subcontrato y factura de costo directo.",
+    intents: ["comprar-material", "gasto-obra", "certificar-subcontrato", "pedir-material"],
+    modules: ["compras", "materiales", "subcontratos", "finanzas"],
+    level: "project",
+    typicalRoles: ["PM", "Compras", "Finanzas", "Administración"],
+    where: { menu: "Operación / Compras / Facturas proveedor" },
+    hrefs: [
+      { kind: "project", suffix: "/materiales", label: "Materiales" },
+      { kind: "project", suffix: "/mano-obra", label: "Mano de obra" },
+      { kind: "project", suffix: "/equipos", label: "Equipos" },
+      { kind: "project", suffix: "/subcontratos", label: "Subcontratos" },
+      { kind: "project", suffix: "/facturas-proveedor", label: "Facturas proveedor" },
+    ],
+    stepsTitle: "Cómo elegir",
+    steps: [
+      "¿Hay faltante de un insumo APU de materiales? → Operación → Materiales → Pedir → SC→OC→recepción→factura.",
+      "¿Cuadrilla, jornal o mano de obra tipada sin paquete contractual? → Mano de obra → Pedir o Factura tipada LAB.",
+      "¿Alquiler / equipo tipado? → Equipos → Pedir o Factura tipada EQP.",
+      "¿Paquete con contrato y certificaciones? → Compras → Subcontratos (no uses Pedir del tablero APU).",
+      "¿Gasto chico, reintegro o tipado sin OC? → Facturas proveedor → Costo directo (partida EDT + tipo de costo). No baja el comprometido de una OC.",
+    ],
+    effects: [
+      "Materiales / MO / Equipos / Subcontrato / costo directo impactan EDT por tipo de costo.",
+      "Solo confirmar OC o activar subcontrato abre Comprometido; emitir factura (o aprobar cert) abre Devengado + CxP.",
+    ],
+    figure: {
+      src: "/help/mapa-flujo-egresos-obra-comparacion.png",
+      alt: "Bloqer — Cinco caminos de egreso en obra",
+      caption:
+        "Compará Materiales, Mano de obra, Equipos, Subcontrato y gasto directo (factura sin OC).",
+    },
+    pitfalls: [
+      "Cuadrilla sin contrato de subcontrato no va a Subcontratos: usá Mano de obra.",
+      "Gasto de empresa (sin obra / sin EDT) es otro caminito: Facturas y gastos corporativos.",
+      "Costo directo no reduce el comprometido de una OC.",
+    ],
+    relatedSlugs: [
+      "circuito-comprar-material-hasta-pagarlo",
+      "tablero-materiales",
+      "tablero-mano-obra",
+      "tablero-equipos",
+      "certificar-y-pagar-subcontrato",
+      "gasto-de-obra-sin-oc",
+      "leer-edt-y-costos",
+      "afectaciones-comprometido-devengado-pagado",
+    ],
+    keywords: [
+      "caminito",
+      "comparar caminos",
+      "egreso de obra",
+      "materiales vs mano de obra",
+      "subcontrato o factura",
+      "gasto directo",
+      "costo directo",
+      "cinco caminos",
+      "mapa egresos",
+      "qué camino usar",
+      "elegir flujo",
+    ],
+    guideRef: "§9.0 · §9.0.1 · §9.0.2 · §10 · §12.2",
+  },
   {
     slug: "circuito-comprar-material-hasta-pagarlo",
     title: "Circuito: comprar material hasta pagarlo",
@@ -562,6 +631,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
         "El caminito: qué sigue si sí y qué pasa si no. La lámina con roles y detalle está en Ayuda → Mapas de proceso.",
     },
     relatedSlugs: [
+      "elegir-camino-egreso-obra",
       "pedir-material-desde-faltante",
       "tablero-materiales",
       "solicitud-de-compra",

@@ -49,6 +49,8 @@ import type { IncomeExpenseFilters } from "../reports/project-income-expense.ser
 import { getProjectIncomeExpenseReport } from "../reports/project-income-expense.service";
 import type { ProfitabilityFilters } from "../reports/project-profitability.service";
 import { getProjectProfitabilityReport } from "../reports/project-profitability.service";
+import type { ProjectGgOverviewFilters } from "../reports/project-gg-overview.service";
+import { getProjectGgOverviewReport } from "../reports/project-gg-overview.service";
 import { parseCurrencyView } from "../reports/report-currency-view";
 import { MAX_EXPORT_ROWS, defaultDateRangeDays, DEFAULT_CASH_DATE_RANGE_DAYS } from "../finance/pagination";
 import { listCompanyPayables, type CompanyPayableListFilters } from "../ap/payable.service";
@@ -1408,6 +1410,91 @@ export async function exportProjectProfitabilityCsv(
     }
   }
   const fname = `rentabilidad_${projectId}_${report.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
+  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+}
+
+export async function exportProjectGgOverviewCsv(
+  projectId: string,
+  filters: ProjectGgOverviewFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
+  const report = await getProjectGgOverviewReport(projectId, filters, ctx);
+  if (report.type === "NO_APPROVED_BUDGETS") {
+    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar GG de obra");
+  }
+  if (report.type === "BUDGET_SELECTION_REQUIRED") {
+    throw new ServiceError("CONFLICT", "Elegí un presupuesto para exportar GG de obra");
+  }
+  const s = report.summary;
+  const headers = ["Seccion", "Codigo", "Nombre", "TipoDoc", "Documento", "Proveedor", "Monto", "Moneda"];
+  const rows: string[][] = [
+    ["Resumen", "", "Presupuesto GG", "", "", "", s.budgetedGg, report.currency],
+    ["Resumen", "", "Devengado partidas GG", "", "", "", s.accruedOnGgPartidas, report.currency],
+    ["Resumen", "", "Comprometido abierto partidas GG", "", "", "", s.openCommittedOnGgPartidas, report.currency],
+    ["Resumen", "", "Sin EDT comprometido", "", "", "", s.unallocatedCommitted, report.currency],
+    ["Resumen", "", "Sin EDT devengado", "", "", "", s.unallocatedAccrued, report.currency],
+    [
+      "Resumen",
+      "",
+      "GG empresa imputados",
+      "",
+      "",
+      "",
+      !s.companyOverheadVisible
+        ? "(oculto)"
+        : s.companyOverhead != null
+          ? s.companyOverhead
+          : "0.00",
+      report.currency,
+    ],
+    [
+      "Resumen",
+      "",
+      "GG empresa incluido en total gastado",
+      "",
+      "",
+      "",
+      s.companyOverheadIncludedInSpent ? "si" : "no",
+      "",
+    ],
+    ["Resumen", "", "Total gastado", "", "", "", s.spentTotal, report.currency],
+    ["Resumen", "", "Restante vs presupuesto", "", "", "", s.remainingVsBudget, report.currency],
+    ["Resumen", "", "% gastado / presupuesto", "", "", "", s.spentPctOfBudget ?? "", "%"],
+  ];
+  for (const note of report.notes) {
+    rows.push(["Nota", "", note, "", "", "", "", ""]);
+  }
+  for (const w of report.warnings) {
+    rows.push(["Aviso", "", w, "", "", "", "", ""]);
+  }
+  for (const p of report.ggPartidas) {
+    rows.push([
+      "PartidaGG",
+      p.wbsCode,
+      p.wbsName,
+      "",
+      "",
+      "",
+      "",
+      report.currency,
+    ]);
+    rows.push(["PartidaGG_presupuesto", p.wbsCode, p.wbsName, "", "", "", p.budgetTotalCost, report.currency]);
+    rows.push(["PartidaGG_devengado", p.wbsCode, p.wbsName, "", "", "", p.accruedCost, report.currency]);
+    rows.push(["PartidaGG_comprom_abierto", p.wbsCode, p.wbsName, "", "", "", p.openCommittedCost, report.currency]);
+  }
+  for (const d of report.unallocatedDocuments) {
+    rows.push([
+      "SinEDT",
+      "",
+      d.description,
+      d.documentType,
+      d.documentCode,
+      d.supplierName,
+      d.amount,
+      report.currency,
+    ]);
+  }
+  const fname = `gg_obra_${projectId}_${report.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
   return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
 }
 

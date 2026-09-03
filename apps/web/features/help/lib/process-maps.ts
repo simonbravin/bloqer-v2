@@ -57,6 +57,16 @@ export const HELP_PROCESS_MAPS: readonly HelpProcessMap[] = [
     guideRef: "§9.0.1 · §9.0.2",
   },
   {
+    id: "egresos-obra-comparacion",
+    kind: "flow",
+    level: "project",
+    title: "Cinco caminos de egreso en obra",
+    summary: "Materiales, MO, equipos, subcontrato y gasto directo comparados.",
+    articleSlug: "elegir-camino-egreso-obra",
+    imageSrc: "/help/mapa-flujo-egresos-obra-comparacion.png",
+    guideRef: "§9.0 · §10 · §12.2",
+  },
+  {
     id: "desvio-oc-si-no",
     kind: "flow",
     level: "project",

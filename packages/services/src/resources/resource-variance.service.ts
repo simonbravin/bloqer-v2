@@ -37,6 +37,7 @@ export type ResourceVarianceReport = {
   projectId: string;
   budgetId: string;
   budgetName: string;
+  currency: string;
   byWbs: ResourceWbsVarianceRow[];
   totals: {
     budgetCost: string;
@@ -209,6 +210,7 @@ export async function getResourceVarianceReport(
     projectId,
     budgetId: budget.id,
     budgetName: budget.name,
+    currency: budget.currency,
     byWbs,
     totals: {
       budgetCost: serializeMoneyDecimal(totBudget),
