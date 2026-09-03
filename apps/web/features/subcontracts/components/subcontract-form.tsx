@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { Paperclip, X } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -75,6 +76,8 @@ export function SubcontractForm({
   const [currency, setCurrency] = useState(defaultValues?.currency ?? "ARS");
   const [error, setError]                 = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
+  const [attachments, setAttachments]     = useState<File[]>([]);
+  const fileInputRef                      = useRef<HTMLInputElement>(null);
   const appliedInitialWbs = useRef(false);
   const wbsComboboxOptions = useMemo(
     () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin EDT" }),
@@ -144,6 +147,21 @@ export function SubcontractForm({
     "0",
   );
 
+  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    setAttachments((prev) => {
+      const existing = new Set(prev.map((f) => `${f.name}-${f.size}`));
+      const deduped = picked.filter((f) => !existing.has(`${f.name}-${f.size}`));
+      return [...prev, ...deduped];
+    });
+    // Reset so the same file can be re-picked if removed
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function removeAttachment(idx: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
@@ -166,6 +184,8 @@ export function SubcontractForm({
       unitPrice:   l.unitPrice,
       notes:       l.notes || null,
     }))));
+    // Attach files so the server action can upload them after creating the subcontract
+    attachments.forEach((file) => fd.append("attachments", file));
     const res = await action(fd);
     setPending(false);
     if ("error" in res) { setError(res.error ?? null); return; }
@@ -312,6 +332,62 @@ export function SubcontractForm({
               </TableFooter>
             </Table>
         </TableScroll>
+      </div>
+
+      {/* Attachments (optional, uploaded after creation) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-medium">Adjuntos</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Opcional — podés adjuntar el contrato firmado u otros documentos.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="mr-1.5 h-3.5 w-3.5" />
+            Adjuntar
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.docx,.doc,.xlsx,.xls,.csv,.txt"
+            className="hidden"
+            onChange={handleFilePick}
+          />
+        </div>
+
+        {attachments.length > 0 && (
+          <ul className="space-y-1.5">
+            {attachments.map((file, idx) => (
+              <li
+                key={idx}
+                className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm"
+              >
+                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {file.size < 1024 * 1024
+                    ? `${(file.size / 1024).toFixed(1)} KB`
+                    : `${(file.size / (1024 * 1024)).toFixed(1)} MB`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeAttachment(idx)}
+                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
+                  aria-label={`Quitar ${file.name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="flex gap-2 justify-end">

@@ -13,6 +13,7 @@ import {
   approveSubcontractCertification,
   rejectSubcontractCertification,
   cancelSubcontractCertification,
+  uploadDocument,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -22,10 +23,12 @@ import {
   createSubcontractCertificationSchema,
   updateSubcontractCertificationSchema,
 } from "@bloqer/validators";
+import { resolveAllowedMimeType } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect }       from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { randomUUID } from "crypto";
 
 async function getCtx() {
   const current = await getCurrentUser();
@@ -69,6 +72,33 @@ export async function createSubcontractAction(
     const result = await createSubcontract(parsed.data, ctx);
     revalidatePath(`/proyectos/${parsed.data.projectId}/subcontratos`);
     revalidateProjectCostAndFinancePaths(parsed.data.projectId);
+
+    // Upload any attachments provided at creation time (best-effort; failures are non-blocking)
+    const files = fd.getAll("attachments").filter((v): v is File => v instanceof File && v.size > 0);
+    for (const file of files) {
+      try {
+        const mimeType = resolveAllowedMimeType(file.name, file.type);
+        if (!mimeType) continue; // skip unsupported types silently
+        const buffer = Buffer.from(await file.arrayBuffer());
+        await uploadDocument(
+          {
+            projectId:       parsed.data.projectId,
+            originalFileName: file.name,
+            mimeType,
+            sizeBytes:       file.size,
+            category:        "CONTRACT",
+            linkedEntityType: "SUBCONTRACT",
+            linkedEntityId:  result.id,
+            idempotencyKey:  randomUUID(),
+          },
+          buffer,
+          ctx,
+        );
+      } catch {
+        // Non-blocking: subcontract was already created; doc upload failure is recoverable
+      }
+    }
+
     return { id: result.id };
   } catch (err) { return handle(err); }
 }
