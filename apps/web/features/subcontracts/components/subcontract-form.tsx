@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Paperclip, X } from "lucide-react";
 import { Button }   from "@/components/ui/button";
 import { Input }    from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -27,13 +26,12 @@ import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@blo
 import type { WbsSubcontractBudgetHint } from "@bloqer/services";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { SubcontractBudgetHints } from "./subcontract-budget-hints";
+import { DocumentUploadZone } from "@/features/documents";
 import {
-  CREATE_ATTACHMENT_TOTAL_MB,
   MAX_CREATE_ATTACHMENT_FILES,
   MAX_CREATE_ATTACHMENT_TOTAL_BYTES,
   createAttachmentLimitHint,
 } from "../lib/create-attachment-limits";
-import { resolveAllowedMimeType } from "@bloqer/validators";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
 export type WbsOption           = { id: string; code: string; name: string; unit: string };
@@ -60,6 +58,7 @@ type Props = {
   action: (fd: FormData) => Promise<{ error: string } | { id: string; attachmentWarning?: string }>;
   /** Only on create: edit uses the detail Adjuntos panel. */
   allowAttachments?: boolean;
+  storageConfigured?: boolean;
   defaultValues?: {
     subcontractorContactId: string;
     title:       string;
@@ -78,6 +77,7 @@ type Props = {
 export function SubcontractForm({
   projectId, companyId, subcontractorOptions, wbsOptions, budgetHints, initialWbsNodeId, action,
   defaultValues, submitLabel = "Crear subcontrato", allowAttachments = false,
+  storageConfigured = false,
 }: Props) {
   const router = useRouter();
   const [lines, setLines]                 = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
@@ -87,7 +87,6 @@ export function SubcontractForm({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [pending, setPending]             = useState(false);
   const [attachments, setAttachments]     = useState<File[]>([]);
-  const fileInputRef                      = useRef<HTMLInputElement>(null);
   const appliedInitialWbs = useRef(false);
   const wbsComboboxOptions = useMemo(
     () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin EDT" }),
@@ -156,49 +155,6 @@ export function SubcontractForm({
     (sum, l) => addDecimal(sum, previewLineMoney(l.quantity, l.unitPrice)),
     "0",
   );
-
-  function formatFileSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (picked.length === 0) return;
-
-    const existing = new Set(attachments.map((f) => `${f.name}-${f.size}-${f.lastModified}`));
-    const next = [...attachments];
-    const rejected: string[] = [];
-    for (const file of picked) {
-      if (existing.has(`${file.name}-${file.size}-${file.lastModified}`)) continue;
-      if (file.size <= 0) {
-        rejected.push(`${file.name}: archivo vacío`);
-        continue;
-      }
-      if (!resolveAllowedMimeType(file.name, file.type)) {
-        rejected.push(`${file.name}: tipo no permitido`);
-        continue;
-      }
-      if (next.length >= MAX_CREATE_ATTACHMENT_FILES) {
-        rejected.push(`${file.name}: máximo ${MAX_CREATE_ATTACHMENT_FILES} archivos`);
-        continue;
-      }
-      const total = next.reduce((sum, f) => sum + f.size, 0) + file.size;
-      if (total > MAX_CREATE_ATTACHMENT_TOTAL_BYTES) {
-        rejected.push(`${file.name}: el conjunto supera ${CREATE_ATTACHMENT_TOTAL_MB} MB`);
-        continue;
-      }
-      next.push(file);
-    }
-    setAttachments(next);
-    setAttachmentError(rejected.length > 0 ? rejected.join(". ") : null);
-  }
-
-  function removeAttachment(idx: number) {
-    setAttachments((prev) => prev.filter((_, i) => i !== idx));
-  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -392,65 +348,25 @@ export function SubcontractForm({
         </TableScroll>
       </div>
 
-      {allowAttachments ? (
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-medium">Adjuntos</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Opcional — contrato firmado u otros documentos ({createAttachmentLimitHint()}).
-            </p>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={pending}
-          >
-            <Paperclip className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-            Adjuntar
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
+      {allowAttachments && storageConfigured ? (
+        <div className="space-y-2">
+          <Label>Adjuntos (opcional)</Label>
+          <p className="text-xs text-muted-foreground">
+            Contrato firmado u otros documentos. Se adjuntan después de crear el subcontrato ({createAttachmentLimitHint()}).
+          </p>
+          <DocumentUploadZone
             multiple
-            accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.docx,.doc,.xlsx,.xls,.csv,.txt"
-            className="sr-only"
-            onChange={handleFilePick}
-            aria-label="Seleccionar archivos para adjuntar"
+            selectedFiles={attachments}
+            onFilesChange={setAttachments}
+            maxFiles={MAX_CREATE_ATTACHMENT_FILES}
+            maxTotalBytes={MAX_CREATE_ATTACHMENT_TOTAL_BYTES}
+            onValidationError={setAttachmentError}
+            disabled={pending}
           />
+          {attachmentError ? (
+            <p role="alert" className="text-sm text-destructive">{attachmentError}</p>
+          ) : null}
         </div>
-
-        {attachmentError ? (
-          <p role="alert" className="text-sm text-destructive">{attachmentError}</p>
-        ) : null}
-
-        {attachments.length > 0 && (
-          <ul className="space-y-1.5">
-            {attachments.map((file, idx) => (
-              <li
-                key={`${file.name}-${file.size}-${file.lastModified}`}
-                className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 text-sm"
-              >
-                <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {formatFileSize(file.size)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(idx)}
-                  className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive"
-                  aria-label={`Quitar ${file.name}`}
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
       ) : null}
 
       <div className="flex gap-2 justify-end">

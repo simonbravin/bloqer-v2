@@ -9,6 +9,7 @@ import {
 import { SubcontractForm } from "@/features/subcontracts";
 import { createSubcontractAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
+import { isStorageConfigured } from "@bloqer/config";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -80,6 +81,7 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
             initialWbsNodeId={sp.wbsNodeId}
             action={createSubcontractAction}
             allowAttachments
+            storageConfigured={isStorageConfigured()}
           />
         </div>
       ) : null}

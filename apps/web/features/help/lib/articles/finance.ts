@@ -15,7 +15,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Prerrequisito: contacto con rol Subcontratista.",
       "Compras → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
       "Alcance e imputación: cada línea con partida EDT (obligatoria antes de aprobar certificaciones).",
-      "Opcional: Adjuntar el contrato u otros documentos (máx. 8 archivos, 45 MB en total). Después también desde el detalle → Adjuntos.",
+      "Opcional: Adjuntos — arrastrá, Seleccionar archivo o Tomar foto (máx. 8 archivos, 45 MB). Después también desde el detalle → Adjuntos.",
     ],
     pitfalls: [
       "Si un adjunto no se sube, el subcontrato igual queda creado: reintentá en el detalle.",
