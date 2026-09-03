@@ -791,7 +791,8 @@ flowchart LR
 
 1. **Agregar documento** sube el archivo a la biblioteca de la obra.
 2. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo en una pestaña nueva (PDF e imágenes) y el icono de descarga **baja** el archivo. El nombre abre el detalle.
-3. En los adjuntos de una ficha (parte de libro de obra, OC, factura, etc.) hay también iconos de **Archivar** (caja) y **Eliminar** (tacho). Archivar y eliminar piden confirmación antes de ejecutarse. El mismo par Ver/Descargar aparece en las tarjetas y en el detalle del documento.
+3. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.
+4. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar aparece en las tarjetas y en el detalle del documento.
 
 <!-- capture:23 parte-de-obra-detalle -->
 ![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)

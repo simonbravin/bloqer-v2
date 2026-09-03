@@ -59,22 +59,30 @@ function getAttachmentMutations(
 ): AttachmentMutations {
   if (!doc.canMutate) return {};
   const { isCompany, projectId, revalidateExtra } = opts;
+  const cancelUpload =
+    doc.status === "UPLOADING"
+      ? isCompany
+        ? () => softDeleteCompanyFinanzasAttachmentAction(doc.id, revalidateExtra)
+        : projectId
+          ? () =>
+              softDeleteDocumentAction(doc.id, projectId, {
+                extraPathsToRevalidate: revalidateExtra,
+                redirectToProjectDocuments: false,
+              })
+          : undefined
+      : undefined;
   if (isCompany) {
     return {
       onArchive: () => archiveCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
       onRestore: () => restoreCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
-      onDelete: () => softDeleteCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
+      onDelete: cancelUpload,
     };
   }
   if (!projectId) return {};
   return {
     onArchive: () => archiveDocumentAction(doc.id, projectId, revalidateExtra),
     onRestore: () => restoreDocumentAction(doc.id, projectId, revalidateExtra),
-    onDelete: () =>
-      softDeleteDocumentAction(doc.id, projectId, {
-        extraPathsToRevalidate: revalidateExtra,
-        redirectToProjectDocuments: false,
-      }),
+    onDelete: cancelUpload,
   };
 }
 
@@ -100,6 +108,7 @@ function AttachmentActionsRow({
         fileName={doc.originalFileName}
         status={doc.status}
         canMutate={doc.canMutate}
+        canDelete={doc.canDelete}
         onArchive={mutations.onArchive}
         onRestore={mutations.onRestore}
         onDelete={mutations.onDelete}

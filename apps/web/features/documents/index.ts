@@ -13,6 +13,7 @@ export type {
   EntityDocumentsPanelScope,
 } from "./components/entity-documents-panel";
 export { DocumentFileActions } from "./components/document-file-actions";
+export { DocumentLibraryActions } from "./components/document-library-actions";
 export { DocumentMutateIconActions } from "./components/document-mutate-icon-actions";
 export { DocumentThumbnail } from "./components/document-thumbnail";
 export { DocumentInlineImagePreview } from "./components/document-inline-image-preview";

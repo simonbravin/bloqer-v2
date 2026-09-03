@@ -45,6 +45,16 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 import { assertUploadContentMatchesDeclaredMime } from "./sniff-upload-content";
+import {
+  canSoftDeleteDocumentByLink,
+  LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE,
+} from "./document-delete-policy";
+
+export {
+  canSoftDeleteDocumentByLink,
+  isStandaloneProjectDocument,
+  LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE,
+} from "./document-delete-policy";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 
@@ -76,6 +86,11 @@ export type DocumentAttachmentView = {
   updatedAt:        string;
   /** Server-computed: archive/restore/delete/confirm allowed for this row given `linkedEntityType` + roles. */
   canMutate:        boolean;
+  /**
+   * Soft-delete (or cancel UPLOADING). Library docs (`PROJECT`) only;
+   * attachments of invoices / quotes / jobsite logs stay as evidence.
+   */
+  canDelete:        boolean;
   /** When present, the tenant has this module disabled; reads/downloads remain allowed; `canMutate` is false. */
   disabledLinkedModule?: PermissionModule;
 };
@@ -749,6 +764,9 @@ export async function softDeleteDocument(id: string, ctx: ServiceContext): Promi
   const gate = await getTenantModuleGate(ctx);
   const doc = await getOwned(id, ctx, gate);
   if (doc.status === "DELETED") throw new ServiceError("CONFLICT", "El documento ya está eliminado");
+  if (!canSoftDeleteDocumentByLink({ status: doc.status, linkedEntityType: doc.linkedEntityType })) {
+    throw new ServiceError("FORBIDDEN", LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE);
+  }
 
   const flipped = await prisma.documentAttachment.updateMany({
     where: { id, tenantId: ctx.tenantId, status: { not: "DELETED" } },
@@ -1376,6 +1394,7 @@ function serialize(
 ): DocumentAttachmentView {
   const mod = linkedEntityTypeToPermissionModule(doc.linkedEntityType);
   const moduleDisabled = !gate.isEnabled(mod);
+  const canMutate = canMutateDocumentByLink(doc.linkedEntityType, ctx) && !moduleDisabled;
   return {
     id:               doc.id,
     tenantId:         doc.tenantId,
@@ -1394,7 +1413,13 @@ function serialize(
     uploadedBy:       doc.uploadedBy,
     createdAt:        doc.createdAt.toISOString(),
     updatedAt:        doc.updatedAt.toISOString(),
-    canMutate:        canMutateDocumentByLink(doc.linkedEntityType, ctx) && !moduleDisabled,
+    canMutate,
+    canDelete:
+      canMutate &&
+      canSoftDeleteDocumentByLink({
+        status: doc.status,
+        linkedEntityType: doc.linkedEntityType,
+      }),
     ...(moduleDisabled ? { disabledLinkedModule: mod } : {}),
   };
 }

@@ -91,6 +91,8 @@ export function DocumentMutateIconActions({
   fileName,
   status,
   canMutate,
+  canDelete = false,
+  deleteBlockedReason,
   onArchive,
   onRestore,
   onDelete,
@@ -98,6 +100,9 @@ export function DocumentMutateIconActions({
   fileName: string;
   status: string;
   canMutate: boolean;
+  /** Soft-delete / cancel upload. Must be explicit; omit = no tacho. */
+  canDelete?: boolean;
+  deleteBlockedReason?: string;
   onArchive?: () => Promise<void>;
   onRestore?: () => Promise<void>;
   onDelete?: () => Promise<void>;
@@ -105,8 +110,9 @@ export function DocumentMutateIconActions({
   if (!canMutate) return null;
 
   const quoted = `«${fileName}»`;
+  const deleteHandler = canDelete ? onDelete : undefined;
 
-  if (status === "UPLOADING" && onDelete) {
+  if (status === "UPLOADING" && deleteHandler) {
     return (
       <ConfirmIconButton
         label="Cancelar subida"
@@ -115,7 +121,7 @@ export function DocumentMutateIconActions({
         confirmLabel="Cancelar subida"
         destructive
         icon={<CircleX className={iconSvg} aria-hidden />}
-        onConfirm={onDelete}
+        onConfirm={deleteHandler}
       />
     );
   }
@@ -150,16 +156,30 @@ export function DocumentMutateIconActions({
           <ArchiveRestore className={iconSvg} aria-hidden />
         </Button>
       ) : null}
-      {status !== "DELETED" && status !== "UPLOADING" && onDelete ? (
+      {status !== "DELETED" && status !== "UPLOADING" && deleteHandler ? (
         <ConfirmIconButton
           label="Eliminar"
           title="¿Eliminar este archivo?"
-          description={`${quoted} se quita de los adjuntos.`}
+          description={`${quoted} se quita de Documentos. Subí la versión nueva antes si la necesitás.`}
           confirmLabel="Eliminar"
           destructive
           icon={<Trash2 className={iconSvg} aria-hidden />}
-          onConfirm={onDelete}
+          onConfirm={deleteHandler}
         />
+      ) : null}
+      {status !== "DELETED" && status !== "UPLOADING" && !deleteHandler && deleteBlockedReason ? (
+        <span className="inline-flex" title={deleteBlockedReason}>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className={cn(iconBtn, "text-muted-foreground")}
+            disabled
+            aria-label={deleteBlockedReason}
+          >
+            <Trash2 className={iconSvg} aria-hidden />
+          </Button>
+        </span>
       ) : null}
     </>
   );

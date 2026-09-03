@@ -108,6 +108,7 @@ test("new concept/report articles are findable", () => {
     { q: "cinco caminos", expectSlugIncludes: "elegir-camino" },
     { q: "materiales vs mano de obra", expectSlugIncludes: "elegir-camino" },
     { q: "justificacion desvio", expectSlugIncludes: "orden-de-compra" },
+    { q: "borrar plano", expectSlugIncludes: "eliminar-documento" },
   ];
   for (const c of cases) {
     const hits = searchHelpArticles(HELP_ARTICLES, { query: c.q });

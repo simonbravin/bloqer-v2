@@ -5,7 +5,7 @@ import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
 import { DocumentStorageBadge } from "./document-storage-badge";
-import { DocumentFileActions } from "./document-file-actions";
+import { DocumentLibraryActions } from "./document-library-actions";
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -52,14 +52,7 @@ export function DocumentCards({
             {fmtSize(doc.sizeBytes)} · {formatDate(doc.createdAt)}
           </p>
           <div className="mt-3">
-            <DocumentFileActions
-              documentId={doc.id}
-              mimeType={doc.mimeType}
-              originalFileName={doc.originalFileName}
-              storageProvider={doc.storageProvider}
-              status={doc.status}
-              className="justify-start"
-            />
+            <DocumentLibraryActions doc={doc} projectId={projectId} className="justify-start" />
           </div>
         </div>
       ))}

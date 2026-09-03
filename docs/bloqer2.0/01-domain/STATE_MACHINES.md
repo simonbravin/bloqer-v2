@@ -868,6 +868,7 @@ stateDiagram-v2
 
 - `DELETED` conserva trazabilidad; el binario puede mantenerse por retención legal.
 - Comprobantes fiscales: preferir `ARCHIVED` antes que `DELETED`.
+- Baja lógica iniciada por el usuario: solo biblioteca de obra (`linkedEntityType = PROJECT`). Los adjuntos de entidades operativas se archivan ([D-111](../00-product/DECISION_LOG.md#d-111--eliminar-solo-documentos-de-biblioteca-no-adjuntos-operativos)).
 
 ### 26.2 `DocumentVersion.status`
 

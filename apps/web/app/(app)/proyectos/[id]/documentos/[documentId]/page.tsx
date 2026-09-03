@@ -6,16 +6,15 @@ import {
   DocumentCategoryBadge,
   DocumentStatusBadge,
   DocumentStorageBadge,
-  DocumentFileActions,
+  DocumentLibraryActions,
   DocumentInlineImagePreview,
 } from "@/features/documents";
 import {
   canInlineImagePreview,
   canAccessDocumentFile,
 } from "@/features/documents/lib/document-file-utils";
+import { linkedEntityTypeLabelEs } from "@/features/documents/lib/linked-entity-label";
 import { PageShell } from "@/components/layout/page-shell";
-import { archiveDocumentAction, restoreDocumentAction, softDeleteDocumentAction } from "../actions";
-import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; documentId: string }>;
@@ -52,23 +51,13 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
   }
 
   if (doc.projectId !== id) notFound();
+  if (doc.status === "DELETED") notFound();
 
   const canAccess = canAccessDocumentFile(doc);
   const showInlineImage =
     canAccess && canInlineImagePreview(doc.mimeType, doc.originalFileName);
 
-  const doArchive = async () => {
-    "use server";
-    await archiveDocumentAction(documentId, id);
-  };
-  const doRestore = async () => {
-    "use server";
-    await restoreDocumentAction(documentId, id);
-  };
-  const doDelete = async () => {
-    "use server";
-    await softDeleteDocumentAction(documentId, id);
-  };
+  const linkedLabel = linkedEntityTypeLabelEs(doc.linkedEntityType);
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={doc.originalFileName}>
@@ -79,44 +68,21 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           </h1>
           <DocumentStorageBadge storageProvider={doc.storageProvider} />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <DocumentFileActions
-            documentId={documentId}
-            mimeType={doc.mimeType}
-            originalFileName={doc.originalFileName}
-            storageProvider={doc.storageProvider}
-            status={doc.status}
-          />
-          {doc.canMutate && doc.status === "ACTIVE" && (
-            <form action={doArchive}>
-              <Button variant="outline" size="sm" type="submit">
-                Archivar
-              </Button>
-            </form>
-          )}
-          {doc.canMutate && doc.status === "ARCHIVED" && (
-            <form action={doRestore}>
-              <Button variant="outline" size="sm" type="submit">
-                Restaurar
-              </Button>
-            </form>
-          )}
-          {doc.canMutate && doc.status === "UPLOADING" && (
-            <form action={doDelete}>
-              <Button variant="ghost" size="sm" type="submit" className="text-destructive">
-                Cancelar subida
-              </Button>
-            </form>
-          )}
-          {doc.canMutate && doc.status !== "DELETED" && doc.status !== "UPLOADING" && (
-            <form action={doDelete}>
-              <Button variant="ghost" size="sm" type="submit" className="text-muted-foreground">
-                Eliminar
-              </Button>
-            </form>
-          )}
-        </div>
+        <DocumentLibraryActions doc={doc} projectId={id} redirectAfterDelete />
       </div>
+
+      {doc.canMutate &&
+      linkedLabel &&
+      !doc.canDelete &&
+      doc.status !== "UPLOADING" ? (
+        <div
+          role="note"
+          className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground"
+        >
+          Este archivo está ligado a {linkedLabel}: no se puede eliminar (es respaldo). Si no
+          querés verlo en la lista, archiválo.
+        </div>
+      ) : null}
 
       {doc.status === "UPLOADING" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
@@ -168,6 +134,12 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
               <DocumentCategoryBadge category={doc.category} />
             </dd>
           </div>
+          {linkedLabel ? (
+            <div>
+              <dt className="text-muted-foreground">Vinculado a</dt>
+              <dd className="font-medium">{linkedLabel}</dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-muted-foreground">Tipo MIME</dt>
             <dd className="font-mono text-xs">{doc.mimeType}</dd>

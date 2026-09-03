@@ -1709,6 +1709,22 @@
 
 ---
 
+### D-111 — Eliminar solo documentos de biblioteca (no adjuntos operativos)
+
+- **Fecha:** 2026-09-03
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** La biblioteca de obra mezcla planos sueltos con PDFs ligados a factura, libro de obra, cotización, etc. Sin versionado ([Q-008]), al actualizar un plano conviene quitar la versión vieja. Los adjuntos de comprobantes son respaldo y no deben borrarse.
+- **Decisión:**
+  1. Soft-delete (`DELETED`) **solo** si `linkedEntityType` es `PROJECT` (o null legado) — p. ej. planos subidos en Operación → Documentos.
+  2. Adjuntos de factura, cotización, libro de obra, OC, recepción, SC, certificación, presupuesto o subcontrato: **no se eliminan**. Se archivan.
+  3. Cancelar una subida `UPLOADING` abandonada sigue permitido en cualquier vínculo.
+  4. Borrado físico de R2 no cambia: la baja es lógica.
+- **Implicancias:** `canDelete` en el DTO; tacho en el listado de Documentos; el panel de adjuntos de ficha pierde Eliminar (queda Archivar).
+- **Documentos afectados:** [`02-modules/DOCUMENTS.md`](../02-modules/DOCUMENTS.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §26, [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §8.4, help `ver-y-descargar-documento` / `eliminar-documento-de-obra`.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
