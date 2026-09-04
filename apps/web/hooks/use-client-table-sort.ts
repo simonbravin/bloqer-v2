@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { sortRowsByAccessor, type SortDir } from "./client-table-sort";
 
-export type SortDir = "asc" | "desc";
+export type { SortDir } from "./client-table-sort";
 
 export function useClientTableSort<T>(
   rows: T[],
@@ -14,17 +15,7 @@ export function useClientTableSort<T>(
 
   const sorted = useMemo(() => {
     if (!sortKey || !accessors[sortKey]) return rows;
-    const acc = accessors[sortKey]!;
-    const copy = [...rows];
-    copy.sort((a, b) => {
-      const av = acc(a);
-      const bv = acc(b);
-      const as = av == null ? "" : String(av);
-      const bs = bv == null ? "" : String(bv);
-      const cmp = as.localeCompare(bs, "es", { numeric: true, sensitivity: "base" });
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return copy;
+    return sortRowsByAccessor(rows, accessors[sortKey]!, sortDir);
   }, [rows, sortKey, sortDir, accessors]);
 
   function toggleSort(key: string) {

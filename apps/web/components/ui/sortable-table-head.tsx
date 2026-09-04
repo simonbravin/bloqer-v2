@@ -12,6 +12,7 @@ export function SortableTableHead({
   sortDir,
   onSort,
   className,
+  align = "left",
 }: {
   label: string;
   sortKey: string;
@@ -19,12 +20,23 @@ export function SortableTableHead({
   sortDir: SortDir;
   onSort: (key: string) => void;
   className?: string;
+  /** Prefer this over stuffing `text-right` into className for amount columns. */
+  align?: "left" | "right";
 }) {
   const active = activeKey === sortKey;
   const Icon = !active ? ArrowUpDown : sortDir === "asc" ? ArrowUp : ArrowDown;
+  const right =
+    align === "right" || Boolean(className?.includes("text-right"));
+  const ariaSort = active ? (sortDir === "asc" ? "ascending" : "descending") : "none";
+  const ariaLabel = active
+    ? `Ordenar por ${label}, actualmente ${sortDir === "asc" ? "ascendente" : "descendente"}`
+    : `Ordenar por ${label}`;
 
   return (
-    <TableHead className={className}>
+    <TableHead
+      className={cn(className, right && "text-right")}
+      aria-sort={ariaSort}
+    >
       <button
         type="button"
         className={cn(
@@ -32,7 +44,7 @@ export function SortableTableHead({
           active ? "text-foreground" : "text-muted-foreground",
         )}
         onClick={() => onSort(sortKey)}
-        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        aria-label={ariaLabel}
       >
         {label}
         <Icon className="size-3.5 shrink-0 opacity-70" aria-hidden />

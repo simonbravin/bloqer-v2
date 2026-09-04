@@ -173,7 +173,7 @@ export function PurchaseRequestListFilters({
           />
           <Input
             aria-label="Buscar solicitudes de compra"
-            placeholder="Buscar por código, descripción, WBS, proveedor o solicitante…"
+            placeholder="Buscar por código, descripción, EDT, proveedor o solicitante…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-8 pr-9"

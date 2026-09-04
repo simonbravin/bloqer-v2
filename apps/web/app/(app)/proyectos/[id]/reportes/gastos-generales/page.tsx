@@ -301,8 +301,9 @@ export default async function ReporteGastosGeneralesObraPage({ params, searchPar
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Documentos sin partida EDT</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Líneas de OC o factura de obra sin WBS. El Total gastado usa el devengado sin EDT de
-                EDT y costos (no la suma cruda de esta tabla: puede mezclar OC abierta + factura).
+                Líneas de OC o factura de obra sin partida EDT. El Total gastado usa el
+                devengado sin EDT de la pantalla EDT y costos (no la suma cruda de esta
+                tabla: puede mezclar OC abierta + factura).
               </p>
             </CardHeader>
             <CardContent>

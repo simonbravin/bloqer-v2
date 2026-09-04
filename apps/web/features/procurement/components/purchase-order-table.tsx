@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useMemo } from "react";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import {
@@ -13,6 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
+import { useClientTableSort } from "@/hooks/use-client-table-sort";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
 import { PurchaseOrderReceiptBadge } from "./purchase-order-receipt-badge";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +31,23 @@ export function PurchaseOrderTable({
   orders: PurchaseOrderListItem[];
   projectId: string;
 }) {
+  const accessors = useMemo(
+    () => ({
+      code: (o: PurchaseOrderListItem) => o.code,
+      amount: (o: PurchaseOrderListItem) => {
+        const n = Number(o.totalAmount);
+        return Number.isFinite(n) ? n : null;
+      },
+    }),
+    [],
+  );
+
+  const { sorted, sortKey, sortDir, toggleSort } = useClientTableSort(
+    orders,
+    accessors,
+    "code",
+  );
+
   if (orders.length === 0) {
     return <ListEmptyState message="No hay órdenes de compra registradas." />;
   }
@@ -35,18 +57,31 @@ export function PurchaseOrderTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Código</TableHead>
+            <SortableTableHead
+              label="Código"
+              sortKey="code"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
             <TableHead>Proveedor</TableHead>
             <TableHead>Emisión</TableHead>
             <TableHead>Entrega prevista</TableHead>
             <TableHead>Recepción</TableHead>
-            <TableHead className="text-right">Total</TableHead>
+            <SortableTableHead
+              align="right"
+              label="Total"
+              sortKey="amount"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
             <TableHead>Aprobado por</TableHead>
             <TableHead>Estado</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {orders.map((order) => (
+          {sorted.map((order) => (
             <TableRow key={order.id}>
               <TableCell className="font-mono text-sm">
                 <Link

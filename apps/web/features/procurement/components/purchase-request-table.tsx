@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import {
   Table,
   TableBody,
@@ -11,8 +13,10 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { SortableTableHead } from "@/components/ui/sortable-table-head";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { useClientTableSort } from "@/hooks/use-client-table-sort";
 import type { PurchaseRequestView } from "@bloqer/services";
 import { PurchaseRequestStatusBadge } from "./purchase-request-status-badge";
 import { purchaseRequestNeededByOverdueDays } from "../lib/purchase-delivery-overdue";
@@ -31,30 +35,61 @@ export function PurchaseRequestTable({
   projectId: string;
   emptyState: ReactNode;
 }) {
+  const accessors = useMemo(
+    () => ({
+      code: (pr: PurchaseRequestView) => pr.code,
+      amount: (pr: PurchaseRequestView) => {
+        if (pr.estimatedAmount == null || pr.estimatedAmount === "") return null;
+        const n = Number(pr.estimatedAmount);
+        return Number.isFinite(n) ? n : null;
+      },
+    }),
+    [],
+  );
+
+  const { sorted, sortKey, sortDir, toggleSort } = useClientTableSort(
+    requests,
+    accessors,
+    "code",
+  );
+
   return (
     <TableScroll>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Código</TableHead>
+            <SortableTableHead
+              label="Código"
+              sortKey="code"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
             <TableHead>Estado</TableHead>
             <TableHead>Descripción</TableHead>
-            <TableHead>WBS</TableHead>
-            <TableHead className="text-right">Monto est.</TableHead>
+            <TableHead>EDT</TableHead>
+            <SortableTableHead
+              align="right"
+              label="Monto est."
+              sortKey="amount"
+              activeKey={sortKey}
+              sortDir={sortDir}
+              onSort={toggleSort}
+            />
             <TableHead>Proveedor</TableHead>
             <TableHead>Necesaria para</TableHead>
             <TableHead className="text-right">Ver</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {requests.length === 0 ? (
+          {sorted.length === 0 ? (
             <TableRow>
               <TableCell colSpan={8} className="whitespace-normal p-0">
                 {emptyState}
               </TableCell>
             </TableRow>
           ) : (
-            requests.map((pr) => (
+            sorted.map((pr) => (
               <TableRow key={pr.id}>
                 <TableCell className="font-medium">{pr.code}</TableCell>
                 <TableCell>
@@ -126,7 +161,7 @@ export function PurchaseRequestTable({
                       );
                     })()
                   ) : (
-                    "—"
+                    <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right">
