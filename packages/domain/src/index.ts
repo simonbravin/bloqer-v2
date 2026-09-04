@@ -133,3 +133,16 @@ export {
   type FinancialDocumentClassCode,
   type FinancialDocumentClassFamily,
 } from "./finance/document-classification";
+
+export {
+  PURCHASE_ORDER_PROCESS_STEP_DEFS,
+  PURCHASE_REQUEST_PROCESS_STEP_DEFS,
+  buildPurchaseOrderProcessSteps,
+  buildPurchaseRequestProcessSteps,
+  type ProcessStep,
+  type ProcessStepState,
+  type PurchaseOrderProcessInput,
+  type PurchaseOrderProcessStatus,
+  type PurchaseRequestProcessInput,
+  type PurchaseRequestProcessStatus,
+} from "./procurement/process-steps";

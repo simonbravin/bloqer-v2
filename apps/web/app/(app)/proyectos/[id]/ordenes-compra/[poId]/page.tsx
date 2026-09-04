@@ -57,9 +57,12 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
+import { ProcessStepper } from "@/components/ui/process-stepper";
 import { ScrollToElement } from "@/components/navigation/scroll-to-element";
 import { ProcurementAmberCallout } from "@/features/procurement/components/procurement-amber-callout";
 import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
+import { purchaseOrderProcessSteps } from "@/features/procurement/lib/purchase-order-process-steps";
+import { compareDecimal } from "@bloqer/utils";
 import {
   submitPurchaseOrderAction,
   confirmPurchaseOrderAction,
@@ -192,6 +195,11 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const globalRefLines = order.lines.filter((l) => l.budgetRefKind === "GLOBAL_PARTIDA");
   const canCancel =
     !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
+  const hasIssuedInvoice = isPositiveMoneyAmount(billing.invoicedAmount);
+  const invoiceSettled = !isPositiveMoneyAmount(billing.pendingToInvoice);
+  const fullyPaid =
+    hasIssuedInvoice &&
+    compareDecimal(billing.paidAmount || "0", billing.invoicedAmount || "0") >= 0;
   const hasActions =
     (isDraft && canEditPo) ||
     (isSubmitted && (canApprovePo || showAuthorizeAndCommit)) ||
@@ -308,6 +316,20 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </div>
         ) : null}
       </div>
+
+      <ProcessStepper
+        aria-label="Progreso de la orden de compra"
+        steps={purchaseOrderProcessSteps({
+          status: order.status,
+          hasReceivedQuantity: billing.hasReceivedQuantity,
+          invoiceSettled,
+          hasIssuedInvoice,
+          fullyPaid,
+          approvedAt: order.approvedAt,
+          confirmedAt: order.confirmedAt,
+        })}
+      />
+
       {isApproved ? (
         <ProcurementAmberCallout className="hidden md:block">
           Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.

@@ -33,6 +33,8 @@ import { PageShell } from "@/components/layout/page-shell";
 import { toContactPickerOption } from "@/lib/searchable-options";
 import { Button } from "@/components/ui/button";
 import { EntityDocumentsPanel } from "@/features/documents";
+import { ProcessStepper } from "@/components/ui/process-stepper";
+import { purchaseRequestProcessSteps } from "@/features/procurement/lib/purchase-request-process-steps";
 import { isStorageConfigured } from "@bloqer/config";
 import { listEntityDocuments } from "@bloqer/services";
 import {
@@ -148,6 +150,16 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           )}
         </div>
       </div>
+
+      <ProcessStepper
+        aria-label="Progreso de la solicitud de compra"
+        steps={purchaseRequestProcessSteps({
+          status: pr.status,
+          submittedAt: pr.submittedAt,
+          quoteCount: quotes.length,
+          hasLinkedPo: Boolean(linkedPo),
+        })}
+      />
 
       <ActionErrorBanner message={sp.actionError} />
 
