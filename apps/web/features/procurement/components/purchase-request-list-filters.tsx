@@ -14,7 +14,7 @@ import { PurchaseRequestTable } from "./purchase-request-table";
 const STATUS_FILTERS = [
   { value: "DRAFT", label: "Borrador" },
   { value: "SUBMITTED", label: "Enviada" },
-  { value: "QUOTE_SELECTED", label: "Cotización elegida" },
+  { value: "QUOTE_SELECTED", label: "Adjudicada" },
   { value: "COMPLETED", label: "Completada" },
   { value: "CANCELLED", label: "Anulada" },
 ] as const;

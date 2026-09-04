@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 const MAP = {
   DRAFT:          { label: "Borrador",           variant: "secondary" },
   SUBMITTED:      { label: "Enviada",            variant: "default" },
-  QUOTE_SELECTED: { label: "Cotización elegida", variant: "outline" },
+  QUOTE_SELECTED: { label: "Adjudicada", variant: "outline" },
   COMPLETED:      { label: "Completada",         variant: "default" },
   CANCELLED:      { label: "Anulada",            variant: "destructive" },
 } as const;

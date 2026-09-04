@@ -156,9 +156,15 @@ export async function getMyFieldPendingItems(
   const prListPromise =
     runPr && !countsOnly
       ? prisma.purchaseRequest.findMany({
-          where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
+          where: {
+            tenantId: ctx.tenantId,
+            status: "SUBMITTED",
+            ...projectWhere,
+            // Align with count: exclude fully awarded SCs ([BR-PUR-024]).
+            lines: { some: { awardedPurchaseOrderId: null } },
+          },
           orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
-          take: INBOX_LIMIT,
+          take: INBOX_LIMIT * 2,
           select: {
             id: true,
             number: true,
@@ -174,6 +180,7 @@ export async function getMyFieldPendingItems(
               select: { id: true },
               take: 1,
             },
+            lines: { select: { awardedPurchaseOrderId: true } },
           },
         })
       : Promise.resolve(null);
@@ -381,7 +388,13 @@ export async function getMyFieldPendingItems(
     subCertListPromise,
     countPr
       ? prisma.purchaseRequest.count({
-          where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
+          where: {
+            tenantId: ctx.tenantId,
+            status: "SUBMITTED",
+            ...projectWhere,
+            // Exclude fully awarded SCs still in SUBMITTED race windows ([BR-PUR-024]).
+            lines: { some: { awardedPurchaseOrderId: null } },
+          },
         })
       : Promise.resolve(0),
     countPo
@@ -467,9 +480,20 @@ export async function getMyFieldPendingItems(
   const names = await resolveUserDisplayNames(actorIds);
 
   if (Array.isArray(prs)) {
-    for (const row of prs) {
+    const openPrs = prs
+      .filter((row) => {
+        const total = row.lines.length;
+        const awarded = row.lines.filter((l) => l.awardedPurchaseOrderId != null).length;
+        // Fully awarded SC leave pendientes — follow-through is on the N OCs ([BR-PUR-024]).
+        return !(total > 0 && awarded === total);
+      })
+      .slice(0, INBOX_LIMIT);
+
+    for (const row of openPrs) {
       const occurredAt = row.submittedAt ?? row.createdAt;
       const hasQuotes = row.quotes.length > 0;
+      const awarded = row.lines.filter((l) => l.awardedPurchaseOrderId != null).length;
+      const partial = awarded > 0;
       const overdueDays = daysOverdueFromDate(row.neededByDate);
       items.push({
         entityType: "PURCHASE_REQUEST",
@@ -481,8 +505,16 @@ export async function getMyFieldPendingItems(
         typeLabel: "Solicitud de compra",
         title: `SC-${String(row.number).padStart(3, "0")}`,
         description: null,
-        statusLabel: hasQuotes ? "Elegir cotización" : "Espera cotizaciones",
-        actionLabel: hasQuotes ? "Elegir cotización" : "Cotizar",
+        statusLabel: partial
+          ? "Adjudicar resto"
+          : hasQuotes
+            ? "Elegir cotización"
+            : "Espera cotizaciones",
+        actionLabel: partial
+          ? "Adjudicar resto"
+          : hasQuotes
+            ? "Elegir cotización"
+            : "Cotizar",
         amount: null,
         currency: null,
         requestedByName:

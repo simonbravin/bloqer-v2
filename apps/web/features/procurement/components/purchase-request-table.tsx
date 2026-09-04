@@ -92,7 +92,11 @@ export function PurchaseRequestTable({
                       </span>
                       {pr.estimatedAmountSource ? (
                         <Badge variant="secondary" className="px-1.5 py-0 text-[10px] leading-4">
-                          {pr.estimatedAmountSource === "quote" ? "Cotización" : "Presup."}
+                          {pr.estimatedAmountSource === "quote"
+                            ? "Cotización"
+                            : pr.estimatedAmountSource === "orders"
+                              ? "Órdenes"
+                              : "Presup."}
                         </Badge>
                       ) : null}
                     </div>

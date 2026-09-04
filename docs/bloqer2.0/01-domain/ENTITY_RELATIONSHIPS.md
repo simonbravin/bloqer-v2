@@ -364,6 +364,10 @@ flowchart LR
 | WbsNode | CostItem | 1:N | hojas |
 | Project | Certification | 1:N | múltiples certificaciones |
 | Certification | CertificationLine | 1:N | una por ítem |
+| PurchaseRequest | PurchaseOrder | 1:N | N OC por adjudicación de líneas ([BR-PUR-024]) |
+| PurchaseRequestLine | PurchaseOrder | N:1 | `awardedPurchaseOrderId` (cobertura activa) |
+| PurchaseRequestLine | PurchaseOrderLine | 1:1 activa | `purchaseRequestLineId` + `isActiveAward` |
+| ProcurementQuoteLine | PurchaseOrderLine | 1:N hist. | procedencia de precio; award activo 1:1 práctico |
 | PurchaseOrder | Receipt | 1:N | recepciones parciales |
 | PurchaseOrder | PurchaseInvoice | 1:N | múltiples facturas posibles |
 | PurchaseInvoice | PurchaseInvoiceLine | 1:N | imputaciones |

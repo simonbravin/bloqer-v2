@@ -119,6 +119,18 @@ test("computeEstimatedAmount prefers selected quote when status is QUOTE_SELECTE
   assert.equal(r.estimatedAmountCurrency, "ARS");
 });
 
+test("computeEstimatedAmount prefers active order totals over quote", () => {
+  const r = computeEstimatedAmount(
+    { status: "SUBMITTED" },
+    [],
+    { totalAmount: "999.00", currency: "ARS" },
+    ["100.00", "50.50"],
+  );
+  assert.equal(r.estimatedAmountSource, "orders");
+  assert.equal(r.estimatedAmount, "150.50");
+  assert.equal(r.estimatedAmountCurrency, "ARS");
+});
+
 test("computeEstimatedAmount uses quote for COMPLETED status", () => {
   const r = computeEstimatedAmount(
     { status: "COMPLETED" },

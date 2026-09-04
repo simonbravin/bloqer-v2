@@ -13,6 +13,7 @@ import { PurchaseRequestStatusBadge } from "@/features/procurement/components/pu
 import {
   ProcurementQuotesSection,
 } from "@/features/procurement/components/procurement-quotes-section";
+import { PurchaseRequestAwardMatrix } from "@/features/procurement/components/purchase-request-award-matrix";
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
@@ -66,31 +67,47 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
     pr = await getPurchaseRequestById(prId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
   if (pr.projectId !== id) notFound();
 
   let quotes;
-  let linkedPo;
+  let linkedOrders: Array<{
+    id: string;
+    code: string;
+    status: string;
+    projectId: string;
+    selectedProcurementQuoteId: string | null;
+  }> = [];
   let hasAnyPo;
+  let awardedLineCount = 0;
+  let totalLineCount = 0;
   try {
     const [quoteRows, poLinks] = await Promise.all([
       listProcurementQuotesDetailedForRequest(prId, ctx),
       getPurchaseRequestPoLinks(prId, ctx),
     ]);
     quotes = quoteRows;
-    linkedPo = poLinks.active;
+    linkedOrders = poLinks.activeOrders;
     hasAnyPo = poLinks.hasAny;
+    awardedLineCount = poLinks.awardedLineCount;
+    totalLineCount = poLinks.totalLineCount;
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
   const canEditPr = canEditPurchaseRequests(current.tenantCtx.roles);
   const canQuote = canManageProcurementQuotes(current.tenantCtx.roles);
+  const frozenQuoteIds = [
+    ...new Set(
+      linkedOrders
+        .map((o) => o.selectedProcurementQuoteId)
+        .filter((qid): qid is string => Boolean(qid)),
+    ),
+  ];
 
   let suppliers: SupplierOption[] = [];
-  if (canQuote && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)) {
+  if (canQuote && pr.status === "SUBMITTED") {
     const suppliersResult = await listAllContacts(
       { role: "SUPPLIER", status: "ACTIVE" },
       ctx,
@@ -138,7 +155,10 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
               </Button>
             </form>
           )}
-          {pr.status !== "CANCELLED" && pr.status !== "COMPLETED" && canEditPr && (
+          {pr.status !== "CANCELLED" &&
+            pr.status !== "COMPLETED" &&
+            canEditPr &&
+            linkedOrders.length === 0 && (
             <form
               action={async () => {
                 "use server";
@@ -161,27 +181,37 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           status: pr.status,
           submittedAt: pr.submittedAt,
           quoteCount: quotes.length,
-          // Include cancelled OCs: SC cancel requires OC cancel first, so active-only would under-mark Elegida.
           hasLinkedPo: hasAnyPo,
+          awardedLineCount,
+          totalLineCount,
         })}
       />
 
       <ActionErrorBanner message={sp.actionError} />
 
-      {linkedPo && (
-        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Orden de compra vinculada: </span>
-          <Link
-            href={`/proyectos/${id}/ordenes-compra/${linkedPo.id}`}
-            className="font-medium hover:underline"
-          >
-            {linkedPo.code}
-          </Link>
-          <span className="text-muted-foreground"> ({linkedPo.status})</span>
+      {linkedOrders.length > 0 && (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm space-y-1">
+          <p className="text-muted-foreground">
+            Cobertura: {awardedLineCount}/{totalLineCount || pr.lines.length} ítems adjudicados
+          </p>
+          <ul className="space-y-0.5">
+            {linkedOrders.map((po) => (
+              <li key={po.id}>
+                <span className="text-muted-foreground">OC: </span>
+                <Link
+                  href={`/proyectos/${id}/ordenes-compra/${po.id}`}
+                  className="font-medium hover:underline"
+                >
+                  {po.code}
+                </Link>
+                <span className="text-muted-foreground"> ({po.status})</span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
-      {pr.status === "SUBMITTED" ? (
+      {pr.status === "SUBMITTED" && quotes.length === 0 ? (
         <p className="rounded-lg border bg-muted/30 px-4 py-3 text-sm md:hidden">
           Solicitud enviada. Pendiente de cotización.
         </p>
@@ -189,6 +219,9 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
 
       <PurchaseRequestDetailMobileSections
         pr={pr}
+        projectId={id}
+        canAward={canQuote && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)}
+        linkedOrders={linkedOrders}
         quotes={quotes.map((q) => ({
           id: q.id,
           supplierName: q.supplierName,
@@ -252,7 +285,12 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
             <TableBody>
               {pr.lines.map((line) => (
                 <TableRow key={line.id}>
-                  <TableCell>{line.description}</TableCell>
+                  <TableCell>
+                    {line.description}
+                    {line.awardedPurchaseOrderId ? (
+                      <span className="ml-2 text-xs text-muted-foreground">(adjudicado)</span>
+                    ) : null}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
                   <TableCell className="text-right">{line.unit}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
@@ -269,6 +307,16 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
 
       {showQuotes && (
         <>
+          {canQuote && pr.status === "SUBMITTED" ? (
+            <PurchaseRequestAwardMatrix
+              projectId={id}
+              purchaseRequestId={prId}
+              prLines={pr.lines}
+              quotes={quotes}
+              canAward={canQuote}
+            />
+          ) : null}
+
           <ProcurementQuotesSection
             projectId={id}
             purchaseRequestId={prId}
@@ -276,6 +324,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
             suppliers={suppliers}
             quotes={quotes}
             canQuote={canQuote}
+            allowCreateQuotes={pr.status === "SUBMITTED"}
+            frozenQuoteIds={frozenQuoteIds}
           />
 
           {quotes.length > 0 && (

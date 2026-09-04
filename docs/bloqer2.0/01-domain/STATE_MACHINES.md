@@ -298,11 +298,14 @@ stateDiagram-v2
   [*] --> DRAFT
   DRAFT --> SUBMITTED : enviar
   DRAFT --> CANCELLED : anular
-  SUBMITTED --> QUOTE_SELECTED : seleccionar cotizacion (genera OC DRAFT)
+  SUBMITTED --> SUBMITTED : adjudicar subset (genera OC DRAFT)
+  SUBMITTED --> QUOTE_SELECTED : cobertura 100 pct lineas
   SUBMITTED --> CANCELLED : anular
-  QUOTE_SELECTED --> COMPLETED : OC confirmada
-  QUOTE_SELECTED --> SUBMITTED : anular OC borrador vinculada
-  QUOTE_SELECTED --> CANCELLED : anular (sin OC activa no-DRAFT)
+  QUOTE_SELECTED --> COMPLETED : todas OC cobertura CONFIRMED+
+  QUOTE_SELECTED --> SUBMITTED : anular OC y cobertura incompleta
+  QUOTE_SELECTED --> CANCELLED : anular (sin OC activas)
+  COMPLETED --> QUOTE_SELECTED : anular OC confirmada; sigue cobertura 100
+  COMPLETED --> SUBMITTED : anular OC; cobertura incompleta
   COMPLETED --> [*]
   CANCELLED --> [*]
 ```
@@ -310,8 +313,9 @@ stateDiagram-v2
 ### Reglas
 
 - Al enviar (`SUBMITTED`): snapshot de costo unitario presupuestario por línea WBS.
-- Cotizaciones mínimas antes de seleccionar ([BR-PUR-010]); cada cotización incluye plazo de entrega ([D-050]).
-- Una OC activa (no `CANCELLED`) por solicitud en Fase 1.
+- Cotizaciones mínimas antes de adjudicar ([BR-PUR-010]); cada cotización incluye plazo de entrega ([D-050]).
+- **N OC activas** por solicitud; cada `PurchaseRequestLine` se adjudica entera a como máximo una OC no anulada ([BR-PUR-024], [D-044]).
+- `SUBMITTED` incluye cobertura parcial; `QUOTE_SELECTED` = 100 % líneas adjudicadas (UI: *Adjudicada*); `COMPLETED` solo cuando todas las OC de cobertura están `CONFIRMED`+.
 - WBS obligatorio en cada línea ([BR-PUR-007]).
 
 ---

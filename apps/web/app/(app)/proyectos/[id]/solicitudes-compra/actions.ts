@@ -8,15 +8,18 @@ import {
   updateProcurementQuote,
   deleteProcurementQuote,
   selectProcurementQuoteAndCreatePo,
+  createPurchaseOrdersFromAwards,
   ServiceError,
 } from "@bloqer/services";
 import {
   createPurchaseRequestSchema,
   createProcurementQuoteSchema,
   updateProcurementQuoteSchema,
+  createPurchaseOrdersFromAwardsSchema,
   type CreatePurchaseRequestInput,
   type CreateProcurementQuoteInput,
   type UpdateProcurementQuoteInput,
+  type CreatePurchaseOrdersFromAwardsInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
@@ -148,6 +151,30 @@ export async function selectQuoteAndCreatePoAction(
     revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${result.purchaseOrderId}`);
     return { purchaseOrderId: result.purchaseOrderId };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function createPurchaseOrdersFromAwardsAction(
+  projectId: string,
+  data: CreatePurchaseOrdersFromAwardsInput,
+): Promise<{ purchaseOrderIds: string[] } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = createPurchaseOrdersFromAwardsSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const result = await createPurchaseOrdersFromAwards(
+      parsed.data.purchaseRequestId,
+      parsed.data.groups,
+      ctx,
+    );
+    revalidatePr(projectId, parsed.data.purchaseRequestId);
+    revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
+    for (const poId of result.purchaseOrderIds) {
+      revalidatePath(`/proyectos/${projectId}/ordenes-compra/${poId}`);
+    }
+    return { purchaseOrderIds: result.purchaseOrderIds };
   } catch (err) {
     return handle(err);
   }

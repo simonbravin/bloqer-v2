@@ -270,10 +270,6 @@ export async function runPurchaseRequestNeededByOverdueAlert(
         companyId: company.id,
         status: { in: ["SUBMITTED", "QUOTE_SELECTED"] },
         neededByDate: { lt: cutoff },
-        // Only alert if no PO has already committed the request.
-        purchaseOrders: {
-          none: { status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] } },
-        },
       },
       select: {
         id: true,
@@ -281,6 +277,11 @@ export async function runPurchaseRequestNeededByOverdueAlert(
         projectId: true,
         companyId: true,
         neededByDate: true,
+        lines: { select: { awardedPurchaseOrderId: true } },
+        purchaseOrders: {
+          where: { status: { not: "CANCELLED" } },
+          select: { id: true, status: true },
+        },
       },
     });
 
@@ -295,6 +296,30 @@ export async function runPurchaseRequestNeededByOverdueAlert(
     if (candidates.length === 0) continue;
 
     for (const pr of prs) {
+      const totalLines = pr.lines.length;
+      const activePoIds = new Set(pr.purchaseOrders.map((p) => p.id));
+      // Only awards pointing at non-cancelled OCs count (stale cache after Anular).
+      const awardedLines = pr.lines.filter(
+        (l) => l.awardedPurchaseOrderId != null && activePoIds.has(l.awardedPurchaseOrderId),
+      );
+      const fullyAwarded = totalLines > 0 && awardedLines.length === totalLines;
+      const awardedPoIds = new Set(
+        awardedLines.map((l) => l.awardedPurchaseOrderId!).filter(Boolean),
+      );
+      const allAwardedConfirmed =
+        fullyAwarded &&
+        [...awardedPoIds].every((poId) => {
+          const po = pr.purchaseOrders.find((p) => p.id === poId);
+          return (
+            po != null &&
+            (po.status === "CONFIRMED" ||
+              po.status === "PARTIALLY_RECEIVED" ||
+              po.status === "RECEIVED")
+          );
+        });
+      // Alert until full coverage AND every awarded OC is CONFIRMED+ ([BR-PUR-019]/[BR-PUR-024]).
+      if (allAwardedConfirmed) continue;
+
       summary.checkedCount += 1;
       const code = `SC-${String(pr.number).padStart(3, "0")}`;
       const overdue = daysOverdue(pr.neededByDate!);
@@ -314,7 +339,9 @@ export async function runPurchaseRequestNeededByOverdueAlert(
         linkedEntityId: pr.id,
         title: formatNotificationTitle("Solicitud vencida", code),
         body: formatNotificationIdentityBody(
-          `La solicitud ${code} tiene fecha requerida vencida hace ${overdue} día(s) y todavía no tiene OC confirmada. Priorizá cotización o compra directa.`,
+          fullyAwarded
+            ? `La solicitud ${code} tiene fecha requerida vencida hace ${overdue} día(s) y todavía hay órdenes sin confirmar. Priorizá la compra.`
+            : `La solicitud ${code} tiene fecha requerida vencida hace ${overdue} día(s) y todavía hay ítems sin adjudicar u OC sin confirmar. Priorizá cotización o compra.`,
           facts,
         ),
         severity: "WARNING",

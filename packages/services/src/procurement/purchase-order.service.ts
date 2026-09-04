@@ -68,6 +68,7 @@ export {
 export type PurchaseOrderLineView = {
   id: string;
   purchaseOrderId: string;
+  purchaseRequestLineId: string | null;
   wbsNodeId: string | null;
   wbsNodeCode: string | null;
   wbsNodeName: string | null;
@@ -119,6 +120,7 @@ function serializeLine(
     id: string; purchaseOrderId: string; wbsNodeId: string | null; productId: string | null;
     costAnalysisLineId: string | null;
     costType: CostCategory | null;
+    purchaseRequestLineId: string | null;
     description: string; unit: string;
     quantity: Prisma.Decimal; unitPrice: Prisma.Decimal; taxRate: Prisma.Decimal;
     discountPct: Prisma.Decimal;
@@ -135,6 +137,7 @@ function serializeLine(
   return {
     id:                l.id,
     purchaseOrderId:   l.purchaseOrderId,
+    purchaseRequestLineId: l.purchaseRequestLineId ?? null,
     wbsNodeId:         l.wbsNodeId,
     wbsNodeCode:       l.wbsNode?.code ?? null,
     wbsNodeName:       l.wbsNode?.name ?? null,
@@ -700,6 +703,15 @@ export async function updatePurchaseOrder(
 
   if (input.supplierContactId) {
     await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
+    if (
+      existing.purchaseRequestId &&
+      input.supplierContactId !== existing.supplierContactId
+    ) {
+      throw new ServiceError(
+        "CONFLICT",
+        "No se puede cambiar el proveedor de una OC generada desde solicitud de compra",
+      );
+    }
   }
 
   let apuCategoryByIdx = new Map<number, CostCategory>();
@@ -729,6 +741,7 @@ export async function updatePurchaseOrder(
         unitPrice: l.unitPrice,
         discountPct: l.discountPct,
         sortOrder: l.sortOrder ?? i,
+        purchaseRequestLineId: l.purchaseRequestLineId ?? null,
       })),
       ctx.tenantId,
     );
@@ -765,9 +778,13 @@ export async function updatePurchaseOrder(
         const line = input.lines[i]!;
         const prev = previousLines.find(
           (p) =>
+            line.purchaseRequestLineId != null &&
+            p.purchaseRequestLineId === line.purchaseRequestLineId,
+        ) ?? previousLines.find(
+          (p) =>
             p.wbsNodeId === line.wbsNodeId &&
             p.description === line.description,
-        );
+        ) ?? previousLines.find((p) => p.sortOrder === (line.sortOrder ?? i));
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(line.taxRate ?? "0");
@@ -797,6 +814,10 @@ export async function updatePurchaseOrder(
         await tx.purchaseOrderLine.create({
           data: {
             purchaseOrderId: id,
+            purchaseRequestLineId:
+              line.purchaseRequestLineId ?? prev?.purchaseRequestLineId ?? null,
+            procurementQuoteLineId: prev?.procurementQuoteLineId ?? null,
+            isActiveAward: prev?.isActiveAward ?? true,
             wbsNodeId:       line.wbsNodeId,
             productId:       line.productId ?? null,
             costAnalysisLineId: line.costAnalysisLineId ?? null,
@@ -810,7 +831,7 @@ export async function updatePurchaseOrder(
             lineSubtotal,
             lineTax,
             lineTotal,
-            sortOrder:       line.sortOrder ?? 0,
+            sortOrder:       line.sortOrder ?? prev?.sortOrder ?? i,
             budgetUnitCostSnapshot: budgetSnapshot,
             varianceJustification:
               line.varianceJustification !== undefined

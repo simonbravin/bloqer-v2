@@ -336,6 +336,7 @@ export async function authorizeAndCommitPurchaseOrder(
         unitPrice: true,
         discountPct: true,
         sortOrder: true,
+        purchaseRequestLineId: true,
       },
     });
     await assertPoLinesWithinSelectedQuote(id, currentLines, ctx.tenantId, tx);
@@ -496,6 +497,7 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
         unitPrice: true,
         discountPct: true,
         sortOrder: true,
+        purchaseRequestLineId: true,
       },
     });
     await assertPoLinesWithinSelectedQuote(id, currentLines, ctx.tenantId, tx);

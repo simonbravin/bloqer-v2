@@ -10,6 +10,7 @@ import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, se
 import { parseDiscountPct } from "../finance/invoice-line-money";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import { assertQuoteNotFrozenByActivePo } from "./purchase-request-to-po.service";
 
 type QuoteWithRequest = Prisma.ProcurementQuoteGetPayload<{
   include: { purchaseRequest: true; lines: true };
@@ -32,6 +33,7 @@ async function loadMutableQuote(quoteId: string, ctx: ServiceContext): Promise<Q
   if (quote.purchaseRequest.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", "La solicitud no admite cambios en cotizaciones en este estado");
   }
+  await assertQuoteNotFrozenByActivePo(quoteId, ctx.tenantId);
   return quote;
 }
 

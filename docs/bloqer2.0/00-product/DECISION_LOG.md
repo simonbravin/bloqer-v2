@@ -560,16 +560,17 @@
 ### D-044 — Solicitud de compra, cotizaciones y flujo de OC
 
 - **Fecha:** 2026-06-01
-- **Estado:** ACTIVA
+- **Estado:** ACTIVA (enmendada 2026-09-04 — adjudicación multi-OC)
 - **Decidido por:** Owner (plan compras + auditoría)
 - **Decisión:**
   1. Entidades `PurchaseRequest`, `ProcurementQuote` y settings `CompanyProcurementSettings` (1:1 `Company`).
   2. OC: `DRAFT` → `SUBMITTED` → `APPROVED` → `CONFIRMED` → recepciones; migración `ISSUED` → `CONFIRMED`.
   3. `committed_amount` solo al confirmar al proveedor ([D-006]).
-  4. Fase 1: una OC activa por solicitud; cotizaciones mínimas configurables.
-  5. Permisos: `PURCHASE_REQUESTS` (PM/capataz EDIT); compras aprueba/confirma OC.
-- **Implicancias:** services en `packages/services/src/procurement/*`, UI en `/solicitudes-compra`, gate AP [BR-APR-005].
-- **Documentos afectados:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7, [`00-product/PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md).
+  4. **Adjudicación por línea completa:** una SC puede generar **N OC activas** sin solapar `PurchaseRequestLine`. No se parte la cantidad de una misma línea entre proveedores. Las cotizaciones siguen cubriendo todas las líneas (comparables); lo que se parte es la adjudicación ([BR-PUR-024]).
+  5. Estados SC: `SUBMITTED` = cotizando y/o cobertura parcial; `QUOTE_SELECTED` (UI: *Adjudicada*) = 100 % de líneas adjudicadas; `COMPLETED` = cobertura 100 % y todas las OC de cobertura en `CONFIRMED`+.
+  6. Cotizaciones mínimas configurables; permisos: `PURCHASE_REQUESTS` (PM/capataz EDIT); compras aprueba/confirma OC.
+- **Implicancias:** services en `packages/services/src/procurement/*`, UI en `/solicitudes-compra`, gate AP [BR-APR-005]; FKs `PurchaseOrderLine.purchaseRequestLineId` / `procurementQuoteLineId` + `PurchaseRequestLine.awardedPurchaseOrderId`.
+- **Documentos afectados:** [`02-modules/PURCHASE_REQUESTS.md`](../02-modules/PURCHASE_REQUESTS.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b, [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) [BR-PUR-024], [`00-product/PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md).
 
 ---
 

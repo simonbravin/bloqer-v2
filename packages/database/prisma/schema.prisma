@@ -2237,19 +2237,24 @@ model PurchaseRequestLine {
   budgetUnitCostSnapshot Decimal?                @db.Decimal(18, 4)
   budgetQuantitySnapshot Decimal?                @db.Decimal(18, 4)
   sortOrder              Int                     @default(0)
+  /// Active award coverage cache ([BR-PUR-024] / D-044 multi-OC). Cleared when OC cancelled.
+  awardedPurchaseOrderId String?
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
 
-  purchaseRequest  PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
-  wbsNode          WbsNode?               @relation(fields: [wbsNodeId], references: [id])
-  product          Product?               @relation(fields: [productId], references: [id])
-  costAnalysisLine CostAnalysisLine?      @relation(fields: [costAnalysisLineId], references: [id], onDelete: SetNull)
-  quoteLines       ProcurementQuoteLine[]
+  purchaseRequest       PurchaseRequest        @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  awardedPurchaseOrder  PurchaseOrder?         @relation("PrLineAwardedPo", fields: [awardedPurchaseOrderId], references: [id], onDelete: SetNull)
+  wbsNode               WbsNode?               @relation(fields: [wbsNodeId], references: [id])
+  product               Product?               @relation(fields: [productId], references: [id])
+  costAnalysisLine      CostAnalysisLine?      @relation(fields: [costAnalysisLineId], references: [id], onDelete: SetNull)
+  quoteLines            ProcurementQuoteLine[]
+  purchaseOrderLines    PurchaseOrderLine[]    @relation("PoLineFromPrLine")
 
   @@index([purchaseRequestId])
   @@index([wbsNodeId])
   @@index([costAnalysisLineId])
   @@index([costType])
+  @@index([awardedPurchaseOrderId])
   @@map("purchase_request_lines")
 }
 
@@ -2301,7 +2306,9 @@ model ProcurementQuoteLine {
 
   procurementQuote    ProcurementQuote    @relation(fields: [procurementQuoteId], references: [id], onDelete: Cascade)
   purchaseRequestLine PurchaseRequestLine @relation(fields: [purchaseRequestLineId], references: [id])
+  purchaseOrderLines  PurchaseOrderLine[] @relation("PoLineFromQuoteLine")
 
+  @@unique([procurementQuoteId, purchaseRequestLineId])
   @@index([procurementQuoteId])
   @@map("procurement_quote_lines")
 }
@@ -2342,13 +2349,14 @@ model PurchaseOrder {
   createdAt                  DateTime            @default(now())
   updatedAt                  DateTime            @updatedAt
 
-  tenant                   Tenant              @relation(fields: [tenantId], references: [id])
-  company                  Company             @relation(fields: [companyId], references: [id])
-  project                  Project             @relation(fields: [projectId], references: [id])
-  supplierContact          Contact             @relation(fields: [supplierContactId], references: [id])
-  purchaseRequest          PurchaseRequest?    @relation(fields: [purchaseRequestId], references: [id])
-  selectedProcurementQuote ProcurementQuote?   @relation("SelectedProcurementQuote", fields: [selectedProcurementQuoteId], references: [id])
+  tenant                   Tenant                @relation(fields: [tenantId], references: [id])
+  company                  Company               @relation(fields: [companyId], references: [id])
+  project                  Project               @relation(fields: [projectId], references: [id])
+  supplierContact          Contact               @relation(fields: [supplierContactId], references: [id])
+  purchaseRequest          PurchaseRequest?      @relation(fields: [purchaseRequestId], references: [id])
+  selectedProcurementQuote ProcurementQuote?     @relation("SelectedProcurementQuote", fields: [selectedProcurementQuoteId], references: [id])
   lines                    PurchaseOrderLine[]
+  awardedRequestLines      PurchaseRequestLine[] @relation("PrLineAwardedPo")
   receipts                 PurchaseReceipt[]
   supplierInvoices         SupplierInvoice[]
 
@@ -2372,6 +2380,12 @@ model PurchaseOrderLine {
   costAnalysisLineId     String?
   /// Job-cost nature for EDT partida × cost type ([D-099]). Default MATERIAL when unset at write.
   costType               CostCategory?
+  /// SC line fulfilled by this PO line ([BR-PUR-024]); required when PO has purchaseRequestId.
+  purchaseRequestLineId  String?
+  /// Quote line that priced this award; required when PO has selectedProcurementQuoteId.
+  procurementQuoteLineId String?
+  /// False when parent OC is CANCELLED — keeps history without violating active-award uniqueness.
+  isActiveAward          Boolean                   @default(true)
   description            String
   unit                   String                    @default("")
   quantity               Decimal                   @db.Decimal(18, 4)
@@ -2393,6 +2407,9 @@ model PurchaseOrderLine {
   updatedAt              DateTime                  @updatedAt
 
   purchaseOrder        PurchaseOrder         @relation(fields: [purchaseOrderId], references: [id])
+  purchaseRequestLine  PurchaseRequestLine?  @relation("PoLineFromPrLine", fields: [purchaseRequestLineId], references: [id], onDelete: Restrict)
+  /// SetNull so Anular OC / inactive awards do not block quote edit/delete ([BR-PUR-024]).
+  procurementQuoteLine ProcurementQuoteLine? @relation("PoLineFromQuoteLine", fields: [procurementQuoteLineId], references: [id], onDelete: SetNull)
   wbsNode              WbsNode?              @relation(fields: [wbsNodeId], references: [id])
   product              Product?              @relation(fields: [productId], references: [id])
   costAnalysisLine     CostAnalysisLine?     @relation(fields: [costAnalysisLineId], references: [id], onDelete: SetNull)
@@ -2404,6 +2421,10 @@ model PurchaseOrderLine {
   @@index([productId])
   @@index([costAnalysisLineId])
   @@index([costType])
+  @@index([purchaseRequestLineId])
+  @@index([procurementQuoteLineId])
+  /// Partial unique `purchase_order_lines_active_pr_line_award_uidx`
+  /// (purchaseRequestLineId WHERE NOT NULL AND isActiveAward) — SQL migration; Prisma cannot express it as @@unique.
   @@map("purchase_order_lines")
 }
 

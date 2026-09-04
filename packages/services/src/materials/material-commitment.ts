@@ -137,10 +137,8 @@ export async function loadMaterialApuCommitments(
           projectId,
           tenantId,
           status: { in: [...MATERIAL_ORDERED_PR_STATUSES] },
-          purchaseOrders: {
-            none: { status: { in: [...MATERIAL_ORDERED_PO_STATUSES] } },
-          },
         },
+        awardedPurchaseOrderId: null,
         wbsNodeId: opts.wbsNodeIds?.length
           ? { in: opts.wbsNodeIds }
           : { not: null },
@@ -164,15 +162,28 @@ export async function loadMaterialApuCommitments(
         purchaseOrder: {
           projectId,
           tenantId,
-          status: { in: [...MATERIAL_ORDERED_PO_STATUSES] },
+          status: { not: "CANCELLED" },
         },
         wbsNodeId: opts.wbsNodeIds?.length
           ? { in: opts.wbsNodeIds }
           : { not: null },
         OR: [
-          { costType: { in: categories } },
-          { costAnalysisLine: { category: { in: categories } } },
-          { AND: [{ costType: null }, { costAnalysisLineId: null }] },
+          { purchaseOrder: { status: { in: [...MATERIAL_ORDERED_PO_STATUSES] } } },
+          {
+            AND: [
+              { purchaseRequestLineId: { not: null } },
+              { isActiveAward: true },
+            ],
+          },
+        ],
+        AND: [
+          {
+            OR: [
+              { costType: { in: categories } },
+              { costAnalysisLine: { category: { in: categories } } },
+              { AND: [{ costType: null }, { costAnalysisLineId: null }] },
+            ],
+          },
         ],
       },
       select: {

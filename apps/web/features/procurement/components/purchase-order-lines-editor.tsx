@@ -42,12 +42,16 @@ export type PurchaseOrderLine = {
   costAnalysisLineId: string | null;
   /** Job-cost nature ([D-099]). */
   costType: CostCategoryOptionValue;
+  /** SC line link for award-sourced OCs ([BR-PUR-024]). */
+  purchaseRequestLineId?: string | null;
   description: string;
   unit: string;
   quantity: string;
   unitPrice: string;
   taxRate: string;
   discountPct: string;
+  /** Persist original sortOrder from SC/quote when editing award OCs. */
+  sortOrder?: number;
   varianceJustification?: string | null;
 };
 
@@ -101,6 +105,8 @@ interface Props {
   productOptions?: ProductOption[];
   showVarianceJustification?: boolean;
   varianceSettings?: VarianceSettings;
+  /** Award-sourced OC: no add/remove lines ([BR-PUR-024]). */
+  structureLocked?: boolean;
 }
 
 export const DEFAULT_PURCHASE_ORDER_LINE: PurchaseOrderLine = {
@@ -129,6 +135,7 @@ export function PurchaseOrderLinesEditor({
   productOptions = [],
   showVarianceJustification = false,
   varianceSettings = DEFAULT_VARIANCE_SETTINGS,
+  structureLocked = false,
 }: Props) {
   const wbsComboboxOptions = useMemo(
     () => wbsToSearchableOptions(wbsOptions),
@@ -297,12 +304,13 @@ export function PurchaseOrderLinesEditor({
   }
 
   function addLine() {
+    if (structureLocked) return;
     setLineKeys((keys) => [...keys, createLineKey()]);
     onChange([...lines, { ...DEFAULT_PURCHASE_ORDER_LINE }]);
   }
 
   function removeLine(i: number) {
-    if (lines.length <= 1) return;
+    if (structureLocked || lines.length <= 1) return;
     setLineKeys((keys) => keys.filter((_, idx) => idx !== i));
     onChange(lines.filter((_, idx) => idx !== i));
   }
@@ -323,9 +331,13 @@ export function PurchaseOrderLinesEditor({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Líneas</p>
-        <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={addLine}>
-          + Agregar línea
-        </Button>
+        {!structureLocked ? (
+          <Button type="button" variant="outline" size="sm" className="min-h-11 md:min-h-8" onClick={addLine}>
+            + Agregar línea
+          </Button>
+        ) : (
+          <p className="text-xs text-muted-foreground">Ítems fijados por la adjudicación</p>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="po-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
@@ -406,7 +418,7 @@ export function PurchaseOrderLinesEditor({
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-xs font-medium text-muted-foreground">Línea {i + 1}</p>
-                {lines.length > 1 && (
+                {lines.length > 1 && !structureLocked && (
                   <button
                     type="button"
                     onClick={() => removeLine(i)}

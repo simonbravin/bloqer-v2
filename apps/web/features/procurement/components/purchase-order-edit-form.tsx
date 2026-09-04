@@ -47,6 +47,7 @@ export function PurchaseOrderEditForm({
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const [supplierContactId, setSupplierContactId] = useState(order.supplierContactId);
+  const awardLocked = Boolean(order.purchaseRequestId);
   const [lines, setLines] = useState<PurchaseOrderLine[]>(
     order.lines.length > 0
       ? order.lines.map((l) => ({
@@ -54,12 +55,14 @@ export function PurchaseOrderEditForm({
           productId:   l.productId ?? null,
           costAnalysisLineId: l.costAnalysisLineId ?? null,
           costType: (l.costType as PurchaseOrderLine["costType"]) ?? "MATERIAL",
+          purchaseRequestLineId: l.purchaseRequestLineId ?? null,
           description: l.description,
           unit:        l.unit,
           quantity:    l.quantity,
           unitPrice:   l.unitPrice,
           taxRate:     l.taxRate,
           discountPct: l.discountPct ?? "0",
+          sortOrder:   l.sortOrder,
           varianceJustification: l.varianceJustification,
         }))
       : [{ ...DEFAULT_PURCHASE_ORDER_LINE }],
@@ -110,7 +113,8 @@ export function PurchaseOrderEditForm({
         lines:                lines.map((l, i) => ({
           ...l,
           wbsNodeId: l.wbsNodeId!,
-          sortOrder: i,
+          purchaseRequestLineId: l.purchaseRequestLineId ?? null,
+          sortOrder: l.sortOrder ?? i,
         })),
       });
       if ("error" in res) {
@@ -137,16 +141,22 @@ export function PurchaseOrderEditForm({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2 space-y-1">
             <Label htmlFor="po-supplier">Proveedor</Label>
-            <SearchableCombobox
-              id="po-supplier"
-              popoverWidth="wide"
-              options={toSearchableOptions(suppliers)}
-              value={supplierContactId}
-              onValueChange={setSupplierContactId}
-              placeholder="Seleccionar proveedor…"
-              searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
-              emptyText="Ningún proveedor coincide."
-            />
+            {awardLocked ? (
+              <p className="min-h-11 rounded-md border bg-muted/40 px-3 py-2 text-sm md:min-h-9">
+                {order.supplierName}
+              </p>
+            ) : (
+              <SearchableCombobox
+                id="po-supplier"
+                popoverWidth="wide"
+                options={toSearchableOptions(suppliers)}
+                value={supplierContactId}
+                onValueChange={setSupplierContactId}
+                placeholder="Seleccionar proveedor…"
+                searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
+                emptyText="Ningún proveedor coincide."
+              />
+            )}
           </div>
 
           <div className="space-y-1">
@@ -176,6 +186,7 @@ export function PurchaseOrderEditForm({
           productOptions={productOptions}
           showVarianceJustification
           varianceSettings={varianceSettings}
+          structureLocked={awardLocked}
         />
 
         <hr />

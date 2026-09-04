@@ -427,7 +427,7 @@ export function SelectQuoteButton({
         });
       }}
     >
-      {pending ? "Generando OC…" : "Seleccionar → OC"}
+      {pending ? "Generando OC…" : "Adjudicar libres → OC"}
     </Button>
   );
 }

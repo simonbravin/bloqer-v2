@@ -26,6 +26,7 @@ type PrLine = {
   unit: string;
   quantity: string;
   budgetUnitCostSnapshot?: string | null;
+  awardedPurchaseOrderId?: string | null;
 };
 
 type QuoteRow = {
@@ -52,6 +53,10 @@ interface Props {
   suppliers: SupplierOption[];
   quotes: QuoteRow[];
   canQuote: boolean;
+  /** New quotes only while SC is SUBMITTED (service gate). */
+  allowCreateQuotes?: boolean;
+  /** Quotes referenced by an active OC — no edit/delete ([BR-PUR-024]). */
+  frozenQuoteIds?: string[];
 }
 
 export function ProcurementQuotesSection({
@@ -61,8 +66,14 @@ export function ProcurementQuotesSection({
   suppliers,
   quotes,
   canQuote,
+  allowCreateQuotes = true,
+  frozenQuoteIds = [],
 }: Props) {
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
+  const frozen = new Set(frozenQuoteIds);
+  const freeLineIds = new Set(
+    prLines.filter((l) => !l.awardedPurchaseOrderId).map((l) => l.id),
+  );
 
   const editingQuote = quotes.find((q) => q.id === editingQuoteId);
   const editValues: ProcurementQuoteEditValues | undefined = editingQuote
@@ -133,23 +144,32 @@ export function ProcurementQuotesSection({
                     {q.validUntil ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    {q.status === "RECEIVED" && canQuote ? (
+                    {(q.status === "RECEIVED" || q.status === "SELECTED") && canQuote ? (
                       <div className="flex flex-col items-end gap-1">
-                        <SelectQuoteButton
-                          quoteId={q.id}
-                          projectId={projectId}
-                          purchaseRequestId={purchaseRequestId}
-                        />
-                        <ProcurementQuoteRowActions
-                          quoteId={q.id}
-                          projectId={projectId}
-                          purchaseRequestId={purchaseRequestId}
-                          canManage={canQuote}
-                          onEdit={() => setEditingQuoteId(q.id)}
-                          onDeleted={() => {
-                            if (editingQuoteId === q.id) setEditingQuoteId(null);
-                          }}
-                        />
+                        {q.lines.some((l) => freeLineIds.has(l.purchaseRequestLineId)) ? (
+                          <SelectQuoteButton
+                            quoteId={q.id}
+                            projectId={projectId}
+                            purchaseRequestId={purchaseRequestId}
+                          />
+                        ) : null}
+                        {q.status === "RECEIVED" && !frozen.has(q.id) ? (
+                          <ProcurementQuoteRowActions
+                            quoteId={q.id}
+                            projectId={projectId}
+                            purchaseRequestId={purchaseRequestId}
+                            canManage={canQuote}
+                            onEdit={() => setEditingQuoteId(q.id)}
+                            onDeleted={() => {
+                              if (editingQuoteId === q.id) setEditingQuoteId(null);
+                            }}
+                          />
+                        ) : !q.lines.some((l) => freeLineIds.has(l.purchaseRequestLineId)) &&
+                          (frozen.has(q.id) || q.status === "SELECTED") ? (
+                          <p className="text-xs text-muted-foreground">En uso por OC</p>
+                        ) : frozen.has(q.id) || q.status === "SELECTED" ? (
+                          <p className="text-xs text-muted-foreground">No editable (OC activa)</p>
+                        ) : null}
                       </div>
                     ) : null}
                   </TableCell>
@@ -173,7 +193,7 @@ export function ProcurementQuotesSection({
         />
       ) : null}
 
-      {canQuote && !editingQuoteId && suppliers.length > 0 ? (
+      {allowCreateQuotes && canQuote && !editingQuoteId && suppliers.length > 0 ? (
         <ProcurementQuoteForm
           projectId={projectId}
           purchaseRequestId={purchaseRequestId}
@@ -182,7 +202,7 @@ export function ProcurementQuotesSection({
         />
       ) : null}
 
-      {canQuote && !editingQuoteId && suppliers.length === 0 ? (
+      {allowCreateQuotes && canQuote && !editingQuoteId && suppliers.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No hay proveedores activos para cargar cotizaciones.
         </p>

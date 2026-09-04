@@ -32,7 +32,7 @@ describe("buildPurchaseRequestProcessSteps", () => {
     ]);
   });
 
-  it("QUOTE_SELECTED → current on Elegida", () => {
+  it("QUOTE_SELECTED → current on Adjudicada", () => {
     assert.deepEqual(states(buildPurchaseRequestProcessSteps({ status: "QUOTE_SELECTED" })), [
       "draft:done",
       "sent:done",
@@ -40,6 +40,16 @@ describe("buildPurchaseRequestProcessSteps", () => {
       "selected:current",
       "completed:upcoming",
     ]);
+  });
+
+  it("SUBMITTED with partial award labels Cotizando progress", () => {
+    const steps = buildPurchaseRequestProcessSteps({
+      status: "SUBMITTED",
+      awardedLineCount: 2,
+      totalLineCount: 5,
+    });
+    assert.equal(steps.find((s) => s.id === "quoting")?.label, "Cotizando (2/5)");
+    assert.equal(steps.find((s) => s.id === "quoting")?.state, "current");
   });
 
   it("COMPLETED → all done", () => {
@@ -55,7 +65,7 @@ describe("buildPurchaseRequestProcessSteps", () => {
         "draft:done:Borrador:",
         "sent:done:Enviada:",
         "quoting:cancelled:Anulada:Cotizando",
-        "selected:upcoming:Elegida:",
+        "selected:upcoming:Adjudicada:",
         "completed:upcoming:Completada:",
       ],
     );

@@ -9,8 +9,10 @@ export function purchaseRequestProcessSteps(input: {
   status: string;
   submittedAt?: string | Date | null;
   quoteCount: number;
-  /** Any linked OC ever (incl. cancelled) — marks Elegida on anulación. */
+  /** Any linked OC ever (incl. cancelled) — marks Adjudicada on anulación. */
   hasLinkedPo: boolean;
+  awardedLineCount?: number;
+  totalLineCount?: number;
 }): ProcessStep[] {
   const cancelledReachedIndex =
     input.status === "CANCELLED"
@@ -24,5 +26,7 @@ export function purchaseRequestProcessSteps(input: {
   return buildPurchaseRequestProcessSteps({
     status: input.status,
     cancelledReachedIndex,
+    awardedLineCount: input.awardedLineCount,
+    totalLineCount: input.totalLineCount,
   });
 }

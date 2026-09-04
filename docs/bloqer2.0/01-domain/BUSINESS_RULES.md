@@ -250,8 +250,13 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-097](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-019 — Alerta SC con fecha requerida vencida y sin OC
-- **Regla:** una `PurchaseRequest` en `SUBMITTED` o `QUOTE_SELECTED` con `neededByDate` anterior a `CURRENT_DATE − neededByOverdueGraceDays` (por empresa; default 0) **y sin `PurchaseOrder` vinculada en `CONFIRMED/PARTIALLY_RECEIVED/RECEIVED`** genera una notificación diaria `PURCHASE_REQUEST_NEEDED_BY_OVERDUE` (severidad `WARNING`) para aprobadores SC/OC (`APPROVE PURCHASE_REQUESTS|PURCHASE_ORDERS` + `EDIT PROCUREMENT`) con CC OWNER/ADMIN. Dedup por 7 días. Deep-link al detalle de SC. Toggle por empresa `neededByAlertsEnabled`. La card en `/pendientes` marca la SC como `Vencida N d`.
-- **Origen:** [D-097](../00-product/DECISION_LOG.md).
+- **Regla:** una `PurchaseRequest` en `SUBMITTED` o `QUOTE_SELECTED` con `neededByDate` anterior a `CURRENT_DATE − neededByOverdueGraceDays` (por empresa; default 0) genera una notificación diaria `PURCHASE_REQUEST_NEEDED_BY_OVERDUE` (severidad `WARNING`) mientras no esté completa la compra comprometida: cobertura de líneas menor a 100 % **o** alguna línea adjudicada cuya OC aún no está en `CONFIRMED` / `PARTIALLY_RECEIVED` / `RECEIVED`. No alcanza con que exista *alguna* OC confirmada si quedan ítems sin adjudicar o sin confirmar ([BR-PUR-024]). Audience: aprobadores SC/OC (`APPROVE PURCHASE_REQUESTS|PURCHASE_ORDERS` + `EDIT PROCUREMENT`) con CC OWNER/ADMIN. Dedup por 7 días. Deep-link al detalle de SC. Toggle por empresa `neededByAlertsEnabled`. La card en `/pendientes` marca la SC como `Vencida N d`.
+- **Origen:** [D-097](../00-product/DECISION_LOG.md), enmienda multi-OC [D-044].
+
+### BR-PUR-024 — Adjudicación multi-OC por línea completa
+- **Regla:** una `PurchaseRequest` puede generar **N** `PurchaseOrder` activas. Cada `PurchaseRequestLine` se adjudica **entera** a una sola OC (no se parte cantidad entre proveedores). Las cotizaciones siguen cotizando todas las líneas; la adjudicación elige subset por cotización/proveedor. Cobertura 100 % → SC `QUOTE_SELECTED`; todas las OC de cobertura en `CONFIRMED+` → `COMPLETED`. Cotización referenciada por OC activa no se edita ni elimina (freeze). Set de líneas PR en OC proveniente de SC es inmutable (no add/remove de líneas ligadas).
+- **Origen:** [D-044](../00-product/DECISION_LOG.md) (enmienda 2026-09-04).
+
 
 ### BR-PUR-020 — Alerta OC recibida sin factura registrada
 - **Regla:** una `PurchaseOrder` en `PARTIALLY_RECEIVED` o `RECEIVED` con primera `PurchaseReceipt` en `CONFIRMED` cuyo `receiptDate` es de hace ≥ `receiptToInvoiceSlaDays` (por empresa; default 5) **y sin ninguna `SupplierInvoice` en `ISSUED` vinculada** genera una notificación diaria `PURCHASE_ORDER_RECEIVED_WITHOUT_INVOICE` (severidad `WARNING`) para `EDIT|APPROVE AP` con CC OWNER/ADMIN. Dedup por 7 días. Deep-link al detalle de OC (CTA "Registrar factura desde OC"). En `/pendientes` aparece como nuevo item con CTA "Registrar factura" para quien tiene `EDIT AP`. Toggle por empresa `receiptToInvoiceAlertsEnabled`.

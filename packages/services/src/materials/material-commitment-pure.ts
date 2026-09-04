@@ -9,7 +9,7 @@ export const MATERIAL_ORDERED_PO_STATUSES = [
   "RECEIVED",
 ] as const;
 
-/** SC statuses that count when no CONFIRMED+ OC exists for that request. */
+/** SC statuses that count when lines are still unawarded (no active award PO). */
 export const MATERIAL_ORDERED_PR_STATUSES = ["SUBMITTED", "QUOTE_SELECTED"] as const;
 
 const ZERO = new Prisma.Decimal(0);

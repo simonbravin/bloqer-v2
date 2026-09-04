@@ -1,7 +1,7 @@
 import { addDecimal, multiplyDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 
-export type PurchaseRequestEstimatedAmountSource = "budget" | "quote";
+export type PurchaseRequestEstimatedAmountSource = "budget" | "quote" | "orders";
 
 export type PurchaseRequestLineForList = {
   wbsNodeId: string | null;
@@ -41,15 +41,32 @@ export function computeLineSummaries(lines: PurchaseRequestLineForList[]): {
   };
 }
 
+/**
+ * Prefer Σ active award POs (ARS) when any exist; else legacy single selected quote total;
+ * else APU budget estimate.
+ */
 export function computeEstimatedAmount(
   pr: { status: string },
   lines: PurchaseRequestLineForList[],
   selectedQuote: { totalAmount: string; currency: string } | null,
+  activeOrderTotalsArs?: string[] | null,
 ): {
   estimatedAmount: string | null;
   estimatedAmountCurrency: string | null;
   estimatedAmountSource: PurchaseRequestEstimatedAmountSource | null;
 } {
+  if (activeOrderTotalsArs && activeOrderTotalsArs.length > 0) {
+    let total = "0";
+    for (const amount of activeOrderTotalsArs) {
+      total = addDecimal(total, amount);
+    }
+    return {
+      estimatedAmount: serializeMoneyDecimal(total),
+      estimatedAmountCurrency: "ARS",
+      estimatedAmountSource: "orders",
+    };
+  }
+
   if (
     (pr.status === "QUOTE_SELECTED" || pr.status === "COMPLETED") &&
     selectedQuote
@@ -78,9 +95,8 @@ export function computeEstimatedAmount(
 
   let total = "0";
   for (const line of apuLines) {
-    const unitCost = resolveApuLineUnitCost(line)!;
-    const lineTotal = multiplyDecimal(line.quantity, unitCost);
-    total = addDecimal(total, lineTotal);
+    const unit = resolveApuLineUnitCost(line)!;
+    total = addDecimal(total, multiplyDecimal(line.quantity, unit));
   }
 
   return {

@@ -17,7 +17,7 @@ const SC_DEFS = [
   { id: "draft", label: "Borrador" },
   { id: "sent", label: "Enviada" },
   { id: "quoting", label: "Cotizando" },
-  { id: "selected", label: "Elegida" },
+  { id: "selected", label: "Adjudicada" },
   { id: "completed", label: "Completada" },
 ] as const;
 
@@ -50,6 +50,9 @@ export type PurchaseRequestProcessInput = {
   status: PurchaseRequestProcessStatus | string;
   /** When CANCELLED: how far the happy path got (0=Borrador … 3=Elegida). */
   cancelledReachedIndex?: number;
+  /** Partial award progress while status is still SUBMITTED ([BR-PUR-024]). */
+  awardedLineCount?: number;
+  totalLineCount?: number;
 };
 
 export type PurchaseOrderProcessInput = {
@@ -157,6 +160,17 @@ export function buildPurchaseRequestProcessSteps(
     return paintHappyPath(SC_DEFS, 3, false);
   }
   if (status === "SUBMITTED") {
+    const total = input.totalLineCount ?? 0;
+    const awarded = input.awardedLineCount ?? 0;
+    // Partial award still sits on Cotizando, but mark Adjudicada as upcoming with progress via label.
+    if (total > 0 && awarded > 0 && awarded < total) {
+      const steps = paintHappyPath(SC_DEFS, 2, false);
+      return steps.map((s) =>
+        s.id === "quoting"
+          ? { ...s, label: `Cotizando (${awarded}/${total})` }
+          : s,
+      );
+    }
     return paintHappyPath(SC_DEFS, 2, false);
   }
   // DRAFT or unknown → Borrador

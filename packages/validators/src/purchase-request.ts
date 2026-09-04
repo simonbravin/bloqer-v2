@@ -63,7 +63,53 @@ export const confirmPurchaseOrderSchema = z.object({
   fxRate: z.string().regex(/^\d+(\.\d+)?$/).optional(),
 });
 
+/** Award whole PR lines from one quote onto a new DRAFT PO ([BR-PUR-024]). */
+export const createPurchaseOrderFromQuoteLinesSchema = z.object({
+  procurementQuoteId: z.string().uuid(),
+  purchaseRequestLineIds: z
+    .array(z.string().uuid())
+    .min(1, "Seleccioná al menos un ítem")
+    .refine((ids) => new Set(ids).size === ids.length, {
+      message: "Cada ítem solo puede adjudicarse una vez",
+    }),
+});
+
+/** Batch award: one transaction, one OC per quote group ([BR-PUR-024]). */
+export const createPurchaseOrdersFromAwardsSchema = z
+  .object({
+    purchaseRequestId: z.string().uuid(),
+    groups: z
+      .array(
+        z.object({
+          procurementQuoteId: z.string().uuid(),
+          purchaseRequestLineIds: z
+            .array(z.string().uuid())
+            .min(1, "Cada grupo debe tener al menos un ítem")
+            .refine((ids) => new Set(ids).size === ids.length, {
+              message: "Cada ítem solo puede adjudicarse una vez en el grupo",
+            }),
+        }),
+      )
+      .min(1, "Seleccioná al menos un proveedor con ítems"),
+  })
+  .superRefine((val, ctx) => {
+    const all = val.groups.flatMap((g) => g.purchaseRequestLineIds);
+    if (new Set(all).size !== all.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Un mismo ítem no puede adjudicarse a dos proveedores",
+        path: ["groups"],
+      });
+    }
+  });
+
 export type CreatePurchaseRequestInput = z.infer<typeof createPurchaseRequestSchema>;
 export type UpdatePurchaseRequestInput = z.infer<typeof updatePurchaseRequestSchema>;
 export type CreateProcurementQuoteInput = z.infer<typeof createProcurementQuoteSchema>;
 export type UpdateProcurementQuoteInput = z.infer<typeof updateProcurementQuoteSchema>;
+export type CreatePurchaseOrderFromQuoteLinesInput = z.infer<
+  typeof createPurchaseOrderFromQuoteLinesSchema
+>;
+export type CreatePurchaseOrdersFromAwardsInput = z.infer<
+  typeof createPurchaseOrdersFromAwardsSchema
+>;

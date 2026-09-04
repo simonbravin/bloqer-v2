@@ -325,17 +325,13 @@ export async function getProjectMaterialsBoard(
           projectId,
           tenantId: ctx.tenantId,
           status: { in: [...ORDERED_PR_STATUSES] },
-          // Avoid double-count when SC already spawned a CONFIRMED+ OC.
-          purchaseOrders: {
-            none: { status: { in: [...ORDERED_PO_STATUSES] } },
-          },
         },
+        // Unawarded SC lines = still "pedido". Awarded lines counted via active PO lines below.
+        awardedPurchaseOrderId: null,
         wbsNodeId: { not: null },
         OR: [
           { costType: "MATERIAL" },
           { costAnalysisLine: { category: "MATERIAL" } },
-          // No legacy free-text branch: orphans with null type+APU create phantom need=0
-          // rows via ensureRow. Align with resource boards ([D-109]).
         ],
       },
       select: {
@@ -352,12 +348,27 @@ export async function getProjectMaterialsBoard(
         purchaseOrder: {
           projectId,
           tenantId: ctx.tenantId,
-          status: { in: [...ORDERED_PO_STATUSES] },
+          status: { not: "CANCELLED" },
         },
         wbsNodeId: { not: null },
         OR: [
-          { costType: "MATERIAL" },
-          { costAnalysisLine: { category: "MATERIAL" } },
+          // Financially committed POs (pre-existing).
+          { purchaseOrder: { status: { in: [...ORDERED_PO_STATUSES] } } },
+          // Active SC awards not yet CONFIRMED+ ([BR-PUR-024]) — avoid false shortfall / Pedir duplicado.
+          {
+            AND: [
+              { purchaseRequestLineId: { not: null } },
+              { isActiveAward: true },
+            ],
+          },
+        ],
+        AND: [
+          {
+            OR: [
+              { costType: "MATERIAL" },
+              { costAnalysisLine: { category: "MATERIAL" } },
+            ],
+          },
         ],
       },
       select: {

@@ -43,6 +43,8 @@ export type PurchaseRequestLineView = {
   budgetUnitCostSnapshot: string | null;
   /** APU unit cost from costAnalysisLine (for DRAFT estimate before submit snapshot). */
   apuUnitCost: string | null;
+  /** Active award PO id when this line is covered ([BR-PUR-024]). */
+  awardedPurchaseOrderId: string | null;
 };
 
 export type { PurchaseRequestEstimatedAmountSource };
@@ -99,6 +101,7 @@ function serialize(
   requestedByName: string | null = null,
   selectedSupplierName: string | null = null,
   selectedQuote: SelectedQuoteForList | null = null,
+  activeOrderTotalsArs: string[] | null = null,
 ): PurchaseRequestView {
   const summaries = computeLineSummaries(pr.lines);
   const estimated = computeEstimatedAmount(
@@ -119,6 +122,7 @@ function serialize(
           currency: selectedQuote.currency,
         }
       : null,
+    activeOrderTotalsArs,
   );
   return {
     ...pr,
@@ -146,7 +150,14 @@ const selectedQuoteInclude = {
     currency: true,
     supplierContact: { select: { legalName: true, fantasyName: true } },
   },
-  take: 1,
+};
+
+const activePoForEstimateInclude = {
+  where: { status: { not: "CANCELLED" as const } },
+  select: {
+    totalAmountArs: true,
+    supplierContact: { select: { legalName: true, fantasyName: true } },
+  },
 };
 
 function mapPrLines(
@@ -161,6 +172,7 @@ function mapPrLines(
     unit: string;
     quantity: Prisma.Decimal;
     budgetUnitCostSnapshot: Prisma.Decimal | null;
+    awardedPurchaseOrderId?: string | null;
     wbsNode: { code: string; name: string } | null;
     costAnalysisLine: { unitCost: Prisma.Decimal } | null;
   }>,
@@ -182,6 +194,7 @@ function mapPrLines(
       l.costAnalysisLine?.unitCost != null
         ? serializeUnitPriceDecimal(l.costAnalysisLine.unitCost)
         : null,
+    awardedPurchaseOrderId: l.awardedPurchaseOrderId ?? null,
   }));
 }
 
@@ -192,15 +205,38 @@ function selectedQuoteFromRows(
     supplierContact: { legalName: string; fantasyName: string | null };
   }>,
 ): {
-  quote: SelectedQuoteForList;
+  quote: SelectedQuoteForList | null;
   supplierName: string;
 } | null {
-  const q = quotes[0];
-  if (!q) return null;
+  if (quotes.length === 0) return null;
+  const names = [
+    ...new Set(
+      quotes.map((q) => q.supplierContact.fantasyName ?? q.supplierContact.legalName),
+    ),
+  ];
+  // Multi-supplier award: full quote totals are not the awarded subset — prefer OC totals.
+  if (quotes.length > 1) {
+    return {
+      quote: null,
+      supplierName: names.length > 1 ? "Múltiple" : names[0]!,
+    };
+  }
+  const q = quotes[0]!;
   return {
     quote: { totalAmount: q.totalAmount, currency: q.currency },
-    supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
+    supplierName: names[0]!,
   };
+}
+
+function supplierNameFromOrders(
+  orders: Array<{ supplierContact: { legalName: string; fantasyName: string | null } }>,
+): string | null {
+  if (orders.length === 0) return null;
+  const names = [
+    ...new Set(orders.map((o) => o.supplierContact.fantasyName ?? o.supplierContact.legalName)),
+  ];
+  if (names.length > 1) return "Múltiple";
+  return names[0] ?? null;
 }
 
 function assertDraftPr(status: string): void {
@@ -222,20 +258,23 @@ export async function listPurchaseRequestsByProject(
     include: {
       lines: prLineInclude,
       quotes: selectedQuoteInclude,
+      purchaseOrders: activePoForEstimateInclude,
     },
     orderBy: { number: "desc" },
   });
   const nameById = await resolveUserDisplayNames(rows.map((r) => r.requestedByUserId));
   return rows.map((r) => {
     const selected = selectedQuoteFromRows(r.quotes);
+    const fromOrders = supplierNameFromOrders(r.purchaseOrders);
     return serialize(
       {
         ...r,
         lines: mapPrLines(r.lines),
       },
       userDisplayNameFromMap(nameById, r.requestedByUserId),
-      selected?.supplierName ?? null,
+      fromOrders ?? selected?.supplierName ?? null,
       selected?.quote ?? null,
+      r.purchaseOrders.map((po) => serializeMoneyDecimal(po.totalAmountArs)),
     );
   });
 }
@@ -250,19 +289,22 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
     include: {
       lines: prLineInclude,
       quotes: selectedQuoteInclude,
+      purchaseOrders: activePoForEstimateInclude,
     },
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   const nameById = await resolveUserDisplayNames([pr.requestedByUserId]);
   const selected = selectedQuoteFromRows(pr.quotes);
+  const fromOrders = supplierNameFromOrders(pr.purchaseOrders);
   return serialize(
     {
       ...pr,
       lines: mapPrLines(pr.lines),
     },
     userDisplayNameFromMap(nameById, pr.requestedByUserId),
-    selected?.supplierName ?? null,
+    fromOrders ?? selected?.supplierName ?? null,
     selected?.quote ?? null,
+    pr.purchaseOrders.map((po) => serializeMoneyDecimal(po.totalAmountArs)),
   );
 }
 
@@ -418,49 +460,84 @@ export async function getActivePurchaseOrderForRequest(
   purchaseRequestId: string,
   ctx: ServiceContext,
 ): Promise<{ id: string; code: string; status: string; projectId: string } | null> {
-  const { active } = await getPurchaseRequestPoLinks(purchaseRequestId, ctx);
-  return active;
+  const { activeOrders } = await getPurchaseRequestPoLinks(purchaseRequestId, ctx);
+  return activeOrders[0] ?? null;
 }
 
 /**
- * Active OC (non-cancelled) + whether any OC was ever linked (incl. CANCELLED).
- * Parallel queries — one call-site for SC detail banner + cancel stepper heuristic.
+ * Active OCs (non-cancelled) + coverage flags + whether any OC was ever linked.
  */
 export async function getPurchaseRequestPoLinks(
   purchaseRequestId: string,
   ctx: ServiceContext,
 ): Promise<{
-  active: { id: string; code: string; status: string; projectId: string } | null;
+  /** @deprecated Prefer activeOrders — kept for single-banner call-sites. */
+  active: {
+    id: string;
+    code: string;
+    status: string;
+    projectId: string;
+    selectedProcurementQuoteId: string | null;
+  } | null;
+  activeOrders: Array<{
+    id: string;
+    code: string;
+    status: string;
+    projectId: string;
+    selectedProcurementQuoteId: string | null;
+  }>;
   hasAny: boolean;
+  awardedLineCount: number;
+  totalLineCount: number;
+  fullyAwarded: boolean;
 }> {
   await assertProcurementTenantModule(ctx);
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
-  const [activeRow, total] = await Promise.all([
-    prisma.purchaseOrder.findFirst({
+  const [activeRows, total, lines] = await Promise.all([
+    prisma.purchaseOrder.findMany({
       where: {
         purchaseRequestId,
         tenantId: ctx.tenantId,
         status: { not: "CANCELLED" },
       },
-      select: { id: true, number: true, status: true, projectId: true },
-      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        number: true,
+        status: true,
+        projectId: true,
+        selectedProcurementQuoteId: true,
+      },
+      orderBy: { createdAt: "asc" },
     }),
     prisma.purchaseOrder.count({
       where: { purchaseRequestId, tenantId: ctx.tenantId },
     }),
+    prisma.purchaseRequestLine.findMany({
+      where: { purchaseRequestId },
+      select: { awardedPurchaseOrderId: true },
+    }),
   ]);
+  const activeOrders = activeRows.map((row) => ({
+    id: row.id,
+    code: `OC-${String(row.number).padStart(3, "0")}`,
+    status: row.status,
+    projectId: row.projectId,
+    selectedProcurementQuoteId: row.selectedProcurementQuoteId,
+  }));
+  const activeIds = new Set(activeOrders.map((o) => o.id));
+  const totalLineCount = lines.length;
+  const awardedLineCount = lines.filter(
+    (l) => l.awardedPurchaseOrderId != null && activeIds.has(l.awardedPurchaseOrderId),
+  ).length;
   return {
-    active: activeRow
-      ? {
-          id: activeRow.id,
-          code: `OC-${String(activeRow.number).padStart(3, "0")}`,
-          status: activeRow.status,
-          projectId: activeRow.projectId,
-        }
-      : null,
+    active: activeOrders[0] ?? null,
+    activeOrders,
     hasAny: total > 0,
+    awardedLineCount,
+    totalLineCount,
+    fullyAwarded: totalLineCount > 0 && awardedLineCount === totalLineCount,
   };
 }
 

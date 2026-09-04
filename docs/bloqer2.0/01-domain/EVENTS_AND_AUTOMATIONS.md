@@ -110,7 +110,9 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 | `purchase_request.submitted` | DRAFT → SUBMITTED (snapshot presupuesto) |
 | `purchase_request.cancelled` | → CANCELLED |
 | `procurement_quote.received` | cotización cargada |
-| `procurement_quote.selected` | cotización elegida; genera OC DRAFT |
+| `procurement_quote.selected` | cotización aportó líneas a una OC (puede haber N SELECTED por SC al cubrir 100 %) |
+| `purchase_order.created_from_quote` | OC DRAFT creada por adjudicación de líneas de SC ([BR-PUR-024]) |
+| `purchase_request.fully_awarded` | cobertura 100 % de líneas → `QUOTE_SELECTED` |
 
 ### 2.7 Receipt
 

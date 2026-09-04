@@ -21,7 +21,7 @@ Pedidos informales sin comparación de ofertas ni vínculo a partida presupuesta
 ## 5. Datos que produce (outputs)
 - `PurchaseRequest` numerada `SC-NNN` (por empresa).
 - `ProcurementQuote` / líneas con precio, impuestos, **plazo de entrega**, vigencia.
-- OC en `DRAFT` al seleccionar cotización; SC `COMPLETED` al confirmar esa OC.
+- Una o más OC en `DRAFT` al adjudicar líneas (por cotización/proveedor); SC `QUOTE_SELECTED` con cobertura 100 %; `COMPLETED` cuando todas las OC de cobertura están confirmadas ([BR-PUR-024]).
 
 ## 6. Entidades principales
 
@@ -46,8 +46,8 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 2. **Enviar** → snapshot de costo unitario presupuestario + cantidad; notifica a Compras ([BR-PUR-015]).
 3. Cargar ≥ `minQuotesRequired` cotizaciones (precio por línea + **plazo de entrega** + `validUntil`).
 4. **Comparar** cotizaciones (total, desglose, plazo, ref. presupuesto / saldo de partida).
-5. Seleccionar cotización → genera OC `DRAFT` vinculada (una OC activa por SC en Fase 1).
-6. Seguir workflow de OC (enviar → aprobar o devolver → confirmar).
+5. Adjudicar por ítem (o atajo “toda la cotización” sobre líneas libres) → una o más OC `DRAFT` ([BR-PUR-024]); cobertura parcial deja la SC en `SUBMITTED`.
+6. Seguir workflow de cada OC (enviar → aprobar o devolver → confirmar).
 
 ## 9. Pantallas y vistas necesarias
 - `/proyectos/[id]/solicitudes-compra` — listado; filtro pendientes de cotización.
@@ -59,14 +59,17 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 - [BR-PUR-008] OC directa restringida por umbral / política.
 - [BR-PUR-009] Tiers de varianza (aplican al enviar la OC generada).
 - [BR-PUR-010] Cotizaciones mínimas + vigencia + plazo comparable.
+- [BR-PUR-024] Adjudicación multi-OC por línea completa (sin partir qty).
 - [BR-PUR-011] Costo referencial y saldo de partida visibles.
 - [BR-APR-004] Segregación: quien solicita no aprueba (salvo excepción de settings).
 - [BR-APR-005] Factura directa a obra sobre umbral.
 
 ## 11. Validaciones
 - Cada línea: `wbs_node_id` de ítem del presupuesto APPROVED/CLOSED del proyecto.
-- Cotización debe cubrir **todas** las líneas de la SC; un proveedor activo por cotización activa.
-- No seleccionar cotización vencida ni por debajo del mínimo de cotizaciones recibidas.
+- Cotización debe cubrir **todas** las líneas de la SC (comparables); un proveedor activo por cotización activa.
+- Adjudicación: línea SC entera a un solo proveedor/OC; N OC por SC sin solapar líneas ([BR-PUR-024]).
+- No adjudicar cotización vencida ni por debajo del mínimo de cotizaciones recibidas.
+- Cotización usada por OC activa: no editar ni eliminar (freeze).
 
 ## 12. Fórmulas relacionadas
 - Baseline material / unitario: APU del `CostItem` del WBS; ver [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md).

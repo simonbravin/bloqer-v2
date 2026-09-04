@@ -10,6 +10,8 @@ const purchaseOrderLineSchema = z.object({
   costAnalysisLineId: z.string().uuid().optional().nullable(),
   /** Job-cost nature ([D-099]). Defaults to APU category or MATERIAL in the service. */
   costType: costCategorySchema.optional().nullable(),
+  /** SC line link for award-sourced OCs ([BR-PUR-024]) — round-trip on edit. */
+  purchaseRequestLineId: z.string().uuid().optional().nullable(),
   description: z.string().min(1, "Descripción requerida"),
   unit: z.string().default(""),
   quantity: positiveQtyString,
