@@ -8,6 +8,7 @@ export function purchaseRequestProcessSteps(input: {
   status: string;
   submittedAt?: string | Date | null;
   quoteCount: number;
+  /** Any linked OC ever (incl. cancelled) — marks Elegida on anulación. */
   hasLinkedPo: boolean;
 }): ProcessStep[] {
   let cancelledReachedIndex = 0;

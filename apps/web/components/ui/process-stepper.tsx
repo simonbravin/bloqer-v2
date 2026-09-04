@@ -47,11 +47,14 @@ export function ProcessStepper({
   const current = steps.find((s) => s.state === "current" || s.state === "cancelled");
   const currentIndex = current ? steps.findIndex((s) => s.id === current.id) : -1;
   const allDone = steps.length > 0 && steps.every((s) => s.state === "done");
+  const isCancelled = current?.state === "cancelled";
   const mobileSummary = allDone
     ? "Proceso completo"
-    : current && currentIndex >= 0
-      ? `Paso ${currentIndex + 1} de ${steps.length} · ${current.label}`
-      : null;
+    : isCancelled && currentIndex >= 0
+      ? `Anulada en paso ${currentIndex + 1} de ${steps.length}`
+      : current && currentIndex >= 0
+        ? `Paso ${currentIndex + 1} de ${steps.length} · ${current.label}`
+        : null;
 
   useEffect(() => {
     const li = currentRef.current;

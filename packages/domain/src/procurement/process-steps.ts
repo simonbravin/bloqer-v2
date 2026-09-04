@@ -135,10 +135,14 @@ export function buildPurchaseOrderProcessSteps(
     if (input.fullyPaid) {
       return paintHappyPath(OC_DEFS, OC_DEFS.length - 1, true);
     }
-    if (input.hasIssuedInvoice && !input.fullyPaid) {
+    // Still quantity/amount to invoice → stay on Facturar even if some invoices exist.
+    if (!input.invoiceSettled) {
+      return paintHappyPath(OC_DEFS, 4, false);
+    }
+    if (input.hasIssuedInvoice) {
       return paintHappyPath(OC_DEFS, 5, false);
     }
-    // Fully received → next commercial step is Facturar (pending or draft-to-issue).
+    // Settled only via drafts (nothing ISSUED yet) → still Facturar.
     return paintHappyPath(OC_DEFS, 4, false);
   }
 

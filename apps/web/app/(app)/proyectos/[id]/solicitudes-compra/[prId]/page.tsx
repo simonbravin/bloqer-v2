@@ -18,12 +18,18 @@ import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import {
+  submitPurchaseRequestAction,
+  cancelPurchaseRequestAction,
+} from "../actions";
+import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
   getActivePurchaseOrderForRequest,
   getPurchaseRequestById,
+  listEntityDocuments,
   listProcurementQuotesDetailedForRequest,
   listAllContacts,
+  purchaseRequestHasAnyPurchaseOrder,
   ServiceError,
 } from "@bloqer/services";
 import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
@@ -36,11 +42,6 @@ import { EntityDocumentsPanel } from "@/features/documents";
 import { ProcessStepper } from "@/components/ui/process-stepper";
 import { purchaseRequestProcessSteps } from "@/features/procurement/lib/purchase-request-process-steps";
 import { isStorageConfigured } from "@bloqer/config";
-import { listEntityDocuments } from "@bloqer/services";
-import {
-  submitPurchaseRequestAction,
-  cancelPurchaseRequestAction,
-} from "../actions";
 
 interface PageProps {
   params: Promise<{ id: string; prId: string }>;
@@ -73,10 +74,12 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
 
   let quotes;
   let linkedPo;
+  let hasAnyPo;
   try {
-    [quotes, linkedPo] = await Promise.all([
+    [quotes, linkedPo, hasAnyPo] = await Promise.all([
       listProcurementQuotesDetailedForRequest(prId, ctx),
       getActivePurchaseOrderForRequest(prId, ctx),
+      purchaseRequestHasAnyPurchaseOrder(prId, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -157,7 +160,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           status: pr.status,
           submittedAt: pr.submittedAt,
           quoteCount: quotes.length,
-          hasLinkedPo: Boolean(linkedPo),
+          // Include cancelled OCs: SC cancel requires OC cancel first, so active-only would under-mark Elegida.
+          hasLinkedPo: hasAnyPo,
         })}
       />
 

@@ -126,6 +126,19 @@ describe("buildPurchaseOrderProcessSteps", () => {
     assert.equal(s.find((x) => x.id === "pay")?.state, "current");
   });
 
+  it("RECEIVED + partial invoice still pending → Facturar (not Pagar)", () => {
+    const s = buildPurchaseOrderProcessSteps({
+      ...base,
+      status: "RECEIVED",
+      hasReceivedQuantity: true,
+      invoiceSettled: false,
+      hasIssuedInvoice: true,
+      fullyPaid: false,
+    });
+    assert.equal(s.find((x) => x.id === "invoice")?.state, "current");
+    assert.equal(s.find((x) => x.id === "pay")?.state, "upcoming");
+  });
+
   it("RECEIVED + fully paid → all done", () => {
     const s = buildPurchaseOrderProcessSteps({
       ...base,

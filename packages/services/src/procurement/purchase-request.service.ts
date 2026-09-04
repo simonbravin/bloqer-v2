@@ -439,6 +439,21 @@ export async function getActivePurchaseOrderForRequest(
   };
 }
 
+/** True if any OC (including CANCELLED) was ever linked — used for cancel stepper heuristics. */
+export async function purchaseRequestHasAnyPurchaseOrder(
+  purchaseRequestId: string,
+  ctx: ServiceContext,
+): Promise<boolean> {
+  await assertProcurementTenantModule(ctx);
+  if (!canViewPurchaseRequests(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos");
+  }
+  const n = await prisma.purchaseOrder.count({
+    where: { purchaseRequestId, tenantId: ctx.tenantId },
+  });
+  return n > 0;
+}
+
 export async function cancelPurchaseRequest(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseRequests(ctx.roles)) {
