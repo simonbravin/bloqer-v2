@@ -418,40 +418,59 @@ export async function getActivePurchaseOrderForRequest(
   purchaseRequestId: string,
   ctx: ServiceContext,
 ): Promise<{ id: string; code: string; status: string; projectId: string } | null> {
+  const { active } = await getPurchaseRequestPoLinks(purchaseRequestId, ctx);
+  return active;
+}
+
+/**
+ * Active OC (non-cancelled) + whether any OC was ever linked (incl. CANCELLED).
+ * Parallel queries — one call-site for SC detail banner + cancel stepper heuristic.
+ */
+export async function getPurchaseRequestPoLinks(
+  purchaseRequestId: string,
+  ctx: ServiceContext,
+): Promise<{
+  active: { id: string; code: string; status: string; projectId: string } | null;
+  hasAny: boolean;
+}> {
   await assertProcurementTenantModule(ctx);
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
-  const po = await prisma.purchaseOrder.findFirst({
-    where: {
-      purchaseRequestId,
-      tenantId: ctx.tenantId,
-      status: { not: "CANCELLED" },
-    },
-    select: { id: true, number: true, status: true, projectId: true },
-  });
-  if (!po) return null;
+  const [activeRow, total] = await Promise.all([
+    prisma.purchaseOrder.findFirst({
+      where: {
+        purchaseRequestId,
+        tenantId: ctx.tenantId,
+        status: { not: "CANCELLED" },
+      },
+      select: { id: true, number: true, status: true, projectId: true },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.purchaseOrder.count({
+      where: { purchaseRequestId, tenantId: ctx.tenantId },
+    }),
+  ]);
   return {
-    id: po.id,
-    code: `OC-${String(po.number).padStart(3, "0")}`,
-    status: po.status,
-    projectId: po.projectId,
+    active: activeRow
+      ? {
+          id: activeRow.id,
+          code: `OC-${String(activeRow.number).padStart(3, "0")}`,
+          status: activeRow.status,
+          projectId: activeRow.projectId,
+        }
+      : null,
+    hasAny: total > 0,
   };
 }
 
-/** True if any OC (including CANCELLED) was ever linked — used for cancel stepper heuristics. */
+/** @deprecated Prefer getPurchaseRequestPoLinks — kept for call-sites that only need the flag. */
 export async function purchaseRequestHasAnyPurchaseOrder(
   purchaseRequestId: string,
   ctx: ServiceContext,
 ): Promise<boolean> {
-  await assertProcurementTenantModule(ctx);
-  if (!canViewPurchaseRequests(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos");
-  }
-  const n = await prisma.purchaseOrder.count({
-    where: { purchaseRequestId, tenantId: ctx.tenantId },
-  });
-  return n > 0;
+  const { hasAny } = await getPurchaseRequestPoLinks(purchaseRequestId, ctx);
+  return hasAny;
 }
 
 export async function cancelPurchaseRequest(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {

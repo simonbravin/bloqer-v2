@@ -24,12 +24,11 @@ import {
 import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
-  getActivePurchaseOrderForRequest,
   getPurchaseRequestById,
+  getPurchaseRequestPoLinks,
   listEntityDocuments,
   listProcurementQuotesDetailedForRequest,
   listAllContacts,
-  purchaseRequestHasAnyPurchaseOrder,
   ServiceError,
 } from "@bloqer/services";
 import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
@@ -76,11 +75,13 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
   let linkedPo;
   let hasAnyPo;
   try {
-    [quotes, linkedPo, hasAnyPo] = await Promise.all([
+    const [quoteRows, poLinks] = await Promise.all([
       listProcurementQuotesDetailedForRequest(prId, ctx),
-      getActivePurchaseOrderForRequest(prId, ctx),
-      purchaseRequestHasAnyPurchaseOrder(prId, ctx),
+      getPurchaseRequestPoLinks(prId, ctx),
     ]);
+    quotes = quoteRows;
+    linkedPo = poLinks.active;
+    hasAnyPo = poLinks.hasAny;
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;

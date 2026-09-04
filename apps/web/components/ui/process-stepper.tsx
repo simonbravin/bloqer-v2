@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 import type { ProcessStep } from "@bloqer/domain";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +36,13 @@ function labelClass(state: ProcessStep["state"]): string {
   }
 }
 
+function stepAccessibleName(step: ProcessStep): string {
+  if (step.state === "cancelled" && step.replacedLabel) {
+    return `${step.replacedLabel}: Anulada`;
+  }
+  return step.label;
+}
+
 export function ProcessStepper({
   steps,
   "aria-label": ariaLabel = "Progreso del proceso",
@@ -43,52 +50,90 @@ export function ProcessStepper({
 }: Props) {
   const scrollerRef = useRef<HTMLOListElement>(null);
   const currentRef = useRef<HTMLLIElement>(null);
+  const summaryId = useId();
 
-  const current = steps.find((s) => s.state === "current" || s.state === "cancelled");
-  const currentIndex = current ? steps.findIndex((s) => s.id === current.id) : -1;
+  const currentIndex = steps.findIndex((s) => s.state === "current" || s.state === "cancelled");
+  const current = currentIndex >= 0 ? steps[currentIndex] : undefined;
   const allDone = steps.length > 0 && steps.every((s) => s.state === "done");
+  const trackCancelled = steps.some((s) => s.state === "cancelled");
   const isCancelled = current?.state === "cancelled";
-  const mobileSummary = allDone
-    ? "Proceso completo"
-    : isCancelled && currentIndex >= 0
-      ? `Anulada en paso ${currentIndex + 1} de ${steps.length}`
-      : current && currentIndex >= 0
-        ? `Paso ${currentIndex + 1} de ${steps.length} · ${current.label}`
-        : null;
+  const mobileSummary =
+    steps.length === 0
+      ? null
+      : allDone
+        ? "Proceso completo"
+        : isCancelled && currentIndex >= 0
+          ? `Anulada en paso ${currentIndex + 1} de ${steps.length}`
+          : current && currentIndex >= 0
+            ? `Paso ${currentIndex + 1} de ${steps.length} · ${current.label}`
+            : null;
 
   useEffect(() => {
+    if (steps.length === 0) return;
     const li = currentRef.current;
     const scroller = scrollerRef.current;
     if (!li || !scroller) return;
-    const liRect = li.getBoundingClientRect();
-    const scRect = scroller.getBoundingClientRect();
-    // Only nudge horizontally when the active step is clipped — avoids jumping the page.
-    if (liRect.left >= scRect.left && liRect.right <= scRect.right) return;
-    li.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
-  }, [current?.id]);
+
+    const preferReduced =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    const run = () => {
+      const liRect = li.getBoundingClientRect();
+      const scRect = scroller.getBoundingClientRect();
+      // Only nudge horizontally when the active step is clipped — avoids jumping the page.
+      if (liRect.left >= scRect.left && liRect.right <= scRect.right) return;
+      li.scrollIntoView({
+        behavior: preferReduced ? "auto" : "smooth",
+        inline: "center",
+        block: "nearest",
+      });
+    };
+
+    const raf = window.requestAnimationFrame(run);
+    return () => window.cancelAnimationFrame(raf);
+  }, [current?.id, steps.length]);
+
+  if (steps.length === 0) return null;
 
   return (
     <div className={cn("rounded-lg border bg-card px-3 py-2.5", className)}>
       {mobileSummary ? (
-        <p className="mb-2 text-sm font-medium text-foreground sm:hidden">{mobileSummary}</p>
+        <p
+          id={summaryId}
+          className="mb-2 text-sm font-medium text-foreground sm:hidden"
+          role="status"
+        >
+          {mobileSummary}
+        </p>
       ) : null}
       <ol
         ref={scrollerRef}
         aria-label={ariaLabel}
-        className="flex items-center gap-0 overflow-x-auto overscroll-x-contain pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        aria-describedby={mobileSummary ? summaryId : undefined}
+        className={cn(
+          "flex list-none items-center gap-0 overflow-x-auto overscroll-x-contain pb-0.5",
+          // Thin scrollbar on small screens (discoverability); hide chrome on sm+.
+          "[scrollbar-width:thin] sm:[scrollbar-width:none] sm:[-ms-overflow-style:none] sm:[&::-webkit-scrollbar]:hidden",
+        )}
       >
         {steps.map((step, index) => {
           const n = index + 1;
           const isFocus = step.state === "current" || step.state === "cancelled";
+          const dimUpcoming = trackCancelled && step.state === "upcoming";
           return (
             <li
               key={step.id}
               ref={isFocus ? currentRef : undefined}
-              className="flex shrink-0 items-center sm:min-w-0 sm:flex-1"
+              aria-current={isFocus ? "step" : undefined}
+              className={cn(
+                "flex shrink-0 items-center sm:min-w-0 sm:flex-1",
+                dimUpcoming && "opacity-40",
+              )}
             >
               <div className="flex shrink-0 items-center gap-1.5">
                 <span
-                  aria-current={isFocus ? "step" : undefined}
+                  aria-hidden
                   className={cn(
                     "inline-flex size-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold tabular-nums sm:size-6",
                     circleClass(step.state),
@@ -96,8 +141,10 @@ export function ProcessStepper({
                 >
                   {n}
                 </span>
+                <span className="sr-only">{stepAccessibleName(step)}</span>
                 {/* Labels: always on sm+; on mobile only the active step (summary covers the rest). */}
                 <span
+                  aria-hidden
                   className={cn(
                     "whitespace-nowrap text-xs",
                     labelClass(step.state),

@@ -139,6 +139,8 @@ export {
   PURCHASE_REQUEST_PROCESS_STEP_DEFS,
   buildPurchaseOrderProcessSteps,
   buildPurchaseRequestProcessSteps,
+  resolvePurchaseOrderCancelledIndex,
+  resolvePurchaseRequestCancelledIndex,
   type ProcessStep,
   type ProcessStepState,
   type PurchaseOrderProcessInput,

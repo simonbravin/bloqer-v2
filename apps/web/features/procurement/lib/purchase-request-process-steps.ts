@@ -1,5 +1,6 @@
 import {
   buildPurchaseRequestProcessSteps,
+  resolvePurchaseRequestCancelledIndex,
   type ProcessStep,
 } from "@bloqer/domain";
 
@@ -11,12 +12,15 @@ export function purchaseRequestProcessSteps(input: {
   /** Any linked OC ever (incl. cancelled) — marks Elegida on anulación. */
   hasLinkedPo: boolean;
 }): ProcessStep[] {
-  let cancelledReachedIndex = 0;
-  if (input.status === "CANCELLED") {
-    if (input.hasLinkedPo) cancelledReachedIndex = 3;
-    else if (input.quoteCount > 0 || input.submittedAt) cancelledReachedIndex = 2;
-    else cancelledReachedIndex = 0;
-  }
+  const cancelledReachedIndex =
+    input.status === "CANCELLED"
+      ? resolvePurchaseRequestCancelledIndex({
+          hasLinkedPo: input.hasLinkedPo,
+          quoteCount: input.quoteCount,
+          submittedAt: input.submittedAt,
+        })
+      : 0;
+
   return buildPurchaseRequestProcessSteps({
     status: input.status,
     cancelledReachedIndex,

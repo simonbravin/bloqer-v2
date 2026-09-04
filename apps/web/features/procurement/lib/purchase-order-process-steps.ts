@@ -1,5 +1,6 @@
 import {
   buildPurchaseOrderProcessSteps,
+  resolvePurchaseOrderCancelledIndex,
   type ProcessStep,
 } from "@bloqer/domain";
 
@@ -13,16 +14,24 @@ export function purchaseOrderProcessSteps(input: {
   fullyPaid: boolean;
   approvedAt?: string | Date | null;
   confirmedAt?: string | Date | null;
+  /**
+   * True when the OC left DRAFT (SUBMITTED+) before cancel.
+   * Used when approvedAt/confirmedAt are null (cancel while pending approval).
+   */
+  leftDraft?: boolean;
 }): ProcessStep[] {
-  let cancelledReachedIndex = 0;
-  if (input.status === "CANCELLED") {
-    // No prior-status column: infer from timestamps / billing (cancel blocked after receive).
-    if (input.hasIssuedInvoice || input.fullyPaid) cancelledReachedIndex = 4;
-    else if (input.hasReceivedQuantity || input.confirmedAt) cancelledReachedIndex = 3;
-    else if (input.approvedAt) cancelledReachedIndex = 2;
-    // SUBMITTED-without-approve vs DRAFT both lack timestamps → default Borrador (conservative).
-    else cancelledReachedIndex = 0;
-  }
+  const cancelledReachedIndex =
+    input.status === "CANCELLED"
+      ? resolvePurchaseOrderCancelledIndex({
+          hasReceivedQuantity: input.hasReceivedQuantity,
+          hasIssuedInvoice: input.hasIssuedInvoice,
+          fullyPaid: input.fullyPaid,
+          approvedAt: input.approvedAt,
+          confirmedAt: input.confirmedAt,
+          leftDraft: input.leftDraft,
+        })
+      : 0;
+
   return buildPurchaseOrderProcessSteps({
     status: input.status,
     hasReceivedQuantity: input.hasReceivedQuantity,

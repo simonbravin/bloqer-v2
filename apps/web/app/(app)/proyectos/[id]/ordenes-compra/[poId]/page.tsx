@@ -197,8 +197,10 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const hasIssuedInvoice = isPositiveMoneyAmount(billing.invoicedAmount);
   const invoiceSettled = !isPositiveMoneyAmount(billing.pendingToInvoice);
+  // Stepper "complete" requires received fully invoiced AND payables covering invoiced.
   const fullyPaid =
     hasIssuedInvoice &&
+    invoiceSettled &&
     compareDecimal(billing.paidAmount || "0", billing.invoicedAmount || "0") >= 0;
   const hasActions =
     (isDraft && canEditPo) ||
@@ -327,6 +329,8 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           fullyPaid,
           approvedAt: order.approvedAt,
           confirmedAt: order.confirmedAt,
+          // Returned-to-draft then cancelled: was past Borrador at least once.
+          leftDraft: Boolean(order.returnedAt),
         })}
       />
 
