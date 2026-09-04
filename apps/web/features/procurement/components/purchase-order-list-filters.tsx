@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { cn } from "@/lib/utils";
+import { matchesListStatusFilter } from "../lib/matches-list-status-filter";
 import { PurchaseOrderListSection } from "./purchase-order-list-section";
 import type { PurchaseOrderListItem } from "./purchase-order-list";
 
@@ -35,6 +37,9 @@ interface Props {
 }
 
 export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PoStatusFilter | null>(initialStatus ?? null);
 
@@ -43,18 +48,31 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
     setStatus(initialStatus ?? null);
   }, [initialStatus]);
 
+  function setStatusFilter(next: PoStatusFilter | null) {
+    setStatus(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("status", next);
+    else params.delete("status");
+    params.delete("create");
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }
+
   const countsByStatus = useMemo(() => {
     const map = new Map<string, number>();
     for (const o of orders) map.set(o.status, (map.get(o.status) ?? 0) + 1);
     return map;
   }, [orders]);
 
+  const cancelledCount = countsByStatus.get("CANCELLED") ?? 0;
+  const activeCount = orders.length - cancelledCount;
+
   const trimmedSearch = search.trim();
 
   const filtered = useMemo(() => {
     const q = normalize(trimmedSearch);
     return orders.filter((o) => {
-      if (status && o.status !== status) return false;
+      if (!matchesListStatusFilter(o.status, status)) return false;
       if (!q) return true;
       const haystack = normalize(
         `${o.code} ${o.supplierName} ${o.approvedByName ?? ""}`,
@@ -64,11 +82,17 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
   }, [orders, trimmedSearch, status]);
 
   const hasActiveFilters = trimmedSearch.length > 0 || status !== null;
-  const filteredToZero = hasActiveFilters && filtered.length === 0 && orders.length > 0;
+  const filteredToZero = filtered.length === 0 && orders.length > 0;
+  const onlyCancelledRemain =
+    status === null &&
+    !trimmedSearch &&
+    filteredToZero &&
+    cancelledCount > 0 &&
+    activeCount === 0;
 
   const clearFilters = () => {
     setSearch("");
-    setStatus(null);
+    setStatusFilter(null);
   };
 
   if (orders.length === 0) {
@@ -112,12 +136,12 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
             type="button"
             size="sm"
             variant={status === null ? "secondary" : "outline"}
-            onClick={() => setStatus(null)}
+            onClick={() => setStatusFilter(null)}
             className="h-8"
             aria-pressed={status === null}
           >
-            Todas
-            <span className="ml-1.5 text-muted-foreground">{orders.length}</span>
+            Activas
+            <span className="ml-1.5 text-muted-foreground">{activeCount}</span>
           </Button>
           {STATUS_FILTERS.map((f) => {
             const count = countsByStatus.get(f.value) ?? 0;
@@ -128,7 +152,7 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
                 type="button"
                 size="sm"
                 variant={active ? "secondary" : "outline"}
-                onClick={() => setStatus(active ? null : f.value)}
+                onClick={() => setStatusFilter(active ? null : f.value)}
                 className={cn(
                   "h-8",
                   count === 0 && !active && "opacity-60",
@@ -142,23 +166,31 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
           })}
         </div>
 
-        {hasActiveFilters ? (
+        {hasActiveFilters || filtered.length !== activeCount ? (
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            {filtered.length === orders.length
-              ? `${filtered.length} ${filtered.length === 1 ? "orden" : "órdenes"}`
-              : `${filtered.length} de ${orders.length} mostradas`}
+            {`${filtered.length} ${filtered.length === 1 ? "orden" : "órdenes"} mostradas`}
           </p>
         ) : null}
       </div>
 
       {filteredToZero ? (
         <ListEmptyState
-          title="Sin resultados"
-          description="Probá con otro término o quitá los filtros."
+          title={onlyCancelledRemain ? "No hay órdenes activas" : "Sin resultados"}
+          description={
+            onlyCancelledRemain
+              ? "Usá Anulada para ver las órdenes anuladas."
+              : "Probá con otro término o quitá los filtros."
+          }
           action={
-            <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
-              Quitar filtros
-            </Button>
+            onlyCancelledRemain ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => setStatusFilter("CANCELLED")}>
+                Ver anuladas
+              </Button>
+            ) : (
+              <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
+                Quitar filtros
+              </Button>
+            )
           }
         />
       ) : (

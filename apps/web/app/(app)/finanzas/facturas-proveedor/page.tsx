@@ -20,6 +20,7 @@ import { isStorageConfigured } from "@bloqer/config";
 import { listCompanySupplierInvoices, listAllContacts, getCompanyFiscalContext, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
+import { parsePage } from "@/lib/parse-page";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
@@ -44,7 +45,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
   if (!current?.tenantCtx) redirect("/login");
 
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const page = parsePage(sp.page);
   const status =
     sp.status && (STATUSES as readonly string[]).includes(sp.status)
       ? (sp.status as (typeof STATUSES)[number])
@@ -121,9 +122,34 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     if (next.search) p.set("search", next.search);
     if (next.dir) p.set("dir", next.dir);
     if (next.sort) p.set("sort", next.sort);
+    if (next.class) p.set("class", next.class);
     const s = p.toString();
     return s ? `?${s}` : "";
   }
+
+  const hasExtraFilters = Boolean(sp.search?.trim() || sp.class || sp.from || sp.to);
+
+  const emptyCopy = !status
+    ? {
+        title: hasExtraFilters ? "No hay facturas activas con estos filtros" : "No hay facturas activas",
+        description: hasExtraFilters
+          ? "Probá otra búsqueda, clase o rango. También podés revisar Anuladas."
+          : "Usá Anuladas para ver las facturas anuladas, o registrá una nueva.",
+        showCancelledCta: true,
+      }
+    : status === "CANCELLED"
+      ? {
+          title: hasExtraFilters ? "No hay facturas anuladas con estos filtros" : "No hay facturas anuladas",
+          description: hasExtraFilters
+            ? "Probá otra búsqueda, clase o rango de fechas."
+            : "No hay comprobantes anulados.",
+          showCancelledCta: false,
+        }
+      : {
+          title: "No hay facturas con los filtros actuales",
+          description: "Probá otro estado, clase o rango de fechas.",
+          showCancelledCta: false,
+        };
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -137,7 +163,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           </Suspense>
           <ReportExportActions
             exportPath="/api/reports/finanzas/facturas-proveedor-corporativo.csv"
-            params={{ status: status ?? "ALL", from: sp.from, to: sp.to, class: sp.class }}
+            params={{ status: status ?? "ACTIVE", from: sp.from, to: sp.to, class: sp.class }}
             pdf
             label="Exportar"
           />
@@ -158,14 +184,16 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs text-muted-foreground mr-1">Estado:</span>
         <Button asChild variant={!status ? "secondary" : "outline"} size="sm">
-          <Link href={`/finanzas/facturas-proveedor${q({ from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort })}`}>
-            Todas
+          <Link
+            href={`/finanzas/facturas-proveedor${q({ from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+          >
+            Activas
           </Link>
         </Button>
         {STATUSES.map((s) => (
           <Button key={s} asChild variant={status === s ? "secondary" : "outline"} size="sm">
             <Link
-              href={`/finanzas/facturas-proveedor${q({ status: s, from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort })}`}
+              href={`/finanzas/facturas-proveedor${q({ status: s, from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
             >
               {s === "DRAFT" ? "Borrador" : s === "ISSUED" ? "Emitidas" : "Anuladas"}
             </Link>
@@ -178,8 +206,18 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       </Suspense>
 
       {items.length === 0 ? (
-        <div className="rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground">
-          <p>No hay facturas con los filtros actuales.</p>
+        <div className="rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground space-y-3">
+          <p className="font-medium text-foreground">{emptyCopy.title}</p>
+          <p>{emptyCopy.description}</p>
+          {!status && emptyCopy.showCancelledCta ? (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={`/finanzas/facturas-proveedor${q({ status: "CANCELLED", from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+              >
+                Ver anuladas
+              </Link>
+            </Button>
+          ) : null}
         </div>
       ) : (
         <Suspense fallback={<ListSectionSkeleton />}>

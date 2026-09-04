@@ -11,6 +11,10 @@ test("supplier invoice export defaults to ISSUED for scheduled/API callers", () 
   });
 });
 
+test("supplier invoice export ACTIVE matches Activas list (hides cancelled)", () => {
+  assert.deepEqual(parseCompanySupplierInvoiceExportFilters({ status: "ACTIVE" }), {});
+});
+
 test("supplier invoice export accepts ALL for UI parity", () => {
   assert.deepEqual(
     parseCompanySupplierInvoiceExportFilters({
@@ -19,7 +23,7 @@ test("supplier invoice export accepts ALL for UI parity", () => {
       to: "2026-01-31",
     }),
     {
-      status: undefined,
+      includeCancelled: true,
       issueDateFrom: "2026-01-01",
       issueDateTo: "2026-01-31",
     },

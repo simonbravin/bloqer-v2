@@ -143,7 +143,8 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
     approvedByName: o.approvedByName,
   }));
 
-  const subtitle = `${items.length} ${items.length === 1 ? "orden" : "órdenes"}`;
+  const activeCount = items.filter((o) => o.status !== "CANCELLED").length;
+  const subtitle = `${activeCount} ${activeCount === 1 ? "orden activa" : "órdenes activas"}`;
 
   return (
     <PageShell variant="default" className="space-y-6">

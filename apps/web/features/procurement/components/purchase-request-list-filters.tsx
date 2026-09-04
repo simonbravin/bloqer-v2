@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { cn } from "@/lib/utils";
 import type { PurchaseRequestView } from "@bloqer/services";
+import { matchesListStatusFilter } from "../lib/matches-list-status-filter";
 import { PurchaseRequestMobileCards } from "./purchase-request-mobile-cards";
 import { PurchaseRequestTable } from "./purchase-request-table";
 
@@ -55,6 +57,9 @@ export function PurchaseRequestListFilters({
   initialStatus,
   canCreate,
 }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PrStatusFilter | null>(initialStatus ?? null);
 
@@ -63,31 +68,50 @@ export function PurchaseRequestListFilters({
     setStatus(initialStatus ?? null);
   }, [initialStatus]);
 
+  function setStatusFilter(next: PrStatusFilter | null) {
+    setStatus(next);
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("status", next);
+    else params.delete("status");
+    params.delete("create");
+    const q = params.toString();
+    router.replace(q ? `${pathname}?${q}` : pathname, { scroll: false });
+  }
+
   const countsByStatus = useMemo(() => {
     const map = new Map<string, number>();
     for (const pr of requests) map.set(pr.status, (map.get(pr.status) ?? 0) + 1);
     return map;
   }, [requests]);
 
+  const cancelledCount = countsByStatus.get("CANCELLED") ?? 0;
+  const activeCount = requests.length - cancelledCount;
+
   const trimmedSearch = search.trim();
 
   const filtered = useMemo(() => {
     const q = normalize(trimmedSearch);
     return requests.filter((pr) => {
-      if (status && pr.status !== status) return false;
+      if (!matchesListStatusFilter(pr.status, status)) return false;
       if (!q) return true;
       return requestSearchHaystack(pr).includes(q);
     });
   }, [requests, trimmedSearch, status]);
 
   const hasActiveFilters = trimmedSearch.length > 0 || status !== null;
-  const filteredToZero = hasActiveFilters && filtered.length === 0 && requests.length > 0;
+  const filteredToZero = filtered.length === 0 && requests.length > 0;
+  const onlyCancelledRemain =
+    status === null &&
+    !trimmedSearch &&
+    filteredToZero &&
+    cancelledCount > 0 &&
+    activeCount === 0;
 
   const listHref = `/proyectos/${projectId}/solicitudes-compra`;
 
   const clearFilters = () => {
     setSearch("");
-    setStatus(null);
+    setStatusFilter(null);
   };
 
   const noBaseRequests = requests.length === 0;
@@ -176,12 +200,12 @@ export function PurchaseRequestListFilters({
             type="button"
             size="sm"
             variant={status === null ? "secondary" : "outline"}
-            onClick={() => setStatus(null)}
+            onClick={() => setStatusFilter(null)}
             className="h-8"
             aria-pressed={status === null}
           >
-            Todas
-            <span className="ml-1.5 text-muted-foreground">{requests.length}</span>
+            Activas
+            <span className="ml-1.5 text-muted-foreground">{activeCount}</span>
           </Button>
           {STATUS_FILTERS.map((f) => {
             const count = countsByStatus.get(f.value) ?? 0;
@@ -192,7 +216,7 @@ export function PurchaseRequestListFilters({
                 type="button"
                 size="sm"
                 variant={active ? "secondary" : "outline"}
-                onClick={() => setStatus(active ? null : f.value)}
+                onClick={() => setStatusFilter(active ? null : f.value)}
                 className={cn("h-8", count === 0 && !active && "opacity-60")}
                 aria-pressed={active}
               >
@@ -203,23 +227,31 @@ export function PurchaseRequestListFilters({
           })}
         </div>
 
-        {hasActiveFilters ? (
+        {hasActiveFilters || filtered.length !== activeCount ? (
           <p className="text-xs text-muted-foreground" aria-live="polite">
-            {filtered.length === requests.length
-              ? `${filtered.length} ${filtered.length === 1 ? "solicitud" : "solicitudes"}`
-              : `${filtered.length} de ${requests.length} mostradas`}
+            {`${filtered.length} ${filtered.length === 1 ? "solicitud" : "solicitudes"} mostradas`}
           </p>
         ) : null}
       </div>
 
       {filteredToZero ? (
         <ListEmptyState
-          title="Sin resultados"
-          description="Probá con otro término o quitá los filtros."
+          title={onlyCancelledRemain ? "No hay solicitudes activas" : "Sin resultados"}
+          description={
+            onlyCancelledRemain
+              ? "Usá Anulada para ver las solicitudes anuladas."
+              : "Probá con otro término o quitá los filtros."
+          }
           action={
-            <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
-              Quitar filtros
-            </Button>
+            onlyCancelledRemain ? (
+              <Button type="button" size="sm" variant="outline" onClick={() => setStatusFilter("CANCELLED")}>
+                Ver anuladas
+              </Button>
+            ) : (
+              <Button type="button" size="sm" variant="outline" onClick={clearFilters}>
+                Quitar filtros
+              </Button>
+            )
           }
         />
       ) : (

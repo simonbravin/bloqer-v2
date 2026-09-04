@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
+import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { NewPurchaseRequestDialog } from "@/features/procurement";
 import { PurchaseRequestListFilters } from "@/features/procurement/components/purchase-request-list-filters";
 import type { WbsOption } from "@/features/procurement";
@@ -128,7 +129,8 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
     </Suspense>
   ) : null;
 
-  const subtitle = `${requests.length} ${requests.length === 1 ? "solicitud" : "solicitudes"}`;
+  const activeCount = requests.filter((r) => r.status !== "CANCELLED").length;
+  const subtitle = `${activeCount} ${activeCount === 1 ? "solicitud activa" : "solicitudes activas"}`;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -154,12 +156,14 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
         }
       />
 
-      <PurchaseRequestListFilters
-        requests={requests}
-        projectId={id}
-        initialStatus={statusFilter}
-        canCreate={canCreate}
-      />
+      <Suspense fallback={<ListSectionSkeleton />}>
+        <PurchaseRequestListFilters
+          requests={requests}
+          projectId={id}
+          initialStatus={statusFilter}
+          canCreate={canCreate}
+        />
+      </Suspense>
     </PageShell>
   );
 }

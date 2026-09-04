@@ -8,6 +8,7 @@ import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcemen
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards";
+import { supplierInvoiceListStatusWhere } from "./supplier-invoice-list-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
@@ -326,6 +327,9 @@ export type ProjectSupplierInvoiceListFilters = {
   sortDir?: "asc" | "desc";
   /** Derived document class filter ([D-102]). */
   class?: string;
+  status?: "DRAFT" | "ISSUED" | "CANCELLED";
+  /** When true and status omitted, include CANCELLED (export ALL). Default: hide cancelled. */
+  includeCancelled?: boolean;
 };
 
 export type ProjectSupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> & {
@@ -374,6 +378,7 @@ export async function listSupplierInvoicesByProject(
   const where: Prisma.SupplierInvoiceWhereInput = {
     projectId,
     tenantId: ctx.tenantId,
+    ...supplierInvoiceListStatusWhere(filters),
     ...(search ? supplierInvoiceSearchWhere(search) : {}),
     ...(classCode ? supplierInvoiceClassWhere(classCode) : {}),
   };
@@ -419,6 +424,8 @@ export async function countOpenSupplierInvoicesByProject(
 
 export type CompanySupplierInvoiceListFilters = {
   status?:            "DRAFT" | "ISSUED" | "CANCELLED";
+  /** When true and status omitted, include CANCELLED (export ALL). Default: hide cancelled. */
+  includeCancelled?: boolean;
   supplierContactId?: string;
   issueDateFrom?:    string;
   issueDateTo?:      string;
@@ -456,7 +463,7 @@ export async function listCompanySupplierInvoices(
     projectId: null,
     // SupplierInvoice.companyId es NOT NULL → scope directo por empresa.
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
-    ...(filters?.status ? { status: filters.status } : {}),
+    ...supplierInvoiceListStatusWhere(filters),
     ...(filters?.supplierContactId ? { supplierContactId: filters.supplierContactId } : {}),
     ...(filters?.issueDateFrom || filters?.issueDateTo
       ? {

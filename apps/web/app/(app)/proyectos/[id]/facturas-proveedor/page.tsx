@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 
 const PAGE_SIZE = 20;
+const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -48,6 +50,7 @@ interface PageProps {
     create?: string;
     error?: string;
     class?: string;
+    status?: string;
     wbsNodeId?: string;
     description?: string;
     quantity?: string;
@@ -65,6 +68,10 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
   const { id } = await params;
   const sp = await searchParams;
   const page = parsePage(sp.page);
+  const status =
+    sp.status && (STATUSES as readonly string[]).includes(sp.status)
+      ? (sp.status as (typeof STATUSES)[number])
+      : undefined;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -89,6 +96,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
       search: sp.search,
       sortDir: sp.dir === "asc" ? "asc" : "desc",
       class: sp.class,
+      status,
     });
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
@@ -175,6 +183,41 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
     }
   }
 
+  function q(next: Record<string, string | undefined>) {
+    const p = new URLSearchParams();
+    if (next.status) p.set("status", next.status);
+    if (next.search) p.set("search", next.search);
+    if (next.dir) p.set("dir", next.dir);
+    if (next.sort) p.set("sort", next.sort);
+    if (next.class) p.set("class", next.class);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  }
+
+  const hasExtraFilters = Boolean(sp.search?.trim() || sp.class);
+
+  const emptyCopy = !status
+    ? {
+        title: hasExtraFilters ? "No hay facturas activas con estos filtros" : "No hay facturas activas",
+        description: hasExtraFilters
+          ? "Probá otra búsqueda o clase. También podés revisar Anuladas."
+          : "Usá Anuladas para ver las facturas anuladas, o registrá una nueva.",
+        showCancelledCta: true,
+      }
+    : status === "CANCELLED"
+      ? {
+          title: hasExtraFilters ? "No hay facturas anuladas con estos filtros" : "No hay facturas anuladas",
+          description: hasExtraFilters
+            ? "Probá otra búsqueda o clase."
+            : "No hay comprobantes anulados.",
+          showCancelledCta: false,
+        }
+      : {
+          title: "No hay facturas con los filtros actuales",
+          description: "Probá otro estado, búsqueda o clase.",
+          showCancelledCta: false,
+        };
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
@@ -220,22 +263,58 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         </div>
       ) : null}
 
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs text-muted-foreground mr-1">Estado:</span>
+        <Button asChild variant={!status ? "secondary" : "outline"} size="sm">
+          <Link
+            href={`/proyectos/${id}/facturas-proveedor${q({ search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+          >
+            Activas
+          </Link>
+        </Button>
+        {STATUSES.map((s) => (
+          <Button key={s} asChild variant={status === s ? "secondary" : "outline"} size="sm">
+            <Link
+              href={`/proyectos/${id}/facturas-proveedor${q({ status: s, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+            >
+              {s === "DRAFT" ? "Borrador" : s === "ISSUED" ? "Emitidas" : "Anuladas"}
+            </Link>
+          </Button>
+        ))}
+      </div>
+
       <Suspense fallback={null}>
         <SupplierInvoiceListFilters
           showDateFilters={false}
-          preserveParams={["search", "sort", "dir", "view", "class"]}
+          preserveParams={["search", "sort", "dir", "view", "class", "status"]}
           classFilterScope="supplier-project"
         />
       </Suspense>
 
-      <Suspense fallback={<ListSectionSkeleton />}>
-        <SupplierInvoiceListSection
-          invoices={items}
-          hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
-          payableHrefPrefix={`/proyectos/${id}/cuentas-por-pagar`}
-          canRegisterPayment={canRegisterApPayment(ctx.roles)}
-        />
-      </Suspense>
+      {items.length === 0 ? (
+        <div className="rounded-lg border bg-card px-6 py-8 text-center text-sm text-muted-foreground space-y-3">
+          <p className="font-medium text-foreground">{emptyCopy.title}</p>
+          <p>{emptyCopy.description}</p>
+          {!status && emptyCopy.showCancelledCta ? (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                href={`/proyectos/${id}/facturas-proveedor${q({ status: "CANCELLED", search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+              >
+                Ver anuladas
+              </Link>
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <Suspense fallback={<ListSectionSkeleton />}>
+          <SupplierInvoiceListSection
+            invoices={items}
+            hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
+            payableHrefPrefix={`/proyectos/${id}/cuentas-por-pagar`}
+            canRegisterPayment={canRegisterApPayment(ctx.roles)}
+          />
+        </Suspense>
+      )}
 
       <Suspense fallback={null}>
         <Pagination page={page} pageSize={PAGE_SIZE} total={invoicesTotal} />
