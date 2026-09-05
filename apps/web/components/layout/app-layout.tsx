@@ -4,6 +4,7 @@ import type { TenantContext } from "@/lib/tenant";
 import { ShellLayout } from "./shell-layout";
 import { AppNavColumn } from "./app-nav-column";
 import { Header } from "./header";
+import { BloqerAiLauncher } from "@/features/bloqer-ai/components/bloqer-ai-launcher";
 
 interface AppLayoutProps {
   user: Session["user"];
@@ -55,6 +56,7 @@ export function AppLayout({
       moduleGateSnapshot={moduleGateSnapshot}
     >
       {children}
+      {tenantCtx ? <BloqerAiLauncher /> : null}
     </ShellLayout>
   );
 }

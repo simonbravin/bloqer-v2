@@ -59,7 +59,12 @@ Leer en este orden:
 ├── 05-workflows/                   ← procesos paso a paso entre módulos
 ├── 06-reports/                     ← catálogo de reportes
 ├── 07-non-functional/              ← multitenancy, seguridad, i18n, integraciones
-└── 08-architecture/                ← arquitectura técnica (stack, capas, ADRs)
+├── 08-architecture/                ← arquitectura técnica (stack, capas, ADRs)
+├── BLOQER_AI_ARCHITECTURE.md       ← asistente IA (tool layer, MVP read-only)
+├── CHANGE_IMPACT_POLICY.md         ← impacto Help + Guía + Bloqer AI
+├── BLOQER_AI_MVP_SCORECARD.md      ← scorecard experimental local
+├── BLOQER_AI_TOOL_AUDIT.md         ← auditoría de tools READ
+└── BLOQER_AI_EVAL_RUNBOOK.md       ← cómo correr evals fake/live
 ```
 
 ---
@@ -207,6 +212,17 @@ Leer en este orden:
 | [`SECURITY_AND_COMPLIANCE.md`](./07-non-functional/SECURITY_AND_COMPLIANCE.md) | Seguridad |
 | [`INTERNATIONALIZATION.md`](./07-non-functional/INTERNATIONALIZATION.md) | i18n / localización |
 | [`INTEGRATIONS_FUTURE.md`](./07-non-functional/INTEGRATIONS_FUTURE.md) | Integraciones futuras |
+
+### Raíz `docs/bloqer2.0/` — Capas de producto transversales
+
+| Archivo | Propósito |
+|---|---|
+| [`GUIA_OPERATIVA_BLOQER_V2.md`](./GUIA_OPERATIVA_BLOQER_V2.md) | Guía operativa para usuarios |
+| [`BLOQER_AI_ARCHITECTURE.md`](./BLOQER_AI_ARCHITECTURE.md) | Bloqer AI: audit FASE 0, tool layer, MVP read-only |
+| [`CHANGE_IMPACT_POLICY.md`](./CHANGE_IMPACT_POLICY.md) | Política de impacto: Help + Guía + Bloqer AI |
+| [`BLOQER_AI_MVP_SCORECARD.md`](./BLOQER_AI_MVP_SCORECARD.md) | Scorecard MVP (experimental local; no staging/prod) |
+| [`BLOQER_AI_TOOL_AUDIT.md`](./BLOQER_AI_TOOL_AUDIT.md) | Auditoría de las 17 tools READ (tenant/project/gates) |
+| [`BLOQER_AI_EVAL_RUNBOOK.md`](./BLOQER_AI_EVAL_RUNBOOK.md) | Runbook de evals fake vs live (nunca producción) |
 
 ### `08-architecture/` — Arquitectura técnica
 

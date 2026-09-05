@@ -8,6 +8,12 @@ const monorepoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: monorepoRoot,
+  // Belt-and-suspenders: include AI docs index if any code path still reads it from disk.
+  outputFileTracingIncludes: {
+    "/api/ai/chat": [
+      "../../packages/ai/knowledge/generated/docs-index.json",
+    ],
+  },
   async redirects() {
     return [
       // Abandoned i18n locale prefix — UI is es-AR only, no `/es` routes.
@@ -72,6 +78,7 @@ const nextConfig: NextConfig = {
     return config;
   },
   transpilePackages: [
+    "@bloqer/ai",
     "@bloqer/config",
     "@bloqer/domain",
     "@bloqer/validators",

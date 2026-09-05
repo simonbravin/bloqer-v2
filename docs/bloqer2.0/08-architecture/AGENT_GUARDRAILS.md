@@ -64,6 +64,7 @@ Estándar: [`TENANT_COMPANY_SCOPING.md`](./TENANT_COMPANY_SCOPING.md). Reglas du
 - Serializar montos money en DTOs con `.toString()` crudo (usar `serializeMoney`).  
 - Redondear el saldo en UI y reenviarlo como “pago total” (usar `payFullBalance` / saldo almacenado en server) — [D-053](../00-product/DECISION_LOG.md).
 - Cambiar UX / rutas / flujos visibles **sin** actualizar [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) **y** el catálogo del centro de ayuda in-app (`apps/web/features/help/`, [D-090](../00-product/DECISION_LOG.md)). Regenerar `guides/Guía_Operativa_Bloqer_v2.docx` si se entrega a cliente. Ver [HELP_CENTER.md](./HELP_CENTER.md) y skill `operational-help-docs`.
+- Cambiar semántica funcional **sin** evaluar impacto en Bloqer AI (knowledge / tools / evals) — ver [`CHANGE_IMPACT_POLICY.md`](../CHANGE_IMPACT_POLICY.md).
 
 ## Scripts provisionales (prohibido)
 

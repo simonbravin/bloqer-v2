@@ -3,12 +3,28 @@ description: Guía operativa + centro de ayuda deben actualizarse con todo cambi
 alwaysApply: true
 ---
 
-# Documentación operativa (guía + ayuda)
+# Documentación operativa (guía + ayuda + Bloqer AI)
 
-Si el cambio afecta **rutas, menús, etiquetas UI o flujos** que ve el usuario (finanzas, compras, directorio, tesorería, obra, etc.):
+Si el cambio afecta **rutas, menús, etiquetas UI, flujos, estados, permisos, module gates, KPIs o reglas** que ve el usuario (finanzas, compras, directorio, tesorería, obra, etc.):
 
 1. Actualizá `docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md` en el mismo PR.
 2. Actualizá el catálogo in-app `apps/web/features/help/` (ficha existente o nueva; keywords; related; `guideRef`).
-3. No inventes procedimientos: alineá a lo que hace el código hoy.
+3. Evaluá impacto en **Bloqer AI** (knowledge index, tool descriptions/schemas, evals) — ver Change Impact Policy abajo.
+4. No inventes procedimientos: alineá a lo que hace el código hoy.
 
-Detalle: skill `operational-help-docs`, [D-090], `docs/bloqer2.0/08-architecture/HELP_CENTER.md`.
+Si el cambio es **solo** refactor/CSS/tests/perf interno: marcá explícitamente `sin impacto documental/AI` en el PR.
+
+## Change Impact Policy (checklist)
+
+Antes de cerrar un cambio funcional:
+
+- [ ] ¿Cambia Centro de Ayuda?
+- [ ] ¿Cambia Guía Operativa?
+- [ ] ¿Cambia Bloqer AI knowledge (docs/help indexados)?
+- [ ] ¿Cambia alguna AI tool / description / schema?
+- [ ] ¿Cambia algún eval AI?
+- [ ] ¿Cambia permisos/contexto que la IA debe entender?
+
+“Actualizar Bloqer AI” puede ser: knowledge (`pnpm ai:index-docs` + `pnpm ai:check-docs-index`), tool description/schema/implementation, system policy, o evals — **solo** si el significado funcional cambió.
+
+Detalle: skill `operational-help-docs`, [D-090], `docs/bloqer2.0/08-architecture/HELP_CENTER.md`, `docs/bloqer2.0/BLOQER_AI_ARCHITECTURE.md`, `docs/bloqer2.0/CHANGE_IMPACT_POLICY.md`.

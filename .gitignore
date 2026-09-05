@@ -43,3 +43,6 @@ blob-report/
 
 # Vercel
 .vercel
+
+# Bloqer AI eval dumps (local paths / provider attempts — regenerate locally)
+packages/ai/evals/reports/*.json

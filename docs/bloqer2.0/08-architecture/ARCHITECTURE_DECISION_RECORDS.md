@@ -44,6 +44,27 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-012 | Transacciones UX: modelo documental + guards de integridad | ACEPTADO |
 | ADR-013 | Anticipos a proveedor: cuenta puente Fase 2 | ACEPTADO |
 | ADR-014 | PDF render boundary en `@bloqer/report-pdf` (monorepo + Next.js) | ACEPTADO |
+| ADR-016 | Company vs project finance tools (D-056) | ACEPTADO |
+| ADR-017 | Bloqer AI: tool layer + provider-agnostic (`AiProvider`) sobre `@bloqer/services` | ACEPTADO |
+
+---
+
+## ADR-017 — Bloqer AI tool layer + provider abstraction (ACEPTADO)
+
+- **Fecha:** 2026-09-04
+- **Estado:** ACEPTADO (D-AI-01…05 en [`BLOQER_AI_ARCHITECTURE.md`](../BLOQER_AI_ARCHITECTURE.md) §0.4)
+- **Contexto:** Incorporar asistente in-app (ayuda + datos reales) sin romper multitenancy, RBAC ni service layer, y sin acoplar el producto a un vendor LLM.
+- **Decisión:**
+  - El LLM solo llama un **registry tipado** de tools (`packages/services/src/ai/`); cada tool delega a services existentes. Tools **nunca** importan SDKs de provider.
+  - `AiExecutionContext` se construye server-side desde sesión; el modelo no aporta `tenantId`.
+  - MVP: solo `READ` (+ knowledge). `WRITE_CONFIRM` tipado pero deshabilitado.
+  - **D-AI-05:** abstracción obligatoria — `AiProvider` (`streamResponse` / `generateResponse`), tipos normalizados (`AiMessage`, `AiToolDefinition`, `AiToolCall`, `AiToolResult`, `AiUsage`, `AiModelConfig`, `AiProviderError`), `AiProviderRegistry` y capabilities. Orquestación / knowledge / adapters viven en `@bloqer/ai`; SDKs solo en `adapters/`.
+  - Primer adapter MVP: OpenAI Chat Completions (`openai` + `baseURL` opcional) — implementación, no lock-in.
+  - Knowledge: help + BM25 local; independiente del provider LLM.
+  - Secrets MVP: solo env de plataforma. Admin/BYOK futuro requiere KMS (sin encryption-at-rest hoy en repo).
+  - Dependencias: `@bloqer/ai` → `config` (+ zod); **no** importa `services` ni React; `services` puede importar tipos de `ai`.
+- **Consecuencias:** dependencia `openai` acotada a adapters; env `BLOQER_AI_PROVIDER` / `BLOQER_AI_MODEL` / `OPENAI_*`; sin migraciones Prisma en MVP; cambio de vendor = nuevo adapter, misma tool registry (también compartida con MCP futuro).
+- **Referencias:** [`BLOQER_AI_ARCHITECTURE.md`](../BLOQER_AI_ARCHITECTURE.md), [`PACKAGE_STRUCTURE.md`](./PACKAGE_STRUCTURE.md), [`SERVICE_LAYER.md`](./SERVICE_LAYER.md), [`HELP_CENTER.md`](./HELP_CENTER.md).
 
 ---
 

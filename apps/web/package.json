@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@bloqer/auth": "workspace:*",
+    "@bloqer/ai": "workspace:*",
     "@bloqer/config": "workspace:*",
     "@bloqer/database": "workspace:^",
     "@bloqer/domain": "workspace:*",

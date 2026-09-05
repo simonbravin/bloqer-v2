@@ -243,6 +243,7 @@ Nunca tomes decisiones de producto unilaterales y las escondas en código.
 - **Centro de ayuda in-app ([D-090](./00-product/DECISION_LOG.md)):** si el cambio afecta rutas, menús, etiquetas o procedimientos visibles, actualizá en el mismo PR:
   1. [`GUIA_OPERATIVA_BLOQER_V2.md`](./GUIA_OPERATIVA_BLOQER_V2.md) (§21).
   2. El catálogo `apps/web/features/help/` — editar ficha existente o crear una nueva (un objetivo = una ficha; no inventar pasos que el producto no haga). Keywords de búsqueda, `relatedSlugs` y `guideRef`. Arquitectura: [`08-architecture/HELP_CENTER.md`](./08-architecture/HELP_CENTER.md). Skill: `.cursor/skills/operational-help-docs/`.
+  3. **Bloqer AI:** evaluá knowledge / tools / evals según [`CHANGE_IMPACT_POLICY.md`](./CHANGE_IMPACT_POLICY.md). Si no aplica: `sin impacto documental/AI` en el PR.
 
 ---
 
