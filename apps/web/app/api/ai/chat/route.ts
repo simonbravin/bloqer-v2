@@ -13,6 +13,7 @@ import {
   runAgent,
   buildBloqerAiSystemPrompt,
   AiProviderError,
+  userFacingOpenAiErrorMessage,
   type AiMessage,
   type KnowledgeIndex,
 } from "@bloqer/ai";
@@ -126,52 +127,42 @@ function combineAbortSignals(...signals: AbortSignal[]): AbortSignal {
 /** Never leak provider credential snippets or raw vendor payloads to the browser. */
 function clientSafeAiErrorMessage(err: unknown): string {
   if (err instanceof AiProviderError) {
-    switch (err.code) {
-      case "AUTH":
-        return "El proveedor de AI rechazó las credenciales. Revisá la configuración.";
-      case "RATE_LIMIT":
-        return "El proveedor de AI está saturado. Probá de nuevo en unos minutos.";
-      case "NOT_CONFIGURED":
-        return "Bloqer AI no está configurado correctamente.";
-      case "TIMEOUT":
-        return "La consulta tardó demasiado y se canceló.";
-      case "UNSUPPORTED":
-        return "El proveedor seleccionado no soporta esta operación.";
-      case "BAD_REQUEST":
-        return "No se pudo procesar la consulta. Reformulá la pregunta.";
-      default:
-        return "No se pudo completar la consulta al asistente.";
-    }
+    return userFacingOpenAiErrorMessage(err.code);
   }
   if (err instanceof Error) {
     const msg = err.message.toLowerCase();
     if (msg.includes("aborted") || msg.includes("timeout") || msg.includes("timed out")) {
-      return "La consulta se canceló o expiró.";
+      return userFacingOpenAiErrorMessage("TIMEOUT");
     }
   }
-  return "No se pudo completar la consulta al asistente.";
+  return userFacingOpenAiErrorMessage("UNKNOWN");
 }
 
 function clientSafeStreamError(message: string, code?: string): string {
-  if (code === "TIMEOUT") return "La consulta se canceló o expiró.";
-  if (code === "AUTH") return "El proveedor de AI rechazó las credenciales. Revisá la configuración.";
-  if (code === "RATE_LIMIT") return "El proveedor de AI está saturado. Probá de nuevo en unos minutos.";
-  if (code === "NOT_CONFIGURED") return "Bloqer AI no está configurado correctamente.";
-  if (code === "UNSUPPORTED") return "El proveedor seleccionado no soporta esta operación.";
+  if (code === "TIMEOUT") return userFacingOpenAiErrorMessage("TIMEOUT");
+  if (code === "AUTH") return userFacingOpenAiErrorMessage("AUTH");
+  if (code === "RATE_LIMIT") return userFacingOpenAiErrorMessage("RATE_LIMIT");
+  if (code === "NOT_CONFIGURED") return userFacingOpenAiErrorMessage("NOT_CONFIGURED");
+  if (code === "UNSUPPORTED") return userFacingOpenAiErrorMessage("UNSUPPORTED");
   if (code === "BAD_REQUEST") {
-    // Orchestrator messages (tool limits, max turns) are already Spanish and safe.
-    if (message && !/api[_ ]?key|sk-|bearer|openai|anthropic|credential/i.test(message)) {
+    // Only allow known orchestrator Spanish (tool/turn limits). Never vendor English.
+    if (
+      message &&
+      /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas/i.test(message) &&
+      !/reasoning_effort|chat\/completions|function tools|openai|api[_ ]?key|sk-/i.test(message)
+    ) {
       return message;
     }
-    return "No se pudo procesar la consulta. Reformulá la pregunta.";
+    return userFacingOpenAiErrorMessage("BAD_REQUEST");
   }
-  if (message && !/api[_ ]?key|sk-|bearer|credential|authorization/i.test(message)) {
-    // Allow short orchestrator Spanish messages; clamp anything vendor-looking.
-    if (message.length <= 180 && !/[A-Za-z]{3,}\.[A-Za-z]{2,}/.test(message)) {
-      return message;
-    }
+  if (
+    message &&
+    /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas/i.test(message) &&
+    !/reasoning_effort|chat\/completions|function tools|openai|api[_ ]?key|sk-/i.test(message)
+  ) {
+    return message;
   }
-  return "No se pudo completar la consulta al asistente.";
+  return userFacingOpenAiErrorMessage("PROVIDER");
 }
 
 export async function POST(req: Request) {

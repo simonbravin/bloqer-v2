@@ -17,6 +17,10 @@ export type { BloqerAiEnv } from "./config";
 export { resolveBloqerAiEnabled, isFakeAiProviderId } from "./env";
 export { createOpenAiProvider } from "./providers/openai/openai-provider";
 export {
+  buildOpenAiChatCompletionsExtras,
+  userFacingOpenAiErrorMessage,
+} from "./providers/openai/openai-provider";
+export {
   createFakeAiProvider,
   createFakeSecondaryProvider,
   createConversationalFakeAiProvider,

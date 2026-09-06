@@ -1,7 +1,15 @@
 import OpenAI from "openai";
-import type { ChatCompletionMessageParam, ChatCompletionTool } from "openai/resources/chat/completions";
+import type {
+  ChatCompletion,
+  ChatCompletionChunk,
+  ChatCompletionCreateParamsNonStreaming,
+  ChatCompletionCreateParamsStreaming,
+  ChatCompletionMessageParam,
+  ChatCompletionTool,
+} from "openai/resources/chat/completions";
+import type { Stream } from "openai/streaming";
 import type { AiProvider } from "../../provider";
-import { AiProviderError } from "../../errors";
+import { AiProviderError, type AiProviderErrorCode } from "../../errors";
 import type {
   AiGenerateRequest,
   AiGenerateResponse,
@@ -97,6 +105,50 @@ function mapOpenAiToolCalls(
   return out.length ? out : undefined;
 }
 
+/**
+ * GPT-5.6 on Chat Completions rejects function tools unless reasoning_effort is
+ * explicitly "none" (otherwise use /v1/responses, which this adapter does not).
+ * Must be explicit — do not rely on model defaults.
+ */
+export function buildOpenAiChatCompletionsExtras(
+  model: string,
+  hasTools: boolean,
+): Record<string, unknown> {
+  if (!hasTools) return {};
+  if (/^gpt-5\.6($|[-.])/i.test(model.trim())) {
+    return { reasoning_effort: "none" };
+  }
+  return {};
+}
+
+/** User-facing Spanish — never vendor English / HTTP payloads. */
+export function userFacingOpenAiErrorMessage(
+  code: AiProviderErrorCode,
+): string {
+  switch (code) {
+    case "AUTH":
+      return "El proveedor de AI rechazó las credenciales. Revisá la configuración.";
+    case "RATE_LIMIT":
+      return "El proveedor de AI está saturado. Probá de nuevo en unos minutos.";
+    case "NOT_CONFIGURED":
+      return "Bloqer AI no está configurado correctamente.";
+    case "TIMEOUT":
+      return "La consulta tardó demasiado y se canceló.";
+    case "UNSUPPORTED":
+      return "El proveedor seleccionado no soporta esta operación.";
+    case "BAD_REQUEST":
+    case "PROVIDER":
+    case "UNKNOWN":
+    default:
+      return "No pude completar la consulta en este momento. Intentá nuevamente.";
+  }
+}
+
+/** Map vendor/SDK errors → AiProviderError with safe Spanish `.message` (detail in cause/log). */
+export function mapAndThrowOpenAiProviderError(err: unknown, providerId = "openai"): never {
+  return wrapProviderError(err, providerId);
+}
+
 function wrapProviderError(err: unknown, providerId: string): never {
   if (err instanceof AiProviderError) throw err;
 
@@ -108,7 +160,7 @@ function wrapProviderError(err: unknown, providerId: string): never {
     name === "AbortError" ||
     /aborted|abort/i.test(message)
   ) {
-    throw new AiProviderError("TIMEOUT", "Solicitud cancelada.", {
+    throw new AiProviderError("TIMEOUT", userFacingOpenAiErrorMessage("TIMEOUT"), {
       providerId,
       retryable: false,
       cause: err,
@@ -118,7 +170,7 @@ function wrapProviderError(err: unknown, providerId: string): never {
     name === "APIConnectionTimeoutError" ||
     /timed?\s*out|timeout/i.test(message)
   ) {
-    throw new AiProviderError("TIMEOUT", "Timeout del proveedor de AI.", {
+    throw new AiProviderError("TIMEOUT", userFacingOpenAiErrorMessage("TIMEOUT"), {
       providerId,
       retryable: true,
       cause: err,
@@ -128,18 +180,37 @@ function wrapProviderError(err: unknown, providerId: string): never {
   const anyErr = err as { status?: number; code?: string; message?: string };
   const status = anyErr.status;
   const detail = anyErr.message ?? message;
+
+  let code: AiProviderErrorCode = "PROVIDER";
+  let retryable = Boolean(status && status >= 500);
   if (status === 401 || status === 403) {
-    throw new AiProviderError("AUTH", detail, { providerId, retryable: false, cause: err });
+    code = "AUTH";
+    retryable = false;
+  } else if (status === 429) {
+    code = "RATE_LIMIT";
+    retryable = true;
+  } else if (status === 400) {
+    code = "BAD_REQUEST";
+    retryable = false;
+  } else if (status && status >= 500) {
+    code = "PROVIDER";
+    retryable = true;
   }
-  if (status === 429) {
-    throw new AiProviderError("RATE_LIMIT", detail, { providerId, retryable: true, cause: err });
-  }
-  if (status === 400) {
-    throw new AiProviderError("BAD_REQUEST", detail, { providerId, retryable: false, cause: err });
-  }
-  throw new AiProviderError("PROVIDER", detail, {
+
+  // Technical detail stays server-side only (cause + log). Never put vendor text in `.message`.
+  console.error(
+    JSON.stringify({
+      type: "bloqer_ai_provider_error",
+      providerId,
+      code,
+      status: status ?? null,
+      detail: String(detail).slice(0, 500),
+    }),
+  );
+
+  throw new AiProviderError(code, userFacingOpenAiErrorMessage(code), {
     providerId,
-    retryable: Boolean(status && status >= 500),
+    retryable,
     cause: err,
   });
 }
@@ -168,7 +239,9 @@ export type OpenAiProviderOptions = {
 export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
   const providerId = "openai";
   if (!opts.apiKey.trim()) {
-    throw new AiProviderError("NOT_CONFIGURED", "OPENAI_API_KEY is missing", { providerId });
+    throw new AiProviderError("NOT_CONFIGURED", userFacingOpenAiErrorMessage("NOT_CONFIGURED"), {
+      providerId,
+    });
   }
 
   const client = new OpenAI({
@@ -191,19 +264,22 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
 
     async generateResponse(request: AiGenerateRequest): Promise<AiGenerateResponse> {
       try {
-        const completion = await client.chat.completions.create(
-          {
-            model: request.model,
-            messages: toOpenAiMessages(request.system, request.messages),
-            tools: toOpenAiTools(request.tools),
-            ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-            // GPT-5.x rejects max_tokens; max_completion_tokens works on 4.x and 5.x.
-            ...(request.maxOutputTokens !== undefined
-              ? { max_completion_tokens: request.maxOutputTokens }
-              : {}),
-          },
-          { signal: request.signal },
-        );
+        const tools = toOpenAiTools(request.tools);
+        // SDK ReasoningEffort lags GPT-5.6 ("none" required with function tools on Chat Completions).
+        const body = {
+          model: request.model,
+          messages: toOpenAiMessages(request.system, request.messages),
+          tools,
+          ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+          // GPT-5.x rejects max_tokens; max_completion_tokens works on 4.x and 5.x.
+          ...(request.maxOutputTokens !== undefined
+            ? { max_completion_tokens: request.maxOutputTokens }
+            : {}),
+          ...buildOpenAiChatCompletionsExtras(request.model, Boolean(tools?.length)),
+        } as ChatCompletionCreateParamsNonStreaming;
+        const completion = (await client.chat.completions.create(body, {
+          signal: request.signal,
+        })) as ChatCompletion;
         const choice = completion.choices[0];
         if (!choice) {
           throw new AiProviderError("PROVIDER", "Empty completion from OpenAI", { providerId });
@@ -234,20 +310,22 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
     async streamResponse(request: AiGenerateRequest): Promise<AiStreamResponse> {
       const stream = (async function* (): AsyncGenerator<AiStreamEvent> {
         try {
-          const completion = await client.chat.completions.create(
-            {
-              model: request.model,
-              messages: toOpenAiMessages(request.system, request.messages),
-              tools: toOpenAiTools(request.tools),
-              ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
-              ...(request.maxOutputTokens !== undefined
-                ? { max_completion_tokens: request.maxOutputTokens }
-                : {}),
-              stream: true,
-              stream_options: { include_usage: true },
-            },
-            { signal: request.signal },
-          );
+          const tools = toOpenAiTools(request.tools);
+          const body = {
+            model: request.model,
+            messages: toOpenAiMessages(request.system, request.messages),
+            tools,
+            ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
+            ...(request.maxOutputTokens !== undefined
+              ? { max_completion_tokens: request.maxOutputTokens }
+              : {}),
+            ...buildOpenAiChatCompletionsExtras(request.model, Boolean(tools?.length)),
+            stream: true as const,
+            stream_options: { include_usage: true },
+          } as ChatCompletionCreateParamsStreaming;
+          const completion = (await client.chat.completions.create(body, {
+            signal: request.signal,
+          })) as Stream<ChatCompletionChunk>;
 
           let content = "";
           let refusalText = "";
