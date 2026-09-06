@@ -1,6 +1,7 @@
 export { prisma } from "./client";
 // Prisma exported as value+type so services can use new Prisma.Decimal()
 export { Prisma } from "@prisma/client";
+export type { PrismaClient } from "@prisma/client";
 export type {
   User, Account, Session, VerificationToken,
   Tenant, Company, UserMembership, AuditLog,

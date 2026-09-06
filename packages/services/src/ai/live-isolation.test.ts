@@ -111,7 +111,17 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
   it("search_projects from Tenant A never returns Tenant B", async () => {
     const ctx = buildAiExecutionContext({
       service: svc(fx.tenantAId, fx.ownerAUserId, ["OWNER"]),
-      enabledModules: new Set(["PROJECTS", "PROCUREMENT", "AP", "AR", "SCHEDULE", "BUDGETS", "JOBSITE_LOG", "CERTIFICATIONS", "TREASURY"] as never),
+      enabledModules: [
+        "PROJECTS",
+        "PROCUREMENT",
+        "AP",
+        "AR",
+        "SCHEDULE",
+        "BUDGETS",
+        "JOBSITE_LOG",
+        "CERTIFICATIONS",
+        "TREASURY",
+      ],
     });
     const res = await exec("search_projects", { search: "AI Adv", pageSize: 20 }, ctx);
     assert.equal(res.isError, undefined);
