@@ -59,7 +59,7 @@ Códigos: `V`=VIEW, `E`=EDIT (incluye VIEW), `A`=APPROVE (incluye EDIT y VIEW), 
 
 ### 2.2 Financieros
 
-> **Company vs project ([D-056](./DECISION_LOG.md)):** tesorería de empresa, cuentas bancarias, transferencias, GL y hub `/finanzas` son **company tools** (`OWNER` / `ADMIN` / `FINANCE` / `TREASURER` / `VIEWER` lectura). PM, `PROJECT_FINANCE`, PROCUREMENT y SALES operan finanzas en **project tools** (sin caja empresa). `TREASURER` opera caja/cobros/pagos; `FINANCE` además aprueba GL e impuestos.
+> **Company vs project ([D-056](./DECISION_LOG.md) + [D-111](./DECISION_LOG.md#d-111--project-membership-acl-procurement--view-projects-treasury-sin-viewer)):** hub `/finanzas`, CxC/CxP corporativos y GL: `OWNER` / `ADMIN` / `FINANCE` / `TREASURER` / `VIEWER` (lectura). **Tesorería / bancos / caja / transferencias:** `OWNER` / `ADMIN` / `FINANCE` / `TREASURER` solamente (`VIEWER` sin `VIEW TREASURY`). PM / `PROJECT_FINANCE` / PROCUREMENT / SALES = project tools (sin caja empresa).
 
 | Módulo | OWNER | ADMIN | PM | PROJECT_FINANCE | FINANCE | TREASURER | PROCUREMENT | SALES | VIEWER |
 |---|---|---|---|---|---|---|---|---|---|

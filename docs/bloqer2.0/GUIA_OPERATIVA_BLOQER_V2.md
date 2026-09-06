@@ -82,7 +82,29 @@ No hay un menú llamado **Afectaciones**. En obra, “afectar” = **imputar** u
 
 La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectaciones por partida.
 
-### 0.3 Índice de capturas (dónde pegar pantallazos)
+### 0.3 Preguntale a Bloqer (asistente)
+
+Botón flotante **Preguntale a Bloqer** (esquina inferior derecha en el layout autenticado), cuando el entorno tiene Bloqer AI habilitado.
+
+**Qué puede hacer (esta versión):**
+
+- Explicar cómo usar Bloqer (Centro de Ayuda / Guía operativa).
+- Consultar y resumir **datos autorizados** (OC, materiales, CxP/CxC, cronograma, etc.) según tus roles, permisos y módulos habilitados.
+- Ofrecer **links internos** a pantallas (chips debajo de la respuesta); los href vienen de las tools del backend, no de URLs inventadas por el modelo.
+- En preguntas abiertas («¿cómo viene esta obra?», «qué debería preocuparme?») prioriza **pocos insights** con explicación, acciones sugeridas y links — no un inventario de todos los KPIs.
+
+**Qué no hace aún:**
+
+- **No modifica** información (no crea, aprueba, paga ni anula).
+- **No guarda historial** en servidor: la conversación vive solo en la sesión del navegador.
+- No reemplaza el Centro de Ayuda (`/ayuda`); lo complementa.
+- **No amplía permisos:** solo ve lo que tu usuario podría consultar en Bloqer. Tesorería / finanzas de empresa quedan ocultas si tu rol no las tiene (p. ej. Jefe de obra).
+
+**Ejemplos de preguntas:** «¿Qué OC están pendientes?», «¿Qué materiales faltan en esta obra?», «¿Cómo creo una solicitud de compra?», «¿Qué debería preocuparme hoy?»
+
+Ficha in-app: `/ayuda/preguntale-a-bloqer`.
+
+### 0.4 Índice de capturas (dónde pegar pantallazos)
 
 En el Markdown y en el DOCX, cada bloque con este formato es un **hueco para imagen real**:
 
@@ -231,7 +253,7 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF). En **reportes programados**, cada envío tiene su propia zona: la **próxima / última ejecución** se muestra en la zona del envío (no en UTC del servidor).
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
-- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas** en sidebar y subnavegación): umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
+- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas**): bloque **Acceso a proyectos** (todas las obras vs solo asignadas, [D-111]); umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
 
 <!-- capture:02 configuracion-zona-horaria -->
 ![Bloqer — Configuración + zona horaria](./guides/assets/screenshots/02-configuracion-zona-horaria.png)
@@ -338,6 +360,48 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 - **`PROJECT_FINANCE`** = contador de obra: AR/AP/gastos del **proyecto**; sin company hub ni tesorería/GL de empresa.
 
 > **Error a evitar:** dar a un PM o a Compras un rol de company finance “para que vean más”: verán saldos y hub corporativo. Si solo necesitan la obra, usá roles de proyecto / `PROJECT_FINANCE`.
+
+### 2.6 Acceso a obras (asignación de proyectos) — D-111
+
+**Permisos ≠ acceso a obras.** Los roles definen *qué* puede hacer el usuario. El acceso a obras define *en qué proyectos* puede hacerlo.
+
+| Modo (Políticas) | Nombre en UI | Comportamiento |
+|------------------|--------------|----------------|
+| `TENANT_WIDE` | **Todos los proyectos** | Quien tenga permisos de proyectos ve todas las obras de la empresa. |
+| `MEMBERSHIP_SCOPED` | **Solo proyectos asignados** | Solo ve las obras con `ProjectMembership`, salvo usuarios con acceso global (OWNER/ADMIN vía RBAC). |
+
+**Dónde se gestiona**
+
+1. **Asignaciones por usuario:** Configuración → **Equipo** → miembro → sección **Acceso a obras** (`/configuracion/equipo/[membershipId]`).
+2. **Modo de la empresa:** Configuración → **Políticas** → **Acceso a proyectos** (`/configuracion/politicas#acceso-obras`).
+
+**Preparación bajo «Todos los proyectos»**
+
+- Podés marcar obras y **Guardar acceso a obras** sin cambiar el acceso real.
+- Mensaje: las asignaciones entran en vigencia cuando la empresa active el acceso por obra.
+- Sirve para preparar el cambio a «Solo proyectos asignados» sin lockouts.
+
+**Activar «Solo proyectos asignados»**
+
+1. Prepará memberships en Equipo.
+2. Políticas → **Solo proyectos asignados** → el sistema muestra un **preview** (usuarios activos, con obras, acceso global, posibles lockouts).
+3. Si hay usuarios con permisos de proyecto sin ninguna obra: aviso + lista + enlace **Revisar asignaciones**; hay que confirmar «revisé las asignaciones».
+4. CTA: **Activar acceso por obras**. El backend **recalcula** el preview al confirmar (no confía en datos viejos del browser).
+5. Solo un usuario con **acceso global** a obras puede activar el modo restringido (evita auto-lockout del admin).
+
+**Volver a «Todos los proyectos»**
+
+- También pide confirmación (amplía acceso).
+- **No borra** las memberships: quedan preparadas si más adelante se vuelve a restringir.
+
+**Acceso global**
+
+- Usuarios con autoridad tenant-wide (helper RBAC, no hardcode de string) ven el mensaje **Acceso global a todas las obras** y no necesitan memberships.
+
+**No confundir con Equipo de obra**
+
+- **Equipo de obra** (en la obra → Configuración) = roster de **avisos** del libro de obra.
+- **Acceso a obras** (en Equipo de la empresa) = **ACL** de quién entra a cada proyecto.
 
 ---
 

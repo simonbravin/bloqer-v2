@@ -296,7 +296,7 @@ export async function authorizeAndCommitPurchaseOrder(
       "Solo se puede autorizar y comprometer una orden en borrador o pendiente de aprobación",
     );
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
   if (!settings.allowAuthorizeAndCommit) {
@@ -463,7 +463,7 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", "Solo se pueden enviar órdenes en borrador");
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   const lineCount = await prisma.purchaseOrderLine.count({ where: { purchaseOrderId: id } });
   if (lineCount === 0) throw new ServiceError("CONFLICT", "La orden debe tener al menos una línea");
@@ -675,7 +675,7 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
   if (existing.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", "La orden no está pendiente de aprobación");
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 
@@ -900,7 +900,7 @@ export async function confirmPurchaseOrder(
   if (existing.status !== "APPROVED") {
     throw new ServiceError("CONFLICT", "La orden debe estar aprobada antes de confirmar al proveedor");
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   // Load policy outside the interactive transaction (avoids extra pool hop while holding locks).
   const settings = !existing.purchaseRequestId

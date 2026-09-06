@@ -783,6 +783,24 @@
 - **Implicancias:** enum Prisma `PROJECT_FINANCE` + `TREASURER`; recorte `matrix.ts`; helpers `canViewCompany*`; gates nav/páginas; `BANK_ACCOUNTS` / `INTERNAL_TRANSFERS` no colapsan solo a `TREASURY`.
 - **Documentos afectados:** [`USER_ROLES.md`](./USER_ROLES.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), [`08-architecture/PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md), [`08-architecture/ARCHITECTURE_DECISION_RECORDS.md`](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md).
 - **Nota:** la primera redacción de D-056 difería `TREASURER` (YAGNI); se incorporó el mismo día a pedido del owner para listado/matriz y segregación caja vs controller.
+- **Enmienda [D-111] (2026-09-06):** `VIEWER` **ya no** tiene `VIEW TREASURY` / bancos / transferencias en el preset. Conserva lectura de hub vía AP/AR/GL. Tesorería = `canViewTreasury` / `VIEW TREASURY` (OWNER|ADMIN|FINANCE|TREASURER). UI y Bloqer AI usan la misma autoridad.
+
+---
+
+### D-111 — Project membership ACL, procurement ≠ VIEW PROJECTS, treasury sin VIEWER
+
+- **Fecha:** 2026-09-06
+- **Estado:** ACTIVA (código + Neon **DEV**; production pendiente)
+- **Decidido por:** Owner
+- **Contexto:** Zero-trust Bloqer AI + gaps RBAC (G1–G4): OR `VIEW PROJECTS` abría procurement/AP; VIEWER veía tesorería (D-056); sin ACL por obra (R-USR-007 / P-ERD-08).
+- **Decisión:**
+  1. **G1-C:** Separar documents/project access de procurement. `canViewProcurementProjectArea` = `VIEW PROCUREMENT|PURCHASE_ORDERS` (sin OR `VIEW PROJECTS`). Documentos siguen con `VIEW PROJECTS` / `DOCUMENTS`.
+  2. **G2:** Quitar `TREASURY`/`BANK_*`/`INTERNAL_TRANSFERS` del preset `VIEWER`. Autoridad única `canViewTreasury(roles)` = `can(VIEW, TREASURY)`. AI y UI alineadas.
+  3. **G4:** Helpers centrales en `packages/services/src/security/access.ts`: `canViewProjectFinancials*`, `canViewCompanyFinancials*`, `canViewTreasury`, `canAccessProject` / `requireProjectAccess`, `resolveAccessibleProjectScope`. Sin módulos comerciales nuevos todavía.
+  4. **G3:** Tabla nueva `ProjectMembership` (no extender `ProjectTeamMember`). `Tenant.projectAccessMode`: `TENANT_WIDE` (default) | `MEMBERSHIP_SCOPED`. Tenants existentes = TENANT_WIDE (cero lockout). Activar SCOPED solo tras preparar memberships; OWNER/ADMIN (`APPROVE PROJECTS` / users) = bypass tenant-wide.
+  5. Permiso = qué; membership = dónde. Ambos necesarios bajo SCOPED.
+- **Implicancias:** migración `20260906180000_d111_project_membership_access_mode`; matrix VIEWER; procurement/AP/AR access helpers; `listProjects` + schedule/AI usan ACL; servicios de agregación deben aplicar `resolveAccessibleProjectScope` antes de sumar (rollout incremental).
+- **Documentos afectados:** este log, [`BLOQER_AI_RBAC_GAPS_DESIGN.md`](../BLOQER_AI_RBAC_GAPS_DESIGN.md), [`BLOQER_AI_SECURITY_SCORECARD.md`](../BLOQER_AI_SECURITY_SCORECARD.md), [`USER_ROLES.md`](./USER_ROLES.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), Guía §0.3 / ayuda.
 
 ---
 

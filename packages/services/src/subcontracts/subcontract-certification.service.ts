@@ -6,6 +6,7 @@ import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectAccessIfPresent } from "../security/access";
 import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
@@ -111,6 +112,7 @@ export async function getSubcontractCertificationById(
   const cert = await prisma.subcontractCertification.findUnique({ where: { id }, include: certInclude });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(cert.projectId, ctx);
   return serializeCert(cert);
 }
 
@@ -125,6 +127,7 @@ export async function listSubcontractCertificationsBySubcontract(
   const sub = await prisma.subcontract.findUnique({ where: { id: subcontractId } });
   if (!sub) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (sub.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(sub.projectId, ctx);
 
   const certs = await prisma.subcontractCertification.findMany({
     where: { subcontractId, tenantId: ctx.tenantId },
@@ -151,7 +154,7 @@ export async function createSubcontractCertification(
   });
   if (!sub) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (sub.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(sub.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(sub.projectId, ctx);
   if (sub.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", `Solo se pueden crear certificaciones en subcontratos activos. Estado actual: "${sub.status}"`);
   }

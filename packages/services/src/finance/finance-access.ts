@@ -1,9 +1,11 @@
 import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
+import { canViewTreasury as canViewTreasuryCapability } from "../security/access";
 
 /**
- * Company finance tools (hub `/finanzas`, corporate AR/AP lists) — D-056.
+ * Company finance tools (hub `/finanzas`, corporate AR/AP lists) — D-056 / D-111.
  * Requires a company-finance role AND at least one finance module VIEW.
+ * Treasury is gated separately via `canViewCompanyTreasury`.
  */
 export function canViewCompanyFinanceHub(roles: ServiceContext["roles"]): boolean {
   if (!hasCompanyFinanceRole(roles)) return false;
@@ -15,7 +17,12 @@ export function canViewCompanyFinanceHub(roles: ServiceContext["roles"]): boolea
   );
 }
 
-/** Company treasury (caja / saldos) — OWNER|ADMIN|FINANCE|TREASURER|VIEWER (D-056). */
+/**
+ * Company treasury (caja / saldos / bancos / movimientos).
+ * Authority = VIEW TREASURY (matrix). VIEWER preset no longer includes TREASURY ([D-111]).
+ */
 export function canViewCompanyTreasury(roles: ServiceContext["roles"]): boolean {
-  return hasCompanyFinanceRole(roles) && can(roles, "VIEW", "TREASURY");
+  return canViewTreasuryCapability(roles);
 }
+
+export { canViewTreasuryCapability as canViewTreasury };

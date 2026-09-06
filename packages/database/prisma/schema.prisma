@@ -69,6 +69,12 @@ enum MembershipStatus {
   INACTIVE
 }
 
+/// Tenant project list / ACL mode ([D-111]). Default TENANT_WIDE = legacy (all VIEW PROJECTS see all obras).
+enum ProjectAccessMode {
+  TENANT_WIDE
+  MEMBERSHIP_SCOPED
+}
+
 enum TenantInvitationStatus {
   PENDING
   ACCEPTED
@@ -548,6 +554,7 @@ model User {
   scheduledReportsCreated   ScheduledReport[]          @relation("ScheduledReportCreatedBy")
   scheduledReportRecipients ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
   projectTeamMemberships    ProjectTeamMember[]
+  projectMemberships        ProjectMembership[]
 
   @@map("users")
 }
@@ -620,6 +627,8 @@ model Tenant {
   logoMimeType          String?            @db.VarChar(128)
   /// Kill-switch: allow economic edits on APPROVED budgets when project flag is also ON ([D-088]). Default OFF.
   allowApprovedBudgetEconomicEdits Boolean @default(false)
+  /// Project ACL mode ([D-111]). TENANT_WIDE preserves legacy access; MEMBERSHIP_SCOPED requires ProjectMembership.
+  projectAccessMode ProjectAccessMode @default(TENANT_WIDE)
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 
@@ -669,6 +678,7 @@ model Tenant {
   periods                     Period[]
   scheduledReports            ScheduledReport[]
   projectTeamMembers          ProjectTeamMember[]
+  projectMemberships          ProjectMembership[]
 
   @@map("tenants")
 }
@@ -1139,6 +1149,7 @@ model Project {
   auditLogs                   AuditLog[]
   scheduledReports            ScheduledReport[]
   teamMembers                 ProjectTeamMember[]
+  memberships                 ProjectMembership[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -1165,6 +1176,27 @@ model ProjectTeamMember {
   @@index([tenantId, projectId])
   @@index([tenantId, userId])
   @@map("project_team_members")
+}
+
+/// Explicit project access ACL ([D-111] / R-USR-007). Independent from ProjectTeamMember (notifications).
+/// Enforced only when Tenant.projectAccessMode = MEMBERSHIP_SCOPED.
+model ProjectMembership {
+  id        String   @id @default(uuid())
+  tenantId  String
+  projectId String
+  userId    String
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, projectId, userId])
+  @@index([tenantId, userId])
+  @@index([tenantId, projectId])
+  @@map("project_memberships")
 }
 
 // ─── Schedule / Cronograma ────────────────────────────────────────────────────

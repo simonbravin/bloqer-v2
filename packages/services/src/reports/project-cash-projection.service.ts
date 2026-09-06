@@ -6,7 +6,7 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { monthLabel, projectionBucketKey, projectionHorizon } from "./report-month";
 
@@ -55,7 +55,7 @@ export async function getProjectCashProjectionReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver proyección de caja del proyecto");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");

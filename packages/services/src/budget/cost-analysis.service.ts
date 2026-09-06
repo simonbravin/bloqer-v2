@@ -37,7 +37,7 @@ async function _guardLine(costItemId: string, ctx: ServiceContext) {
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: costItem.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertBudgetEditable(budget);
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   return { costItem, budget };
 }
 

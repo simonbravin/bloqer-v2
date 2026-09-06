@@ -7,7 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 
 import { canViewBudgetsArea } from "../project/project-nav-guards";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { resolveActiveCompanyId } from "../company/company.service";
 
 export { canViewBudgetsArea };
@@ -228,6 +228,7 @@ export async function getBudgetById(id: string, ctx: ServiceContext): Promise<Bu
   });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(budget.projectId, ctx);
   return budget;
 }
 
@@ -238,7 +239,7 @@ export async function listBudgetsByProject(
   if (!canViewBudgetsArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view budgets");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   return prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -286,7 +287,7 @@ export async function createBudget(
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to create budgets");
   }
-  const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
+  const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
 
   const { name, currency, internalNotes, projectId, parentBudgetId, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct } = input;
 
@@ -420,7 +421,7 @@ export async function updateBudget(
   const existing = await prisma.budget.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(existing.projectId, ctx);
   if (existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "No se puede editar un presupuesto cancelado");
   }
@@ -505,7 +506,7 @@ export async function approveBudget(
   if (budget.status !== "IN_REVIEW") {
     throw new ServiceError("CONFLICT", "Solo se puede aprobar un presupuesto en revisión");
   }
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
 
   // BR-BUD-005: every CostItem must have at least one CostAnalysisLine (APU).
   const itemsWithoutApu = await prisma.costItem.findMany({
@@ -620,7 +621,7 @@ async function _transition(
   const budget = await prisma.budget.findUnique({ where: { id } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   if (!allowedFrom.includes(budget.status)) {
     throw new ServiceError("CONFLICT", `No se puede cambiar el estado desde "${budget.status}"`);
   }

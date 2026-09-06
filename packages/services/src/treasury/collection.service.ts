@@ -14,7 +14,8 @@ import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal"
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { ensureDraftJournalFromCollection } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -61,6 +62,7 @@ export async function getCollectionById(
   if (projectScopeId !== undefined && c.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(c.projectId, ctx);
   return serialize(c);
 }
 
@@ -78,7 +80,7 @@ export async function listCollectionsByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -162,7 +164,7 @@ export async function createCollection(
     throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
   }
   if (receivablePreview.projectId) {
-    await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx.tenantId);
+    await assertProjectAllowsOperationalMutation(receivablePreview.projectId, ctx);
   }
 
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);

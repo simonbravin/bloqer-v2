@@ -7,6 +7,8 @@ import { listPurchaseRequestsByProject } from "../../procurement/purchase-reques
 import { getProjectProcurementHub } from "../../procurement/project-procurement-hub.service";
 import { resolveAiProjectId } from "../context";
 import { defineBloqerAiTool, nowIso } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
+import { minimizeNotes } from "../policy/minimize";
 import { ServiceError } from "../../types";
 
 const searchPrSchema = z.object({
@@ -20,6 +22,11 @@ export const searchPurchaseRequestsTool = defineBloqerAiTool({
   description: "Lista solicitudes de compra de un proyecto (filtro opcional por estado).",
   risk: "READ",
   requiredModules: ["PROCUREMENT"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "procurement",
+  },
   inputSchema: searchPrSchema,
   jsonSchema: {
     type: "object",
@@ -71,6 +78,11 @@ export const searchPurchaseOrdersTool = defineBloqerAiTool({
   description: "Lista órdenes de compra de un proyecto con filtros de estado / pendientes.",
   risk: "READ",
   requiredModules: ["PROCUREMENT"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "procurement",
+  },
   inputSchema: searchPoSchema,
   jsonSchema: {
     type: "object",
@@ -121,6 +133,11 @@ export const getPurchaseOrderTool = defineBloqerAiTool({
   description: "Detalle de una orden de compra por id.",
   risk: "READ",
   requiredModules: ["PROCUREMENT"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "procurement",
+  },
   inputSchema: z.object({ purchaseOrderId: z.string().uuid() }),
   jsonSchema: {
     type: "object",
@@ -141,7 +158,7 @@ export const getPurchaseOrderTool = defineBloqerAiTool({
         totalAmount: po.totalAmount,
         currency: po.currency,
         lineCount: po.lines.length,
-        notes: po.notes,
+        notes: minimizeNotes(po.notes),
         href,
       },
       provenance: {
@@ -161,6 +178,11 @@ export const getPendingPurchaseOrdersTool = defineBloqerAiTool({
   description: "Resumen de OC pendientes (aprobación / recepción) vía hub de compras + top items.",
   risk: "READ",
   requiredModules: ["PROCUREMENT"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "procurement",
+  },
   inputSchema: z.object({ projectId: z.string().uuid().optional() }),
   jsonSchema: {
     type: "object",
@@ -194,6 +216,10 @@ export const getPendingPurchaseOrdersTool = defineBloqerAiTool({
         links: [
           { label: "Hub de compras", href },
           { label: "Órdenes pendientes", href: `/proyectos/${projectId}/ordenes-compra` },
+          ...pendingApproval.slice(0, 5).map((o) => ({
+            label: o.code ? `Ver ${o.code}` : "Ver OC",
+            href: `/proyectos/${projectId}/ordenes-compra/${o.id}`,
+          })),
         ],
       },
     };

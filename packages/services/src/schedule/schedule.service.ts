@@ -25,7 +25,7 @@ import {
   statusChangeAuditAction,
 } from "./schedule-audit";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 import {
   applyMoveSibling,
@@ -39,11 +39,11 @@ import { assertCanCompleteScheduleItem } from "./schedule-milestone-from-receipt
 const MS_PER_DAY = 86_400_000;
 
 async function assertProjectScheduleMutation(projectId: string, ctx: ServiceContext) {
-  await assertProjectAllowsBudgetPlanning(projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(projectId, ctx);
 }
 
 async function assertProjectAccess(projectId: string, ctx: ServiceContext) {
-  return requireProjectInTenant(projectId, ctx.tenantId);
+  return requireProjectAccess(projectId, ctx);
 }
 
 async function getScheduleForProject(projectId: string, ctx: ServiceContext) {

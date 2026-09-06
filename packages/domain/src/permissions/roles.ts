@@ -15,7 +15,9 @@ export type UserRole =
   | "SITE_FOREMAN"
   | "PROJECT_VIEWER";
 
-/** Roles that may access company finance tools (hub, treasury, GL) — D-056. */
+/** Roles that may access company finance tools (hub, AP/AR corporate, GL) — D-056.
+ *  Treasury/banks require VIEW TREASURY separately (VIEWER preset no longer includes it — D-111).
+ */
 export const COMPANY_FINANCE_ROLES: readonly UserRole[] = [
   "OWNER",
   "ADMIN",

@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import {
+  AI_RATE_LIMIT_USER_MESSAGE,
+  checkAiChatRateLimit,
+  resetAiChatRateLimitForTests,
+} from "./ai-rate-limit";
+
+test("ai rate limit blocks per user per minute", () => {
+  resetAiChatRateLimitForTests();
+  const cfg = { userPerMinute: 2, tenantPerHour: 100 };
+  const base = {
+    tenantId: "t1",
+    userId: "u1",
+    config: cfg,
+    nowMs: 1_000_000,
+  };
+  assert.equal(checkAiChatRateLimit(base).ok, true);
+  assert.equal(checkAiChatRateLimit(base).ok, true);
+  const blocked = checkAiChatRateLimit(base);
+  assert.equal(blocked.ok, false);
+  if (!blocked.ok) assert.ok(blocked.retryAfterSec >= 1);
+  assert.match(AI_RATE_LIMIT_USER_MESSAGE, /límite de consultas/i);
+});
+
+test("ai rate limit blocks per tenant per hour", () => {
+  resetAiChatRateLimitForTests();
+  const cfg = { userPerMinute: 100, tenantPerHour: 2 };
+  const nowMs = 2_000_000;
+  assert.equal(
+    checkAiChatRateLimit({ tenantId: "t2", userId: "a", config: cfg, nowMs }).ok,
+    true,
+  );
+  assert.equal(
+    checkAiChatRateLimit({ tenantId: "t2", userId: "b", config: cfg, nowMs }).ok,
+    true,
+  );
+  assert.equal(
+    checkAiChatRateLimit({ tenantId: "t2", userId: "c", config: cfg, nowMs }).ok,
+    false,
+  );
+});

@@ -7,7 +7,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject, assertWbsLineForProject } from "../procurement/procurement-wbs";
@@ -97,6 +97,7 @@ export async function getSubcontractById(id: string, ctx: ServiceContext): Promi
   const s = await prisma.subcontract.findUnique({ where: { id }, include: subcontractInclude });
   if (!s) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (s.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(s.projectId, ctx);
   return serializeSubcontract(s);
 }
 
@@ -108,7 +109,7 @@ export async function listSubcontractsByProject(
   if (!canViewSubcontractsArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver subcontratos");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const subcontracts = await prisma.subcontract.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -179,7 +180,7 @@ export async function createSubcontract(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear subcontratos");
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   await assertContactRoleInTenant(input.subcontractorContactId, "SUBCONTRACTOR", ctx.tenantId);
 
@@ -281,7 +282,7 @@ export async function updateSubcontract(
   const existing = await prisma.subcontract.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El subcontrato en estado "${existing.status}" no puede editarse. Use actualizar metadatos para campos no económicos.`);
   }
@@ -359,7 +360,7 @@ export async function updateSubcontractMeta(
   if (existing.status === "CANCELLED" || existing.status === "COMPLETED") {
     throw new ServiceError("CONFLICT", `El subcontrato en estado "${existing.status}" es de solo lectura`);
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   const updated = await prisma.subcontract.update({
     where: { id },
@@ -385,7 +386,7 @@ export async function activateSubcontract(id: string, ctx: ServiceContext): Prom
   const existing = await prisma.subcontract.findUnique({ where: { id }, include: { lines: { select: { id: true } } } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El subcontrato en estado "${existing.status}" no puede activarse`);
   }

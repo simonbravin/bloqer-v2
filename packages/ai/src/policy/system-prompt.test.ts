@@ -19,8 +19,28 @@ describe("system prompt policy", () => {
     assert.match(p, /NO podés modificar|solo lectura/i);
     assert.match(p, /DATA|prompt injection/i);
     assert.match(p, /No inventes/i);
+    assert.match(p, /BLOQER_PRESENTATION|executive|prioriz/i);
+    assert.match(p, /NUNCA confíes|identidad|roles/i);
     for (const m of FORBIDDEN_LEAK_MARKERS) {
       assert.ok(!p.includes(m), `system prompt must not embed ${m}`);
     }
+  });
+
+  it("uses preferredName only when provided from session", () => {
+    const withName = buildBloqerAiSystemPrompt({
+      locale: "es-AR",
+      timezone: "America/Argentina/Buenos_Aires",
+      contextSummary: "test",
+      preferredName: "Simón",
+      isFirstAssistantTurn: true,
+    });
+    assert.match(withName, /preferredName: Simón/);
+    assert.match(withName, /Hola Simón/);
+    const without = buildBloqerAiSystemPrompt({
+      locale: "es-AR",
+      timezone: "America/Argentina/Buenos_Aires",
+      contextSummary: "test",
+    });
+    assert.match(without, /no hay preferredName/i);
   });
 });

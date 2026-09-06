@@ -25,7 +25,8 @@ import {
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
 import { isRichNoteEmpty, normalizeRichNote, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
@@ -606,6 +607,7 @@ export async function getJobsiteLogById(id: string, ctx: ServiceContext): Promis
   const l = await prisma.jobsiteLog.findUnique({ where: { id }, include: logInclude });
   if (!l) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (l.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(l.projectId, ctx);
   return serializeLog(l);
 }
 
@@ -620,10 +622,11 @@ export async function getJobsiteLogActivityLog(
 
   const existing = await prisma.jobsiteLog.findUnique({
     where: { id: logId },
-    select: { id: true, tenantId: true, createdBy: true, updatedBy: true },
+    select: { id: true, tenantId: true, projectId: true, createdBy: true, updatedBy: true },
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(existing.projectId, ctx);
 
   const [lifecycleRows, linkedDocs, actorUsers] = await Promise.all([
     listEntityAuditLogs(
@@ -699,7 +702,7 @@ export async function listJobsiteLogsByProject(
   if (!canViewJobsiteLogArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const f = filters ?? {};
   const dateOnlyRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -834,7 +837,7 @@ export async function createJobsiteLog(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear partes de obra");
   }
 
-  const projectForCreate = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  const projectForCreate = await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   const companyId = await resolveActiveCompanyId(
     ctx,
@@ -950,7 +953,7 @@ export async function updateJobsiteLog(
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede editarse`);
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   if (input.logDate) {
     if (input.logDate > toIsoDateInTimeZone()) {
@@ -1031,7 +1034,7 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede enviarse`);
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   const hasContent =
     !isRichNoteEmpty(existing.generalNotes) || existing.blockers || existing.incidents || existing.safetyNotes ||
     existing.title || existing.workFront || existing.weather || existing.shift ||
@@ -1091,7 +1094,7 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertJobsiteLogApprovable(existing.status);
 
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);
 
   const gate = await getTenantModuleGate(ctx);
@@ -1190,7 +1193,7 @@ export async function returnJobsiteLog(
     throw new ServiceError("CONFLICT", `Solo los partes enviados pueden devolverse para corrección. Estado actual: "${existing.status}"`);
   }
 
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   const flipped = await prisma.jobsiteLog.updateMany({
     where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },

@@ -30,6 +30,7 @@ export type HelpIntent =
   | "equipo-obra"
   | "invitar-usuario"
   | "roles-permisos"
+  | "acceso-obras"
   | "politicas-compras"
   | "cuenta-tesoreria"
   | "transferencia"
@@ -91,7 +92,8 @@ export type HelpIntent =
   | "checklist-roles"
   | "limitaciones"
   | "puesta-marcha-contable"
-  | "tablero-finanzas";
+  | "tablero-finanzas"
+  | "preguntale-a-bloqer";
 
 export type HelpHref =
   | { kind: "company"; path: string; label?: string }
@@ -169,4 +171,5 @@ export const HELP_INTENT_LABELS: Partial<Record<HelpIntent, string>> = {
   "anular-documentos": "Anular / devolver / cancelar",
   rentabilidad: "Rentabilidad de obra",
   "reportes-obra": "Reportes de obra",
+  "preguntale-a-bloqer": "Preguntale a Bloqer",
 };

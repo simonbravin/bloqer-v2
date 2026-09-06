@@ -208,7 +208,7 @@ async function createStockConsumptionOnce(
 
   let projectCompanyId: string | null = null;
   if (input.projectId) {
-    const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+    const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx);
     projectCompanyId = project.companyId;
   }
 

@@ -5,6 +5,7 @@ import { getMyFieldPendingCounts } from "../../field/field-pending.service";
 import { listCertificationsByProject } from "../../certification/certification.service";
 import { resolveAiProjectId } from "../context";
 import { defineBloqerAiTool, nowIso } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
 import { ServiceError } from "../../types";
 
 export const getRecentJobsiteLogsTool = defineBloqerAiTool({
@@ -12,6 +13,11 @@ export const getRecentJobsiteLogsTool = defineBloqerAiTool({
   description: "Últimos partes de obra (libro de obra) del proyecto.",
   risk: "READ",
   requiredModules: ["JOBSITE_LOG"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "field",
+  },
   inputSchema: z.object({
     projectId: z.string().uuid().optional(),
     limit: z.number().int().min(1).max(20).optional(),
@@ -58,6 +64,12 @@ export const getProjectFieldSummaryTool = defineBloqerAiTool({
   name: "get_project_field_summary",
   description: "Resumen Field: pendientes del actor y foco de obra (si aplica).",
   risk: "READ",
+  requiredModules: ["JOBSITE_LOG"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "field",
+  },
   inputSchema: z.object({ projectId: z.string().uuid().optional() }),
   jsonSchema: {
     type: "object",
@@ -93,6 +105,11 @@ export const getProjectCertificationSummaryTool = defineBloqerAiTool({
   description: "Resumen liviano de certificaciones del proyecto (conteos por estado).",
   risk: "READ",
   requiredModules: ["CERTIFICATIONS"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_FINANCIAL,
+    scope: "PROJECT",
+    accessKind: "project_financial",
+  },
   inputSchema: z.object({ projectId: z.string().uuid().optional() }),
   jsonSchema: {
     type: "object",

@@ -2,7 +2,9 @@
 // Product source of truth: docs/bloqer2.0/00-product/PERMISSIONS_MATRIX.md
 // Phase 7C: `SALES_COLLECTIONS` removed from `PermissionModule` (unused in `can()` gates; AR covers invoices / receivables / collections).
 // Phase 12A: Full role set matches `USER_ROLES.md` + `roles.ts`; service `can()` gates audited against this MATRIX — see PERMISSIONS_ROUTE_MATRIX.md.
-// D-056: Company treasury/GL/hub only OWNER|ADMIN|FINANCE|TREASURER|VIEWER; PROJECT_FINANCE = project finance tools; no TREASURY/ACCOUNTING on PM/PROCUREMENT/SALES.
+// D-056 + D-111: Company hub/AP/AR: OWNER|ADMIN|FINANCE|TREASURER|VIEWER.
+// Treasury/banks: OWNER|ADMIN|FINANCE|TREASURER only (VIEWER removed from TREASURY preset).
+// PROJECT_FINANCE = project finance tools; no TREASURY/ACCOUNTING on PM/PROCUREMENT/SALES.
 //
 // Project-scoped qualifications ("su proyecto") are enforced at the query/service
 // layer, not here. This function resolves the role-level ceiling.
@@ -153,9 +155,9 @@ const MATRIX: Record<UserRole, Partial<Record<PermissionModule, PermissionAction
     PURCHASE_REQUESTS: "VIEW",
     SUBCONTRACTS: "VIEW", INVENTORY: "VIEW", WAREHOUSES: "VIEW",
     DOCUMENTS: "VIEW", NOTIFICATIONS: "VIEW",
-    TREASURY: "VIEW", BANK_ACCOUNTS: "VIEW", BANK_RECONCILIATION: "VIEW",
+    // D-111: VIEWER no longer has TREASURY / banks / transfers (auditor read of AP/AR/GL only).
     EXPENSES_PAYMENTS: "VIEW",
-    INTERNAL_TRANSFERS: "VIEW", AR: "VIEW", AP: "VIEW",
+    AR: "VIEW", AP: "VIEW",
     TAXES: "VIEW", ACCOUNTING: "VIEW", MASTER_DATA: "VIEW",
   },
   PROJECT_MANAGER: {

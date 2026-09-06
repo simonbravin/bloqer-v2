@@ -8,7 +8,8 @@ import { createSystemNotification } from "../notifications/notification.service"
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { formatCertificationCode, formatNotificationTitle } from "../notifications/notification-copy";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { resolveActiveCompanyId } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
 import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
@@ -70,6 +71,7 @@ export async function getCertificationById(
   });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(cert.projectId, ctx);
   return serializeCertification(cert);
 }
 
@@ -80,7 +82,7 @@ export async function listCertificationsByProject(
   if (!can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver certificaciones");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const certs = await prisma.certification.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -106,7 +108,7 @@ export async function createCertification(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear certificaciones");
   }
 
-  const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   if (input.periodEnd < input.periodStart) {
     throw new ServiceError("VALIDATION", "La fecha de fin del período no puede ser anterior al inicio");
@@ -185,7 +187,7 @@ export async function updateCertification(
   const cert = await prisma.certification.findUnique({ where: { id } });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(cert.projectId, ctx);
   assertCertificationEditable(cert);
 
   const nextStart = input.periodStart ?? cert.periodStart.toISOString().slice(0, 10);
@@ -235,7 +237,7 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
   });
   if (!certPreview) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (certPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(certPreview.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(certPreview.projectId, ctx);
 
   // Single txn + project advisory lock serializes concurrent issues that share WBS
   // lines (P-CERT-01 / BR-CERT-002). Conditional DRAFT→ISSUED update prevents TOCTOU.
@@ -334,7 +336,7 @@ export async function approveCertification(id: string, ctx: ServiceContext): Pro
   });
   if (!meta) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (meta.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(meta.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(meta.projectId, ctx);
   const updated = await _transition(id, ctx, ["ISSUED"], "APPROVED", "certification.approved");
 
   const recipients = await resolveNotificationAudience({
@@ -378,7 +380,7 @@ export async function rejectCertification(id: string, ctx: ServiceContext): Prom
   });
   if (!meta) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (meta.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(meta.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(meta.projectId, ctx);
   return _transition(id, ctx, ["ISSUED"], "REJECTED", "certification.rejected");
 }
 
@@ -392,7 +394,7 @@ export async function cancelCertification(id: string, ctx: ServiceContext): Prom
   });
   if (!meta) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (meta.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(meta.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(meta.projectId, ctx);
 
   // BR-CERT-005: block if a non-cancelled SalesInvoice is linked to this certification
   const activeInvoice = await prisma.salesInvoice.findFirst({

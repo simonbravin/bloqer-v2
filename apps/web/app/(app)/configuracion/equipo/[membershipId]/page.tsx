@@ -8,6 +8,7 @@ import {
   canEditTeamMembership,
   canReadTenantConfigArea,
   getTenantMemberById,
+  getUserProjectAccessEditor,
   ServiceError,
 } from "@bloqer/services";
 import { Label } from "@/components/ui/label";
@@ -21,6 +22,7 @@ import {
 } from "../../configuracion-actions";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { UserProjectAccessSection } from "@/features/tenant-config/components/user-project-access-section";
 
 interface PageProps {
   params: Promise<{ membershipId: string }>;
@@ -54,6 +56,17 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
 
   const canEdit = canEditTeamMembership(current.tenantCtx.roles);
 
+  let projectAccess: Awaited<ReturnType<typeof getUserProjectAccessEditor>> | null = null;
+  let projectAccessError: string | null = null;
+  if (canEdit) {
+    try {
+      projectAccess = await getUserProjectAccessEditor(member.userId, ctx);
+    } catch (e) {
+      if (e instanceof ServiceError) projectAccessError = e.message;
+      else throw e;
+    }
+  }
+
   return (
     <PageShell variant="form" className="space-y-6" breadcrumbLabel={member.name ?? member.email}>
       <PageListHeader title="Miembro" subtitle={member.email} />
@@ -71,6 +84,16 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
           </DetailFieldGrid>
         </CardContent>
       </Card>
+
+      {projectAccess ? (
+        <UserProjectAccessSection
+          membershipId={member.membershipId}
+          initial={projectAccess}
+          canEdit={canEdit}
+        />
+      ) : projectAccessError ? (
+        <p className="text-sm text-muted-foreground">{projectAccessError}</p>
+      ) : null}
 
       {canEdit ? (
         <>

@@ -71,7 +71,7 @@ test("no duplicate keywords within an article (normalized)", () => {
 test("intent chips stay usable (not flooded)", () => {
   const chips = listHelpIntentChips();
   assert.ok(chips.length >= 8, String(chips.length));
-  assert.ok(chips.length <= 28, `too many chips: ${chips.length}`);
+  assert.ok(chips.length <= 30, `too many chips: ${chips.length}`);
 });
 
 test("featured home slugs resolve", () => {

@@ -34,6 +34,7 @@ export const HELP_FEATURED_SLUGS: readonly string[] = [
   "leer-edt-y-costos",
   "pagar-una-cuenta-por-pagar",
   "errores-operativos-frecuentes",
+  "preguntale-a-bloqer",
 ];
 
 const BY_SLUG = new Map(HELP_ARTICLES.map((a) => [a.slug, a]));

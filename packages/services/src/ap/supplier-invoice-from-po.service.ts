@@ -423,7 +423,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   const po = await loadPoForBilling(input.purchaseOrderId, ctx);
   if (po.projectId !== input.projectId) {

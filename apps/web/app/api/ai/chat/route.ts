@@ -25,10 +25,17 @@ import {
   buildAiExecutionContext,
   createDefaultBloqerAiToolRegistry,
   getTenantModuleGate,
-  requireProjectInTenant,
+  aiCanViewCompanyAp,
+  aiCanViewCompanyAr,
+  aiCanViewTreasury,
 } from "@bloqer/services";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  AI_RATE_LIMIT_USER_MESSAGE,
+  checkAiChatRateLimit,
+} from "@/lib/ai-rate-limit";
+import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { filterSafeAiLinks } from "@/features/bloqer-ai/lib/safe-ai-content";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,6 +63,8 @@ const bodySchema = z.object({
   currentProjectId: z.string().uuid().optional(),
   currentEntityType: z.string().max(80).optional(),
   currentEntityId: z.string().uuid().optional(),
+  /** Client hint: no prior assistant messages in this browser session. */
+  isFirstAssistantTurn: z.boolean().optional(),
 });
 
 function ensureKnowledgeLoaded() {
@@ -155,6 +164,7 @@ function clientSafeStreamError(message: string, code?: string): string {
     }
     return userFacingOpenAiErrorMessage("BAD_REQUEST");
   }
+  // Anything else (including English vendor text) → generic.
   if (
     message &&
     /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas/i.test(message) &&
@@ -180,6 +190,20 @@ export async function POST(req: Request) {
     return Response.json({ error: "Sin contexto de tenant." }, { status: 401 });
   }
 
+  const rate = checkAiChatRateLimit({
+    tenantId: service.tenantId,
+    userId: service.actorUserId,
+  });
+  if (!rate.ok) {
+    return Response.json(
+      { error: AI_RATE_LIMIT_USER_MESSAGE },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rate.retryAfterSec) },
+      },
+    );
+  }
+
   let body: z.infer<typeof bodySchema>;
   try {
     body = bodySchema.parse(await req.json());
@@ -191,7 +215,8 @@ export async function POST(req: Request) {
   let safeProjectId = body.currentProjectId;
   if (safeProjectId) {
     try {
-      await requireProjectInTenant(safeProjectId, service.tenantId);
+      const { requireProjectAccess } = await import("@bloqer/services");
+      await requireProjectAccess(safeProjectId, service);
     } catch {
       safeProjectId = undefined;
     }
@@ -211,6 +236,7 @@ export async function POST(req: Request) {
     actorDisplayName: current.session.user.name ?? current.session.user.email ?? undefined,
     tenantName: current.tenantCtx.tenantName,
     enabledModules,
+    isFirstAssistantTurn: body.isFirstAssistantTurn === true,
   });
 
   const registry = createDefaultBloqerAiToolRegistry({
@@ -225,18 +251,28 @@ export async function POST(req: Request) {
         })),
   });
 
-  const tools = registry.definitions({ risks: ["READ"] });
+  // Deny-by-default advertise: only tools the session may use.
+  const tools = registry.definitions({ risks: ["READ"], ctx: aiCtx, logAdvertise: false });
   const history = normalizeHistoryForProvider(body.messages);
+
+  const hasCompanyFinanceAccess =
+    aiCanViewTreasury(service.roles) ||
+    aiCanViewCompanyAp(service.roles) ||
+    aiCanViewCompanyAr(service.roles);
 
   const system = buildBloqerAiSystemPrompt({
     locale: aiCtx.locale,
     timezone: aiCtx.timezone,
+    preferredName: aiCtx.actorPreferredName,
+    isFirstAssistantTurn: aiCtx.isFirstAssistantTurn,
+    hasCompanyFinanceAccess,
     contextSummary: [
-      `Usuario: ${aiCtx.actorDisplayName ?? "—"}`,
+      `Usuario (sesión): ${aiCtx.actorPreferredName ?? aiCtx.actorDisplayName ?? "—"}`,
+      `Roles: ${(aiCtx.actorRoleLabels ?? []).join(", ") || "—"}`,
       `Empresa: ${aiCtx.tenantName ?? "—"}`,
-      `Roles: ${aiCtx.service.roles.join(", ")}`,
       `Ruta: ${aiCtx.currentRoute ?? "—"}`,
       `Proyecto actual (hint validado al usarlo): ${aiCtx.currentProjectId ?? "ninguno"}`,
+      `Acceso finanzas empresa: ${hasCompanyFinanceAccess ? "sí" : "no"}`,
       `Módulos habilitados: ${enabledModules.slice(0, 24).join(", ")}${enabledModules.length > 24 ? "…" : ""}`,
     ].join("\n"),
   });
@@ -270,7 +306,7 @@ export async function POST(req: Request) {
           system,
           messages: history,
           tools,
-          maxTurns: 8,
+          maxTurns: env.maxAgentTurns,
           maxToolCalls: env.maxToolCalls,
           maxOutputTokens: env.maxOutputTokens,
           signal: agentSignal,
@@ -291,7 +327,15 @@ export async function POST(req: Request) {
                 `Consultando ${ev.name}…`,
             });
           } else if (ev.type === "tool_end") {
-            send("tool_end", { toolCallId: ev.toolCallId, name: ev.name, ok: ev.ok });
+            const links = filterSafeAiLinks(ev.links);
+            send("tool_end", {
+              toolCallId: ev.toolCallId,
+              name: ev.name,
+              ok: ev.ok,
+              ...(links.length ? { links } : {}),
+            });
+          } else if (ev.type === "presentation") {
+            send("presentation", { presentation: ev.presentation });
           } else if (ev.type === "usage") {
             // Privacy: metadata only — never log prompts, tool payloads, or API keys.
             console.info(

@@ -16,7 +16,8 @@ import { notifyPayableReadyToPay } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
@@ -317,6 +318,7 @@ export async function getSupplierInvoiceById(
   if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(inv.projectId, ctx);
   return serializeInvoice(inv);
 }
 
@@ -366,7 +368,7 @@ export async function listSupplierInvoicesByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -415,7 +417,7 @@ export async function countOpenSupplierInvoicesByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   return prisma.supplierInvoice.count({
     where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },
@@ -586,7 +588,7 @@ export async function createSupplierInvoice(
   }
 
   if (projectId) {
-    await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
+    await assertProjectAllowsOperationalMutation(projectId, ctx);
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: { tenantId: true, companyId: true },
@@ -773,7 +775,7 @@ export async function updateSupplierInvoice(
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
   if (existing.projectId) {
-    await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+    await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   }
   assertSupplierInvoiceEditable(existing);
 
@@ -989,7 +991,7 @@ export async function issueSupplierInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas de proveedor");
   }
   if (invPreview.projectId) {
-    await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx.tenantId);
+    await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx);
   }
 
   const directSpendSettings =

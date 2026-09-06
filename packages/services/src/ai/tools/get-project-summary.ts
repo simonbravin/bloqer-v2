@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getProjectOverviewDashboard } from "../../project/project-overview-dashboard.service";
 import { resolveAiProjectId } from "../context";
 import { defineBloqerAiTool, nowIso } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
 import { ServiceError } from "../../types";
 
 const inputSchema = z.object({
@@ -14,6 +15,11 @@ export const getProjectSummaryTool = defineBloqerAiTool({
     "Resumen operativo de una obra (KPIs, progreso de cronograma, alertas). Usa el proyecto del contexto si no se indica projectId.",
   risk: "READ",
   requiredModules: ["PROJECTS"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_FINANCIAL,
+    scope: "PROJECT",
+    accessKind: "project_financial",
+  },
   inputSchema,
   jsonSchema: {
     type: "object",
@@ -31,11 +37,19 @@ export const getProjectSummaryTool = defineBloqerAiTool({
     const dash = await getProjectOverviewDashboard(ctx.service, projectId);
     return {
       data: {
-        project: dash.project,
+        project: {
+          id: dash.project.id,
+          name: dash.project.name,
+          code: dash.project.code,
+          status: dash.project.status,
+        },
         scheduleProgress: dash.scheduleProgress,
         kpis: dash.kpis,
-        alerts: dash.alerts,
-        activity: dash.activity,
+        alerts: dash.alerts.map((a) => ({
+          title: a.label,
+          severity: a.severity,
+          ...(a.description ? { message: a.description } : {}),
+        })),
         sectionsExcluded: dash.sectionsExcluded,
         href: `/proyectos/${projectId}`,
       },

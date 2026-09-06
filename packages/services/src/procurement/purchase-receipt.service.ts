@@ -11,7 +11,8 @@ import {
   canViewProcurementProjectArea,
 } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { serializeQtyDecimal } from "../finance/money-decimal";
 import {
   resolveUserDisplayNames,
@@ -150,6 +151,7 @@ export async function getPurchaseReceiptById(id: string, ctx: ServiceContext): P
   const r = await prisma.purchaseReceipt.findUnique({ where: { id }, include: receiptInclude });
   if (!r) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
   if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(r.projectId, ctx);
   return toPurchaseReceiptView(r);
 }
 
@@ -161,7 +163,7 @@ export async function listReceiptsByProject(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver recepciones");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const receipts = await prisma.purchaseReceipt.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -186,6 +188,7 @@ export async function listReceiptsByPurchaseOrder(
   const po = await prisma.purchaseOrder.findUnique({ where: { id: purchaseOrderId } });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(po.projectId, ctx);
 
   const receipts = await prisma.purchaseReceipt.findMany({
     where: { purchaseOrderId, tenantId: ctx.tenantId },
@@ -216,7 +219,7 @@ export async function createPurchaseReceipt(
   });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(po.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(po.projectId, ctx);
 
   // BR-PUR-004: receipt only allowed on CONFIRMED+
   assertPoEligibleForReceipt(po.status);
@@ -380,7 +383,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `La recepción en estado "${existing.status}" no puede confirmarse.`);
   }
@@ -552,7 +555,7 @@ export async function cancelPurchaseReceipt(id: string, ctx: ServiceContext): Pr
   if (existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "La recepción ya está anulada");
   }
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   const receipt = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM purchase_receipts WHERE id = ${id} FOR UPDATE`;

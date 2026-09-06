@@ -2,6 +2,7 @@ import { prisma } from "@bloqer/database";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { canViewProcurementProjectArea, canViewPurchaseRequests } from "./procurement-access";
+import { requireProjectAccess } from "../security/access";
 
 export type ProjectProcurementHub = {
   projectId: string;
@@ -42,6 +43,8 @@ export async function getProjectProcurementHub(
   if (!canViewHub(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el hub de compras");
   }
+
+  await requireProjectAccess(projectId, ctx);
 
   const gate = await getTenantModuleGate(ctx);
   if (!gate.isEnabled("PROCUREMENT")) {

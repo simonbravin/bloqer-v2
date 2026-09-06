@@ -6,7 +6,8 @@ import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenan
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
+
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { computeCostExposureLayers } from "./cost-exposure";
 import { pctOfBudget, pctPhysicalProgressFromLibro, shouldWarnUnlinkedInvoiceAgainstPo } from "./cost-control-pct";
@@ -221,7 +222,7 @@ export async function getProjectCostControl(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver control de costos");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");

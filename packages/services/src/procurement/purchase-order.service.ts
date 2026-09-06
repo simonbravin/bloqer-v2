@@ -12,7 +12,7 @@ import {
 } from "./procurement-access";
 import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import {
   computeDominantCostTypeFromApuLines,
@@ -236,7 +236,7 @@ export async function listLinkablePurchaseOrders(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para listar órdenes de compra");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const orders = await prisma.purchaseOrder.findMany({
     where: {
@@ -314,7 +314,7 @@ export async function listProcurementWbsOptions(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para opciones de compra / EDT");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const nodes = await prisma.wbsNode.findMany({
     where: {
@@ -440,6 +440,7 @@ export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Pro
   const po = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(po.projectId, ctx);
   return hydrateLiveBudgetRefs(await toPurchaseOrderView(po), ctx);
 }
 
@@ -517,7 +518,7 @@ export async function listPurchaseOrdersByProject(
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver órdenes de compra");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const orders = await prisma.purchaseOrder.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -547,7 +548,7 @@ export async function createPurchaseOrder(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear órdenes de compra");
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
@@ -698,7 +699,7 @@ export async function updatePurchaseOrder(
   const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   assertDraft(existing);
 
   if (input.supplierContactId) {

@@ -295,7 +295,7 @@ export async function registerApExpense(
   }
 
   if (projectId) {
-    await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
+    await assertProjectAllowsOperationalMutation(projectId, ctx);
     const project = await prisma.project.findUnique({
       where: { id: projectId },
       select: { tenantId: true, companyId: true },

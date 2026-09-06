@@ -18,6 +18,7 @@ export {
 } from "./audit/audit-display";
 export * from "./project/project.service";
 export * from "./project/project-team.service";
+export * from "./project/project-membership.service";
 export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";
 export * from "./budget/approved-budget-edits.service";
@@ -48,6 +49,34 @@ export {
   canMutateArForScope,
 } from "./ar/ar-access";
 export * from "./finance/finance-access";
+export {
+  canAccessProject,
+  requireProjectAccess,
+  resolveAccessibleProjectScope,
+  projectIdWhereForScope,
+  projectRowIdWhereForScope,
+  projectScopeWhereForOptionalProject,
+  requireProjectAccessIfPresent,
+  hasTenantWideProjectAccess,
+  getTenantProjectAccessMode,
+  clearProjectAccessModeCache,
+  canViewTreasury,
+  canViewProjectFinancials,
+  canViewCompanyFinancials,
+  canViewProjectFinancialsCapability,
+  canViewCompanyFinancialsCapability,
+  canViewProcurementCapability,
+  canViewProjectDocuments,
+  type ProjectAccessMode,
+} from "./security/access";
+export type {
+  UserProjectAccessEditor,
+  UserProjectAccessProjectRow,
+  MembershipScopedActivationPreview,
+  SetProjectAccessModeInput,
+  ImportTeamMembershipsPreview,
+} from "./project/project-membership.service";
+
 export * from "./finance/document-class.service";
 export * from "./ar/sales-invoice.service";
 export * from "./ar/receivable.service";

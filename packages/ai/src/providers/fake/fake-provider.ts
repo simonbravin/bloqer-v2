@@ -7,7 +7,15 @@ import type {
   AiToolCall,
 } from "../../types";
 import type { AiProvider } from "../../provider";
+import {
+  PRESENTATION_END,
+  PRESENTATION_START,
+  type AiPresentation,
+} from "../../presentation";
 
+function withPresentation(visible: string, presentation: AiPresentation): string {
+  return `${visible}\n\n${PRESENTATION_START}\n${JSON.stringify(presentation)}\n${PRESENTATION_END}`;
+}
 export type FakeAiScriptedTurn =
   | { kind: "text"; text: string }
   | { kind: "tool_calls"; toolCalls: AiToolCall[] };
@@ -155,11 +163,93 @@ export function createConversationalFakeAiProvider(opts?: { id?: string }): AiPr
         .filter((m): m is Extract<AiMessage, { role: "tool" }> => m.role === "tool")
         .map((m) => m.toolName)
         .join(" ");
-      const text = /material/i.test(toolNames)
-        ? "Según Bloqer (fake): revisá materiales en la obra. Abrí /proyectos para el detalle autorizado."
-        : /purchase_order|pending/i.test(toolNames)
-          ? "Según Bloqer (fake): hay OC pendientes de aprobación. Abrí el hub de compras del proyecto."
-          : "Resumen (FakeAiProvider): usé solo tools de lectura. No inventé montos.";
+      let visible: string;
+      let presentation: AiPresentation;
+      if (/material/i.test(toolNames)) {
+        visible = "Hay faltantes de materiales que conviene revisar.";
+        presentation = {
+          kind: "list",
+          headline: "Materiales",
+          summary: "Según Bloqer (fake): revisá materiales en la obra.",
+          insights: [
+            {
+              kind: "materials",
+              severity: "attention",
+              title: "Faltantes",
+              explanation: "Hay ítems con riesgo de desabastecimiento en la obra.",
+              links: [{ label: "Ver materiales", href: "/proyectos" }],
+            },
+          ],
+          actions: [{ rank: 1, label: "Abrir materiales de la obra", links: [{ label: "Ver materiales", href: "/proyectos" }] }],
+          secondaryMetrics: [],
+          followUps: ["¿Qué OC están pendientes?", "¿Cómo viene esta obra?"],
+        };
+      } else if (/purchase_order|pending/i.test(toolNames)) {
+        visible = "Hay OC pendientes de aprobación.";
+        presentation = {
+          kind: "list",
+          headline: "Compras pendientes",
+          summary: "Según Bloqer (fake): hay OC pendientes de aprobación.",
+          insights: [
+            {
+              kind: "procurement",
+              severity: "pending",
+              title: "OC por aprobar",
+              explanation: "Hay órdenes esperando decisión en el hub de compras.",
+              links: [{ label: "Ver órdenes pendientes", href: "/proyectos" }],
+            },
+          ],
+          actions: [{ rank: 1, label: "Revisar OC pendientes", links: [{ label: "Hub de compras", href: "/proyectos" }] }],
+          secondaryMetrics: [],
+          followUps: ["¿Qué materiales faltan?", "¿Cómo viene esta obra?"],
+        };
+      } else {
+        visible = "Priorizo los puntos que más afectan la obra ahora.";
+        presentation = {
+          kind: /debo|pagar|cxp/i.test(q)
+            ? "direct"
+            : /cómo viene|preocup|urgente|colgado|cómo estamos/i.test(q)
+              ? "executive"
+              : "list",
+          headline: /debo|pagar|cxp/i.test(q)
+            ? "Cuentas por pagar"
+            : "Resumen de obra",
+          summary: "Resumen (FakeAiProvider): priorizado, sin inventar montos.",
+          insights:
+            /debo|pagar|cxp/i.test(q)
+              ? [
+                  {
+                    kind: "payables" as const,
+                    severity: "attention" as const,
+                    title: "CxP",
+                    explanation: "Consultá el detalle autorizado en CxP.",
+                    links: [{ label: "Ver CxP", href: "/finanzas/cuentas-por-pagar" }],
+                  },
+                ]
+              : [
+                  {
+                    kind: "schedule" as const,
+                    severity: "attention" as const,
+                    title: "Cronograma",
+                    explanation: "Hay señales de atraso que conviene revisar primero.",
+                    links: [{ label: "Ver cronograma", href: "/proyectos" }],
+                  },
+                  {
+                    kind: "procurement" as const,
+                    severity: "pending" as const,
+                    title: "Compras",
+                    explanation: "Pueden existir OC o materiales pendientes de decisión.",
+                    links: [{ label: "Ver compras", href: "/proyectos" }],
+                  },
+                ],
+          actions: [
+            { rank: 1, label: "Revisar lo más urgente en la obra", links: [{ label: "Abrir obra", href: "/proyectos" }] },
+          ],
+          secondaryMetrics: [],
+          followUps: ["Analizar cronograma", "Revisar compras", "Ver situación financiera"],
+        };
+      }
+      const text = withPresentation(visible, presentation);
       return {
         message: { role: "assistant", content: text },
         finishReason: "stop",
@@ -175,9 +265,25 @@ export function createConversationalFakeAiProvider(opts?: { id?: string }): AiPr
     }
 
     if (/cómo creo|como creo|solicitud de compra|significa|ayuda|centro de ayuda/.test(q)) {
-      const text =
-        "Para crear una solicitud de compra (SC) en Bloqer: abrí el proyecto → Solicitudes de compra → Nueva. " +
-        "Más detalle en el centro de ayuda: /ayuda. (respuesta FakeAiProvider)";
+      const visible =
+        "Para crear una solicitud de compra (SC): abrí el proyecto → Solicitudes de compra → Nueva.";
+      const text = withPresentation(visible, {
+        kind: "help",
+        headline: "Cómo crear una solicitud de compra",
+        insights: [
+          {
+            kind: "help",
+            severity: "info",
+            title: "Pasos",
+            explanation:
+              "1) Abrí la obra. 2) Ir a Solicitudes de compra. 3) Nueva SC. Más detalle en el centro de ayuda.",
+            links: [{ label: "Centro de ayuda", href: "/ayuda" }],
+          },
+        ],
+        actions: [{ rank: 1, label: "Abrir centro de ayuda", links: [{ label: "Centro de ayuda", href: "/ayuda" }] }],
+        secondaryMetrics: [],
+        followUps: ["¿Qué OC están pendientes?"],
+      });
       return {
         message: { role: "assistant", content: text },
         finishReason: "stop",
@@ -192,12 +298,14 @@ export function createConversationalFakeAiProvider(opts?: { id?: string }): AiPr
       };
     }
 
-    let toolName = "get_current_context";
+    let toolName = "get_project_summary";
     if (/oc|orden|pendient|compra/.test(q)) toolName = "get_pending_purchase_orders";
     else if (/material|faltan|faltante/.test(q)) toolName = "get_project_material_shortages";
     else if (/atrasad|cronograma|tarea/.test(q)) toolName = "get_delayed_schedule_items";
     else if (/pagar|debo|cxp|proveedor/.test(q)) toolName = "get_payables";
     else if (/cobrar|deben|cxc|cliente/.test(q)) toolName = "get_receivables";
+    else if (/cómo viene|preocup|urgente|colgado|cómo estamos/.test(q)) toolName = "get_project_summary";
+    else toolName = "get_current_context";
 
     const toolCalls: AiToolCall[] = [
       {

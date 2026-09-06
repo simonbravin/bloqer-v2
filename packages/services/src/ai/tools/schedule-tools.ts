@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getProjectScheduleWorkspace } from "../../schedule/schedule-workspace.service";
 import { resolveAiProjectId } from "../context";
 import { defineBloqerAiTool, nowIso } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
 import { ServiceError } from "../../types";
 
 const inputSchema = z.object({
@@ -13,6 +14,11 @@ export const getProjectScheduleSummaryTool = defineBloqerAiTool({
   description: "Resumen de cronograma: progreso, atrasadas, totales. Requiere módulo SCHEDULE.",
   risk: "READ",
   requiredModules: ["PROJECTS", "SCHEDULE"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "project_operational",
+  },
   inputSchema,
   jsonSchema: {
     type: "object",
@@ -55,6 +61,11 @@ export const getDelayedScheduleItemsTool = defineBloqerAiTool({
   description: "Lista tareas/ítems de cronograma atrasados (top N).",
   risk: "READ",
   requiredModules: ["PROJECTS", "SCHEDULE"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "project_operational",
+  },
   inputSchema: delayedInput,
   jsonSchema: {
     type: "object",

@@ -20,6 +20,8 @@ type Props = {
   cancelLabel?: string;
   variant?: "default" | "destructive";
   pending?: boolean;
+  /** Extra gate (e.g. lockout acknowledgment checkbox). */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
 };
 
@@ -32,6 +34,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancelar",
   variant = "default",
   pending = false,
+  confirmDisabled = false,
   onConfirm,
 }: Props) {
   return (
@@ -56,9 +59,9 @@ export function ConfirmDialog({
             type="button"
             variant={variant === "destructive" ? "destructive" : "default"}
             onClick={onConfirm}
-            disabled={pending}
+            disabled={pending || confirmDisabled}
           >
-            {pending ? "Eliminando…" : confirmLabel}
+            {pending ? "Procesando…" : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

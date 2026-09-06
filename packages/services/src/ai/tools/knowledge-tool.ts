@@ -2,6 +2,7 @@ import { z } from "zod";
 import { searchKnowledge, type KnowledgeHit } from "@bloqer/ai";
 import { defineBloqerAiTool, nowIso } from "../types";
 import type { AiToolExecuteResult } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
 
 export type HelpKnowledgeHit = {
   slug: string;
@@ -33,6 +34,11 @@ export function createSearchBloqerKnowledgeTool(deps: KnowledgeToolDeps = {}) {
     description:
       "Busca en la ayuda in-app y en la documentación de Bloqer (cómo crear SC, significados, flujos). No son datos de una obra concreta.",
     risk: "READ",
+    policy: {
+      dataClass: AI_DATA_CLASS.PRODUCT_HELP,
+      scope: "NONE",
+      accessKind: "help",
+    },
     inputSchema: z.object({
       query: z.string().min(2).max(200),
       limit: z.number().int().min(1).max(10).optional(),

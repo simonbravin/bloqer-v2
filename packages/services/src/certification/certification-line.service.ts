@@ -96,7 +96,7 @@ async function _guardLine(certificationId: string, ctx: ServiceContext) {
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   assertCertificationEditable(cert);
-  await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(cert.projectId, ctx);
   return cert;
 }
 
@@ -260,7 +260,7 @@ export async function refreshPreviousQty(certId: string, ctx: ServiceContext): P
   const cert = await prisma.certification.findUnique({ where: { id: certId } });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(cert.projectId, ctx);
   assertCertificationEditable(cert);
 
   const lines = await prisma.certificationLine.findMany({ where: { certificationId: certId } });

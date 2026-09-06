@@ -2,6 +2,8 @@ import type { AiToolDefinition } from "@bloqer/ai";
 import type { PermissionModule } from "@bloqer/domain";
 import type { z } from "zod";
 import type { ServiceContext } from "../types";
+import type { AiDataClass, AiToolScope } from "./policy/data-class";
+import type { AiToolAccessKind, AiToolPolicy } from "./policy/access";
 
 export type AiToolRisk = "READ" | "PREPARE" | "WRITE_CONFIRM";
 
@@ -10,14 +12,21 @@ export type AiExecutionContext = {
   correlationId: string;
   locale: "es-AR";
   timezone: string;
-  /** Convenience from UI — revalidated before use. */
+  /** Convenience from UI — revalidated before use. Never authorization. */
   currentRoute?: string;
   currentProjectId?: string;
   currentEntityType?: string;
   currentEntityId?: string;
+  /** Full display name from session (not model-supplied). */
   actorDisplayName?: string;
+  /** First token of display name for occasional greetings — session only. */
+  actorPreferredName?: string | null;
+  /** Role labels (es-AR) for role-aware tone — session only. */
+  actorRoleLabels?: string[];
   tenantName?: string;
   enabledModules?: PermissionModule[];
+  /** True when this is the first assistant turn of the browser conversation. */
+  isFirstAssistantTurn?: boolean;
 };
 
 export type AiToolProvenance = {
@@ -43,6 +52,8 @@ export type BloqerAiTool<TIn = unknown> = {
   description: string;
   risk: AiToolRisk;
   requiredModules?: PermissionModule[];
+  /** Zero-trust policy metadata — advertise + execute gates. */
+  policy: AiToolPolicy;
   inputSchema: z.ZodType<TIn>;
   jsonSchema: Record<string, unknown>;
   statusLabel?: string;
@@ -56,6 +67,7 @@ export function defineBloqerAiTool<TSchema extends z.ZodType>(
     description: string;
     risk: AiToolRisk;
     requiredModules?: PermissionModule[];
+    policy: AiToolPolicy;
     inputSchema: TSchema;
     jsonSchema: Record<string, unknown>;
     statusLabel?: string;
@@ -91,3 +103,5 @@ export function wrapToolDataAsModelContent(result: AiToolExecuteResult): string 
     0,
   );
 }
+
+export type { AiDataClass, AiToolScope, AiToolAccessKind, AiToolPolicy };

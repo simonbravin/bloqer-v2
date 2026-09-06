@@ -50,9 +50,11 @@ describe("D-056 company finance helpers", () => {
     assert.equal(canMutateArForScope(["TREASURER"], null), true);
   });
 
-  it("allows VIEWER read company finance", () => {
+  it("VIEWER: company hub/AP/AR yes; treasury no (D-111)", () => {
     assert.equal(canViewCompanyFinanceHub(["VIEWER"]), true);
-    assert.equal(canViewCompanyTreasury(["VIEWER"]), true);
+    assert.equal(canViewCompanyAp(["VIEWER"]), true);
+    assert.equal(canViewCompanyAr(["VIEWER"]), true);
+    assert.equal(canViewCompanyTreasury(["VIEWER"]), false);
   });
 
   it("PROJECT_FINANCE cannot open company hub", () => {

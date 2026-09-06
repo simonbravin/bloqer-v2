@@ -4,7 +4,7 @@ import type { AvailableBudget } from "../cost-control/cost-control-types";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getProjectOverheadAmount } from "../finance/project-overhead.service";
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { selectGgItemIds } from "./gg-wbs-detect";
@@ -115,7 +115,7 @@ export async function getProjectGgOverviewReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el reporte de gastos generales de obra");
   }
 
-  const project = await requireProjectInTenant(projectId, ctx.tenantId);
+  const project = await requireProjectAccess(projectId, ctx);
   const approved = await listApprovedBudgetsForProject(projectId, ctx);
   const availableBudgets = toAvailableBudgets(approved);
 

@@ -3,6 +3,8 @@
  * Never surface these in end-user UI copy; tests/docs-internal only.
  *
  * Prefix `b1a0…` (tenant A) / `b1b0…` (tenant B) avoids collision with DOCS_GUIDE_IDS (`a000…`).
+ *
+ * D-111: Tenant A may run MEMBERSHIP_SCOPED with PM-A1→A1, PM-A2→A2 (see seed-d111-scoped).
  */
 export const AI_ADV = {
   tenantA: {
@@ -11,28 +13,74 @@ export const AI_ADV = {
     ownerUserId: "b1a00000-0000-4000-8000-000000000010",
     pmUserId: "b1a00000-0000-4000-8000-000000000011",
     viewerUserId: "b1a00000-0000-4000-8000-000000000012",
+    /** D-111: PM scoped to A2 only */
+    pmA2UserId: "b1a00000-0000-4000-8000-000000000013",
+    financeUserId: "b1a00000-0000-4000-8000-000000000014",
+    treasurerUserId: "b1a00000-0000-4000-8000-000000000015",
+    /** PROJECT_MANAGER with zero ProjectMembership under SCOPED */
+    emptyPmUserId: "b1a00000-0000-4000-8000-000000000016",
+    /** PROJECT_VIEWER + membership A1 (no procurement capability) */
+    viewerNoProcUserId: "b1a00000-0000-4000-8000-000000000017",
     clientContactId: "b1a00000-0000-4000-8000-000000000020",
     supplierContactId: "b1a00000-0000-4000-8000-000000000021",
     projectA1Id: "b1a00000-0000-4000-8000-000000000030",
     projectA2Id: "b1a00000-0000-4000-8000-000000000031",
     scheduleA1Id: "b1a00000-0000-4000-8000-000000000040",
     delayedTaskId: "b1a00000-0000-4000-8000-000000000041",
+    scheduleA2Id: "b1a00000-0000-4000-8000-000000000042",
+    delayedTaskA2Ids: [
+      "b1a00000-0000-4000-8000-000000000043",
+      "b1a00000-0000-4000-8000-000000000044",
+      "b1a00000-0000-4000-8000-000000000045",
+    ] as const,
     productId: "b1a00000-0000-4000-8000-000000000050",
+    productA2Id: "b1a00000-0000-4000-8000-000000000051",
     prId: "b1a00000-0000-4000-8000-000000000060",
     prLineId: "b1a00000-0000-4000-8000-000000000061",
+    prA2Id: "b1a00000-0000-4000-8000-000000000062",
+    prA2LineId: "b1a00000-0000-4000-8000-000000000063",
     poId: "b1a00000-0000-4000-8000-000000000070",
     poLineId: "b1a00000-0000-4000-8000-000000000071",
+    /** A2: five pending OCs for aggregate side-channel */
+    poA2Ids: [
+      "b1a00000-0000-4000-8000-000000000170",
+      "b1a00000-0000-4000-8000-000000000171",
+      "b1a00000-0000-4000-8000-000000000172",
+      "b1a00000-0000-4000-8000-000000000173",
+      "b1a00000-0000-4000-8000-000000000174",
+    ] as const,
+    poA2LineIds: [
+      "b1a00000-0000-4000-8000-000000000175",
+      "b1a00000-0000-4000-8000-000000000176",
+      "b1a00000-0000-4000-8000-000000000177",
+      "b1a00000-0000-4000-8000-000000000178",
+      "b1a00000-0000-4000-8000-000000000179",
+    ] as const,
     jobsiteLogId: "b1a00000-0000-4000-8000-000000000080",
+    jobsiteLogA2Id: "b1a00000-0000-4000-8000-000000000083",
+    receiptA2Id: "b1a00000-0000-4000-8000-000000000084",
     budgetId: "b1a00000-0000-4000-8000-000000000090",
     wbsItemId: "b1a00000-0000-4000-8000-000000000091",
+    budgetA2Id: "b1a00000-0000-4000-8000-000000000094",
+    wbsA2Id: "b1a00000-0000-4000-8000-000000000095",
     certificationId: "b1a00000-0000-4000-8000-000000000092",
     certLineId: "b1a00000-0000-4000-8000-000000000093",
+    certificationA2Id: "b1a00000-0000-4000-8000-000000000096",
+    certLineA2Id: "b1a00000-0000-4000-8000-000000000097",
     supplierInvoiceId: "b1a00000-0000-4000-8000-0000000000a0",
     supplierInvoiceLineId: "b1a00000-0000-4000-8000-0000000000a1",
     payableId: "b1a00000-0000-4000-8000-0000000000a2",
+    supplierInvoiceA2Id: "b1a00000-0000-4000-8000-0000000000a3",
+    supplierInvoiceLineA2Id: "b1a00000-0000-4000-8000-0000000000a4",
+    payableA2Id: "b1a00000-0000-4000-8000-0000000000a5",
     salesInvoiceId: "b1a00000-0000-4000-8000-0000000000b0",
     salesInvoiceLineId: "b1a00000-0000-4000-8000-0000000000b1",
     receivableId: "b1a00000-0000-4000-8000-0000000000b2",
+    salesInvoiceA2Id: "b1a00000-0000-4000-8000-0000000000b3",
+    salesInvoiceLineA2Id: "b1a00000-0000-4000-8000-0000000000b4",
+    receivableA2Id: "b1a00000-0000-4000-8000-0000000000b5",
+    documentA1Id: "b1a00000-0000-4000-8000-0000000000c0",
+    documentA2Id: "b1a00000-0000-4000-8000-0000000000c1",
   },
   tenantB: {
     tenantId: "b1b00000-0000-4000-8000-000000000001",
@@ -71,10 +119,22 @@ export const AI_ADV = {
     ownerA: "ai-adv-owner-a@bloqer.demo",
     pmA: "ai-adv-pm-a@bloqer.demo",
     viewerA: "ai-adv-viewer-a@bloqer.demo",
+    pmA2: "ai-adv-pm-a2@bloqer.demo",
+    financeA: "ai-adv-finance-a@bloqer.demo",
+    treasurerA: "ai-adv-treasurer-a@bloqer.demo",
+    emptyPmA: "ai-adv-empty-pm-a@bloqer.demo",
+    viewerNoProcA: "ai-adv-viewer-noproc-a@bloqer.demo",
     ownerB: "ai-adv-owner-b@bloqer.demo",
   },
   slugs: {
     tenantA: "ai-adv-tenant-a",
     tenantB: "ai-adv-tenant-b",
+  },
+  /** Deliberate side-channel amounts (ARS). */
+  amounts: {
+    a1Payable: 10_000_000,
+    a2Payable: 90_000_000,
+    a1PendingPoCount: 1,
+    a2PendingPoCount: 5,
   },
 } as const;

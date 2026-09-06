@@ -8,6 +8,7 @@ export type {
   Contact, ContactRole, ClientProfile, SupplierProfile, SubcontractorProfile,
   Project,
   ProjectTeamMember,
+  ProjectMembership,
   Schedule, ScheduleItem, ScheduleItemDependency, ScheduleItemWbsLink,
   Budget, BudgetSettings, WbsNode, CostItem, CostAnalysisLine,
   Certification, CertificationLine,
@@ -38,7 +39,7 @@ export type {
 export {
   UserStatus, TenantStatus, CompanyStatus, MembershipStatus, UserRole,
   ContactStatus, ContactRoleType, ContactRoleStatus, TaxIdType, IvaCondition, InvoiceLetter,
-  ProjectStatus, ProjectType, ProjectTeamMemberKind,
+  ProjectStatus, ProjectType, ProjectTeamMemberKind, ProjectAccessMode,
   ScheduleType, ScheduleItemType, ScheduleItemStatus, ScheduleDependencyType,
   BudgetStatus, WbsNodeType, CostCategory,
   CertificationStatus,

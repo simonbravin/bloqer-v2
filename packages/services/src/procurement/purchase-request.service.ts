@@ -6,6 +6,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
 import {
@@ -253,6 +254,7 @@ export async function listPurchaseRequestsByProject(
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
+  await requireProjectAccess(projectId, ctx);
   const rows = await prisma.purchaseRequest.findMany({
     where: { projectId, tenantId: ctx.tenantId },
     include: {
@@ -293,6 +295,7 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
     },
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  await requireProjectAccessIfPresent(pr.projectId, ctx);
   const nameById = await resolveUserDisplayNames([pr.requestedByUserId]);
   const selected = selectedQuoteFromRows(pr.quotes);
   const fromOrders = supplierNameFromOrders(pr.purchaseOrders);
@@ -316,7 +319,7 @@ export async function createPurchaseRequest(
   if (!canEditPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear solicitudes de compra");
   }
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx);
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
   assertWbsRequiredOnLines(input.lines);
@@ -394,7 +397,7 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
   });
   if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   assertDraftPr(existing.status);
-  await assertProjectAllowsOperationalMutation(existing.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   await prisma.$transaction(async (tx) => {
     for (const line of existing.lines) {

@@ -4,7 +4,7 @@ import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obliga
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { parseFilterDate } from "./report-month";
 import {
   buildProjectSupplierReport,
@@ -54,7 +54,7 @@ export async function getProjectSupplierReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el reporte de proveedores");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const gate = await getTenantModuleGate(ctx);
   const warnings: string[] = [];

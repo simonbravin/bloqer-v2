@@ -25,7 +25,7 @@ export async function updateCostItem(
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: costItem.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertBudgetEditable(budget);
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
 
   if (input.quantity !== undefined && !(input.quantity > 0)) {
     throw new ServiceError("VALIDATION", "La cantidad del ítem debe ser mayor a 0");

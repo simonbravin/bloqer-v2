@@ -2,7 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { canViewArProjectArea } from "./ar-access";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type ProjectBillingVsCollectionsSummary = {
@@ -19,7 +19,7 @@ export async function summarizeProjectBillingVsCollections(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const baseWhere = { projectId, tenantId: ctx.tenantId };
 

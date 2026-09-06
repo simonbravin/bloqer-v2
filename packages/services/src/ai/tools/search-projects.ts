@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { listProjects } from "../../project/project.service";
 import { defineBloqerAiTool, nowIso } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
 
 const inputSchema = z.object({
   search: z.string().min(1).max(120).optional(),
@@ -13,6 +14,11 @@ export const searchProjectsTool = defineBloqerAiTool({
   description: "Busca proyectos del tenant por nombre, código o ciudad.",
   risk: "READ",
   requiredModules: ["PROJECTS"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "TENANT",
+    accessKind: "projects",
+  },
   inputSchema,
   jsonSchema: {
     type: "object",
@@ -46,7 +52,13 @@ export const searchProjectsTool = defineBloqerAiTool({
       truncation: { total, returned: data.length },
       ui: {
         summaryLabel: "Buscando proyectos…",
-        links: [{ label: "Ver proyectos", href: "/proyectos" }],
+        links: [
+          { label: "Ver proyectos", href: "/proyectos" },
+          ...data.slice(0, 5).map((p) => ({
+            label: p.code ? `Abrir ${p.code}` : `Abrir ${p.name}`.slice(0, 40),
+            href: `/proyectos/${p.id}`,
+          })),
+        ],
       },
     };
   },

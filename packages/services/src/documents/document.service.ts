@@ -29,6 +29,7 @@ import {
   type TenantModuleGate,
 } from "../tenant-modules/tenant-module.service";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import {
   canEditPurchaseOrders,
   canEditPurchaseReceipts,
@@ -122,7 +123,7 @@ export async function createDocumentMetadata(
   });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
@@ -322,7 +323,7 @@ async function resolveDocumentUploadPlan(
       if (!input.projectId || input.projectId !== inv.projectId) {
         throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
       }
-      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx.tenantId);
+      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx);
       anchorProjectId = inv.projectId;
       strictProjectId   = inv.projectId;
     } else {
@@ -346,7 +347,7 @@ async function resolveDocumentUploadPlan(
       if (!input.projectId || input.projectId !== inv.projectId) {
         throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
       }
-      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx.tenantId);
+      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx);
       anchorProjectId = inv.projectId;
       strictProjectId   = inv.projectId;
     } else {
@@ -368,7 +369,7 @@ async function resolveDocumentUploadPlan(
     });
     if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
     if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    await assertProjectAllowsBudgetPlanning(input.projectId, ctx.tenantId);
+    await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
     anchorProjectId = input.projectId;
     strictProjectId   = input.projectId;
   }
@@ -650,6 +651,7 @@ export async function getDocumentDownloadUrl(
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
+  await requireProjectAccessIfPresent(doc.projectId, ctx);
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
   if (doc.storageProvider !== "R2") {
@@ -688,6 +690,7 @@ export async function getDocumentFileBytes(
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
+  await requireProjectAccessIfPresent(doc.projectId, ctx);
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
   if (doc.storageProvider !== "R2") {
@@ -793,6 +796,7 @@ export async function getDocumentById(id: string, ctx: ServiceContext): Promise<
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver documentos");
   }
+  await requireProjectAccessIfPresent(doc.projectId, ctx);
   const gate = await getTenantModuleGate(ctx);
   return serialize(doc, ctx, gate);
 }
@@ -834,11 +838,7 @@ export async function listProjectDocuments(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver documentos");
   }
 
-  const project = await prisma.project.findUnique({
-    where:  { id: projectId },
-    select: { id: true, tenantId: true },
-  });
-  if (!project || project.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  await requireProjectAccess(projectId, ctx);
 
   await reconcileAbandonedUploadingDocuments(ctx, { projectId });
 
@@ -1069,6 +1069,7 @@ async function getOwned(id: string, ctx: ServiceContext, gate: TenantModuleGate)
   if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para modificar documentos");
   }
+  await requireProjectAccessIfPresent(doc.projectId, ctx);
   return doc;
 }
 

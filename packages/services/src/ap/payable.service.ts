@@ -12,7 +12,7 @@ import {
   normalizeObligationBalanceDue,
 } from "../finance/obligation-balance";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import {
   aggregateCorporatePayableBalances,
   fetchCorporatePayableSnapshotRows,
@@ -81,6 +81,7 @@ export async function getPayableById(
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(p.projectId, ctx);
   const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
   const { supplierInvoice, ...rest } = { ...p, ...reconciled };
   return serializePayable({
@@ -110,6 +111,7 @@ export async function getPayableBySupplierInvoiceId(
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(p.projectId, ctx);
   const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
   const { supplierInvoice, ...rest } = { ...p, ...reconciled };
   return serializePayable({ ...rest, supplierInvoice });
@@ -129,7 +131,7 @@ export async function listPayablesByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -176,7 +178,7 @@ export async function summarizePayablesByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const rows = await prisma.payable.findMany({
     where: { projectId, tenantId: ctx.tenantId },
@@ -360,7 +362,7 @@ export async function listPayablesFieldBoard(
     if (!canViewApProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar");
     }
-    await requireProjectInTenant(scope.projectId, ctx.tenantId);
+    await requireProjectAccess(scope.projectId, ctx);
     where.projectId = scope.projectId;
   } else {
     if (!canViewCompanyAp(ctx.roles)) {

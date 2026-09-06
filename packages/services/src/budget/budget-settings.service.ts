@@ -20,7 +20,7 @@ export async function updateBudgetSettings(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertBudgetEditable(budget);
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
 
   const settings = await prisma.$transaction(async (tx) => {
     await lockBudgetForEconomicEdit(tx, budgetId, ctx.tenantId);

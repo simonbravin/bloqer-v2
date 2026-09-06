@@ -31,6 +31,7 @@ export type BloqerAiEnv = {
   model: string;
   timeoutMs: number;
   maxToolCalls: number;
+  maxAgentTurns: number;
   maxOutputTokens: number;
   baseUrl?: string;
   openaiApiKey?: string;
@@ -87,6 +88,7 @@ export function getBloqerAiEnv(env: NodeJS.ProcessEnv = process.env): BloqerAiEn
   const model = env.BLOQER_AI_MODEL?.trim() || "gpt-4.1-mini";
   const timeoutMs = parsePositiveInt(env.BLOQER_AI_TIMEOUT_MS, 60_000);
   const maxToolCalls = parsePositiveInt(env.BLOQER_AI_MAX_TOOL_CALLS, 10);
+  const maxAgentTurns = parsePositiveInt(env.BLOQER_AI_MAX_AGENT_TURNS, 8);
   const maxOutputTokens = parsePositiveInt(env.BLOQER_AI_MAX_OUTPUT_TOKENS, 2048);
 
   let baseUrl: string | undefined;
@@ -104,6 +106,7 @@ export function getBloqerAiEnv(env: NodeJS.ProcessEnv = process.env): BloqerAiEn
     model,
     timeoutMs,
     maxToolCalls,
+    maxAgentTurns,
     maxOutputTokens,
     baseUrl,
     openaiApiKey,

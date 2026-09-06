@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
+import type { AiPresentation } from "@bloqer/ai";
+import { aiPresentationSchema } from "@bloqer/ai";
 import {
   Sheet,
   SheetContent,
@@ -13,13 +15,17 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { sanitizeAssistantPlainText } from "@/features/bloqer-ai/lib/safe-ai-content";
+import { sanitizeAssistantPlainText, filterSafeAiLinks } from "@/features/bloqer-ai/lib/safe-ai-content";
+import { BloqerAiPresentationView } from "@/features/bloqer-ai/components/bloqer-ai-presentation";
 
 type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   content: string;
   status?: string;
+  /** Trusted internal actions from tool `ui.links` (server-filtered). */
+  links?: { label: string; href: string }[];
+  presentation?: AiPresentation | null;
 };
 
 type BloqerAiChatProps = {
@@ -150,16 +156,18 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
           messages: history,
           currentRoute: pathname,
           currentProjectId: resolvedProjectId ?? undefined,
+          isFirstAssistantTurn: !messages.some((m) => m.role === "assistant"),
         }),
       });
       if (!res.ok || !res.body) {
         const err = await res.json().catch(() => ({ error: "No se pudo consultar a Bloqer AI." }));
+        const msg =
+          res.status === 429
+            ? (typeof err.error === "string" && err.error) ||
+              "Alcanzaste temporalmente el límite de consultas de Bloqer AI. Intentá nuevamente en unos minutos."
+            : (err.error ?? "Error al consultar el asistente.");
         setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? { ...m, content: err.error ?? "Error al consultar el asistente." }
-              : m,
-          ),
+          prev.map((m) => (m.id === assistantId ? { ...m, content: msg } : m)),
         );
         return;
       }
@@ -207,6 +215,27 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
             setToolStatus(typeof data.label === "string" ? data.label : "Consultando…");
           } else if (eventName === "tool_end") {
             setToolStatus(null);
+            const safe = filterSafeAiLinks(
+              Array.isArray(data.links) ? (data.links as { label?: unknown; href?: unknown }[]) : null,
+            );
+            if (safe.length) {
+              setMessages((prev) =>
+                prev.map((m) => {
+                  if (m.id !== assistantId) return m;
+                  const merged = filterSafeAiLinks([...(m.links ?? []), ...safe]);
+                  return { ...m, links: merged };
+                }),
+              );
+            }
+          } else if (eventName === "presentation") {
+            const parsed = aiPresentationSchema.safeParse(data.presentation);
+            if (parsed.success) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantId ? { ...m, presentation: parsed.data } : m,
+                ),
+              );
+            }
           } else if (eventName === "error") {
             const msg = typeof data.message === "string" ? data.message : "Error del asistente";
             setMessages((prev) =>
@@ -219,23 +248,18 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
           } else if (eventName === "done") {
             const finalText =
               typeof data.assistantText === "string" ? data.assistantText.trim() : "";
-            if (finalText) {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId && !m.content.trim()
-                    ? { ...m, content: finalText }
-                    : m,
-                ),
-              );
-            } else {
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId && !m.content.trim()
-                    ? { ...m, content: "El asistente no devolvió una respuesta. Probá de nuevo." }
-                    : m,
-                ),
-              );
-            }
+            setMessages((prev) =>
+              prev.map((m) => {
+                if (m.id !== assistantId) return m;
+                // Prefer finalized text (fence stripped). Keep streaming content if done is empty.
+                if (finalText) return { ...m, content: finalText };
+                if (m.content.trim() || m.presentation) return m;
+                return {
+                  ...m,
+                  content: "El asistente no devolvió una respuesta. Probá de nuevo.",
+                };
+              }),
+            );
           }
         }
       }
@@ -283,7 +307,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="right"
-          className="flex w-full flex-col gap-0 p-0 sm:max-w-md"
+          className="flex w-full flex-col gap-0 p-0 sm:max-w-md max-sm:w-full"
         >
           <SheetHeader className="border-b px-4 py-3 pr-12 text-left">
             <div>
@@ -292,7 +316,8 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
                 Preguntale a Bloqer
               </SheetTitle>
               <SheetDescription className="text-xs">
-                Ayuda del producto y datos autorizados (solo lectura).
+                Ayuda del producto y datos autorizados (solo lectura). El historial vive
+                solo en esta sesión del navegador.
               </SheetDescription>
             </div>
           </SheetHeader>
@@ -321,15 +346,42 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
                 <div
                   key={m.id}
                   className={cn(
-                    "max-w-[95%] whitespace-pre-wrap rounded-lg px-3 py-2 text-sm",
+                    "max-w-[95%] space-y-2 rounded-lg px-3 py-2 text-sm",
                     m.role === "user"
                       ? "ml-auto bg-primary text-primary-foreground"
                       : "bg-muted text-foreground",
                   )}
                 >
-                  {sanitizeAssistantPlainText(
-                    m.content || (busy && m.role === "assistant" ? "…" : ""),
+                  {m.role === "assistant" && m.presentation ? (
+                    <BloqerAiPresentationView
+                      presentation={m.presentation}
+                      onNavigate={() => setOpen(false)}
+                      onFollowUp={(q) => void send(q)}
+                    />
+                  ) : (
+                    <div className="whitespace-pre-wrap">
+                      {sanitizeAssistantPlainText(
+                        m.content || (busy && m.role === "assistant" ? "…" : ""),
+                      )}
+                    </div>
                   )}
+                  {m.role === "assistant" && !m.presentation && m.links?.length ? (
+                    <div
+                      data-testid="bloqer-ai-links"
+                      className="flex flex-wrap gap-1.5 pt-0.5"
+                    >
+                      {m.links.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          onClick={() => setOpen(false)}
+                          className="inline-flex items-center rounded-md border border-border/80 bg-background px-2 py-1 text-xs font-medium text-foreground hover:bg-accent"
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))}
               {toolStatus ? (

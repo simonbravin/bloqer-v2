@@ -15,6 +15,11 @@ import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 import { formatDashboardMoney } from "./dashboard-format";
+import {
+  projectIdWhereForScope,
+  projectRowIdWhereForScope,
+  resolveAccessibleProjectScope,
+} from "../security/access";
 
 export { formatDashboardMoney };
 
@@ -360,14 +365,16 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
   if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
     const canViewBudgets = gate.isEnabled("BUDGETS") && can(ctx.roles, "VIEW", "BUDGETS");
+    const projectScope = await resolveAccessibleProjectScope(ctx);
+    const projectIdScope = projectRowIdWhereForScope(projectScope);
     const activeProjectsCount = await prisma.project.count({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+      where: { tenantId: ctx.tenantId, status: "ACTIVE", ...projectIdScope },
     });
     const draftProjectsCount = await prisma.project.count({
-      where: { tenantId: ctx.tenantId, status: "DRAFT" },
+      where: { tenantId: ctx.tenantId, status: "DRAFT", ...projectIdScope },
     });
     const onHoldProjectsCount = await prisma.project.count({
-      where: { tenantId: ctx.tenantId, status: "ON_HOLD" },
+      where: { tenantId: ctx.tenantId, status: "ON_HOLD", ...projectIdScope },
     });
 
     kpis.push({
@@ -378,7 +385,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
     });
 
     const recent = await prisma.project.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+      where: { tenantId: ctx.tenantId, status: "ACTIVE", ...projectIdScope },
       orderBy: { updatedAt: "desc" },
       take: 5,
       select: {
@@ -448,8 +455,13 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
 
   // ─── Certifications ───────────────────────────────────────────────────────
   if (gate.isEnabled("CERTIFICATIONS") && can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
+    const certScope = await resolveAccessibleProjectScope(ctx);
     const pendingCertCount = await prisma.certification.count({
-      where: { tenantId: ctx.tenantId, status: "DRAFT" },
+      where: {
+        tenantId: ctx.tenantId,
+        status: "DRAFT",
+        ...projectIdWhereForScope(certScope),
+      },
     });
     kpis.push({
       key:    "certifications_pending",

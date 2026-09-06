@@ -2,11 +2,11 @@ import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
 
 /**
- * Lecturas AR en contexto de proyecto (facturas, CXC, cobranzas list/detail).
- * Alineado con adjuntos y con AP project reads (`VIEW AP | VIEW PROJECTS`).
+ * Lecturas AR en contexto de proyecto ([D-111] G4).
+ * Requires VIEW AR — VIEW PROJECTS alone is insufficient.
  */
 export function canViewArProjectArea(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "AR") || can(roles, "VIEW", "PROJECTS");
+  return can(roles, "VIEW", "AR");
 }
 
 /**

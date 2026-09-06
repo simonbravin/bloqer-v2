@@ -4,6 +4,7 @@ import { can, type UserRole } from "@bloqer/domain";
 import type { AddProjectTeamMemberInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
+import { requireProjectAccess } from "../security/access";
 import { ServiceContext, ServiceError } from "../types";
 
 export type ProjectTeamMemberRow = {
@@ -47,20 +48,12 @@ function assertCanViewProjectTeam(roles: ServiceContext["roles"]): void {
   }
 }
 
-async function requireProjectInTenant(projectId: string, tenantId: string): Promise<void> {
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId },
-    select: { id: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-}
-
 export async function listProjectTeam(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<ProjectTeamMemberRow[]> {
   assertCanViewProjectTeam(ctx.roles);
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const rows = await prisma.projectTeamMember.findMany({
     where: { tenantId: ctx.tenantId, projectId },
@@ -114,7 +107,7 @@ export async function listActiveMembersForProjectTeamPicker(
   ctx: ServiceContext,
 ): Promise<ProjectTeamPickerOption[]> {
   assertCanEditProjectTeam(ctx.roles);
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const [memberships, existing] = await Promise.all([
     prisma.userMembership.findMany({
@@ -149,7 +142,7 @@ export async function addProjectTeamMember(
   ctx: ServiceContext,
 ): Promise<ProjectTeamMemberRow> {
   assertCanEditProjectTeam(ctx.roles);
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const membership = await prisma.userMembership.findFirst({
     where: {
@@ -231,7 +224,7 @@ export async function removeProjectTeamMember(
   ctx: ServiceContext,
 ): Promise<void> {
   assertCanEditProjectTeam(ctx.roles);
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const row = await prisma.projectTeamMember.findFirst({
     where: { id: memberId, tenantId: ctx.tenantId, projectId },

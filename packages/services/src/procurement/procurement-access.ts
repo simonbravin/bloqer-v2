@@ -1,12 +1,19 @@
 import { can } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
 
-/** Aligns reads with `document.service` listEntityDocuments for PO / PURCHASE_RECEIPT (VIEW PROCUREMENT | VIEW PROJECTS). */
+/**
+ * Procurement project-area reads ([D-111] G1-C).
+ * Explicit PROCUREMENT / PURCHASE_* only — VIEW PROJECTS alone is NOT enough
+ * (documents use canViewProjectDocuments / VIEW PROJECTS separately).
+ */
 export function canViewProcurementProjectArea(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "PROCUREMENT") || can(roles, "VIEW", "PROJECTS");
+  return (
+    can(roles, "VIEW", "PROCUREMENT") ||
+    can(roles, "VIEW", "PURCHASE_ORDERS")
+  );
 }
 
-/** List/detail purchase requests (VIEW PURCHASE_REQUESTS or procurement/project read). */
+/** List/detail purchase requests. */
 export function canViewPurchaseRequests(roles: ServiceContext["roles"]): boolean {
   return can(roles, "VIEW", "PURCHASE_REQUESTS") || canViewProcurementProjectArea(roles);
 }
@@ -17,9 +24,6 @@ export function canManageProcurementQuotes(roles: ServiceContext["roles"]): bool
 }
 
 export function canEditPurchaseOrders(roles: ServiceContext["roles"]): boolean {
-  // Matrix gives WAREHOUSE EDIT PURCHASE_ORDERS for receipt workflows, but OC
-  // create/edit/submit/confirm is Compras / PM / Admin / Owner
-  // ([PURCHASE_ORDERS_AND_RECEIPTS] § permisos).
   return (
     can(roles, "EDIT", "PROCUREMENT") ||
     can(roles, "APPROVE", "PURCHASE_ORDERS") ||

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getProjectMaterialsBoard } from "../../materials/project-materials-board.service";
 import { resolveAiProjectId } from "../context";
 import { defineBloqerAiTool, nowIso } from "../types";
+import { AI_DATA_CLASS } from "../policy/data-class";
 import { ServiceError } from "../../types";
 
 const inputSchema = z.object({
@@ -17,6 +18,11 @@ export const getProjectMaterialShortagesTool = defineBloqerAiTool({
     "Materiales con faltante (need − ordered) del Materials Board. No inventa stock de depósito.",
   risk: "READ",
   requiredModules: ["PROJECTS", "BUDGETS"],
+  policy: {
+    dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
+    scope: "PROJECT",
+    accessKind: "project_operational",
+  },
   inputSchema,
   jsonSchema: {
     type: "object",

@@ -9,6 +9,7 @@ const sampleTool: BloqerAiTool = {
   name: "ping_read",
   description: "ping",
   risk: "READ",
+  policy: { dataClass: "PRODUCT_HELP", scope: "NONE", accessKind: "session" },
   inputSchema: z.object({}).strict(),
   jsonSchema: { type: "object", properties: {}, additionalProperties: false },
   async execute() {

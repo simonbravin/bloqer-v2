@@ -8,7 +8,7 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { getCertificationEvolutionReport } from "./certification-evolution.service";
 import { defaultReportDateRange, monthKey, monthLabel } from "./report-month";
 import { canConsolidateToArs, parseCurrencyView, type CurrencyView } from "./report-currency-view";
@@ -67,12 +67,18 @@ export async function getProjectIncomeExpenseReport(
   projectId: string,
   filters: IncomeExpenseFilters,
   ctx: ServiceContext,
+  options?: { /** Only for company consolidations already gated by canViewCompany*. */ skipMembershipAcl?: boolean },
 ): Promise<IncomeExpenseReport> {
   if (!canViewProjectCostControlReport(ctx.roles) && !canViewProjectCashFlowReport(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver ingresos vs gastos");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  if (options?.skipMembershipAcl) {
+    const { requireProjectInTenant } = await import("../project/require-project-in-tenant");
+    await requireProjectInTenant(projectId, ctx.tenantId);
+  } else {
+    await requireProjectAccess(projectId, ctx);
+  }
 
   const range =
     filters.dateFrom && filters.dateTo

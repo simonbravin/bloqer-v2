@@ -1,7 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
@@ -149,7 +149,7 @@ export async function getCertificationEvolutionReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de certificaciones");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const budget = await resolveBudget(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };

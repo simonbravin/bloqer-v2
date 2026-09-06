@@ -4,7 +4,7 @@ import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
 import { monthKey, monthLabel } from "./report-month";
@@ -72,7 +72,7 @@ export async function getSubcontractVarianceReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de subcontratos");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };

@@ -38,6 +38,18 @@ AI Tool → SAME Service → SAME Permission → DB
 - writes autónomos en este lote
 - importar SDKs de proveedores desde tools (`packages/services/src/ai/`)
 
+### Zero-trust tool surface (hardening)
+
+Además del RBAC en services:
+
+1. Cada tool declara `policy` (`dataClass`, `scope`, `accessKind`, opcional `aiAllowed`).
+2. El registry **no anuncia** al provider tools que el usuario no puede usar (`definitions({ ctx })`).
+3. `execute` **revalida** la misma policy + module gate + service (defense in depth).
+4. Outputs pasan por DTOs minimizados (sin emails, audit, IDs bancarios innecesarios).
+5. Nombre de pila (`preferredName`) sale solo de la sesión autenticada.
+
+Scorecard: [`BLOQER_AI_SECURITY_SCORECARD.md`](./BLOQER_AI_SECURITY_SCORECARD.md).
+
 ---
 
 ## 0.1 FASE 0 — Inventario del repo real

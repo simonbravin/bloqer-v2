@@ -4,7 +4,7 @@ import type { CreateWarehouseInput, UpdateWarehouseInput } from "@bloqer/validat
 import { log } from "../audit/audit.service";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 // ─── View types ───────────────────────────────────────────────────────────────
 
@@ -20,6 +20,7 @@ export async function getWarehouseById(id: string, ctx: ServiceContext): Promise
   const wh = await prisma.warehouse.findUnique({ where: { id } });
   if (!wh) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
   if (wh.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(wh.projectId, ctx);
   return wh;
 }
 
@@ -30,6 +31,9 @@ export async function listWarehouses(
   await assertInventoryTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "INVENTORY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver depósitos");
+  }
+  if (filters.projectId) {
+    await requireProjectAccess(filters.projectId, ctx);
   }
   return prisma.warehouse.findMany({
     where: {
@@ -67,7 +71,7 @@ export async function createWarehouse(
   }
 
   if (input.projectId) {
-    const project = await requireProjectInTenant(input.projectId, ctx.tenantId);
+    const project = await requireProjectAccess(input.projectId, ctx);
     if (project.companyId && project.companyId !== input.companyId) {
       throw new ServiceError("VALIDATION", "El proyecto no pertenece a la empresa seleccionada");
     }

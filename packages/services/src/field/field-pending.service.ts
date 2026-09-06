@@ -13,6 +13,11 @@ import {
 } from "./field-pending-access";
 import { getCompanyProcurementSettings } from "../procurement/company-procurement-settings.service";
 import { willApproveAutoConfirmPo } from "../procurement/purchase-order-workflow.service";
+import {
+  projectIdWhereForScope,
+  requireProjectAccess,
+  resolveAccessibleProjectScope,
+} from "../security/access";
 
 const INBOX_LIMIT = 80;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
@@ -115,6 +120,10 @@ export async function getMyFieldPendingItems(
   const gate = await getTenantModuleGate(ctx);
   const sources = fieldPendingSourcesForActor(ctx.roles, gate);
   const projectFilter = resolveFieldPendingProjectFilter(filters?.projectId);
+  if (projectFilter) {
+    await requireProjectAccess(projectFilter, ctx);
+  }
+  const scope = await resolveAccessibleProjectScope(ctx);
   const groupFilter = filters?.group;
   const countsOnly = filters?.countsOnly === true;
 
@@ -122,7 +131,9 @@ export async function getMyFieldPendingItems(
     ? sources.filter((s) => FIELD_PENDING_GROUP_BY_SOURCE[s] === groupFilter)
     : sources;
 
-  const projectWhere = projectFilter ? { projectId: projectFilter } : {};
+  const projectWhere = projectFilter
+    ? { projectId: projectFilter }
+    : projectIdWhereForScope(scope);
   const counts = emptyCounts();
   const items: FieldPendingItem[] = [];
 

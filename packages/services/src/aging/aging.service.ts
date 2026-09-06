@@ -5,6 +5,7 @@ import { assertApTenantModule, assertArTenantModule } from "../tenant-modules/te
 import { ServiceContext, ServiceError } from "../types";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { requireProjectAccess } from "../security/access";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -151,6 +152,7 @@ export async function getReceivableAgingReport(
     if (!canViewArProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por cobrar");
     }
+    await requireProjectAccess(filters.projectId, ctx);
   } else if (!canViewCompanyAr(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por cobrar a nivel empresa");
   }
@@ -244,6 +246,7 @@ export async function getPayableAgingReport(
     if (!canViewApProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por pagar");
     }
+    await requireProjectAccess(filters.projectId, ctx);
   } else if (!canViewCompanyAp(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el aging de cuentas por pagar a nivel empresa");
   }

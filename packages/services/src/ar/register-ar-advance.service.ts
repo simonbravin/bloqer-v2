@@ -32,7 +32,7 @@ export async function registerArAdvance(
     );
   }
 
-  await assertProjectAllowsOperationalMutation(input.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   const project = await prisma.project.findUnique({
     where: { id: input.projectId },

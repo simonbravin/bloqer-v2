@@ -12,7 +12,8 @@ import { ServiceContext, ServiceError } from "../types";
 import { canRegisterApPayment, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPaymentConfirmed } from "./ap-notifications.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -56,6 +57,7 @@ export async function getPaymentById(
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(p.projectId, ctx);
   return serialize(p);
 }
 
@@ -94,7 +96,7 @@ export async function listPaymentsByProject(
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -216,7 +218,7 @@ export async function createPayment(
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
   if (payablePreview.projectId) {
-    await assertProjectAllowsOperationalMutation(payablePreview.projectId, ctx.tenantId);
+    await assertProjectAllowsOperationalMutation(payablePreview.projectId, ctx);
   }
 
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);

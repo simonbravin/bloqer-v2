@@ -8,6 +8,10 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { getMyFieldPendingItems } from "./field-pending.service";
 import type { FieldPendingCounts } from "./field-pending.service";
+import {
+  projectRowIdWhereForScope,
+  resolveAccessibleProjectScope,
+} from "../security/access";
 
 const TODAY_LIMIT = 5;
 /** Matches `listProjects` max pageSize — Field pickers must not silently drop obras. */
@@ -54,8 +58,13 @@ export type FieldHomeView = {
 /** Operational obras for Field pickers. Excludes CANCELLED; capped at `FIELD_PROJECT_LIST_LIMIT`. */
 export async function listFieldProjects(ctx: ServiceContext): Promise<FieldHomeProject[]> {
   if (!can(ctx.roles, "VIEW", "PROJECTS")) return [];
+  const scope = await resolveAccessibleProjectScope(ctx);
   return prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
+    where: {
+      tenantId: ctx.tenantId,
+      status: { not: "CANCELLED" },
+      ...projectRowIdWhereForScope(scope),
+    },
     select: { id: true, code: true, name: true, status: true },
     orderBy: { code: "asc" },
     take: FIELD_PROJECT_LIST_LIMIT,

@@ -32,6 +32,7 @@ describe("Bloqer AI MVP read-only registry", () => {
         name: "evil_write",
         description: "should not run",
         risk: "WRITE_CONFIRM",
+        policy: { dataClass: "PRODUCT_HELP", scope: "NONE", accessKind: "session" },
         inputSchema: z.object({}).strict(),
         jsonSchema: { type: "object", properties: {}, additionalProperties: false },
         async execute() {

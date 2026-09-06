@@ -325,7 +325,7 @@ export async function addWbsNode(
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   await assertBudgetWbsStructureMutable(budget, ctx);
 
   const nodeType: WbsNodeType = "ITEM";
@@ -507,7 +507,7 @@ export async function updateWbsNode(
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: node.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   if (input.code != null && input.code !== node.code) {
     await assertBudgetWbsStructureMutable(budget, ctx);
   } else {
@@ -668,7 +668,7 @@ export async function removeWbsNode(id: string, ctx: ServiceContext): Promise<vo
 
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: node.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   await assertBudgetWbsStructureMutable(budget, ctx);
 
   const allNodes = await prisma.wbsNode.findMany({
@@ -776,7 +776,7 @@ export async function reorderWbsNodes(
   const budget = await prisma.budget.findUnique({ where: { id: budgetId } });
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   await assertBudgetWbsStructureMutable(budget, ctx);
 
   const nodes = await prisma.wbsNode.findMany({

@@ -44,14 +44,36 @@ function chatDialog(page: Page) {
 
 async function login(page: Page, email: string): Promise<void> {
   await page.goto(`${baseUrl}/login`);
+  // Session may already be authenticated (soft redirect / shell still painting).
+  const fab = page.getByRole("button", { name: /preguntale a bloqer/i });
+  if (await fab.isVisible().catch(() => false)) return;
+  if (!page.url().includes("/login")) return;
+
   await page.locator("#login-email").fill(email);
   await page.locator("#login-password").fill(password);
   await page.getByRole("button", { name: /iniciar sesión/i }).click();
+
+  // Prefer auth chrome over waitForURL("load") — client navigations can miss the load event.
   try {
-    await page.waitForURL((url) => !url.pathname.includes("/login"), { timeout: 45_000 });
+    await Promise.race([
+      page.waitForURL((url) => !url.pathname.includes("/login"), {
+        timeout: 45_000,
+        waitUntil: "commit",
+      }),
+      fab.waitFor({ state: "visible", timeout: 45_000 }),
+      page.getByRole("navigation").waitFor({ state: "visible", timeout: 45_000 }),
+    ]);
   } catch (err) {
-    const alert = await page.locator('[role="alert"], .text-destructive, body').first().innerText().catch(() => "");
-    throw new Error(`Login failed for ${email}. Page text snippet: ${alert.slice(0, 400)}. Cause: ${String(err)}`);
+    if (await fab.isVisible().catch(() => false)) return;
+    if (!page.url().includes("/login")) return;
+    const alert = await page
+      .locator('[role="alert"], .text-destructive, body')
+      .first()
+      .innerText()
+      .catch(() => "");
+    throw new Error(
+      `Login failed for ${email}. Page text snippet: ${alert.slice(0, 400)}. Cause: ${String(err)}`,
+    );
   }
 }
 
@@ -86,7 +108,8 @@ for (const vp of viewports) {
 
     test(`login FAB help streaming OC close reopen @ ${vp.name}`, async ({ page }) => {
       await login(page, ownerEmail);
-      await page.goto(`${baseUrl}/dashboard`);
+      // Prefer domcontentloaded — full "load" can flake with ERR_CONNECTION_RESET under Next turbopack.
+      await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded", timeout: 60_000 });
 
       const fab = page.getByRole("button", { name: /preguntale a bloqer/i });
       await expect(fab).toBeVisible({ timeout: 30_000 });
@@ -104,13 +127,28 @@ for (const vp of viewports) {
       const input = page.getByTestId("bloqer-ai-input");
       await input.fill("¿Cómo creo una solicitud de compra?");
       await page.getByTestId("bloqer-ai-send").click();
+      await expect(dialog.getByTestId("bloqer-ai-presentation")).toBeVisible({ timeout: 45_000 });
+      await expect(dialog.getByTestId("bloqer-ai-presentation")).toHaveAttribute(
+        "data-kind",
+        /help|explain|list/,
+      );
       await expect(
-        dialog.getByText(/solicitud de compra|FakeAiProvider|\/ayuda/i).first(),
-      ).toBeVisible({ timeout: 30_000 });
+        dialog.getByText(/solicitud de compra|FakeAiProvider|\/ayuda|cómo/i).first(),
+      ).toBeVisible({ timeout: 5_000 });
       // Internal help link: empty-state link and/or path rendered from assistant text.
       await expect(
         dialog.getByRole("link", { name: /centro de ayuda|ayuda/i }).or(dialog.locator('a[href="/ayuda"]')).first(),
       ).toBeVisible({ timeout: 5_000 });
+
+      await input.fill("¿Cómo viene esta obra?");
+      await page.getByTestId("bloqer-ai-send").click();
+      await expect(dialog.getByTestId("bloqer-ai-presentation")).toBeVisible({ timeout: 45_000 });
+      await expect(dialog.getByTestId("bloqer-ai-presentation").last()).toHaveAttribute(
+        "data-kind",
+        "executive",
+      );
+      await expect(dialog.getByTestId("bloqer-ai-insight").first()).toBeVisible();
+      await expect(dialog.getByText(/qué haría hoy/i).first()).toBeVisible();
 
       await input.fill("¿Qué OC están pendientes?");
       await page.getByTestId("bloqer-ai-send").click();
@@ -170,5 +208,79 @@ test.describe("Bloqer AI streaming abort", () => {
     await expect(page.getByRole("heading").first()).toBeVisible({ timeout: 10_000 });
     await fab.click();
     await expect(page.getByTestId("bloqer-ai-input")).toBeVisible();
+  });
+});
+
+test.describe("Bloqer AI links + rate limit + errors", () => {
+  test.skip(!e2eEnabled, "Set BLOQER_AI_E2E=1");
+  test.use({ viewport: { width: 768, height: 1024 } });
+
+  test("tool ui.links render as clickable chips", async ({ page }) => {
+    await login(page, ownerEmail);
+    await page.goto(`${baseUrl}/proyectos/${projectA1}/materiales`);
+    await openChat(page);
+    const dialog = chatDialog(page);
+    await page.getByTestId("bloqer-ai-input").fill("¿Qué materiales faltan?");
+    await page.getByTestId("bloqer-ai-send").click();
+    await expect(dialog.getByText(/materiales|FakeAiProvider/i).first()).toBeVisible({
+      timeout: 45_000,
+    });
+    // Links may render as presentation cards or legacy chips under the message.
+    const presentationLink = dialog.getByTestId("bloqer-ai-presentation").getByRole("link").first();
+    const legacyLinks = dialog.getByTestId("bloqer-ai-links").getByRole("link").first();
+    await expect(presentationLink.or(legacyLinks)).toBeVisible({ timeout: 15_000 });
+    await expect(presentationLink.or(legacyLinks)).toHaveAttribute("href", /^\//);
+  });
+
+  test("Help article Preguntale a Bloqer is reachable", async ({ page }) => {
+    await login(page, ownerEmail);
+    await page.goto(`${baseUrl}/ayuda/preguntale-a-bloqer`);
+    await expect(page.getByRole("heading", { name: /preguntale a bloqer/i })).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
+  test("provider/error path surfaces safe Spanish message", async ({ page, request }) => {
+    await login(page, ownerEmail);
+    // Unauthenticated already covered; authenticated empty payload → 400.
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const res = await request.post(`${baseUrl}/api/ai/chat`, {
+      headers: { Cookie: cookieHeader, "Content-Type": "application/json" },
+      data: { messages: [] },
+      failOnStatusCode: false,
+    });
+    expect([400, 429, 503]).toContain(res.status());
+    const body = await res.text();
+    expect(body).not.toMatch(/OPENAI_API_KEY|sk-[a-zA-Z0-9]{10,}/i);
+  });
+
+  test("rate limit returns 429 with user-facing message", async ({ page, request }) => {
+    test.skip(
+      process.env.BLOQER_AI_RATE_LIMIT_USER_PER_MINUTE !== "2",
+      "Set BLOQER_AI_RATE_LIMIT_USER_PER_MINUTE=2 on the Next server to exercise this test",
+    );
+    await login(page, ownerEmail);
+    const cookies = await page.context().cookies();
+    const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
+    const payload = {
+      messages: [{ role: "user", content: "ping rate limit" }],
+      currentRoute: "/dashboard",
+    };
+    let saw429 = false;
+    for (let i = 0; i < 5; i++) {
+      const res = await request.post(`${baseUrl}/api/ai/chat`, {
+        headers: { Cookie: cookieHeader, "Content-Type": "application/json" },
+        data: payload,
+        failOnStatusCode: false,
+      });
+      if (res.status() === 429) {
+        saw429 = true;
+        const json = (await res.json()) as { error?: string };
+        expect(json.error).toMatch(/límite de consultas de Bloqer AI/i);
+        break;
+      }
+    }
+    expect(saw429).toBeTruthy();
   });
 });

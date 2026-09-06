@@ -94,6 +94,13 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
     assertNonProd();
     ({ prisma } = await import("@bloqer/database"));
     fx = await seedAiAdversarialFixtures(prisma);
+    // Keep this suite on TENANT_WIDE so D-111 SCOPED fixtures do not leak into RBAC baseline.
+    await prisma.tenant.update({
+      where: { id: fx.tenantAId },
+      data: { projectAccessMode: "TENANT_WIDE" },
+    });
+    const { clearProjectAccessModeCache } = await import("../security/access");
+    clearProjectAccessModeCache();
   });
 
   async function exec(
@@ -229,7 +236,7 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
       { tool: "get_payables", args: {}, owner: "ok", pm: "ok", viewer: "ok" },
       { tool: "get_receivables", args: {}, owner: "ok", pm: "ok", viewer: "ok" },
       { tool: "get_project_certification_summary", args: {}, owner: "ok", pm: "ok", viewer: "ok" },
-      { tool: "get_cash_position", args: {}, owner: "ok", pm: "deny", viewer: "ok" },
+      { tool: "get_cash_position", args: {}, owner: "ok", pm: "deny", viewer: "deny" },
     ];
 
     const rows: string[] = [];
@@ -244,8 +251,8 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
         if (expect === "ok") {
           assert.ok(ok, `${row.tool}/${role}: ${res.content.slice(0, 200)}`);
         } else {
-          // PM may lack TREASURY VIEW — cash should deny or return empty gated error
-          assert.ok(denied || /deshabilitado|Sin permiso|tesorer/i.test(res.content), `${row.tool}/${role}`);
+          // PM / VIEWER: AI denies treasury (VIEWER stricter than D-056 UI)
+          assert.ok(denied || /deshabilitado|Sin permiso|tesorer|FORBIDDEN|acceso/i.test(res.content), `${row.tool}/${role}`);
         }
       };
       await run("OWNER", row.owner);
@@ -271,10 +278,10 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
       });
       const res = await exec("search_purchase_orders", {}, ctx);
       assert.ok(res.isError, res.content);
-      assert.match(res.content, /PROCUREMENT|deshabilitado/i);
+      assert.match(res.content, /FORBIDDEN|no está disponible|módulo/i);
       assert.ok(!leaksTenantB(res.content, fx));
       // Must not still list PO rows
-      assert.ok(!res.content.includes(fx.poAId) || /deshabilitado/i.test(res.content));
+      assert.ok(!res.content.includes(fx.poAId) || /FORBIDDEN|disponible/i.test(res.content));
     } finally {
       await prisma.tenantModuleSetting.upsert({
         where: {
@@ -298,7 +305,10 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
         currentProjectId: fx.projectA1Id,
       });
       const res = await exec("get_payables", {}, ctx);
-      assert.ok(res.isError && /AP|deshabilitado/i.test(res.content), res.content);
+      assert.ok(
+        res.isError && /módulo no está disponible|AP|deshabilitado/i.test(res.content),
+        res.content,
+      );
     } finally {
       await prisma.tenantModuleSetting.upsert({
         where: { tenantId_moduleKey: { tenantId: fx.tenantAId, moduleKey: "AP" } },
@@ -308,7 +318,7 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
     }
   });
 
-  it("documents: ProjectTeamMember is not project ACL (A2 visible to same-tenant VIEWER)", async () => {
+  it("documents: under TENANT_WIDE, A2 is visible to same-tenant VIEWER (ProjectTeamMember ≠ ACL)", async () => {
     const ctx = buildAiExecutionContext({
       service: svc(fx.tenantAId, fx.viewerAUserId, ["VIEWER"]),
     });

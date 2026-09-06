@@ -8,6 +8,8 @@ import {
   getApprovedBudgetEditsPolicy,
   getCompanies,
   getCompanyProcurementSettings,
+  getTenantProjectAccessMode,
+  hasTenantWideProjectAccess,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -16,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CompanyProcurementSettingsForm } from "@/features/procurement/components/company-procurement-settings-form";
 import { ApprovedBudgetEditsPolicyForm } from "@/features/budgets/components/approved-budget-edits-policy-form";
+import { ProjectAccessModeSection } from "@/features/tenant-config/components/project-access-mode-section";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -58,6 +61,10 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
     can(current.tenantCtx.roles, "EDIT", "TENANT_SETTINGS") ||
     current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
   const canEditPresupuestos = canManageApprovedBudgetEditPolicy(current.tenantCtx.roles);
+  const canEditProjectAccess =
+    can(current.tenantCtx.roles, "EDIT", "TENANT_SETTINGS") ||
+    hasTenantWideProjectAccess(current.tenantCtx.roles);
+  const projectAccessMode = await getTenantProjectAccessMode(ctx.tenantId);
 
   let budgetPolicy: Awaited<ReturnType<typeof getApprovedBudgetEditsPolicy>> | null = null;
   let budgetPolicyMissingSchema = false;
@@ -79,8 +86,22 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
     <PageShell variant="default" className="space-y-12">
       <PageListHeader
         title="Políticas"
-        subtitle="Reglas de compras y excepciones de presupuesto de la organización."
+        subtitle="Reglas de acceso a obras, compras y excepciones de presupuesto de la organización."
       />
+
+      <section id="acceso-obras" className="space-y-5 scroll-mt-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight">Acceso a proyectos</h2>
+          <p className="text-sm text-muted-foreground max-w-3xl">
+            Definí si el equipo ve todas las obras o solo las asignadas. Las asignaciones se
+            gestionan por usuario en Equipo.
+          </p>
+        </div>
+        <ProjectAccessModeSection
+          initialMode={projectAccessMode}
+          canEdit={canEditProjectAccess}
+        />
+      </section>
 
       <section id="compras" className="space-y-5 scroll-mt-6">
         <div className="space-y-1">

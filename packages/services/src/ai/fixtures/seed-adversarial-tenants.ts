@@ -780,11 +780,11 @@ export async function seedAiAdversarialFixtures(
     roles: ["VIEWER"],
   });
 
-  // Project A2 — same tenant; matrix has no project-scoped ACL (documented in tests).
+  // Project A2 — same tenant; ACL enforced only when MEMBERSHIP_SCOPED (D-111 seed).
   await prisma.project.upsert({
     where: { id: a.projectA2Id },
     update: {
-      name: "Obra AI Adv A2 (sin ACL de proyecto)",
+      name: "Obra AI Adv A2",
       code: "AIA-A2",
       status: "ACTIVE",
       companyId: a.companyId,
@@ -796,7 +796,7 @@ export async function seedAiAdversarialFixtures(
       companyId: a.companyId,
       clientContactId: a.clientContactId,
       code: "AIA-A2",
-      name: "Obra AI Adv A2 (sin ACL de proyecto)",
+      name: "Obra AI Adv A2",
       type: "PRIVATE",
       status: "ACTIVE",
       createdBy: ownerAUserId,

@@ -20,7 +20,8 @@ import { resolvePagination } from "../finance/pagination";
 import { assertCanCancelReceivableDirect } from "./receivable-cancel-guards";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, isObligationOverdue, OBLIGATION_OPEN_BALANCE_EPSILON } from "../finance/obligation-date";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import {
   computeObligationBalanceDue,
   normalizeObligationBalanceDue,
@@ -71,6 +72,7 @@ export async function getReceivableById(
   if (projectScopeId !== undefined && r.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(r.projectId, ctx);
   const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
   return serializeReceivable({ ...r, ...reconciled });
 }
@@ -96,6 +98,7 @@ export async function getReceivableBySalesInvoiceId(
   if (projectScopeId !== undefined && r.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(r.projectId, ctx);
   const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
   return serializeReceivable({ ...r, ...reconciled });
 }
@@ -118,7 +121,7 @@ export async function listReceivablesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -164,7 +167,7 @@ export async function listCollectibleReceivablesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const rows = await prisma.receivable.findMany({
     where: {
@@ -346,7 +349,7 @@ export async function listReceivablesFieldBoard(
     if (!canViewArProjectArea(ctx.roles)) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
     }
-    await requireProjectInTenant(scope.projectId, ctx.tenantId);
+    await requireProjectAccess(scope.projectId, ctx);
     where.projectId = scope.projectId;
   } else {
     if (!canViewCompanyAr(ctx.roles)) {
@@ -446,7 +449,7 @@ export async function summarizeReceivablesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const rows = await prisma.receivable.findMany({
     where: { projectId, tenantId: ctx.tenantId },

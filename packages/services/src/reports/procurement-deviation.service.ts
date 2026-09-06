@@ -5,7 +5,7 @@ import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess } from "../security/access";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
 import { parseFilterDate } from "./report-month";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
@@ -86,7 +86,7 @@ export async function getProcurementDeviationReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de compras");
   }
 
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };

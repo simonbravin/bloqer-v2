@@ -110,6 +110,7 @@ export async function getCompanyIncomeExpenseReport(
           p.id,
           { dateFrom: range.dateFrom, dateTo: range.dateTo },
           ctx,
+          { skipMembershipAcl: true },
         ).catch(() => null),
       ),
     );

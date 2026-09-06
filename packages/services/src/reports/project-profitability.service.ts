@@ -23,6 +23,10 @@ import {
 import { getProjectOverheadAmount } from "../finance/project-overhead.service";
 import { isPositiveMoneyDecimal } from "../finance/money-decimal";
 import { compareDecimal } from "@bloqer/utils";
+import {
+  projectRowIdWhereForScope,
+  resolveAccessibleProjectScope,
+} from "../security/access";
 
 export type ProfitabilityFilters = {
   budgetId?: string;
@@ -393,8 +397,13 @@ export async function getPortfolioProfitabilityReport(
     ? { status: filters.status }
     : { status: { not: "CANCELLED" } };
 
+  const scope = await resolveAccessibleProjectScope(ctx);
   const projects = await prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, ...statusFilter },
+    where: {
+      tenantId: ctx.tenantId,
+      ...statusFilter,
+      ...projectRowIdWhereForScope(scope),
+    },
     select: { id: true, code: true, name: true, status: true },
     orderBy: { code: "asc" },
   });

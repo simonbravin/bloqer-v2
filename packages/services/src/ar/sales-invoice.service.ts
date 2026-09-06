@@ -19,7 +19,8 @@ import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-li
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectInTenant } from "../project/require-project-in-tenant";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
 import {
   assertJournalAllowsOperationalCancel,
@@ -98,6 +99,7 @@ export async function getSalesInvoiceById(
   if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(inv.projectId, ctx);
   return serializeInvoice(inv);
 }
 
@@ -161,7 +163,7 @@ export async function listInvoicesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   const { skip, take } = resolvePagination({
     page: filters?.page,
@@ -201,7 +203,7 @@ export async function countOpenSalesInvoicesByProject(
   if (!canViewArProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de venta");
   }
-  await requireProjectInTenant(projectId, ctx.tenantId);
+  await requireProjectAccess(projectId, ctx);
 
   return prisma.salesInvoice.count({
     where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },
@@ -232,10 +234,10 @@ export async function resolveCompanyIdForAr(
 
 async function assertProjectGuardIfPresent(
   projectId: string | null | undefined,
-  tenantId: string,
+  ctx: ServiceContext,
 ): Promise<void> {
   if (projectId) {
-    await assertProjectAllowsOperationalMutation(projectId, tenantId);
+    await assertProjectAllowsOperationalMutation(projectId, ctx);
   }
 }
 
@@ -256,7 +258,7 @@ export async function createSalesInvoice(
       "Para facturas corporativas usá el flujo Registrar transacción (Ingreso / factura).",
     );
   }
-  await assertProjectGuardIfPresent(input.projectId, ctx.tenantId);
+  await assertProjectGuardIfPresent(input.projectId, ctx);
 
   await assertContactRoleInTenant(input.clientContactId, "CLIENT", ctx.tenantId);
 
@@ -373,7 +375,7 @@ export async function createInvoiceFromCertification(
   if (projectScopeId !== undefined && cert.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
   }
-  await assertProjectAllowsOperationalMutation(cert.projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(cert.projectId, ctx);
   // Billing gate aligned with UI / STATE_MACHINES: APPROVED only.
   if (cert.status !== "APPROVED") {
     throw new ServiceError("CONFLICT", "Solo se pueden facturar certificaciones aprobadas");
@@ -501,7 +503,7 @@ export async function updateSalesInvoice(
   if (!canMutateArForScope(ctx.roles, inv.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
   }
-  await assertProjectGuardIfPresent(inv.projectId, ctx.tenantId);
+  await assertProjectGuardIfPresent(inv.projectId, ctx);
   assertInvoiceEditable(inv);
 
   const zeroTaxForLetter =
@@ -597,7 +599,7 @@ export async function issueSalesInvoice(
   if (!canMutateArForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para emitir facturas");
   }
-  await assertProjectGuardIfPresent(invPreview.projectId, ctx.tenantId);
+  await assertProjectGuardIfPresent(invPreview.projectId, ctx);
 
   const result = await prisma.$transaction(async (tx) => {
     const inv = await tx.salesInvoice.findUnique({

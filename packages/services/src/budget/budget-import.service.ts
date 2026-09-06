@@ -42,7 +42,7 @@ export async function previewImport(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertBudgetEditable(budget);
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
 
   const existingNodes = await prisma.wbsNode.findMany({
     where: { budgetId },
@@ -68,7 +68,7 @@ export async function executeImport(
   if (!budget) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await assertBudgetEditable(budget);
-  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx.tenantId);
+  await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   await assertBudgetWbsStructureMutable(budget, ctx);
 
   const existingNodes = await prisma.wbsNode.findMany({

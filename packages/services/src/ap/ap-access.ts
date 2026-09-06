@@ -1,9 +1,12 @@
 import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
 
-/** Aligns reads with `document.service` for SUPPLIER_INVOICE (VIEW AP | VIEW PROJECTS). */
+/**
+ * Project AP reads ([D-111] G4).
+ * Requires VIEW AP — VIEW PROJECTS alone is insufficient.
+ */
 export function canViewApProjectArea(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "AP") || can(roles, "VIEW", "PROJECTS");
+  return can(roles, "VIEW", "AP");
 }
 
 /**

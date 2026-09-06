@@ -67,7 +67,7 @@
 
 ### 2.7 `VIEWER`
 - **Quién es:** stakeholder solo lectura (auditor externo, contador, asesor).
-- **Acceso:** lectura de módulos operativos **y** company finance (hub, tesorería, GL) sin mutar ([D-056](./DECISION_LOG.md)).
+- **Acceso:** lectura de módulos operativos **y** company finance de AP/AR/GL (hub) sin mutar ([D-056](./DECISION_LOG.md)). **Sin tesorería/bancos/caja** ([D-111](./DECISION_LOG.md#d-111--project-membership-acl-procurement--view-projects-treasury-sin-viewer)).
 - **Acciones:** ninguna que modifique datos.
 
 ---

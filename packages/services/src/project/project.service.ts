@@ -159,6 +159,8 @@ export async function getProjectById(id: string, ctx: ServiceContext): Promise<P
   });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(project.id, ctx);
   return project;
 }
 
@@ -170,8 +172,12 @@ export async function listProjects(
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view projects");
   }
 
+  const { resolveAccessibleProjectScope } = await import("../security/access");
+  const scope = await resolveAccessibleProjectScope(ctx);
+
   const where: Prisma.ProjectWhereInput = {
     tenantId: ctx.tenantId,
+    ...(scope === "ALL" ? {} : { id: { in: scope.projectIds } }),
     ...(filters.status ? { status: filters.status } : {}),
     ...(filters.clientContactId ? { clientContactId: filters.clientContactId } : {}),
     ...(filters.search

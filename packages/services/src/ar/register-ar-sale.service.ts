@@ -297,7 +297,7 @@ export async function registerArSale(
   }
   const projectId = input.projectId;
 
-  await assertProjectAllowsOperationalMutation(projectId, ctx.tenantId);
+  await assertProjectAllowsOperationalMutation(projectId, ctx);
 
   const companyId = await resolveCompanyId(projectId, ctx);
   const company = await prisma.company.findUnique({

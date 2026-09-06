@@ -7,6 +7,24 @@ export { runAgent } from "./orchestration/run-agent";
 export type { AgentStreamEvent, AgentToolExecutor, RunAgentInput } from "./orchestration/run-agent";
 export { buildBloqerAiSystemPrompt } from "./policy/system-prompt";
 export {
+  parseAiPresentationFromAssistantText,
+  sanitizeAiPresentation,
+  scorePresentationQuality,
+  aiPresentationSchema,
+  PRESENTATION_START,
+  PRESENTATION_END,
+} from "./presentation";
+export type {
+  AiPresentation,
+  AiPresentationKind,
+  AiInsight,
+  AiInsightSeverity,
+  AiAction,
+  AiSecondaryMetric,
+  AiPresentationLink,
+  ParsedAssistantPresentation,
+} from "./presentation";
+export {
   getBloqerAiEnv,
   isBloqerAiEnabled,
   createAiProviderFromEnv,

@@ -4,6 +4,10 @@ import { can } from "@bloqer/domain";
 import { getProjectCostControl } from "../cost-control/cost-control.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
+import {
+  projectRowIdWhereForScope,
+  resolveAccessibleProjectScope,
+} from "../security/access";
 
 export type PortfolioFilters = {
   status?: ProjectStatus;
@@ -46,10 +50,12 @@ export async function getProjectPortfolioReport(
     ? { status: filters.status }
     : { status: { not: "CANCELLED" } };
 
+  const scope = await resolveAccessibleProjectScope(ctx);
   const projects = await prisma.project.findMany({
     where: {
       tenantId: ctx.tenantId,
       ...statusFilter,
+      ...projectRowIdWhereForScope(scope),
     },
     select: { id: true, code: true, name: true, status: true },
     orderBy: { code: "asc" },
