@@ -163,8 +163,9 @@ export class BloqerAiToolRegistry {
       };
     }
 
-    // Module gate via live tenant settings (authoritative; complements enabledModules hint).
-    if (tool.requiredModules?.length) {
+    // Module gate: chat route already loads tenant settings into ctx.enabledModules
+    // (checked above). Live DB lookup only when the session hint is absent.
+    if (tool.requiredModules?.length && !ctx.enabledModules) {
       const gate = await getTenantModuleGate(ctx.service);
       for (const mod of tool.requiredModules) {
         if (!gate.isEnabled(mod)) {
