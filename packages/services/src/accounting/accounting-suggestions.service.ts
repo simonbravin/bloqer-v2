@@ -23,6 +23,8 @@ import {
   buildSupplierInvoiceJournalInput,
   COA_IVA_CREDIT_FISCAL,
   COA_IVA_DEBIT_FISCAL,
+  COA_IIBB_PERCEPTION_CREDIT,
+  COA_IIBB_PERCEPTION_DEBIT,
 } from "./accounting-invoice-journal-lines";
 
 async function resolveActiveGlAccountId(
@@ -471,6 +473,11 @@ export async function suggestJournalFromSalesInvoice(
     inv.companyId,
     COA_IVA_DEBIT_FISCAL,
   );
+  const iibbPerceptionDebitAccountId = await resolveActiveGlAccountId(
+    ctx.tenantId,
+    inv.companyId,
+    COA_IIBB_PERCEPTION_DEBIT,
+  );
   const { input } = buildSalesInvoiceJournalInput({
     companyId: inv.companyId,
     projectId: inv.projectId,
@@ -480,10 +487,12 @@ export async function suggestJournalFromSalesInvoice(
     currency: inv.currency,
     subtotal: inv.subtotal,
     taxAmount: inv.taxAmount,
+    iibbPerceptionAmount: inv.iibbPerceptionAmount,
     totalAmount: inv.totalAmount,
     clientsAccountId: rule.debitAccountId,
     incomeAccountId: rule.creditAccountId,
     ivaDebitAccountId,
+    iibbPerceptionDebitAccountId,
     sourceId: inv.id,
   });
   return createJournalEntry(input, ctx);
@@ -519,6 +528,11 @@ export async function suggestJournalFromSupplierInvoice(
     inv.companyId,
     COA_IVA_CREDIT_FISCAL,
   );
+  const iibbPerceptionCreditAccountId = await resolveActiveGlAccountId(
+    ctx.tenantId,
+    inv.companyId,
+    COA_IIBB_PERCEPTION_CREDIT,
+  );
   const { input } = buildSupplierInvoiceJournalInput({
     companyId: inv.companyId,
     projectId: inv.projectId,
@@ -528,10 +542,12 @@ export async function suggestJournalFromSupplierInvoice(
     currency: inv.currency,
     subtotal: inv.subtotal,
     taxAmount: inv.taxAmount,
+    iibbPerceptionAmount: inv.iibbPerceptionAmount,
     totalAmount: inv.totalAmount,
     expenseAccountId: rule.debitAccountId,
     suppliersAccountId: rule.creditAccountId,
     ivaCreditAccountId,
+    iibbPerceptionCreditAccountId,
     sourceId: inv.id,
   });
   return createJournalEntry(input, ctx);

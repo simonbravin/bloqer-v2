@@ -7,7 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
 
 /** Bumped when the seed list grows; apply remains idempotent by account `code` per company. */
-export const ARGENTINE_COA_TEMPLATE_KEY = "ar_construction_v2";
+export const ARGENTINE_COA_TEMPLATE_KEY = "ar_construction_v3";
 
 type TemplateAccount = {
   code: string;
@@ -31,6 +31,7 @@ export const ARGENTINE_COA_TEMPLATE_ACCOUNTS: TemplateAccount[] = [
   { code: "1.1.05", name: "Valores / cheques a depositar", type: "ASSET" },
   { code: "1.1.10", name: "Clientes / Deudores por ventas", type: "ASSET" },
   { code: "1.1.20", name: "IVA Crédito Fiscal", type: "ASSET" },
+  { code: "1.1.22", name: "Percepción IIBB Crédito Fiscal", type: "ASSET" },
   { code: "1.1.30", name: "Anticipos a proveedores", type: "ASSET" },
   { code: "1.1.40", name: "Retenciones sufridas a cobrar", type: "ASSET" },
   { code: "1.1.50", name: "Depósitos en garantía", type: "ASSET" },
@@ -39,6 +40,7 @@ export const ARGENTINE_COA_TEMPLATE_ACCOUNTS: TemplateAccount[] = [
   { code: "2.1.01", name: "Proveedores", type: "LIABILITY" },
   { code: "2.1.05", name: "Cheques diferidos a pagar", type: "LIABILITY" },
   { code: "2.1.10", name: "IVA Débito Fiscal", type: "LIABILITY" },
+  { code: "2.1.12", name: "Percepción IIBB a depositar", type: "LIABILITY" },
   { code: "2.1.15", name: "Tarjetas de crédito a pagar", type: "LIABILITY" },
   { code: "2.1.20", name: "Retenciones a depositar", type: "LIABILITY" },
   { code: "2.1.30", name: "Anticipos de clientes", type: "LIABILITY" },

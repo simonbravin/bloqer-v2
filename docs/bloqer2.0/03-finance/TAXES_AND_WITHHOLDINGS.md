@@ -7,6 +7,7 @@ IVA, IIBB, Ganancias, SUSS, percepciones — **sin motor fiscal automático** ([
 > Ver también [D-085]: presets de alícuota (0 / 10,5 / 21 / 27) y asiento GL con IVA discriminado cuando `taxAmount > 0`.
 > Ver también [D-086]: en Factura B (u otras) se puede ingresar **precio unitario con IVA incluido**; al guardar se persiste neto + IVA.
 > Ver también [D-093]: descuento comercial % por línea **antes de IVA**; el precio unitario persistido es list net.
+> Ver también [D-112]: **Percepción IIBB** a nivel documento (`iibbPerceptionRate` / `iibbPerceptionAmount`) sobre el neto; default 3% en altas; no es costo de obra.
 
 ## Modelo TaxLine
 Por cada documento o movimiento:
@@ -16,7 +17,28 @@ Por cada documento o movimiento:
 - `amount` resultante
 - `sign`: `+` percepción / `-` retención
 
-En la implementación actual el IVA operativo vive como `taxRate` / `lineTax` en líneas de factura (AR/AP); el modelo `TaxLine` polimórfico fino sigue pendiente (P-ERD-05).
+En la implementación actual:
+- el **IVA** operativo vive como `taxRate` / `lineTax` en líneas (AR/AP/OC/cotización) → header `taxAmount`;
+- la **Percepción IIBB** vive como cabecera `iibbPerceptionRate` / `iibbPerceptionAmount` ([D-112]);
+- el modelo `TaxLine` polimórfico fino sigue pendiente (P-ERD-05).
+
+## Percepción IIBB ([D-112])
+
+| Campo | Semántica |
+|---|---|
+| `iibbPerceptionRate` | % editable (default **3** en documentos nuevos; histórico migra en 0) |
+| `iibbPerceptionAmount` | `roundMoney(subtotal × rate / 100)` — base = neto del documento |
+| `totalAmount` | `subtotal + taxAmount(IVA) + iibbPerceptionAmount` |
+
+Aplica en cotizaciones, OC, facturas proveedor, registrar gastos, facturas de venta / registrar ingresos. Costo de obra y reportes de neto **excluyen** IVA y percepción (crédito fiscal / activo, no gasto directo).
+
+### Contabilidad
+
+Con CoA template `ar_construction_v3`:
+- **Compra:** Debe Gasto(neto) + IVA crédito (`1.1.20`) + Perc. IIBB crédito (`1.1.22`) / Haber Proveedores(total).
+- **Venta:** Debe Clientes(total) / Haber Ingresos(neto) + IVA débito (`2.1.10`) + Perc. IIBB a depositar (`2.1.12`).
+
+Sin cuenta o sin montos → asiento de 2 líneas por total.
 
 ## Letra de comprobante vs IVA ([D-084] / [D-085] / [D-086])
 
@@ -33,13 +55,13 @@ En la implementación actual el IVA operativo vive como `taxRate` / `lineTax` en
 - Materiales sueltos, artefactos/grifería y muchos honorarios profesionales suelen ir al **21%**.
 - Bloqer **no** elige 10,5% solo: el operador lo carga en la línea.
 
-## Contabilidad ([D-085])
+## Contabilidad ([D-085] / [D-112])
 
-Al emitir factura con `taxAmount > 0` y CoA IVA activo:
-- **Venta:** Debe Clientes (total) / Haber Ingresos (neto) + Haber IVA Débito (`2.1.10`).
-- **Compra:** Debe Gasto (neto) + Debe IVA Crédito (`1.1.20`) / Haber Proveedores (total).
+Al emitir factura con IVA y/o Percepción IIBB y cuentas CoA activas:
+- **Venta:** Debe Clientes (total) / Haber Ingresos (neto) + Haber IVA Débito (`2.1.10`) + Haber Perc. IIBB a depositar (`2.1.12`) cuando aplique.
+- **Compra:** Debe Gasto (neto) + Debe IVA Crédito (`1.1.20`) + Debe Perc. IIBB crédito (`1.1.22`) / Haber Proveedores (total).
 
-Sin cuenta IVA o sin impuesto → asiento de 2 líneas por total (comportamiento previo).
+Sin las cuentas necesarias o sin montos de impuesto/percepción → asiento de 2 líneas por total (comportamiento previo).
 
 ## Aplicación típica
 - En **factura venta**: discrimina IVA en líneas.

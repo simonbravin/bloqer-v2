@@ -98,10 +98,18 @@ export type PurchaseOrderLineView = {
 
 export type PurchaseOrderView = Omit<
   PurchaseOrder,
-  "subtotal" | "taxAmount" | "totalAmount" | "totalAmountArs" | "fxRate"
+  | "subtotal"
+  | "taxAmount"
+  | "totalAmount"
+  | "totalAmountArs"
+  | "fxRate"
+  | "iibbPerceptionRate"
+  | "iibbPerceptionAmount"
 > & {
   subtotal: string;
   taxAmount: string;
+  iibbPerceptionRate: string;
+  iibbPerceptionAmount: string;
   totalAmount: string;
   totalAmountArs: string;
   fxRate: string;
@@ -182,6 +190,8 @@ function serializePO(
     ...po,
     subtotal:    serializeMoneyDecimal(po.subtotal),
     taxAmount:   serializeMoneyDecimal(po.taxAmount),
+    iibbPerceptionRate: serializeRatePctDecimal(po.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(po.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(po.totalAmount),
     totalAmountArs: serializeMoneyDecimal(po.totalAmountArs),
     fxRate: serializeFxRateDecimal(po.fxRate),
@@ -606,6 +616,7 @@ export async function createPurchaseOrder(
           ? new Date(input.expectedDeliveryDate)
           : null,
         currency: input.currency ?? "ARS",
+        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
         emergencyReason: input.emergencyReason?.trim() || null,
@@ -764,6 +775,9 @@ export async function updatePurchaseOrder(
           input.emergencyReason !== undefined
             ? input.emergencyReason?.trim() || null
             : existing.emergencyReason,
+        ...(input.iibbPerceptionRate !== undefined
+          ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
+          : {}),
         updatedBy:            ctx.actorUserId,
       },
     });
@@ -844,6 +858,8 @@ export async function updatePurchaseOrder(
           },
         });
       }
+      await recalcPurchaseOrderTotals(tx, id);
+    } else if (input.iibbPerceptionRate !== undefined) {
       await recalcPurchaseOrderTotals(tx, id);
     }
 

@@ -2,13 +2,14 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -56,6 +57,7 @@ export function CertificationInvoiceForm({
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(suggested);
   // Certification PU already includes budget taxes — default 0; user may discriminate IVA.
   const [taxRate, setTaxRate] = useState("0");
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
 
   const today = toIsoDateInTimeZone();
 
@@ -74,6 +76,7 @@ export function CertificationInvoiceForm({
         dueDate:   fd.get("dueDate")   as string,
         taxRate: forceZeroTax ? "0" : (taxRate || "0"),
         invoiceLetter: showLetter ? invoiceLetter : null,
+        iibbPerceptionRate,
         notes:     (fd.get("notes") as string) || null,
       });
       if ("error" in res) {
@@ -166,6 +169,12 @@ export function CertificationInvoiceForm({
             ))}
           </div>
         </div>
+
+        <IibbPerceptionFields
+          rate={iibbPerceptionRate}
+          onRateChange={setIibbPerceptionRate}
+          subtotal={cert.totalAmount}
+        />
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas</Label>

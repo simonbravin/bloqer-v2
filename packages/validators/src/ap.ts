@@ -46,6 +46,8 @@ export const createSupplierInvoiceSchema = z.object({
   invoiceLetter:     invoiceLetterSchema.optional().nullable(),
   /** When true, line unit prices are gross (IVA incluido) — [D-086]. */
   pricesIncludeTax:  z.boolean().optional(),
+  /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
+  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),
@@ -59,6 +61,7 @@ export const updateSupplierInvoiceSchema = z.object({
   fxRate:            optionalFxRateString,
   invoiceLetter:     invoiceLetterSchema.optional().nullable(),
   pricesIncludeTax:  z.boolean().optional(),
+  iibbPerceptionRate: ratePctString.optional(),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),

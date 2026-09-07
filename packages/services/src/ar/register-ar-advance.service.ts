@@ -73,6 +73,7 @@ export async function registerArAdvance(
       issueDate: input.issueDate,
       dueDate: input.dueDate ?? input.issueDate,
       currency,
+      iibbPerceptionRate: "0",
       notes: input.notes ?? "Anticipo de cliente — imputado a obra",
       internalNotes: "Registrado vía flujo de anticipo",
       externalInvoiceRef: null,

@@ -362,6 +362,7 @@ export async function registerArSale(
             dueDate: new Date(input.dueDate),
             currency: input.currency ?? "ARS",
             invoiceLetter: input.invoiceLetter ?? null,
+            iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
             notes: input.notes ?? null,
             internalNotes: input.internalNotes ?? null,
             externalInvoiceRef: input.externalInvoiceRef ?? null,

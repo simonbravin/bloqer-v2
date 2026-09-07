@@ -89,6 +89,8 @@ export default async function EditarFacturaPage({ params }: PageProps) {
             notes: invoice.notes ?? "",
             internalNotes: invoice.internalNotes ?? "",
             invoiceLetter: (invoice.invoiceLetter as InvoiceLetterCode | null) ?? null,
+            iibbPerceptionRate: invoice.iibbPerceptionRate,
+            subtotal: invoice.subtotal,
           }}
         />
       </div>

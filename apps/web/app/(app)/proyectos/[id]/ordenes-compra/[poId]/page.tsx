@@ -1,3 +1,4 @@
+import { IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
 import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
 import {
@@ -497,6 +498,12 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           <div className="text-right">
             <p className="text-muted-foreground">IVA</p>
             <p className="tabular-nums">{formatMoneyAmount(order.taxAmount)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-muted-foreground">
+              {IIBB_PERCEPTION_LABEL_ES} ({formatRatePctFromString(order.iibbPerceptionRate)}%)
+            </p>
+            <p className="tabular-nums">{formatMoneyAmount(order.iibbPerceptionAmount)}</p>
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>

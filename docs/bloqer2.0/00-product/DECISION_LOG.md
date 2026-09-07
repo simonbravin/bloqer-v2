@@ -1744,6 +1744,30 @@
 
 ---
 
+### D-112 — Percepción IIBB a nivel documento (compras y ventas)
+
+- **Fecha:** 2026-09-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** Los comprobantes de proveedores (p. ej. Mendoza) discriminan **Percepción de Ingresos Brutos** además del IVA. El IVA operativo ya existe por línea; faltaba un espejo simple sin armar el motor `TaxLine` ([Q-040] / P-ERD-05).
+- **Decisión:**
+  1. Campos de cabecera en `SupplierInvoice`, `SalesInvoice`, `PurchaseOrder`, `ProcurementQuote`: `iibbPerceptionRate` (% editable) + `iibbPerceptionAmount`.
+  2. **Base:** neto/subtotal del documento (suma de `lineSubtotal`), **antes de IVA**. Fórmula: `amount = roundMoney(subtotal × rate / 100)` ([D-053]).
+  3. **Total:** `totalAmount = subtotal + taxAmount(IVA) + iibbPerceptionAmount`. El IVA sigue en `taxAmount`; la percepción no se mezcla ahí.
+  4. **Default:** alícuota **3%** en documentos **nuevos** (típico Mendoza); modificable libremente (o 0% si no aplica). Filas históricas migran en **0** para no alterar totales.
+  5. **Alcance:** cotizaciones, OC, facturas proveedor, registrar gastos, facturas de venta / registrar ingresos.
+  6. **Costo de obra:** igual que el IVA — **crédito fiscal / activo**, no costo directo. Reportes de costo siguen en neto (`lineSubtotal`).
+  7. **Contabilidad ([D-085] extendido):** al emitir, asiento con línea aparte si hay percepción y cuenta CoA:
+     - **AP:** Debe Gasto(neto) + IVA crédito + **Percepción IIBB crédito** (`1.1.22`) / Haber Proveedores(total).
+     - **AR:** Debe Clientes(total) / Haber Ingresos(neto) + IVA débito + **Percepción IIBB a depositar** (`2.1.12`).
+     - Sin cuenta o sin montos de impuesto/percepción → fallback de 2 líneas por total (comportamiento previo).
+  8. Copia de cabecera cotización → OC → factura proveedor cuando exista.
+  9. No es catálogo provincial ni motor AFIP; alícuota libre. `TaxType`/`TaxLine` fino sigue pendiente ([Q-040]).
+- **Implicancias:** migración Prisma; kernel `@bloqer/utils` `calcDocumentHeaderTaxTotals`; UI de totales con alícuota IIBB; CoA template `ar_construction_v3`; guía/help.
+- **Documentos afectados:** [`TAXES_AND_WITHHOLDINGS.md`](../03-finance/TAXES_AND_WITHHOLDINGS.md), [`TAX_FORMULAS.md`](../04-formulas/TAX_FORMULAS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), help facturas/OC/cotizaciones/gastos, [D-011](./DECISION_LOG.md), [D-085](./DECISION_LOG.md).
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

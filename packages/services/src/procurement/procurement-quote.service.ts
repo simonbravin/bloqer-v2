@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { CreateProcurementQuoteInput, UpdateProcurementQuoteInput } from "@bloqer/validators";
 import { calcLine } from "./purchase-order-calc.service";
+import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -82,10 +83,15 @@ async function writeQuoteLines(
   prLines: Array<{ id: string; quantity: Prisma.Decimal }>,
   inputLines: CreateProcurementQuoteInput["lines"],
   pricesIncludeTax: boolean,
-): Promise<{ subtotal: Prisma.Decimal; taxAmount: Prisma.Decimal; totalAmount: Prisma.Decimal }> {
-  let subtotal = new Prisma.Decimal(0);
-  let taxAmount = new Prisma.Decimal(0);
-  let totalAmount = new Prisma.Decimal(0);
+  iibbPerceptionRate: Prisma.Decimal,
+): Promise<{
+  subtotal: Prisma.Decimal;
+  taxAmount: Prisma.Decimal;
+  iibbPerceptionAmount: Prisma.Decimal;
+  totalAmount: Prisma.Decimal;
+}> {
+  const lineSubtotals: Prisma.Decimal[] = [];
+  const lineTaxes: Prisma.Decimal[] = [];
 
   for (const line of inputLines) {
     const prLine = prLines.find((l) => l.id === line.purchaseRequestLineId)!;
@@ -93,9 +99,8 @@ async function writeQuoteLines(
     const price = new Prisma.Decimal(line.unitPrice);
     const rate = new Prisma.Decimal(line.taxRate ?? "0");
     const calc = calcLine(qty, price, rate, parseDiscountPct(line.discountPct), pricesIncludeTax);
-    subtotal = subtotal.plus(calc.lineSubtotal);
-    taxAmount = taxAmount.plus(calc.lineTax);
-    totalAmount = totalAmount.plus(calc.lineTotal);
+    lineSubtotals.push(calc.lineSubtotal);
+    lineTaxes.push(calc.lineTax);
     await tx.procurementQuoteLine.create({
       data: {
         procurementQuoteId: quoteId,
@@ -111,7 +116,11 @@ async function writeQuoteLines(
     });
   }
 
-  return { subtotal, taxAmount, totalAmount };
+  return headerTotalsWithIibbPerception({
+    lineSubtotals,
+    lineTaxes,
+    iibbPerceptionRate,
+  });
 }
 
 export async function createProcurementQuote(
@@ -159,6 +168,7 @@ export async function createProcurementQuote(
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
   const quote = await prisma.$transaction(async (tx) => {
+    const iibbPerceptionRate = new Prisma.Decimal(input.iibbPerceptionRate ?? "3");
     const created = await tx.procurementQuote.create({
       data: {
         tenantId: ctx.tenantId,
@@ -166,6 +176,7 @@ export async function createProcurementQuote(
         supplierContactId: input.supplierContactId,
         status: "RECEIVED",
         currency: input.currency ?? "ARS",
+        iibbPerceptionRate,
         validUntil: input.validUntil ? new Date(input.validUntil) : null,
         leadTimeDays: input.leadTimeDays ?? null,
         notes: input.notes ?? null,
@@ -175,12 +186,13 @@ export async function createProcurementQuote(
       },
     });
 
-    const { subtotal, taxAmount, totalAmount } = await writeQuoteLines(
+    const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount } = await writeQuoteLines(
       tx,
       created.id,
       pr.lines,
       input.lines,
       pricesIncludeTax,
+      iibbPerceptionRate,
     );
 
     const fx = computeDocumentFxAmounts(
@@ -194,6 +206,7 @@ export async function createProcurementQuote(
       data: {
         subtotal,
         taxAmount,
+        iibbPerceptionAmount,
         totalAmount,
         fxRate: fx.fxRate,
         totalAmountArs: fx.amountArs,
@@ -257,12 +270,16 @@ export async function updateProcurementQuote(
 
     await tx.procurementQuoteLine.deleteMany({ where: { procurementQuoteId: quoteId } });
 
-    const { subtotal, taxAmount, totalAmount } = await writeQuoteLines(
+    const iibbPerceptionRate = new Prisma.Decimal(
+      input.iibbPerceptionRate ?? quote.iibbPerceptionRate.toString(),
+    );
+    const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount } = await writeQuoteLines(
       tx,
       quoteId,
       prLines,
       input.lines,
       pricesIncludeTax,
+      iibbPerceptionRate,
     );
 
     const fx = computeDocumentFxAmounts(
@@ -283,8 +300,10 @@ export async function updateProcurementQuote(
             : quote.validUntil,
         leadTimeDays: input.leadTimeDays !== undefined ? input.leadTimeDays : quote.leadTimeDays,
         notes: input.notes !== undefined ? input.notes : quote.notes,
+        iibbPerceptionRate,
         subtotal,
         taxAmount,
+        iibbPerceptionAmount,
         totalAmount,
         fxRate: fx.fxRate,
         totalAmountArs: fx.amountArs,
@@ -396,6 +415,8 @@ export async function listProcurementQuotesDetailedForRequest(
     currency: string;
     validUntil: string | null;
     leadTimeDays: number | null;
+    iibbPerceptionRate: string;
+    iibbPerceptionAmount: string;
     lines: Array<{
       purchaseRequestLineId: string;
       description: string;
@@ -404,6 +425,9 @@ export async function listProcurementQuotesDetailedForRequest(
       unitPrice: string;
       taxRate: string;
       discountPct: string;
+      lineSubtotal: string;
+      lineTax: string;
+      lineTotal: string;
       budgetUnitCostSnapshot: string | null;
     }>;
   }>
@@ -441,6 +465,8 @@ export async function listProcurementQuotesDetailedForRequest(
     currency: q.currency,
     validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
     leadTimeDays: q.leadTimeDays,
+    iibbPerceptionRate: serializeRatePctDecimal(q.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(q.iibbPerceptionAmount),
     lines: q.lines.map((l) => ({
       purchaseRequestLineId: l.purchaseRequestLineId,
       description: l.purchaseRequestLine.description,
@@ -449,6 +475,9 @@ export async function listProcurementQuotesDetailedForRequest(
       unitPrice: serializeUnitPriceDecimal(l.unitPrice),
       taxRate: serializeRatePctDecimal(l.taxRate),
       discountPct: serializeRatePctDecimal(l.discountPct),
+      lineSubtotal: serializeMoneyDecimal(l.lineSubtotal),
+      lineTax: serializeMoneyDecimal(l.lineTax),
+      lineTotal: serializeMoneyDecimal(l.lineTotal),
       budgetUnitCostSnapshot: l.purchaseRequestLine.budgetUnitCostSnapshot != null
         ? serializeUnitPriceDecimal(l.purchaseRequestLine.budgetUnitCostSnapshot)
         : null,

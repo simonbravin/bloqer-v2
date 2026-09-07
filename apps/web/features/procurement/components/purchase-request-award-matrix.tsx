@@ -13,7 +13,11 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { createPurchaseOrdersFromAwardsAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
-import { formatUnitPriceFromString } from "@/lib/format-money";
+import {
+  formatMoneyAmount,
+  formatQtyWithUnit,
+  formatUnitPriceFromString,
+} from "@/lib/format-money";
 
 type PrLine = {
   id: string;
@@ -23,15 +27,19 @@ type PrLine = {
   awardedPurchaseOrderId?: string | null;
 };
 
+type QuoteLineCol = {
+  purchaseRequestLineId: string;
+  unitPrice: string;
+  /** Persisted quote line total (desc. + IVA) — same amount copied into the OC. */
+  lineTotal: string;
+};
+
 type QuoteCol = {
   id: string;
   supplierName: string;
   status: string;
   currency: string;
-  lines: Array<{
-    purchaseRequestLineId: string;
-    unitPrice: string;
-  }>;
+  lines: QuoteLineCol[];
 };
 
 interface Props {
@@ -74,10 +82,9 @@ export function PurchaseRequestAwardMatrix({
     return null;
   }
 
-  function priceFor(quoteId: string, lineId: string): string | null {
+  function quoteLineFor(quoteId: string, lineId: string): QuoteLineCol | null {
     const q = awardableQuotes.find((x) => x.id === quoteId);
-    const line = q?.lines.find((l) => l.purchaseRequestLineId === lineId);
-    return line?.unitPrice ?? null;
+    return q?.lines.find((l) => l.purchaseRequestLineId === lineId) ?? null;
   }
 
   function onGenerate() {
@@ -85,7 +92,7 @@ export function PurchaseRequestAwardMatrix({
     const groupsMap = new Map<string, string[]>();
     for (const line of freeLines) {
       const quoteId = selection[line.id];
-      if (!quoteId) {
+      if (!quoteId || quoteLineFor(quoteId, line.id) == null) {
         setError("Asigná un proveedor a cada ítem pendiente");
         return;
       }
@@ -135,9 +142,11 @@ export function PurchaseRequestAwardMatrix({
             <TableRow>
               <TableHead>Ítem</TableHead>
               {awardableQuotes.map((q) => (
-                <TableHead key={q.id} className="text-center min-w-[8rem]">
+                <TableHead key={q.id} className="text-center min-w-[9rem]">
                   {q.supplierName}
-                  <span className="block text-xs font-normal text-muted-foreground">{q.currency}</span>
+                  <span className="block text-xs font-normal text-muted-foreground">
+                    {q.currency} · P. unit. / Total
+                  </span>
                 </TableHead>
               ))}
             </TableRow>
@@ -148,11 +157,11 @@ export function PurchaseRequestAwardMatrix({
                 <TableCell>
                   <p className="font-medium">{line.description}</p>
                   <p className="text-xs text-muted-foreground">
-                    {line.quantity} {line.unit}
+                    {formatQtyWithUnit(line.quantity, line.unit)}
                   </p>
                 </TableCell>
                 {awardableQuotes.map((q) => {
-                  const price = priceFor(q.id, line.id);
+                  const ql = quoteLineFor(q.id, line.id);
                   const checked = selection[line.id] === q.id;
                   return (
                     <TableCell key={q.id} className="text-center">
@@ -164,11 +173,20 @@ export function PurchaseRequestAwardMatrix({
                           onChange={() =>
                             setSelection((prev) => ({ ...prev, [line.id]: q.id }))
                           }
-                          disabled={pending || price == null}
+                          disabled={pending || ql == null}
                         />
-                        <span className="text-xs tabular-nums text-muted-foreground">
-                          {price != null ? formatUnitPriceFromString(price) : "—"}
-                        </span>
+                        {ql != null ? (
+                          <>
+                            <span className="text-xs tabular-nums text-muted-foreground">
+                              {formatUnitPriceFromString(ql.unitPrice)}
+                            </span>
+                            <span className="text-xs font-medium tabular-nums">
+                              {formatMoneyAmount(ql.lineTotal)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-xs tabular-nums text-muted-foreground">—</span>
+                        )}
                       </label>
                     </TableCell>
                   );

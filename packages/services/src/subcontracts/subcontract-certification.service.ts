@@ -495,6 +495,9 @@ export async function approveSubcontractCertification(
         invoiceLetter:             suggestedLetter,
         subtotal:                  totalAmount,
         taxAmount:                 new Prisma.Decimal(0),
+        // Certifications are net of IVA; no IIBB perception on this auto-draft ([D-112]).
+        iibbPerceptionRate:        new Prisma.Decimal(0),
+        iibbPerceptionAmount:      new Prisma.Decimal(0),
         totalAmount,
         createdBy:                 ctx.actorUserId,
         updatedBy:                 ctx.actorUserId,

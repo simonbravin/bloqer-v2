@@ -1540,6 +1540,9 @@ model SalesInvoice {
   amountArs          Decimal            @default(0) @db.Decimal(18, 4)
   subtotal           Decimal            @default(0) @db.Decimal(18, 4)
   taxAmount          Decimal            @default(0) @db.Decimal(18, 4)
+  /// Percepción IIBB % on net subtotal ([D-112]). Default 0 in DB; creates use 3%.
+  iibbPerceptionRate Decimal            @default(0) @db.Decimal(8, 4)
+  iibbPerceptionAmount Decimal          @default(0) @db.Decimal(18, 4)
   totalAmount        Decimal            @default(0) @db.Decimal(18, 4)
   status             SalesInvoiceStatus @default(DRAFT)
   /// External official voucher ref when issued outside Bloqer (e.g. ARCA) — D-051 corporate AR bridge.
@@ -2007,6 +2010,9 @@ model SupplierInvoice {
   amountArs         Decimal               @default(0) @db.Decimal(18, 4)
   subtotal          Decimal               @default(0) @db.Decimal(18, 4)
   taxAmount         Decimal               @default(0) @db.Decimal(18, 4)
+  /// Percepción IIBB % on net subtotal ([D-112]). Default 0 in DB; creates use 3%.
+  iibbPerceptionRate Decimal              @default(0) @db.Decimal(8, 4)
+  iibbPerceptionAmount Decimal            @default(0) @db.Decimal(18, 4)
   totalAmount       Decimal               @default(0) @db.Decimal(18, 4)
   status            SupplierInvoiceStatus @default(DRAFT)
   notes             String?
@@ -2301,6 +2307,9 @@ model ProcurementQuote {
   totalAmountArs    Decimal                @default(0) @db.Decimal(18, 4)
   subtotal          Decimal                @default(0) @db.Decimal(18, 4)
   taxAmount         Decimal                @default(0) @db.Decimal(18, 4)
+  /// Percepción IIBB % on net subtotal ([D-112]). Default 0 in DB; creates use 3%.
+  iibbPerceptionRate Decimal               @default(0) @db.Decimal(8, 4)
+  iibbPerceptionAmount Decimal             @default(0) @db.Decimal(18, 4)
   totalAmount       Decimal                @default(0) @db.Decimal(18, 4)
   validUntil        DateTime?              @db.Date
   /// Calendar days until delivery from quote date (D-050 comparable lead time).
@@ -2362,6 +2371,9 @@ model PurchaseOrder {
   totalAmountArs             Decimal             @default(0) @db.Decimal(18, 4)
   subtotal                   Decimal             @default(0) @db.Decimal(18, 4)
   taxAmount                  Decimal             @default(0) @db.Decimal(18, 4)
+  /// Percepción IIBB % on net subtotal ([D-112]). Default 0 in DB; creates use 3%.
+  iibbPerceptionRate         Decimal             @default(0) @db.Decimal(8, 4)
+  iibbPerceptionAmount       Decimal             @default(0) @db.Decimal(18, 4)
   totalAmount                Decimal             @default(0) @db.Decimal(18, 4)
   status                     PurchaseOrderStatus @default(DRAFT)
   approvedByUserId           String?

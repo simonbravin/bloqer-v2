@@ -3,8 +3,13 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { addDecimal, compareDecimal, resolveDocumentLineAmounts } from "@bloqer/utils";
-import { IVA_RATE_LABEL_ES, IVA_RATE_PRESETS, normalizeIvaRatePreset } from "@bloqer/domain";
+import { addDecimal, compareDecimal, resolveDocumentLineAmounts, calcIibbPerceptionAmount, roundMoney } from "@bloqer/utils";
+import {
+  DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+  IVA_RATE_LABEL_ES,
+  IVA_RATE_PRESETS,
+  normalizeIvaRatePreset,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -22,6 +27,9 @@ import type { SupplierOption } from "./purchase-order-form";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import { PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
+import {
+  DocumentTaxTotalsFooter,
+} from "@/features/finance/components/iibb-perception-fields";
 import {
   createProcurementQuoteAction,
   deleteProcurementQuoteAction,
@@ -51,6 +59,7 @@ export type ProcurementQuoteEditValues = {
   supplierName: string;
   validUntil: string | null;
   leadTimeDays: number | null;
+  iibbPerceptionRate?: string;
   lines: QuoteLineInitial[];
 };
 
@@ -112,6 +121,11 @@ export function ProcurementQuoteForm({
   const [supplierId, setSupplierId] = useState("");
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [taxRate, setTaxRate] = useState<string>(defaultTaxRate);
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(
+    editValues?.iibbPerceptionRate?.trim()
+      ? editValues.iibbPerceptionRate
+      : DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+  );
   const [lineMoney, setLineMoney] = useState<Record<string, LineMoney>>(() =>
     Object.fromEntries(
       lines.map((l) => {
@@ -141,8 +155,9 @@ export function ProcurementQuoteForm({
     return lines.some((line) => compareDecimal(lineMoney[line.id]?.unitPrice ?? "0", "0") > 0);
   }
 
-  const quoteTotal = useMemo(() => {
-    let total = "0";
+  const quoteTotals = useMemo(() => {
+    let subtotal = "0";
+    let tax = "0";
     for (const line of lines) {
       const money = lineMoney[line.id];
       const preview = linePreview(
@@ -153,10 +168,22 @@ export function ProcurementQuoteForm({
         pricesIncludeTax,
       );
       if (!preview) continue;
-      total = addDecimal(total, preview.lineTotal);
+      subtotal = addDecimal(subtotal, preview.lineSubtotal);
+      tax = addDecimal(tax, preview.lineTax);
     }
-    return total;
-  }, [lineMoney, lines, pricesIncludeTax, taxRate]);
+    let iibb = "0.00";
+    let total = "0.00";
+    try {
+      iibb = calcIibbPerceptionAmount({
+        subtotal,
+        ratePercent: iibbPerceptionRate || "0",
+      });
+      total = roundMoney(addDecimal(addDecimal(subtotal, tax), iibb));
+    } catch {
+      total = roundMoney(addDecimal(subtotal, tax));
+    }
+    return { subtotal, tax, iibb, total };
+  }, [lineMoney, lines, pricesIncludeTax, taxRate, iibbPerceptionRate]);
 
   function buildPayload(
     leadTimeDays: number | null,
@@ -169,6 +196,7 @@ export function ProcurementQuoteForm({
       validUntil,
       leadTimeDays,
       pricesIncludeTax,
+      iibbPerceptionRate,
       lines: lines.map((line, i) => ({
         purchaseRequestLineId: line.id,
         unitPrice: lineMoney[line.id]?.unitPrice ?? "0",
@@ -209,6 +237,7 @@ export function ProcurementQuoteForm({
                 validUntil: payload.validUntil,
                 leadTimeDays: payload.leadTimeDays,
                 pricesIncludeTax: payload.pricesIncludeTax,
+                iibbPerceptionRate: payload.iibbPerceptionRate,
                 lines: payload.lines,
               })
             : await createProcurementQuoteAction(projectId, payload);
@@ -371,14 +400,14 @@ export function ProcurementQuoteForm({
         );
       })}
 
-      <div className="rounded-md bg-muted/40 px-3 py-2 text-sm">
-        <p>
-          <span className="text-muted-foreground">Total cotización (con IVA): </span>
-          <span className="font-semibold tabular-nums">
-            {formatMoneyAmount(quoteTotal, "ARS")}
-          </span>
-        </p>
-      </div>
+      <DocumentTaxTotalsFooter
+        subtotal={quoteTotals.subtotal}
+        taxAmount={quoteTotals.tax}
+        iibbPerceptionRate={iibbPerceptionRate}
+        onIibbPerceptionRateChange={setIibbPerceptionRate}
+        totalLabel="Total cotización"
+        className="rounded-md bg-muted/40 px-3 py-2 border-0"
+      />
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" size="sm" disabled={pending || (!isEdit && suppliers.length === 0)}>

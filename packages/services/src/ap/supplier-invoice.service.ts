@@ -145,9 +145,14 @@ export type SupplierInvoiceLineView = {
   sortOrder: number;
 };
 
-export type SupplierInvoiceView = Omit<SupplierInvoice, "subtotal" | "taxAmount" | "totalAmount"> & {
+export type SupplierInvoiceView = Omit<
+  SupplierInvoice,
+  "subtotal" | "taxAmount" | "totalAmount" | "iibbPerceptionRate" | "iibbPerceptionAmount"
+> & {
   subtotal: string;
   taxAmount: string;
+  iibbPerceptionRate: string;
+  iibbPerceptionAmount: string;
   totalAmount: string;
   code: string;
   lines: SupplierInvoiceLineView[];
@@ -691,6 +696,7 @@ export async function createSupplierInvoice(
         currency:          input.currency ?? "ARS",
         fxRate: estimatedFx.fxRate,
         invoiceLetter:     suggestedLetter,
+        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
         notes:             input.notes ?? null,
         internalNotes:     input.internalNotes ?? null,
         purchaseOrderId:   input.purchaseOrderId ?? null,
@@ -869,6 +875,9 @@ export async function updateSupplierInvoice(
         purchaseOrderId: nextPurchaseOrderId,
         fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined,
         ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
+        ...(input.iibbPerceptionRate !== undefined
+          ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
+          : {}),
         updatedBy:       ctx.actorUserId,
       },
     });
@@ -944,7 +953,11 @@ export async function updateSupplierInvoice(
       }
       if (changed) {
         await recalcSupplierInvoiceTotals(tx, id);
+      } else if (input.iibbPerceptionRate !== undefined) {
+        await recalcSupplierInvoiceTotals(tx, id);
       }
+    } else if (input.iibbPerceptionRate !== undefined) {
+      await recalcSupplierInvoiceTotals(tx, id);
     }
 
     const inv = await tx.supplierInvoice.findUniqueOrThrow({
@@ -1313,6 +1326,8 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     ...inv,
     subtotal:    serializeMoneyDecimal(inv.subtotal),
     taxAmount:   serializeMoneyDecimal(inv.taxAmount),
+    iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
     code:        `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
@@ -1340,6 +1355,8 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
     ...inv,
     subtotal:    serializeMoneyDecimal(inv.subtotal),
     taxAmount:   serializeMoneyDecimal(inv.taxAmount),
+    iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
     code:        `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,

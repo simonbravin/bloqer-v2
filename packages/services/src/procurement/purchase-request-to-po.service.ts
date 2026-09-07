@@ -311,6 +311,7 @@ async function createOnePoFromQuoteLinesInTx(
       issueDate: new Date(),
       currency: quote.currency,
       fxRate: quote.fxRate,
+      iibbPerceptionRate: quote.iibbPerceptionRate,
       status: PurchaseOrderStatus.DRAFT,
       createdBy: ctx.actorUserId,
       updatedBy: ctx.actorUserId,

@@ -1,9 +1,10 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
+import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
-/** Canonical line math [D-053]/[D-093]/[D-086]: discount on rounded subtotal, then IVA; header = sum. */
+/** Canonical line math [D-053]/[D-093]/[D-086]: discount on rounded subtotal, then IVA; header = sum + IIBB ([D-112]). */
 export function calcLine(
   quantity: Prisma.Decimal,
   unitPrice: Prisma.Decimal,
@@ -22,16 +23,23 @@ export function calcLine(
 }
 
 export async function recalcPurchaseOrderTotals(tx: TxClient, purchaseOrderId: string): Promise<void> {
-  const lines = await tx.purchaseOrderLine.findMany({
-    where: { purchaseOrderId },
-    select: { lineSubtotal: true, lineTax: true, lineTotal: true },
+  const [lines, poHeader] = await Promise.all([
+    tx.purchaseOrderLine.findMany({
+      where: { purchaseOrderId },
+      select: { lineSubtotal: true, lineTax: true },
+    }),
+    tx.purchaseOrder.findUniqueOrThrow({
+      where: { id: purchaseOrderId },
+      select: { iibbPerceptionRate: true },
+    }),
+  ]);
+  const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount } = headerTotalsWithIibbPerception({
+    lineSubtotals: lines.map((l) => l.lineSubtotal),
+    lineTaxes: lines.map((l) => l.lineTax),
+    iibbPerceptionRate: poHeader.iibbPerceptionRate,
   });
-  const zero        = new Prisma.Decimal(0);
-  const subtotal    = lines.reduce((s, l) => s.plus(l.lineSubtotal), zero);
-  const taxAmount   = lines.reduce((s, l) => s.plus(l.lineTax), zero);
-  const totalAmount = lines.reduce((s, l) => s.plus(l.lineTotal), zero);
   await tx.purchaseOrder.update({
     where: { id: purchaseOrderId },
-    data: { subtotal, taxAmount, totalAmount },
+    data: { subtotal, taxAmount, iibbPerceptionAmount, totalAmount },
   });
 }

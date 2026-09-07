@@ -11,11 +11,10 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
-import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES, can } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import { costCategoryLabelEs } from "@/lib/cost-category-colors";
@@ -218,6 +217,12 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
           <div className="text-right">
             <p className="text-muted-foreground">IVA</p>
             <p className="tabular-nums">{formatMoneyAmount(invoice.taxAmount)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-muted-foreground">
+              {IIBB_PERCEPTION_LABEL_ES} ({formatRatePctFromString(invoice.iibbPerceptionRate)}%)
+            </p>
+            <p className="tabular-nums">{formatMoneyAmount(invoice.iibbPerceptionAmount)}</p>
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>

@@ -74,4 +74,30 @@ describe("buildSupplierInvoiceJournalInput", () => {
     assert.equal(input.lines[1]?.debit, "105.00");
     assert.equal(input.lines[2]?.credit, "1105.00");
   });
+
+  it("splits IVA + Percepción IIBB when both present", () => {
+    const { input, usedIvaSplit } = buildSupplierInvoiceJournalInput({
+      companyId: "c1",
+      projectId: "p1",
+      entryDate: "2026-08-10",
+      description: "test",
+      reference: "1",
+      currency: "ARS",
+      subtotal: new Prisma.Decimal("1043586.95"),
+      taxAmount: new Prisma.Decimal("219153.26"),
+      iibbPerceptionAmount: new Prisma.Decimal("31307.61"),
+      totalAmount: new Prisma.Decimal("1294047.82"),
+      expenseAccountId: "acc-exp",
+      suppliersAccountId: "acc-sup",
+      ivaCreditAccountId: "acc-iva-credit",
+      iibbPerceptionCreditAccountId: "acc-iibb",
+      sourceId: "inv1",
+    });
+    assert.equal(usedIvaSplit, true);
+    assert.equal(input.lines.length, 4);
+    assert.equal(input.lines[0]?.debit, "1043586.95");
+    assert.equal(input.lines[1]?.debit, "219153.26");
+    assert.equal(input.lines[2]?.debit, "31307.61");
+    assert.equal(input.lines[3]?.credit, "1294047.82");
+  });
 });

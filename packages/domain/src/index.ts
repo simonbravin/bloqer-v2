@@ -115,6 +115,12 @@ export {
 } from "./finance/iva-rates";
 
 export {
+  DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+  IIBB_PERCEPTION_HINT_ES,
+  IIBB_PERCEPTION_LABEL_ES,
+} from "./finance/iibb-perception";
+
+export {
   FINANCIAL_DOCUMENT_CLASS_CODES,
   FINANCIAL_DOCUMENT_CLASS_FAMILY,
   FINANCIAL_DOCUMENT_CLASS_LABEL_ES,

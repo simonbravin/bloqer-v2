@@ -10,6 +10,7 @@ import {
   suggestInvoiceLetter,
   type InvoiceLetterCode,
   type IvaConditionCode,
+  DEFAULT_IIBB_PERCEPTION_RATE_PCT,
 } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -86,6 +87,11 @@ export function SupplierInvoiceEditForm({
           costType: (l.costType as InvoiceLine["costType"]) ?? "MATERIAL",
         }))
       : [{ description: "", quantity: "1", unitPrice: "", taxRate: "21", discountPct: "0", wbsNodeId: null, purchaseOrderLineId: null, costAnalysisLineId: null, costType: "MATERIAL" }],
+  );
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(
+    invoice.iibbPerceptionRate?.trim()
+      ? invoice.iibbPerceptionRate
+      : DEFAULT_IIBB_PERCEPTION_RATE_PCT,
   );
 
   function onPurchaseOrderChange(nextId: string | null) {
@@ -214,6 +220,7 @@ export function SupplierInvoiceEditForm({
       pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
       notes:           (fd.get("notes") as string) || null,
       purchaseOrderId: companyFinanzas || apSpendMode === "DIRECT" ? null : purchaseOrderId ?? null,
+      iibbPerceptionRate,
       lines:           lines.map((l, i) => ({
         ...l,
         taxRate: forceZeroTax ? "0" : l.taxRate,
@@ -406,6 +413,8 @@ export function SupplierInvoiceEditForm({
           requireWbs={!companyFinanzas && Boolean(projectId)}
           wbsOptions={wbsOptions}
           pricesIncludeTax={pricesIncludeTax}
+          iibbPerceptionRate={iibbPerceptionRate}
+          onIibbPerceptionRateChange={setIibbPerceptionRate}
         />
 
         <div className="space-y-1">

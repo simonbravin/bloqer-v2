@@ -34,6 +34,7 @@ import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { SEARCHABLE_NONE, productsToSearchableOptions, toSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
+import { DocumentTaxTotalsFooter } from "@/features/finance/components/iibb-perception-fields";
 import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type PurchaseOrderLine = {
@@ -107,6 +108,9 @@ interface Props {
   varianceSettings?: VarianceSettings;
   /** Award-sourced OC: no add/remove lines ([BR-PUR-024]). */
   structureLocked?: boolean;
+  /** Document-level Percepción IIBB % ([D-112]). Controlled; omit both to hide. */
+  iibbPerceptionRate?: string;
+  onIibbPerceptionRateChange?: (v: string) => void;
 }
 
 export const DEFAULT_PURCHASE_ORDER_LINE: PurchaseOrderLine = {
@@ -136,6 +140,8 @@ export function PurchaseOrderLinesEditor({
   showVarianceJustification = false,
   varianceSettings = DEFAULT_VARIANCE_SETTINGS,
   structureLocked = false,
+  iibbPerceptionRate,
+  onIibbPerceptionRateChange,
 }: Props) {
   const wbsComboboxOptions = useMemo(
     () => wbsToSearchableOptions(wbsOptions),
@@ -732,12 +738,12 @@ export function PurchaseOrderLinesEditor({
         })}
       </div>
 
-      <div className="flex justify-end gap-8 text-sm border-t pt-3">
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground font-semibold">Total (vista previa)</p>
-          <p className="tabular-nums font-semibold">{formatDecimalArFromString(totals.total)}</p>
-        </div>
-      </div>
+      <DocumentTaxTotalsFooter
+        subtotal={totals.subtotal}
+        taxAmount={totals.tax}
+        iibbPerceptionRate={iibbPerceptionRate}
+        onIibbPerceptionRateChange={onIibbPerceptionRateChange}
+      />
     </div>
   );
 }

@@ -20,6 +20,8 @@ import {
   buildTwoLineJournalInput,
   COA_IVA_CREDIT_FISCAL,
   COA_IVA_DEBIT_FISCAL,
+  COA_IIBB_PERCEPTION_CREDIT,
+  COA_IIBB_PERCEPTION_DEBIT,
 } from "./accounting-invoice-journal-lines";
 
 type EnsureResult =
@@ -507,6 +509,11 @@ export async function ensureDraftJournalFromSalesInvoice(
       inv.companyId,
       COA_IVA_DEBIT_FISCAL,
     );
+    const iibbPerceptionDebitAccountId = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      inv.companyId,
+      COA_IIBB_PERCEPTION_DEBIT,
+    );
     const { input } = buildSalesInvoiceJournalInput({
       companyId: inv.companyId,
       projectId: inv.projectId,
@@ -516,10 +523,12 @@ export async function ensureDraftJournalFromSalesInvoice(
       currency: inv.currency,
       subtotal: inv.subtotal,
       taxAmount: inv.taxAmount,
+      iibbPerceptionAmount: inv.iibbPerceptionAmount,
       totalAmount: inv.totalAmount,
       clientsAccountId: rule.debitAccountId,
       incomeAccountId: rule.creditAccountId,
       ivaDebitAccountId,
+      iibbPerceptionDebitAccountId,
       sourceId: inv.id,
     });
     return createDraftFromInput(ctx, inv.companyId, "SALES_INVOICE", inv.id, input);
@@ -586,6 +595,11 @@ export async function ensureDraftJournalFromSupplierInvoice(
       inv.companyId,
       COA_IVA_CREDIT_FISCAL,
     );
+    const iibbPerceptionCreditAccountId = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      inv.companyId,
+      COA_IIBB_PERCEPTION_CREDIT,
+    );
     const { input } = buildSupplierInvoiceJournalInput({
       companyId: inv.companyId,
       projectId: inv.projectId,
@@ -595,10 +609,12 @@ export async function ensureDraftJournalFromSupplierInvoice(
       currency: inv.currency,
       subtotal: inv.subtotal,
       taxAmount: inv.taxAmount,
+      iibbPerceptionAmount: inv.iibbPerceptionAmount,
       totalAmount: inv.totalAmount,
       expenseAccountId: rule.debitAccountId,
       suppliersAccountId: rule.creditAccountId,
       ivaCreditAccountId,
+      iibbPerceptionCreditAccountId,
       sourceId: inv.id,
     });
     return createDraftFromInput(ctx, inv.companyId, "SUPPLIER_INVOICE", inv.id, input);

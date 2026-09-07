@@ -298,7 +298,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "¿Es material con OC o un paquete de ejecución? Si sí → usá el caminito de compras o el de subcontrato. Este camino es gasto directo.",
       "Facturas proveedor → Nueva → modo Costo directo. ¿Cada línea tiene partida hoja EDT? Si no → no se guarda.",
       "Payee: Proveedor o Empleado. Tipo de costo en cada línea. Desde Mano de obra / Equipos → Factura llega tipado + insumo APU ([D-110]).",
-      "Crear → Emitir = Devengado + CxP. ¿Pagar ahora? Si sí, hace falta fondos y mes abierto; si no, Bloqer bloquea. Si no pagás ahora, queda CxP.",
+      "Crear → Emitir = Devengado + CxP. En el pie de totales ajustá **Percepción IIBB** (default 3% sobre el neto) si aplica. ¿Pagar ahora? Si sí, hace falta fondos y mes abierto; si no, Bloqer bloquea. Si no pagás ahora, queda CxP.",
     ],
     figure: {
       src: "/help/mapa-flujo-costo-obra-si-no.png",
@@ -309,6 +309,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Costo directo no reduce el comprometido de una OC. Si compraste contra OC, usá Contra orden de compra.",
       "No uses Solo caja para reintegrar al capataz.",
       "Si cambiás la partida EDT, se limpia el vínculo APU: el tablero de MO/Equipos deja de matchear esa fila por id.",
+      "La percepción IIBB va sobre el neto (subtotal), no sobre el IVA. Poné 0% si el comprobante no trae percepción.",
     ],
     relatedSlugs: [
       "reintegrar-gasto-a-empleado",
@@ -328,6 +329,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       "boleta",
       "factura proveedor",
       "clase",
+      "percepcion iibb",
+      "iibb",
     ],
     guideRef: "§12.0 · §12.2",
   },

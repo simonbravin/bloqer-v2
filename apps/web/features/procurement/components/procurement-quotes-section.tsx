@@ -37,6 +37,7 @@ type QuoteRow = {
   currency: string;
   validUntil: string | null;
   leadTimeDays: number | null;
+  iibbPerceptionRate?: string;
   lines: Array<{
     purchaseRequestLineId: string;
     description: string;
@@ -82,6 +83,7 @@ export function ProcurementQuotesSection({
         supplierName: editingQuote.supplierName,
         validUntil: editingQuote.validUntil,
         leadTimeDays: editingQuote.leadTimeDays,
+        iibbPerceptionRate: editingQuote.iibbPerceptionRate,
         lines: editingQuote.lines.map((l) => ({
           purchaseRequestLineId: l.purchaseRequestLineId,
           unitPrice: l.unitPrice,

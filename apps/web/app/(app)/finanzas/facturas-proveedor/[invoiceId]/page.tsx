@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
-import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
@@ -165,6 +165,12 @@ export default async function FinanzasFacturaProveedorDetailPage({
           <div className="text-right">
             <p className="text-muted-foreground">IVA</p>
             <p className="tabular-nums">{formatMoneyAmount(invoice.taxAmount)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-muted-foreground">
+              {IIBB_PERCEPTION_LABEL_ES} ({formatRatePctFromString(invoice.iibbPerceptionRate)}%)
+            </p>
+            <p className="tabular-nums">{formatMoneyAmount(invoice.iibbPerceptionAmount)}</p>
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>

@@ -73,6 +73,28 @@ IVA = round(Neto_{linea} \times alicuota / 100)
 
 El `unitPrice` persistido es siempre el **list net** (sin descuento). Un 10% sobre ARS 100 + IVA 21% = subtotal 90, IVA 18,90, total 108,90.
 
+## Percepción IIBB a nivel documento ([D-112])
+
+Base = **neto del documento** (suma de `lineSubtotal`), **antes de IVA**:
+
+\[
+Percepcion_{IIBB} = round\left(Subtotal \times \frac{alicuota}{100}\right)
+\]
+\[
+Total = Subtotal + IVA + Percepcion_{IIBB}
+\]
+
+Default de alícuota en altas: **3%** (editable). No entra al costo de obra (crédito fiscal).
+
+### Ejemplo (factura proveedor Mendoza)
+
+| Concepto | ARS |
+|---|---:|
+| Subtotal | 1.043.586,95 |
+| IVA 21% | 219.153,26 |
+| Perc. IIBB 3% | 31.307,61 |
+| **Total** | **1.294.047,82** |
+
 ## Referencias
 - [`../03-finance/TAXES_AND_WITHHOLDINGS.md`](../03-finance/TAXES_AND_WITHHOLDINGS.md)
-- [`../00-product/DECISION_LOG.md`](../00-product/DECISION_LOG.md) D-053, D-086, D-093
+- [`../00-product/DECISION_LOG.md`](../00-product/DECISION_LOG.md) D-053, D-086, D-093, D-112

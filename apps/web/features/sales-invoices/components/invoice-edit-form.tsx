@@ -2,12 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, type InvoiceLetterCode, invoiceLetterHint } from "@bloqer/domain";
+import {
+  requiresArInvoiceLetter,
+  type InvoiceLetterCode,
+  invoiceLetterHint,
+  DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+} from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
+import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { updateSalesInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
 interface Props {
@@ -21,6 +27,8 @@ interface Props {
     notes: string;
     internalNotes: string;
     invoiceLetter: InvoiceLetterCode | null;
+    iibbPerceptionRate?: string;
+    subtotal?: string;
   };
 }
 
@@ -37,6 +45,11 @@ export function InvoiceEditForm({
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(
     defaults.invoiceLetter,
   );
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(
+    defaults.iibbPerceptionRate?.trim()
+      ? defaults.iibbPerceptionRate
+      : DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+  );
   const showLetter = requiresArInvoiceLetter(companyCountry, clientCountry);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -48,11 +61,12 @@ export function InvoiceEditForm({
     const fd = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await updateSalesInvoiceAction(invoiceId, projectId, {
-        issueDate:     (fd.get("issueDate")     as string) || undefined,
-        dueDate:       (fd.get("dueDate")       as string) || undefined,
+        issueDate: (fd.get("issueDate") as string) || undefined,
+        dueDate: (fd.get("dueDate") as string) || undefined,
         // Only patch letter when AR gating is known; avoid wiping on failed country load.
         ...(showLetter ? { invoiceLetter } : {}),
-        notes:         (fd.get("notes")         as string) || null,
+        iibbPerceptionRate,
+        notes: (fd.get("notes") as string) || null,
         internalNotes: (fd.get("internalNotes") as string) || null,
       });
       if ("error" in res) {
@@ -92,13 +106,31 @@ export function InvoiceEditForm({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1">
           <Label htmlFor="issueDate">Fecha de emisión</Label>
-          <Input id="issueDate" name="issueDate" type="date" defaultValue={defaults.issueDate} required />
+          <Input
+            id="issueDate"
+            name="issueDate"
+            type="date"
+            defaultValue={defaults.issueDate}
+            required
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="dueDate">Fecha de vencimiento</Label>
-          <Input id="dueDate" name="dueDate" type="date" defaultValue={defaults.dueDate} required />
+          <Input
+            id="dueDate"
+            name="dueDate"
+            type="date"
+            defaultValue={defaults.dueDate}
+            required
+          />
         </div>
       </div>
+
+      <IibbPerceptionFields
+        rate={iibbPerceptionRate}
+        onRateChange={setIibbPerceptionRate}
+        subtotal={defaults.subtotal ?? "0"}
+      />
 
       <div className="space-y-1">
         <Label htmlFor="notes">Notas</Label>
@@ -107,11 +139,18 @@ export function InvoiceEditForm({
 
       <div className="space-y-1">
         <Label htmlFor="internalNotes">Notas internas</Label>
-        <Textarea id="internalNotes" name="internalNotes" rows={2} defaultValue={defaults.internalNotes} />
+        <Textarea
+          id="internalNotes"
+          name="internalNotes"
+          rows={2}
+          defaultValue={defaults.internalNotes}
+        />
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+        <Button type="button" variant="outline" onClick={() => router.back()}>
+          Cancelar
+        </Button>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Guardando…" : "Guardar cambios"}
         </Button>

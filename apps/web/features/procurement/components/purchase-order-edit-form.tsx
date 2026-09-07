@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
+import { compareDecimal } from "@bloqer/utils";
+import type { PurchaseOrderView } from "@bloqer/services";
+import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,6 +13,8 @@ import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { PROCUREMENT_FORM_PAGE_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
+import { toDateInput } from "@/lib/date-input";
+import { isPositiveQty } from "@/lib/format-money";
 import {
   DEFAULT_PURCHASE_ORDER_LINE,
   PurchaseOrderLinesEditor,
@@ -17,10 +23,7 @@ import {
   type WbsOption,
 } from "./purchase-order-lines-editor";
 import { updatePurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
-import type { PurchaseOrderView } from "@bloqer/services";
-import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import type { SupplierOption } from "./purchase-order-form";
-import { toDateInput } from "@/lib/date-input";
 
 interface Props {
   projectId: string;
@@ -67,6 +70,11 @@ export function PurchaseOrderEditForm({
         }))
       : [{ ...DEFAULT_PURCHASE_ORDER_LINE }],
   );
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(
+    order.iibbPerceptionRate?.trim()
+      ? order.iibbPerceptionRate
+      : DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+  );
 
   const showEmergency =
     allowEmergencyDirectPo && !order.purchaseRequestId;
@@ -84,16 +92,14 @@ export function PurchaseOrderEditForm({
     }
     if (
       lines.some((l) => {
-        const qty = Number(l.quantity);
-        const price = Number(l.unitPrice);
-        return (
-          !l.description.trim() ||
-          !Number.isFinite(qty) ||
-          qty <= 0 ||
-          l.unitPrice.trim() === "" ||
-          !Number.isFinite(price) ||
-          price < 0
-        );
+        if (!l.description.trim() || !isPositiveQty(l.quantity) || l.unitPrice.trim() === "") {
+          return true;
+        }
+        try {
+          return compareDecimal(l.unitPrice, "0") < 0;
+        } catch {
+          return true;
+        }
       })
     ) {
       setError("Completar descripción, cantidad (> 0) y precio (≥ 0) en todas las líneas");
@@ -110,6 +116,7 @@ export function PurchaseOrderEditForm({
         expectedDeliveryDate: (fd.get("expectedDeliveryDate") as string) || null,
         notes:                (fd.get("notes") as string) || null,
         ...(emergencyReason !== undefined ? { emergencyReason } : {}),
+        iibbPerceptionRate,
         lines:                lines.map((l, i) => ({
           ...l,
           wbsNodeId: l.wbsNodeId!,
@@ -187,6 +194,8 @@ export function PurchaseOrderEditForm({
           showVarianceJustification
           varianceSettings={varianceSettings}
           structureLocked={awardLocked}
+          iibbPerceptionRate={iibbPerceptionRate}
+          onIibbPerceptionRateChange={setIibbPerceptionRate}
         />
 
         <hr />

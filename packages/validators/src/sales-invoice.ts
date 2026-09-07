@@ -36,6 +36,8 @@ export const createSalesInvoiceSchema = z.object({
    * Typical for Factura B; ignored when taxRate is 0.
    */
   pricesIncludeTax:    z.boolean().optional(),
+  /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
+  iibbPerceptionRate:  ratePctString.optional().default("3.0000"),
   notes:               z.string().optional().nullable(),
   internalNotes:       z.string().optional().nullable(),
   externalInvoiceRef:  z
@@ -56,6 +58,7 @@ export const createInvoiceFromCertificationSchema = z.object({
   invoiceLetter:   invoiceLetterSchema.optional().nullable(),
   /** Gross certification amount already embeds tax; usually leave false. */
   pricesIncludeTax: z.boolean().optional(),
+  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });
@@ -65,6 +68,7 @@ export const updateSalesInvoiceSchema = z.object({
   dueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   invoiceLetter: invoiceLetterSchema.optional().nullable(),
   pricesIncludeTax: z.boolean().optional(),
+  iibbPerceptionRate: ratePctString.optional(),
   notes:         z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
 });

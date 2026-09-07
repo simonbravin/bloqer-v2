@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { positiveQtyString, discountPctString, unitPriceString } from "./money";
+import { positiveQtyString, discountPctString, unitPriceString, ratePctString } from "./money";
 import { costCategorySchema } from "./budget";
 
 const purchaseRequestLineSchema = z.object({
@@ -51,13 +51,20 @@ export const createProcurementQuoteSchema = z.object({
   notes: z.string().optional().nullable(),
   /** Ephemeral input flag [D-086]: unit price is gross (Factura B). Not persisted. */
   pricesIncludeTax: z.boolean().optional(),
+  /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
+  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
   lines: z.array(quoteLineSchema).min(1),
 });
 
-export const updateProcurementQuoteSchema = createProcurementQuoteSchema.omit({
-  purchaseRequestId: true,
-  supplierContactId: true,
-});
+export const updateProcurementQuoteSchema = createProcurementQuoteSchema
+  .omit({
+    purchaseRequestId: true,
+    supplierContactId: true,
+  })
+  .extend({
+    /** Optional on edit — omit keeps stored rate ([D-112]). */
+    iibbPerceptionRate: ratePctString.optional(),
+  });
 
 export const confirmPurchaseOrderSchema = z.object({
   fxRate: z.string().regex(/^\d+(\.\d+)?$/).optional(),

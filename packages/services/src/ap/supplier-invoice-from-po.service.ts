@@ -276,6 +276,8 @@ export async function listSupplierInvoicesByPurchaseOrder(
     ...inv,
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),
+    iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
     code: `FP-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
@@ -553,6 +555,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       currency: po.currency,
       fxRate: po.fxRate != null ? serializeFxRateDecimal(po.fxRate) : undefined,
       invoiceLetter: suggestedLetter,
+      iibbPerceptionRate: serializeRatePctDecimal(po.iibbPerceptionRate),
       purchaseOrderId: input.purchaseOrderId,
       internalNotes,
       notes: input.purchaseReceiptId

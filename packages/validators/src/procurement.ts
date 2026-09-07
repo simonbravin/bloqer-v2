@@ -1,7 +1,14 @@
 import { z } from "zod";
 import { idempotencyKeySchema } from "./idempotency";
 import { costCategorySchema } from "./budget";
-import { isPositiveRoundedQty, positiveQtyString, qtyString, unitPriceString, discountPctString } from "./money";
+import {
+  isPositiveRoundedQty,
+  positiveQtyString,
+  qtyString,
+  ratePctString,
+  unitPriceString,
+  discountPctString,
+} from "./money";
 
 const purchaseOrderLineSchema = z.object({
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
@@ -31,6 +38,8 @@ export const createPurchaseOrderSchema = z.object({
   notes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
   emergencyReason: z.string().max(2000).optional().nullable(),
+  /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
+  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
   lines: z.array(purchaseOrderLineSchema).min(1, "Debe tener al menos una línea"),
 });
 
@@ -41,6 +50,7 @@ export const updatePurchaseOrderSchema = z.object({
   notes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
   emergencyReason: z.string().max(2000).optional().nullable(),
+  iibbPerceptionRate: ratePctString.optional(),
   lines: z.array(purchaseOrderLineSchema).min(1).optional(),
 });
 

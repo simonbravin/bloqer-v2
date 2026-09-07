@@ -12,7 +12,7 @@ import {
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
-import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
@@ -263,6 +263,14 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
               <div className="flex justify-between">
                 <span className="text-muted-foreground">IVA</span>
                 <span className="font-mono">{fmtMoney(invoice.taxAmount, invoice.currency)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">
+                  {IIBB_PERCEPTION_LABEL_ES} ({formatRatePctFromString(invoice.iibbPerceptionRate)}%)
+                </span>
+                <span className="font-mono">
+                  {fmtMoney(invoice.iibbPerceptionAmount, invoice.currency)}
+                </span>
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Total</span>

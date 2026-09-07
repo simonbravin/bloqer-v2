@@ -52,9 +52,14 @@ export type SalesInvoiceLineView = {
   sortOrder: number;
 };
 
-export type SalesInvoiceWithLines = Omit<SalesInvoice, "subtotal" | "taxAmount" | "totalAmount"> & {
+export type SalesInvoiceWithLines = Omit<
+  SalesInvoice,
+  "subtotal" | "taxAmount" | "totalAmount" | "iibbPerceptionRate" | "iibbPerceptionAmount"
+> & {
   subtotal: string;
   taxAmount: string;
+  iibbPerceptionRate: string;
+  iibbPerceptionAmount: string;
   totalAmount: string;
   code: string;
   lines: SalesInvoiceLineView[];
@@ -293,6 +298,7 @@ export async function createSalesInvoice(
         dueDate: new Date(input.dueDate),
         currency: input.currency ?? "ARS",
         invoiceLetter: suggestedLetter,
+        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
         externalInvoiceRef: input.externalInvoiceRef ?? null,
@@ -428,6 +434,7 @@ export async function createInvoiceFromCertification(
           dueDate: new Date(input.dueDate),
           currency: cert.project.type === "PUBLIC" ? "ARS" : "ARS",
           invoiceLetter: suggestedLetter,
+          iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
           notes: input.notes ?? null,
           internalNotes: input.internalNotes ?? null,
           createdBy: ctx.actorUserId,
@@ -516,6 +523,9 @@ export async function updateSalesInvoice(
         issueDate:     input.issueDate ? new Date(input.issueDate) : undefined,
         dueDate:       input.dueDate   ? new Date(input.dueDate)   : undefined,
         ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
+        ...(input.iibbPerceptionRate !== undefined
+          ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
+          : {}),
         notes:         input.notes         ?? undefined,
         internalNotes: input.internalNotes ?? undefined,
         updatedBy: ctx.actorUserId,
@@ -540,6 +550,8 @@ export async function updateSalesInvoice(
           data: { taxRate: new Prisma.Decimal(0), lineSubtotal, lineTax, lineTotal },
         });
       }
+      await recalcInvoiceTotals(tx as never, id);
+    } else if (input.iibbPerceptionRate !== undefined) {
       await recalcInvoiceTotals(tx as never, id);
     }
 
@@ -859,6 +871,8 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceLis
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),
+    iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
     ...classFieldsForSalesInvoice({
       projectId: inv.projectId,
@@ -892,6 +906,8 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),
+    iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
+    iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
     lines: inv.lines.map((l) => ({
       id: l.id,

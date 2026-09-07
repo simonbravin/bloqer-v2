@@ -14,6 +14,7 @@ import {
   classifyAccountMovement,
   type InvoiceLetterCode,
   type IvaConditionCode,
+  DEFAULT_IIBB_PERCEPTION_RATE_PCT,
 } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -157,6 +158,7 @@ export function NewTransactionDialog({
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [pricesIncludeTaxTouched, setPricesIncludeTaxTouched] = useState(false);
   const [lines, setLines] = useState<InvoiceLine[]>([{ ...DEFAULT_LINE }]);
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
   const [payNow, setPayNow] = useState(false);
   const [collectNow, setCollectNow] = useState(false);
   const [payAccountId, setPayAccountId] = useState("");
@@ -389,6 +391,7 @@ export function NewTransactionDialog({
           pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
           internalNotes: null,
+          iibbPerceptionRate,
           lines: lines.map((l, i) => ({
             ...l,
             taxRate: forceZeroTax ? "0" : l.taxRate,
@@ -471,6 +474,7 @@ export function NewTransactionDialog({
           notes: (fd.get("arNotes") as string) || null,
           internalNotes: null,
           externalInvoiceRef: ((fd.get("arExternalInvoiceRef") as string) || "").trim() || null,
+          iibbPerceptionRate,
           lines: lines.map((l, i) => ({
             ...l,
             taxRate: forceZeroTax ? "0" : l.taxRate,
@@ -691,6 +695,8 @@ export function NewTransactionDialog({
                 lines={lines}
                 onChange={setLines}
                 pricesIncludeTax={pricesIncludeTax}
+                iibbPerceptionRate={iibbPerceptionRate}
+                onIibbPerceptionRateChange={setIibbPerceptionRate}
               />
               <div className="space-y-1">
                 <Label htmlFor="notes">Notas (opcional)</Label>
@@ -850,6 +856,8 @@ export function NewTransactionDialog({
                     lines={lines}
                     onChange={setLines}
                     pricesIncludeTax={pricesIncludeTax}
+                    iibbPerceptionRate={iibbPerceptionRate}
+                    onIibbPerceptionRateChange={setIibbPerceptionRate}
                   />
                   <div className="space-y-1">
                     <Label htmlFor="arExternalInvoiceRef">N° de comprobante externo (opcional)</Label>

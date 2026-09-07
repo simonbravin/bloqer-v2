@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
+import { DocumentTaxTotalsFooter } from "@/features/finance/components/iibb-perception-fields";
 import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type InvoiceLine = {
@@ -99,6 +100,9 @@ interface Props {
    * restomp LABOR/EQUIPMENT prefill from Mano de obra / Equipos ([D-099]).
    */
   seedFirstLineCostTypeAsManual?: boolean;
+  /** Document-level Percepción IIBB % ([D-112]). Controlled; omit both to hide. */
+  iibbPerceptionRate?: string;
+  onIibbPerceptionRateChange?: (v: string) => void;
 }
 
 export function InvoiceLinesEditor({
@@ -108,6 +112,8 @@ export function InvoiceLinesEditor({
   wbsOptions = [],
   pricesIncludeTax = false,
   seedFirstLineCostTypeAsManual = false,
+  iibbPerceptionRate,
+  onIibbPerceptionRateChange,
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const [headerDiscount, setHeaderDiscount] = useState("");
@@ -441,20 +447,12 @@ export function InvoiceLinesEditor({
         })}
       </div>
 
-      <div className="flex flex-wrap justify-end gap-x-8 gap-y-2 border-t pt-3 text-sm">
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Subtotal</p>
-          <p className="tabular-nums font-medium">{formatDecimalArFromString(totals.subtotal)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">IVA</p>
-          <p className="tabular-nums font-medium">{formatDecimalArFromString(totals.tax)}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground font-semibold">Total (vista previa)</p>
-          <p className="tabular-nums font-semibold">{formatDecimalArFromString(totals.total)}</p>
-        </div>
-      </div>
+      <DocumentTaxTotalsFooter
+        subtotal={totals.subtotal}
+        taxAmount={totals.tax}
+        iibbPerceptionRate={iibbPerceptionRate}
+        onIibbPerceptionRateChange={onIibbPerceptionRateChange}
+      />
       {requireWbs && wbsOptions.length === 0 ? (
         <p className="text-xs text-destructive" role="alert">
           No hay partidas EDT disponibles. Aprobá un presupuesto con ítems EDT antes de

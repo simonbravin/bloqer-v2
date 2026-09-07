@@ -436,6 +436,7 @@ export async function registerApExpense(
                 currency: input.currency ?? "ARS",
                 fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
                 invoiceLetter: input.invoiceLetter ?? null,
+                iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
                 notes: input.notes ?? null,
                 internalNotes: input.internalNotes ?? null,
                 purchaseOrderId: input.purchaseOrderId ?? null,

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -143,6 +143,7 @@ export function SupplierInvoiceForm({
   /** Project AP: explicit commitment vs direct cost ([D-102] / Phase 1). */
   const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">("DIRECT");
   const [lines, setLines] = useState<InvoiceLine[]>(() => buildInitialLines(initialLine));
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
   const [payNow, setPayNow] = useState(false);
   const [payAccountId, setPayAccountId] = useState("");
   const [payMethod, setPayMethod] = useState<SettlementMethodValue | "">("");
@@ -382,6 +383,7 @@ export function SupplierInvoiceForm({
           pricesIncludeTax,
           notes:         (fd.get("notes") as string) || null,
           internalNotes: null,
+          iibbPerceptionRate,
           lines:         lines.map((l, i) => ({ ...l, sortOrder: i })),
         });
         if ("error" in res) {
@@ -418,6 +420,7 @@ export function SupplierInvoiceForm({
           pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
           purchaseOrderId: apSpendMode === "AGAINST_PO" ? purchaseOrderId : null,
+          iibbPerceptionRate,
           lines: lines.map((l, i) => ({
             ...l,
             sortOrder: i,
@@ -459,6 +462,7 @@ export function SupplierInvoiceForm({
         notes:           (fd.get("notes") as string) || null,
         internalNotes:   null,
         purchaseOrderId: apSpendMode === "AGAINST_PO" ? purchaseOrderId : null,
+        iibbPerceptionRate,
         lines: lines.map((l, i) => ({
           ...l,
           sortOrder: i,
@@ -651,6 +655,8 @@ export function SupplierInvoiceForm({
           requireWbs={Boolean(projectId) && !companyFinanzas}
           wbsOptions={wbsOptions}
           pricesIncludeTax={pricesIncludeTax}
+          iibbPerceptionRate={iibbPerceptionRate}
+          onIibbPerceptionRateChange={setIibbPerceptionRate}
           seedFirstLineCostTypeAsManual={Boolean(
             initialLine?.costType === "LABOR" ||
               initialLine?.costType === "EQUIPMENT" ||

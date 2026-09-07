@@ -78,6 +78,13 @@ export {
   type DocumentLineAmounts,
   type ExclusiveLineAmounts,
 } from "./line-amounts";
+export {
+  DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+  calcDocumentHeaderTaxTotals,
+  calcIibbPerceptionAmount,
+  normalizeIibbPerceptionRate,
+  type DocumentHeaderTaxTotals,
+} from "./document-tax-totals";
 export { isUuid } from "./uuid";
 export { sortTreeOrder } from "./sort-tree-order";
 export {

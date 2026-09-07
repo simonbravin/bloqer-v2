@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
+import { resolveDocumentLineAmounts } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -14,6 +15,7 @@ import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/se
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
@@ -78,6 +80,7 @@ export function ManualInvoiceForm({
   const [quantity, setQuantity] = useState("1.00");
   const [unitPrice, setUnitPrice] = useState("");
   const [discountPct, setDiscountPct] = useState("0");
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
   const [attachment, setAttachment] = useState<File | null>(null);
   const [collectNow, setCollectNow] = useState(false);
   const [collectAccountId, setCollectAccountId] = useState("");
@@ -89,6 +92,20 @@ export function ManualInvoiceForm({
   useEffect(() => {
     rotateAttachmentKey();
   }, [attachment, rotateAttachmentKey]);
+
+  const lineNetSubtotal = useMemo(() => {
+    try {
+      return resolveDocumentLineAmounts({
+        quantity: quantity.trim() || "0",
+        unitPrice: unitPrice.trim() || "0",
+        taxRatePercent: taxRate.trim() || "0",
+        discountPct: discountPct.trim() || "0",
+        pricesIncludeTax,
+      }).lineSubtotal;
+    } catch {
+      return "0.00";
+    }
+  }, [quantity, unitPrice, taxRate, discountPct, pricesIncludeTax]);
 
   const selectedClient = useMemo(
     () => clients.find((c) => c.id === clientContactId),
@@ -177,6 +194,7 @@ export function ManualInvoiceForm({
           pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
           notes: (fd.get("notes") as string) || null,
           externalInvoiceRef: null,
+          iibbPerceptionRate,
           lines: [{
             description: fd.get("description") as string,
             quantity: String(fd.get("quantity") ?? "").trim() || quantity,
@@ -221,6 +239,7 @@ export function ManualInvoiceForm({
         pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
         notes:      (fd.get("notes") as string) || null,
         externalInvoiceRef: null,
+        iibbPerceptionRate,
         lines: [{
           description: fd.get("description") as string,
           quantity:    String(fd.get("quantity") ?? "").trim() || quantity,
@@ -369,6 +388,12 @@ export function ManualInvoiceForm({
               ))}
           </div>
         </div>
+
+        <IibbPerceptionFields
+          rate={iibbPerceptionRate}
+          onRateChange={setIibbPerceptionRate}
+          subtotal={lineNetSubtotal}
+        />
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas</Label>
