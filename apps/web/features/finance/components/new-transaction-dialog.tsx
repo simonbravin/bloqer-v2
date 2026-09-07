@@ -38,7 +38,7 @@ import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/financ
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
-import { uploadDocumentAction } from "@/features/documents/upload-document-action";
+import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 
@@ -323,14 +323,15 @@ export function NewTransactionDialog({
     detailPath: string;
     paidOrCollected: boolean;
   }): Promise<boolean> {
-    const fd = new FormData();
-    fd.set("file", opts.file);
-    fd.set("linkedEntityType", opts.linkedEntityType);
-    fd.set("linkedEntityId", opts.invoiceId);
-    fd.set("category", "INVOICE");
-    fd.set("revalidatePaths", JSON.stringify([opts.detailPath]));
-    fd.set("idempotencyKey", attachmentKey);
-    const uploadRes = await uploadDocumentAction(fd);
+    const uploadRes = await clientUploadDocument({
+      file: opts.file,
+      projectId: null,
+      category: "INVOICE",
+      linkedEntityType: opts.linkedEntityType,
+      linkedEntityId: opts.invoiceId,
+      idempotencyKey: attachmentKey,
+      revalidatePaths: [opts.detailPath],
+    });
     if ("error" in uploadRes) {
       toast.warning(
         opts.paidOrCollected

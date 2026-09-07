@@ -4,8 +4,11 @@ import {
   buildStorageKey,
   putObject,
   getObjectBytes,
+  getObjectByteRange,
+  getPresignedPutUrl,
   getPresignedGetUrl,
   deleteObject,
+  headObject,
   assertTenantScopedStorageKey,
   buildContentDispositionHeader,
   type ContentDispositionKind,
@@ -62,8 +65,11 @@ const MAX_SIZE_BYTES = 50 * 1024 * 1024;
 /** Default age after which an UPLOADING row is considered abandoned (1 hour) — admin batch cleanup. */
 const DEFAULT_STALE_UPLOAD_THRESHOLD_MS = 60 * 60 * 1000;
 
-/** Server-side uploads finish in seconds; rows in UPLOADING beyond this are legacy/crashed. */
-const ABANDONED_UPLOAD_THRESHOLD_MS = 60 * 1000;
+/** Auto-reconcile on list: abandon incomplete direct uploads (presigned PUT is 5 min). */
+const ABANDONED_UPLOAD_THRESHOLD_MS = 15 * 60 * 1000;
+
+/** Prefix bytes fetched on confirm for MIME sniff (stay under Vercel response limits). */
+const CONFIRM_SNIFF_MAX_BYTES = 64 * 1024;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -320,7 +326,9 @@ async function resolveDocumentUploadPlan(
       throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
     }
     if (inv.projectId) {
-      if (!input.projectId || input.projectId !== inv.projectId) {
+      // Derive project from the invoice when the client omitted it (corporate UI
+      // always passes null; project-scoped invoices still need the anchor).
+      if (input.projectId && input.projectId !== inv.projectId) {
         throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
       }
       await assertProjectAllowsBudgetPlanning(inv.projectId, ctx);
@@ -344,7 +352,7 @@ async function resolveDocumentUploadPlan(
       throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
     }
     if (inv.projectId) {
-      if (!input.projectId || input.projectId !== inv.projectId) {
+      if (input.projectId && input.projectId !== inv.projectId) {
         throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
       }
       await assertProjectAllowsBudgetPlanning(inv.projectId, ctx);
@@ -647,6 +655,205 @@ export async function uploadDocument(
   return { documentId: doc.id, storageConfigured: configured };
 }
 
+/**
+ * Direct-to-R2 upload (browser PUT). Avoids Vercel’s 4.5 MB function body limit.
+ * When R2 is not configured, creates ACTIVE PLACEHOLDER metadata (no uploadUrl).
+ */
+export async function initiateDocumentUpload(
+  input: InitiateUploadInput,
+  ctx: ServiceContext,
+): Promise<{ documentId: string; uploadUrl: string | null; storageConfigured: boolean }> {
+  const configured = isStorageConfigured();
+  const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+
+  if (input.sizeBytes <= 0) {
+    throw new ServiceError("VALIDATION", "El archivo está vacío");
+  }
+  if (input.sizeBytes > MAX_SIZE_BYTES) {
+    throw new ServiceError("VALIDATION", "El archivo no puede superar 50 MB");
+  }
+  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
+    throw new ServiceError("VALIDATION", "Tipo de archivo no permitido");
+  }
+
+  const plan = await resolveDocumentUploadPlan(input, ctx, idempotencyKey);
+  const provider = configured ? "R2" : "PLACEHOLDER";
+  const status = configured ? "UPLOADING" : "ACTIVE";
+
+  const findExisting = () =>
+    prisma.documentAttachment.findFirst({
+      where: { tenantId: ctx.tenantId, idempotencyKey },
+    });
+
+  const payloadsMatch = (existing: {
+    originalFileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    linkedEntityType: string | null;
+    linkedEntityId: string | null;
+    status: string;
+    storageProvider: string;
+  }) => {
+    if (existing.status !== "UPLOADING" && existing.status !== "ACTIVE") return false;
+    return (
+      existing.originalFileName === input.originalFileName &&
+      existing.mimeType === input.mimeType &&
+      existing.sizeBytes === input.sizeBytes &&
+      (existing.linkedEntityType ?? null) === plan.linkedEntityType &&
+      (existing.linkedEntityId ?? null) === plan.linkedEntityId
+    );
+  };
+
+  const existing = await findExisting();
+  if (existing) {
+    if (!payloadsMatch(existing)) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
+      );
+    }
+    let uploadUrl: string | null = null;
+    if (configured && existing.status === "UPLOADING" && existing.storageProvider === "R2") {
+      uploadUrl = await getPresignedPutUrl(existing.storageKey, existing.mimeType, 300);
+    }
+    return { documentId: existing.id, uploadUrl, storageConfigured: configured };
+  }
+
+  let createdNow = false;
+  let doc;
+  doc = await withIdempotentCreate({
+    findExisting,
+    payloadsMatch,
+    create: async () => {
+      const row = await prisma.documentAttachment.create({
+        data: {
+          id: plan.id,
+          tenantId: ctx.tenantId,
+          companyId: ctx.companyId ?? null,
+          projectId: plan.anchorProjectId,
+          originalFileName: input.originalFileName,
+          fileName: plan.fileName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+          storageProvider: provider,
+          storageKey: plan.storageKey,
+          category: input.category ?? "OTHER",
+          description: input.description ?? null,
+          status,
+          linkedEntityType: plan.linkedEntityType,
+          linkedEntityId: plan.linkedEntityId,
+          idempotencyKey,
+          uploadedBy: ctx.actorUserId,
+        },
+      });
+      createdNow = true;
+      return row;
+    },
+  });
+
+  if (createdNow) {
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "document.upload_initiated",
+      entityType: "DocumentAttachment",
+      entityId: doc.id,
+      after: {
+        originalFileName: doc.originalFileName,
+        storageProvider: provider,
+        status,
+      },
+    });
+    if (!configured) {
+      await notifyDocumentUploadConfirmed(doc, ctx);
+    }
+  }
+
+  let uploadUrl: string | null = null;
+  if (configured && doc.status === "UPLOADING") {
+    uploadUrl = await getPresignedPutUrl(doc.storageKey, doc.mimeType, 300);
+  }
+
+  return { documentId: doc.id, uploadUrl, storageConfigured: configured };
+}
+
+export async function confirmDocumentUpload(
+  id: string,
+  ctx: ServiceContext,
+): Promise<void> {
+  const doc = await prisma.documentAttachment.findUnique({ where: { id } });
+  if (!doc || doc.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
+  const gate = await getTenantModuleGate(ctx);
+  assertLinkedEntityTenantModuleEnabled(gate, doc.linkedEntityType);
+  if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para confirmar subida");
+  }
+  if (doc.status === "ACTIVE" && doc.storageProvider === "R2") {
+    return;
+  }
+  if (doc.status !== "UPLOADING") {
+    throw new ServiceError("CONFLICT", "El documento no está en estado UPLOADING");
+  }
+  if (doc.storageProvider !== "R2") {
+    throw new ServiceError("CONFLICT", "Solo se confirman subidas al almacenamiento R2");
+  }
+
+  assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
+
+  let contentLength: number | undefined;
+  try {
+    const head = await headObject(doc.storageKey);
+    contentLength = head.contentLength;
+  } catch {
+    throw new ServiceError(
+      "VALIDATION",
+      "No encontramos el archivo en el almacenamiento. Subilo de nuevo.",
+    );
+  }
+
+  if (contentLength == null || contentLength <= 0) {
+    throw new ServiceError("VALIDATION", "El archivo subido está vacío");
+  }
+  if (contentLength !== doc.sizeBytes) {
+    // Keep UPLOADING so the same idempotency key can re-issue a PUT URL.
+    await deleteObject(doc.storageKey).catch(() => undefined);
+    throw new ServiceError(
+      "VALIDATION",
+      "El tamaño del archivo subido no coincide. Intentá de nuevo.",
+    );
+  }
+
+  try {
+    const sniffEnd = Math.min(contentLength, CONFIRM_SNIFF_MAX_BYTES) - 1;
+    if (sniffEnd >= 0) {
+      const prefix = await getObjectByteRange(doc.storageKey, 0, sniffEnd);
+      await assertUploadContentMatchesDeclaredMime(prefix, doc.mimeType);
+    }
+  } catch (err) {
+    await deleteObject(doc.storageKey).catch(() => undefined);
+    if (err instanceof ServiceError) throw err;
+    throw new ServiceError("VALIDATION", "Error al validar el archivo subido");
+  }
+
+  await prisma.documentAttachment.update({
+    where: { id },
+    data: { status: "ACTIVE" },
+  });
+
+  await log({
+    tenantId: ctx.tenantId,
+    actorUserId: ctx.actorUserId,
+    action: "document.upload_confirmed",
+    entityType: "DocumentAttachment",
+    entityId: id,
+    after: { status: "ACTIVE" },
+  });
+
+  await notifyDocumentUploadConfirmed(doc, ctx);
+}
+
 export async function getDocumentDownloadUrl(
   id: string,
   ctx: ServiceContext,
@@ -811,7 +1018,7 @@ export async function getDocumentById(id: string, ctx: ServiceContext): Promise<
 /**
  * Soft-deletes UPLOADING rows older than {@link ABANDONED_UPLOAD_THRESHOLD_MS}.
  * Called automatically on document list reads — no admin role required.
- * New uploads never enter UPLOADING; remaining rows are legacy abandoned attempts.
+ * Covers abandoned direct-to-R2 uploads (client never confirmed).
  */
 async function reconcileAbandonedUploadingDocuments(
   ctx: ServiceContext,

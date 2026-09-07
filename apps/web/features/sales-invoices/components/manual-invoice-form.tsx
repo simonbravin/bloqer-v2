@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
-import { uploadDocumentAction } from "@/features/documents/upload-document-action";
+import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
@@ -126,15 +126,15 @@ export function ManualInvoiceForm({
   async function uploadAttachmentIfAny(invoiceId: string) {
     if (!attachment || !storageConfigured) return null;
     const detailPath = `/proyectos/${projectId}/facturas/${invoiceId}`;
-    const fd = new FormData();
-    fd.set("file", attachment);
-    fd.set("linkedEntityType", "SALES_INVOICE");
-    fd.set("linkedEntityId", invoiceId);
-    fd.set("category", "INVOICE");
-    fd.set("projectId", projectId);
-    fd.set("revalidatePaths", JSON.stringify([detailPath]));
-    fd.set("idempotencyKey", attachmentKey);
-    return uploadDocumentAction(fd);
+    return clientUploadDocument({
+      file: attachment,
+      projectId,
+      category: "INVOICE",
+      linkedEntityType: "SALES_INVOICE",
+      linkedEntityId: invoiceId,
+      idempotencyKey: attachmentKey,
+      revalidatePaths: [detailPath],
+    });
   }
 
   function notifyAttachFailure(uploadError: string, collected: boolean) {

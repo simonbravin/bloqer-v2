@@ -39,6 +39,7 @@
 |---|---|---|
 | P-API-01 | Lista cerrada de rutas que **deben** ser Route Handler vs Action | Tabla en ADR cuando exista `app/` |
 | P-API-02 | **Idempotency-Key**: tabla y TTL de dedupe | Diseñar con tesorería |
+| P-DOC-05 | **Upload create-subcontrato → direct-to-R2** | UI Documentos / evidencias / facturas ya usan initiate→PUT→confirm (hasta 50 MB; CORS en bucket). Pendiente: adjuntos al *crear* subcontrato (aún Server Action, tope ~3.5 MB). Ver [`FILE_STORAGE_ARCHITECTURE.md`](./FILE_STORAGE_ARCHITECTURE.md). |
 
 ## Repo / packages (prompt 3)
 

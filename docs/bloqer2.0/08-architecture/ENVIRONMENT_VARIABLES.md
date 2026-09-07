@@ -54,10 +54,28 @@ If either is missing/invalid, email features no-op; **boot continues**.
 | Variable | Notes |
 |----------|--------|
 | `R2_ACCOUNT_ID` | All five required together for `isStorageConfigured()`. |
-| `R2_ACCESS_KEY_ID` | |
+| `R2_ACCESS_KEY_ID` | Object read/write. Prefer a token that can also set bucket CORS (or set CORS in the Cloudflare dashboard). |
 | `R2_SECRET_ACCESS_KEY` | |
 | `R2_BUCKET_NAME` | |
 | `R2_PUBLIC_URL` | **Opcional** para presigned flows. Un valor vacío se ignora (equivale a no definirla). Si está definida, debe ser URL `http(s)` válida. |
+
+### R2 CORS (required for browser uploads)
+
+Browser uploads go **direct to R2** (presigned PUT) to bypass the Vercel function body limit (4.5 MB). The bucket must allow CORS from the app origins:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://portal.bloqer.app", "http://localhost:3000"],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag", "Content-Length", "Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Configure in Cloudflare Dashboard → R2 → bucket → Settings → CORS policy. Without this, large PDFs/planos fail in the browser after `initiate-upload`.
 
 ## Optional — Operational alerts cron
 

@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
-import { uploadDocumentAction } from "../upload-document-action";
+import { clientUploadDocument } from "../lib/client-upload-document";
 import { DocumentUploadZone } from "./document-upload-zone";
 
 const CATEGORY_OPTIONS = [
@@ -109,21 +109,16 @@ export function DocumentForm({
         ]),
       ];
 
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("category", category);
-      if (description) formData.append("description", description);
-      if (projectId) formData.append("projectId", projectId);
-      if (linkedEntity) {
-        formData.append("linkedEntityType", linkedEntity.type);
-        formData.append("linkedEntityId", linkedEntity.id);
-      }
-      if (paths.length > 0) {
-        formData.append("revalidatePaths", JSON.stringify(paths));
-      }
-      formData.append("idempotencyKey", idempotencyKey);
-
-      const result = await uploadDocumentAction(formData);
+      const result = await clientUploadDocument({
+        file: selectedFile,
+        projectId,
+        category,
+        description,
+        linkedEntityType: linkedEntity?.type,
+        linkedEntityId: linkedEntity?.id,
+        idempotencyKey,
+        revalidatePaths: paths,
+      });
 
       if ("error" in result) {
         setError(result.error);

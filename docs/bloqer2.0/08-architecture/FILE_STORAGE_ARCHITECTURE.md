@@ -28,6 +28,18 @@ Almacenar **blobs** (adjuntos de documentos, fotos de obra, PDFs) en **Cloudflar
 2. Tras upload, servidor **confirma** y crea fila metadatos + vínculo a entidad.
 3. Descarga pasa por **autorización** y **auditoría** si el producto lo exige.
 
+### Transporte actual (2026-09) — direct-to-R2 desde el browser
+
+Vercel Functions tienen un **límite duro de ~4.5 MB** en el body de request. Por eso **todas** las subidas desde UI usan:
+
+1. `POST /api/documents/initiate-upload` (JSON, sin bytes)
+2. Browser `PUT` a URL firmada R2
+3. `POST /api/documents/[id]/confirm`
+
+**Requisito:** CORS del bucket R2 permitiendo el origin de la app (`https://portal.bloqer.app`, `http://localhost:3000`). JSON en [`ENVIRONMENT_VARIABLES.md`](./ENVIRONMENT_VARIABLES.md) § R2 CORS.
+
+**Excepción residual:** adjuntos al *crear* subcontrato todavía pueden ir por Server Action con tope ~3.5 MB (FormData). Detalle / Documentos / evidencias = R2 directo hasta 50 MB. Unificar create-subcontrato → **P-DOC-05**.
+
 ## Branding de tenant ([D-071])
 
 - Logo de organización: objeto R2 con clave `{tenantId}/branding/logo/{uuid}.{ext}`; metadatos en `Tenant.logoStorageKey` / `logoMimeType`.

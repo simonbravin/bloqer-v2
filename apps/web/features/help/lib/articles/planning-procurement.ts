@@ -312,6 +312,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     pitfalls: [
       "Si ves un icono de archivo tachado, no hay binario almacenado (almacenamiento no configurado al subir).",
       "HEIC de iPhone no siempre se puede previsualizar: usá descargar.",
+      "Los planos PDF grandes (varios MB) están soportados hasta 50 MB; si falla la subida, reintentá (no hace falta comprimir por debajo de 5 MB).",
     ],
     relatedSlugs: ["cargar-libro-de-obra", "eliminar-documento-de-obra"],
     keywords: [

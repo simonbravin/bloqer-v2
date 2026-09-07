@@ -3,6 +3,8 @@ import {
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
+  HeadObjectCommand,
+  PutBucketCorsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getStorageEnv } from "@bloqer/config";
@@ -99,6 +101,41 @@ export async function putObject(
   );
 }
 
+/**
+ * Browser direct upload (bypass Vercel 4.5 MB function body limit).
+ * Requires R2 bucket CORS allowing PUT from the app origin.
+ */
+export async function getPresignedPutUrl(
+  storageKey: string,
+  mimeType: string,
+  expiresInSeconds = 300,
+): Promise<string> {
+  const { client, bucket } = createS3Client();
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: storageKey,
+    ContentType: mimeType,
+  });
+  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+}
+
+export async function headObject(storageKey: string): Promise<{
+  contentLength: number | undefined;
+  contentType: string | undefined;
+}> {
+  const { client, bucket } = createS3Client();
+  const result = await client.send(
+    new HeadObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+    }),
+  );
+  return {
+    contentLength: result.ContentLength,
+    contentType: result.ContentType,
+  };
+}
+
 export async function getObjectBytes(storageKey: string): Promise<{
   body: Buffer;
   contentType: string | undefined;
@@ -118,6 +155,54 @@ export async function getObjectBytes(storageKey: string): Promise<{
     body: Buffer.from(bytes),
     contentType: result.ContentType,
   };
+}
+
+/** Range GET for MIME sniff on confirm without pulling the whole object through the function. */
+export async function getObjectByteRange(
+  storageKey: string,
+  start: number,
+  endInclusive: number,
+): Promise<Buffer> {
+  const { client, bucket } = createS3Client();
+  const result = await client.send(
+    new GetObjectCommand({
+      Bucket: bucket,
+      Key: storageKey,
+      Range: `bytes=${start}-${endInclusive}`,
+    }),
+  );
+  if (!result.Body) {
+    throw new Error("Empty object body");
+  }
+  return Buffer.from(await result.Body.transformToByteArray());
+}
+
+/**
+ * Idempotent CORS for browser PUT/GET to the private bucket.
+ * Origins must be exact (R2 does not expand `*.vercel.app`).
+ */
+export async function putDocumentUploadCors(allowedOrigins: string[]): Promise<void> {
+  const origins = [...new Set(allowedOrigins.map((o) => o.trim()).filter(Boolean))];
+  if (origins.length === 0) {
+    throw new Error("At least one CORS origin is required");
+  }
+  const { client, bucket } = createS3Client();
+  await client.send(
+    new PutBucketCorsCommand({
+      Bucket: bucket,
+      CORSConfiguration: {
+        CORSRules: [
+          {
+            AllowedOrigins: origins,
+            AllowedMethods: ["GET", "PUT", "HEAD"],
+            AllowedHeaders: ["*"],
+            ExposeHeaders: ["ETag", "Content-Length", "Content-Type"],
+            MaxAgeSeconds: 3600,
+          },
+        ],
+      },
+    }),
+  );
 }
 
 export async function deleteObject(storageKey: string): Promise<void> {

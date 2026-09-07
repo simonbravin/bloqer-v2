@@ -1,6 +1,7 @@
 import { resolveAllowedMimeType } from "@bloqer/validators";
+import { MAX_DOCUMENT_UPLOAD_BYTES } from "./upload-size-limits";
 
-export const MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024;
+export const MAX_UPLOAD_SIZE_BYTES = MAX_DOCUMENT_UPLOAD_BYTES;
 
 export function formatUploadSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

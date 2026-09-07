@@ -30,6 +30,7 @@
 
 - Descarga vía **URL firmada** o **proxy autenticado** que valida `tenant_id` + permiso de módulo.
 - Columna Prisma `DocumentAttachment.publicUrl`: **no usada** en flujos actuales (presigned GET desde `storageKey`); reservada si en el futuro hubiera assets públicos/CDN; **no** exponer en DTOs de API.
+- **Upload:** ver híbrido Server Action / presigned PUT y CORS en [`FILE_STORAGE_ARCHITECTURE.md`](./FILE_STORAGE_ARCHITECTURE.md) (P-DOC-05).
 
 ## Problemas que evita
 

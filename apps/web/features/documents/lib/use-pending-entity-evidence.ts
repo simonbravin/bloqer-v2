@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { uploadDocumentAction } from "@/features/documents/upload-document-action";
 import {
   formatPartialEntityUploadMessage,
   uploadPendingEntityEvidence,
@@ -48,7 +47,6 @@ export function usePendingEntityEvidence(options: Options) {
         entityId,
         linkedEntityType: options.linkedEntityType,
         files: [{ file: item.file, clientId: item.clientId }],
-        upload: uploadDocumentAction,
         category: options.category,
         afterUploadPath: options.afterUploadPath(entityId),
       }).catch((err: unknown) => ({

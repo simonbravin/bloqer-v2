@@ -15,7 +15,7 @@ import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
-import { uploadDocumentAction } from "@/features/documents/upload-document-action";
+import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { AP_PAYEE_PICKER_HINT } from "../lib/ap-payee-options";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
@@ -318,18 +318,18 @@ export function SupplierInvoiceForm({
 
   async function uploadAttachmentIfAny(invoiceId: string, scopeProjectId: string | null) {
     if (!attachment || !storageConfigured) return null;
-    const fd = new FormData();
-    fd.set("file", attachment);
-    fd.set("linkedEntityType", "SUPPLIER_INVOICE");
-    fd.set("linkedEntityId", invoiceId);
-    fd.set("category", "INVOICE");
-    if (scopeProjectId) fd.set("projectId", scopeProjectId);
     const detailPath = scopeProjectId
       ? `/proyectos/${scopeProjectId}/facturas-proveedor/${invoiceId}`
       : `/finanzas/facturas-proveedor/${invoiceId}`;
-    fd.set("revalidatePaths", JSON.stringify([detailPath]));
-    fd.set("idempotencyKey", attachmentKey);
-    return uploadDocumentAction(fd);
+    return clientUploadDocument({
+      file: attachment,
+      projectId: scopeProjectId,
+      category: "INVOICE",
+      linkedEntityType: "SUPPLIER_INVOICE",
+      linkedEntityId: invoiceId,
+      idempotencyKey: attachmentKey,
+      revalidatePaths: [detailPath],
+    });
   }
 
   function notifyAttachFailure(uploadError: string, paid: boolean) {

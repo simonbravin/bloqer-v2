@@ -7,8 +7,7 @@ import {
   initiateUploadSchema,
   resolveAllowedMimeType,
 } from "@bloqer/validators";
-
-const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+import { VERCEL_FUNCTION_BODY_SAFE_BYTES } from "@/features/documents/lib/upload-size-limits";
 
 export type UploadDocumentActionResult =
   | { documentId: string; storageConfigured: boolean }
@@ -43,6 +42,10 @@ function parseRevalidatePaths(raw: FormDataEntryValue | null): string[] {
   }
 }
 
+/**
+ * Server-side upload for small files only (e.g. subcontract create attachments).
+ * Larger browser uploads must use `clientUploadDocument` (direct R2).
+ */
 export async function uploadDocumentAction(formData: FormData): Promise<UploadDocumentActionResult> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) {
@@ -54,8 +57,11 @@ export async function uploadDocumentAction(formData: FormData): Promise<UploadDo
     return { error: "Seleccioná un archivo" };
   }
 
-  if (file.size > MAX_SIZE_BYTES) {
-    return { error: "El archivo no puede superar 50 MB" };
+  if (file.size > VERCEL_FUNCTION_BODY_SAFE_BYTES) {
+    return {
+      error:
+        "Este archivo es demasiado grande para esta vía de subida. Usá Documentos → Agregar documento (hasta 50 MB).",
+    };
   }
 
   const mimeType = resolveAllowedMimeType(file.name, file.type);
