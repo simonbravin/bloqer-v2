@@ -33,7 +33,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const result = await initiateDocumentUpload(parsed.data, ctx);
-    return NextResponse.json(result, { status: 201 });
+    return NextResponse.json(result, { status: result.created ? 201 : 200 });
   } catch (err) {
     if (err instanceof ServiceError) {
       const status =

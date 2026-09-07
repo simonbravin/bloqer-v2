@@ -62,6 +62,7 @@ export async function clientUploadDocument(
     documentId?: string;
     uploadUrl?: string | null;
     storageConfigured?: boolean;
+    status?: "UPLOADING" | "ACTIVE";
     error?: string;
   };
   try {
@@ -80,8 +81,9 @@ export async function clientUploadDocument(
   }
 
   const paths = input.revalidatePaths ?? [];
+  const needsPut = Boolean(initiateData.uploadUrl);
 
-  if (initiateData.uploadUrl) {
+  if (needsPut && initiateData.uploadUrl) {
     let putRes: Response;
     try {
       putRes = await fetch(initiateData.uploadUrl, {
@@ -118,6 +120,10 @@ export async function clientUploadDocument(
           "El archivo se subió pero no se pudo confirmar. Intentá de nuevo o contactá soporte.",
       };
     }
+  } else if (initiateData.storageConfigured && initiateData.status === "UPLOADING") {
+    return {
+      error: "No se pudo obtener la URL de subida. Recargá e intentá de nuevo.",
+    };
   }
 
   return {

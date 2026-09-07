@@ -75,7 +75,9 @@ Browser uploads go **direct to R2** (presigned PUT) to bypass the Vercel functio
 ]
 ```
 
-Configure in Cloudflare Dashboard → R2 → bucket → Settings → CORS policy. Without this, large PDFs/planos fail in the browser after `initiate-upload`.
+Configure in Cloudflare Dashboard → R2 → bucket → Settings → CORS policy. Without this, browser uploads fail after `initiate-upload`.
+
+If you use Vercel **preview** URLs, add those exact origins too (R2 does not expand `*.vercel.app`).
 
 ## Optional — Operational alerts cron
 

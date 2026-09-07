@@ -7,6 +7,9 @@ interface RouteParams {
   params: Promise<{ documentId: string }>;
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function parseRevalidatePaths(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return [
@@ -31,6 +34,9 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<N
   }
 
   const { documentId } = await params;
+  if (!UUID_RE.test(documentId)) {
+    return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
+  }
 
   let revalidatePaths: string[] = [];
   try {

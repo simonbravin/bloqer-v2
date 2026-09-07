@@ -662,7 +662,13 @@ export async function uploadDocument(
 export async function initiateDocumentUpload(
   input: InitiateUploadInput,
   ctx: ServiceContext,
-): Promise<{ documentId: string; uploadUrl: string | null; storageConfigured: boolean }> {
+): Promise<{
+  documentId: string;
+  uploadUrl: string | null;
+  storageConfigured: boolean;
+  status: "UPLOADING" | "ACTIVE";
+  created: boolean;
+}> {
   const configured = isStorageConfigured();
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
@@ -716,12 +722,17 @@ export async function initiateDocumentUpload(
     if (configured && existing.status === "UPLOADING" && existing.storageProvider === "R2") {
       uploadUrl = await getPresignedPutUrl(existing.storageKey, existing.mimeType, 300);
     }
-    return { documentId: existing.id, uploadUrl, storageConfigured: configured };
+    return {
+      documentId: existing.id,
+      uploadUrl,
+      storageConfigured: configured,
+      status: existing.status as "UPLOADING" | "ACTIVE",
+      created: false,
+    };
   }
 
   let createdNow = false;
-  let doc;
-  doc = await withIdempotentCreate({
+  const doc = await withIdempotentCreate({
     findExisting,
     payloadsMatch,
     create: async () => {
@@ -774,7 +785,13 @@ export async function initiateDocumentUpload(
     uploadUrl = await getPresignedPutUrl(doc.storageKey, doc.mimeType, 300);
   }
 
-  return { documentId: doc.id, uploadUrl, storageConfigured: configured };
+  return {
+    documentId: doc.id,
+    uploadUrl,
+    storageConfigured: configured,
+    status: doc.status as "UPLOADING" | "ACTIVE",
+    created: createdNow,
+  };
 }
 
 export async function confirmDocumentUpload(
@@ -800,7 +817,11 @@ export async function confirmDocumentUpload(
     throw new ServiceError("CONFLICT", "Solo se confirman subidas al almacenamiento R2");
   }
 
-  assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
+  try {
+    assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
+  } catch {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
 
   let contentLength: number | undefined;
   try {
@@ -837,10 +858,23 @@ export async function confirmDocumentUpload(
     throw new ServiceError("VALIDATION", "Error al validar el archivo subido");
   }
 
-  await prisma.documentAttachment.update({
-    where: { id },
+  // Atomic transition: only one concurrent confirm wins and notifies.
+  const activated = await prisma.documentAttachment.updateMany({
+    where: {
+      id,
+      tenantId: ctx.tenantId,
+      status: "UPLOADING",
+      storageProvider: "R2",
+    },
     data: { status: "ACTIVE" },
   });
+  if (activated.count === 0) {
+    const again = await prisma.documentAttachment.findUnique({ where: { id } });
+    if (again?.tenantId === ctx.tenantId && again.status === "ACTIVE") {
+      return;
+    }
+    throw new ServiceError("CONFLICT", "El documento no está en estado UPLOADING");
+  }
 
   await log({
     tenantId: ctx.tenantId,
@@ -1547,7 +1581,8 @@ function canMutateDocumentByLink(
     return can(ctx.roles, "EDIT", "PROJECTS");
   }
   if (t === "JOBSITE_LOG") {
-    return can(ctx.roles, "EDIT", "JOBSITE_LOG");
+    // Must match initiateDocumentUpload / resolveDocumentUploadPlan.
+    return canMutateJobsiteLogAsContributor(ctx.roles);
   }
   if (t === "CERTIFICATION") {
     return can(ctx.roles, "EDIT", "CERTIFICATIONS");
