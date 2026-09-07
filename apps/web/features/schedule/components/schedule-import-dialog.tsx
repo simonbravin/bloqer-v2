@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { AvailableBudget } from "@bloqer/services";
+import { budgetStatusLabel } from "@/features/budgets";
 import { importScheduleFromBudgetAction } from "../actions/schedule-actions";
 
 export function ScheduleImportDialog({
@@ -80,7 +81,7 @@ export function ScheduleImportDialog({
             >
               {budgets.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.name} ({b.status})
+                  {b.name} ({budgetStatusLabel(b.status)})
                 </option>
               ))}
             </select>

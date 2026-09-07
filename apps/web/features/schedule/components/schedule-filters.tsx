@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/select";
 import type { AvailableBudget } from "@bloqer/services";
 import type { ScheduleItemStatus } from "@bloqer/database";
+import { budgetStatusLabel } from "@/features/budgets";
 import { STATUS_LABELS } from "../adapters/schedule-view-types";
 import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 
@@ -87,7 +88,7 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
             <SelectContent>
               {budgets.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
-                  {b.name} ({b.status})
+                  {b.name} ({budgetStatusLabel(b.status)})
                 </SelectItem>
               ))}
             </SelectContent>

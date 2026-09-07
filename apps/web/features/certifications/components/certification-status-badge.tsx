@@ -9,6 +9,11 @@ const CONFIG: Record<CertificationStatus, { label: string; variant: "default" | 
   CANCELLED: { label: "Cancelada", variant: "destructive" },
 };
 
+/** UI label (es-AR). Canonical enum stays English in DB/API. */
+export function certificationStatusLabel(status: string): string {
+  return CONFIG[status as CertificationStatus]?.label ?? status;
+}
+
 export function CertificationStatusBadge({ status }: { status: CertificationStatus }) {
   const { label, variant } = CONFIG[status];
   return <Badge variant={variant}>{label}</Badge>;

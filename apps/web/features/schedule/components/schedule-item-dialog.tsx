@@ -48,6 +48,7 @@ import {
   STATUS_LABELS,
   MILESTONE_COLOR,
 } from "../adapters/schedule-view-types";
+import { certificationStatusLabel } from "@/features/certifications";
 import { formatDateAr } from "@/lib/gantt-date-format";
 import { formatMoneyAmount, formatRatePctDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { ScheduleCancelDialog } from "./schedule-cancel-dialog";
@@ -820,7 +821,7 @@ export function ScheduleItemDialog({
                   {context.certificationEntries.map((c) => (
                     <li key={c.certificationId} className="flex justify-between gap-2">
                       <Link href={c.href} className="text-primary hover:underline">
-                        Cert. #{c.certificationNumber} ({c.status})
+                        Cert. #{c.certificationNumber} ({certificationStatusLabel(c.status)})
                       </Link>
                       <span className="tabular-nums">{money(c.periodAmount)}</span>
                     </li>

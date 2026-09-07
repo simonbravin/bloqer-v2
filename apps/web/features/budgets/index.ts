@@ -1,4 +1,4 @@
-export { BudgetStatusBadge } from "./components/budget-status-badge";
+export { BudgetStatusBadge, budgetStatusLabel } from "./components/budget-status-badge";
 export type { BudgetListItem } from "./components/budget-list";
 export { BudgetTable } from "./components/budget-table";
 export { BudgetCards } from "./components/budget-cards";

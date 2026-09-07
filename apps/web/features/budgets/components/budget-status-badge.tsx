@@ -10,6 +10,11 @@ const CONFIG: Record<BudgetStatus, { label: string; variant: "default" | "second
   CANCELLED:             { label: "Cancelado",           variant: "destructive" },
 };
 
+/** UI label (es-AR). Canonical enum stays English in DB/API. */
+export function budgetStatusLabel(status: string): string {
+  return CONFIG[status as BudgetStatus]?.label ?? status;
+}
+
 export function BudgetStatusBadge({ status }: { status: BudgetStatus }) {
   const { label, variant } = CONFIG[status];
   return <Badge variant={variant}>{label}</Badge>;
