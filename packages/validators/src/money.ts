@@ -72,13 +72,23 @@ export const positiveQtyString = qtyString.refine(
 /**
  * Line unit price: 4 dp (schema Decimal 18,4).
  * Needed so Factura B inclusive nets survive DRAFT re-save ([D-086]).
+ * Empty (cleared DecimalInput) → 0; accepts es-AR commas like discountPct.
  */
 export const unitPriceString = z
   .string()
   .trim()
-  .regex(LOOSE_DECIMAL, "Precio inválido")
-  .transform((v) => roundQty(v))
-  .refine((v) => !v.startsWith("-"), "El precio no puede ser negativo");
+  .transform((v) => {
+    if (v === "") return "0";
+    const parsed = tryParseUserDecimal(v, "commit");
+    return parsed == null || parsed === "" ? v : parsed;
+  })
+  .pipe(
+    z
+      .string()
+      .regex(LOOSE_DECIMAL, "Precio inválido")
+      .transform((v) => roundQty(v))
+      .refine((v) => !v.startsWith("-"), "El precio no puede ser negativo"),
+  );
 
 /** Tax / rate percentage: round to 4 dp. */
 export const ratePctString = z

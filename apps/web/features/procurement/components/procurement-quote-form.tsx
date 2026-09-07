@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addDecimal, compareDecimal, resolveDocumentLineAmounts, calcIibbPerceptionAmount, roundMoney } from "@bloqer/utils";
@@ -38,6 +38,9 @@ import {
   updateProcurementQuoteAction,
 } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
 
+/** Default alícuota IVA for new quote forms (matches IVA_RATE_PRESETS). */
+const DEFAULT_QUOTE_TAX_RATE = "21";
+
 type PrLine = {
   id: string;
   description: string;
@@ -74,6 +77,12 @@ interface ProcurementQuoteFormProps {
   onCancelEdit?: () => void;
 }
 
+/** DecimalInput may emit "" while clearing; treat as zero for calc/payload. */
+function decimalOrZero(raw: string | null | undefined): string {
+  const t = (raw ?? "").trim();
+  return t === "" ? "0" : t;
+}
+
 function linePreview(
   qty: string,
   unitPrice: string,
@@ -84,9 +93,9 @@ function linePreview(
   try {
     return resolveDocumentLineAmounts({
       quantity: qty,
-      unitPrice,
-      taxRatePercent: taxRate,
-      discountPct,
+      unitPrice: decimalOrZero(unitPrice),
+      taxRatePercent: decimalOrZero(taxRate),
+      discountPct: decimalOrZero(discountPct),
       pricesIncludeTax,
     });
   } catch {
@@ -117,7 +126,7 @@ export function ProcurementQuoteForm({
   }, [editValues?.lines]);
 
   const defaultTaxRate =
-    normalizeIvaRatePreset(editValues?.lines[0]?.taxRate) ?? "21";
+    normalizeIvaRatePreset(editValues?.lines[0]?.taxRate) ?? DEFAULT_QUOTE_TAX_RATE;
 
   const [supplierId, setSupplierId] = useState("");
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
@@ -127,6 +136,8 @@ export function ProcurementQuoteForm({
       ? editValues.iibbPerceptionRate
       : DEFAULT_IIBB_PERCEPTION_RATE_PCT,
   );
+  /** Remount create form after success so uncontrolled date/plazo + DecimalInput drafts reset. */
+  const [createEpoch, setCreateEpoch] = useState(0);
   const [lineMoney, setLineMoney] = useState<Record<string, LineMoney>>(() =>
     Object.fromEntries(
       lines.map((l) => {
@@ -143,17 +154,65 @@ export function ProcurementQuoteForm({
     ),
   );
 
-  function applyGlobalTaxRate(next: string) {
-    setTaxRate(next);
-    setLineMoney((prev) =>
-      Object.fromEntries(
-        Object.entries(prev).map(([id, row]) => [id, { ...row, taxRate: next }]),
-      ),
+  // Submit reads refs so DecimalInput flushSync-on-submit is visible (avoids stale closure).
+  const supplierIdRef = useRef(supplierId);
+  const pricesIncludeTaxRef = useRef(pricesIncludeTax);
+  const taxRateRef = useRef(taxRate);
+  const iibbPerceptionRateRef = useRef(iibbPerceptionRate);
+  const lineMoneyRef = useRef(lineMoney);
+  supplierIdRef.current = supplierId;
+  pricesIncludeTaxRef.current = pricesIncludeTax;
+  taxRateRef.current = taxRate;
+  iibbPerceptionRateRef.current = iibbPerceptionRate;
+  lineMoneyRef.current = lineMoney;
+
+  function blankLineMoney(rate: string): Record<string, LineMoney> {
+    return Object.fromEntries(
+      lines.map((l) => [
+        l.id,
+        { unitPrice: "0", discountPct: "0", taxRate: rate },
+      ]),
     );
   }
 
-  function hasPositiveUnitPrice(): boolean {
-    return lines.some((line) => compareDecimal(lineMoney[line.id]?.unitPrice ?? "0", "0") > 0);
+  function resetCreateForm() {
+    const rate = DEFAULT_QUOTE_TAX_RATE;
+    const nextMoney = blankLineMoney(rate);
+    setSupplierId("");
+    supplierIdRef.current = "";
+    setPricesIncludeTax(false);
+    pricesIncludeTaxRef.current = false;
+    setTaxRate(rate);
+    taxRateRef.current = rate;
+    setIibbPerceptionRate(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
+    iibbPerceptionRateRef.current = DEFAULT_IIBB_PERCEPTION_RATE_PCT;
+    setLineMoney(nextMoney);
+    lineMoneyRef.current = nextMoney;
+    setError(null);
+    setCreateEpoch((n) => n + 1);
+  }
+
+  function applyGlobalTaxRate(next: string) {
+    setTaxRate(next);
+    taxRateRef.current = next;
+    setLineMoney((prev) => {
+      const updated = Object.fromEntries(
+        Object.entries(prev).map(([id, row]) => [id, { ...row, taxRate: next }]),
+      );
+      lineMoneyRef.current = updated;
+      return updated;
+    });
+  }
+
+  function hasPositiveUnitPrice(moneyMap: Record<string, LineMoney>): boolean {
+    return lines.some((line) => {
+      const raw = decimalOrZero(moneyMap[line.id]?.unitPrice);
+      try {
+        return compareDecimal(raw, "0") > 0;
+      } catch {
+        return false;
+      }
+    });
   }
 
   const quoteTotals = useMemo(() => {
@@ -177,7 +236,7 @@ export function ProcurementQuoteForm({
     try {
       iibb = calcIibbPerceptionAmount({
         subtotal,
-        ratePercent: iibbPerceptionRate || "0",
+        ratePercent: decimalOrZero(iibbPerceptionRate),
       });
       total = roundMoney(addDecimal(addDecimal(subtotal, tax), iibb));
     } catch {
@@ -189,36 +248,53 @@ export function ProcurementQuoteForm({
   function buildPayload(
     leadTimeDays: number | null,
     validUntil: string | null,
+    moneyMap: Record<string, LineMoney>,
+    opts: {
+      supplierContactId: string;
+      taxRate: string;
+      iibbPerceptionRate: string;
+      pricesIncludeTax: boolean;
+    },
   ) {
     return {
       purchaseRequestId,
-      supplierContactId: supplierId,
+      supplierContactId: opts.supplierContactId,
       currency: "ARS" as const,
       validUntil,
       leadTimeDays,
-      pricesIncludeTax,
-      iibbPerceptionRate,
-      lines: lines.map((line, i) => ({
-        purchaseRequestLineId: line.id,
-        unitPrice: lineMoney[line.id]?.unitPrice ?? "0",
-        taxRate: lineMoney[line.id]?.taxRate ?? taxRate,
-        discountPct: lineMoney[line.id]?.discountPct ?? "0",
-        sortOrder: i,
-      })),
+      pricesIncludeTax: opts.pricesIncludeTax,
+      iibbPerceptionRate: decimalOrZero(opts.iibbPerceptionRate),
+      lines: lines.map((line, i) => {
+        const money = moneyMap[line.id];
+        return {
+          purchaseRequestLineId: line.id,
+          unitPrice: decimalOrZero(money?.unitPrice),
+          taxRate: money?.taxRate ?? opts.taxRate,
+          discountPct: decimalOrZero(money?.discountPct),
+          sortOrder: i,
+        };
+      }),
     };
   }
 
   return (
     <form
+      key={isEdit ? editValues!.quoteId : `create-${createEpoch}`}
       className="space-y-4 rounded-lg border p-4"
       action={(fd) => {
         startTransition(async () => {
           setError(null);
-          if (!isEdit && !supplierId) {
+          const currentSupplierId = supplierIdRef.current;
+          const currentLineMoney = lineMoneyRef.current;
+          const currentTaxRate = taxRateRef.current;
+          const currentIibb = iibbPerceptionRateRef.current;
+          const currentPricesIncludeTax = pricesIncludeTaxRef.current;
+
+          if (!isEdit && !currentSupplierId) {
             setError("Seleccioná un proveedor");
             return;
           }
-          if (!hasPositiveUnitPrice()) {
+          if (!hasPositiveUnitPrice(currentLineMoney)) {
             setError("Ingresá al menos un precio unitario mayor a cero.");
             return;
           }
@@ -230,7 +306,12 @@ export function ProcurementQuoteForm({
             return;
           }
           const validUntil = fd.get("validUntil")?.toString() || null;
-          const payload = buildPayload(leadTimeDays, validUntil);
+          const payload = buildPayload(leadTimeDays, validUntil, currentLineMoney, {
+            supplierContactId: currentSupplierId,
+            taxRate: currentTaxRate,
+            iibbPerceptionRate: currentIibb,
+            pricesIncludeTax: currentPricesIncludeTax,
+          });
 
           const result = isEdit
             ? await updateProcurementQuoteAction(projectId, editValues!.quoteId, purchaseRequestId, {
@@ -248,13 +329,21 @@ export function ProcurementQuoteForm({
             return;
           }
           toast.success(isEdit ? "Cotización actualizada." : "Cotización registrada.");
-          onCancelEdit?.();
+          if (isEdit) {
+            onCancelEdit?.();
+          } else {
+            resetCreateForm();
+          }
           router.refresh();
         });
       }}
     >
       <p className="font-medium text-sm">{isEdit ? "Editar cotización" : "Cargar cotización"}</p>
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      )}
 
       {isEdit ? (
         <div className="space-y-1">
@@ -273,7 +362,10 @@ export function ProcurementQuoteForm({
               popoverWidth="wide"
               options={toSearchableOptions(suppliers)}
               value={supplierId}
-              onValueChange={setSupplierId}
+              onValueChange={(id) => {
+                setSupplierId(id);
+                supplierIdRef.current = id;
+              }}
               placeholder="Elegir proveedor…"
               searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
               emptyText="Ningún proveedor coincide."
@@ -307,9 +399,9 @@ export function ProcurementQuoteForm({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1">
-          <Label htmlFor="quoteTaxRate">Alícuota IVA</Label>
+          <Label htmlFor={isEdit ? "editQuoteTaxRate" : "quoteTaxRate"}>Alícuota IVA</Label>
           <Select value={taxRate} onValueChange={applyGlobalTaxRate}>
-            <SelectTrigger id="quoteTaxRate">
+            <SelectTrigger id={isEdit ? "editQuoteTaxRate" : "quoteTaxRate"}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -322,20 +414,30 @@ export function ProcurementQuoteForm({
           </Select>
         </div>
         <IibbPerceptionFields
-          id="quoteIibbRate"
+          id={isEdit ? "editQuoteIibbRate" : "quoteIibbRate"}
           rate={iibbPerceptionRate}
-          onRateChange={setIibbPerceptionRate}
+          onRateChange={(v) => {
+            setIibbPerceptionRate(v);
+            iibbPerceptionRateRef.current = v;
+          }}
           label="Alícuota IIBB"
         />
         <PricesIncludeTaxCheckbox
           checked={pricesIncludeTax}
-          onCheckedChange={setPricesIncludeTax}
+          onCheckedChange={(v) => {
+            setPricesIncludeTax(v);
+            pricesIncludeTaxRef.current = v;
+          }}
           editModeHint={isEdit}
         />
       </div>
 
       {lines.map((line) => {
-        const money = lineMoney[line.id] ?? { unitPrice: "0", discountPct: "0", taxRate };
+        const money = lineMoney[line.id] ?? {
+          unitPrice: "0",
+          discountPct: "0",
+          taxRate,
+        };
         const preview = linePreview(
           line.quantity,
           money.unitPrice,
@@ -363,14 +465,18 @@ export function ProcurementQuoteForm({
                   id={`unitPrice_${line.id}`}
                   value={money.unitPrice}
                   onValueChange={(v) =>
-                    setLineMoney((prev) => ({
-                      ...prev,
-                      [line.id]: {
-                        unitPrice: v,
-                        discountPct: prev[line.id]?.discountPct ?? "0",
-                        taxRate: prev[line.id]?.taxRate ?? taxRate,
-                      },
-                    }))
+                    setLineMoney((prev) => {
+                      const next = {
+                        ...prev,
+                        [line.id]: {
+                          unitPrice: v,
+                          discountPct: prev[line.id]?.discountPct ?? "0",
+                          taxRate: prev[line.id]?.taxRate ?? taxRate,
+                        },
+                      };
+                      lineMoneyRef.current = next;
+                      return next;
+                    })
                   }
                   placeholder="0,00"
                 />
@@ -381,14 +487,18 @@ export function ProcurementQuoteForm({
                   id={`discountPct_${line.id}`}
                   value={money.discountPct}
                   onValueChange={(v) =>
-                    setLineMoney((prev) => ({
-                      ...prev,
-                      [line.id]: {
-                        unitPrice: prev[line.id]?.unitPrice ?? "0",
-                        discountPct: v,
-                        taxRate: prev[line.id]?.taxRate ?? taxRate,
-                      },
-                    }))
+                    setLineMoney((prev) => {
+                      const next = {
+                        ...prev,
+                        [line.id]: {
+                          unitPrice: prev[line.id]?.unitPrice ?? "0",
+                          discountPct: v,
+                          taxRate: prev[line.id]?.taxRate ?? taxRate,
+                        },
+                      };
+                      lineMoneyRef.current = next;
+                      return next;
+                    })
                   }
                   placeholder="0"
                 />
