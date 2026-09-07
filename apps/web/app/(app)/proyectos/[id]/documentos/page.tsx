@@ -30,6 +30,8 @@ const VALID_CATEGORIES = [
   "CERTIFICATE",
   "REPORT",
   "JOBSITE_EVIDENCE",
+  "BUDGET",
+  "QUOTE",
   "OTHER",
 ] as const;
 

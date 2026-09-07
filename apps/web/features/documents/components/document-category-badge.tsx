@@ -9,6 +9,8 @@ const CATEGORY_LABELS: Record<string, string> = {
   CERTIFICATE:     "Certificado",
   REPORT:          "Informe",
   JOBSITE_EVIDENCE:"Evidencia obra",
+  BUDGET:          "Presupuesto",
+  QUOTE:           "Cotización",
   OTHER:           "Otro",
 };
 
@@ -23,6 +25,8 @@ const CATEGORY_COLORS: Record<string, string> = {
   CERTIFICATE:     "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   REPORT:          "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400",
   JOBSITE_EVIDENCE:"bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  BUDGET:          "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400",
+  QUOTE:           "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
   OTHER:           "bg-muted text-muted-foreground",
 };
 

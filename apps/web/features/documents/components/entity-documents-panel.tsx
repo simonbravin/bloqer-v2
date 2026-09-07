@@ -302,7 +302,7 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
         revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta cotización.",
-        defaultCategory: "INVOICE",
+        defaultCategory: "QUOTE",
         uploadHint: "Presupuesto o cotización del proveedor",
       };
     }
@@ -332,7 +332,7 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
         revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en este presupuesto.",
-        defaultCategory: "REPORT",
+        defaultCategory: "BUDGET",
         uploadHint: "Informe de costos, exportaciones o respaldo del presupuesto",
       };
     }

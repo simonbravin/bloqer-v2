@@ -307,6 +307,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Operación → Documentos.",
       "En la columna Acciones: el icono de ojo abre el archivo en una pestaña nueva (PDF e imágenes); el icono de descarga baja el archivo.",
       "El nombre del archivo abre el detalle (ficha, archivar; eliminar solo si no está ligado a un comprobante).",
+      "Al subir o filtrar, el tipo incluye Presupuesto y Cotización (además de Contrato, Plano, Factura, etc.).",
       "En los adjuntos de un parte, OC, factura o subcontrato: los mismos iconos de ver y descargar, más caja (archivar). Esos adjuntos no se pueden eliminar.",
     ],
     pitfalls: [
@@ -324,6 +325,10 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "archivar adjunto",
       "biblioteca",
       "adjunto",
+      "presupuesto documento",
+      "cotización documento",
+      "tipo documento",
+      "categoría documento",
     ],
     guideRef: "§8.4",
   },

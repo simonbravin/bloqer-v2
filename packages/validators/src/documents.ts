@@ -3,7 +3,8 @@ import { idempotencyKeySchema } from "./idempotency";
 
 const DOCUMENT_CATEGORIES = [
   "CONTRACT", "PLAN", "PERMIT", "TECHNICAL", "PHOTO",
-  "INVOICE", "RECEIPT", "CERTIFICATE", "REPORT", "JOBSITE_EVIDENCE", "OTHER",
+  "INVOICE", "RECEIPT", "CERTIFICATE", "REPORT", "JOBSITE_EVIDENCE",
+  "BUDGET", "QUOTE", "OTHER",
 ] as const;
 
 export const ALLOWED_MIME_TYPES = [

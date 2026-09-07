@@ -21,6 +21,8 @@ const CATEGORY_OPTIONS = [
   { value: "CERTIFICATE",      label: "Certificado" },
   { value: "REPORT",           label: "Informe" },
   { value: "JOBSITE_EVIDENCE", label: "Evidencia obra" },
+  { value: "BUDGET",           label: "Presupuesto" },
+  { value: "QUOTE",            label: "Cotización" },
   { value: "OTHER",            label: "Otro" },
 ];
 

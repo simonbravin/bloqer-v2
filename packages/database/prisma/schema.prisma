@@ -2930,6 +2930,8 @@ enum DocumentCategory {
   CERTIFICATE
   REPORT
   JOBSITE_EVIDENCE
+  BUDGET
+  QUOTE
   OTHER
 }
 

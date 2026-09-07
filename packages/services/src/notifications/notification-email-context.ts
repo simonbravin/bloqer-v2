@@ -25,6 +25,8 @@ const DOCUMENT_CATEGORY_LABEL_ES: Record<string, string> = {
   CERTIFICATE: "Certificado",
   REPORT: "Informe",
   JOBSITE_EVIDENCE: "Evidencia obra",
+  BUDGET: "Presupuesto",
+  QUOTE: "Cotización",
   OTHER: "Otro",
 };
 
