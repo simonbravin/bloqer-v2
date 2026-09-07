@@ -132,6 +132,8 @@ export async function getPurchaseOrderBillingSummary(
       status: { in: ["DRAFT", "ISSUED"] },
     },
     select: {
+      subtotal: true,
+      taxAmount: true,
       totalAmount: true,
       status: true,
       payable: { select: { paidAmount: true, status: true } },
@@ -146,9 +148,11 @@ export async function getPurchaseOrderBillingSummary(
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
+    // Coverage vs recibido uses neto+IVA only — IIBB is crédito fiscal, not goods coverage ([D-112]).
+    const goodsTaxAmount = inv.subtotal.plus(inv.taxAmount);
     if (inv.status === "DRAFT") {
       draftInvoiceCount += 1;
-      draftReservedAmount = draftReservedAmount.add(inv.totalAmount);
+      draftReservedAmount = draftReservedAmount.add(goodsTaxAmount);
       // Reserve draft qty so clamp / pending cannot double-create ([D-108] vs panel).
       for (const line of inv.lines) {
         if (!line.purchaseOrderLineId) continue;
@@ -157,7 +161,7 @@ export async function getPurchaseOrderBillingSummary(
       }
       continue;
     }
-    invoicedAmount = invoicedAmount.add(inv.totalAmount);
+    invoicedAmount = invoicedAmount.add(goodsTaxAmount);
     if (inv.payable && inv.payable.status !== "CANCELLED") {
       paidAmount = paidAmount.add(inv.payable.paidAmount);
     }
@@ -204,6 +208,8 @@ export type PurchaseOrderInvoiceDraftPreview = {
   summary: PurchaseOrderBillingSummary;
   supplierContactId: string;
   currency: string;
+  /** PO header percepción rate to copy onto the invoice form ([D-112]). */
+  iibbPerceptionRate: string;
   /** Líneas sugeridas (pendiente de facturar) — editables en el form, sin persistir. */
   lines: InvoiceDraftLineInput[];
 };
@@ -244,6 +250,7 @@ export async function getPurchaseOrderInvoiceDraftPreview(
     summary,
     supplierContactId: po.supplierContactId,
     currency: po.currency,
+    iibbPerceptionRate: serializeRatePctDecimal(po.iibbPerceptionRate),
     lines,
   };
 }
@@ -308,6 +315,8 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
       tenantId: true,
       projectId: true,
       purchaseOrderId: true,
+      subtotal: true,
+      taxAmount: true,
       totalAmount: true,
       currency: true,
       supplierContactId: true,
@@ -333,12 +342,14 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
     : await getCompanyProcurementSettingsForProject(po.projectId, ctx);
   const matchTol = new Prisma.Decimal(settings.invoiceMatchTolerancePct);
 
+  // Compare neto+IVA to received (lineTotal sum); exclude IIBB percepción ([D-112]).
+  const invoiceGoodsTax = inv.subtotal.plus(inv.taxAmount);
   if (
-    invoiceExceedsReceivedWithTolerance(inv.totalAmount, receivedAmount, matchTol) &&
-    (receivedAmount.greaterThan(0) || inv.totalAmount.greaterThan(0))
+    invoiceExceedsReceivedWithTolerance(invoiceGoodsTax, receivedAmount, matchTol) &&
+    (receivedAmount.greaterThan(0) || invoiceGoodsTax.greaterThan(0))
   ) {
     warnings.push(
-      `El total de la factura (${inv.totalAmount.toFixed(2)}) supera el valor recibido acumulado de la OC (${receivedAmount.toFixed(2)})` +
+      `El neto+IVA de la factura (${invoiceGoodsTax.toFixed(2)}) supera el valor recibido acumulado de la OC (${receivedAmount.toFixed(2)})` +
         (matchTol.greaterThan(0) ? ` más tolerancia ${matchTol.toFixed(2)}%.` : "."),
     );
   }

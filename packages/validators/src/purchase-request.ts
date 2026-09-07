@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { positiveQtyString, discountPctString, unitPriceString, ratePctString } from "./money";
 import { costCategorySchema } from "./budget";
 
@@ -52,7 +53,7 @@ export const createProcurementQuoteSchema = z.object({
   /** Ephemeral input flag [D-086]: unit price is gross (Factura B). Not persisted. */
   pricesIncludeTax: z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
+  iibbPerceptionRate: ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   lines: z.array(quoteLineSchema).min(1),
 });
 

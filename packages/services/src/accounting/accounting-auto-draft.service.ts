@@ -23,6 +23,7 @@ import {
   COA_IIBB_PERCEPTION_CREDIT,
   COA_IIBB_PERCEPTION_DEBIT,
 } from "./accounting-invoice-journal-lines";
+import { ensureIibbPerceptionCoaAccounts } from "./ensure-iibb-coa-accounts";
 
 type EnsureResult =
   | { status: "created" | "existing"; entry: JournalEntryView }
@@ -509,6 +510,7 @@ export async function ensureDraftJournalFromSalesInvoice(
       inv.companyId,
       COA_IVA_DEBIT_FISCAL,
     );
+    await ensureIibbPerceptionCoaAccounts(ctx.tenantId, inv.companyId);
     const iibbPerceptionDebitAccountId = await resolveActiveGlAccountId(
       ctx.tenantId,
       inv.companyId,
@@ -595,6 +597,7 @@ export async function ensureDraftJournalFromSupplierInvoice(
       inv.companyId,
       COA_IVA_CREDIT_FISCAL,
     );
+    await ensureIibbPerceptionCoaAccounts(ctx.tenantId, inv.companyId);
     const iibbPerceptionCreditAccountId = await resolveActiveGlAccountId(
       ctx.tenantId,
       inv.companyId,

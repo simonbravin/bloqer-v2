@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type { RegisterApExpenseInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { applyPaymentToPayable } from "./apply-payment-to-payable";
@@ -436,7 +437,7 @@ export async function registerApExpense(
                 currency: input.currency ?? "ARS",
                 fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : new Prisma.Decimal(1),
                 invoiceLetter: input.invoiceLetter ?? null,
-                iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
+                iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
                 notes: input.notes ?? null,
                 internalNotes: input.internalNotes ?? null,
                 purchaseOrderId: input.purchaseOrderId ?? null,

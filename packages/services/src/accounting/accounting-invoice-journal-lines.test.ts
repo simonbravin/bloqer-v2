@@ -100,4 +100,29 @@ describe("buildSupplierInvoiceJournalInput", () => {
     assert.equal(input.lines[2]?.debit, "31307.61");
     assert.equal(input.lines[3]?.credit, "1294047.82");
   });
+
+  it("keeps IVA split and folds IIBB into expense when IIBB CoA missing", () => {
+    const { input, usedIvaSplit } = buildSupplierInvoiceJournalInput({
+      companyId: "c1",
+      projectId: "p1",
+      entryDate: "2026-08-10",
+      description: "test",
+      reference: "1",
+      currency: "ARS",
+      subtotal: new Prisma.Decimal("1000"),
+      taxAmount: new Prisma.Decimal("210"),
+      iibbPerceptionAmount: new Prisma.Decimal("30"),
+      totalAmount: new Prisma.Decimal("1240"),
+      expenseAccountId: "acc-exp",
+      suppliersAccountId: "acc-sup",
+      ivaCreditAccountId: "acc-iva-credit",
+      iibbPerceptionCreditAccountId: null,
+      sourceId: "inv1",
+    });
+    assert.equal(usedIvaSplit, true);
+    assert.equal(input.lines.length, 3);
+    assert.equal(input.lines[0]?.debit, "1030.00");
+    assert.equal(input.lines[1]?.debit, "210.00");
+    assert.equal(input.lines[2]?.credit, "1240.00");
+  });
 });

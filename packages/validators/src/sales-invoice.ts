@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import {
   moneyAmountString,
   optionalMoneyAmountString,
@@ -37,7 +38,7 @@ export const createSalesInvoiceSchema = z.object({
    */
   pricesIncludeTax:    z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate:  ratePctString.optional().default("3.0000"),
+  iibbPerceptionRate:  ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   notes:               z.string().optional().nullable(),
   internalNotes:       z.string().optional().nullable(),
   externalInvoiceRef:  z
@@ -58,7 +59,7 @@ export const createInvoiceFromCertificationSchema = z.object({
   invoiceLetter:   invoiceLetterSchema.optional().nullable(),
   /** Gross certification amount already embeds tax; usually leave false. */
   pricesIncludeTax: z.boolean().optional(),
-  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
+  iibbPerceptionRate: ratePctString.optional().default("0.0000"),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });

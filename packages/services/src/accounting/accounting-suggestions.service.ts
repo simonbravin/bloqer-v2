@@ -26,6 +26,7 @@ import {
   COA_IIBB_PERCEPTION_CREDIT,
   COA_IIBB_PERCEPTION_DEBIT,
 } from "./accounting-invoice-journal-lines";
+import { ensureIibbPerceptionCoaAccounts } from "./ensure-iibb-coa-accounts";
 
 async function resolveActiveGlAccountId(
   tenantId: string,
@@ -473,6 +474,7 @@ export async function suggestJournalFromSalesInvoice(
     inv.companyId,
     COA_IVA_DEBIT_FISCAL,
   );
+  await ensureIibbPerceptionCoaAccounts(ctx.tenantId, inv.companyId);
   const iibbPerceptionDebitAccountId = await resolveActiveGlAccountId(
     ctx.tenantId,
     inv.companyId,
@@ -528,6 +530,7 @@ export async function suggestJournalFromSupplierInvoice(
     inv.companyId,
     COA_IVA_CREDIT_FISCAL,
   );
+  await ensureIibbPerceptionCoaAccounts(ctx.tenantId, inv.companyId);
   const iibbPerceptionCreditAccountId = await resolveActiveGlAccountId(
     ctx.tenantId,
     inv.companyId,

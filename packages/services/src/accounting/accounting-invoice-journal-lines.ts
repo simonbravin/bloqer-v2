@@ -62,23 +62,24 @@ export function buildTwoLineJournalInput(params: {
 
 type JournalLineDraft = CreateJournalEntryInput["lines"][number];
 
-function canSplitTaxComponents(params: {
+/**
+ * Decide whether we can emit a multi-line tax split ([D-085]/[D-112]).
+ * IVA requires its CoA account when tax > 0.
+ * Missing IIBB account does **not** block the split: percepción folds into neto
+ * so IVA crédito/débito is preserved on existing companies without v3 CoA.
+ */
+function canEmitTaxSplit(params: {
   taxAmount: Prisma.Decimal;
-  iibbPerceptionAmount: Prisma.Decimal;
   ivaAccountId: string | null;
-  iibbAccountId: string | null;
 }): boolean {
-  const taxPositive = params.taxAmount.gt(0);
-  const iibbPositive = params.iibbPerceptionAmount.gt(0);
-  if (!taxPositive && !iibbPositive) return false;
-  if (taxPositive && !params.ivaAccountId) return false;
-  if (iibbPositive && !params.iibbAccountId) return false;
+  if (params.taxAmount.gt(0) && !params.ivaAccountId) return false;
+  // tax == 0 (with or without IIBB) can still split if we have components to show
   return true;
 }
 
 /**
- * AR issued invoice: Clientes (total) / Ingresos (neto) + IVA Débito + Perc. IIBB a depositar.
- * Falls back to two-line total when no tax/perception or required accounts missing.
+ * AR issued invoice: Clientes (total) / Ingresos (neto [+ IIBB folded]) + IVA Débito + Perc. IIBB a depositar.
+ * Falls back to two-line total when tax > 0 but IVA account missing, or no tax/perception.
  */
 export function buildSalesInvoiceJournalInput(params: {
   companyId: string;
@@ -99,14 +100,13 @@ export function buildSalesInvoiceJournalInput(params: {
 }): { input: CreateJournalEntryInput; usedIvaSplit: boolean } {
   const iibb = params.iibbPerceptionAmount ?? new Prisma.Decimal(0);
   const iibbAccount = params.iibbPerceptionDebitAccountId ?? null;
-  if (
-    !canSplitTaxComponents({
-      taxAmount: params.taxAmount,
-      iibbPerceptionAmount: iibb,
-      ivaAccountId: params.ivaDebitAccountId,
-      iibbAccountId: iibbAccount,
-    })
-  ) {
+  const taxPositive = params.taxAmount.gt(0);
+  const iibbPositive = iibb.gt(0);
+
+  if ((!taxPositive && !iibbPositive) || !canEmitTaxSplit({
+    taxAmount: params.taxAmount,
+    ivaAccountId: params.ivaDebitAccountId,
+  })) {
     return {
       usedIvaSplit: false,
       input: buildTwoLineJournalInput({
@@ -127,6 +127,10 @@ export function buildSalesInvoiceJournalInput(params: {
     };
   }
 
+  const hasIibbLine = iibbPositive && Boolean(iibbAccount);
+  // Fold percepción into ingresos when CoA IIBB is missing so IVA split still works.
+  const incomeCredit = hasIibbLine ? params.subtotal : params.subtotal.plus(iibb);
+
   const lines: JournalLineDraft[] = [
     {
       accountId: params.clientsAccountId,
@@ -139,13 +143,17 @@ export function buildSalesInvoiceJournalInput(params: {
     {
       accountId: params.incomeAccountId,
       projectId: params.projectId,
-      description: "Haber — ingresos (neto)",
+      description: hasIibbLine
+        ? "Haber — ingresos (neto)"
+        : iibbPositive
+          ? "Haber — ingresos (neto + Perc. IIBB sin cuenta)"
+          : "Haber — ingresos (neto)",
       debit: "0",
-      credit: moneyAmountString(params.subtotal),
+      credit: moneyAmountString(incomeCredit),
       currency: params.currency,
     },
   ];
-  if (params.taxAmount.gt(0) && params.ivaDebitAccountId) {
+  if (taxPositive && params.ivaDebitAccountId) {
     lines.push({
       accountId: params.ivaDebitAccountId,
       projectId: params.projectId,
@@ -155,7 +163,7 @@ export function buildSalesInvoiceJournalInput(params: {
       currency: params.currency,
     });
   }
-  if (iibb.gt(0) && iibbAccount) {
+  if (hasIibbLine && iibbAccount) {
     lines.push({
       accountId: iibbAccount,
       projectId: params.projectId,
@@ -182,7 +190,7 @@ export function buildSalesInvoiceJournalInput(params: {
 }
 
 /**
- * AP issued invoice: Gasto (neto) + IVA Crédito + Perc. IIBB crédito / Proveedores (total).
+ * AP issued invoice: Gasto (neto [+ IIBB folded]) + IVA Crédito + Perc. IIBB crédito / Proveedores (total).
  */
 export function buildSupplierInvoiceJournalInput(params: {
   companyId: string;
@@ -203,14 +211,13 @@ export function buildSupplierInvoiceJournalInput(params: {
 }): { input: CreateJournalEntryInput; usedIvaSplit: boolean } {
   const iibb = params.iibbPerceptionAmount ?? new Prisma.Decimal(0);
   const iibbAccount = params.iibbPerceptionCreditAccountId ?? null;
-  if (
-    !canSplitTaxComponents({
-      taxAmount: params.taxAmount,
-      iibbPerceptionAmount: iibb,
-      ivaAccountId: params.ivaCreditAccountId,
-      iibbAccountId: iibbAccount,
-    })
-  ) {
+  const taxPositive = params.taxAmount.gt(0);
+  const iibbPositive = iibb.gt(0);
+
+  if ((!taxPositive && !iibbPositive) || !canEmitTaxSplit({
+    taxAmount: params.taxAmount,
+    ivaAccountId: params.ivaCreditAccountId,
+  })) {
     return {
       usedIvaSplit: false,
       input: buildTwoLineJournalInput({
@@ -231,17 +238,24 @@ export function buildSupplierInvoiceJournalInput(params: {
     };
   }
 
+  const hasIibbLine = iibbPositive && Boolean(iibbAccount);
+  const expenseDebit = hasIibbLine ? params.subtotal : params.subtotal.plus(iibb);
+
   const lines: JournalLineDraft[] = [
     {
       accountId: params.expenseAccountId,
       projectId: params.projectId,
-      description: "Debe — gasto/costo (neto)",
-      debit: moneyAmountString(params.subtotal),
+      description: hasIibbLine
+        ? "Debe — gasto/costo (neto)"
+        : iibbPositive
+          ? "Debe — gasto/costo (neto + Perc. IIBB sin cuenta)"
+          : "Debe — gasto/costo (neto)",
+      debit: moneyAmountString(expenseDebit),
       credit: "0",
       currency: params.currency,
     },
   ];
-  if (params.taxAmount.gt(0) && params.ivaCreditAccountId) {
+  if (taxPositive && params.ivaCreditAccountId) {
     lines.push({
       accountId: params.ivaCreditAccountId,
       projectId: params.projectId,
@@ -251,7 +265,7 @@ export function buildSupplierInvoiceJournalInput(params: {
       currency: params.currency,
     });
   }
-  if (iibb.gt(0) && iibbAccount) {
+  if (hasIibbLine && iibbAccount) {
     lines.push({
       accountId: iibbAccount,
       projectId: params.projectId,

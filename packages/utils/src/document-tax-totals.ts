@@ -8,8 +8,8 @@ import {
 } from "./money";
 
 /**
- * Default IIBB perception rate for new purchase/sales documents in Mendoza ops ([D-112]).
- * Stored as percent (3 = 3%). Editable per document; not a fiscal engine.
+ * Default IIBB perception rate for new purchase/sales documents ([D-112]).
+ * Keep in sync with `@bloqer/domain` DEFAULT_IIBB_PERCEPTION_RATE_PCT.
  */
 export const DEFAULT_IIBB_PERCEPTION_RATE_PCT = "3";
 
@@ -39,7 +39,7 @@ export function calcDocumentHeaderTaxTotals(params: {
   subtotal: string | number;
   taxAmount: string | number;
   iibbPerceptionRatePercent: string | number;
-  /** When set, use this amount instead of rate × subtotal (centavo match to voucher). */
+  /** When set, use this amount instead of rate × subtotal (reserved for voucher centavo match; not exposed in UI yet). */
   iibbPerceptionAmountOverride?: string | number | null;
 }): DocumentHeaderTaxTotals {
   const subtotal = roundMoney(normalizeDecimalString(params.subtotal));

@@ -6,6 +6,8 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { calcLine, recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
+import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import {
   canEditPurchaseOrders,
   canViewProcurementProjectArea,
@@ -582,15 +584,24 @@ export async function createPurchaseOrder(
   const companyId = await resolveCompanyId(input.projectId, ctx);
   await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
 
-  let estimatedTotal = new Prisma.Decimal(0);
+  let estimatedSubtotal = new Prisma.Decimal(0);
+  let estimatedTax = new Prisma.Decimal(0);
   for (const line of input.lines) {
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
     const rate = new Prisma.Decimal(line.taxRate ?? "0");
-    estimatedTotal = estimatedTotal.plus(
-      calcLine(qty, price, rate, parseDiscountPct(line.discountPct)).lineTotal,
-    );
+    const calc = calcLine(qty, price, rate, parseDiscountPct(line.discountPct));
+    estimatedSubtotal = estimatedSubtotal.plus(calc.lineSubtotal);
+    estimatedTax = estimatedTax.plus(calc.lineTax);
   }
+  const estimatedHeader = headerTotalsWithIibbPerception({
+    lineSubtotals: [estimatedSubtotal],
+    lineTaxes: [estimatedTax],
+    iibbPerceptionRate: new Prisma.Decimal(
+      input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+    ),
+  });
+  const estimatedTotal = estimatedHeader.totalAmount;
   const settings = await getCompanyProcurementSettingsForProject(input.projectId, ctx);
   const fx = computeDocumentFxAmounts(input.currency ?? "ARS", estimatedTotal, null);
   assertDirectPoAllowed(settings, fx.amountArs, ctx, {
@@ -616,7 +627,7 @@ export async function createPurchaseOrder(
           ? new Date(input.expectedDeliveryDate)
           : null,
         currency: input.currency ?? "ARS",
-        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
+        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
         emergencyReason: input.emergencyReason?.trim() || null,

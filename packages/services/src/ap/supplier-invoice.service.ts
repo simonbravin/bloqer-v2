@@ -1,4 +1,5 @@
 import { Prisma, prisma, SupplierInvoice, type CostCategory } from "@bloqer/database";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
 import { auditAp } from "./ap-audit";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
@@ -696,7 +697,7 @@ export async function createSupplierInvoice(
         currency:          input.currency ?? "ARS",
         fxRate: estimatedFx.fxRate,
         invoiceLetter:     suggestedLetter,
-        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
+        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
         notes:             input.notes ?? null,
         internalNotes:     input.internalNotes ?? null,
         purchaseOrderId:   input.purchaseOrderId ?? null,

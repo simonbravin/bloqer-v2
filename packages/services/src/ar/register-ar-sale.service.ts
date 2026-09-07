@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { can, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type { RegisterArSaleInput } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
@@ -362,7 +362,7 @@ export async function registerArSale(
             dueDate: new Date(input.dueDate),
             currency: input.currency ?? "ARS",
             invoiceLetter: input.invoiceLetter ?? null,
-            iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
+            iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
             notes: input.notes ?? null,
             internalNotes: input.internalNotes ?? null,
             externalInvoiceRef: input.externalInvoiceRef ?? null,

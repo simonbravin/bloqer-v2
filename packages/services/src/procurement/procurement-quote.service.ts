@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type { CreateProcurementQuoteInput, UpdateProcurementQuoteInput } from "@bloqer/validators";
 import { calcLine } from "./purchase-order-calc.service";
 import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
@@ -168,7 +169,7 @@ export async function createProcurementQuote(
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
   const quote = await prisma.$transaction(async (tx) => {
-    const iibbPerceptionRate = new Prisma.Decimal(input.iibbPerceptionRate ?? "3");
+    const iibbPerceptionRate = new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT);
     const created = await tx.procurementQuote.create({
       data: {
         tenantId: ctx.tenantId,

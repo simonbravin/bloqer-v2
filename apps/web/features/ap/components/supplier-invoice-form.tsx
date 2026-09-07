@@ -224,6 +224,11 @@ export function SupplierInvoiceForm({
     setPricesIncludeTaxTouched(true);
     setPricesIncludeTax(false);
     const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
+    setIibbPerceptionRate(
+      poPreview.iibbPerceptionRate?.trim()
+        ? poPreview.iibbPerceptionRate
+        : DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+    );
     setLines(
       poPreview.lines.map((l) => ({
         description: l.description,

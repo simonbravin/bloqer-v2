@@ -1,4 +1,5 @@
 import { Prisma, prisma, SalesInvoice, SalesInvoiceStatus } from "@bloqer/database";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type {
   CreateSalesInvoiceInput,
   CreateInvoiceFromCertificationInput,
@@ -298,7 +299,7 @@ export async function createSalesInvoice(
         dueDate: new Date(input.dueDate),
         currency: input.currency ?? "ARS",
         invoiceLetter: suggestedLetter,
-        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
+        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
         externalInvoiceRef: input.externalInvoiceRef ?? null,
@@ -434,7 +435,7 @@ export async function createInvoiceFromCertification(
           dueDate: new Date(input.dueDate),
           currency: cert.project.type === "PUBLIC" ? "ARS" : "ARS",
           invoiceLetter: suggestedLetter,
-          iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "3"),
+          iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "0"),
           notes: input.notes ?? null,
           internalNotes: input.internalNotes ?? null,
           createdBy: ctx.actorUserId,

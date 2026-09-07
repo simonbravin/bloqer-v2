@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
+import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice } from "@bloqer/domain";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +57,7 @@ export function CertificationInvoiceForm({
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(suggested);
   // Certification PU already includes budget taxes — default 0; user may discriminate IVA.
   const [taxRate, setTaxRate] = useState("0");
-  const [iibbPerceptionRate, setIibbPerceptionRate] = useState(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
+  const [iibbPerceptionRate, setIibbPerceptionRate] = useState("0");
 
   const today = toIsoDateInTimeZone();
 

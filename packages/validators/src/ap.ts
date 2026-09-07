@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import {
   fxRateString,
   moneyAmountString,
@@ -47,7 +48,7 @@ export const createSupplierInvoiceSchema = z.object({
   /** When true, line unit prices are gross (IVA incluido) — [D-086]. */
   pricesIncludeTax:  z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
+  iibbPerceptionRate: ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
   purchaseOrderId:   z.string().uuid().optional().nullable(),

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { idempotencyKeySchema } from "./idempotency";
 import { costCategorySchema } from "./budget";
 import {
@@ -39,7 +40,7 @@ export const createPurchaseOrderSchema = z.object({
   internalNotes: z.string().optional().nullable(),
   emergencyReason: z.string().max(2000).optional().nullable(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate: ratePctString.optional().default("3.0000"),
+  iibbPerceptionRate: ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   lines: z.array(purchaseOrderLineSchema).min(1, "Debe tener al menos una línea"),
 });
 

@@ -61,7 +61,7 @@ export function IibbPerceptionFields({
           <DecimalInput
             id={id}
             value={rate}
-            onValueChange={onRateChange}
+            onValueChange={(v) => onRateChange(v.trim() === "" ? "0" : v)}
             disabled={disabled}
             placeholder="3"
             className={cn("text-sm", compact ? "h-8 text-right" : "h-9")}
