@@ -9,9 +9,8 @@ export { COST_TYPE_LABELS_ES, COST_TYPE_ORDER } from "./cost-type-constants";
  * Priority:
  *  1. Explicit input from the caller (user picked a type in the form).
  *  2. APU category of the picked insumo APU (baño químico = EQP → EQP).
- *  3. APU-derived **dominant** CostCategory of the partida when no insumo APU
- *     was selected (helps flows without a costType selector, e.g. purchase
- *     requests that only reference the WBS node).
+ *  3. APU **sole** CostCategory of the partida when no insumo APU was selected
+ *     (only when the APU has exactly one positive category — mixed → MATERIAL).
  *  4. Fallback: MATERIAL.
  */
 export function resolveLineCostType(input: {
@@ -25,18 +24,40 @@ export function resolveLineCostType(input: {
   return "MATERIAL";
 }
 
+/**
+ * Free-text goods (`lineType=MATERIAL`, no APU) must not persist as LAB/EQP.
+ * Pedir from Mano de obra / Equipos uses `lineType=SERVICE` — unaffected.
+ */
+export function coerceFreeTextGoodsCostType(
+  lineType: string | null | undefined,
+  costAnalysisLineId: string | null | undefined,
+  costType: CostCategory,
+): CostCategory {
+  if (
+    lineType === "MATERIAL" &&
+    !costAnalysisLineId &&
+    (costType === "LABOR" || costType === "EQUIPMENT")
+  ) {
+    return "MATERIAL";
+  }
+  return costType;
+}
+
 /** Inventory consumption always MATERIAL. */
 export function inventoryCostType(): CostCategory {
   return "MATERIAL";
 }
 
 /**
- * Given the analysisLines of an ITEM's APU, return the CostCategory that
- * concentrates ≥ 60% of the total cost, or the sole category present.
- * Returns null when the APU is empty, all-zero, or genuinely mixed.
+ * Given the analysisLines of an ITEM's APU, return the CostCategory only when
+ * it is the **sole** positive category (e.g. baño químico = 100% EQP).
+ *
+ * Mixed APUs (even if one category is ≥ 60%) return **null** so free-text
+ * SC/OC/factura lines default to MATERIAL instead of stealing LABOR/EQP and
+ * polluting Mano de obra / Equipos boards ([D-099] amend 2026-09).
  *
  * Used by procurement flows to pre-select `costType` when the user picks a
- * partida without picking a specific insumo APU ([D-099]).
+ * partida without picking a specific insumo APU.
  *
  * Weighs by `totalCost` (the persisted per-line amount that already accounts
  * for coefficient × unitCost / lump sums).
@@ -62,16 +83,11 @@ export function computeDominantCostTypeFromApuLines(
   }
   if (grand.lessThanOrEqualTo(0)) return null;
   if (totals.size === 1) return [...totals.keys()][0]!;
-  const threshold = grand.times(0.6);
-  for (const [cat, sum] of totals) {
-    if (sum.greaterThanOrEqualTo(threshold)) return cat;
-  }
   return null;
 }
 
 /**
- * Load the APU-derived dominant CostCategory for a set of WBS ITEM ids.
- * Returns an entry per wbs id, with null for mixed / empty APUs.
+ * Load the APU sole CostCategory for a set of WBS ITEM ids (null if mixed / empty).
  * Tenant-scoped for safety.
  */
 export async function loadWbsDominantCostTypes(

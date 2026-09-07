@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-09-07T18:04:34.623Z",
-  "sourceHash": "3b0a544a3977f7ed880ff9f2336bba20713023c211c342c5922784221cb7b13b",
+  "generatedAt": "2026-09-07T21:15:33.453Z",
+  "sourceHash": "7a2146dd3365ebc8b11046f891bfe6f85969d196b0aa4ec6467bf85c0154ef53",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "52e0422c2e50a31828181f24aa14fa33762e7c81b1e4282dbde702a22c85ca86",
-      "bytes": 141630
+      "sha256": "78c4ece3d8c8090641bcc07864b75de4622b71366c36b1d6bd6da29db12e9aca",
+      "bytes": 141904
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -738,7 +738,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "spondiente.\n2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías.\n3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto). Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad."
+      "text": "spondiente.\n2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías.\n3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto, **DWG/DXF**). No hay preview in-app de CAD: Ver/Descargar baja el archivo. Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#82",
@@ -1178,7 +1178,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "- **Filtro por tipo de costo ([D-099]):** en la barra superior, selector *Tipo de costo* (Todos / Materiales / Mano de obra / Equipos / Subcontratos / Otros). Al elegir un tipo, la tabla reemplaza los importes por los del bucket, oculta columnas de cantidad / recepción / avance libro / certificado (son atributos de la partida entera, no de un tipo), y los totales del proyecto se recalculan para ese tipo. El CSV / PDF respeta el filtro (queda en la URL como `?costType=`).\n- **Desglose por tipo de costo ([D-099]):** en partidas hoja, el chevron junto al código EDT abre filas de solo lectura por categoría presente (Materiales / Mano de obra / Equipos / Subcontratos / Otros). El presupuesto por tipo viene del APU; el gasto tipado de OC, factura, subcontrato y consumo. Categorías vacías se ocultan. En el diálogo de partida, sección **Por tipo de costo**. El chevron se desactiva cuando el filtro por tipo está activo (redundante).\n- **Tipo en OC / factura de obra:** cada línea tiene **Tipo de costo**. **Auto-tipado al elegir partida ([D-099]):** si el APU de la partida tiene una categoría dominante (≥ 60% del costo directo, o categoría única), la línea se pre-tipa con esa. Ej.: baño quími"
+      "text": "- **Filtro por tipo de costo ([D-099]):** en la barra superior, selector *Tipo de costo* (Todos / Materiales / Mano de obra / Equipos / Subcontratos / Otros). Al elegir un tipo, la tabla reemplaza los importes por los del bucket, oculta columnas de cantidad / recepción / avance libro / certificado (son atributos de la partida entera, no de un tipo), y los totales del proyecto se recalculan para ese tipo. El CSV / PDF respeta el filtro (queda en la URL como `?costType=`).\n- **Desglose por tipo de costo ([D-099]):** en partidas hoja, el chevron junto al código EDT abre filas de solo lectura por categoría presente (Materiales / Mano de obra / Equipos / Subcontratos / Otros). El presupuesto por tipo viene del APU; el gasto tipado de OC, factura, subcontrato y consumo. Categorías vacías se ocultan. En el diálogo de partida, sección **Por tipo de costo**. El chevron se desactiva cuando el filtro por tipo está activo (redundante).\n- **Tipo en OC / factura de obra:** cada línea tiene **Tipo de costo**. **Auto-tipado al elegir partida ([D-099]):** si el APU de la partida tiene **una sola** categoría con costo (p. ej. baño químico = EQP), la línea se pre-tipa con esa. Si el APU es **mixto** "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#137",
@@ -1186,7 +1186,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "co → EQP; excavación con retro (EQP ~70%) → EQP; movimiento de suelos con MAT/LAB/EQP parejo → MATERIAL con hint “varios tipos, elegí el correcto”. Si elegís un insumo APU específico, prevalece su categoría. Si cambiaste el tipo a mano, no se pisa al mover la partida."
+      "text": "(aunque una categoría sea mayoría), queda **Materiales** con hint “varios tipos, elegí el correcto” — evitá que un pedido de clavos en Replanteo se tipifique como Mano de obra. Si elegís un insumo APU específico, prevalece su categoría. Desde Pedir en Materiales / Mano de obra / Equipos, el tipado viene del tablero. Si cambiaste el tipo a mano, no se pisa al mover la partida."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#138",
@@ -1530,7 +1530,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "21. Mantenimiento de esta guía (obligatorio para el equipo)",
-      "text": "oke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.\n\n---\n\n*Documento vivo. Actualizado septiembre 2026: tableros Mano de obra / Equipos ([D-109]), vínculo APU en factura ([D-110]), caminito MO/EQP, Pedir tipado desde faltante, varianza CSV neto. Antes: agosto 2026 — descuento % en líneas ([D-093]); centro de ayuda `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Actualizar en el mismo PR que el cambio de producto.*"
+      "text": "oke:** validar con [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) si el cambio afecta operación diaria.\n\n---\n\n*Documento vivo. Actualizado septiembre 2026: auto-tipado APU solo con categoría única ([D-099] amend; evita MAT→LAB en partidas mixtas), tableros Mano de obra / Equipos ([D-109]), vínculo APU en factura ([D-110]), caminito MO/EQP, Pedir tipado desde faltante, varianza CSV neto. Antes: agosto 2026 — descuento % en líneas ([D-093]); centro de ayuda `/ayuda` ([D-090]); payee AP proveedor o empleado (D-089, §3 / §12.2), conciliación bancaria (§4.2), ajuste manual de caja (§4.3), cierre de períodos (§15.3), métodos de liquidación, estados Confirmado/Conciliado, invitaciones sin token en URL, menús Tesorería/Contabilidad. Actualizar en el mismo PR que el cambio de producto.*"
     },
     {
       "id": "00-product/GLOSSARY.md#1",

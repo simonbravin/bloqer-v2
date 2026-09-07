@@ -8,7 +8,7 @@ import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
-import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
+import { loadWbsDominantCostTypes, coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
 import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
@@ -353,21 +353,28 @@ export async function createPurchaseRequest(
         createdBy: ctx.actorUserId,
         updatedBy: ctx.actorUserId,
         lines: {
-          create: input.lines.map((line, i) => ({
-            wbsNodeId: line.wbsNodeId,
-            productId: line.productId ?? null,
-            costAnalysisLineId: line.costAnalysisLineId ?? null,
-            costType: resolveLineCostType({
-              costType: line.costType ?? null,
-              apuCategory: apuCategoryByIdx.get(i) ?? null,
-              wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
-            }),
-            lineType: line.lineType,
-            description: line.description,
-            unit: line.unit ?? "",
-            quantity: new Prisma.Decimal(line.quantity),
-            sortOrder: line.sortOrder ?? i,
-          })),
+          create: input.lines.map((line, i) => {
+            const costType = coerceFreeTextGoodsCostType(
+              line.lineType,
+              line.costAnalysisLineId,
+              resolveLineCostType({
+                costType: line.costType ?? null,
+                apuCategory: apuCategoryByIdx.get(i) ?? null,
+                wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
+              }),
+            );
+            return {
+              wbsNodeId: line.wbsNodeId,
+              productId: line.productId ?? null,
+              costAnalysisLineId: line.costAnalysisLineId ?? null,
+              costType,
+              lineType: line.lineType,
+              description: line.description,
+              unit: line.unit ?? "",
+              quantity: new Prisma.Decimal(line.quantity),
+              sortOrder: line.sortOrder ?? i,
+            };
+          }),
         },
       },
       include: { lines: { orderBy: { sortOrder: "asc" } } },

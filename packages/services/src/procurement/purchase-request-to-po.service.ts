@@ -1,5 +1,5 @@
 import { effectiveUnitPriceNet } from "@bloqer/utils";
-import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
+import { loadWbsDominantCostTypes, coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
 import { parseDiscountPct } from "../finance/invoice-line-money";
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
 import { auditProcurement } from "./procurement-audit";
@@ -320,6 +320,15 @@ async function createOnePoFromQuoteLinesInTx(
 
   for (const prl of prLines) {
     const ql = quoteLineByPrLine.get(prl.id)!;
+    const costType = coerceFreeTextGoodsCostType(
+      prl.lineType,
+      prl.costAnalysisLineId,
+      resolveLineCostType({
+        costType: prl.costType,
+        apuCategory: null,
+        wbsDominantCostType: prl.wbsNodeId ? wbsDominant.get(prl.wbsNodeId) ?? null : null,
+      }),
+    );
     await tx.purchaseOrderLine.create({
       data: {
         purchaseOrderId: po.id,
@@ -329,11 +338,7 @@ async function createOnePoFromQuoteLinesInTx(
         wbsNodeId: prl.wbsNodeId,
         costAnalysisLineId: prl.costAnalysisLineId,
         productId: prl.productId,
-        costType: resolveLineCostType({
-          costType: prl.costType,
-          apuCategory: null,
-          wbsDominantCostType: prl.wbsNodeId ? wbsDominant.get(prl.wbsNodeId) ?? null : null,
-        }),
+        costType,
         description: prl.description,
         unit: prl.unit,
         quantity: prl.quantity,

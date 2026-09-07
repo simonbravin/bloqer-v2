@@ -45,7 +45,7 @@ export type InvoiceWbsOption = {
   id: string;
   code: string;
   name: string;
-  /** APU-derived dominant CostCategory used to pre-select `costType` ([D-099]). */
+  /** APU sole CostCategory used to pre-select `costType` ([D-099]). */
   dominantCostType?: CostCategoryOptionValue | null;
 };
 
@@ -160,7 +160,7 @@ export function InvoiceLinesEditor({
       if (field === "wbsNodeId" && value !== l.wbsNodeId) {
         patched.purchaseOrderLineId = null;
         patched.costAnalysisLineId = null;
-        // Auto-type from APU dominant when the user has not overridden `costType`.
+        // Auto-type from APU sole category when the user has not overridden `costType`.
         if (!manualCostTypeKeys.has(lineKey)) {
           const wbs = wbsOptions.find((w) => w.id === value);
           const dominant = wbs?.dominantCostType ?? null;

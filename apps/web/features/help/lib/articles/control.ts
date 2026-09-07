@@ -27,7 +27,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "No sumes OC + factura como costo total (doble conteo): mirá exposición esperada.",
       "Presupuesto vs real ya no es una pantalla aparte: vivía acá ([D-098]).",
       "**% recepción ≠ % avance libro**: recepción = costo recibido (cant. × PU de la OC) / presupuesto; avance libro = suma del % del día de partes APPROVED. Recibir toda una OC chica no da 100% de la partida. Si el capataz cargó 95% pero no hay OC recibida, % recepción queda en 0 y eso es correcto ([D-045]). Un parte solo enviado (SUBMITTED) no mueve % avance libro. Facturas emitidas sin vincular a la OC no bajan el comprometido abierto. La vista *Financiero* no muestra esas columnas: usá *Cantidades* o *% Avance*.",
-      "Al elegir la partida en una OC / factura, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico = EQP, excavación con retro = EQP, etc.). Podés cambiarla en el selector; si lo hacés a mano, no la pisamos cuando cambies la partida.",
+      "Al elegir la partida en una OC / factura, el sistema pre-tipa la línea solo si el APU tiene **una sola** categoría (baño químico = EQP). Si es mixto, queda Materiales y te pide elegir el tipo — así un pedido de clavos en Replanteo no cae en Mano de obra. Podés cambiarla en el selector; si lo hacés a mano, no la pisamos cuando cambies la partida.",
       "**Mano de obra en factura de proveedor**: si contratás una cuadrilla externa o pagás un jornal como AP, tipá la línea como **LAB** — no hace falta que sea subcontrato. Subcontrato = módulo Subcontratos con certificación (SUB). El vínculo APU en la factura ([D-110]) hace que el tablero Operación → Mano de obra baje el faltante de esa fila.",
     ],
     relatedSlugs: [

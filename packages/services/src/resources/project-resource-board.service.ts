@@ -20,6 +20,7 @@ import { resolveApprovedBudgetForProject } from "../reports/report-budget-resolv
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import {
   asCostCategory,
+  isMistypedMaterialOnResourceBoard,
   resourceFallbackRowKey,
   resourceRowKey,
   RESOURCE_BOARD_LABELS_ES,
@@ -360,6 +361,8 @@ export async function getProjectResourceBoard(
       select: {
         wbsNodeId: true,
         costAnalysisLineId: true,
+        costType: true,
+        lineType: true,
         description: true,
         quantity: true,
         purchaseRequest: { select: { id: true, number: true } },
@@ -382,9 +385,13 @@ export async function getProjectResourceBoard(
         id: true,
         wbsNodeId: true,
         costAnalysisLineId: true,
+        costType: true,
         description: true,
         quantity: true,
         purchaseOrder: { select: { id: true, number: true } },
+        purchaseRequestLine: {
+          select: { lineType: true, costAnalysisLineId: true },
+        },
       },
     }),
     gate.isEnabled("AP")
@@ -460,6 +467,16 @@ export async function getProjectResourceBoard(
 
   for (const line of prLines) {
     if (!line.wbsNodeId) continue;
+    if (
+      isMistypedMaterialOnResourceBoard({
+        boardCategory: costCategory,
+        costType: line.costType,
+        lineType: line.lineType,
+        costAnalysisLineId: line.costAnalysisLineId,
+      })
+    ) {
+      continue;
+    }
     let apuId = line.costAnalysisLineId;
     if (apuId && !byApuId.has(apuId)) apuId = null;
     const row = ensureOrphan(line.wbsNodeId, line.description, apuId);
@@ -474,6 +491,17 @@ export async function getProjectResourceBoard(
 
   for (const line of poLines) {
     if (!line.wbsNodeId) continue;
+    const prLine = line.purchaseRequestLine;
+    if (
+      isMistypedMaterialOnResourceBoard({
+        boardCategory: costCategory,
+        costType: line.costType,
+        lineType: prLine?.lineType ?? null,
+        costAnalysisLineId: line.costAnalysisLineId ?? prLine?.costAnalysisLineId ?? null,
+      })
+    ) {
+      continue;
+    }
     let apuId = line.costAnalysisLineId;
     if (apuId && !byApuId.has(apuId)) apuId = null;
     const row = ensureOrphan(line.wbsNodeId, line.description, apuId);

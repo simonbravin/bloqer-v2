@@ -1065,7 +1065,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Desde Pendientes (**Registrar factura** o **Completar factura**) aterrizás en la OC / borrador; desde recepción confirmada u OC: panel Facturación → **Registrar factura**.",
       "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta), el **insumo APU** si venía de la OC ([D-110]: se guarda en la línea para los tableros) y el adjunto del comprobante.",
       "Crear → borrador → Emitir (o Emitir y pagar ahora).",
-      "**Sin OC**: al elegir la partida, el sistema pre-tipa la línea con la categoría dominante del APU (baño químico → EQP; excavación con retro → EQP). Si es mixto, queda Materiales con hint. Desde Mano de obra / Equipos → Factura, el tipado y el APU vienen prellenados.",
+      "**Sin OC**: al elegir la partida, el sistema pre-tipa la línea solo si el APU tiene una sola categoría (baño químico → EQP). Si es mixto, queda Materiales con hint. Desde Mano de obra / Equipos → Factura, el tipado y el APU vienen prellenados.",
     ],
     effects: ["Emitir → Devengado + CxP + asiento DRAFT (en el bucket del tipo de cada línea)."],
     pitfalls: [

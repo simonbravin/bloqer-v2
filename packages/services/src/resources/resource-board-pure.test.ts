@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isResourceBoardCategory,
+  isMistypedMaterialOnResourceBoard,
   resourceBoardFromParam,
   resourceCoverageShortfall,
   resourceFallbackRowKey,
@@ -32,4 +33,43 @@ test("resourceCoverageShortfall uses max(ordered, invoiced)", () => {
   assert.equal(resourceCoverageShortfall(10, 12, 8), 0);
   assert.equal(resourceCoverageShortfall(5, 0, 0), 5);
   assert.equal(resourceCoverageShortfall(0, 2, 1), 0);
+});
+
+test("isMistypedMaterialOnResourceBoard ignores free-text MATERIAL as LAB/EQP", () => {
+  assert.equal(
+    isMistypedMaterialOnResourceBoard({
+      boardCategory: "LABOR",
+      costType: "LABOR",
+      lineType: "MATERIAL",
+      costAnalysisLineId: null,
+    }),
+    true,
+  );
+  assert.equal(
+    isMistypedMaterialOnResourceBoard({
+      boardCategory: "LABOR",
+      costType: "LABOR",
+      lineType: "SERVICE",
+      costAnalysisLineId: null,
+    }),
+    false,
+  );
+  assert.equal(
+    isMistypedMaterialOnResourceBoard({
+      boardCategory: "LABOR",
+      costType: "LABOR",
+      lineType: "MATERIAL",
+      costAnalysisLineId: "apu-1",
+    }),
+    false,
+  );
+  assert.equal(
+    isMistypedMaterialOnResourceBoard({
+      boardCategory: "EQUIPMENT",
+      costType: "MATERIAL",
+      lineType: "MATERIAL",
+      costAnalysisLineId: null,
+    }),
+    false,
+  );
 });

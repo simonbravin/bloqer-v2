@@ -4,6 +4,7 @@ import { Prisma } from "@bloqer/database";
 import { computeCostExposureLayers } from "./cost-exposure";
 import {
   computeDominantCostTypeFromApuLines,
+  coerceFreeTextGoodsCostType,
   dominantCostTypeByWbs,
   resolveLineCostType,
 } from "./cost-type";
@@ -15,7 +16,7 @@ describe("resolveLineCostType [D-099]", () => {
     assert.equal(resolveLineCostType({ costType: "LABOR", apuCategory: "MATERIAL" }), "LABOR");
   });
 
-  it("falls back to the APU category, then to the partida dominant, then to MATERIAL", () => {
+  it("falls back to the APU category, then to the partida sole type, then to MATERIAL", () => {
     assert.equal(resolveLineCostType({ costType: null, apuCategory: "EQUIPMENT" }), "EQUIPMENT");
     assert.equal(
       resolveLineCostType({ costType: null, apuCategory: null, wbsDominantCostType: "LABOR" }),
@@ -24,7 +25,7 @@ describe("resolveLineCostType [D-099]", () => {
     assert.equal(resolveLineCostType({ costType: null, apuCategory: null }), "MATERIAL");
   });
 
-  it("the APU insumo category beats the partida dominant", () => {
+  it("the APU insumo category beats the partida sole type", () => {
     assert.equal(
       resolveLineCostType({
         costType: null,
@@ -33,6 +34,15 @@ describe("resolveLineCostType [D-099]", () => {
       }),
       "MATERIAL",
     );
+  });
+});
+
+describe("coerceFreeTextGoodsCostType", () => {
+  it("forces MATERIAL for free-text goods mistyped as LABOR/EQP", () => {
+    assert.equal(coerceFreeTextGoodsCostType("MATERIAL", null, "LABOR"), "MATERIAL");
+    assert.equal(coerceFreeTextGoodsCostType("MATERIAL", null, "EQUIPMENT"), "MATERIAL");
+    assert.equal(coerceFreeTextGoodsCostType("SERVICE", null, "LABOR"), "LABOR");
+    assert.equal(coerceFreeTextGoodsCostType("MATERIAL", "apu-1", "LABOR"), "LABOR");
   });
 });
 
@@ -46,14 +56,21 @@ describe("computeDominantCostTypeFromApuLines [D-099]", () => {
     );
   });
 
-  it("returns the category holding ≥ 60% (excavación EQP 70% + LAB 20% + MAT 10%)", () => {
+  it("returns null when mixed even if one category is ≥ 60% (avoid LAB stealing MAT buys)", () => {
     assert.equal(
       computeDominantCostTypeFromApuLines([
         { category: "EQUIPMENT", totalCost: dec(7000) },
         { category: "LABOR", totalCost: dec(2000) },
         { category: "MATERIAL", totalCost: dec(1000) },
       ]),
-      "EQUIPMENT",
+      null,
+    );
+    assert.equal(
+      computeDominantCostTypeFromApuLines([
+        { category: "LABOR", totalCost: dec(4599999) },
+        { category: "MATERIAL", totalCost: dec(1250000) },
+      ]),
+      null,
     );
   });
 
@@ -82,7 +99,6 @@ describe("computeDominantCostTypeFromApuLines [D-099]", () => {
     assert.equal(
       computeDominantCostTypeFromApuLines([
         { category: "SUBCONTRACT", totalCost: "5000" },
-        { category: "MATERIAL", totalCost: "1000" },
       ]),
       "SUBCONTRACT",
     );

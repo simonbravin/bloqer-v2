@@ -304,13 +304,10 @@ export type ProcurementWbsOption = {
   /** MATERIAL APU hints under this ITEM ([D-068]). */
   apuLines: ProcurementApuOption[];
   /**
-   * APU-derived dominant CostCategory for this ITEM ([D-099]).
+   * APU sole CostCategory for this ITEM ([D-099] amend 2026-09).
    *
-   * Computed from the sum of `totalCost` per category across all analysisLines:
-   * - a category with ≥ 60% of the total → dominant.
-   * - if a single category exists (e.g. baño químico = 100% EQP) → that one.
-   * - mixed (no category reaches 60% and >1 categories present) → null.
-   * - lump-sum or empty APU → null.
+   * - sole positive category (e.g. baño químico = 100% EQP) → that one.
+   * - mixed / empty / all-zero → null (UI defaults to MATERIAL; user picks).
    *
    * Used by the OC/factura line editor to pre-select `costType` when the user
    * picks the partida but does not pick a specific insumo APU.

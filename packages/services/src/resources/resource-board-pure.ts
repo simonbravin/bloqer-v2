@@ -54,3 +54,18 @@ export function resourceCoverageShortfall(
   const covered = Math.max(orderedQty, invoicedQty);
   return Math.max(0, needQty - covered);
 }
+
+/**
+ * Free-text SC lines with `lineType=MATERIAL` but `costType=LABOR|EQUIPMENT` and no APU
+ * must not seed Mano de obra / Equipos (legacy mistype from mixed-partida auto-tipado).
+ */
+export function isMistypedMaterialOnResourceBoard(input: {
+  boardCategory: ResourceBoardCategory;
+  costType: string | null | undefined;
+  lineType: string | null | undefined;
+  costAnalysisLineId: string | null | undefined;
+}): boolean {
+  if (input.costAnalysisLineId) return false;
+  if (input.costType !== input.boardCategory) return false;
+  return input.lineType === "MATERIAL";
+}

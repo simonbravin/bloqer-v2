@@ -80,7 +80,7 @@ export type WbsOption = {
   availableSaldo?: string | null;
   wouldExceedBudget?: boolean;
   apuLines?: WbsApuOption[];
-  /** APU-derived dominant CostCategory used to pre-select `costType` ([D-099]). */
+  /** APU sole CostCategory used to pre-select `costType` ([D-099]). */
   dominantCostType?: CostCategoryOptionValue | null;
 };
 export type ProductOption = { id: string; sku: string; name: string; unit: string };
@@ -156,7 +156,7 @@ export function PurchaseOrderLinesEditor({
     Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
   );
   // Lines whose `costType` the user set manually. We must not overwrite that
-  // when the WBS changes (auto-typing from the APU dominant only kicks in for
+  // when the WBS changes (auto-typing from the APU sole category only kicks in for
   // untouched lines). Persisted lines already carry the user's choice, so the
   // set only tracks changes within this editing session.
   const [manualCostTypeKeys, setManualCostTypeKeys] = useState<Set<string>>(() => new Set());
@@ -185,10 +185,9 @@ export function PurchaseOrderLinesEditor({
         patched.costAnalysisLineId = null;
         const overriddenManually = manualCostTypeKeys.has(lineKey);
         if (!overriddenManually) {
-          // Auto-type from the APU dominant category ([D-099]).
+          // Auto-type from the APU sole category ([D-099] amend 2026-09).
           // - baño químico with 100% EQP → EQP.
-          // - excavación with EQP 70% → EQP.
-          // - genuinely mixed or empty APU → MATERIAL (safe default; hint asks user to pick).
+          // - mixed APU (even LAB-heavy) → MATERIAL (safe default; hint asks user to pick).
           const wbs = wbsOptions.find((w) => w.id === value);
           const dominant = wbs?.dominantCostType ?? null;
           patched.costType = dominant && COST_CATEGORY_OPTIONS.some((o) => o.value === dominant)
