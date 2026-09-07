@@ -29,7 +29,7 @@ export async function clientUploadDocument(
   if (!mimeType) {
     return {
       error:
-        "Tipo de archivo no permitido. Formatos aceptados: PDF, imágenes, Word, Excel, CSV, texto.",
+        "Tipo de archivo no permitido. Formatos aceptados: PDF, imágenes, Word, Excel, CSV, texto, DWG/DXF.",
     };
   }
   if (input.file.size <= 0) {

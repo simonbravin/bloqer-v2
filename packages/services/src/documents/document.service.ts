@@ -25,7 +25,8 @@ import {
   resolveDocumentNotificationEntityLabel,
 } from "../notifications/notification-copy";
 import type { CreateDocumentMetadataInput, InitiateUploadInput, ListProjectDocumentsInput } from "@bloqer/validators";
-import { ALLOWED_MIME_TYPES } from "@bloqer/validators";
+import { ALLOWED_MIME_TYPES, isInlineDocumentPreviewMime, resolveAllowedMimeType } from "@bloqer/validators";
+import type { AllowedMimeType } from "@bloqer/validators";
 import {
   assertTenantModuleEnabledWithGate,
   getTenantModuleGate,
@@ -66,6 +67,37 @@ export {
 } from "./document-delete-policy";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Trust extension + allowlist, not a client-claimed MIME alone.
+ * Critical for CAD/Office where byte sniff is skipped or weak.
+ */
+function canonicalizeDeclaredUploadMime(originalFileName: string, declaredMime: string): AllowedMimeType {
+  const resolved = resolveAllowedMimeType(originalFileName, declaredMime);
+  if (!resolved) {
+    throw new ServiceError("VALIDATION", "Tipo de archivo no permitido");
+  }
+  if (resolved !== declaredMime) {
+    throw new ServiceError(
+      "VALIDATION",
+      "El tipo de archivo no coincide con la extensión del nombre",
+    );
+  }
+  const ext = originalFileName.split(".").pop()?.toLowerCase() ?? "";
+  if (declaredMime === "image/vnd.dwg" && ext !== "dwg") {
+    throw new ServiceError(
+      "VALIDATION",
+      "El tipo de archivo no coincide con la extensión del nombre",
+    );
+  }
+  if (declaredMime === "image/vnd.dxf" && ext !== "dxf") {
+    throw new ServiceError(
+      "VALIDATION",
+      "El tipo de archivo no coincide con la extensión del nombre",
+    );
+  }
+  return resolved;
+}
 
 /** Default age after which an UPLOADING row is considered abandoned (1 hour) — admin batch cleanup. */
 const DEFAULT_STALE_UPLOAD_THRESHOLD_MS = 60 * 60 * 1000;
@@ -559,6 +591,7 @@ export async function uploadDocument(
 ): Promise<{ documentId: string; storageConfigured: boolean }> {
   const configured = isStorageConfigured();
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const mimeType = canonicalizeDeclaredUploadMime(input.originalFileName, input.mimeType);
 
   if (input.sizeBytes === 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
@@ -570,10 +603,10 @@ export async function uploadDocument(
     throw new ServiceError("VALIDATION", "El tamaño del archivo no coincide");
   }
 
-  await assertUploadContentMatchesDeclaredMime(content, input.mimeType);
+  await assertUploadContentMatchesDeclaredMime(content, mimeType);
 
   const contentSha256 = sha256Hex(content);
-  const plan = await resolveDocumentUploadPlan(input, ctx, idempotencyKey);
+  const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx, idempotencyKey);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
@@ -611,7 +644,7 @@ export async function uploadDocument(
 
   if (configured) {
     try {
-      await putObject(plan.storageKey, content, input.mimeType);
+      await putObject(plan.storageKey, content, mimeType);
     } catch {
       throw new ServiceError("VALIDATION", "Error al guardar el archivo. Intentá de nuevo.");
     }
@@ -633,7 +666,7 @@ export async function uploadDocument(
             folderId,
             originalFileName: input.originalFileName,
             fileName:         plan.fileName,
-            mimeType:         input.mimeType,
+            mimeType,
             sizeBytes:        input.sizeBytes,
             storageProvider:  provider,
             storageKey:       plan.storageKey,
@@ -691,6 +724,7 @@ export async function initiateDocumentUpload(
 }> {
   const configured = isStorageConfigured();
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
+  const mimeType = canonicalizeDeclaredUploadMime(input.originalFileName, input.mimeType);
 
   if (input.sizeBytes <= 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
@@ -698,11 +732,8 @@ export async function initiateDocumentUpload(
   if (input.sizeBytes > MAX_SIZE_BYTES) {
     throw new ServiceError("VALIDATION", "El archivo no puede superar 50 MB");
   }
-  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
-    throw new ServiceError("VALIDATION", "Tipo de archivo no permitido");
-  }
 
-  const plan = await resolveDocumentUploadPlan(input, ctx, idempotencyKey);
+  const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx, idempotencyKey);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
@@ -729,7 +760,7 @@ export async function initiateDocumentUpload(
     if (existing.status !== "UPLOADING" && existing.status !== "ACTIVE") return false;
     return (
       existing.originalFileName === input.originalFileName &&
-      existing.mimeType === input.mimeType &&
+      existing.mimeType === mimeType &&
       existing.sizeBytes === input.sizeBytes &&
       (existing.linkedEntityType ?? null) === plan.linkedEntityType &&
       (existing.linkedEntityId ?? null) === plan.linkedEntityId
@@ -771,7 +802,7 @@ export async function initiateDocumentUpload(
           folderId,
           originalFileName: input.originalFileName,
           fileName: plan.fileName,
-          mimeType: input.mimeType,
+          mimeType,
           sizeBytes: input.sizeBytes,
           storageProvider: provider,
           storageKey: plan.storageKey,
@@ -920,7 +951,6 @@ export async function getDocumentDownloadUrl(
   ctx: ServiceContext,
   options: { disposition?: ContentDispositionKind } = {},
 ): Promise<string> {
-  const disposition = options.disposition ?? "attachment";
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
@@ -934,6 +964,12 @@ export async function getDocumentDownloadUrl(
       "CONFLICT",
       "No hay archivo almacenado para descargar. Solo se guardó la metadata del documento (el almacenamiento de archivos no estaba configurado).",
     );
+  }
+
+  // Never force-inline CAD/Office/etc. even if the client asks for disposition=inline.
+  let disposition: ContentDispositionKind = options.disposition ?? "attachment";
+  if (disposition === "inline" && !isInlineDocumentPreviewMime(doc.mimeType)) {
+    disposition = "attachment";
   }
 
   try {

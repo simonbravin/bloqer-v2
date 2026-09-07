@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ALLOWED_MIME_TYPES } from "@bloqer/validators";
+import { DOCUMENT_FILE_INPUT_ACCEPT } from "@bloqer/validators";
 import {
   formatUploadSize,
   isImageUploadFile,
@@ -232,7 +232,7 @@ export function DocumentUploadZone(props: DocumentUploadZoneProps) {
         ref={fileInputRef}
         type="file"
         className="sr-only"
-        accept={ALLOWED_MIME_TYPES.join(",")}
+        accept={DOCUMENT_FILE_INPUT_ACCEPT}
         multiple={multiple}
         disabled={disabled}
         tabIndex={-1}

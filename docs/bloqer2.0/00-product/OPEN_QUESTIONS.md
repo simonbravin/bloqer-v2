@@ -244,12 +244,13 @@
 ### Q-020 — Formato exacto de adjuntos / documentos
 
 - **Categoría:** Documentos
-- **Estado:** ABIERTA
+- **Estado:** ABIERTA (parcialmente acotada en runtime)
 - **Opciones:**
   1. Solo PDF + imágenes.
   2. Cualquier tipo de archivo (con tamaño máximo).
   3. Tipos permitidos configurables por tenant.
 - **Recomendación:** opción 2 con tamaño máximo (ej. 25 MB).
+- **Runtime actual:** allowlist fija hasta **50 MB** — PDF, imágenes (jpeg/png/webp/heic/heif), Word, Excel, CSV, texto, **DWG/DXF**. No es “cualquier tipo” ni configurable por tenant.
 - **Bloquea:** [`02-modules/DOCUMENTS.md`](../02-modules/DOCUMENTS.md), [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md).
 
 ### Q-021 — Anulación de movimientos confirmados

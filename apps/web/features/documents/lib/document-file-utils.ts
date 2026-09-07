@@ -48,9 +48,7 @@ export function isImageLikeDocument(mimeType: string, fileName: string): boolean
   ) {
     return true;
   }
-  if (mime.startsWith("image/")) {
-    return true;
-  }
+  // Do not treat other image/* (e.g. IANA CAD image/vnd.dwg) as raster previews.
   if (mime && mime !== "application/octet-stream") {
     return false;
   }

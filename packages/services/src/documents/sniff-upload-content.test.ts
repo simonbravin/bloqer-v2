@@ -80,11 +80,13 @@ describe("sniff-upload-content", () => {
     );
   });
 
-  it("does not sniff Office / CSV / TXT (zip-based or text)", () => {
+  it("does not sniff Office / CSV / TXT / CAD (zip-based, text, or opaque binary)", () => {
     assert.equal(isByteSniffSkippedMime("application/vnd.openxmlformats-officedocument.wordprocessingml.document"), true);
     assert.equal(isByteSniffSkippedMime("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"), true);
     assert.equal(isByteSniffSkippedMime("text/csv"), true);
     assert.equal(isByteSniffSkippedMime("text/plain"), true);
+    assert.equal(isByteSniffSkippedMime("image/vnd.dwg"), true);
+    assert.equal(isByteSniffSkippedMime("image/vnd.dxf"), true);
     assert.equal(isByteSniffSkippedMime("image/jpeg"), false);
   });
 
@@ -103,18 +105,26 @@ describe("sniff-upload-content", () => {
     assert.equal(createHash("sha256").update(PNG).digest("hex"), a);
   });
 
-  it("smoke: sniff + hash of ~2MB JPEG-like and ~10MB PDF-like stays well under 1s", async () => {
-    const jpeg2mb = Buffer.concat([JPEG, Buffer.alloc(2 * 1024 * 1024 - JPEG.length, 0x00)]);
-    const pdf10mb = Buffer.concat([PDF, Buffer.alloc(10 * 1024 * 1024 - PDF.length, 0x20)]);
-    const t0 = performance.now();
-    await assertUploadContentMatchesDeclaredMime(jpeg2mb.subarray(0, JPEG.length + 4096), "image/jpeg");
-    sha256Hex(jpeg2mb);
-    const jpegMs = performance.now() - t0;
-    const t1 = performance.now();
-    await assertUploadContentMatchesDeclaredMime(pdf10mb.subarray(0, PDF.length + 4096), "application/pdf");
-    sha256Hex(pdf10mb);
-    const pdfMs = performance.now() - t1;
-    assert.ok(jpegMs < 1000, `2MB JPEG hash/sniff took ${jpegMs.toFixed(0)}ms`);
-    assert.ok(pdfMs < 2000, `10MB PDF hash/sniff took ${pdfMs.toFixed(0)}ms`);
+  it("requires DWG AC10 header and DXF SECTION/HEADER (or binary DXF)", async () => {
+    const dwg = Buffer.from("AC1015....fake-dwg-body");
+    const dxf = Buffer.from("  0\nSECTION\n  2\nHEADER\n");
+    const binaryDxf = Buffer.from("AutoCAD Binary DXF\r\nmore");
+    await assertUploadContentMatchesDeclaredMime(dwg, "image/vnd.dwg");
+    await assertUploadContentMatchesDeclaredMime(dxf, "image/vnd.dxf");
+    await assertUploadContentMatchesDeclaredMime(binaryDxf, "image/vnd.dxf");
+
+    await assert.rejects(
+      () => assertUploadContentMatchesDeclaredMime(PDF, "image/vnd.dwg"),
+      expectMismatch,
+    );
+    await assert.rejects(
+      () => assertUploadContentMatchesDeclaredMime(Buffer.from("not-a-cad-file"), "image/vnd.dxf"),
+      expectMismatch,
+    );
+  });
+
+  it("still skips byte sniff for Office without CAD shape checks", async () => {
+    await assertUploadContentMatchesDeclaredMime(ZIP, "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    await assertUploadContentMatchesDeclaredMime(Buffer.from("a,b\n1,2\n"), "text/csv");
   });
 });

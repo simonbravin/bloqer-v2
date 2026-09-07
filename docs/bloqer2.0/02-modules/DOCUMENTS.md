@@ -3,7 +3,7 @@
 > Ver [D-113](../00-product/DECISION_LOG.md) — carpetas SYSTEM + USER por proyecto; auto-filing operativo.
 
 ## 1. Objetivo
-Almacenar archivos (PDF, imágenes, Office) **vinculados polimórficamente** a entidades del sistema (proyecto, OC, certificación, contrato, parte de obra) con trazabilidad, **organización en carpetas por obra** y exportación ([`PRODUCT_SCOPE.md`](../00-product/PRODUCT_SCOPE.md)).
+Almacenar archivos (PDF, imágenes, Office, **DWG/DXF**) **vinculados polimórficamente** a entidades del sistema (proyecto, OC, certificación, contrato, parte de obra) con trazabilidad, **organización en carpetas por obra** y exportación ([`PRODUCT_SCOPE.md`](../00-product/PRODUCT_SCOPE.md)).
 
 ## 2. Usuarios y roles que lo usan
 - Todos los roles con permiso de edición en el módulo destino; **ADMIN** gestiona políticas de tamaño/tipo.
@@ -48,7 +48,7 @@ Pérdida de respaldo contractual y fiscal disperso en carpetas locales; bibliote
 - Auto-filing y destinos de biblioteca según [D-113]; aislamiento `tenantId` + `projectId` en carpetas y asserts de `folderId`.
 
 ## 11. Validaciones
-- Tipos MIME permitidos ([Q-020]).
+- Tipos MIME permitidos ([Q-020]): PDF, imágenes (jpeg/png/webp/heic), Word, Excel, CSV, texto, **DWG/DXF** (`image/vnd.dwg` / `image/vnd.dxf`; resolución por extensión si el browser manda vacío/`octet-stream`). CAD sin preview in-app.
 - Tamaño máximo.
 - `folderId` debe pertenecer al mismo tenant/proyecto; uploads operativos ignoran `folderId` del cliente.
 

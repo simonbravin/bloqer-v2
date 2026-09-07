@@ -20,9 +20,22 @@ export const ALLOWED_MIME_TYPES = [
   "application/vnd.ms-excel",
   "text/csv",
   "text/plain",
+  /** AutoCAD Drawing — IANA `image/vnd.dwg`; browsers often send empty / octet-stream. */
+  "image/vnd.dwg",
+  /** AutoCAD DXF — IANA `image/vnd.dxf`. */
+  "image/vnd.dxf",
 ] as const;
 
 export type AllowedMimeType = typeof ALLOWED_MIME_TYPES[number];
+
+/** Extra `accept` tokens for file inputs (MIME alone is unreliable for CAD). */
+export const DOCUMENT_UPLOAD_EXTENSION_ACCEPT = [".dwg", ".dxf"] as const;
+
+/** Value for `<input type="file" accept=…>` in Documentos / adjuntos. */
+export const DOCUMENT_FILE_INPUT_ACCEPT = [
+  ...ALLOWED_MIME_TYPES,
+  ...DOCUMENT_UPLOAD_EXTENSION_ACCEPT,
+].join(",");
 
 const EXTENSION_MIME_MAP: Record<string, AllowedMimeType> = {
   pdf:  "application/pdf",
@@ -38,18 +51,45 @@ const EXTENSION_MIME_MAP: Record<string, AllowedMimeType> = {
   xls:  "application/vnd.ms-excel",
   csv:  "text/csv",
   txt:  "text/plain",
+  dwg:  "image/vnd.dwg",
+  dxf:  "image/vnd.dxf",
 };
 
-/** Resolve a canonical allowed MIME type from browser hint and/or file extension. */
+/** Extensiones donde el MIME del browser suele ser vacío u `octet-stream`. */
+const EXTENSION_PREFERRED = new Set(["dwg", "dxf"]);
+
+/** MIME types safe to open with Content-Disposition: inline in a browser tab. */
+export const INLINE_DOCUMENT_PREVIEW_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+] as const;
+
+export function isInlineDocumentPreviewMime(mimeType: string): boolean {
+  return (INLINE_DOCUMENT_PREVIEW_MIME_TYPES as readonly string[]).includes(
+    mimeType.toLowerCase().trim(),
+  );
+}
+
+/**
+ * Canonical MIME for upload: extension wins for CAD; otherwise browser MIME if allowed.
+ * Returns null when the pair is not on the allowlist.
+ */
 export function resolveAllowedMimeType(
   fileName:        string,
   browserMimeType?: string | null,
 ): AllowedMimeType | null {
+  const ext = fileName.split(".").pop()?.toLowerCase();
+  if (ext && EXTENSION_PREFERRED.has(ext) && ext in EXTENSION_MIME_MAP) {
+    return EXTENSION_MIME_MAP[ext]!;
+  }
   const browser = browserMimeType?.trim();
   if (browser && (ALLOWED_MIME_TYPES as readonly string[]).includes(browser)) {
     return browser as AllowedMimeType;
   }
-  const ext = fileName.split(".").pop()?.toLowerCase();
   if (ext && ext in EXTENSION_MIME_MAP) {
     return EXTENSION_MIME_MAP[ext]!;
   }

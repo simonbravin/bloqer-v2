@@ -31,6 +31,14 @@ describe("document-file-utils", () => {
     assert.equal(isImageLikeDocument("application/pdf", "x.pdf"), false);
   });
 
+  it("isImageLikeDocument excludes CAD image/* IANA types", () => {
+    assert.equal(isImageLikeDocument("image/vnd.dwg", "plano.dwg"), false);
+    assert.equal(isImageLikeDocument("image/vnd.dxf", "corte.dxf"), false);
+    assert.equal(isImageLikeDocument("image/svg+xml", "a.svg"), false);
+    assert.equal(canPreviewInBrowser("image/vnd.dwg", "plano.dwg"), false);
+    assert.equal(canInlineImagePreview("image/vnd.dwg", "plano.dwg"), false);
+  });
+
   it("canAccessDocumentFile only for R2 ACTIVE/ARCHIVED", () => {
     assert.equal(canAccessDocumentFile({ storageProvider: "R2", status: "ACTIVE" }), true);
     assert.equal(canAccessDocumentFile({ storageProvider: "R2", status: "ARCHIVED" }), true);

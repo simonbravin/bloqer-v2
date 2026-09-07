@@ -21,7 +21,8 @@ const HEIC_FTYP_BRANDS = new Set([
 
 /**
  * ZIP-based Office and plain text cannot be sniffed reliably without a second
- * parser (docx/xlsx are PKZip). Declared MIME + size/extension remain the gate.
+ * parser (docx/xlsx are PKZip). CAD is opaque to `file-type`. Declared MIME +
+ * extension (and light CAD shape checks below) remain the gate.
  */
 const SKIP_BYTE_SNIFF = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -30,10 +31,41 @@ const SKIP_BYTE_SNIFF = new Set([
   "application/vnd.ms-excel",
   "text/csv",
   "text/plain",
+  "image/vnd.dwg",
+  "image/vnd.dxf",
 ]);
 
 export function isByteSniffSkippedMime(mimeType: string): boolean {
   return SKIP_BYTE_SNIFF.has(mimeType);
+}
+
+/** AutoCAD DWG versions from ~R13 onward start with ASCII `AC10…`. */
+export function looksLikeDwgHeader(content: Buffer): boolean {
+  if (content.length < 4) return false;
+  return content.subarray(0, 4).toString("ascii") === "AC10";
+}
+
+/**
+ * DXF (ASCII or many exporters): early "SECTION" / "HEADER" tokens.
+ * Binary DXF is rare in obra packs; those still pass via skip without shape fail.
+ */
+export function looksLikeDxfHeader(content: Buffer): boolean {
+  if (content.length < 8) return false;
+  // Binary DXF sentinel (AutoCAD)
+  if (content.subarray(0, 18).toString("latin1").includes("AutoCAD Binary DXF")) {
+    return true;
+  }
+  const sample = content.subarray(0, Math.min(content.length, 4096)).toString("latin1").toUpperCase();
+  return sample.includes("SECTION") || sample.includes("HEADER");
+}
+
+function assertCadShapeMatchesDeclared(content: Buffer, declaredMime: string): void {
+  if (declaredMime === "image/vnd.dwg" && !looksLikeDwgHeader(content)) {
+    throw new ServiceError("VALIDATION", UPLOAD_CONTENT_MISMATCH_MESSAGE);
+  }
+  if (declaredMime === "image/vnd.dxf" && !looksLikeDxfHeader(content)) {
+    throw new ServiceError("VALIDATION", UPLOAD_CONTENT_MISMATCH_MESSAGE);
+  }
 }
 
 function sniffHeicByFtyp(content: Buffer): "image/heic" | "image/heif" | undefined {
@@ -65,6 +97,7 @@ export async function sniffAllowedUploadMime(content: Buffer): Promise<string | 
 /**
  * JPEG / PNG / WebP / PDF / HEIC / HEIF: bytes must match the declared family.
  * Office / CSV / TXT: no byte sniff (see SKIP_BYTE_SNIFF).
+ * DWG/DXF: skip `file-type` sniff but require a light header shape check.
  */
 export async function assertUploadContentMatchesDeclaredMime(
   content: Buffer,
@@ -73,7 +106,10 @@ export async function assertUploadContentMatchesDeclaredMime(
   if (content.length === 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
   }
-  if (isByteSniffSkippedMime(declaredMime)) return;
+  if (isByteSniffSkippedMime(declaredMime)) {
+    assertCadShapeMatchesDeclared(content, declaredMime);
+    return;
+  }
 
   const sniffed = await sniffAllowedUploadMime(content);
   if (!sniffed || !declaredMimeMatchesSniffed(declaredMime, sniffed)) {

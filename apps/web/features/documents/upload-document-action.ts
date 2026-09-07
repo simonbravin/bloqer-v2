@@ -67,7 +67,7 @@ export async function uploadDocumentAction(formData: FormData): Promise<UploadDo
   const mimeType = resolveAllowedMimeType(file.name, file.type);
   if (!mimeType) {
     return {
-      error: "Tipo de archivo no permitido. Formatos aceptados: PDF, imágenes, Word, Excel, CSV, texto.",
+      error: "Tipo de archivo no permitido. Formatos aceptados: PDF, imágenes, Word, Excel, CSV, texto, DWG/DXF.",
     };
   }
 
