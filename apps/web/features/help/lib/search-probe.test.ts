@@ -109,6 +109,7 @@ test("new concept/report articles are findable", () => {
     { q: "materiales vs mano de obra", expectSlugIncludes: "elegir-camino" },
     { q: "justificacion desvio", expectSlugIncludes: "orden-de-compra" },
     { q: "borrar plano", expectSlugIncludes: "eliminar-documento" },
+    { q: "carpetas planos", expectSlugIncludes: "organizar-carpetas" },
   ];
   for (const c of cases) {
     const hits = searchHelpArticles(HELP_ARTICLES, { query: c.q });

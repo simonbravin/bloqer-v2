@@ -1768,6 +1768,25 @@
 
 ---
 
+### D-113 — Carpetas en Documentos (sistema + libres)
+
+- **Fecha:** 2026-09-07
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** La biblioteca de obra era una lista plana. Hacía falta estructurar archivos (Planos → Arq/Est/Elect) y que los adjuntos operativos (libro, SC, OC, facturas, etc.) aparezcan catalogados automáticamente sin mezclar tenants/obras.
+- **Decisión:**
+  1. Modelo `DocumentFolder` por **proyecto** (`tenantId` + `projectId`) con árbol vía `parentId`. `DocumentAttachment.folderId` opcional.
+  2. Carpetas **SYSTEM** fijas (no renombrar/borrar/mover): Libro de Obra, SC, Cotizaciones, OC, Recepciones, Facturas venta/proveedor, Certificaciones, Subcontratos, Presupuestos, **Planos**, **General**.
+  3. **Auto-filing:** al subir un adjunto operativo con `projectId`, se fuerza `folderId` a la carpeta SYSTEM del `linkedEntityType` (mapa; `SUBCONTRACT_CERTIFICATION` → Subcontratos). El cliente no puede override. Sin `projectId` → `folderId` null (fuera del árbol de obra).
+  4. Carpetas **USER** (crear/renombrar/borrar vacía/mover): solo bajo **Planos**, **General** o USER hijas de esas; profundidad máx. 5. No bajo carpetas SYSTEM operativas.
+  5. Upload/move de biblioteca (`linkedEntityType = PROJECT`): solo hacia destinos de (4). Carpetas SYSTEM operativas = solo lectura en Documentos.
+  6. Seed idempotente lazy (`ensureProjectDocumentFolders`) + backfill lazy de `folderId` al listar/subir. Migración = solo DDL (índices únicos parciales por NULL).
+  7. [D-111] sin cambio (eliminar solo biblioteca). El vínculo a la entidad operativa se mantiene.
+- **Implicancias:** Prisma + service layer + UI árbol en `/proyectos/[id]/documentos`; guía/help.
+- **Documentos afectados:** [`02-modules/DOCUMENTS.md`](../02-modules/DOCUMENTS.md), [`08-architecture/DOCUMENT_STORAGE_DATA_MODEL.md`](../08-architecture/DOCUMENT_STORAGE_DATA_MODEL.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §8.4, help documentos.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

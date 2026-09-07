@@ -853,10 +853,14 @@ flowchart LR
 
 **Ruta:** Operación → **Documentos** → `/proyectos/[id]/documentos`
 
-1. **Agregar documento** sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto). La subida va directo al almacenamiento; no hace falta comprimir planos de unos pocos MB. Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo.
-2. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo en una pestaña nueva (PDF e imágenes) y el icono de descarga **baja** el archivo. El nombre abre el detalle.
-3. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.
-4. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar aparece en las tarjetas y en el detalle del documento.
+1. A la izquierda ves el **árbol de carpetas** de la obra. Hay carpetas de **sistema** (Libro de Obra, Solicitudes de compra, Órdenes de compra, Cotizaciones, Recepciones, Facturas, Certificaciones, Subcontratos, Presupuestos, **Planos**, **General**) que se crean solas y **no se renombran ni borran**. Los adjuntos que subís desde un parte, SC, OC, factura, etc. **caen solos** en la carpeta correspondiente.
+2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías.
+3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto). Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad.
+4. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo en una pestaña nueva (PDF e imágenes) y el icono de descarga **baja** el archivo. El nombre abre el detalle.
+5. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.
+6. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar aparece en las tarjetas y en el detalle del documento. Esos archivos también aparecen en Documentos dentro de su carpeta de sistema.
+
+> Ver [D-113](./00-product/DECISION_LOG.md): carpetas SYSTEM + USER; auto-filing; adjuntos sin obra no entran al árbol.
 
 <!-- capture:23 parte-de-obra-detalle -->
 ![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)

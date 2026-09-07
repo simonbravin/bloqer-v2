@@ -5,12 +5,22 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   archiveDocument,
+  createDocumentFolder,
+  deleteDocumentFolder,
   getDocumentById,
+  moveLibraryDocumentToFolder,
+  renameDocumentFolder,
   restoreDocument,
   softDeleteDocument,
   ServiceError,
   type DocumentAttachmentView,
+  type DocumentFolderView,
 } from "@bloqer/services";
+import {
+  createDocumentFolderSchema,
+  moveLibraryDocumentSchema,
+  renameDocumentFolderSchema,
+} from "@bloqer/validators";
 import { documentRevalidatePaths } from "@/features/documents/lib/document-revalidate-paths";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 
@@ -56,6 +66,10 @@ function revalidateDocumentSurfaces(
     ...(extraPathsToRevalidate ?? []),
   ]);
   for (const p of paths) revalidatePath(p);
+}
+
+function revalidateProjectDocuments(projectId: string): void {
+  revalidatePath(`/proyectos/${projectId}/documentos`);
 }
 
 export async function archiveDocumentAction(
@@ -109,5 +123,78 @@ export async function softDeleteDocumentAction(
   }
   if (options?.redirectToProjectDocuments) {
     redirect(`/proyectos/${projectId}/documentos`);
+  }
+}
+
+export async function createDocumentFolderAction(
+  projectId: string,
+  raw: { parentId: string; name: string },
+): Promise<DocumentFolderView> {
+  const current = await getCurrentUser();
+  if (!current?.tenantCtx) redirect("/login");
+  const parsed = createDocumentFolderSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+  }
+  try {
+    const folder = await createDocumentFolder(projectId, parsed.data, getCtx(current));
+    revalidateProjectDocuments(projectId);
+    return folder;
+  } catch (err) {
+    rethrowActionError(err);
+  }
+}
+
+export async function renameDocumentFolderAction(
+  projectId: string,
+  folderId: string,
+  raw: { name: string },
+): Promise<DocumentFolderView> {
+  const current = await getCurrentUser();
+  if (!current?.tenantCtx) redirect("/login");
+  const parsed = renameDocumentFolderSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+  }
+  try {
+    const folder = await renameDocumentFolder(projectId, folderId, parsed.data, getCtx(current));
+    revalidateProjectDocuments(projectId);
+    return folder;
+  } catch (err) {
+    rethrowActionError(err);
+  }
+}
+
+export async function deleteDocumentFolderAction(
+  projectId: string,
+  folderId: string,
+): Promise<void> {
+  const current = await getCurrentUser();
+  if (!current?.tenantCtx) redirect("/login");
+  try {
+    await deleteDocumentFolder(projectId, folderId, getCtx(current));
+    revalidateProjectDocuments(projectId);
+  } catch (err) {
+    rethrowActionError(err);
+  }
+}
+
+export async function moveLibraryDocumentAction(
+  projectId: string,
+  documentId: string,
+  raw: { folderId: string },
+): Promise<void> {
+  const current = await getCurrentUser();
+  if (!current?.tenantCtx) redirect("/login");
+  const parsed = moveLibraryDocumentSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+  }
+  try {
+    await loadDocumentInProject(documentId, projectId, getCtx(current));
+    await moveLibraryDocumentToFolder(documentId, projectId, parsed.data.folderId, getCtx(current));
+    revalidateProjectDocuments(projectId);
+  } catch (err) {
+    rethrowActionError(err);
   }
 }

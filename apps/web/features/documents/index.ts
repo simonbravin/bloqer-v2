@@ -9,6 +9,7 @@ export type { DocumentFormProps }    from "./components/document-form";
 export { DocumentUploadDialog }    from "./components/document-upload-dialog";
 export { DocumentUploadZone }      from "./components/document-upload-zone";
 export type { DocumentUploadZoneProps } from "./components/document-upload-zone";
+export { DocumentFolderTree }      from "./components/document-folder-tree";
 export { EntityDocumentsPanel }      from "./components/entity-documents-panel";
 export type {
   EntityDocumentsLink,

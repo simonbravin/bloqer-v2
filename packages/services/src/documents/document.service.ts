@@ -53,6 +53,11 @@ import {
   canSoftDeleteDocumentByLink,
   LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE,
 } from "./document-delete-policy";
+import {
+  backfillProjectDocumentFolders,
+  getFolderInProjectOrThrow,
+  resolveFolderIdForUpload,
+} from "./document-folder.service";
 
 export {
   canSoftDeleteDocumentByLink,
@@ -78,6 +83,7 @@ export type DocumentAttachmentView = {
   tenantId:         string;
   companyId:        string | null;
   projectId:        string | null;
+  folderId:         string | null;
   originalFileName: string;
   fileName:         string;
   mimeType:         string;
@@ -137,6 +143,12 @@ export async function createDocumentMetadata(
   const id         = crypto.randomUUID();
   const fileName   = sanitize(input.originalFileName);
   const storageKey = buildStorageKey(ctx.tenantId, input.projectId, id, input.originalFileName);
+  const folderId = await resolveFolderIdForUpload({
+    projectId: input.projectId,
+    linkedEntityType: "PROJECT",
+    requestedFolderId: null,
+    ctx,
+  });
 
   const doc = await prisma.documentAttachment.create({
     data: {
@@ -144,6 +156,7 @@ export async function createDocumentMetadata(
       tenantId:         ctx.tenantId,
       companyId:        ctx.companyId ?? null,
       projectId:        input.projectId,
+      folderId,
       originalFileName: input.originalFileName,
       fileName,
       mimeType:         input.mimeType,
@@ -561,6 +574,12 @@ export async function uploadDocument(
 
   const contentSha256 = sha256Hex(content);
   const plan = await resolveDocumentUploadPlan(input, ctx, idempotencyKey);
+  const folderId = await resolveFolderIdForUpload({
+    projectId: plan.anchorProjectId,
+    linkedEntityType: plan.linkedEntityType,
+    requestedFolderId: input.folderId,
+    ctx,
+  });
   const provider = configured ? "R2" : "PLACEHOLDER";
 
   const findExisting = () =>
@@ -611,6 +630,7 @@ export async function uploadDocument(
             tenantId:         ctx.tenantId,
             companyId:        ctx.companyId ?? null,
             projectId:        plan.anchorProjectId,
+            folderId,
             originalFileName: input.originalFileName,
             fileName:         plan.fileName,
             mimeType:         input.mimeType,
@@ -683,6 +703,12 @@ export async function initiateDocumentUpload(
   }
 
   const plan = await resolveDocumentUploadPlan(input, ctx, idempotencyKey);
+  const folderId = await resolveFolderIdForUpload({
+    projectId: plan.anchorProjectId,
+    linkedEntityType: plan.linkedEntityType,
+    requestedFolderId: input.folderId,
+    ctx,
+  });
   const provider = configured ? "R2" : "PLACEHOLDER";
   const status = configured ? "UPLOADING" : "ACTIVE";
 
@@ -742,6 +768,7 @@ export async function initiateDocumentUpload(
           tenantId: ctx.tenantId,
           companyId: ctx.companyId ?? null,
           projectId: plan.anchorProjectId,
+          folderId,
           originalFileName: input.originalFileName,
           fileName: plan.fileName,
           mimeType: input.mimeType,
@@ -1089,12 +1116,18 @@ export async function listProjectDocuments(
   await requireProjectAccess(projectId, ctx);
 
   await reconcileAbandonedUploadingDocuments(ctx, { projectId });
+  await backfillProjectDocumentFolders(projectId, ctx);
+
+  if (filters.folderId) {
+    await getFolderInProjectOrThrow(filters.folderId, projectId, ctx);
+  }
 
   const docs = await prisma.documentAttachment.findMany({
     where: {
       tenantId:  ctx.tenantId,
       projectId,
       status:    filters.status ?? "ACTIVE",
+      ...(filters.folderId ? { folderId: filters.folderId } : {}),
       ...(filters.category ? { category: filters.category } : {}),
       ...(filters.search ? {
         OR: [
@@ -1634,6 +1667,7 @@ function assertLinkedEntityTenantModuleEnabled(gate: TenantModuleGate, linkedEnt
 function serialize(
   doc: {
     id: string; tenantId: string; companyId: string | null; projectId: string | null;
+    folderId?: string | null;
     originalFileName: string; fileName: string; mimeType: string; sizeBytes: number;
     storageProvider: string; category: string; description: string | null;
     status: string; linkedEntityType: string | null; linkedEntityId: string | null;
@@ -1650,6 +1684,7 @@ function serialize(
     tenantId:         doc.tenantId,
     companyId:        doc.companyId,
     projectId:        doc.projectId,
+    folderId:         doc.folderId ?? null,
     originalFileName: doc.originalFileName,
     fileName:         doc.fileName,
     mimeType:         doc.mimeType,

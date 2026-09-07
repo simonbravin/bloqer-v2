@@ -36,6 +36,8 @@ const CATEGORY_OPTIONS = [
 export type DocumentFormProps = {
   /** Project UUID, or `null` for corporate SUPPLIER_INVOICE / SALES_INVOICE uploads. */
   projectId: string | null;
+  /** Library folder destination ([D-113]); ignored for operational linkedEntity. */
+  folderId?: string | null;
   storageConfigured: boolean;
   linkedEntity?:
     | { type: "JOBSITE_LOG"; id: string }
@@ -64,6 +66,7 @@ export type DocumentFormProps = {
 
 export function DocumentForm({
   projectId,
+  folderId,
   storageConfigured,
   linkedEntity,
   defaultCategory = "OTHER",
@@ -114,6 +117,7 @@ export function DocumentForm({
       const result = await clientUploadDocument({
         file: selectedFile,
         projectId,
+        folderId,
         category,
         description,
         linkedEntityType: linkedEntity?.type,

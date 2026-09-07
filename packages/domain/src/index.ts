@@ -153,3 +153,24 @@ export {
   type PurchaseRequestProcessInput,
   type PurchaseRequestProcessStatus,
 } from "./procurement/process-steps";
+
+export {
+  DOCUMENT_FOLDER_KINDS,
+  DOCUMENT_FOLDER_SYSTEM_KEYS,
+  DOCUMENT_FOLDER_SYSTEM_SEED,
+  DOCUMENT_FOLDER_MAX_DEPTH,
+  LIBRARY_DESTINATION_SYSTEM_KEYS,
+  canCreateUserFolderUnder,
+  findSystemRootAncestor,
+  folderDepth,
+  isDocumentFolderSystemKey,
+  isLibraryDestinationSystemKey,
+  isLibraryFolderDestination,
+  isOperationalLinkedEntity,
+  resolveSystemKeyForLinkedEntity,
+  wouldCreateFolderCycle,
+  type DocumentFolderKind,
+  type DocumentFolderSystemKey,
+  type FolderTreeNode,
+  type LibraryDestinationSystemKey,
+} from "./documents/folder-rules";

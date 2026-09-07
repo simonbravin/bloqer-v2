@@ -78,6 +78,8 @@ export const initiateUploadSchema = z
     sizeBytes:        z.coerce.number().int().min(1).max(MAX_SIZE_BYTES, "El archivo no puede superar 50 MB"),
     category:         z.enum(DOCUMENT_CATEGORIES).default("OTHER"),
     description:      z.string().max(1000).optional().nullable(),
+    /** Library destination only ([D-113]); ignored/overridden for operational linkedEntityType. */
+    folderId:         z.string().uuid().optional().nullable(),
     /** When set with linkedEntityId, attachment is bound to this entity (server validates ownership). */
     linkedEntityType: z
       .enum([
@@ -128,8 +130,32 @@ export const listProjectDocumentsSchema = z.object({
   category: z.enum(DOCUMENT_CATEGORIES).optional(),
   status:   z.enum(["ACTIVE", "ARCHIVED"]).optional(),
   search:   z.string().max(200).optional(),
+  /** When set, only docs in that folder. Omit for flat “Todos”. */
+  folderId: z.string().uuid().optional(),
+});
+
+export const createDocumentFolderSchema = z.object({
+  parentId:  z.string().uuid(),
+  name:      z.string().trim().min(1, "Nombre requerido").max(120),
+  sortOrder: z.coerce.number().int().min(0).max(10_000).optional(),
+});
+
+export const renameDocumentFolderSchema = z.object({
+  name: z.string().trim().min(1, "Nombre requerido").max(120),
+});
+
+export const moveDocumentFolderSchema = z.object({
+  parentId: z.string().uuid(),
+});
+
+export const moveLibraryDocumentSchema = z.object({
+  folderId: z.string().uuid(),
 });
 
 export type CreateDocumentMetadataInput = z.infer<typeof createDocumentMetadataSchema>;
 export type InitiateUploadInput         = z.infer<typeof initiateUploadSchema>;
 export type ListProjectDocumentsInput   = z.infer<typeof listProjectDocumentsSchema>;
+export type CreateDocumentFolderInput   = z.infer<typeof createDocumentFolderSchema>;
+export type RenameDocumentFolderInput   = z.infer<typeof renameDocumentFolderSchema>;
+export type MoveDocumentFolderInput     = z.infer<typeof moveDocumentFolderSchema>;
+export type MoveLibraryDocumentInput    = z.infer<typeof moveLibraryDocumentSchema>;

@@ -664,6 +664,7 @@ model Tenant {
   jobsiteLogs                 JobsiteLog[]
   warehouseTransfers          WarehouseTransfer[]
   documentAttachments         DocumentAttachment[]
+  documentFolders             DocumentFolder[]
   notifications               Notification[]
   emailDeliveryLogs           EmailDeliveryLog[]
   platformAuditLogs           PlatformAuditLog[]           @relation("PlatformAuditTargetTenant")
@@ -1140,6 +1141,7 @@ model Project {
   jobsiteLogs                 JobsiteLog[]
   warehouseTransfers          WarehouseTransfer[]
   documentAttachments         DocumentAttachment[]
+  documentFolders             DocumentFolder[]
   notifications               Notification[]
   journalEntries              JournalEntry[]
   journalEntryLines           JournalEntryLine[]
@@ -2966,6 +2968,27 @@ enum StorageProvider {
   S3
 }
 
+enum DocumentFolderKind {
+  SYSTEM
+  USER
+}
+
+/// Stable keys for auto-filing system folders ([D-113]). Partial unique per project in SQL.
+enum DocumentFolderSystemKey {
+  JOBSITE_LOG
+  PURCHASE_REQUEST
+  PURCHASE_ORDER
+  PROCUREMENT_QUOTE
+  PURCHASE_RECEIPT
+  SALES_INVOICE
+  SUPPLIER_INVOICE
+  CERTIFICATION
+  SUBCONTRACT
+  BUDGET
+  PLANS
+  GENERAL
+}
+
 // ─── Warehouse Transfers ──────────────────────────────────────────────────────
 
 model WarehouseTransfer {
@@ -3011,12 +3034,39 @@ model WarehouseTransfer {
 
 // ─── Documents ────────────────────────────────────────────────────────────────
 // Download/access policy: presigned GET URLs only (`document.service`); `publicUrl` is unused/reserved — do not expose in API DTOs.
+// Folder tree ([D-113]): DocumentFolder + folderId. Partial unique indexes in SQL migration.
+
+model DocumentFolder {
+  id         String                   @id @default(uuid())
+  tenantId   String
+  projectId  String
+  parentId   String?
+  name       String
+  kind       DocumentFolderKind
+  /// Null for USER folders. Unique per (tenant, project) when set — partial unique in SQL.
+  systemKey  DocumentFolderSystemKey?
+  sortOrder  Int                      @default(0)
+  createdBy  String?
+  createdAt  DateTime                 @default(now())
+  updatedAt  DateTime                 @updatedAt
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+  project   Project              @relation(fields: [projectId], references: [id])
+  parent    DocumentFolder?      @relation("DocumentFolderTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  DocumentFolder[]     @relation("DocumentFolderTree")
+  documents DocumentAttachment[]
+
+  @@index([tenantId, projectId])
+  @@index([tenantId, projectId, parentId])
+  @@map("document_folders")
+}
 
 model DocumentAttachment {
   id               String            @id @default(uuid())
   tenantId         String
   companyId        String?
   projectId        String?
+  folderId         String?
   originalFileName String
   fileName         String
   mimeType         String
@@ -3039,10 +3089,12 @@ model DocumentAttachment {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  tenant  Tenant   @relation(fields: [tenantId], references: [id])
-  project Project? @relation(fields: [projectId], references: [id])
+  tenant  Tenant           @relation(fields: [tenantId], references: [id])
+  project Project?         @relation(fields: [projectId], references: [id])
+  folder  DocumentFolder?  @relation(fields: [folderId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, projectId])
+  @@index([tenantId, folderId])
   @@index([tenantId, linkedEntityType, linkedEntityId])
   @@index([tenantId, status])
   @@map("document_attachments")

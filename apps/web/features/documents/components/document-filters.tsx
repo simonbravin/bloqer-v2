@@ -85,7 +85,13 @@ export function DocumentFilters() {
       <Button
         variant="ghost"
         size="sm"
-        onClick={() => router.push(pathname)}
+        onClick={() => {
+          const folderId = sp.get("folderId");
+          const params = new URLSearchParams();
+          if (folderId) params.set("folderId", folderId);
+          const q = params.toString();
+          router.push(q ? `${pathname}?${q}` : pathname);
+        }}
         className="self-end"
       >
         Limpiar
