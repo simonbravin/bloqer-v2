@@ -13,6 +13,7 @@ import {
   formatJobsiteLogDate,
   formatNotificationTitle,
 } from "../notifications/notification-copy";
+import { filterUserIdsByProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
 
 type JobsiteLogNotifyBase = {
@@ -44,8 +45,13 @@ async function fanOut(params: {
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
+  const scoped = await filterUserIdsByProjectAccess(
+    params.ctx.tenantId,
+    params.projectId,
+    unique,
+  );
 
-  for (const recipientUserId of unique) {
+  for (const recipientUserId of scoped) {
     try {
       const { id: notificationId } = await createSystemNotification({
         tenantId: params.ctx.tenantId,

@@ -1,9 +1,9 @@
 # Bloqer AI — Architecture (Foundation + Tool Layer + MVP Read-Only)
 
-> **Estado:** FASE 0 audit completa + diseño **aprobado** (FASES 1–25).  
-> **Implementación de código:** pendiente (este doc no es implementación).  
-> **Alcance MVP:** solo tools `READ` (+ knowledge). Sin mutaciones `WRITE_CONFIRM`.  
-> **Relacionado:** [`08-architecture/PACKAGE_STRUCTURE.md`](./08-architecture/PACKAGE_STRUCTURE.md), [`SERVICE_LAYER.md`](./08-architecture/SERVICE_LAYER.md), [`HELP_CENTER.md`](./08-architecture/HELP_CENTER.md), [ADR-017](./08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ACEPTADO), [D-090](./00-product/DECISION_LOG.md#d-090--centro-de-ayuda-in-app-faq--wiki-de-procesos).
+> **Estado:** diseño **aprobado** (ADR-017) + implementación MVP READ en código (ver scorecards).  
+> **Roadmap de producto (canónico):** [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md) — fases V1→V4; este archivo no define prioridad de producto.  
+> **Alcance MVP actual:** solo tools `READ` (+ knowledge). Sin mutaciones `WRITE_CONFIRM`.  
+> **Relacionado:** [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md), [`08-architecture/PACKAGE_STRUCTURE.md`](./08-architecture/PACKAGE_STRUCTURE.md), [`SERVICE_LAYER.md`](./08-architecture/SERVICE_LAYER.md), [`HELP_CENTER.md`](./08-architecture/HELP_CENTER.md), [ADR-017](./08-architecture/ARCHITECTURE_DECISION_RECORDS.md) (ACEPTADO), [D-090](./00-product/DECISION_LOG.md#d-090--centro-de-ayuda-in-app-faq--wiki-de-procesos).
 
 ---
 
@@ -692,14 +692,16 @@ Preguntas respondibles con datos/autorización reales:
 
 ---
 
-## 16. Próximo lote recomendado (post-doc)
+## 16. Próximo lote recomendado
 
-1. Scaffold `@bloqer/ai` (tipos + `AiProvider` + registry + adapter OpenAI Chat Completions) + `services/src/ai` registry + 1 tool `get_current_context`.  
-2. Knowledge help-first + index script.  
-3. Resto READ tools + UI Sheet + `POST /api/ai/chat`.  
-4. Evals + isolation tests + mock `AiProvider`.  
-5. **No** WRITE. **No** Admin keys. **No** Prisma AI.  
-6. Después: PREPARE → WRITE_CONFIRM; evaluar Admin (A→B/C) solo con KMS.
+> **Canónico:** [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md) §11 (post smoke production).  
+> El checklist histórico de scaffold MVP abajo quedó **cumplido** en código; no usarlo como backlog.
+
+1. ~~Scaffold `@bloqer/ai`…~~ **hecho**  
+2. ~~Knowledge + tools READ + UI + chat~~ **hecho**  
+3. ~~Evals + isolation + Fake~~ **hecho**  
+4. **No** WRITE. **No** Admin keys sin KMS/D-xxx. **No** Prisma AI hasta V1.5.  
+5. Secuencia de producto: V1 cierre → V1.5 Admin/historial → V2 analista → V3 PREPARE/WRITE → V4 MCP.
 
 ---
 
@@ -721,3 +723,4 @@ Preguntas respondibles con datos/autorización reales:
 |---|---|
 | 2026-09-04 | FASE 0 audit + arquitectura propuesta; STOP en D-AI-01…04 |
 | 2026-09-04 | D-AI-01…04 APROBADOS; D-AI-05 provider-agnostic; rewrite OpenAI-centric → `AiProvider`; secrets/Admin tradeoffs; ADR-017 ACEPTADO |
+| 2026-09-06 | Header + §16 apuntan a [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md) como roadmap canónico de producto |

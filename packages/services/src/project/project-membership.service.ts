@@ -147,14 +147,15 @@ export async function setUserProjectMemberships(
   const toRemove = existing.filter((e) => !desiredSet.has(e.projectId));
 
   await prisma.$transaction(async (tx) => {
-    for (const projectId of toAdd) {
-      await tx.projectMembership.create({
-        data: {
+    if (toAdd.length > 0) {
+      await tx.projectMembership.createMany({
+        data: toAdd.map((projectId) => ({
           tenantId: ctx.tenantId,
           projectId,
           userId,
           createdBy: ctx.actorUserId,
-        },
+        })),
+        skipDuplicates: true,
       });
     }
     if (toRemove.length > 0) {
@@ -452,28 +453,42 @@ export async function importMembershipsFromProjectTeam(
     where: { tenantId: ctx.tenantId, projectId },
     select: { userId: true },
   });
-  let created = 0;
-  for (const t of team) {
-    const before = await prisma.projectMembership.findUnique({
-      where: {
-        tenantId_projectId_userId: {
-          tenantId: ctx.tenantId,
-          projectId,
-          userId: t.userId,
-        },
-      },
-    });
-    if (before) continue;
-    await prisma.projectMembership.create({
-      data: {
+  if (team.length === 0) {
+    return {
+      created: 0,
+      alreadyExists: preview.alreadyExists,
+      teamSize: preview.teamSize,
+    };
+  }
+  const activeMembers = await prisma.userMembership.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      status: "ACTIVE",
+      userId: { in: team.map((t) => t.userId) },
+    },
+    select: { userId: true },
+  });
+  const activeSet = new Set(activeMembers.map((m) => m.userId));
+  const eligible = team.filter((t) => activeSet.has(t.userId));
+  if (eligible.length === 0) {
+    return {
+      created: 0,
+      alreadyExists: preview.alreadyExists,
+      teamSize: preview.teamSize,
+    };
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    const created = await tx.projectMembership.createMany({
+      data: eligible.map((t) => ({
         tenantId: ctx.tenantId,
         projectId,
         userId: t.userId,
         createdBy: ctx.actorUserId,
-      },
+      })),
+      skipDuplicates: true,
     });
-    created += 1;
-  }
+    return created.count;
+  });
 
   await log({
     tenantId: ctx.tenantId,
@@ -482,11 +497,11 @@ export async function importMembershipsFromProjectTeam(
     entityType: "Project",
     entityId: projectId,
     projectId,
-    after: { created, alreadyExists: preview.alreadyExists, teamSize: preview.teamSize },
+    after: { created: result, alreadyExists: preview.alreadyExists, teamSize: preview.teamSize },
   });
 
   return {
-    created,
+    created: result,
     alreadyExists: preview.alreadyExists,
     teamSize: preview.teamSize,
   };

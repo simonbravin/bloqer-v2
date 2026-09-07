@@ -1,5 +1,5 @@
 export type * from "./types";
-export { AiProviderError } from "./errors";
+export { AiProviderError, userFacingAiProviderErrorMessage, userFacingOpenAiErrorMessage } from "./errors";
 export type { AiProviderErrorCode } from "./errors";
 export type { AiProvider } from "./provider";
 export { AiProviderRegistry, defaultAiProviderRegistry } from "./provider-registry";
@@ -34,10 +34,7 @@ export {
 export type { BloqerAiEnv } from "./config";
 export { resolveBloqerAiEnabled, isFakeAiProviderId } from "./env";
 export { createOpenAiProvider } from "./providers/openai/openai-provider";
-export {
-  buildOpenAiChatCompletionsExtras,
-  userFacingOpenAiErrorMessage,
-} from "./providers/openai/openai-provider";
+export { buildOpenAiChatCompletionsExtras } from "./providers/openai/openai-provider";
 export {
   createFakeAiProvider,
   createFakeSecondaryProvider,

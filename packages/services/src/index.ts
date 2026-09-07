@@ -57,6 +57,7 @@ export {
   projectRowIdWhereForScope,
   projectScopeWhereForOptionalProject,
   requireProjectAccessIfPresent,
+  filterUserIdsByProjectAccess,
   hasTenantWideProjectAccess,
   getTenantProjectAccessMode,
   clearProjectAccessModeCache,

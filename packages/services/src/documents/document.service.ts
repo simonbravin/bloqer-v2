@@ -29,7 +29,7 @@ import {
   type TenantModuleGate,
 } from "../tenant-modules/tenant-module.service";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+import { requireProjectAccess, requireProjectAccessIfPresent, filterUserIdsByProjectAccess } from "../security/access";
 import {
   canEditPurchaseOrders,
   canEditPurchaseReceipts,
@@ -486,6 +486,13 @@ async function notifyDocumentUploadConfirmed(
 
   if (recipients.length === 0) return;
 
+  const scopedRecipients = await filterUserIdsByProjectAccess(
+    ctx.tenantId,
+    doc.projectId,
+    recipients,
+  );
+  if (scopedRecipients.length === 0) return;
+
   const actionUrl = doc.projectId
     ? `/proyectos/${doc.projectId}/documentos/${doc.id}`
     : await resolveCorporateDocumentActionUrl(doc.linkedEntityType, doc.linkedEntityId, ctx);
@@ -502,7 +509,7 @@ async function notifyDocumentUploadConfirmed(
     category: doc.category,
   });
 
-  for (const recipientUserId of recipients) {
+  for (const recipientUserId of scopedRecipients) {
     try {
       await createSystemNotification({
         tenantId: ctx.tenantId,

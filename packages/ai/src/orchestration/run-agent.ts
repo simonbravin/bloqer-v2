@@ -1,6 +1,6 @@
 import type { AiMessage, AiToolCall, AiToolDefinition, AiUsage } from "../types";
 import type { AiProvider } from "../provider";
-import { AiProviderError } from "../errors";
+import { AiProviderError, userFacingAiProviderErrorMessage } from "../errors";
 import {
   parseAiPresentationFromAssistantText,
   PRESENTATION_START,
@@ -69,25 +69,19 @@ function ensureAssistantText(text: string): { text: string; filled: boolean } {
   return { text: EMPTY_ASSISTANT_FALLBACK, filled: true };
 }
 
-/** Merge trusted tool links into presentation insights/actions that lack links. */
+/** Merge trusted tool links into presentation only when pairing is unambiguous. */
 function enrichPresentationWithToolLinks(
   presentation: AiPresentation,
   toolLinks: { label: string; href: string }[],
 ): AiPresentation {
-  if (!toolLinks.length) return presentation;
-  const unused = [...toolLinks];
-  const take = (n: number) => unused.splice(0, n);
-
-  const insights = presentation.insights.map((insight) => {
-    if (insight.links.length > 0) return insight;
-    const links = take(1);
-    return links.length ? { ...insight, links } : insight;
-  });
-  const actions = presentation.actions.map((action) => {
-    if (action.links.length > 0) return action;
-    const links = take(1);
-    return links.length ? { ...action, links } : action;
-  });
+  if (toolLinks.length !== 1) return presentation;
+  const only = toolLinks[0]!;
+  const insights = presentation.insights.map((insight) =>
+    insight.links.length > 0 ? insight : { ...insight, links: [only] },
+  );
+  const actions = presentation.actions.map((action) =>
+    action.links.length > 0 ? action : { ...action, links: [only] },
+  );
   return { ...presentation, insights, actions };
 }
 
@@ -196,7 +190,11 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
 
     for (let turn = 0; turn < maxTurns; turn++) {
       if (input.signal?.aborted) {
-        yield { type: "error", message: "Solicitud cancelada.", code: "TIMEOUT" };
+        yield {
+          type: "error",
+          message: userFacingAiProviderErrorMessage("CANCELLED"),
+          code: "CANCELLED",
+        };
         return;
       }
 
@@ -337,8 +335,16 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
           }
         } catch (err) {
           ok = false;
+          console.error(
+            JSON.stringify({
+              type: "bloqer_ai_tool_execute_error",
+              tool: call.name,
+              detail: err instanceof Error ? err.message.slice(0, 300) : "unknown",
+            }),
+          );
           resultContent = JSON.stringify({
-            error: err instanceof Error ? err.message : "Error al ejecutar herramienta",
+            error: "No se pudo completar esa consulta. Intentá de nuevo.",
+            code: "TOOL_ERROR",
           });
         }
         if (resultLinks?.length) {
@@ -380,16 +386,21 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
     }
     yield { type: "done", assistantText: finalized.visibleText };
   } catch (err) {
+    const code =
+      err instanceof AiProviderError
+        ? err.code
+        : input.signal?.aborted
+          ? "CANCELLED"
+          : "UNKNOWN";
+    // Never put raw vendor / Error.message into done — chat UI may render assistantText.
     const message =
       err instanceof AiProviderError
-        ? err.message
-        : err instanceof Error
-          ? err.message
-          : "Error del asistente";
+        ? err.message || userFacingAiProviderErrorMessage(code)
+        : userFacingAiProviderErrorMessage(code === "CANCELLED" ? "CANCELLED" : "UNKNOWN");
     yield {
       type: "error",
       message,
-      code: err instanceof AiProviderError ? err.code : "UNKNOWN",
+      code,
     };
     usage = { ...usage, latencyMs: Date.now() - started, toolCallCount: toolCallsTotal };
     yield { type: "usage", usage };

@@ -8,7 +8,7 @@ import { createSystemNotification } from "../notifications/notification.service"
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { formatCertificationCode, formatNotificationTitle } from "../notifications/notification-copy";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+import { requireProjectAccess, requireProjectAccessIfPresent, filterUserIdsByProjectAccess } from "../security/access";
 
 import { resolveActiveCompanyId } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -344,10 +344,15 @@ export async function approveCertification(id: string, ctx: ServiceContext): Pro
     primaryUserIds: meta.createdBy ? [meta.createdBy] : [],
     excludeUserId: ctx.actorUserId,
   });
+  const scopedRecipients = await filterUserIdsByProjectAccess(
+    ctx.tenantId,
+    meta.projectId,
+    recipients,
+  );
 
   const certCode = formatCertificationCode(meta.number);
 
-  for (const recipientUserId of recipients) {
+  for (const recipientUserId of scopedRecipients) {
     try {
       await createSystemNotification({
         tenantId: ctx.tenantId,

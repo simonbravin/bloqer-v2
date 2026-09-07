@@ -252,15 +252,20 @@ describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
           assert.ok(ok, `${row.tool}/${role}: ${res.content.slice(0, 200)}`);
         } else {
           // PM / VIEWER: AI denies treasury (VIEWER stricter than D-056 UI)
-          assert.ok(denied || /deshabilitado|Sin permiso|tesorer|FORBIDDEN|acceso/i.test(res.content), `${row.tool}/${role}`);
+          assert.ok(
+            denied,
+            `${row.tool}/${role}: expected deny, got isError=${res.isError} content=${res.content.slice(0, 200)}`,
+          );
         }
       };
       await run("OWNER", row.owner);
       await run("PM", row.pm);
       await run("VIEWER", row.viewer);
     }
-    // Keep matrix visible in test output
-    console.log("\n### RBAC matrix\n| Tool | Role | Expected | Actual |\n|---|---|---|---|\n" + rows.join("\n"));
+    // Keep matrix visible when debugging live isolation
+    if (process.env.DEBUG_AI_LIVE === "1") {
+      console.log("\n### RBAC matrix\n| Tool | Role | Expected | Actual |\n|---|---|---|---|\n" + rows.join("\n"));
+    }
   });
 
   it("module gate: PROCUREMENT off blocks PR/PO tools", async () => {

@@ -13,11 +13,15 @@ import { requireProjectInTenant, type ProjectTenantScope } from "../project/requ
 import { hasCompanyFinanceRole } from "@bloqer/domain";
 
 const projectAccessModeCache = new Map<string, { mode: ProjectAccessMode; at: number }>();
-const MODE_TTL_MS = 15_000;
+/** Short TTL: multi-instance (Vercel) can stay stale until expiry; mode flips clear local cache only. */
+const MODE_TTL_MS = 5_000;
+/** Bumped by clearProjectAccessModeCache so request-scoped WeakMap bags drop stale mode/scope. */
+let aclCacheGeneration = 0;
 
 export type ProjectAccessScope = "ALL" | { projectIds: string[] };
 
 type AclRequestBag = {
+  generation: number;
   mode?: Promise<ProjectAccessMode>;
   scope?: Promise<ProjectAccessScope>;
 };
@@ -27,8 +31,8 @@ const aclByCtx = new WeakMap<object, AclRequestBag>();
 
 function aclBag(ctx: ServiceContext): AclRequestBag {
   let bag = aclByCtx.get(ctx);
-  if (!bag) {
-    bag = {};
+  if (!bag || bag.generation !== aclCacheGeneration) {
+    bag = { generation: aclCacheGeneration };
     aclByCtx.set(ctx, bag);
   }
   return bag;
@@ -59,6 +63,7 @@ async function getTenantProjectAccessModeForCtx(
 /** Test helper — clear TTL cache after toggling mode in fixtures. */
 export function clearProjectAccessModeCache(): void {
   projectAccessModeCache.clear();
+  aclCacheGeneration += 1;
 }
 
 /**
@@ -259,6 +264,42 @@ export async function requireProjectAccessIfPresent(
   if (projectId) {
     await requireProjectAccess(projectId, ctx);
   }
+}
+
+/**
+ * Filter notification / fan-out recipients by D-111 project ACL.
+ * - No projectId (company-level) → unchanged (company permission already gated audience).
+ * - TENANT_WIDE → unchanged.
+ * - MEMBERSHIP_SCOPED → keep tenant-wide roles (OWNER/ADMIN/…) or explicit ProjectMembership.
+ */
+export async function filterUserIdsByProjectAccess(
+  tenantId: string,
+  projectId: string | null | undefined,
+  userIds: string[],
+): Promise<string[]> {
+  if (!projectId || userIds.length === 0) return userIds;
+  const mode = await getTenantProjectAccessMode(tenantId);
+  if (mode === "TENANT_WIDE") return userIds;
+
+  const unique = [...new Set(userIds)];
+  const [memberships, projectMembers] = await Promise.all([
+    prisma.userMembership.findMany({
+      where: { tenantId, status: "ACTIVE", userId: { in: unique } },
+      select: { userId: true, roles: true },
+    }),
+    prisma.projectMembership.findMany({
+      where: { tenantId, projectId, userId: { in: unique } },
+      select: { userId: true },
+    }),
+  ]);
+  const rolesByUser = new Map(memberships.map((m) => [m.userId, m.roles]));
+  const memberSet = new Set(projectMembers.map((m) => m.userId));
+
+  return unique.filter((userId) => {
+    const roles = rolesByUser.get(userId) ?? [];
+    if (hasTenantWideProjectAccess(roles)) return true;
+    return memberSet.has(userId);
+  });
 }
 
 /** Convenience: project ACL + project financials capability. */

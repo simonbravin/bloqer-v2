@@ -13,6 +13,8 @@ test("isSafeInternalHref allows Bloqer internal paths only", () => {
   assert.equal(isSafeInternalHref("javascript:alert(1)"), false);
   assert.equal(isSafeInternalHref("data:text/html,hi"), false);
   assert.equal(isSafeInternalHref("//evil.example"), false);
+  assert.equal(isSafeInternalHref("/proyectos\\evil"), false);
+  assert.equal(isSafeInternalHref("/contabilidad/asientos?status=DRAFT"), true);
 });
 
 test("filterSafeAiLinks keeps tool links and drops unsafe ones", () => {

@@ -8,6 +8,7 @@ import {
   loadNotificationIdentityFacts,
 } from "../notifications/notification-email-context";
 import { formatNotificationTitle, formatSalesInvoiceCode } from "../notifications/notification-copy";
+import { filterUserIdsByProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
 
 /** Company-finance actors who should be nudged to collect (D-072). Not PROJECT_FINANCE / VIEWER. */
@@ -66,6 +67,11 @@ export async function notifyReceivableReadyToCollect(params: {
     excludeUserId: params.ctx.actorUserId,
     alwaysCcOwnerAdmin: true,
   });
+  const scoped = await filterUserIdsByProjectAccess(
+    params.ctx.tenantId,
+    params.projectId,
+    unique,
+  );
 
   const type: NotificationType = "RECEIVABLE_READY_TO_COLLECT";
   const title = formatNotificationTitle("Listo para cobrar", invCode);
@@ -80,7 +86,7 @@ export async function notifyReceivableReadyToCollect(params: {
     facts,
   );
 
-  for (const recipientUserId of unique) {
+  for (const recipientUserId of scoped) {
     try {
       const { id: notificationId } = await createSystemNotification({
         tenantId: params.ctx.tenantId,

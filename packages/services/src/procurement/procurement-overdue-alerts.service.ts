@@ -11,8 +11,11 @@ import {
   formatNotificationIdentityBody,
   loadNotificationIdentityFacts,
 } from "../notifications/notification-email-context";
-import { formatNotificationTitle } from "../notifications/notification-copy";
+import {
+  formatNotificationTitle,
+} from "../notifications/notification-copy";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
+import { filterUserIdsByProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
 
 /**
@@ -113,7 +116,12 @@ async function fanOut(params: {
   metadata?: Prisma.JsonObject | null;
   summary: ProcurementOverdueRunSummary;
 }): Promise<void> {
-  for (const recipientUserId of params.candidates) {
+  const candidates = await filterUserIdsByProjectAccess(
+    params.tenantId,
+    params.projectId,
+    params.candidates,
+  );
+  for (const recipientUserId of candidates) {
     const dup = await hasRecentDuplicate({
       tenantId: params.tenantId,
       type: params.type,

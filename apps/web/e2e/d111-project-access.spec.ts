@@ -75,12 +75,12 @@ test.describe("D-111 project access UI", () => {
   test("PM cannot manage Equipo (unauthorized)", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await login(page, PM_EMAIL);
-    await page.goto(`${baseUrl}/configuracion/equipo`);
-    const body = await page.locator("body").innerText();
-    const denied =
-      /no encontr|404|sin permisos|not found/i.test(body) ||
-      !page.url().includes("/configuracion/equipo") ||
-      !(await page.getByText(/Acceso a obras/i).count());
-    expect(denied).toBeTruthy();
+    await page.goto(`${baseUrl}/configuracion/equipo`, { waitUntil: "domcontentloaded" });
+    await page.waitForLoadState("networkidle").catch(() => undefined);
+    const url = page.url();
+    const deniedByRedirect = !url.includes("/configuracion/equipo");
+    const accesoHeading = page.getByRole("heading", { name: /Acceso a obras/i });
+    const hasAccesoUi = (await accesoHeading.count()) > 0;
+    expect(deniedByRedirect || !hasAccesoUi).toBeTruthy();
   });
 });

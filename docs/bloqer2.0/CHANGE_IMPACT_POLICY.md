@@ -3,7 +3,7 @@
 > **Idioma:** español (es-AR).  
 > **Estado:** vigente.  
 > **Canon también en:** [`.cursor/rules/operational-docs.mdc`](../../.cursor/rules/operational-docs.mdc) (`alwaysApply`), [`AGENTS.md`](./AGENTS.md), [`08-architecture/AGENT_GUARDRAILS.md`](./08-architecture/AGENT_GUARDRAILS.md).  
-> **Relacionado:** [D-090](./00-product/DECISION_LOG.md), [`08-architecture/HELP_CENTER.md`](./08-architecture/HELP_CENTER.md), [`BLOQER_AI_ARCHITECTURE.md`](./BLOQER_AI_ARCHITECTURE.md), skill `.cursor/skills/operational-help-docs/`.
+> **Relacionado:** [D-090](./00-product/DECISION_LOG.md), [`08-architecture/HELP_CENTER.md`](./08-architecture/HELP_CENTER.md), [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md), [`BLOQER_AI_ARCHITECTURE.md`](./BLOQER_AI_ARCHITECTURE.md), skill `.cursor/skills/operational-help-docs/`.
 
 ---
 

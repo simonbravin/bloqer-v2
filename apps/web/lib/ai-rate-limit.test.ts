@@ -40,3 +40,23 @@ test("ai rate limit blocks per tenant per hour", () => {
     false,
   );
 });
+
+test("tenant deny does not burn user quota", () => {
+  resetAiChatRateLimitForTests();
+  const cfg = { userPerMinute: 1, tenantPerHour: 1 };
+  const nowMs = 3_000_000;
+  assert.equal(
+    checkAiChatRateLimit({ tenantId: "t3", userId: "u1", config: cfg, nowMs }).ok,
+    true,
+  );
+  // Tenant exhausted; user u2 must not consume their only user slot.
+  assert.equal(
+    checkAiChatRateLimit({ tenantId: "t3", userId: "u2", config: cfg, nowMs }).ok,
+    false,
+  );
+  // Different tenant — u2 still has full user quota.
+  assert.equal(
+    checkAiChatRateLimit({ tenantId: "t4", userId: "u2", config: cfg, nowMs }).ok,
+    true,
+  );
+});

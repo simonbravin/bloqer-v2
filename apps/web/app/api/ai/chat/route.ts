@@ -61,6 +61,7 @@ const bodySchema = z.object({
   }, z.array(chatMessageSchema).min(1).max(40)),
   currentRoute: z.string().max(500).optional(),
   currentProjectId: z.string().uuid().optional(),
+  // Reserved for future entity-aware tools — ignored for auth until revalidated like projects.
   currentEntityType: z.string().max(80).optional(),
   currentEntityId: z.string().uuid().optional(),
   /** Client hint: no prior assistant messages in this browser session. */
@@ -149,6 +150,7 @@ function clientSafeAiErrorMessage(err: unknown): string {
 
 function clientSafeStreamError(message: string, code?: string): string {
   if (code === "TIMEOUT") return userFacingOpenAiErrorMessage("TIMEOUT");
+  if (code === "CANCELLED") return userFacingOpenAiErrorMessage("CANCELLED");
   if (code === "AUTH") return userFacingOpenAiErrorMessage("AUTH");
   if (code === "RATE_LIMIT") return userFacingOpenAiErrorMessage("RATE_LIMIT");
   if (code === "NOT_CONFIGURED") return userFacingOpenAiErrorMessage("NOT_CONFIGURED");
@@ -157,7 +159,7 @@ function clientSafeStreamError(message: string, code?: string): string {
     // Only allow known orchestrator Spanish (tool/turn limits). Never vendor English.
     if (
       message &&
-      /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas/i.test(message) &&
+      /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas|Consulta cancelada/i.test(message) &&
       !/reasoning_effort|chat\/completions|function tools|openai|api[_ ]?key|sk-/i.test(message)
     ) {
       return message;
@@ -167,12 +169,25 @@ function clientSafeStreamError(message: string, code?: string): string {
   // Anything else (including English vendor text) → generic.
   if (
     message &&
-    /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas/i.test(message) &&
+    /alcanzó el (límite|máximo)|máximo de pasos|límite de consultas|Consulta cancelada/i.test(message) &&
     !/reasoning_effort|chat\/completions|function tools|openai|api[_ ]?key|sk-/i.test(message)
   ) {
     return message;
   }
   return userFacingOpenAiErrorMessage("PROVIDER");
+}
+
+/** Strip injection-prone noise from client route hints (never authorization). */
+function sanitizeCurrentRouteHint(route: string | undefined): string | undefined {
+  if (!route) return undefined;
+  const trimmed = route.trim().slice(0, 200);
+  if (!trimmed.startsWith("/")) return undefined;
+  if (trimmed.includes("://") || trimmed.startsWith("//")) return undefined;
+  if (/[<>`\r\n\0]/.test(trimmed)) return undefined;
+  // Path only — drop query/hash to reduce prompt injection surface.
+  const pathOnly = trimmed.split(/[?#]/, 1)[0] ?? trimmed;
+  if (!/^\/[A-Za-z0-9\-._/~]*$/.test(pathOnly)) return undefined;
+  return pathOnly;
 }
 
 export async function POST(req: Request) {
@@ -190,6 +205,14 @@ export async function POST(req: Request) {
     return Response.json({ error: "Sin contexto de tenant." }, { status: 401 });
   }
 
+  let body: z.infer<typeof bodySchema>;
+  try {
+    body = bodySchema.parse(await req.json());
+  } catch {
+    return Response.json({ error: "Payload inválido." }, { status: 400 });
+  }
+
+  // After auth + body validation so invalid payloads do not burn AI quota.
   const rate = checkAiChatRateLimit({
     tenantId: service.tenantId,
     userId: service.actorUserId,
@@ -202,13 +225,6 @@ export async function POST(req: Request) {
         headers: { "Retry-After": String(rate.retryAfterSec) },
       },
     );
-  }
-
-  let body: z.infer<typeof bodySchema>;
-  try {
-    body = bodySchema.parse(await req.json());
-  } catch {
-    return Response.json({ error: "Payload inválido." }, { status: 400 });
   }
 
   // Convenience context only — never authorization. Drop invalid/inaccessible project hints.
@@ -229,10 +245,11 @@ export async function POST(req: Request) {
 
   const aiCtx = buildAiExecutionContext({
     service,
-    currentRoute: body.currentRoute,
+    currentRoute: sanitizeCurrentRouteHint(body.currentRoute),
     currentProjectId: safeProjectId,
-    currentEntityType: body.currentEntityType,
-    currentEntityId: body.currentEntityId,
+    // Entity hints ignored until ownership-validated tools exist.
+    currentEntityType: undefined,
+    currentEntityId: undefined,
     actorDisplayName: current.session.user.name ?? current.session.user.email ?? undefined,
     tenantName: current.tenantCtx.tenantName,
     enabledModules,
@@ -335,7 +352,18 @@ export async function POST(req: Request) {
               ...(links.length ? { links } : {}),
             });
           } else if (ev.type === "presentation") {
-            send("presentation", { presentation: ev.presentation });
+            const safePresentation = {
+              ...ev.presentation,
+              insights: (ev.presentation.insights ?? []).map((insight) => ({
+                ...insight,
+                links: filterSafeAiLinks(insight.links ?? []),
+              })),
+              actions: (ev.presentation.actions ?? []).map((action) => ({
+                ...action,
+                links: filterSafeAiLinks(action.links ?? []),
+              })),
+            };
+            send("presentation", { presentation: safePresentation });
           } else if (ev.type === "usage") {
             // Privacy: metadata only — never log prompts, tool payloads, or API keys.
             console.info(

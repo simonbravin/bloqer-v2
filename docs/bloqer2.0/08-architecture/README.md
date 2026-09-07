@@ -55,6 +55,7 @@ Traducir la **fuente de verdad funcional** (producto, dominio, finanzas, fórmul
 37. [`AGENT_GUARDRAILS.md`](./AGENT_GUARDRAILS.md) — Límites duros para agentes.
 37b. [`HELP_CENTER.md`](./HELP_CENTER.md) — Centro de ayuda in-app ([D-090]).  
 37c. [`../BLOQER_AI_ARCHITECTURE.md`](../BLOQER_AI_ARCHITECTURE.md) — Asistente IA (tool layer sobre services; MVP read-only).  
+37d. [`../BLOQER_AI_ROADMAP.md`](../BLOQER_AI_ROADMAP.md) — **Roadmap canónico** de producto Bloqer AI (V1→V4).  
 38. [`TESTING_STRATEGY.md`](./TESTING_STRATEGY.md) — Pirámide y prioridades.  
 39. [`CODE_REVIEW_CHECKLIST.md`](./CODE_REVIEW_CHECKLIST.md) — Checklist de PR.  
 40. [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md) — **Pendientes técnicos** a cerrar (ERD, API, repo).  

@@ -1,13 +1,16 @@
 # Bloqer AI — MVP Scorecard
 
-> **Estado del producto AI:** **EXPERIMENTAL LOCAL**  
-> **Recomendación:** **READY FOR INTERNAL DEV** — **NOT READY FOR STAGING** — **NOT READY FOR PRODUCTION**  
-> **Corrida staging-readiness:** 2026-09-05 (local, sin commit/push/deploy)  
+> **Nota (2026-09-06):** este scorecard es **histórico** (corrida 2026-09-05).  
+> Estado de producto canónico: [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md).  
+> Seguridad D-111 / zero-trust: [`BLOQER_AI_SECURITY_SCORECARD.md`](./BLOQER_AI_SECURITY_SCORECARD.md).  
+> La matriz VIEWER+treasury y “sin ACL por obra” abajo está **obsoleta** post D-111.  
 > **Relacionado:** [`BLOQER_AI_ARCHITECTURE.md`](./BLOQER_AI_ARCHITECTURE.md), [`BLOQER_AI_TOOL_AUDIT.md`](./BLOQER_AI_TOOL_AUDIT.md), [`BLOQER_AI_EVAL_RUNBOOK.md`](./BLOQER_AI_EVAL_RUNBOOK.md), [`BLOQER_AI_MANUAL_SMOKE.md`](./BLOQER_AI_MANUAL_SMOKE.md)
+
+> ~~Estado: EXPERIMENTAL LOCAL / NOT READY FOR PRODUCTION~~ — ver roadmap + smoke production del release controlado.
 
 ---
 
-## 1. Veredicto ejecutivo
+## 1. Veredicto ejecutivo (histórico 2026-09-05)
 
 | Dimensión | Estado |
 |---|---|

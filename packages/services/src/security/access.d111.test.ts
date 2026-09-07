@@ -71,3 +71,15 @@ describe("D-111 tenant-wide project access", () => {
     assert.equal(hasTenantWideProjectAccess(["VIEWER"]), false);
   });
 });
+
+describe("filterUserIdsByProjectAccess (company / empty)", () => {
+  it("passes through when projectId is null/undefined or list empty", async () => {
+    const { filterUserIdsByProjectAccess } = await import("../security/access");
+    assert.deepEqual(
+      await filterUserIdsByProjectAccess("tenant", null, ["u1", "u2"]),
+      ["u1", "u2"],
+    );
+    assert.deepEqual(await filterUserIdsByProjectAccess("tenant", undefined, ["u1"]), ["u1"]);
+    assert.deepEqual(await filterUserIdsByProjectAccess("tenant", "proj", []), []);
+  });
+});

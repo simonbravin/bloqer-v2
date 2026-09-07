@@ -224,10 +224,11 @@ export class BloqerAiToolRegistry {
       };
     } catch (err) {
       if (err instanceof ServiceError) {
+        // Prefer the service message (project ACL, company AP, etc.). Do not remap
+        // project-membership FORBIDDEN onto accessKind deny text (e.g. COMPANY_AP).
         const safeMessage =
-          err.code === "FORBIDDEN"
-            ? access.denyMessage || AI_DENY_MESSAGES.TOOL
-            : err.message;
+          err.message?.trim() ||
+          (err.code === "FORBIDDEN" ? access.denyMessage || AI_DENY_MESSAGES.TOOL : "Error al consultar Bloqer.");
         logAiToolAuthDecision({
           type: "bloqer_ai_tool_auth",
           correlationId: ctx.correlationId,
@@ -242,7 +243,7 @@ export class BloqerAiToolRegistry {
         });
         return {
           content: JSON.stringify({
-            error: err.code === "FORBIDDEN" ? safeMessage : err.message,
+            error: safeMessage,
             code: err.code,
           }),
           isError: true,

@@ -264,6 +264,8 @@ export type JobsiteLogListFilters = {
   dateTo?: string;
   wbsNodeId?: string;
   status?: string;
+  /** Cap rows returned (newest first). Used by AI tools to avoid loading entire libro. */
+  take?: number;
 };
 
 /** Sum of incremental physicalPct (+ qty) from jobsite logs, grouped by WBS. */
@@ -755,6 +757,7 @@ export async function listJobsiteLogsByProject(
     },
     include: logInclude,
     orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
+    ...(typeof f.take === "number" && f.take > 0 ? { take: Math.min(200, f.take) } : {}),
   });
   return logs.map(serializeLog);
 }

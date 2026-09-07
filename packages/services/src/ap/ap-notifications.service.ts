@@ -12,6 +12,7 @@ import {
   loadNotificationIdentityFacts,
 } from "../notifications/notification-email-context";
 import { formatNotificationTitle, formatSupplierInvoiceCode } from "../notifications/notification-copy";
+import { filterUserIdsByProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
 import { canRegisterApPayment } from "./ap-access";
 
@@ -64,10 +65,15 @@ async function notifyApPaymentWorkflow(params: {
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
+  const scoped = await filterUserIdsByProjectAccess(
+    params.ctx.tenantId,
+    params.projectId,
+    unique,
+  );
 
   const sendEmail = await resolveApPaymentEmailEnabled(params.companyId, params.ctx);
 
-  for (const recipientUserId of unique) {
+  for (const recipientUserId of scoped) {
     try {
       const { id: notificationId } = await createSystemNotification({
         tenantId: params.ctx.tenantId,

@@ -13,6 +13,7 @@ import {
 } from "../notifications/notification-email-context";
 import { formatNotificationTitle } from "../notifications/notification-copy";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
+import { filterUserIdsByProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
 
 type ProcurementNotifyType =
@@ -61,8 +62,13 @@ async function notifyRecipients(params: {
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
+  const scoped = await filterUserIdsByProjectAccess(
+    params.ctx.tenantId,
+    params.projectId,
+    unique,
+  );
   let created = 0;
-  for (const recipientUserId of unique) {
+  for (const recipientUserId of scoped) {
     try {
       const { id: notificationId } = await createSystemNotification({
         tenantId: params.ctx.tenantId,

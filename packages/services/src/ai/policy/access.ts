@@ -3,7 +3,7 @@ import type { PermissionModule } from "@bloqer/domain";
 import type { ServiceContext } from "../../types";
 import { canViewCompanyAp, canViewApProjectArea } from "../../ap/ap-access";
 import { canViewCompanyAr, canViewArProjectArea } from "../../ar/ar-access";
-import { canViewTreasury } from "../../security/access";
+import { canViewTreasury, canViewProjectFinancialsCapability } from "../../security/access";
 import type { AiExecutionContext } from "../types";
 import type { AiDataClass, AiToolScope } from "./data-class";
 
@@ -134,10 +134,8 @@ export function evaluateAiToolAccess(
         ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TOOL }
         : { allowed: false, denyMessage: AI_DENY_MESSAGES.TOOL };
     case "project_financial":
-      return aiCanViewProjects(roles) ||
-        aiCanViewProjectAp(roles) ||
-        aiCanViewProjectAr(roles) ||
-        aiCanViewCertifications(roles)
+      // Align with G4 capability — not VIEW PROJECTS alone.
+      return canViewProjectFinancialsCapability(roles)
         ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TOOL }
         : { allowed: false, denyMessage: AI_DENY_MESSAGES.TOOL };
     case "project_or_company_ap":

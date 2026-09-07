@@ -10,6 +10,7 @@ import {
 import { createSystemNotification } from "./notification.service";
 import { sendOperationalAlertEmailAsSystem } from "./notification-email.service";
 import { resolveDocumentNotificationEntityLabel, staleDocumentUploadCopy } from "./notification-copy";
+import { filterUserIdsByProjectAccess } from "../security/access";
 
 /** Re-export recipient helpers for existing call sites. */
 export { findActiveOwnerAdminUserIds, findActiveUsersForPermission } from "./notification-audience.service";
@@ -166,7 +167,12 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
       ? `/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`
       : `/finanzas/cuentas-por-cobrar/${r.id}`;
 
-    for (const uid of recipients) {
+    const scopedRecipients = await filterUserIdsByProjectAccess(
+      ctx.tenantId,
+      r.projectId,
+      recipients,
+    );
+    for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
         {
@@ -247,7 +253,12 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
       ? `/proyectos/${p.projectId}/cuentas-por-pagar/${p.id}`
       : `/finanzas/cuentas-por-pagar/${p.id}`;
 
-    for (const uid of recipients) {
+    const scopedRecipients = await filterUserIdsByProjectAccess(
+      ctx.tenantId,
+      p.projectId,
+      recipients,
+    );
+    for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
         {
@@ -318,7 +329,12 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
 
     if (recipients.length === 0) continue;
 
-    for (const uid of recipients) {
+    const scopedRecipients = await filterUserIdsByProjectAccess(
+      ctx.tenantId,
+      row.projectId,
+      recipients,
+    );
+    for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
         {
@@ -372,7 +388,12 @@ export async function runApprovedCertificationsWithoutInvoiceAlert(ctx: ServiceC
 
     if (recipients.length === 0) continue;
 
-    for (const uid of recipients) {
+    const scopedRecipients = await filterUserIdsByProjectAccess(
+      ctx.tenantId,
+      c.projectId,
+      recipients,
+    );
+    for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
         {
@@ -443,7 +464,12 @@ export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Prom
       category: d.category,
     });
 
-    for (const uid of recipientIds) {
+    const scopedRecipients = await filterUserIdsByProjectAccess(
+      ctx.tenantId,
+      d.projectId,
+      recipientIds,
+    );
+    for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
         {

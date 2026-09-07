@@ -9,7 +9,7 @@ import type {
 } from "openai/resources/chat/completions";
 import type { Stream } from "openai/streaming";
 import type { AiProvider } from "../../provider";
-import { AiProviderError, type AiProviderErrorCode } from "../../errors";
+import { AiProviderError, type AiProviderErrorCode, userFacingOpenAiErrorMessage } from "../../errors";
 import type {
   AiGenerateRequest,
   AiGenerateResponse,
@@ -19,6 +19,9 @@ import type {
   AiToolCall,
   AiToolDefinition,
 } from "../../types";
+
+/** Re-export for existing imports from this module. */
+export { userFacingOpenAiErrorMessage } from "../../errors";
 
 function toOpenAiMessages(system: string | undefined, messages: AiMessage[]): ChatCompletionMessageParam[] {
   const out: ChatCompletionMessageParam[] = [];
@@ -119,29 +122,6 @@ export function buildOpenAiChatCompletionsExtras(
     return { reasoning_effort: "none" };
   }
   return {};
-}
-
-/** User-facing Spanish — never vendor English / HTTP payloads. */
-export function userFacingOpenAiErrorMessage(
-  code: AiProviderErrorCode,
-): string {
-  switch (code) {
-    case "AUTH":
-      return "El proveedor de AI rechazó las credenciales. Revisá la configuración.";
-    case "RATE_LIMIT":
-      return "El proveedor de AI está saturado. Probá de nuevo en unos minutos.";
-    case "NOT_CONFIGURED":
-      return "Bloqer AI no está configurado correctamente.";
-    case "TIMEOUT":
-      return "La consulta tardó demasiado y se canceló.";
-    case "UNSUPPORTED":
-      return "El proveedor seleccionado no soporta esta operación.";
-    case "BAD_REQUEST":
-    case "PROVIDER":
-    case "UNKNOWN":
-    default:
-      return "No pude completar la consulta en este momento. Intentá nuevamente.";
-  }
 }
 
 /** Map vendor/SDK errors → AiProviderError with safe Spanish `.message` (detail in cause/log). */

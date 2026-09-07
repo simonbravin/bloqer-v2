@@ -539,8 +539,7 @@ async function main(): Promise<void> {
         item.evalRole === "OWNER" ||
         item.evalRole === "ADMIN" ||
         item.evalRole === "FINANCE" ||
-        item.evalRole === "TREASURER" ||
-        (!item.evalRole && true),
+        item.evalRole === "TREASURER",
       contextSummary: item.noProjectContext
         ? "Eval harness — tenant DEV. No hay obra/proyecto seleccionado en esta sesión."
         : item.requiresProject || item.useProjectA1

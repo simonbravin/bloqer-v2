@@ -3,7 +3,8 @@
  * Model output is treated as plain text; only tool-provided hrefs may become links.
  */
 
-const SAFE_INTERNAL = /^\/[A-Za-z0-9\-._~:/?#[\]@!$&'()*+,;=%]*$/;
+const SAFE_INTERNAL =
+  /^\/[A-Za-z0-9\-._~\/]+(?:\?[A-Za-z0-9\-._~=&%]*)?(?:#[A-Za-z0-9\-._~\/]*)?$/;
 
 export type AiSafeLink = { label: string; href: string };
 
@@ -13,6 +14,7 @@ export function isSafeInternalHref(href: string): boolean {
   if (
     trimmed.startsWith("//") ||
     trimmed.includes("://") ||
+    trimmed.includes("\\") ||
     trimmed.toLowerCase().startsWith("javascript:") ||
     trimmed.toLowerCase().startsWith("data:")
   ) {

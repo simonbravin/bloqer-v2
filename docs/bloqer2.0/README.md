@@ -60,6 +60,7 @@ Leer en este orden:
 ├── 06-reports/                     ← catálogo de reportes
 ├── 07-non-functional/              ← multitenancy, seguridad, i18n, integraciones
 ├── 08-architecture/                ← arquitectura técnica (stack, capas, ADRs)
+├── BLOQER_AI_ROADMAP.md            ← roadmap de producto AI (canónico V1→V4)
 ├── BLOQER_AI_ARCHITECTURE.md       ← asistente IA (tool layer, MVP read-only)
 ├── CHANGE_IMPACT_POLICY.md         ← impacto Help + Guía + Bloqer AI
 ├── BLOQER_AI_MVP_SCORECARD.md      ← scorecard experimental local
@@ -218,9 +219,11 @@ Leer en este orden:
 | Archivo | Propósito |
 |---|---|
 | [`GUIA_OPERATIVA_BLOQER_V2.md`](./GUIA_OPERATIVA_BLOQER_V2.md) | Guía operativa para usuarios |
-| [`BLOQER_AI_ARCHITECTURE.md`](./BLOQER_AI_ARCHITECTURE.md) | Bloqer AI: audit FASE 0, tool layer, MVP read-only |
+| [`BLOQER_AI_ROADMAP.md`](./BLOQER_AI_ROADMAP.md) | **Roadmap canónico** Bloqer AI (V1 asistente → V4 MCP) |
+| [`BLOQER_AI_ARCHITECTURE.md`](./BLOQER_AI_ARCHITECTURE.md) | Bloqer AI: tool layer, provider-agnostic, MVP READ |
 | [`CHANGE_IMPACT_POLICY.md`](./CHANGE_IMPACT_POLICY.md) | Política de impacto: Help + Guía + Bloqer AI |
-| [`BLOQER_AI_MVP_SCORECARD.md`](./BLOQER_AI_MVP_SCORECARD.md) | Scorecard MVP (experimental local; no staging/prod) |
+| [`BLOQER_AI_MVP_SCORECARD.md`](./BLOQER_AI_MVP_SCORECARD.md) | Scorecard MVP (calidad / gates) |
+| [`BLOQER_AI_SECURITY_SCORECARD.md`](./BLOQER_AI_SECURITY_SCORECARD.md) | Scorecard zero-trust / D-111 |
 | [`BLOQER_AI_TOOL_AUDIT.md`](./BLOQER_AI_TOOL_AUDIT.md) | Auditoría de las 17 tools READ (tenant/project/gates) |
 | [`BLOQER_AI_EVAL_RUNBOOK.md`](./BLOQER_AI_EVAL_RUNBOOK.md) | Runbook de evals fake vs live (nunca producción) |
 

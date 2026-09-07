@@ -39,10 +39,13 @@ export const getRecentJobsiteLogsTool = defineBloqerAiTool({
     const limit = args.limit ?? 10;
     const logs = await listJobsiteLogsByProject(
       projectId,
-      args.status ? { status: args.status } : undefined,
+      {
+        ...(args.status ? { status: args.status } : {}),
+        take: limit,
+      },
       ctx.service,
     );
-    const rows = logs.slice(0, limit).map((l) => ({
+    const rows = logs.map((l) => ({
       id: l.id,
       logDate:
         l.logDate instanceof Date ? l.logDate.toISOString().slice(0, 10) : String(l.logDate),
@@ -52,9 +55,9 @@ export const getRecentJobsiteLogsTool = defineBloqerAiTool({
     }));
     const href = `/proyectos/${projectId}/libro-obra`;
     return {
-      data: { total: logs.length, logs: rows },
+      data: { total: rows.length, logs: rows, truncated: rows.length >= limit },
       provenance: { sourceType: "bloqer_data", entityType: "Project", entityId: projectId, route: href, asOf: nowIso() },
-      truncation: { total: logs.length, returned: rows.length },
+      truncation: { total: rows.length, returned: rows.length },
       ui: { links: [{ label: "Ver libro de obra", href }], summaryLabel: "Consultando partes de obra…" },
     };
   },
