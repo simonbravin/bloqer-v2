@@ -583,13 +583,13 @@
   1. `ScheduleItem.progressPct` (**avance real** en cronograma) se actualiza **automáticamente al aprobar** un `JobsiteLog`, no al enviar ni al guardar borrador.
   2. La fuente es el WBS **primario** (`ScheduleItemWbsLink.isPrimary = true`) del ítem de cronograma.
   3. El % proviene del acumulado aprobado de `physicalPct` incremental por parte; si no hay % físico, fallback cantidad ejecutada / `budgetQty` del ítem de costo.
-  4. Si el acumulado supera 100 %, no se sincroniza ese WBS (datos legacy / Q-005b).
-  5. Al llegar a 100 % con estado `IN_PROGRESS`, la tarea pasa a `COMPLETED` (transición documentada en §27).
-  6. El **avance certificado** y el **avance por cantidad operativa** siguen siendo dimensiones de lectura separadas ([BR-SCH-002]); el PM puede editar fechas y dependencias; el avance real manual queda como excepción operativa.
+  4. Si el acumulado físico supera 100 %, la sync **clamp** a `100.00` y completa la tarea (datos legacy / Q-005b). No se deja el ítem sin sincronizar: el tope evita % Real > 100 y falsos “abiertos”.
+  5. Al llegar a **100 %** de avance real (sync desde libro **o** % manual en hoja), la tarea `TASK` en `PLANNED` o `IN_PROGRESS` pasa a `COMPLETED`. Así un parte que carga 100 % de una no deja la tarea en `IN_PROGRESS` (evita falsos “atrasados”). Ítems ya `COMPLETED` **no** se vuelven a pisar desde el libro. El botón **Completar** del Kanban/detalle para `TASK` sigue exigiendo `IN_PROGRESS` → `COMPLETED` ([D-104] / §27); el salto `PLANNED` → `COMPLETED` por botón o recepción sigue siendo **solo** `MILESTONE`.
+  6. El **avance certificado** y el **avance por cantidad operativa** siguen siendo dimensiones de lectura separadas ([BR-SCH-002]); el PM puede editar fechas y dependencias; el avance real manual queda como excepción operativa (bloqueado si la tarea ya está `COMPLETED` / `CANCELLED`).
   7. **Excepción ([D-103]):** ítems `type = MILESTONE` **no** reciben sync de `progressPct` ni transición de estado desde el libro; el PM completa el hito a mano (o vía recepción de OC en P1).
-- **Implicancias:** `syncScheduleProgressFromJobsiteLog` en `packages/services`; auditoría `SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG`.
-- **Documentos afectados:** [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SCH-004]), [`05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md), [D-103](#d-103--cronograma-árbol-de-filas-hitos-visuales-y-sync-solo-en-tareas).
-
+- **Implicancias:** `syncScheduleProgressFromJobsiteLog` + `updateScheduleItemProgress` usan `resolveScheduleStatusAfterProgressSync`; auditoría `SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG` / `schedule_item.completed`.
+- **Documentos afectados:** [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SCH-004]), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §27, [`05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md), [`02-modules/PROJECT_SCHEDULING.md`](../02-modules/PROJECT_SCHEDULING.md), [`02-modules/JOBSITE_LOG.md`](../02-modules/JOBSITE_LOG.md), [D-103](#d-103--cronograma-árbol-de-filas-hitos-visuales-y-sync-solo-en-tareas).
+- **Corrección (2026-09-07):** el punto 5 antes solo contemplaba `IN_PROGRESS` → `COMPLETED`; en la práctica el primer sync a 100 % partía de `PLANNED` y dejaba la tarea abierta. El punto 4 se alineó al clamp real del código (antes decía “no sincronizar”).
 ---
 
 ### D-046 — Import WBS sin fechas por defecto y rollup de contenedores
@@ -1617,7 +1617,7 @@
 - **Decisión:**
   1. Al **confirmar** un `PurchaseReceipt`, completar `ScheduleItem` `type = MILESTONE` del mismo proyecto con vínculo a cualquier `wbsNodeId` de las líneas recibidas, si el estado es `PLANNED` o `IN_PROGRESS`. Idempotente si ya `COMPLETED`. `BLOCKED` / `CANCELLED` no se tocan.
   2. Cualquier cantidad confirmada en esa EDT alcanza (no hace falta el 100 % de la OC).
-  3. Transición `PLANNED → COMPLETED` **solo** para `MILESTONE` (recepción o complete manual). Las `TASK` siguen sin salto directo.
+  3. Transición `PLANNED → COMPLETED` por **botón Completar / Kanban / recepción** **solo** para `MILESTONE`. Las `TASK` usan Completar desde `IN_PROGRESS`. **Excepción [D-045]:** avance real al 100 % (libro aprobado o % manual en hoja) completa `TASK` desde `PLANNED` o `IN_PROGRESS`.
   4. Anular recepción **no** reabre el hito.
   5. Workspace (solo lectura): por ítem con EDT, `expectedDeliveryDate` = min de OC `CONFIRMED`/`PARTIALLY_RECEIVED` con líneas en esos WBS; `latestReceiptDate` = max recepción `CONFIRMED`. Riesgo si la prometida es posterior al `startDate` más temprano de una tarea hoja hermana que comparte WBS.
   6. UI: barras de tarea atrasadas en color peligro; contenedores colapsables en Gantt (estado local, sin DB).

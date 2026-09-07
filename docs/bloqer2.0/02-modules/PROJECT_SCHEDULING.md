@@ -23,7 +23,7 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 
 ## 7. Estados y transiciones
 - **`Schedule`:** contenedor sin máquina de estados propia en Fase 1 (ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §27).
-- **`ScheduleItem`:** `PLANNED` → `IN_PROGRESS` → `COMPLETED`; ramas `BLOCKED`, `CANCELLED`; causa obligatoria en `BLOCKED`.
+- **`ScheduleItem`:** `PLANNED` → `IN_PROGRESS` → `COMPLETED`; ramas `BLOCKED`, `CANCELLED`; causa obligatoria en `BLOCKED`. Al llegar a 100 % de avance real (libro o % manual), una `TASK` en `PLANNED`/`IN_PROGRESS` pasa a `COMPLETED` ([D-045]).
 
 ## 8. Acciones disponibles
 - Crear/editar cronograma (Gantt y/o lista de hitos según [Q-003]).

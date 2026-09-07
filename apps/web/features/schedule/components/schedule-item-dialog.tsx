@@ -499,7 +499,7 @@ export function ScheduleItemDialog({
               {item.blockReason && (
                 <p className="text-destructive">Bloqueo: {item.blockReason}</p>
               )}
-              {workspace.canEdit && !isContainer && (
+              {workspace.canEdit && !isContainer && item.status !== "CANCELLED" && item.status !== "COMPLETED" && (
                 <div className="flex items-end gap-2">
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-1">
@@ -518,6 +518,11 @@ export function ScheduleItemDialog({
                     Guardar
                   </Button>
                 </div>
+              )}
+              {workspace.canEdit && !isContainer && item.status === "COMPLETED" && (
+                <p className="text-xs text-muted-foreground">
+                  Completada — el avance real queda bloqueado al 100%.
+                </p>
               )}
             </section>
 
@@ -659,12 +664,22 @@ export function ScheduleItemDialog({
             )}
 
             <div className="flex flex-wrap gap-2">
-              {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && m?.operationalProgressPct && (
+              {workspace.canEdit &&
+                !isContainer &&
+                item.type !== "MILESTONE" &&
+                item.status !== "COMPLETED" &&
+                item.status !== "CANCELLED" &&
+                m?.operationalProgressPct && (
                 <Button size="sm" variant="secondary" disabled={pending} onClick={copyPhysical}>
                   Copiar avance por cantidad
                 </Button>
               )}
-              {workspace.canEdit && !isContainer && item.type !== "MILESTONE" && context?.jobsitePhysicalPctCumulative && (
+              {workspace.canEdit &&
+                !isContainer &&
+                item.type !== "MILESTONE" &&
+                item.status !== "COMPLETED" &&
+                item.status !== "CANCELLED" &&
+                context?.jobsitePhysicalPctCumulative && (
                 <Button size="sm" variant="secondary" disabled={pending} onClick={copyJobsitePhysicalPct}>
                   Copiar % físico ({context.jobsitePhysicalPctCumulative}%)
                 </Button>

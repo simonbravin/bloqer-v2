@@ -1,12 +1,13 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { log } from "../audit/audit.service";
 import { ServiceContext } from "../types";
-import { SCHEDULE_ITEM_ENTITY, scheduleItemSnapshot } from "./schedule-audit";
+import { SCHEDULE_ITEM_ENTITY, scheduleItemSnapshot, statusChangeAuditAction } from "./schedule-audit";
 import { assertScheduleStatusTransition, isScheduleLeafItem } from "./schedule-helpers";
 import {
   capSyncProgressPct,
   resolveJobsitePhysicalPctForSync,
   resolveScheduleStatusAfterProgressSync,
+  serializeProgressPct,
 } from "./schedule-progress-sync-pure";
 import { shouldSyncProgressFromJobsite } from "./schedule-placement";
 
@@ -181,6 +182,10 @@ export async function syncScheduleProgressFromJobsiteLog(
       if (!shouldSyncProgressFromJobsite(item.type)) continue;
       // Containers must not receive libro sync (same leaf rule as manual progress/status).
       if (!isScheduleLeafItem(scheduleTree, item.id)) continue;
+      // COMPLETED is terminal for progress: never lower/overwrite Real after completion
+      // (e.g. Completar button forced 100% while libro still has a lower cumulative %).
+      if (item.status === "COMPLETED") continue;
+
       const before = scheduleItemSnapshot(item);
       const nextStatus = resolveScheduleStatusAfterProgressSync(item.status, pct);
 
@@ -188,15 +193,23 @@ export async function syncScheduleProgressFromJobsiteLog(
         assertScheduleStatusTransition(item.status, nextStatus);
       }
 
+      const prevPct = serializeProgressPct(item.progressPct.toString());
+      if (prevPct === pct && nextStatus === item.status) continue;
+
       const row = await tx.scheduleItem.update({
         where: { id: item.id },
         data: {
           progressPct: pct,
           status: nextStatus,
+          ...(nextStatus !== item.status &&
+          (nextStatus === "COMPLETED" || nextStatus === "IN_PROGRESS")
+            ? { blockReason: null }
+            : {}),
           updatedBy: ctx.actorUserId,
         },
       });
 
+      const after = scheduleItemSnapshot(row);
       await log(
         {
           tenantId: ctx.tenantId,
@@ -206,10 +219,25 @@ export async function syncScheduleProgressFromJobsiteLog(
           entityId: item.id,
           projectId,
           before,
-          after: scheduleItemSnapshot(row),
+          after,
         },
         tx,
       );
+      if (nextStatus !== item.status) {
+        await log(
+          {
+            tenantId: ctx.tenantId,
+            actorUserId: ctx.actorUserId,
+            action: statusChangeAuditAction(item.status, nextStatus),
+            entityType: SCHEDULE_ITEM_ENTITY,
+            entityId: item.id,
+            projectId,
+            before,
+            after,
+          },
+          tx,
+        );
+      }
       updated++;
     }
   }

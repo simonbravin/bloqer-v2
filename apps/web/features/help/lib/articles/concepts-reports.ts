@@ -65,7 +65,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Abrí Planificación → Cronograma. En detalle/tabla/Gantt ves Real / plan t. / cant. / cert. Pasá el mouse por cada valor para la descripción. La Leyenda de avances está en la barra de filtros (junto a Tipo / Estado / Solo atrasados).",
-      "Real: lo mueve el libro de obra aprobado en **tareas** (o el PM con «Avance real %»). Los **hitos** no sincronizan desde el libro ([D-103]); se completan a mano o al confirmar una recepción de la misma EDT ([D-104]).",
+      "Real: lo mueve el libro de obra aprobado en **tareas** (o el PM con «Avance real %»). Al llegar a **100 %**, la tarea pasa a Completado (también si venía de Planificado) y el % queda bloqueado. Los **hitos** no sincronizan desde el libro ([D-103]); se completan a mano o al confirmar una recepción de la misma EDT ([D-104]).",
       "Plan (tiempo): automático según fechas vs hoy.",
       "Cantidades: libro de obra vs presupuesto.",
       "Certificado: solo el módulo Certificaciones (lectura en cronograma).",

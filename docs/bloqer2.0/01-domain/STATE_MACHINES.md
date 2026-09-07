@@ -926,7 +926,7 @@ stateDiagram-v2
   CANCELLED --> [*]
 ```
 
-> Nota: `PLANNED → COMPLETED` aplica **solo** a `ScheduleItem.type = MILESTONE` ([D-104]).
+> Nota: el botón **Completar** / recepción de OC hace `PLANNED → COMPLETED` **solo** en `MILESTONE` ([D-104]). Por **avance real al 100 %** (libro aprobado o % manual en hoja), una `TASK` en `PLANNED` o `IN_PROGRESS` también pasa a `COMPLETED` ([D-045] / [BR-SCH-004]).
 
 #### Tabla — ScheduleItem
 
@@ -935,7 +935,7 @@ stateDiagram-v2
 | `PLANNED` | `IN_PROGRESS` | `schedule_item.started` |
 | `PLANNED` | `BLOCKED` | `schedule_item.blocked` |
 | `PLANNED` | `CANCELLED` | `schedule_item.cancelled` |
-| `PLANNED` | `COMPLETED` | `schedule_item.completed` (**solo** `type = MILESTONE` — [D-104]) |
+| `PLANNED` | `COMPLETED` | `schedule_item.completed` (`MILESTONE` por botón/recepción — [D-104]; `TASK` por avance real 100 % — [D-045]) |
 | `IN_PROGRESS` | `COMPLETED` | `schedule_item.completed` |
 | `IN_PROGRESS` | `BLOCKED` | `schedule_item.blocked` |
 | `IN_PROGRESS` | `CANCELLED` | `schedule_item.cancelled` |
@@ -946,7 +946,7 @@ stateDiagram-v2
 
 - Ítems `CANCELLED` quedan en histórico; reportes de avance pueden excluirlos por defecto ([BR-SCH-002]).
 - `BLOCKED` requiere **`block_reason`** no vacío ([BR-SCH-003]).
-- `PLANNED → COMPLETED` solo para hitos (`MILESTONE`), p. ej. al confirmar recepción de OC ([D-104] / [BR-SCH-005]). Las tareas deben pasar por `IN_PROGRESS`.
+- Botón **Completar** / Kanban / recepción: `PLANNED → COMPLETED` solo para hitos (`MILESTONE`) ([D-104] / [BR-SCH-005]). Las tareas usan **Completar** desde `IN_PROGRESS`, **o** quedan `COMPLETED` automáticamente al alcanzar 100 % de avance real ([D-045]).
 
 ---
 

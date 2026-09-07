@@ -783,7 +783,7 @@ stateDiagram-v2
 
 *Importar EDT, fechas, dependencias FS, hitos y reordenar.*
 
-**Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED`.
+**Estados de ítem:** `PLANNED` · `IN_PROGRESS` · `BLOCKED` · `COMPLETED` · `CANCELLED`. Al aprobar un parte (o cargar **Avance real %** en una hoja) que deja la tarea en **100 %**, el estado pasa a **Completado** aunque antes estuviera Planificado — así no figura como atrasada. El botón **Completar** del Kanban/detalle en tareas sigue siendo En curso → Hecho; en hitos también Planificado → Hecho ([D-104]).
 
 **Kanban:** solo transiciones permitidas (ej. Planificado → En curso / Bloqueado; En curso → Hecho / Bloqueado; hitos también Planificado → Hecho — [D-104]). Soltar en Planificado o Cancelado, o un salto inválido, muestra un mensaje y no cambia el estado. Para cancelar, usar el detalle de la tarea.
 

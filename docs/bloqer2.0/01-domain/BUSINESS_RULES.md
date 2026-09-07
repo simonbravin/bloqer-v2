@@ -438,7 +438,8 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 ### BR-SCH-004 — Sincronización de avance real desde libro de obra
 - **Regla:** al **aprobar** un parte de obra (`JobsiteLog` → `APPROVED`), el sistema recalcula y persiste `ScheduleItem.progressPct` para cada ítem de cronograma **`type = TASK`** cuyo WBS primario aparece en las líneas de avance del parte, según [D-045] y [D-103].
 - **Regla:** ítems `type = MILESTONE` **no** reciben sync de avance ni transición de estado desde el libro ([D-103]).
-- **Regla:** no se sincroniza en `DRAFT`, `SUBMITTED` ni `RETURNED`; tampoco si el acumulado físico del WBS supera 100 %.
+- **Regla:** no se sincroniza en `DRAFT`, `SUBMITTED` ni `RETURNED`. Si el acumulado físico supera 100 %, se **clamp** a 100 % ([D-045] / Q-005b).
+- **Regla:** si el % real sincronizado (o el % manual en hoja) llega a **100 %** y el ítem está en `PLANNED` o `IN_PROGRESS`, el estado pasa a `COMPLETED` ([D-045]). `BLOCKED` / `CANCELLED` / ya `COMPLETED` no se modifican por avance.
 - **Regla:** el avance **plan temporal** (curva tiempo vs fechas), el avance **por cantidad** y el **certificado** no se sobrescriben con esta operación.
 - **Origen:** [D-045], [D-103]; procedimiento en [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md).
 

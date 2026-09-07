@@ -71,15 +71,28 @@ describe("resolveJobsitePhysicalPctForSync", () => {
 });
 
 describe("resolveScheduleStatusAfterProgressSync", () => {
-  it("PLANNED → IN_PROGRESS when pct > 0", () => {
+  it("PLANNED → IN_PROGRESS when pct > 0 and below 100", () => {
     assert.equal(resolveScheduleStatusAfterProgressSync("PLANNED", "1.00"), "IN_PROGRESS");
+    assert.equal(resolveScheduleStatusAfterProgressSync("PLANNED", "99.99"), "IN_PROGRESS");
+  });
+
+  it("PLANNED → COMPLETED at 100% (one-shot libro / manual)", () => {
+    assert.equal(resolveScheduleStatusAfterProgressSync("PLANNED", "100"), "COMPLETED");
+    assert.equal(resolveScheduleStatusAfterProgressSync("PLANNED", "100.00"), "COMPLETED");
   });
 
   it("IN_PROGRESS → COMPLETED at 100%", () => {
     assert.equal(resolveScheduleStatusAfterProgressSync("IN_PROGRESS", "100.00"), "COMPLETED");
   });
 
-  it("keeps BLOCKED unchanged", () => {
+  it("keeps BLOCKED unchanged even at 100%", () => {
     assert.equal(resolveScheduleStatusAfterProgressSync("BLOCKED", "50.00"), "BLOCKED");
+    assert.equal(resolveScheduleStatusAfterProgressSync("BLOCKED", "100.00"), "BLOCKED");
+  });
+
+  it("keeps COMPLETED / CANCELLED unchanged", () => {
+    assert.equal(resolveScheduleStatusAfterProgressSync("COMPLETED", "100.00"), "COMPLETED");
+    assert.equal(resolveScheduleStatusAfterProgressSync("COMPLETED", "40.00"), "COMPLETED");
+    assert.equal(resolveScheduleStatusAfterProgressSync("CANCELLED", "100.00"), "CANCELLED");
   });
 });

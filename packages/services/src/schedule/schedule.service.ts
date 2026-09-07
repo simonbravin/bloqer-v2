@@ -26,7 +26,7 @@ import {
 } from "./schedule-audit";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
 import { requireProjectAccess } from "../security/access";
-import { serializeProgressPct } from "./schedule-progress-sync-pure";
+import { serializeProgressPct, resolveScheduleStatusAfterProgressSync } from "./schedule-progress-sync-pure";
 import {
   applyMoveSibling,
   resolveInsertSortOrder,
@@ -837,6 +837,16 @@ export async function updateScheduleItemProgress(
   }
   const item = await getScheduleItemForMutation(scheduleItemId, ctx);
 
+  if (item.status === "CANCELLED") {
+    throw new ServiceError("VALIDATION", "No se puede editar el avance de una tarea anulada");
+  }
+  if (item.status === "COMPLETED") {
+    throw new ServiceError(
+      "VALIDATION",
+      "La tarea ya está completada. El avance real queda bloqueado.",
+    );
+  }
+
   // [D-046] Containers are date-derived; progress is leaf-only (manual % on parents misleads).
   const hasActiveChildren = await prisma.scheduleItem.count({
     where: {
@@ -851,23 +861,57 @@ export async function updateScheduleItemProgress(
     );
   }
 
-  const before = { progressPct: serializeProgressPct(item.progressPct.toString()) };
+  // Defense in depth (action Zod already 0–100); keep service safe for internal callers.
   const pct = serializeProgressPct(progressPct);
+  const pctNum = Number(pct);
+  if (!Number.isFinite(pctNum) || pctNum < 0 || pctNum > 100) {
+    throw new ServiceError("VALIDATION", "Avance inválido (0–100)");
+  }
+
+  const nextStatus = resolveScheduleStatusAfterProgressSync(item.status, pct);
+  // Progress-driven path uses the status matrix (same as libro sync), not the
+  // MILESTONE-only PLANNED→COMPLETED button guard ([D-045] / [D-104]).
+  if (nextStatus !== item.status) {
+    assertScheduleStatusTransition(item.status, nextStatus);
+  }
+
+  const prevPct = serializeProgressPct(item.progressPct.toString());
+  if (prevPct === pct && nextStatus === item.status) {
+    return item;
+  }
+
+  const before = scheduleItemSnapshot(item);
   const updated = await prisma.scheduleItem.update({
     where: { id: item.id },
     data: {
       progressPct: pct,
+      status: nextStatus,
+      ...(nextStatus !== item.status &&
+      (nextStatus === "COMPLETED" || nextStatus === "IN_PROGRESS")
+        ? { blockReason: null }
+        : {}),
       updatedBy: ctx.actorUserId,
     },
   });
+  const after = scheduleItemSnapshot(updated);
   await auditSchedule(
     ctx,
     "schedule_item.progress_updated",
     SCHEDULE_ITEM_ENTITY,
     item.id,
     before,
-    { progressPct: serializeProgressPct(updated.progressPct.toString()) },
+    after,
   );
+  if (nextStatus !== item.status) {
+    await auditSchedule(
+      ctx,
+      statusChangeAuditAction(item.status, nextStatus),
+      SCHEDULE_ITEM_ENTITY,
+      item.id,
+      before,
+      after,
+    );
+  }
   return updated;
 }
 

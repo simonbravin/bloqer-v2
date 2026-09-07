@@ -41,12 +41,21 @@ export function capSyncProgressPct(pct: string | number): string | null {
   return rounded;
 }
 
+/**
+ * Progress-driven status ([D-045]): reaching 100% completes the item whether it
+ * was still PLANNED or already IN_PROGRESS. A single approved libro line at 100%
+ * must not leave the task stuck in IN_PROGRESS (that inflated “atrasados”).
+ * BLOCKED / CANCELLED / COMPLETED are unchanged. Button “Completar” for TASK still
+ * goes IN_PROGRESS → COMPLETED only ([D-104] / STATE_MACHINES §27).
+ */
 export function resolveScheduleStatusAfterProgressSync(
   current: import("@bloqer/database").ScheduleItemStatus,
   pct: string | number,
 ): import("@bloqer/database").ScheduleItemStatus {
   const cents = toCents2(serializeProgressPct(pct));
-  if (cents >= BigInt(10000) && current === "IN_PROGRESS") return "COMPLETED";
+  if (cents >= BigInt(10000) && (current === "IN_PROGRESS" || current === "PLANNED")) {
+    return "COMPLETED";
+  }
   if (cents > BigInt(0) && current === "PLANNED") return "IN_PROGRESS";
   return current;
 }

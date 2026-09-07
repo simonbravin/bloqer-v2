@@ -1,52 +1,52 @@
-# Procedimiento ? Avance fÌsico, cronograma y certificaciones
+# Procedimiento ? Avance f√≠sico, cronograma y certificaciones
 
-> Ver decisiÛn [D-045](../00-product/DECISION_LOG.md#d-045--avance-real-del-cronograma-sincronizado-desde-libro-de-obra), [D-103](../00-product/DECISION_LOG.md#d-103--cronograma-·rbol-de-filas-hitos-visuales-y-sync-solo-en-tareas) y [D-104](../00-product/DECISION_LOG.md#d-104--hito-de-cronograma-completado-por-recepciÛn-de-oc--fechas-de-compra-en-workspace). Reglas [BR-SCH-004](../01-domain/BUSINESS_RULES.md#br-sch-004--sincronizaciÛn-de-avance-real-desde-libro-de-obra) y [BR-SCH-005](../01-domain/BUSINESS_RULES.md#br-sch-005--hito-completado-por-recepciÛn-de-compra).
+> Ver decisi√≥n [D-045](../00-product/DECISION_LOG.md#d-045--avance-real-del-cronograma-sincronizado-desde-libro-de-obra), [D-103](../00-product/DECISION_LOG.md#d-103--cronograma-√°rbol-de-filas-hitos-visuales-y-sync-solo-en-tareas) y [D-104](../00-product/DECISION_LOG.md#d-104--hito-de-cronograma-completado-por-recepci√≥n-de-oc--fechas-de-compra-en-workspace). Reglas [BR-SCH-004](../01-domain/BUSINESS_RULES.md#br-sch-004--sincronizaci√≥n-de-avance-real-desde-libro-de-obra) y [BR-SCH-005](../01-domain/BUSINESS_RULES.md#br-sch-005--hito-completado-por-recepci√≥n-de-compra).
 
 ## 1. Dimensiones de avance (no confundir)
 
-| DimensiÛn | Campo / fuente | QuiÈn la mueve | Uso en UI cronograma |
+| Dimensi√≥n | Campo / fuente | Qui√©n la mueve | Uso en UI cronograma |
 |-----------|----------------|----------------|----------------------|
-| **Real** | `ScheduleItem.progressPct` | Autom·tico al aprobar libro en **TASK** ([BR-SCH-004], [D-103]); hitos: manual (PM) o al confirmar recepciÛn ([D-104]) | Chip **Real** |
-| **Plan (tiempo)** | Fechas inicio/fin + hoy | PM (fechas del Ìtem) | Chip **Plan (t)** ? solo lectura calculada |
+| **Real** | `ScheduleItem.progressPct` | Autom√°tico al aprobar libro en **TASK** ([BR-SCH-004], [D-103]); hitos: manual (PM) o al confirmar recepci√≥n ([D-104]) | Chip **Real** |
+| **Plan (tiempo)** | Fechas inicio/fin + hoy | PM (fechas del √≠tem) | Chip **Plan (t)** ? solo lectura calculada |
 | **Cantidad** | Libro aprobado / presupuesto (`operationalProgressPct`) | Obra (cantidades en parte) | Chip **Cant.** ? lectura |
-| **Certificado** | Certificaciones emitidas | AdministraciÛn / certificaciones | Chip **Cert.** ? lectura ([BR-SCH-002]) |
+| **Certificado** | Certificaciones emitidas | Administraci√≥n / certificaciones | Chip **Cert.** ? lectura ([BR-SCH-002]) |
 
 ## 2. Flujo operativo recomendado
 
 1. El capataz/PM registra el **parte de obra** (`JobsiteLog`) con avances por WBS (`physicalPct` incremental o cantidades).
-2. EnvÌa el parte (`SUBMITTED`); validaciones de stock y tope 100 % incluyen partes enviados seg˙n polÌtica vigente.
+2. Env√≠a el parte (`SUBMITTED`); validaciones de stock y tope 100 % incluyen partes enviados seg√∫n pol√≠tica vigente.
 3. El PM **aprueba** el parte.
-4. El sistema ejecuta `syncScheduleProgressFromJobsiteLog` dentro de la misma transacciÛn:
-   - Busca vÌnculos WBS **primarios** al cronograma del proyecto en Ìtems **`type = TASK`** ([D-103]: los `MILESTONE` se omiten).
-   - Actualiza `progressPct` y, si corresponde, completa la tarea (`IN_PROGRESS` ? `COMPLETED` al 100 %).
-   - Registra auditorÌa por Ìtem y evento agregado `SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG`.
-5. El cronograma (Gantt, tabla, calendario) refleja el **Real** en la siguiente carga; **Plan (t)**, **Cant.** y **Cert.** se comparan en el di·logo de tarea.
+4. El sistema ejecuta `syncScheduleProgressFromJobsiteLog` dentro de la misma transacci√≥n:
+   - Busca v√≠nculos WBS **primarios** al cronograma del proyecto en √≠tems **`type = TASK`** ([D-103]: los `MILESTONE` se omiten).
+   - Actualiza `progressPct` y, si el acumulado llega a 100 %, completa la tarea (`PLANNED` o `IN_PROGRESS` ‚Üí `COMPLETED`) ([D-045]).
+   - Registra auditor√≠a por √≠tem y evento agregado `SCHEDULE_PROGRESS_SYNCED_FROM_JOBSITE_LOG`.
+5. El cronograma (Gantt, tabla, calendario) refleja el **Real** en la siguiente carga; **Plan (t)**, **Cant.** y **Cert.** se comparan en el di√°logo de tarea.
 
-## 2bis. Hito por recepciÛn de OC ([D-104])
+## 2bis. Hito por recepci√≥n de OC ([D-104])
 
-1. DepÛsito/Compras confirma un `PurchaseReceipt` (`DRAFT` ? `CONFIRMED`).
-2. El sistema completa cada `ScheduleItem` `MILESTONE` del mismo proyecto vinculado (cualquier link) a un `wbsNodeId` de las lÌneas recibidas, si est· `PLANNED` o `IN_PROGRESS` ([BR-SCH-005]).
-3. Cualquier cantidad confirmada alcanza; anular la recepciÛn **no** reabre el hito.
+1. Dep√≥sito/Compras confirma un `PurchaseReceipt` (`DRAFT` ? `CONFIRMED`).
+2. El sistema completa cada `ScheduleItem` `MILESTONE` del mismo proyecto vinculado (cualquier link) a un `wbsNodeId` de las l√≠neas recibidas, si est√° `PLANNED` o `IN_PROGRESS` ([BR-SCH-005]).
+3. Cualquier cantidad confirmada alcanza; anular la recepci√≥n **no** reabre el hito.
 4. En el workspace, con EDT: chips **Entrega OC** / **Recibido** y riesgo si la prometida es posterior al inicio de una tarea hermana con la misma EDT.
 
 ## 3. Enlaces WBS
 
-- Cada `ScheduleItem` puede tener varios `ScheduleItemWbsLink`; solo el marcado **`isPrimary`** participa en la sincronizaciÛn de **tareas**.
-- Los hitos pueden vincular EDT para mÈtricas de costo y para completar por recepciÛn, pero **no** reciben % Real del libro ([D-103]).
-- Si un WBS del parte no tiene Ìtem de cronograma primario `TASK`, no hay efecto en cronograma (el parte igualmente queda aprobado).
-- La **altura** en el Gantt es `parent_id` + `sort_order`, independiente del vÌnculo EDT ([D-103]).
+- Cada `ScheduleItem` puede tener varios `ScheduleItemWbsLink`; solo el marcado **`isPrimary`** participa en la sincronizaci√≥n de **tareas**.
+- Los hitos pueden vincular EDT para m√©tricas de costo y para completar por recepci√≥n, pero **no** reciben % Real del libro ([D-103]).
+- Si un WBS del parte no tiene √≠tem de cronograma primario `TASK`, no hay efecto en cronograma (el parte igualmente queda aprobado).
+- La **altura** en el Gantt es `parent_id` + `sort_order`, independiente del v√≠nculo EDT ([D-103]).
 
 ## 4. Dependencias Finish-to-Start (FS)
 
-- Al mover fechas (formulario, Gantt o acciÛn server), el sistema **guarda** las fechas y devuelve **advertencias** si se viola FS (inicio antes del fin de una predecesora, o sucesora que inicia antes del fin de la tarea).
-- Las advertencias no bloquean el guardado en Fase 1; el PM debe corregir o aceptar el riesgo explÌcitamente.
+- Al mover fechas (formulario, Gantt o acci√≥n server), el sistema **guarda** las fechas y devuelve **advertencias** si se viola FS (inicio antes del fin de una predecesora, o sucesora que inicia antes del fin de la tarea).
+- Las advertencias no bloquean el guardado en Fase 1; el PM debe corregir o aceptar el riesgo expl√≠citamente.
 
 ## 5. Excepciones y datos legacy
 
-- Acumulado fÌsico > 100 % en un WBS: la sync **omite** ese WBS hasta normalizar datos (ver Q-005b en producto).
+- Acumulado f√≠sico > 100 % en un WBS: la sync **clamp** a 100 % y puede completar la tarea (Q-005b / [D-045]). √çtems ya COMPLETED no se vuelven a pisar.
 - Certificaciones **no** actualizan `progressPct` del cronograma (permanece [BR-SCH-002]).
-- Õtems `MILESTONE` **no** reciben sync desde libro ([D-103]); sÌ pueden completarse por recepciÛn ([D-104]).
-- `PLANNED ? COMPLETED` solo para hitos ([D-104]).
+- √çtems `MILESTONE` **no** reciben sync desde libro ([D-103]); s√≠ pueden completarse por recepci√≥n ([D-104]).
+- Bot√≥n **Completar** / recepci√≥n: `PLANNED ‚Üí COMPLETED` solo para hitos ([D-104]). Avance real al 100 % (libro o % manual) tambi√©n completa `TASK` desde `PLANNED` o `IN_PROGRESS` ([D-045]).
 
 ## 6. Pantallas
 
@@ -57,15 +57,16 @@
 
 Ejecutar una vez tras cambios en cronograma/libro:
 
-- [ ] Aprobar un parte con WBS primario enlazado ? abrir cronograma (misma sesiÛn) y verificar % **Real** sin F5.
+- [ ] Aprobar un parte con WBS primario enlazado ? abrir cronograma (misma sesi√≥n) y verificar % **Real** sin F5.
 - [ ] Aprobar un parte sobre WBS de tarea **cancelada** ? el % Real de esa tarea **no** cambia.
 - [ ] Aprobar un parte con WBS primario en un **hito** ? el % Real del hito **no** cambia ([D-103]).
 - [ ] Crear hito vinculando EDT de una hoja existente ? queda **hermano, debajo** (no hijo).
-- [ ] Confirmar recepciÛn de OC con la EDT del hito ? hito `COMPLETED`, diamante verde ([D-104]).
+- [ ] Aprobar un parte que deja una tarea en **100 % Real** (desde Planificado) ‚Üí estado **Completado**, no figura en Solo atrasados ([D-045]).
+- [ ] Confirmar recepci√≥n de OC con la EDT del hito ‚Üí hito `COMPLETED`, diamante verde ([D-104]).
 - [ ] OC con `expectedDeliveryDate` posterior al inicio de tarea hermana ? chip de riesgo.
-- [ ] Tarea atrasada ? barra roja; colapsar capÌtulo ? hijos ocultos.
+- [ ] Tarea atrasada ? barra roja; colapsar cap√≠tulo ? hijos ocultos.
 - [ ] Filtro Tipo = Hitos ? solo diamantes en las 4 vistas.
 - [ ] Aplicar filtro de estado sin coincidencias ? banner ?Ninguna tarea coincide? + **Limpiar filtros**.
-- [ ] Gantt: flechas FS visibles entre dos tareas enlazadas; scroll horizontal mantiene alineaciÛn (diario/mensual).
-- [ ] Gantt: hito `MILESTONE` visible, color fijo, arrastrable; lÌnea **Hoy** en espa?ol; toast al mover fechas.
-- [ ] Gantt: barra con relleno Real + indicador Cert (·mbar) cuando hay % certificado.
+- [ ] Gantt: flechas FS visibles entre dos tareas enlazadas; scroll horizontal mantiene alineaci√≥n (diario/mensual).
+- [ ] Gantt: hito `MILESTONE` visible, color fijo, arrastrable; l√≠nea **Hoy** en espa?ol; toast al mover fechas.
+- [ ] Gantt: barra con relleno Real + indicador Cert (√°mbar) cuando hay % certificado.
