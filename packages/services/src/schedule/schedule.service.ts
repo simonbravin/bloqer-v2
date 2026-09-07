@@ -941,13 +941,32 @@ async function transitionScheduleItem(
     );
   }
 
-  if (to === "COMPLETED") {
-    assertCanCompleteScheduleItem(item.type, item.status, to);
-  } else {
-    assertScheduleStatusTransition(item.status, to);
+  // D-045: if Real is already 100% (e.g. libro approved while BLOCKED), Iniciar /
+  // Desbloquear must land on COMPLETED — otherwise the item stays open and counts
+  // as atrasada again.
+  const progressPctNum = Number(serializeProgressPct(item.progressPct.toString()));
+  let effectiveTo = to;
+  if (
+    to === "IN_PROGRESS" &&
+    Number.isFinite(progressPctNum) &&
+    progressPctNum >= 100 &&
+    (item.status === "BLOCKED" || item.status === "PLANNED")
+  ) {
+    effectiveTo = "COMPLETED";
   }
 
-  if (to === "BLOCKED" && !extra?.blockReason?.trim()) {
+  if (effectiveTo === "COMPLETED") {
+    if (item.status === "PLANNED" && item.type === "TASK" && progressPctNum >= 100) {
+      // Progress-driven (same as libro sync): matrix allows PLANNED→COMPLETED.
+      assertScheduleStatusTransition(item.status, effectiveTo);
+    } else {
+      assertCanCompleteScheduleItem(item.type, item.status, effectiveTo);
+    }
+  } else {
+    assertScheduleStatusTransition(item.status, effectiveTo);
+  }
+
+  if (effectiveTo === "BLOCKED" && !extra?.blockReason?.trim()) {
     throw new ServiceError("VALIDATION", "La causa de bloqueo es obligatoria");
   }
 
@@ -956,12 +975,14 @@ async function transitionScheduleItem(
     const claimed = await tx.scheduleItem.updateMany({
       where: { id: item.id, tenantId: ctx.tenantId, status: item.status },
       data: {
-        status: to,
-        ...(to === "COMPLETED" ? { progressPct: new Prisma.Decimal(100) } : {}),
+        status: effectiveTo,
+        ...(effectiveTo === "COMPLETED" ? { progressPct: new Prisma.Decimal(100) } : {}),
         blockReason:
-          to === "BLOCKED"
+          effectiveTo === "BLOCKED"
             ? extra!.blockReason!.trim()
-            : to === "IN_PROGRESS" || to === "COMPLETED" || to === "CANCELLED"
+            : effectiveTo === "IN_PROGRESS" ||
+                effectiveTo === "COMPLETED" ||
+                effectiveTo === "CANCELLED"
               ? null
               : item.blockReason,
         updatedBy: ctx.actorUserId,
@@ -971,14 +992,14 @@ async function transitionScheduleItem(
       throw new ServiceError("CONFLICT", "El ítem de cronograma cambió de estado. Recargá e intentá de nuevo.");
     }
     const row = await tx.scheduleItem.findUniqueOrThrow({ where: { id: item.id } });
-    if (to === "CANCELLED") {
+    if (effectiveTo === "CANCELLED") {
       await rollupScheduleContainerDatesInTx(item.scheduleId, ctx, tx);
     }
     return row;
   });
   await auditSchedule(
     ctx,
-    statusChangeAuditAction(item.status, to),
+    statusChangeAuditAction(item.status, effectiveTo),
     SCHEDULE_ITEM_ENTITY,
     item.id,
     before,

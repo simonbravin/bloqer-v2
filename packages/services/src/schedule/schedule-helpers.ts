@@ -233,10 +233,12 @@ export function wouldCreateDependencyCycle(
 }
 
 const ALLOWED: Record<ScheduleItemStatus, ScheduleItemStatus[]> = {
-  // COMPLETED from PLANNED is allowed in the matrix but only for MILESTONE ([D-104]).
+  // COMPLETED from PLANNED is allowed in the matrix but only for MILESTONE ([D-104])
+  // or progress-driven TASK completion at 100% ([D-045]).
   PLANNED: ["IN_PROGRESS", "BLOCKED", "CANCELLED", "COMPLETED"],
   IN_PROGRESS: ["COMPLETED", "BLOCKED", "CANCELLED"],
-  BLOCKED: ["IN_PROGRESS", "CANCELLED"],
+  // BLOCKED → COMPLETED: resume when Real is already 100% (libro synced while blocked).
+  BLOCKED: ["IN_PROGRESS", "CANCELLED", "COMPLETED"],
   COMPLETED: [],
   CANCELLED: [],
 };

@@ -24,7 +24,7 @@ export function scheduleProgressValues(item: ScheduleWorkspaceItemDto) {
 export const PROGRESS_DIMENSION_HINTS = {
   real: {
     label: "Real",
-    hint: "Avance real del cronograma. En tareas se sincroniza al aprobar el libro de obra. En hitos se completa a mano o al confirmar una recepción de la misma EDT.",
+    hint: "Avance real del cronograma. En tareas se sincroniza al aprobar el libro; al llegar a 100% la tarea queda Completada. En hitos se completa a mano o al confirmar una recepción de la misma EDT.",
   },
   time: {
     label: "Plan (t)",

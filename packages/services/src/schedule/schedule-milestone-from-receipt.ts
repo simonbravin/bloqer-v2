@@ -18,7 +18,7 @@ import {
 } from "./schedule-helpers";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
-/** Pure guard: PLANNED → COMPLETED only for MILESTONE. */
+/** Pure guard: PLANNED → COMPLETED only for MILESTONE (button/receipt). */
 export function canCompleteScheduleItemDirectly(
   type: string,
   from: ScheduleItemStatus,
@@ -26,6 +26,8 @@ export function canCompleteScheduleItemDirectly(
 ): boolean {
   if (to !== "COMPLETED") return true;
   if (from === "IN_PROGRESS") return true;
+  // Resume after block when Real is already 100% (progress synced while BLOCKED).
+  if (from === "BLOCKED") return true;
   if (from === "PLANNED") return type === "MILESTONE";
   return false;
 }

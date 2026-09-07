@@ -43,6 +43,10 @@ describe("assertScheduleStatusTransition", () => {
     assert.doesNotThrow(() => assertScheduleStatusTransition("PLANNED", "COMPLETED"));
   });
 
+  it("allows BLOCKED → COMPLETED (resume when Real already 100%)", () => {
+    assert.doesNotThrow(() => assertScheduleStatusTransition("BLOCKED", "COMPLETED"));
+  });
+
   it("rejects COMPLETED → IN_PROGRESS", () => {
     assert.throws(
       () => assertScheduleStatusTransition("COMPLETED", "IN_PROGRESS"),

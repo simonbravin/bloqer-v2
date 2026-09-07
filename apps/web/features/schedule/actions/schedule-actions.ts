@@ -198,9 +198,9 @@ export async function moveScheduleItemStatusAction(
   const ctx = await getCtx();
   if (status === "BLOCKED") blockScheduleItemSchema.parse({ blockReason });
   try {
-    await moveScheduleItemToStatus(scheduleItemId, status, ctx, blockReason);
+    const updated = await moveScheduleItemToStatus(scheduleItemId, status, ctx, blockReason);
     revalidateCronograma(projectId);
-    return { ok: true as const };
+    return { ok: true as const, status: updated.status };
   } catch (e) {
     return handle(e);
   }

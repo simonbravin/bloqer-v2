@@ -916,17 +916,18 @@ stateDiagram-v2
   PLANNED --> IN_PROGRESS : iniciar
   PLANNED --> BLOCKED : bloquear
   PLANNED --> CANCELLED : cancelar
-  PLANNED --> COMPLETED : completar hito
+  PLANNED --> COMPLETED : completar hito / avance 100%
   IN_PROGRESS --> COMPLETED : completar
   IN_PROGRESS --> BLOCKED : bloquear
   IN_PROGRESS --> CANCELLED : cancelar
   BLOCKED --> IN_PROGRESS : desbloquear
+  BLOCKED --> COMPLETED : desbloquear con Real 100%
   BLOCKED --> CANCELLED : cancelar
   COMPLETED --> [*]
   CANCELLED --> [*]
 ```
 
-> Nota: el botón **Completar** / recepción de OC hace `PLANNED → COMPLETED` **solo** en `MILESTONE` ([D-104]). Por **avance real al 100 %** (libro aprobado o % manual en hoja), una `TASK` en `PLANNED` o `IN_PROGRESS` también pasa a `COMPLETED` ([D-045] / [BR-SCH-004]).
+> Nota: el botón **Completar** / recepción de OC hace `PLANNED → COMPLETED` **solo** en `MILESTONE` ([D-104]). Por **avance real al 100 %** (libro aprobado o % manual en hoja), una `TASK` en `PLANNED` o `IN_PROGRESS` también pasa a `COMPLETED` ([D-045] / [BR-SCH-004]). Si el libro llegó a 100 % mientras la tarea estaba `BLOCKED`, **Desbloquear** / **Iniciar** la completa ([D-045]).
 
 #### Tabla — ScheduleItem
 
@@ -940,13 +941,14 @@ stateDiagram-v2
 | `IN_PROGRESS` | `BLOCKED` | `schedule_item.blocked` |
 | `IN_PROGRESS` | `CANCELLED` | `schedule_item.cancelled` |
 | `BLOCKED` | `IN_PROGRESS` | `schedule_item.unblocked` |
+| `BLOCKED` | `COMPLETED` | `schedule_item.completed` (Real ya al 100 % al desbloquear / iniciar — [D-045]) |
 | `BLOCKED` | `CANCELLED` | `schedule_item.cancelled` |
 
 #### Reglas críticas (ScheduleItem)
 
 - Ítems `CANCELLED` quedan en histórico; reportes de avance pueden excluirlos por defecto ([BR-SCH-002]).
 - `BLOCKED` requiere **`block_reason`** no vacío ([BR-SCH-003]).
-- Botón **Completar** / Kanban / recepción: `PLANNED → COMPLETED` solo para hitos (`MILESTONE`) ([D-104] / [BR-SCH-005]). Las tareas usan **Completar** desde `IN_PROGRESS`, **o** quedan `COMPLETED` automáticamente al alcanzar 100 % de avance real ([D-045]).
+- Botón **Completar** / Kanban / recepción: `PLANNED → COMPLETED` solo para hitos (`MILESTONE`) ([D-104] / [BR-SCH-005]). Las tareas usan **Completar** desde `IN_PROGRESS`, **o** quedan `COMPLETED` automáticamente al alcanzar 100 % de avance real ([D-045]). Si el Real ya está en 100 % y la tarea está `BLOCKED`, **Desbloquear** completa.
 
 ---
 

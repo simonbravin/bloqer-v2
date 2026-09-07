@@ -129,7 +129,7 @@ async function resolveWbsPhysicalPct(
 
 /**
  * BR-SCH-004 / D-045 — sync ScheduleItem.progressPct from an approved jobsite log.
- * Call inside the approve transaction before status flip.
+ * Call inside the approve transaction after the log is claimed APPROVED.
  */
 export async function syncScheduleProgressFromJobsiteLog(
   jobsiteLogId: string,
@@ -171,7 +171,7 @@ export async function syncScheduleProgressFromJobsiteLog(
         isPrimary: true,
         scheduleItem: {
           scheduleId: schedule.id,
-          status: { not: "CANCELLED" },
+          status: { notIn: ["CANCELLED", "COMPLETED"] },
         },
       },
       include: { scheduleItem: true },
@@ -182,9 +182,8 @@ export async function syncScheduleProgressFromJobsiteLog(
       if (!shouldSyncProgressFromJobsite(item.type)) continue;
       // Containers must not receive libro sync (same leaf rule as manual progress/status).
       if (!isScheduleLeafItem(scheduleTree, item.id)) continue;
-      // COMPLETED is terminal for progress: never lower/overwrite Real after completion
-      // (e.g. Completar button forced 100% while libro still has a lower cumulative %).
-      if (item.status === "COMPLETED") continue;
+      // Defense in depth (query already excludes COMPLETED/CANCELLED).
+      if (item.status === "COMPLETED" || item.status === "CANCELLED") continue;
 
       const before = scheduleItemSnapshot(item);
       const nextStatus = resolveScheduleStatusAfterProgressSync(item.status, pct);

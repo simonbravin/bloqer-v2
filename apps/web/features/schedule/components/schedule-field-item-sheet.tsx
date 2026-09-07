@@ -65,10 +65,11 @@ export function ScheduleFieldItemSheet({
         toast.error(res.error);
         return;
       }
+      const landed = "status" in res ? res.status : status;
       toast.success(
-        status === "COMPLETED"
+        landed === "COMPLETED"
           ? "Tarea completada"
-          : status === "BLOCKED"
+          : landed === "BLOCKED"
             ? "Tarea bloqueada"
             : item.status === "BLOCKED"
               ? "Tarea reanudada"
