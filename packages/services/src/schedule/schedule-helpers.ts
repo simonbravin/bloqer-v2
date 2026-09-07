@@ -243,6 +243,18 @@ const ALLOWED: Record<ScheduleItemStatus, ScheduleItemStatus[]> = {
   CANCELLED: [],
 };
 
+const SCHEDULE_STATUS_LABEL_ES: Record<ScheduleItemStatus, string> = {
+  PLANNED: "Planificado",
+  IN_PROGRESS: "En curso",
+  BLOCKED: "Bloqueado",
+  COMPLETED: "Completado",
+  CANCELLED: "Anulado",
+};
+
+export function scheduleStatusLabelEs(status: ScheduleItemStatus): string {
+  return SCHEDULE_STATUS_LABEL_ES[status] ?? status;
+}
+
 export function isScheduleStatusTransitionAllowed(
   from: ScheduleItemStatus,
   to: ScheduleItemStatus,
@@ -257,7 +269,7 @@ export function assertScheduleStatusTransition(
   if (!isScheduleStatusTransitionAllowed(from, to)) {
     throw new ServiceError(
       "VALIDATION",
-      `Transición de estado no permitida: ${from} → ${to}`,
+      `Transición de estado no permitida: ${scheduleStatusLabelEs(from)} → ${scheduleStatusLabelEs(to)}`,
     );
   }
 }

@@ -14,7 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { AvailableBudget } from "@bloqer/services";
-import { budgetStatusLabel } from "@/features/budgets";
+import { budgetStatusLabel } from "@/features/budgets/components/budget-status-badge";
 import { importScheduleFromBudgetAction } from "../actions/schedule-actions";
 
 export function ScheduleImportDialog({

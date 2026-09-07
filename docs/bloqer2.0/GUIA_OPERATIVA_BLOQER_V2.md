@@ -776,16 +776,16 @@ stateDiagram-v2
 8. Filtrá por **Tipo** (Todos / Tareas / Hitos), **Estado** y **Solo atrasados**. **Leyenda de avances** está en esa misma barra. Los hitos se ven con color fijo (diamante) en el Gantt; las barras de tarea **atrasadas** también se pintan en rojo. En el sidebar del Gantt, **▾** colapsa capítulos (estado local del navegador); **Sin EDT** va junto al nombre; a la derecha quedan alineados días, **⋮** y **FS**.
 9. Con EDT vinculada: chips **Entrega OC** (fecha prometida de OC confirmada) y **Recibido**; chip ámbar si la prometida es posterior al inicio de una tarea hermana con la misma EDT.
 10. Revisar si aparece aviso de **baselineBudgetMismatch** (presupuesto base del cronograma ≠ el aprobado actual).
-11. Las tareas **canceladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Cancelado** para verlas.
+11. Las tareas **anuladas** están ocultas por defecto en las cuatro vistas; filtrá estado **Anulado** para verlas.
 12. **Exportar:** en escritorio, botón **Exportar** abre un diálogo. Elegí **Tabla**, **Gantt** o **Ambos**, y un lapso opcional (**Desde** / **Hasta**, o atajos Todo / Este mes / Este trimestre / Este año). El archivo respeta también los filtros de la pantalla (tipo, estado, solo atrasados y presupuesto). Sin fechas, el Gantt usa el rango de los ítems filtrados; con lapso, entran ítems que se solapan con ese período **y sus capítulos padre**. El PDF es apaisado y se parte en hojas según el contenido elegido: tabla de **fechas**, tabla de **avance/costos**, y/o Gantt (eje de tiempo a lo ancho + filas a lo largo). Cada hoja lleva empresa y obra. El Excel trae hoja **Tabla** (fechas `dd/mm/aaaa` reales) y/o hoja **Gantt** con celdas pintadas del mismo color que las barras.
 
 ![Bloqer — Armar el cronograma](./guides/assets/laminas/mapa-armar-cronograma.png)
 
 *Importar EDT, fechas, dependencias FS, hitos y reordenar.*
 
-**Estados de ítem (en pantalla):** Planificado · En curso · Bloqueado · Completado · Cancelado. Al aprobar un parte (o cargar **Avance real %** en una hoja) que deja la tarea en **100 %**, el estado pasa a **Completado** aunque antes estuviera Planificado — así no figura como atrasada. El botón **Completar** del Kanban/detalle en tareas sigue siendo En curso → Hecho; en hitos también Planificado → Hecho ([D-104]).
+**Estados de ítem (en pantalla):** Planificado · En curso · Bloqueado · Completado · Anulado. Al aprobar un parte (o cargar **Avance real %** en una hoja) que deja la tarea en **100 %**, el estado pasa a **Completado** aunque antes estuviera Planificado — así no figura como atrasada. El botón **Completar** del Kanban/detalle en tareas sigue siendo En curso → Completado; en hitos también Planificado → Completado ([D-104]).
 
-**Kanban:** solo transiciones permitidas (ej. Planificado → En curso / Bloqueado; En curso → Hecho / Bloqueado; hitos también Planificado → Hecho — [D-104]). Soltar en Planificado o Cancelado, o un salto inválido, muestra un mensaje y no cambia el estado. Para cancelar, usar el detalle de la tarea.
+**Kanban:** solo transiciones permitidas (ej. Planificado → En curso / Bloqueado; En curso → Completado / Bloqueado; hitos también Planificado → Completado — [D-104]). Soltar en Planificado o Anulado, o un salto inválido, muestra un mensaje y no cambia el estado. Para anular, usar el detalle de la tarea.
 
 **Montos** en sidebar/tabla/detalle (comprometido, presupuesto, certificado): moneda del presupuesto base del cronograma.
 

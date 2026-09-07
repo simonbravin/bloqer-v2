@@ -215,7 +215,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "El Excel trae hoja Tabla (fechas dd/mm/aaaa) y/o hoja Gantt con celdas del mismo color que las barras.",
     ],
     effects: [
-      "Se descarga un archivo con los ítems visibles según el filtro y el lapso (incluye capítulos padre; las canceladas siguen ocultas salvo que filtres Cancelado).",
+      "Se descarga un archivo con los ítems visibles según el filtro y el lapso (incluye capítulos padre; las anuladas siguen ocultas salvo que filtres Anulado).",
     ],
     pitfalls: [
       "En el celular no está el botón: usá escritorio o una ventana ancha.",

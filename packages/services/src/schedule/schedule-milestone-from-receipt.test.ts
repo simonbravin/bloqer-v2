@@ -47,7 +47,10 @@ describe("schedule-milestone-from-receipt", () => {
     assert.equal(canCompleteScheduleItemDirectly("MILESTONE", "PLANNED", "COMPLETED"), true);
     assert.equal(canCompleteScheduleItemDirectly("TASK", "PLANNED", "COMPLETED"), false);
     assert.equal(canCompleteScheduleItemDirectly("TASK", "IN_PROGRESS", "COMPLETED"), true);
-    assert.equal(canCompleteScheduleItemDirectly("TASK", "BLOCKED", "COMPLETED"), true);
+    assert.equal(canCompleteScheduleItemDirectly("TASK", "BLOCKED", "COMPLETED", 100), true);
+    assert.equal(canCompleteScheduleItemDirectly("TASK", "BLOCKED", "COMPLETED", 30), false);
+    assert.equal(canCompleteScheduleItemDirectly("TASK", "BLOCKED", "COMPLETED"), false);
+    assert.equal(canCompleteScheduleItemDirectly("MILESTONE", "BLOCKED", "COMPLETED"), true);
   });
 
   it("flags risk per shared WBS when promised date is after sibling TASK start", () => {

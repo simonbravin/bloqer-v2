@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { canViewScheduleArea } from "./schedule-access";
+import { requireProjectAccess } from "../security/access";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
@@ -60,6 +61,7 @@ export async function getScheduleItemContext(
   if (!canViewScheduleArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
+  await requireProjectAccess(projectId, ctx);
 
   const item = await prisma.scheduleItem.findFirst({
     where: { id: scheduleItemId, schedule: { projectId, tenantId: ctx.tenantId } },

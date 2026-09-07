@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import type { AvailableBudget } from "@bloqer/services";
 import type { ScheduleItemStatus } from "@bloqer/database";
-import { budgetStatusLabel } from "@/features/budgets";
+import { budgetStatusLabel } from "@/features/budgets/components/budget-status-badge";
 import { STATUS_LABELS } from "../adapters/schedule-view-types";
 import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 

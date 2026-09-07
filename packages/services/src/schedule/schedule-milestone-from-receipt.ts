@@ -23,11 +23,16 @@ export function canCompleteScheduleItemDirectly(
   type: string,
   from: ScheduleItemStatus,
   to: ScheduleItemStatus,
+  /** Real % — required for TASK BLOCKED→COMPLETED (must already be 100%). */
+  progressPct?: number,
 ): boolean {
   if (to !== "COMPLETED") return true;
   if (from === "IN_PROGRESS") return true;
   // Resume after block when Real is already 100% (progress synced while BLOCKED).
-  if (from === "BLOCKED") return true;
+  if (from === "BLOCKED") {
+    if (type === "MILESTONE") return true;
+    return progressPct != null && Number.isFinite(progressPct) && progressPct >= 100;
+  }
   if (from === "PLANNED") return type === "MILESTONE";
   return false;
 }
@@ -36,9 +41,16 @@ export function assertCanCompleteScheduleItem(
   type: string,
   from: ScheduleItemStatus,
   to: ScheduleItemStatus,
+  progressPct?: number,
 ): void {
   assertScheduleStatusTransition(from, to);
-  if (!canCompleteScheduleItemDirectly(type, from, to)) {
+  if (!canCompleteScheduleItemDirectly(type, from, to, progressPct)) {
+    if (from === "BLOCKED" && type === "TASK") {
+      throw new ServiceError(
+        "VALIDATION",
+        "Solo podés completar una tarea bloqueada si el avance real ya es 100%. Usá Desbloquear o Iniciar.",
+      );
+    }
     throw new ServiceError(
       "VALIDATION",
       "Solo los hitos pueden pasar de Planificado a Completado sin pasar por En curso",

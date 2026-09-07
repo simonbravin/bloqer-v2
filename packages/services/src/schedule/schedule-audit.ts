@@ -1,6 +1,10 @@
 import type { Prisma, ScheduleItemStatus } from "@bloqer/database";
+import { prisma } from "@bloqer/database";
 import { log, listEntityAuditLogs } from "../audit/audit.service";
+import { requireProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
+import { ServiceError } from "../types";
+import { canViewScheduleArea } from "./schedule-access";
 import { formatDateOnly } from "./schedule-helpers";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 
@@ -94,14 +98,14 @@ export type ScheduleItemAuditEntryDto = {
 
 const ACTION_LABELS: Record<string, string> = {
   "schedule_item.dates_updated": "Fechas actualizadas",
-  "schedule_item.progress_updated": "Avance planificado actualizado",
+  "schedule_item.progress_updated": "Avance real actualizado",
   "schedule_item.moved": "Ítem reordenado",
   "schedule_item.status_changed": "Estado cambiado",
   "schedule_item.started": "Tarea iniciada",
   "schedule_item.completed": "Tarea completada",
   "schedule_item.blocked": "Tarea bloqueada",
   "schedule_item.unblocked": "Tarea desbloqueada",
-  "schedule_item.cancelled": "Tarea cancelada",
+  "schedule_item.cancelled": "Tarea anulada",
   "schedule_item.created": "Tarea creada",
   "schedule_item.name_updated": "Nombre actualizado",
   "schedule_item.wbs_linked": "EDT vinculado",
@@ -112,16 +116,63 @@ const ACTION_LABELS: Record<string, string> = {
   "schedule.containers_rollup": "Fechas de contenedores recalculadas",
 };
 
+/** UI gloss for ScheduleItemStatus — enums stay English in snapshots. */
+const STATUS_LABEL_ES: Record<string, string> = {
+  PLANNED: "Planificado",
+  IN_PROGRESS: "En curso",
+  BLOCKED: "Bloqueado",
+  COMPLETED: "Completado",
+  CANCELLED: "Anulado",
+};
+
+function statusLabelEs(status: string): string {
+  return STATUS_LABEL_ES[status] ?? status;
+}
+
 function summarizeEntry(action: string, after: unknown, before: unknown): string {
   const label = ACTION_LABELS[action] ?? action;
   if (action === "schedule_item.blocked" && after && typeof after === "object") {
     const reason = (after as { blockReason?: string }).blockReason;
     if (reason) return `${label}: ${reason}`;
   }
-  if (action === "schedule_item.status_changed" && before && after && typeof before === "object" && typeof after === "object") {
+  if (
+    action === "schedule_item.progress_updated" &&
+    before &&
+    after &&
+    typeof before === "object" &&
+    typeof after === "object"
+  ) {
+    const fromPct = (before as { progressPct?: string }).progressPct;
+    const toPct = (after as { progressPct?: string }).progressPct;
+    const fromStatus = (before as { status?: string }).status;
+    const toStatus = (after as { status?: string }).status;
+    const parts: string[] = [];
+    if (fromPct != null && toPct != null && fromPct !== toPct) {
+      parts.push(`${fromPct}% → ${toPct}%`);
+    } else if (toPct != null) {
+      parts.push(`${toPct}%`);
+    }
+    if (fromStatus && toStatus && fromStatus !== toStatus) {
+      parts.push(`${statusLabelEs(fromStatus)} → ${statusLabelEs(toStatus)}`);
+    }
+    if (parts.length > 0) return `${label}: ${parts.join(" · ")}`;
+  }
+  if (
+    (action === "schedule_item.status_changed" ||
+      action === "schedule_item.started" ||
+      action === "schedule_item.completed" ||
+      action === "schedule_item.unblocked" ||
+      action === "schedule_item.cancelled") &&
+    before &&
+    after &&
+    typeof before === "object" &&
+    typeof after === "object"
+  ) {
     const from = (before as { status?: string }).status;
     const to = (after as { status?: string }).status;
-    if (from && to) return `${label}: ${from} → ${to}`;
+    if (from && to && from !== to) {
+      return `${label}: ${statusLabelEs(from)} → ${statusLabelEs(to)}`;
+    }
   }
   return label;
 }
@@ -130,6 +181,17 @@ export async function listScheduleItemAuditHistory(
   scheduleItemId: string,
   ctx: ServiceContext,
 ): Promise<ScheduleItemAuditEntryDto[]> {
+  if (!canViewScheduleArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos");
+  }
+
+  const item = await prisma.scheduleItem.findFirst({
+    where: { id: scheduleItemId, tenantId: ctx.tenantId },
+    select: { id: true, schedule: { select: { projectId: true } } },
+  });
+  if (!item) throw new ServiceError("NOT_FOUND", "Ítem no encontrado");
+  await requireProjectAccess(item.schedule.projectId, ctx);
+
   const rows = await listEntityAuditLogs(
     ctx.tenantId,
     SCHEDULE_ITEM_ENTITY,

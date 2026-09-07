@@ -48,7 +48,7 @@ import {
   STATUS_LABELS,
   MILESTONE_COLOR,
 } from "../adapters/schedule-view-types";
-import { certificationStatusLabel } from "@/features/certifications";
+import { certificationStatusLabel } from "@/features/certifications/components/certification-status-badge";
 import { formatDateAr } from "@/lib/gantt-date-format";
 import { formatMoneyAmount, formatRatePctDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { ScheduleCancelDialog } from "./schedule-cancel-dialog";

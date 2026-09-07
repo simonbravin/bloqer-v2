@@ -960,7 +960,7 @@ async function transitionScheduleItem(
       // Progress-driven (same as libro sync): matrix allows PLANNED→COMPLETED.
       assertScheduleStatusTransition(item.status, effectiveTo);
     } else {
-      assertCanCompleteScheduleItem(item.type, item.status, effectiveTo);
+      assertCanCompleteScheduleItem(item.type, item.status, effectiveTo, progressPctNum);
     }
   } else {
     assertScheduleStatusTransition(item.status, effectiveTo);

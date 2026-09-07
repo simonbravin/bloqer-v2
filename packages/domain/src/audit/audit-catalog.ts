@@ -173,7 +173,7 @@ export const AUDIT_ACTION_LABELS_ES: Record<string, string> = {
   "schedule_item.created": "Tarea de cronograma creada",
   "schedule_item.name_updated": "Nombre de tarea actualizado",
   "schedule_item.dates_updated": "Fechas de tarea actualizadas",
-  "schedule_item.progress_updated": "Avance de tarea actualizado",
+  "schedule_item.progress_updated": "Avance real de tarea actualizado",
   "schedule_item.status_changed": "Estado de tarea cambiado",
   "schedule_item.started": "Tarea iniciada",
   "schedule_item.completed": "Tarea completada",

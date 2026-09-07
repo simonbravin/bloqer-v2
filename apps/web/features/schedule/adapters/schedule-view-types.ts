@@ -32,8 +32,8 @@ const STATUS_LABELS: Record<string, string> = {
   PLANNED: "Planificado",
   IN_PROGRESS: "En curso",
   BLOCKED: "Bloqueado",
-  COMPLETED: "Hecho",
-  CANCELLED: "Cancelado",
+  COMPLETED: "Completado",
+  CANCELLED: "Anulado",
 };
 
 function parseItemDate(iso: string | null, fallback: Date): Date {

@@ -9,8 +9,8 @@ export const SCHEDULE_EXPORT_STATUS_LABELS: Record<string, string> = {
   PLANNED: "Planificado",
   IN_PROGRESS: "En curso",
   BLOCKED: "Bloqueado",
-  COMPLETED: "Hecho",
-  CANCELLED: "Cancelado",
+  COMPLETED: "Completado",
+  CANCELLED: "Anulado",
 };
 
 const MONTHS_SHORT_ES = [

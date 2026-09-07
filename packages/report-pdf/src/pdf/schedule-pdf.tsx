@@ -155,7 +155,7 @@ function GanttLegend() {
       {item("#475569", "Contenedor")}
       {item("#3b82f6", "En curso")}
       {item("#94a3b8", "Planificado")}
-      {item("#22c55e", "Hecho")}
+      {item("#22c55e", "Completado")}
       {item("#ef4444", "Atrasado / bloqueado")}
       {item("#7c3aed", "Hito")}
       <View style={{ flexDirection: "row", alignItems: "center", marginRight: 10 }}>
