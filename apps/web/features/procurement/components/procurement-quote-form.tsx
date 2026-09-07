@@ -29,6 +29,7 @@ import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } fro
 import { PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import {
   DocumentTaxTotalsFooter,
+  IibbPerceptionFields,
 } from "@/features/finance/components/iibb-perception-fields";
 import {
   createProcurementQuoteAction,
@@ -304,7 +305,7 @@ export function ProcurementQuoteForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="space-y-1">
           <Label htmlFor="quoteTaxRate">Alícuota IVA</Label>
           <Select value={taxRate} onValueChange={applyGlobalTaxRate}>
@@ -320,6 +321,12 @@ export function ProcurementQuoteForm({
             </SelectContent>
           </Select>
         </div>
+        <IibbPerceptionFields
+          id="quoteIibbRate"
+          rate={iibbPerceptionRate}
+          onRateChange={setIibbPerceptionRate}
+          label="Alícuota IIBB"
+        />
         <PricesIncludeTaxCheckbox
           checked={pricesIncludeTax}
           onCheckedChange={setPricesIncludeTax}
@@ -404,7 +411,7 @@ export function ProcurementQuoteForm({
         subtotal={quoteTotals.subtotal}
         taxAmount={quoteTotals.tax}
         iibbPerceptionRate={iibbPerceptionRate}
-        onIibbPerceptionRateChange={setIibbPerceptionRate}
+        showIibbRateInput={false}
         totalLabel="Total cotización"
         className="rounded-md bg-muted/40 px-3 py-2 border-0"
       />

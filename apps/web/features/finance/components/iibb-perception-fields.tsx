@@ -1,9 +1,6 @@
 "use client";
 
-import {
-  IIBB_PERCEPTION_HINT_ES,
-  IIBB_PERCEPTION_LABEL_ES,
-} from "@bloqer/domain";
+import { IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
 import { addDecimal, calcIibbPerceptionAmount, roundMoney } from "@bloqer/utils";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
@@ -13,13 +10,13 @@ import { cn } from "@/lib/utils";
 export type IibbPerceptionFieldsProps = {
   rate: string;
   onRateChange: (v: string) => void;
-  /** Net subtotal (before IVA) used for the amount preview. */
-  subtotal: string;
+  /** Net subtotal (before IVA) — when set, shows Perc. IIBB amount under the rate. */
+  subtotal?: string;
   disabled?: boolean;
-  /** Tighter layout for totals footers. */
-  compact?: boolean;
   className?: string;
   id?: string;
+  /** Match TaxRateSelect / quote “Alícuota IVA”. */
+  label?: string;
 };
 
 export function previewIibbPerceptionAmount(subtotal: string, rate: string): string {
@@ -33,55 +30,35 @@ export function previewIibbPerceptionAmount(subtotal: string, rate: string): str
   }
 }
 
-/** Editable alícuota + read-only perception amount ([D-112]). */
+/** Document-level alícuota — same shape as “Alícuota IVA” ([D-112]). */
 export function IibbPerceptionFields({
   rate,
   onRateChange,
   subtotal,
   disabled = false,
-  compact = false,
   className,
   id = "iibb-perception-rate",
+  label = "Alícuota IIBB (%)",
 }: IibbPerceptionFieldsProps) {
-  const amount = previewIibbPerceptionAmount(subtotal, rate);
+  const amount =
+    subtotal != null ? previewIibbPerceptionAmount(subtotal, rate) : null;
 
   return (
-    <div className={cn(compact ? "space-y-1 text-right" : "space-y-2", className)}>
-      <div
-        className={cn(
-          compact
-            ? "flex flex-col items-end gap-1"
-            : "flex flex-wrap items-end gap-3",
-        )}
-      >
-        <div className={cn("space-y-1", compact ? "w-full max-w-[7.5rem]" : "w-28")}>
-          <Label htmlFor={id} className="text-xs text-muted-foreground">
-            Alícuota IIBB %
-          </Label>
-          <DecimalInput
-            id={id}
-            value={rate}
-            onValueChange={(v) => onRateChange(v.trim() === "" ? "0" : v)}
-            disabled={disabled}
-            placeholder="3"
-            className={cn("text-sm", compact ? "h-8 text-right" : "h-9")}
-          />
-        </div>
-        <div className={cn("space-y-1", compact ? "w-full" : "min-w-[7rem]")}>
-          <p className="text-xs text-muted-foreground">{IIBB_PERCEPTION_LABEL_ES}</p>
-          <p
-            className={cn(
-              "tabular-nums font-medium",
-              compact ? "text-sm" : "flex h-9 items-center text-sm",
-            )}
-          >
-            {formatDecimalArFromString(amount)}
-          </p>
-        </div>
-      </div>
-      <p className={cn("text-xs text-muted-foreground", compact && "max-w-[16rem] text-right")}>
-        {IIBB_PERCEPTION_HINT_ES}
-      </p>
+    <div className={cn("space-y-2", className)}>
+      <Label htmlFor={id}>{label}</Label>
+      <DecimalInput
+        id={id}
+        value={rate}
+        onValueChange={(v) => onRateChange(v.trim() === "" ? "0" : v)}
+        disabled={disabled}
+        placeholder="3"
+        className="h-9 text-sm"
+      />
+      {amount != null ? (
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {IIBB_PERCEPTION_LABEL_ES}: {formatDecimalArFromString(amount)}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -89,26 +66,35 @@ export function IibbPerceptionFields({
 export type DocumentTaxTotalsFooterProps = {
   subtotal: string;
   taxAmount: string;
-  /** When set with `onIibbPerceptionRateChange`, shows IIBB controls and includes perception in Total. */
+  /** When set, Perc. IIBB amount is shown and included in Total. */
   iibbPerceptionRate?: string;
   onIibbPerceptionRateChange?: (v: string) => void;
+  /** When false, only shows Perc. IIBB amount (rate edited elsewhere, e.g. next to Alícuota IVA). */
+  showIibbRateInput?: boolean;
   disabled?: boolean;
   totalLabel?: string;
   className?: string;
 };
 
-/** Subtotal | IVA | Perc. IIBB (optional) | Total — matches invoice/PO footer spacing. */
+/**
+ * Subtotal | IVA | [Alícuota IIBB %] | Perc. IIBB | Total —
+ * same column rhythm as the previous Subtotal/IVA/Total footer.
+ */
 export function DocumentTaxTotalsFooter({
   subtotal,
   taxAmount,
   iibbPerceptionRate,
   onIibbPerceptionRateChange,
+  showIibbRateInput = true,
   disabled = false,
   totalLabel = "Total (vista previa)",
   className,
 }: DocumentTaxTotalsFooterProps) {
-  const showIibb =
-    iibbPerceptionRate != null && typeof onIibbPerceptionRateChange === "function";
+  const showIibb = iibbPerceptionRate != null;
+  const canEditRate =
+    showIibb &&
+    showIibbRateInput &&
+    typeof onIibbPerceptionRateChange === "function";
   const iibbAmount = showIibb
     ? previewIibbPerceptionAmount(subtotal, iibbPerceptionRate)
     : "0.00";
@@ -124,30 +110,55 @@ export function DocumentTaxTotalsFooter({
   return (
     <div
       className={cn(
-        "flex flex-wrap justify-end gap-x-8 gap-y-2 border-t pt-3 text-sm",
+        "flex flex-wrap items-end justify-end gap-x-8 gap-y-2 border-t pt-3 text-sm",
         className,
       )}
     >
       <div className="text-right">
         <p className="text-xs text-muted-foreground">Subtotal</p>
-        <p className="tabular-nums font-medium">{formatDecimalArFromString(subtotal)}</p>
+        <p className="flex h-9 items-center justify-end tabular-nums font-medium">
+          {formatDecimalArFromString(subtotal)}
+        </p>
       </div>
       <div className="text-right">
         <p className="text-xs text-muted-foreground">IVA</p>
-        <p className="tabular-nums font-medium">{formatDecimalArFromString(taxAmount)}</p>
+        <p className="flex h-9 items-center justify-end tabular-nums font-medium">
+          {formatDecimalArFromString(taxAmount)}
+        </p>
       </div>
+      {canEditRate ? (
+        <div className="space-y-1 text-right">
+          <Label
+            htmlFor="document-iibb-rate"
+            className="text-xs text-muted-foreground"
+          >
+            Alícuota IIBB %
+          </Label>
+          <DecimalInput
+            id="document-iibb-rate"
+            value={iibbPerceptionRate}
+            onValueChange={(v) =>
+              onIibbPerceptionRateChange(v.trim() === "" ? "0" : v)
+            }
+            disabled={disabled}
+            placeholder="3"
+            className="h-9 w-[5.5rem] text-right text-sm"
+          />
+        </div>
+      ) : null}
       {showIibb ? (
-        <IibbPerceptionFields
-          rate={iibbPerceptionRate}
-          onRateChange={onIibbPerceptionRateChange}
-          subtotal={subtotal}
-          disabled={disabled}
-          compact
-        />
+        <div className="text-right">
+          <p className="text-xs text-muted-foreground">{IIBB_PERCEPTION_LABEL_ES}</p>
+          <p className="flex h-9 items-center justify-end tabular-nums font-medium">
+            {formatDecimalArFromString(iibbAmount)}
+          </p>
+        </div>
       ) : null}
       <div className="text-right">
         <p className="text-xs text-muted-foreground font-semibold">{totalLabel}</p>
-        <p className="tabular-nums font-semibold">{formatDecimalArFromString(total)}</p>
+        <p className="flex h-9 items-center justify-end tabular-nums font-semibold">
+          {formatDecimalArFromString(total)}
+        </p>
       </div>
     </div>
   );

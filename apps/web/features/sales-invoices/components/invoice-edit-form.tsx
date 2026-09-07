@@ -124,13 +124,14 @@ export function InvoiceEditForm({
             required
           />
         </div>
+        <IibbPerceptionFields
+          id="iibbPerceptionRate"
+          rate={iibbPerceptionRate}
+          onRateChange={setIibbPerceptionRate}
+          subtotal={defaults.subtotal ?? "0"}
+          label="Alícuota IIBB (%)"
+        />
       </div>
-
-      <IibbPerceptionFields
-        rate={iibbPerceptionRate}
-        onRateChange={setIibbPerceptionRate}
-        subtotal={defaults.subtotal ?? "0"}
-      />
 
       <div className="space-y-1">
         <Label htmlFor="notes">Notas</Label>

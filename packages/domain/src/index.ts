@@ -116,7 +116,6 @@ export {
 
 export {
   DEFAULT_IIBB_PERCEPTION_RATE_PCT,
-  IIBB_PERCEPTION_HINT_ES,
   IIBB_PERCEPTION_LABEL_ES,
 } from "./finance/iibb-perception";
 

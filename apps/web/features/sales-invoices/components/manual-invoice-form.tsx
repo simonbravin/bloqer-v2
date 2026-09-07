@@ -387,13 +387,14 @@ export function ManualInvoiceForm({
                 </p>
               ))}
           </div>
+          <IibbPerceptionFields
+            id="iibbPerceptionRate"
+            rate={iibbPerceptionRate}
+            onRateChange={setIibbPerceptionRate}
+            subtotal={lineNetSubtotal}
+            label="Alícuota IIBB (%)"
+          />
         </div>
-
-        <IibbPerceptionFields
-          rate={iibbPerceptionRate}
-          onRateChange={setIibbPerceptionRate}
-          subtotal={lineNetSubtotal}
-        />
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas</Label>

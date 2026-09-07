@@ -141,7 +141,7 @@ export function CertificationInvoiceForm({
             <Label htmlFor="dueDate">Fecha de vencimiento</Label>
             <Input id="dueDate" name="dueDate" type="date" required defaultValue={today} />
           </div>
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1">
             <TaxRateSelect
               id="taxRate"
               value={taxRate}
@@ -168,13 +168,14 @@ export function CertificationInvoiceForm({
               </p>
             ))}
           </div>
+          <IibbPerceptionFields
+            id="iibbPerceptionRate"
+            rate={iibbPerceptionRate}
+            onRateChange={setIibbPerceptionRate}
+            subtotal={cert.totalAmount}
+            label="Alícuota IIBB (%)"
+          />
         </div>
-
-        <IibbPerceptionFields
-          rate={iibbPerceptionRate}
-          onRateChange={setIibbPerceptionRate}
-          subtotal={cert.totalAmount}
-        />
 
         <div className="space-y-1">
           <Label htmlFor="notes">Notas</Label>
