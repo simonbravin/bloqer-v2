@@ -10,6 +10,7 @@ import {
   authorizeAndCommitPurchaseOrder,
   cancelPurchaseOrder,
   createPurchaseReceipt,
+  updatePurchaseReceipt,
   confirmPurchaseReceipt,
   cancelPurchaseReceipt,
   getPurchaseOrderById,
@@ -20,10 +21,12 @@ import {
   createPurchaseOrderSchema,
   updatePurchaseOrderSchema,
   createPurchaseReceiptSchema,
+  updatePurchaseReceiptSchema,
   returnPurchaseOrderSchema,
   type CreatePurchaseOrderInput,
   type UpdatePurchaseOrderInput,
   type CreatePurchaseReceiptInput,
+  type UpdatePurchaseReceiptInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
@@ -219,7 +222,37 @@ export async function createPurchaseReceiptAction(
   try {
     const receipt = await createPurchaseReceipt(parsed.data, ctx);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
+    revalidatePath(`/proyectos/${projectId}/recepciones/${receipt.id}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${data.purchaseOrderId}`);
+    revalidatePath("/pendientes");
+    revalidatePath(`/proyectos/${projectId}/pendientes`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    return { id: receipt.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function updatePurchaseReceiptAction(
+  receiptId: string,
+  projectId: string,
+  purchaseOrderId: string,
+  data: UpdatePurchaseReceiptInput,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = updatePurchaseReceiptSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const existing = await getPurchaseReceiptById(receiptId, ctx);
+    if (existing.projectId !== projectId || existing.purchaseOrderId !== purchaseOrderId) {
+      return { error: "La recepción no pertenece a este proyecto u orden" };
+    }
+    const receipt = await updatePurchaseReceipt(receiptId, parsed.data, ctx);
+    revalidatePath(`/proyectos/${projectId}/recepciones`);
+    revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
+    revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
+    revalidatePath("/pendientes");
+    revalidatePath(`/proyectos/${projectId}/pendientes`);
     revalidateProjectCostAndFinancePaths(projectId);
     return { id: receipt.id };
   } catch (err) {

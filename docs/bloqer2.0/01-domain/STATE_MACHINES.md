@@ -334,6 +334,7 @@ stateDiagram-v2
 
 ### Reglas
 
+- En `DRAFT` se pueden editar fecha, cantidades, notas y depósito; hay **como máximo un borrador activo por OC** (reanudar / anular antes de crear otro).
 - `CONFIRMED` genera uno o más `StockMovement` ([BR-INV-005]); **por defecto** pasan a `CONFIRMED` en la **misma transacción** que la recepción. Si el tenant usa borradores de movimiento, quedan en `DRAFT` hasta confirmación explícita en depósito.
 - Anular `CONFIRMED` sigue [BR-INV-007]: reversión por movimiento compensatorio o regla explícita — **no** borrado silencioso.
 

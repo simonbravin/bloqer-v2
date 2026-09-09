@@ -77,7 +77,16 @@ export const createPurchaseReceiptSchema = z.object({
   idempotencyKey: idempotencyKeySchema,
 });
 
+/** Edit DRAFT receipt header + lines (no idempotency key). */
+export const updatePurchaseReceiptSchema = z.object({
+  warehouseId: z.string().uuid().optional().nullable(),
+  receiptDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  notes: z.string().optional().nullable(),
+  lines: z.array(receiptLineSchema).min(1, "Debe incluir al menos una línea"),
+});
+
 export type CreatePurchaseOrderInput = z.infer<typeof createPurchaseOrderSchema>;
 export type UpdatePurchaseOrderInput = z.infer<typeof updatePurchaseOrderSchema>;
 export type ReturnPurchaseOrderInput = z.infer<typeof returnPurchaseOrderSchema>;
 export type CreatePurchaseReceiptInput = z.infer<typeof createPurchaseReceiptSchema>;
+export type UpdatePurchaseReceiptInput = z.infer<typeof updatePurchaseReceiptSchema>;

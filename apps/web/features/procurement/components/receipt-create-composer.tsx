@@ -69,7 +69,7 @@ export function ReceiptCreateComposer({
           files={evidence.files}
           onChange={evidence.setFiles}
           title="Foto / remito"
-          description="Evidencia de entrega: foto del material, remito o etiqueta. Se sube al registrar."
+          description="Evidencia de entrega: foto del material, remito o etiqueta. Se sube al guardar el borrador."
           emptyLabel="Todavía no hay foto ni remito."
           fileInputTestId="receipt-evidence-file"
         />

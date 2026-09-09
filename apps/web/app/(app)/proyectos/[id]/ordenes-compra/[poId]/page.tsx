@@ -136,6 +136,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const isSubmitted = order.status === "SUBMITTED";
   const isApproved = order.status === "APPROVED";
   const isReceivable = ["CONFIRMED", "PARTIALLY_RECEIVED"].includes(order.status);
+  const draftReceipt = receipts.find((r) => r.status === "DRAFT");
   const canApprovePo = canApprovePurchaseOrders(current.tenantCtx.roles);
   const canEditPo = canEditPurchaseOrders(current.tenantCtx.roles);
   const canReceive = canEditPurchaseReceipts(current.tenantCtx.roles);
@@ -308,8 +309,14 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
             )}
             {isReceivable && canReceive && (
               <Button asChild className={actionBtn} data-testid="po-register-receipt">
-                <Link href={`/proyectos/${id}/ordenes-compra/${poId}/recepciones/nueva`}>
-                  Registrar recepción
+                <Link
+                  href={
+                    draftReceipt
+                      ? `/proyectos/${id}/recepciones/${draftReceipt.id}`
+                      : `/proyectos/${id}/ordenes-compra/${poId}/recepciones/nueva`
+                  }
+                >
+                  {draftReceipt ? "Continuar recepción" : "Registrar recepción"}
                 </Link>
               </Button>
             )}

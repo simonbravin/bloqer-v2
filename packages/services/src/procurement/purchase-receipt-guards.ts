@@ -40,7 +40,7 @@ export function assertReceiptQtyWithinRemaining(
       const tol = opts.tolerancePct;
       throw new ServiceError(
         "CONFLICT",
-        `La cantidad recibida (${qtyReceived}) excede el máximo permitido (${maxThis.toFixed(4)}) para: ${description}` +
+        `La cantidad recibida (${formatQtyMessage(qtyReceived)}) excede el máximo permitido (${formatQtyMessage(maxThis)}) para: ${description}` +
           (tol.greaterThan(0) ? ` (tolerancia sobrecantidad ${tol.toFixed(2)}%).` : "."),
       );
     }
@@ -51,7 +51,12 @@ export function assertReceiptQtyWithinRemaining(
   if (qtyReceived.greaterThan(remaining)) {
     throw new ServiceError(
       "CONFLICT",
-      `La cantidad recibida (${qtyReceived}) excede la cantidad pendiente (${remaining}) para: ${description}`,
+      `La cantidad recibida (${formatQtyMessage(qtyReceived)}) excede la cantidad pendiente (${formatQtyMessage(remaining)}) para: ${description}`,
     );
   }
+}
+
+/** User-facing qty in messages — display scale (2 dp), not storage (4). */
+function formatQtyMessage(value: Prisma.Decimal): string {
+  return value.toFixed(2);
 }

@@ -24,6 +24,7 @@ export const PROCUREMENT_AUDIT_ACTIONS = [
   "procurement_quote.updated",
   "procurement_quote.deleted",
   "purchase_receipt.created",
+  "purchase_receipt.updated",
   "purchase_receipt.confirmed",
   "purchase_receipt.cancelled",
 ] as const;

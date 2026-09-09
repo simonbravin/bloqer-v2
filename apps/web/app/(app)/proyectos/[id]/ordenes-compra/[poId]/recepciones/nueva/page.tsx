@@ -1,8 +1,11 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { ReceiptCreateComposer } from "@/features/procurement/components/receipt-create-composer";
 import { getCurrentUser } from "@/lib/auth";
 import {
   canEditPurchaseReceipts,
+  findActiveDraftReceiptId,
+  getPoLinesForReceiptForm,
   getPurchaseOrderById,
   listWarehouses,
   ServiceError,
@@ -48,6 +51,14 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
     redirect(poHref);
   }
 
+  // Resume the same ficha if a DRAFT already exists (avoids false "máximo 0" errors).
+  const draftId = await findActiveDraftReceiptId(poId, ctx);
+  if (draftId) {
+    redirect(`/proyectos/${id}/recepciones/${draftId}`);
+  }
+
+  const formLines = await getPoLinesForReceiptForm(poId, order.lines, ctx);
+
   // Warehouse list needs INVENTORY module + VIEW; receipt itself does not (warehouse optional).
   // Never 404 the receive form when deposits are unavailable.
   let warehouseOptions: Array<{ id: string; name: string }> = [];
@@ -66,6 +77,24 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
       className="space-y-6"
       breadcrumbSegmentLabels={{ [poId]: order.code }}
     >
+      <nav
+        aria-label="Camino documental"
+        className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-muted-foreground"
+      >
+        <Link href={`/proyectos/${id}/ordenes-compra`} className="hover:text-foreground hover:underline">
+          Órdenes de compra
+        </Link>
+        <span aria-hidden>/</span>
+        <Link
+          href={`/proyectos/${id}/ordenes-compra/${poId}`}
+          className="hover:text-foreground hover:underline"
+        >
+          {order.code}
+        </Link>
+        <span aria-hidden>/</span>
+        <span className="text-foreground">Nueva recepción</span>
+      </nav>
+
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold tracking-tight">Registrar recepción</h1>
       </div>
@@ -74,7 +103,7 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
         projectId={id}
         purchaseOrderId={poId}
         purchaseOrderCode={order.code}
-        poLines={order.lines}
+        poLines={formLines}
         warehouseOptions={warehouseOptions}
       />
     </PageShell>

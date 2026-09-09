@@ -57,6 +57,25 @@ test("assertReceiptQtyWithinRemaining blocks over-receipt beyond tolerance [D-06
         alreadyReceived: new Prisma.Decimal("0"),
         tolerancePct: new Prisma.Decimal("5"),
       }),
-    (err) => err instanceof ServiceError && err.code === "CONFLICT",
+    (err) =>
+      err instanceof ServiceError &&
+      err.code === "CONFLICT" &&
+      err.message.includes("máximo permitido (105.00)"),
+  );
+});
+
+test("assertReceiptQtyWithinRemaining message uses 2 dp when max is zero", () => {
+  assert.throws(
+    () =>
+      assertReceiptQtyWithinRemaining(new Prisma.Decimal("5"), new Prisma.Decimal("0"), "Caño", {
+        orderQuantity: new Prisma.Decimal("6"),
+        alreadyReceived: new Prisma.Decimal("6"),
+        tolerancePct: new Prisma.Decimal("0"),
+      }),
+    (err) =>
+      err instanceof ServiceError &&
+      err.code === "CONFLICT" &&
+      err.message.includes("máximo permitido (0.00)") &&
+      !err.message.includes("0.0000"),
   );
 });

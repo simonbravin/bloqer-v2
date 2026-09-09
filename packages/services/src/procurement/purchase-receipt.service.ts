@@ -1,5 +1,5 @@
 import { Prisma, prisma, PurchaseReceipt, PurchaseReceiptStatus, PurchaseOrderStatus } from "@bloqer/database";
-import type { CreatePurchaseReceiptInput } from "@bloqer/validators";
+import type { CreatePurchaseReceiptInput, UpdatePurchaseReceiptInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertPoEligibleForReceipt, assertReceiptQtyWithinRemaining } from "./purchase-receipt-guards";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
@@ -12,6 +12,7 @@ import {
 } from "./procurement-access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 
 import { serializeQtyDecimal } from "../finance/money-decimal";
 import {
@@ -24,6 +25,7 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 import { completeMilestonesFromPurchaseReceipt } from "../schedule/schedule-milestone-from-receipt";
+import type { PurchaseOrderLineView } from "./purchase-order.service";
 
 /** Confirmer is stored on confirm as `updatedBy`; after cancel that field is the canceller. */
 function receiptActorUserId(r: {
@@ -141,6 +143,145 @@ async function recomputePOStatus(tx: TxClient, purchaseOrderId: string): Promise
   });
 }
 
+// ─── Draft reservation helpers ────────────────────────────────────────────────
+
+async function loadDraftReservedByLine(
+  purchaseOrderId: string,
+  purchaseOrderLineIds: string[],
+  ctx: ServiceContext,
+  opts?: { excludeReceiptId?: string },
+): Promise<Map<string, Prisma.Decimal>> {
+  if (purchaseOrderLineIds.length === 0) return new Map();
+  const draftReservedRows = await prisma.purchaseReceiptLine.findMany({
+    where: {
+      purchaseOrderLineId: { in: purchaseOrderLineIds },
+      purchaseReceipt: {
+        purchaseOrderId,
+        status: "DRAFT",
+        tenantId: ctx.tenantId,
+        ...(opts?.excludeReceiptId ? { id: { not: opts.excludeReceiptId } } : {}),
+      },
+    },
+    select: { purchaseOrderLineId: true, quantityReceived: true },
+  });
+  const draftReservedByLine = new Map<string, Prisma.Decimal>();
+  for (const row of draftReservedRows) {
+    const prev = draftReservedByLine.get(row.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+    draftReservedByLine.set(row.purchaseOrderLineId, prev.plus(row.quantityReceived));
+  }
+  return draftReservedByLine;
+}
+
+/**
+ * Active DRAFT receipt for a PO (at most one is enforced on create).
+ * Used to resume the same ficha instead of opening /recepciones/nueva again.
+ */
+export async function findActiveDraftReceiptId(
+  purchaseOrderId: string,
+  ctx: ServiceContext,
+): Promise<string | null> {
+  await assertProcurementTenantModule(ctx);
+  if (!canViewProcurementProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver recepciones");
+  }
+  const po = await prisma.purchaseOrder.findUnique({
+    where: { id: purchaseOrderId },
+    select: { id: true, tenantId: true, projectId: true },
+  });
+  if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccessIfPresent(po.projectId, ctx);
+
+  const draft = await prisma.purchaseReceipt.findFirst({
+    where: { purchaseOrderId, tenantId: ctx.tenantId, status: "DRAFT" },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return draft?.id ?? null;
+}
+
+/** How many DRAFT receipts exist for a PO (optionally excluding one). */
+export async function countActiveDraftReceiptsForPo(
+  purchaseOrderId: string,
+  ctx: ServiceContext,
+  opts?: { excludeReceiptId?: string },
+): Promise<number> {
+  await assertProcurementTenantModule(ctx);
+  if (!canViewProcurementProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver recepciones");
+  }
+  return prisma.purchaseReceipt.count({
+    where: {
+      purchaseOrderId,
+      tenantId: ctx.tenantId,
+      status: "DRAFT",
+      ...(opts?.excludeReceiptId ? { id: { not: opts.excludeReceiptId } } : {}),
+    },
+  });
+}
+
+/**
+ * Patch PO line `remainingQuantity` so receipt forms match server create/update
+ * (confirmed received + other DRAFT reservations).
+ */
+export function withDraftAwareRemainingQuantity(
+  lines: PurchaseOrderLineView[],
+  draftReservedByLine: Map<string, Prisma.Decimal>,
+): PurchaseOrderLineView[] {
+  return lines.map((line) => {
+    const ordered = new Prisma.Decimal(line.quantity);
+    const confirmed = new Prisma.Decimal(line.receivedQuantity);
+    const draftReserved = draftReservedByLine.get(line.id) ?? new Prisma.Decimal(0);
+    const available = ordered.minus(confirmed).minus(draftReserved);
+    return {
+      ...line,
+      remainingQuantity: available.lessThan(0)
+        ? serializeQtyDecimal(0)
+        : serializeQtyDecimal(available),
+    };
+  });
+}
+
+/** Load draft-aware remaining for receipt create/edit forms. */
+export async function getPoLinesForReceiptForm(
+  purchaseOrderId: string,
+  poLines: PurchaseOrderLineView[],
+  ctx: ServiceContext,
+  opts?: { excludeReceiptId?: string },
+): Promise<PurchaseOrderLineView[]> {
+  const draftReserved = await loadDraftReservedByLine(
+    purchaseOrderId,
+    poLines.map((l) => l.id),
+    ctx,
+    opts,
+  );
+  return withDraftAwareRemainingQuantity(poLines, draftReserved);
+}
+
+async function assertWarehouseOkForPo(
+  warehouseId: string,
+  po: { companyId: string; projectId: string },
+  ctx: ServiceContext,
+): Promise<void> {
+  const warehouse = await prisma.warehouse.findFirst({
+    where: {
+      id: warehouseId,
+      tenantId: ctx.tenantId,
+      status: "ACTIVE",
+    },
+    select: { id: true, companyId: true, projectId: true },
+  });
+  if (!warehouse) {
+    throw new ServiceError("NOT_FOUND", "Depósito no encontrado o inactivo");
+  }
+  if (warehouse.companyId !== po.companyId) {
+    throw new ServiceError("CONFLICT", "El depósito no pertenece a la misma empresa que la orden");
+  }
+  if (warehouse.projectId && warehouse.projectId !== po.projectId) {
+    throw new ServiceError("CONFLICT", "El depósito está asignado a otra obra");
+  }
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getPurchaseReceiptById(id: string, ctx: ServiceContext): Promise<PurchaseReceiptView> {
@@ -230,6 +371,12 @@ export async function createPurchaseReceipt(
     include: receiptInclude,
   });
   if (existingByKey) {
+    if (existingByKey.status === "CANCELLED") {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta operación ya se registró y la recepción fue anulada. Recargá la página e intentá de nuevo.",
+      );
+    }
     if (!purchaseReceiptReplayMatches(existingByKey, input)) {
       throw new ServiceError(
         "CONFLICT",
@@ -242,43 +389,27 @@ export async function createPurchaseReceipt(
   const settings = await getCompanyProcurementSettingsForProject(po.projectId, ctx);
   const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
 
-  if (input.warehouseId) {
-    const warehouse = await prisma.warehouse.findFirst({
-      where: {
-        id: input.warehouseId,
-        tenantId: ctx.tenantId,
-        status: "ACTIVE",
-      },
-      select: { id: true, companyId: true, projectId: true },
-    });
-    if (!warehouse) {
-      throw new ServiceError("NOT_FOUND", "Depósito no encontrado o inactivo");
-    }
-    if (warehouse.companyId !== po.companyId) {
-      throw new ServiceError("CONFLICT", "El depósito no pertenece a la misma empresa que la orden");
-    }
-    if (warehouse.projectId && warehouse.projectId !== po.projectId) {
-      throw new ServiceError("CONFLICT", "El depósito está asignado a otra obra");
-    }
+  // Pre-check for fast UX; the create txn re-checks under lock to close races.
+  const existingDraft = await prisma.purchaseReceipt.findFirst({
+    where: { purchaseOrderId: po.id, tenantId: ctx.tenantId, status: "DRAFT" },
+    select: { id: true },
+  });
+  if (existingDraft) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Ya hay una recepción en borrador para esta orden. Continuá o anulá esa recepción antes de crear otra.",
+    );
   }
 
-  // Count qty already reserved on other DRAFT receipts so create cannot over-allocate.
-  const draftReservedRows = await prisma.purchaseReceiptLine.findMany({
-    where: {
-      purchaseOrderLineId: { in: po.lines.map((l) => l.id) },
-      purchaseReceipt: {
-        purchaseOrderId: po.id,
-        status: "DRAFT",
-        tenantId: ctx.tenantId,
-      },
-    },
-    select: { purchaseOrderLineId: true, quantityReceived: true },
-  });
-  const draftReservedByLine = new Map<string, Prisma.Decimal>();
-  for (const row of draftReservedRows) {
-    const prev = draftReservedByLine.get(row.purchaseOrderLineId) ?? new Prisma.Decimal(0);
-    draftReservedByLine.set(row.purchaseOrderLineId, prev.plus(row.quantityReceived));
+  if (input.warehouseId) {
+    await assertWarehouseOkForPo(input.warehouseId, po, ctx);
   }
+
+  const draftReservedByLine = await loadDraftReservedByLine(
+    po.id,
+    po.lines.map((l) => l.id),
+    ctx,
+  );
 
   // Validate each line exists on PO and quantity > 0 within remaining + over-receipt tolerance ([D-067])
   for (const inputLine of input.lines) {
@@ -303,9 +434,27 @@ export async function createPurchaseReceipt(
         where: { tenantId: ctx.tenantId, idempotencyKey },
         include: receiptInclude,
       }),
-    payloadsMatch: (existing) => purchaseReceiptReplayMatches(existing, input),
+    payloadsMatch: (existing) =>
+      existing.status !== "CANCELLED" && purchaseReceiptReplayMatches(existing, input),
     create: async () => {
       const created = await prisma.$transaction(async (tx) => {
+        // Serialize draft creation per PO (closes double-tab race).
+        await tx.$queryRaw`
+          SELECT id FROM purchase_orders
+          WHERE id = ${po.id} AND "tenantId" = ${ctx.tenantId}
+          FOR UPDATE
+        `;
+        const racedDraft = await tx.purchaseReceipt.findFirst({
+          where: { purchaseOrderId: po.id, tenantId: ctx.tenantId, status: "DRAFT" },
+          select: { id: true },
+        });
+        if (racedDraft) {
+          throw new ServiceError(
+            "CONFLICT",
+            "Ya hay una recepción en borrador para esta orden. Continuá o anulá esa recepción antes de crear otra.",
+          );
+        }
+
         const row = await tx.purchaseReceipt.create({
           data: {
             tenantId:         ctx.tenantId,
@@ -350,6 +499,111 @@ export async function createPurchaseReceipt(
       });
       return created;
     },
+  });
+
+  return toPurchaseReceiptView(receipt);
+}
+
+export async function updatePurchaseReceipt(
+  id: string,
+  input: UpdatePurchaseReceiptInput,
+  ctx: ServiceContext,
+): Promise<PurchaseReceiptView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canEditPurchaseReceipts(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para editar recepciones");
+  }
+
+  const existing = await prisma.purchaseReceipt.findUnique({
+    where: { id },
+    include: { lines: true },
+  });
+  if (!existing) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
+  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
+  if (existing.status !== "DRAFT") {
+    throw new ServiceError("CONFLICT", `La recepción en estado "${existing.status}" no puede editarse.`);
+  }
+
+  const po = await prisma.purchaseOrder.findUnique({
+    where: { id: existing.purchaseOrderId },
+    include: { lines: true },
+  });
+  if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  assertPoEligibleForReceipt(po.status);
+
+  const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
+  const tolerancePct = new Prisma.Decimal(settings.overReceiptTolerancePct);
+
+  if (input.warehouseId) {
+    await assertWarehouseOkForPo(input.warehouseId, po, ctx);
+  }
+
+  const draftReservedByLine = await loadDraftReservedByLine(
+    po.id,
+    po.lines.map((l) => l.id),
+    ctx,
+    { excludeReceiptId: id },
+  );
+
+  for (const inputLine of input.lines) {
+    const poLine = po.lines.find((l) => l.id === inputLine.purchaseOrderLineId);
+    if (!poLine) {
+      throw new ServiceError("NOT_FOUND", `Línea de OC no encontrada: ${inputLine.purchaseOrderLineId}`);
+    }
+    const qtyReceived = new Prisma.Decimal(inputLine.quantityReceived);
+    const draftReserved = draftReservedByLine.get(poLine.id) ?? new Prisma.Decimal(0);
+    const alreadyReceived = poLine.receivedQuantity.plus(draftReserved);
+    const remaining = poLine.quantity.minus(alreadyReceived);
+    assertReceiptQtyWithinRemaining(qtyReceived, remaining, poLine.description, {
+      orderQuantity: poLine.quantity,
+      alreadyReceived,
+      tolerancePct,
+    });
+  }
+
+  const receipt = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`
+      SELECT id FROM purchase_receipts
+      WHERE id = ${id} AND "tenantId" = ${ctx.tenantId}
+      FOR UPDATE
+    `;
+    const claimed = await tx.purchaseReceipt.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: {
+        warehouseId: input.warehouseId ?? null,
+        receiptDate: new Date(input.receiptDate),
+        notes: input.notes ?? null,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(claimed.count, "La recepción ya no está en borrador");
+
+    await tx.purchaseReceiptLine.deleteMany({ where: { purchaseReceiptId: id } });
+    for (const inputLine of input.lines) {
+      await tx.purchaseReceiptLine.create({
+        data: {
+          purchaseReceiptId: id,
+          purchaseOrderLineId: inputLine.purchaseOrderLineId,
+          quantityReceived: new Prisma.Decimal(inputLine.quantityReceived),
+          notes: inputLine.notes ?? null,
+        },
+      });
+    }
+
+    const full = await tx.purchaseReceipt.findUniqueOrThrow({
+      where: { id },
+      include: receiptInclude,
+    });
+    await auditProcurement(
+      ctx,
+      "purchase_receipt.updated",
+      "PurchaseReceipt",
+      id,
+      { projectId: full.projectId, companyId: full.companyId },
+      { after: { purchaseOrderId: po.id, number: po.number }, tx },
+    );
+    return full;
   });
 
   return toPurchaseReceiptView(receipt);

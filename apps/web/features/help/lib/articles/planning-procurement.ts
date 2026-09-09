@@ -1017,9 +1017,9 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
     ],
     steps: [
-      "Desde Pendientes (botón Recibir → abre …/recepciones/nueva), desde la campana al confirmar (CTA Registrar recepción), desde la OC (Compras → Órdenes de compra) o Compras → Recepciones.",
-      "Registrá recepción parcial o total. El depósito es opcional si Inventario está activo.",
-      "Al confirmar la recepción, el panel Facturación queda arriba. Si la política «Al recibir, crear borrador» está ON, ya hay borrador para Completar y emitir (no crea CxP sola la recepción).",
+      "Desde Pendientes (botón Recibir), la campana (CTA Registrar recepción), la OC (Registrar / Continuar recepción) o Compras → Recepciones. Si ya hay borrador, se abre esa misma ficha.",
+      "En borrador editá fecha, cantidades y depósito (opcional). Guardá el borrador o confirmá la recepción.",
+      "Al confirmar, el panel Facturación queda arriba. Si la política «Al recibir, crear borrador» está ON, ya hay borrador para Completar y emitir (no crea CxP sola la recepción).",
     ],
     effects: [
       "Stock + cantidades recibidas. No crea CxP sola.",
@@ -1028,6 +1028,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "La recepción no abre deuda: hay que emitir la factura. Pedile a Finanzas o usá el panel si tenés EDIT AP.",
+      "No intentes crear una segunda recepción si ya hay un borrador: abrí Continuar recepción o el borrador desde Recepciones.",
     ],
     relatedSlugs: [
       "factura-desde-oc",
