@@ -214,6 +214,20 @@ test("preparePurchaseRequestLinesForSubmit uses defaultCostType without APU", ()
   assert.equal(prepared.lines[0]?.costType, "LABOR");
 });
 
+test("preparePurchaseRequestLinesForSubmit prefers line costType on edit", () => {
+  const prepared = preparePurchaseRequestLinesForSubmit(
+    [line({ description: "Equipo", quantity: "2", unit: "d", costType: "EQUIPMENT" })],
+    WBS,
+    "d",
+    [],
+    { defaultCostType: "LABOR" },
+  );
+  assert.equal(prepared.ok, true);
+  if (!prepared.ok) return;
+  assert.equal(prepared.lines[0]?.lineType, "SERVICE");
+  assert.equal(prepared.lines[0]?.costType, "EQUIPMENT");
+});
+
 test("selectedApuIds collects bound lines", () => {
   assert.deepEqual(
     [...selectedApuIds([

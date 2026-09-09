@@ -1,5 +1,5 @@
 import { Prisma, prisma, type PurchaseRequest, type CostCategory } from "@bloqer/database";
-import type { CreatePurchaseRequestInput } from "@bloqer/validators";
+import type { CreatePurchaseRequestInput, UpdatePurchaseRequestInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -13,7 +13,10 @@ import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
 } from "./procurement-budget-baseline";
-import { notifyPurchaseRequestSubmitted } from "./procurement-notifications.service";
+import {
+  notifyPurchaseRequestReturned,
+  notifyPurchaseRequestSubmitted,
+} from "./procurement-notifications.service";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -28,6 +31,10 @@ import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
+import {
+  assertPurchaseRequestReturnable,
+  PURCHASE_REQUEST_BLOCKING_QUOTE_STATUSES,
+} from "./purchase-request-return-guards";
 
 export type PurchaseRequestLineView = {
   id: string;
@@ -393,6 +400,95 @@ export async function createPurchaseRequest(
   return getPurchaseRequestById(pr.id, ctx);
 }
 
+export async function updatePurchaseRequest(
+  id: string,
+  input: UpdatePurchaseRequestInput,
+  ctx: ServiceContext,
+): Promise<PurchaseRequestView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canEditPurchaseRequests(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para editar solicitudes de compra");
+  }
+  const existing = await prisma.purchaseRequest.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true, projectId: true, companyId: true, status: true },
+  });
+  if (!existing || existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  }
+  assertDraftPr(existing.status);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
+  await requireProjectAccess(existing.projectId, ctx);
+
+  assertWbsRequiredOnLines(input.lines);
+  const apuCategoryByIdx = new Map<number, CostCategory>();
+  for (let i = 0; i < input.lines.length; i++) {
+    const line = input.lines[i]!;
+    await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId);
+    if (line.costAnalysisLineId) {
+      apuCategoryByIdx.set(
+        i,
+        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId),
+      );
+    }
+  }
+  const wbsIds = Array.from(new Set(input.lines.map((l) => l.wbsNodeId).filter((v): v is string => Boolean(v))));
+  const wbsDominant = await loadWbsDominantCostTypes(wbsIds, ctx.tenantId);
+
+  await prisma.$transaction(async (tx) => {
+    const flipped = await tx.purchaseRequest.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: {
+        neededByDate: new Date(input.neededByDate),
+        notes: input.notes ?? null,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La solicitud ya no está en borrador. Recargá e intentá de nuevo.",
+    );
+
+    await tx.purchaseRequestLine.deleteMany({ where: { purchaseRequestId: id } });
+    await tx.purchaseRequestLine.createMany({
+      data: input.lines.map((line, i) => {
+        const costType = coerceFreeTextGoodsCostType(
+          line.lineType,
+          line.costAnalysisLineId,
+          resolveLineCostType({
+            costType: line.costType ?? null,
+            apuCategory: apuCategoryByIdx.get(i) ?? null,
+            wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
+          }),
+        );
+        return {
+          purchaseRequestId: id,
+          wbsNodeId: line.wbsNodeId,
+          productId: line.productId ?? null,
+          costAnalysisLineId: line.costAnalysisLineId ?? null,
+          costType,
+          lineType: line.lineType,
+          description: line.description,
+          unit: line.unit ?? "",
+          quantity: new Prisma.Decimal(line.quantity),
+          sortOrder: line.sortOrder ?? i,
+        };
+      }),
+    });
+
+    await auditProcurement(
+      ctx,
+      "purchase_request.updated",
+      "PurchaseRequest",
+      id,
+      { projectId: existing.projectId, companyId: existing.companyId },
+      { after: { linesCount: input.lines.length }, tx },
+    );
+  });
+
+  return getPurchaseRequestById(id, ctx);
+}
+
 export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseRequests(ctx.roles)) {
@@ -405,6 +501,7 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
   if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   assertDraftPr(existing.status);
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
+  await requireProjectAccess(existing.projectId, ctx);
 
   await prisma.$transaction(async (tx) => {
     for (const line of existing.lines) {
@@ -437,6 +534,9 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
       data: {
         status: "SUBMITTED",
         submittedAt: new Date(),
+        returnReason: null,
+        returnedAt: null,
+        returnedByUserId: null,
         updatedBy: ctx.actorUserId,
       },
     });
@@ -461,6 +561,106 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
     projectId: existing.projectId,
     companyId: existing.companyId,
     code,
+  });
+
+  return getPurchaseRequestById(id, ctx);
+}
+
+export async function returnPurchaseRequest(
+  id: string,
+  reason: string,
+  ctx: ServiceContext,
+): Promise<PurchaseRequestView> {
+  await assertProcurementTenantModule(ctx);
+  if (!canEditPurchaseRequests(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para devolver solicitudes de compra");
+  }
+
+  const trimmed = reason.trim();
+  if (trimmed.length < 3) {
+    throw new ServiceError("VALIDATION", "Indicá el motivo de la devolución");
+  }
+
+  const existing = await prisma.purchaseRequest.findUnique({
+    where: { id },
+    include: {
+      lines: { select: { id: true, awardedPurchaseOrderId: true } },
+    },
+  });
+  if (!existing || existing.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  }
+  await requireProjectAccess(existing.projectId, ctx);
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
+
+  const [activeQuoteCount, activePoCount] = await Promise.all([
+    prisma.procurementQuote.count({
+      where: {
+        purchaseRequestId: id,
+        tenantId: ctx.tenantId,
+        status: { in: [...PURCHASE_REQUEST_BLOCKING_QUOTE_STATUSES] },
+      },
+    }),
+    prisma.purchaseOrder.count({
+      where: {
+        purchaseRequestId: id,
+        tenantId: ctx.tenantId,
+        status: { not: "CANCELLED" },
+      },
+    }),
+  ]);
+  const awardedLineCount = existing.lines.filter((l) => l.awardedPurchaseOrderId != null).length;
+
+  assertPurchaseRequestReturnable({
+    status: existing.status,
+    quoteCount: activeQuoteCount,
+    activePoCount,
+    awardedLineCount,
+  });
+
+  await prisma.$transaction(async (tx) => {
+    const flipped = await tx.purchaseRequest.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
+      data: {
+        status: "DRAFT",
+        submittedAt: null,
+        returnReason: trimmed,
+        returnedAt: new Date(),
+        returnedByUserId: ctx.actorUserId,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "La solicitud cambió de estado. Recargá e intentá de nuevo.",
+    );
+
+    await tx.purchaseRequestLine.updateMany({
+      where: { purchaseRequestId: id },
+      data: {
+        budgetUnitCostSnapshot: null,
+        budgetQuantitySnapshot: null,
+      },
+    });
+
+    await auditProcurement(
+      ctx,
+      "purchase_request.returned_for_changes",
+      "PurchaseRequest",
+      id,
+      { projectId: existing.projectId, companyId: existing.companyId },
+      { after: { returnReason: trimmed, status: "DRAFT" }, tx },
+    );
+  });
+
+  const code = `SC-${String(existing.number).padStart(3, "0")}`;
+  await notifyPurchaseRequestReturned({
+    ctx,
+    purchaseRequestId: id,
+    projectId: existing.projectId,
+    companyId: existing.companyId,
+    code,
+    reason: trimmed,
   });
 
   return getPurchaseRequestById(id, ctx);

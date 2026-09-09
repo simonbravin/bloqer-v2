@@ -298,6 +298,7 @@ stateDiagram-v2
   [*] --> DRAFT
   DRAFT --> SUBMITTED : enviar
   DRAFT --> CANCELLED : anular
+  SUBMITTED --> DRAFT : devolver sin cotizaciones ni OC
   SUBMITTED --> SUBMITTED : adjudicar subset (genera OC DRAFT)
   SUBMITTED --> QUOTE_SELECTED : cobertura 100 pct lineas
   SUBMITTED --> CANCELLED : anular
@@ -310,6 +311,16 @@ stateDiagram-v2
   CANCELLED --> [*]
 ```
 
+### Tabla — transiciones relevantes (PurchaseRequest)
+
+| Desde | Hacia | Acción | Quién |
+|---|---|---|---|
+| `DRAFT` | `SUBMITTED` | Enviar (snapshot presupuesto) | `EDIT PURCHASE_REQUESTS` |
+| `DRAFT` | `CANCELLED` | Anular | `EDIT PURCHASE_REQUESTS` |
+| `SUBMITTED` | `DRAFT` | Devolver a borrador con motivo ([BR-PUR-025]): **0 cotizaciones**, **0 OC no anuladas**, sin líneas adjudicadas | `EDIT PURCHASE_REQUESTS` |
+| `SUBMITTED` | `QUOTE_SELECTED` | Cobertura 100 % de líneas | Adjudicación |
+| `SUBMITTED` / `QUOTE_SELECTED` | `CANCELLED` | Anular (sin OC activas) | `EDIT PURCHASE_REQUESTS` |
+
 ### Reglas
 
 - Al enviar (`SUBMITTED`): snapshot de costo unitario presupuestario por línea WBS.
@@ -317,6 +328,7 @@ stateDiagram-v2
 - **N OC activas** por solicitud; cada `PurchaseRequestLine` se adjudica entera a como máximo una OC no anulada ([BR-PUR-024], [D-044]).
 - `SUBMITTED` incluye cobertura parcial; `QUOTE_SELECTED` = 100 % líneas adjudicadas (UI: *Adjudicada*); `COMPLETED` solo cuando todas las OC de cobertura están `CONFIRMED`+.
 - WBS obligatorio en cada línea ([BR-PUR-007]).
+- Edición de cabecera/líneas solo en `DRAFT`. Devolver a borrador limpia `submittedAt` y snapshots; el próximo envío los regenera ([BR-PUR-025]).
 
 ---
 

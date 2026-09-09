@@ -26,6 +26,7 @@ import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
   getPurchaseRequestById,
+  isBlockingProcurementQuoteStatus,
   getPurchaseRequestPoLinks,
   listEntityDocuments,
   listProcurementQuotesDetailedForRequest,
@@ -33,6 +34,8 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PurchaseRequestDetailMobileSections } from "@/features/procurement/components/purchase-request-detail-mobile-sections";
+import { PurchaseRequestReturnActions } from "@/features/procurement/components/purchase-request-return-actions";
+import { procurementActionBtnClass, procurementAmberBannerClass } from "@/features/procurement/lib/procurement-ui";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
@@ -116,6 +119,13 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
   }
 
   const isDraft = pr.status === "DRAFT";
+  const blockingQuoteCount = quotes.filter((q) => isBlockingProcurementQuoteStatus(q.status)).length;
+  const canReturnToDraft =
+    canEditPr &&
+    pr.status === "SUBMITTED" &&
+    blockingQuoteCount === 0 &&
+    linkedOrders.length === 0 &&
+    awardedLineCount === 0;
   const showQuotes = ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status);
   const storageConfigured = isStorageConfigured();
   const prAttachments = await listEntityDocuments("PURCHASE_REQUEST", prId, ctx, { projectId: id });
@@ -142,18 +152,28 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         </div>
         <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
           {isDraft && canEditPr && (
-            <form
-              action={async () => {
-                "use server";
-                const res = await submitPurchaseRequestAction(prId, id);
-                if ("error" in res) redirectWithActionError(prPath, res.error);
-                redirect(prPath);
-              }}
-            >
-              <Button type="submit" className="min-h-11 w-full md:min-h-9 sm:w-auto" data-testid="purchase-request-submit">
-                Enviar solicitud
+            <>
+              <Button asChild variant="outline" className={procurementActionBtnClass}>
+                <Link href={`${prPath}/editar`} data-testid="purchase-request-edit-link">
+                  Editar
+                </Link>
               </Button>
-            </form>
+              <form
+                action={async () => {
+                  "use server";
+                  const res = await submitPurchaseRequestAction(prId, id);
+                  if ("error" in res) redirectWithActionError(prPath, res.error);
+                  redirect(prPath);
+                }}
+              >
+                <Button type="submit" className={procurementActionBtnClass} data-testid="purchase-request-submit">
+                  Enviar solicitud
+                </Button>
+              </form>
+            </>
+          )}
+          {canReturnToDraft && (
+            <PurchaseRequestReturnActions prId={prId} projectId={id} />
           )}
           {pr.status !== "CANCELLED" &&
             pr.status !== "COMPLETED" &&
@@ -167,7 +187,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                 redirect(prPath);
               }}
             >
-              <Button type="submit" variant="destructive" className="min-h-11 w-full md:min-h-9 sm:w-auto">
+              <Button type="submit" variant="destructive" className={procurementActionBtnClass}>
                 Anular
               </Button>
             </form>
@@ -188,6 +208,12 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
       />
 
       <ActionErrorBanner message={sp.actionError} />
+
+      {isDraft && pr.returnReason ? (
+        <p className={procurementAmberBannerClass}>
+          Devuelta a borrador: {pr.returnReason}
+        </p>
+      ) : null}
 
       {linkedOrders.length > 0 && (
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm space-y-1">

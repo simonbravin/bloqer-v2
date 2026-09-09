@@ -108,6 +108,7 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 |---|---|
 | `purchase_request.created` | alta borrador |
 | `purchase_request.submitted` | DRAFT → SUBMITTED (snapshot presupuesto) |
+| `purchase_request.returned_for_changes` | SUBMITTED → DRAFT (sin cotizaciones ni OC, motivo obligatorio, [BR-PUR-025]) |
 | `purchase_request.cancelled` | → CANCELLED |
 | `procurement_quote.received` | cotización cargada |
 | `procurement_quote.selected` | cotización aportó líneas a una OC (puede haber N SELECTED por SC al cubrir 100 %) |
@@ -346,6 +347,7 @@ flowchart LR
 | Evento | Reacción |
 |---|---|
 | `purchase_request.submitted` | notifica a Compras / aprobadores OC (in-app + email, [BR-PUR-015], [D-050]). El email identifica tenant, proyecto y solicitante. |
+| `purchase_request.returned_for_changes` | notifica a Compras / aprobadores (misma audiencia que el submit) con el motivo; SC vuelve a editable ([BR-PUR-025]). |
 | `purchase_order.submitted` | si requiere alto nivel (umbral o `EXTRA_APPROVAL`), notifica a OWNER/ADMIN; si auto-aprueba, emite también `purchase_order.approved`. |
 | `purchase_order.approved` | habilita confirmación al proveedor; notifica al solicitante. **Excepto** atajo [D-105]: se audita el evento pero **no** se notifica APPROVED. |
 | `purchase_order.returned_for_changes` | notifica al creador/solicitante con el motivo; documento vuelve a editable. |
@@ -378,6 +380,7 @@ Cada evento puede generar una **Notification** para roles específicos. Tabla re
 | `certification.rejected_by_client` | OWNER, ADMIN, FINANCE, PM |
 | `certification.over_budget_warning` | OWNER, ADMIN, PM |
 | `purchase_request.submitted` | PROCUREMENT, APPROVE PURCHASE_ORDERS (fallback OWNER/ADMIN) |
+| `purchase_request.returned_for_changes` | misma audiencia que el submit ([BR-PUR-025]) |
 | `purchase_order.submitted` (pendiente aprobación) | aprobadores estándar o OWNER/ADMIN si alto nivel |
 | `purchase_order.approved` | solicitante / creador |
 | `purchase_order.returned_for_changes` | solicitante / creador |

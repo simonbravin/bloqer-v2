@@ -224,6 +224,10 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Regla:** desde `SUBMITTED`, un aprobador autorizado puede devolver la OC a `DRAFT` con **motivo obligatorio** (auditado). El origen/creador edita y reenvía. No existe “des-aprobar” un `APPROVED`/`CONFIRMED`: se anula o se cierra según [BR-PUR-013] y reglas de anulación.
 - **Origen:** [D-050](../00-product/DECISION_LOG.md).
 
+### BR-PUR-025 — Devolución de solicitud de compra a borrador
+- **Regla:** desde `SUBMITTED`, quien tiene `EDIT PURCHASE_REQUESTS` puede devolver la SC a `DRAFT` con **motivo obligatorio** (≥ 3 caracteres, auditado: `purchase_request.returned_for_changes`). Solo si **no hay cotizaciones activas** (`DRAFT` / `RECEIVED` / `SELECTED`; `REJECTED` / `SUPERSEDED` no bloquean), **no hay OC no anuladas** vinculadas y **ninguna línea** tiene `awardedPurchaseOrderId`. Con cotizaciones activas, cobertura parcial u OC, no se permite: hay que anular OC / gestionar cotizaciones o anular y recrear. Al devolver se limpia `submittedAt` y los snapshots presupuestarios de línea; en `DRAFT` se pueden editar cabecera y líneas; al reenviar se regeneran los snapshots.
+- **Origen:** necesidad operativa de corregir cantidades antes de cotizar (paridad parcial con [BR-PUR-016], con freno más estricto).
+
 ### BR-PUR-021 — Autorizar y comprometer (atajo de un paso)
 - **Regla:** si `CompanyProcurementSettings.allowAuthorizeAndCommit` está ON (default OFF), una OC en `DRAFT` o `SUBMITTED` puede pasar a `CONFIRMED` en un acto. Internamente se persisten `APPROVED` + `CONFIRMED` en la misma transacción. **No alto nivel:** quien tiene EDIT de OC ([D-105]). **Alto nivel** (umbral o `EXTRA_APPROVAL`): solo OWNER/ADMIN ([D-106] / `assertHighLevelApprover`). Respeta [BR-APR-004]. No se notifica `PURCHASE_ORDER_APPROVED` en este camino; solo `PURCHASE_ORDER_CONFIRMED`. El compromiso de costo sigue en `CONFIRMED` ([BR-PUR-001], [D-006]).
 

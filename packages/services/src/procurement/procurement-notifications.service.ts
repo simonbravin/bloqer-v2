@@ -18,6 +18,7 @@ import type { ServiceContext } from "../types";
 
 type ProcurementNotifyType =
   | "PURCHASE_REQUEST_SUBMITTED"
+  | "PURCHASE_REQUEST_RETURNED"
   | "PURCHASE_ORDER_PENDING_APPROVAL"
   | "PURCHASE_ORDER_APPROVED"
   | "PURCHASE_ORDER_RETURNED"
@@ -133,6 +134,57 @@ export async function notifyPurchaseRequestSubmitted(params: {
       facts,
     ),
     severity: "INFO",
+    linkedEntityType: "PURCHASE_REQUEST",
+    linkedEntityId: params.purchaseRequestId,
+    projectId: params.projectId,
+    companyId: params.companyId,
+    actionUrl: `/proyectos/${params.projectId}/solicitudes-compra/${params.purchaseRequestId}`,
+    excludeUserId: params.ctx.actorUserId,
+    alwaysCcOwnerAdmin: false,
+  });
+}
+
+export async function notifyPurchaseRequestReturned(params: {
+  ctx: ServiceContext;
+  purchaseRequestId: string;
+  projectId: string;
+  companyId: string;
+  code: string;
+  reason: string;
+}): Promise<void> {
+  // Same audience as submit ([BR-PUR-015] / [BR-PUR-025]).
+  const recipients = await resolveNotificationAudience({
+    tenantId: params.ctx.tenantId,
+    permissionTargets: [
+      { action: "APPROVE", module: "PURCHASE_REQUESTS" },
+      { action: "APPROVE", module: "PURCHASE_ORDERS" },
+    ],
+    excludeUserId: params.ctx.actorUserId,
+    alwaysCcOwnerAdmin: true,
+  });
+
+  const pr = await prisma.purchaseRequest.findFirst({
+    where: { id: params.purchaseRequestId, tenantId: params.ctx.tenantId },
+    select: { requestedByUserId: true },
+  });
+  const facts = await loadNotificationIdentityFacts({
+    tenantId: params.ctx.tenantId,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    requestedByUserId: pr?.requestedByUserId ?? params.ctx.actorUserId,
+    actorUserId: params.ctx.actorUserId,
+  });
+
+  await notifyRecipients({
+    ctx: params.ctx,
+    recipients,
+    type: "PURCHASE_REQUEST_RETURNED",
+    title: formatNotificationTitle("Solicitud devuelta", params.code),
+    body: formatNotificationIdentityBody(
+      `La solicitud ${params.code} volvió a borrador: ${params.reason}`,
+      facts,
+    ),
+    severity: "WARNING",
     linkedEntityType: "PURCHASE_REQUEST",
     linkedEntityId: params.purchaseRequestId,
     projectId: params.projectId,

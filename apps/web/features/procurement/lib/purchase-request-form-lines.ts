@@ -23,6 +23,8 @@ export type PurchaseRequestLineDraft = {
   quantity: string;
   unit: string;
   productId: string | null;
+  /** Preserved on edit for free-text lines without APU ([D-099]). */
+  costType?: PurchaseRequestSubmitLine["costType"];
 };
 
 export type PurchaseRequestSubmitLine = {
@@ -283,7 +285,7 @@ export function preparePurchaseRequestLinesForSubmit(
     ok: true,
     lines: substantive.map((line, i) => {
       const apu = line.costAnalysisLineId ? apuById.get(line.costAnalysisLineId) : undefined;
-      const category = apu?.category ?? fallbackType ?? undefined;
+      const category = apu?.category ?? line.costType ?? fallbackType ?? undefined;
       const isServiceNature = category === "LABOR" || category === "EQUIPMENT";
       const costType =
         category === "MATERIAL" ||

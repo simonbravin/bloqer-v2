@@ -6,8 +6,7 @@ import {
 } from "@bloqer/validators";
 
 /**
- * [D-096] · [BR-PUR-017] — `neededByDate` obligatorio al crear SC.
- * Se mantiene opcional en `update` para no forzar edits sobre SCs históricas.
+ * [D-096] · [BR-PUR-017] — `neededByDate` obligatorio al crear y editar SC en borrador.
  */
 
 const baseCreatePayload = {
@@ -73,19 +72,31 @@ describe("createPurchaseRequestSchema neededByDate", () => {
   });
 });
 
-describe("updatePurchaseRequestSchema neededByDate stays optional", () => {
-  it("accepts an update without neededByDate", () => {
-    const parsed = updatePurchaseRequestSchema.safeParse({ notes: "recordatorio" });
+const baseUpdatePayload = {
+  neededByDate: "2026-09-15",
+  notes: "recordatorio",
+  lines: baseCreatePayload.lines,
+};
+
+describe("updatePurchaseRequestSchema", () => {
+  it("requires neededByDate and at least one line", () => {
+    assert.equal(updatePurchaseRequestSchema.safeParse({ notes: "x" }).success, false);
+    assert.equal(
+      updatePurchaseRequestSchema.safeParse({ neededByDate: "2026-09-15", lines: [] }).success,
+      false,
+    );
+  });
+
+  it("accepts a full draft update payload", () => {
+    const parsed = updatePurchaseRequestSchema.safeParse(baseUpdatePayload);
     assert.equal(parsed.success, true);
   });
 
-  it("accepts explicit null on update (legacy SCs without date)", () => {
-    const parsed = updatePurchaseRequestSchema.safeParse({ neededByDate: null });
-    assert.equal(parsed.success, true);
-  });
-
-  it("still validates format when provided", () => {
-    const parsed = updatePurchaseRequestSchema.safeParse({ neededByDate: "not-a-date" });
+  it("rejects invalid neededByDate format", () => {
+    const parsed = updatePurchaseRequestSchema.safeParse({
+      ...baseUpdatePayload,
+      neededByDate: "not-a-date",
+    });
     assert.equal(parsed.success, false);
   });
 });

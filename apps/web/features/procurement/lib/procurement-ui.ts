@@ -10,3 +10,7 @@ export const procurementAmberCalloutClass =
 
 export const procurementAmberInsetClass =
   "rounded border border-amber-300/60 bg-amber-50/80 dark:bg-amber-950/20 p-2 space-y-1";
+
+/** Full-width banner on procurement document detail (devolución, avisos). */
+export const procurementAmberBannerClass =
+  "rounded-lg border border-amber-300/60 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100";

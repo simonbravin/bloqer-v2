@@ -171,6 +171,8 @@ export function actionLabelForNotification(
       return "Ver parte";
     case "PURCHASE_REQUEST_SUBMITTED":
       return "Cotizar solicitud";
+    case "PURCHASE_REQUEST_RETURNED":
+      return "Ver solicitud";
     case "PURCHASE_ORDER_PENDING_APPROVAL":
       return "Revisar orden";
     case "PURCHASE_ORDER_APPROVED":

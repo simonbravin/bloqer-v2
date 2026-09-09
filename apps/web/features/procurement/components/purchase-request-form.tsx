@@ -15,7 +15,7 @@ import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { formatDecimalArFromString, formatQtyDisplay } from "@/lib/format-money";
 import type { WbsApuOption, WbsOption } from "./purchase-order-lines-editor";
-import { createPurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
+import { createPurchaseRequestAction, updatePurchaseRequestAction } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
 import {
   apuCommitmentHintText,
   applyApuToPurchaseRequestLine,
@@ -24,6 +24,7 @@ import {
   computeApuLineEstimatedAmount,
   createEmptyPurchaseRequestLine,
   createPurchaseRequestLineFromInitial,
+  createPurchaseRequestLineKey,
   formatApuCoverageHint,
   mergeApuShortfallLines,
   preparePurchaseRequestLinesForSubmit,
@@ -31,10 +32,26 @@ import {
   type PurchaseRequestApuLine,
   type PurchaseRequestLineDraft,
 } from "../lib/purchase-request-form-lines";
+import { procurementAmberCalloutClass } from "../lib/procurement-ui";
 
 interface PurchaseRequestFormProps {
   projectId: string;
   wbsOptions: WbsOption[];
+  mode?: "create" | "edit";
+  purchaseRequestId?: string;
+  initialValues?: {
+    neededByDate?: string | null;
+    notes?: string | null;
+    wbsNodeId?: string | null;
+    lines?: Array<{
+      description: string;
+      quantity: string;
+      unit: string;
+      productId?: string | null;
+      costAnalysisLineId?: string | null;
+      costType?: "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER";
+    }>;
+  };
   initialLine?: {
     wbsNodeId?: string;
     description?: string;
@@ -75,6 +92,9 @@ const EMPTY_APU_LINES: WbsApuOption[] = [];
 export function PurchaseRequestForm({
   projectId,
   wbsOptions,
+  mode = "create",
+  purchaseRequestId,
+  initialValues,
   initialLine,
   prefilledFromMaterials = false,
   prefillFrom,
@@ -87,8 +107,22 @@ export function PurchaseRequestForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [wbsNodeId, setWbsNodeId] = useState<string>(initialLine?.wbsNodeId ?? "");
+  const isEdit = mode === "edit" && Boolean(purchaseRequestId);
+  const [wbsNodeId, setWbsNodeId] = useState<string>(
+    initialValues?.wbsNodeId ?? initialLine?.wbsNodeId ?? "",
+  );
   const [lines, setLines] = useState<PurchaseRequestLineDraft[]>(() => {
+    if (initialValues?.lines && initialValues.lines.length > 0) {
+      return initialValues.lines.map((line) => ({
+        rowKey: createPurchaseRequestLineKey(),
+        costAnalysisLineId: line.costAnalysisLineId ?? null,
+        description: line.description,
+        quantity: line.quantity,
+        unit: line.unit,
+        productId: line.productId ?? null,
+        costType: line.costType,
+      }));
+    }
     const base =
       initialLine?.description || initialLine?.costAnalysisLineId
         ? createPurchaseRequestLineFromInitial(initialLine)
@@ -182,6 +216,7 @@ export function PurchaseRequestForm({
               apuCatalog,
               {
                 defaultCostType:
+                  initialValues?.lines?.[0]?.costType ??
                   initialLine?.costType ??
                   (prefillFrom === "mano-obra"
                     ? "LABOR"
@@ -196,14 +231,26 @@ export function PurchaseRequestForm({
               setError(prepared.error);
               return;
             }
-            const result = await createPurchaseRequestAction(projectId, {
-              projectId,
+            const payload = {
               neededByDate,
               notes: fd.get("notes")?.toString() || null,
               lines: prepared.lines,
-            });
+            };
+            const result = isEdit
+              ? await updatePurchaseRequestAction(purchaseRequestId!, projectId, payload)
+              : await createPurchaseRequestAction(projectId, {
+                  projectId,
+                  ...payload,
+                });
             if ("error" in result) {
               setError(result.error);
+              return;
+            }
+            if (isEdit) {
+              toast.success("Solicitud actualizada.");
+              onSuccess?.();
+              router.replace(`/proyectos/${projectId}/solicitudes-compra/${purchaseRequestId}`);
+              router.refresh();
               return;
             }
             let created: { navigate?: boolean; message?: string } | void = undefined;
@@ -230,7 +277,7 @@ export function PurchaseRequestForm({
         }}
       >
         {prefilledFromMaterials ? (
-          <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-100">
+          <p className={procurementAmberCalloutClass}>
             Prefill desde{" "}
             {prefillFrom === "mano-obra"
               ? "Mano de obra"
@@ -256,15 +303,23 @@ export function PurchaseRequestForm({
                 No hay ítems EDT en presupuestos aprobados/cerrados.
               </p>
             ) : (
-              <SearchableCombobox
-                id="pr-wbs"
-                popoverWidth="wide"
-                options={wbsComboboxOptions}
-                value={wbsNodeId}
-                onValueChange={onWbsChange}
-                placeholder="Elegir partida…"
-                searchPlaceholder="Buscar partida…"
-              />
+              <>
+                <SearchableCombobox
+                  id="pr-wbs"
+                  popoverWidth="wide"
+                  options={wbsComboboxOptions}
+                  value={wbsNodeId}
+                  onValueChange={onWbsChange}
+                  placeholder="Elegir partida…"
+                  searchPlaceholder="Buscar partida…"
+                  disabled={isEdit}
+                />
+                {isEdit ? (
+                  <p className="text-xs text-muted-foreground">
+                    La partida EDT no se puede cambiar al editar; solo cantidades, insumos y notas.
+                  </p>
+                ) : null}
+              </>
             )}
             {selectedWbs?.availableSaldo != null ? (
               <p className="text-xs text-muted-foreground">
@@ -438,6 +493,7 @@ export function PurchaseRequestForm({
               type="date"
               required
               aria-required="true"
+              defaultValue={initialValues?.neededByDate ?? undefined}
               className="min-h-11 md:min-h-9"
             />
             <p className="text-xs text-muted-foreground">
@@ -452,7 +508,7 @@ export function PurchaseRequestForm({
           <h2 className="text-sm font-semibold">Observaciones</h2>
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>
-            <AutoGrowTextarea id="notes" name="notes" />
+            <AutoGrowTextarea id="notes" name="notes" defaultValue={initialValues?.notes ?? undefined} />
           </div>
         </section>
 
@@ -468,10 +524,10 @@ export function PurchaseRequestForm({
           <Button
             type="submit"
             className="min-h-11 md:min-h-9"
-            data-testid="purchase-request-create-submit"
+            data-testid={isEdit ? "purchase-request-edit-submit" : "purchase-request-create-submit"}
             disabled={pending || wbsOptions.length === 0 || !wbsNodeId}
           >
-            {pending ? "Guardando…" : "Crear solicitud"}
+            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear solicitud"}
           </Button>
         </div>
       </form>

@@ -44,10 +44,11 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 ## 8. Acciones disponibles
 1. Crear / editar SC en borrador (todas las líneas con WBS).
 2. **Enviar** → snapshot de costo unitario presupuestario + cantidad; notifica a Compras ([BR-PUR-015]).
-3. Cargar ≥ `minQuotesRequired` cotizaciones (precio por línea + **plazo de entrega** + `validUntil`).
-4. **Comparar** cotizaciones (total, desglose, plazo, ref. presupuesto / saldo de partida).
-5. Adjudicar por ítem (o atajo “toda la cotización” sobre líneas libres) → una o más OC `DRAFT` ([BR-PUR-024]); cobertura parcial deja la SC en `SUBMITTED`.
-6. Seguir workflow de cada OC (enviar → aprobar o devolver → confirmar).
+3. **Devolver a borrador** desde `SUBMITTED` con motivo ([BR-PUR-025]): solo si no hay cotizaciones ni OC activas; limpia snapshots y permite editar de nuevo.
+4. Cargar ≥ `minQuotesRequired` cotizaciones (precio por línea + **plazo de entrega** + `validUntil`).
+5. **Comparar** cotizaciones (total, desglose, plazo, ref. presupuesto / saldo de partida).
+6. Adjudicar por ítem (o atajo “toda la cotización” sobre líneas libres) → una o más OC `DRAFT` ([BR-PUR-024]); cobertura parcial deja la SC en `SUBMITTED`.
+7. Seguir workflow de cada OC (enviar → aprobar o devolver → confirmar).
 
 ## 9. Pantallas y vistas necesarias
 - `/proyectos/[id]/solicitudes-compra` — listado; filtro pendientes de cotización.
@@ -60,6 +61,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 - [BR-PUR-009] Tiers de varianza (aplican al enviar la OC generada).
 - [BR-PUR-010] Cotizaciones mínimas + vigencia + plazo comparable.
 - [BR-PUR-024] Adjudicación multi-OC por línea completa (sin partir qty).
+- [BR-PUR-025] Devolver SC a borrador solo sin cotizaciones ni OC.
 - [BR-PUR-011] Costo referencial y saldo de partida visibles.
 - [BR-APR-004] Segregación: quien solicita no aprueba (salvo excepción de settings).
 - [BR-APR-005] Factura directa a obra sobre umbral.
@@ -90,14 +92,14 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 | Acción | Módulo / helper | Roles típicos |
 |--------|-----------------|-------------|
 | Ver solicitudes | `VIEW PURCHASE_REQUESTS` | PM, capataz, compras, depósito (V), finanzas (V) |
-| Crear / enviar solicitud | `EDIT PURCHASE_REQUESTS` | PM, capataz |
+| Crear / enviar / editar borrador / devolver a borrador | `EDIT PURCHASE_REQUESTS` | PM, capataz |
 | Cargar cotización / generar OC | `canManageProcurementQuotes` (= editar OC) | Compras, PM (OC borrador) |
 | Aprobar OC | `canApprovePurchaseOrders` | Compras, owner/admin — no el solicitante (BR-APR-004) |
 
 Matriz canónica: [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md).
 
 ## 17. Eventos / notificaciones
-- `purchase_request.created` / `submitted` / `cancelled`
+- `purchase_request.created` / `submitted` / `returned_for_changes` / `cancelled`
 - `procurement_quote.received` / `selected`
 - Notificar Compras al enviar SC; notificar solicitante cuando hay cotización seleccionada / OC confirmada o rechazada ([BR-PUR-015], [D-050]). Email e in-app identifican organización, proyecto y solicitante.
 

@@ -2,8 +2,11 @@
 
 import {
   createPurchaseRequest,
+  updatePurchaseRequest,
   submitPurchaseRequest,
+  returnPurchaseRequest,
   cancelPurchaseRequest,
+  getPurchaseRequestById,
   createProcurementQuote,
   updateProcurementQuote,
   deleteProcurementQuote,
@@ -13,10 +16,13 @@ import {
 } from "@bloqer/services";
 import {
   createPurchaseRequestSchema,
+  updatePurchaseRequestSchema,
+  returnPurchaseRequestSchema,
   createProcurementQuoteSchema,
   updateProcurementQuoteSchema,
   createPurchaseOrdersFromAwardsSchema,
   type CreatePurchaseRequestInput,
+  type UpdatePurchaseRequestInput,
   type CreateProcurementQuoteInput,
   type UpdateProcurementQuoteInput,
   type CreatePurchaseOrdersFromAwardsInput,
@@ -43,7 +49,10 @@ function handle(err: unknown): { error: string } {
 
 function revalidatePr(projectId: string, prId?: string) {
   revalidatePath(`/proyectos/${projectId}/solicitudes-compra`);
-  if (prId) revalidatePath(`/proyectos/${projectId}/solicitudes-compra/${prId}`);
+  if (prId) {
+    revalidatePath(`/proyectos/${projectId}/solicitudes-compra/${prId}`);
+    revalidatePath(`/proyectos/${projectId}/solicitudes-compra/${prId}/editar`);
+  }
 }
 
 export async function createPurchaseRequestAction(
@@ -62,6 +71,25 @@ export async function createPurchaseRequestAction(
   }
 }
 
+export async function updatePurchaseRequestAction(
+  prId: string,
+  projectId: string,
+  data: UpdatePurchaseRequestInput,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = updatePurchaseRequestSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const existing = await getPurchaseRequestById(prId, ctx);
+    if (existing.projectId !== projectId) return { error: "Solicitud no encontrada" };
+    const pr = await updatePurchaseRequest(prId, parsed.data, ctx);
+    revalidatePr(projectId, prId);
+    return { id: pr.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
 export async function submitPurchaseRequestAction(
   prId: string,
   projectId: string,
@@ -69,6 +97,25 @@ export async function submitPurchaseRequestAction(
   const ctx = await getCtx();
   try {
     await submitPurchaseRequest(prId, ctx);
+    revalidatePr(projectId, prId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function returnPurchaseRequestAction(
+  prId: string,
+  projectId: string,
+  reason: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = returnPurchaseRequestSchema.safeParse({ reason });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    const existing = await getPurchaseRequestById(prId, ctx);
+    if (existing.projectId !== projectId) return { error: "Solicitud no encontrada" };
+    await returnPurchaseRequest(prId, parsed.data.reason, ctx);
     revalidatePr(projectId, prId);
     return { ok: true };
   } catch (err) {

@@ -29,9 +29,17 @@ export const createPurchaseRequestSchema = z.object({
 });
 
 export const updatePurchaseRequestSchema = z.object({
-  neededByDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  neededByDate: z
+    .string({ required_error: "La fecha requerida es obligatoria" })
+    .regex(/^\d{4}-\d{2}-\d{2}$/, {
+      message: "La fecha requerida es obligatoria",
+    }),
   notes: z.string().optional().nullable(),
-  lines: z.array(purchaseRequestLineSchema).min(1).optional(),
+  lines: z.array(purchaseRequestLineSchema).min(1, "Debe tener al menos una línea"),
+});
+
+export const returnPurchaseRequestSchema = z.object({
+  reason: z.string().min(3, "Indicá el motivo de la devolución").max(2000),
 });
 
 const quoteLineSchema = z.object({
@@ -113,6 +121,7 @@ export const createPurchaseOrdersFromAwardsSchema = z
 
 export type CreatePurchaseRequestInput = z.infer<typeof createPurchaseRequestSchema>;
 export type UpdatePurchaseRequestInput = z.infer<typeof updatePurchaseRequestSchema>;
+export type ReturnPurchaseRequestInput = z.infer<typeof returnPurchaseRequestSchema>;
 export type CreateProcurementQuoteInput = z.infer<typeof createProcurementQuoteSchema>;
 export type UpdateProcurementQuoteInput = z.infer<typeof updateProcurementQuoteSchema>;
 export type CreatePurchaseOrderFromQuoteLinesInput = z.infer<

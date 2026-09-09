@@ -121,6 +121,7 @@ export {
 } from "./procurement/procurement-access";
 export * from "./procurement/company-procurement-settings.service";
 export * from "./procurement/purchase-request.service";
+export * from "./procurement/purchase-request-return-guards";
 export * from "./procurement/procurement-quote.service";
 export * from "./procurement/purchase-request-to-po.service";
 export * from "./procurement/purchase-order-workflow.service";

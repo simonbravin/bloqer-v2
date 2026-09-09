@@ -97,6 +97,7 @@ describe("notification email context formatters", () => {
     assert.equal(actionLabelForNotification("JOBSITE_LOG_APPROVED", "JOBSITE_LOG"), "Ver parte");
     assert.equal(actionLabelForNotification("STALE_DOCUMENT_UPLOAD", null), "Ver documento");
     assert.equal(actionLabelForNotification("PURCHASE_REQUEST_SUBMITTED", "PURCHASE_REQUEST"), "Cotizar solicitud");
+    assert.equal(actionLabelForNotification("PURCHASE_REQUEST_RETURNED", "PURCHASE_REQUEST"), "Ver solicitud");
     assert.equal(actionLabelForNotification("PURCHASE_ORDER_PENDING_APPROVAL", "PURCHASE_ORDER"), "Revisar orden");
     assert.equal(actionLabelForNotification("PURCHASE_ORDER_APPROVED", "PURCHASE_ORDER"), "Confirmar orden");
     assert.equal(actionLabelForNotification("PURCHASE_ORDER_RETURNED", "PURCHASE_ORDER"), "Corregir orden");

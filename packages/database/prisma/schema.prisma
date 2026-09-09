@@ -2243,6 +2243,10 @@ model PurchaseRequest {
   notes                   String?
   emergencyDirectPoReason String?
   submittedAt             DateTime?
+  /// Reason when SUBMITTED is returned to DRAFT ([BR-PUR-025]).
+  returnReason            String?
+  returnedAt              DateTime?
+  returnedByUserId        String?
   createdBy               String?
   updatedBy               String?
   createdAt               DateTime              @default(now())
@@ -3116,6 +3120,8 @@ enum NotificationType {
   CERTIFICATION_APPROVED_WITHOUT_INVOICE
   STALE_DOCUMENT_UPLOAD
   PURCHASE_REQUEST_SUBMITTED
+  /// SC returned SUBMITTED → DRAFT without quotes ([BR-PUR-025]).
+  PURCHASE_REQUEST_RETURNED
   PURCHASE_ORDER_PENDING_APPROVAL
   PURCHASE_ORDER_APPROVED
   PURCHASE_ORDER_RETURNED

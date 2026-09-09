@@ -9,6 +9,7 @@ export { NewPurchaseRequestDialog } from "./components/new-purchase-request-dial
 export { NewPurchaseOrderDialog } from "./components/new-purchase-order-dialog";
 export { PurchaseRequestForm } from "./components/purchase-request-form";
 export { PurchaseRequestCreateComposer } from "./components/purchase-request-create-composer";
+export { PurchaseRequestReturnActions } from "./components/purchase-request-return-actions";
 export { PurchaseRequestMobileCards } from "./components/purchase-request-mobile-cards";
 export { ReceiptCreateComposer } from "./components/receipt-create-composer";
 export { PurchaseOrderEditForm } from "./components/purchase-order-edit-form";
