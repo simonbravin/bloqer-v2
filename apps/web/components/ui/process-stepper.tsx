@@ -101,7 +101,7 @@ export function ProcessStepper({
       {mobileSummary ? (
         <p
           id={summaryId}
-          className="mb-2 text-sm font-medium text-foreground sm:hidden"
+          className="mb-2 text-center text-sm font-medium text-foreground sm:hidden"
           role="status"
         >
           {mobileSummary}
@@ -112,7 +112,7 @@ export function ProcessStepper({
         aria-label={ariaLabel}
         aria-describedby={mobileSummary ? summaryId : undefined}
         className={cn(
-          "flex list-none items-center gap-0 overflow-x-auto overscroll-x-contain pb-0.5",
+          "flex w-full list-none items-center justify-center gap-0 overflow-x-auto overscroll-x-contain pb-0.5",
           // Thin scrollbar on small screens (discoverability); hide chrome on sm+.
           "[scrollbar-width:thin] sm:[scrollbar-width:none] sm:[-ms-overflow-style:none] sm:[&::-webkit-scrollbar]:hidden",
         )}
@@ -127,7 +127,7 @@ export function ProcessStepper({
               ref={isFocus ? currentRef : undefined}
               aria-current={isFocus ? "step" : undefined}
               className={cn(
-                "flex shrink-0 items-center sm:min-w-0 sm:flex-1",
+                "flex shrink-0 items-center",
                 dimUpcoming && "opacity-40",
               )}
             >
@@ -158,7 +158,7 @@ export function ProcessStepper({
                 <span
                   aria-hidden
                   className={cn(
-                    "mx-1.5 h-px w-5 shrink-0 sm:mx-2 sm:w-auto sm:min-w-4 sm:flex-1",
+                    "mx-1.5 h-px w-5 shrink-0 sm:mx-2.5 sm:w-8",
                     step.state === "done" ? "bg-primary/30" : "bg-border",
                   )}
                 />
