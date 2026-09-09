@@ -299,6 +299,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Facturas proveedor → Nueva → modo Costo directo. ¿Cada línea tiene partida hoja EDT? Si no → no se guarda.",
       "Payee: Proveedor o Empleado. Tipo de costo en cada línea. Desde Mano de obra / Equipos → Factura llega tipado + insumo APU ([D-110]).",
       "Crear → Emitir = Devengado + CxP. En el pie de totales ajustá **Percepción IIBB** (default 3% sobre el neto) si aplica. ¿Pagar ahora? Si sí, hace falta fondos y mes abierto; si no, Bloqer bloquea. Si no pagás ahora, queda CxP.",
+      "En el detalle ves una pista de proceso (Borrador → Emitir → Pagar) además del badge de estado; el paso Pagar sigue la CxP (parcial / vencida / pagada).",
     ],
     figure: {
       src: "/help/mapa-flujo-costo-obra-si-no.png",
@@ -331,6 +332,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "clase",
       "percepcion iibb",
       "iibb",
+      "pista de proceso",
     ],
     guideRef: "§12.0 · §12.2",
   },
@@ -353,6 +355,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Facturas y gastos o Transacciones → Gasto / factura, sin proyecto. Clase: Gasto general.",
       "¿El payee es Proveedor o Empleado activo? Si no → no sale en el listado: asigná el rol. Cliente y Subcontratista no sirven acá.",
       "Crear / Emitir = Devengado + CxP. ¿Pagar ahora? Si sí y hay fondos → Pagado. Si no hay fondos → Bloqer bloquea. Si no pagás ahora → CxP.",
+      "En el detalle de Facturas y gastos ves la pista de proceso Borrador → Emitir → Pagar (igual que en obra).",
     ],
     figure: {
       src: "/help/mapa-flujo-gasto-empresa-si-no.png",
@@ -377,6 +380,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "no aparece proveedor",
       "no aparece en facturas",
       "clase",
+      "pista de proceso",
     ],
     guideRef: "§12.0 · §12.2 · §14",
   },

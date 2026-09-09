@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import {
   buildPurchaseOrderProcessSteps,
   buildPurchaseRequestProcessSteps,
+  buildSupplierInvoiceProcessSteps,
   resolvePurchaseOrderCancelledIndex,
   resolvePurchaseRequestCancelledIndex,
+  resolveSupplierInvoiceCancelledIndex,
 } from "./process-steps";
 
 function states(steps: ReturnType<typeof buildPurchaseRequestProcessSteps>) {
@@ -279,6 +281,121 @@ describe("resolvePurchaseOrderCancelledIndex", () => {
         fullyPaid: false,
       }),
       0,
+    );
+  });
+});
+
+describe("buildSupplierInvoiceProcessSteps", () => {
+  it("DRAFT → current on Borrador", () => {
+    assert.deepEqual(states(buildSupplierInvoiceProcessSteps({ status: "DRAFT" })), [
+      "draft:current",
+      "issue:upcoming",
+      "pay:upcoming",
+    ]);
+  });
+
+  it("ISSUED unpaid → current on Pagar", () => {
+    assert.deepEqual(
+      states(buildSupplierInvoiceProcessSteps({ status: "ISSUED", payableStatus: "OPEN" })),
+      ["draft:done", "issue:done", "pay:current"],
+    );
+  });
+
+  it("ISSUED OVERDUE → current on Pagar (vencida)", () => {
+    const steps = buildSupplierInvoiceProcessSteps({
+      status: "ISSUED",
+      payableStatus: "OVERDUE",
+    });
+    assert.deepEqual(states(steps), ["draft:done", "issue:done", "pay:current"]);
+    assert.equal(steps[2]?.label, "Pagar (vencida)");
+  });
+
+  it("ISSUED without payable stays on Emitir", () => {
+    assert.deepEqual(states(buildSupplierInvoiceProcessSteps({ status: "ISSUED" })), [
+      "draft:done",
+      "issue:current",
+      "pay:upcoming",
+    ]);
+  });
+
+  it("ISSUED with CANCELLED payable stays on Emitir", () => {
+    assert.deepEqual(
+      states(
+        buildSupplierInvoiceProcessSteps({
+          status: "ISSUED",
+          payableStatus: "CANCELLED",
+        }),
+      ),
+      ["draft:done", "issue:current", "pay:upcoming"],
+    );
+  });
+
+  it("ISSUED PARTIAL labels Pagar (parcial)", () => {
+    const steps = buildSupplierInvoiceProcessSteps({
+      status: "ISSUED",
+      payableStatus: "PARTIAL",
+    });
+    assert.deepEqual(states(steps), ["draft:done", "issue:done", "pay:current"]);
+    assert.equal(steps[2]?.label, "Pagar (parcial)");
+  });
+
+  it("ISSUED PAID → all done", () => {
+    assert.deepEqual(
+      states(buildSupplierInvoiceProcessSteps({ status: "ISSUED", payableStatus: "PAID" })),
+      ["draft:done", "issue:done", "pay:done"],
+    );
+  });
+
+  it("CANCELLED marks Anulada at reached index", () => {
+    const steps = buildSupplierInvoiceProcessSteps({
+      status: "CANCELLED",
+      cancelledReachedIndex: 1,
+    });
+    assert.deepEqual(states(steps), ["draft:done", "issue:cancelled", "pay:upcoming"]);
+    assert.equal(steps[1]?.label, "Anulada");
+    assert.equal(steps[1]?.replacedLabel, "Emitir");
+  });
+});
+
+describe("resolveSupplierInvoiceCancelledIndex", () => {
+  it("draft cancel → Borrador", () => {
+    assert.equal(
+      resolveSupplierInvoiceCancelledIndex({
+        hasPayable: false,
+        fullyPaid: false,
+        partiallyPaid: false,
+      }),
+      0,
+    );
+  });
+
+  it("issued unpaid → Emitir", () => {
+    assert.equal(
+      resolveSupplierInvoiceCancelledIndex({
+        hasPayable: true,
+        fullyPaid: false,
+        partiallyPaid: false,
+      }),
+      1,
+    );
+  });
+
+  it("partial or paid → Pagar", () => {
+    assert.equal(
+      resolveSupplierInvoiceCancelledIndex({
+        hasPayable: true,
+        fullyPaid: false,
+        partiallyPaid: true,
+      }),
+      2,
+    );
+    assert.equal(
+      resolveSupplierInvoiceCancelledIndex({
+        hasPayable: true,
+        fullyPaid: true,
+        partiallyPaid: false,
+      }),
+      2,
     );
   });
 });

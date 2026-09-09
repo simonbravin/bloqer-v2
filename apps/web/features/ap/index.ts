@@ -10,6 +10,7 @@ export type { SupplierInvoiceListItem } from "./components/supplier-invoice-list
 export { SupplierInvoiceForm } from "./components/supplier-invoice-form";
 export type { SupplierOption, POOption, TreasuryAccountOption } from "./components/supplier-invoice-form";
 export { LIST_AP_DIRECT_PAYEES, AP_PAYEE_PICKER_HINT, toApPayeeOption, withCurrentApPayee } from "./lib/ap-payee-options";
+export { supplierInvoiceProcessSteps } from "./lib/supplier-invoice-process-steps";
 export { NewCompanySupplierInvoiceDialog } from "./components/new-company-supplier-invoice-dialog";
 export { NewProjectSupplierInvoiceDialog } from "./components/new-project-supplier-invoice-dialog";
 export { SupplierInvoiceEditForm } from "./components/supplier-invoice-edit-form";

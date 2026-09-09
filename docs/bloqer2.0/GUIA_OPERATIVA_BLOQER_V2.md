@@ -1200,7 +1200,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | Pantalla | Ruta |
 |----------|------|
 | Listado / alta | `/proyectos/[id]/facturas-proveedor` · `/nueva` |
-| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador) |
+| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador). Debajo del título: **pista de proceso** Borrador → Emitir → Pagar (pago según CxP; parcial «Pagar (parcial)», vencida «Pagar (vencida)»). |
 | CxP | `/proyectos/[id]/cuentas-por-pagar` → `/[payableId]/pagar` |
 | Pagos (consulta) | `/proyectos/[id]/pagos` (también desde CxP / trazabilidad) |
 
@@ -1222,7 +1222,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 | Pantalla | Ruta / etiqueta |
 |----------|-----------------|
-| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto) |
+| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto). Detalle: misma **pista de proceso** Borrador → Emitir → Pagar. |
 | Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → **A quién se le paga** → opcional **Pagar ahora (egreso de caja)** |
 | CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
 | Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |

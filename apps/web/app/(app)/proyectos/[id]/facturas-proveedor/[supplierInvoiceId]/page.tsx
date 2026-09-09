@@ -10,7 +10,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
+import { PayableStatusBadge, SupplierInvoiceStatusBadge, supplierInvoiceProcessSteps } from "@/features/ap";
 import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES, can } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
@@ -36,6 +36,7 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProcessStepper } from "@/components/ui/process-stepper";
 
 interface PageProps {
   params: Promise<{ id: string; supplierInvoiceId: string }>;
@@ -57,15 +58,13 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
   };
 
   let invoice;
-  let payable;
+  let payable = null;
   let warnings: string[] = [];
   let poCode: string | null = null;
 
   try {
     invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx, id);
-    if (invoice.status === "ISSUED") {
-      payable = await getPayableBySupplierInvoiceId(supplierInvoiceId, ctx, id);
-    }
+    payable = await getPayableBySupplierInvoiceId(supplierInvoiceId, ctx, id);
     if (invoice.purchaseOrderId) {
       warnings = await getSupplierInvoicePurchaseOrderWarnings(supplierInvoiceId, ctx);
       poCode = await getPurchaseOrderCodeForApLink(invoice.purchaseOrderId, ctx);
@@ -93,6 +92,10 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
     (payable!.status === "OPEN" ||
       payable!.status === "PARTIAL" ||
       payable!.status === "OVERDUE");
+  const showRelated =
+    Boolean(invoice.purchaseOrderId && poCode) ||
+    Boolean(invoice.subcontractCertificationId && invoice.subcontractId) ||
+    Boolean(payable);
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
@@ -112,9 +115,18 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
         ) : null}
       </div>
 
+      <ProcessStepper
+        aria-label="Progreso de la factura de proveedor"
+        steps={supplierInvoiceProcessSteps({
+          status: invoice.status,
+          payableStatus: payable?.status ?? null,
+          hasPayable: payable != null,
+        })}
+      />
+
       <ActionErrorBanner message={sp.actionError} />
 
-      {(invoice.purchaseOrderId || invoice.subcontractCertificationId || (isIssued && payable)) ? (
+      {showRelated ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Relacionados</CardTitle>
@@ -136,7 +148,7 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
                 </Link>
               </Button>
             ) : null}
-            {isIssued && payable ? (
+            {payable ? (
               <Button asChild variant="outline" size="sm">
                 <Link href={`/proyectos/${id}/cuentas-por-pagar/${payable.id}`}>Ver C×P</Link>
               </Button>
@@ -240,7 +252,7 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
         )}
       </div>
 
-      {isIssued && payable ? (
+      {payable ? (
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-base">Cuenta por pagar</CardTitle>

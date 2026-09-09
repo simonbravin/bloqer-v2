@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { PayableStatusBadge, SupplierInvoiceStatusBadge } from "@/features/ap";
+import { PayableStatusBadge, SupplierInvoiceStatusBadge, supplierInvoiceProcessSteps } from "@/features/ap";
 import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
@@ -34,6 +34,7 @@ import {
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProcessStepper } from "@/components/ui/process-stepper";
 
 interface PageProps {
   params: Promise<{ invoiceId: string }>;
@@ -69,8 +70,10 @@ export default async function FinanzasFacturaProveedorDetailPage({
   let payable = null;
   try {
     payable = await getPayableBySupplierInvoiceId(invoiceId, ctx);
-  } catch {
-    payable = null;
+  } catch (err) {
+    // Missing payable returns null (not NOT_FOUND). FORBIDDEN must not soft-fail the stepper.
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") notFound();
+    throw err;
   }
 
   const invoiceAttachments = await listEntityDocuments("SUPPLIER_INVOICE", invoiceId, ctx, {});
@@ -105,6 +108,15 @@ export default async function FinanzasFacturaProveedorDetailPage({
           />
         ) : null}
       </div>
+
+      <ProcessStepper
+        aria-label="Progreso de la factura de proveedor"
+        steps={supplierInvoiceProcessSteps({
+          status: invoice.status,
+          payableStatus: payable?.status ?? null,
+          hasPayable: payable != null,
+        })}
+      />
 
       <ActionErrorBanner message={sp.actionError} />
 
@@ -224,7 +236,7 @@ export default async function FinanzasFacturaProveedorDetailPage({
         </div>
       ) : null}
 
-      {isIssued && payable ? (
+      {payable ? (
         <Card>
           <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-base">Cuenta por pagar</CardTitle>

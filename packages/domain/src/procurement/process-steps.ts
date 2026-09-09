@@ -1,5 +1,5 @@
 /**
- * Pure process-track helpers for SC / OC detail steppers.
+ * Pure process-track helpers for SC / OC / factura proveedor detail steppers.
  * Derived from entity status + linked-doc flags — nothing persisted.
  */
 
@@ -30,6 +30,13 @@ const OC_DEFS = [
   { id: "pay", label: "Pagar" },
 ] as const;
 
+/** Factura / gasto proveedor: Borrador → Emitir → Pagar */
+const FP_DEFS = [
+  { id: "draft", label: "Borrador" },
+  { id: "issue", label: "Emitir" },
+  { id: "pay", label: "Pagar" },
+] as const;
+
 export type PurchaseRequestProcessStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -44,6 +51,15 @@ export type PurchaseOrderProcessStatus =
   | "CONFIRMED"
   | "PARTIALLY_RECEIVED"
   | "RECEIVED"
+  | "CANCELLED";
+
+export type SupplierInvoiceProcessStatus = "DRAFT" | "ISSUED" | "CANCELLED";
+
+export type SupplierInvoicePayableProcessStatus =
+  | "OPEN"
+  | "PARTIAL"
+  | "PAID"
+  | "OVERDUE"
   | "CANCELLED";
 
 export type PurchaseRequestProcessInput = {
@@ -65,6 +81,14 @@ export type PurchaseOrderProcessInput = {
   /** True when issued invoices exist and linked payables cover invoiced amount. */
   fullyPaid: boolean;
   /** When CANCELLED: happy-path index (0=Borrador … 4=Facturar). */
+  cancelledReachedIndex?: number;
+};
+
+export type SupplierInvoiceProcessInput = {
+  status: SupplierInvoiceProcessStatus | string;
+  /** Linked payable status when the invoice was/is issued. */
+  payableStatus?: SupplierInvoicePayableProcessStatus | string | null;
+  /** When CANCELLED: happy-path index (0=Borrador · 1=Emitir · 2=Pagar). */
   cancelledReachedIndex?: number;
 };
 
@@ -220,5 +244,62 @@ export function buildPurchaseOrderProcessSteps(
   return paintHappyPath(OC_DEFS, 0, false);
 }
 
+/**
+ * Infer cancel marker for factura proveedor when status is already CANCELLED.
+ * Index: 0 Borrador · 1 Emitir · 2 Pagar
+ */
+export function resolveSupplierInvoiceCancelledIndex(input: {
+  /** True when a payable exists (invoice left DRAFT / was issued). */
+  hasPayable: boolean;
+  fullyPaid: boolean;
+  partiallyPaid: boolean;
+}): number {
+  if (input.fullyPaid || input.partiallyPaid) return 2;
+  if (input.hasPayable) return 1;
+  return 0;
+}
+
+/**
+ * Factura / gasto track: Borrador → Emitir → Pagar
+ * Payment progress comes from the linked Payable (not invoice.status).
+ */
+export function buildSupplierInvoiceProcessSteps(
+  input: SupplierInvoiceProcessInput,
+): ProcessStep[] {
+  const status = input.status;
+  if (status === "CANCELLED") {
+    return paintCancelled(FP_DEFS, input.cancelledReachedIndex ?? 0);
+  }
+
+  if (status === "ISSUED") {
+    const payable = input.payableStatus ?? null;
+    // Sin CxP, o CxP anulada con factura aún emitida = inconsistencia → no saltar a Pagar.
+    if (!payable || payable === "CANCELLED") {
+      return paintHappyPath(FP_DEFS, 1, false);
+    }
+    if (payable === "PAID") {
+      return paintHappyPath(FP_DEFS, FP_DEFS.length - 1, true);
+    }
+    if (payable === "PARTIAL") {
+      const steps = paintHappyPath(FP_DEFS, 2, false);
+      return steps.map((s) =>
+        s.id === "pay" ? { ...s, label: "Pagar (parcial)" } : s,
+      );
+    }
+    if (payable === "OVERDUE") {
+      const steps = paintHappyPath(FP_DEFS, 2, false);
+      return steps.map((s) =>
+        s.id === "pay" ? { ...s, label: "Pagar (vencida)" } : s,
+      );
+    }
+    // OPEN (or unexpected payable status) → Pagar
+    return paintHappyPath(FP_DEFS, 2, false);
+  }
+
+  // DRAFT or unknown
+  return paintHappyPath(FP_DEFS, 0, false);
+}
+
 export const PURCHASE_REQUEST_PROCESS_STEP_DEFS = SC_DEFS;
 export const PURCHASE_ORDER_PROCESS_STEP_DEFS = OC_DEFS;
+export const SUPPLIER_INVOICE_PROCESS_STEP_DEFS = FP_DEFS;

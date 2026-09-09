@@ -142,16 +142,22 @@ export {
 export {
   PURCHASE_ORDER_PROCESS_STEP_DEFS,
   PURCHASE_REQUEST_PROCESS_STEP_DEFS,
+  SUPPLIER_INVOICE_PROCESS_STEP_DEFS,
   buildPurchaseOrderProcessSteps,
   buildPurchaseRequestProcessSteps,
+  buildSupplierInvoiceProcessSteps,
   resolvePurchaseOrderCancelledIndex,
   resolvePurchaseRequestCancelledIndex,
+  resolveSupplierInvoiceCancelledIndex,
   type ProcessStep,
   type ProcessStepState,
   type PurchaseOrderProcessInput,
   type PurchaseOrderProcessStatus,
   type PurchaseRequestProcessInput,
   type PurchaseRequestProcessStatus,
+  type SupplierInvoiceProcessInput,
+  type SupplierInvoiceProcessStatus,
+  type SupplierInvoicePayableProcessStatus,
 } from "./procurement/process-steps";
 
 export {
