@@ -17,6 +17,7 @@ export function buildConfiguracionSubnavLinks(roles: UserRole[]): ModuleSubnavLi
   const links: ModuleSubnavLink[] = [
     { href: "/configuracion", label: "General", match: "exact" },
     { href: "/configuracion/perfil", label: "Mi perfil" },
+    { href: "/configuracion/notificaciones", label: "Notificaciones" },
   ];
 
   if (canReadConfigNav(roles)) {

@@ -6,7 +6,7 @@ Arquitectura técnica: [`08-architecture/NOTIFICATIONS_ARCHITECTURE.md`](../08-a
 Informar en tiempo casi real a usuarios sobre eventos críticos: vencimientos AR/AP, certificaciones, documentos, aprobaciones de compra, alertas operativas ([`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md)).
 
 ## 2. Usuarios y roles que lo usan
-Todos los miembros activos del tenant (bandeja personal). OWNER/ADMIN reciben copia de las notificaciones generadas (CC). Preferencias por usuario **Fase 2**.
+Todos los miembros activos del tenant (bandeja personal). OWNER/ADMIN reciben copia **in-app** de las notificaciones generadas (CC, [D-054]). El **email** se filtra por preferencias de categoría y defaults de rol ([D-114]); Propietario/Administrador no reciben por defecto el flujo diario SC/OC por correo.
 
 ## 3. Problema que resuelve
 Errores por desconocimiento de estado del sistema y cuellos de botella de aprobación.
@@ -19,7 +19,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - **Email transaccional** para procurement (SC/OC y recordatorios SLA) según [D-050] / [BR-PUR-015], CxP/CxC ([D-069]/[D-072]), **libro de obra** ([D-091]), invitaciones y reportes. Todas las plantillas usan el mismo layout: organización (tenant) en encabezado y Subject, contexto de proyecto/entidad/actor, CTA. Auth (verificar / reset) no lleva tenant. Resto del producto: ver [Q-009](../00-product/OPEN_QUESTIONS.md) (cerrada parcial).
 
 ## 6. Entidades principales
-- **Notification**, preferencias usuario (Fase 2).
+- **Notification**, `TenantNotificationEmailPolicy`, `UserNotificationEmailPreference` ([D-114]).
 
 ## 7. Estados y transiciones
 `UNREAD` ↔ `READ` → `ARCHIVED` (sin hard delete). El estado es **por destinatario** (una fila por usuario). Desde `READ` se puede volver a `UNREAD` (limpia `readAt`). Las archivadas no vuelven a leídas/no leídas en esta fase.
@@ -27,7 +27,8 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 ## 8. Acciones disponibles
 - Marcar leída, marcar como no leída, marcar todas leídas, archivar.
 - Ir a entidad origen (deep link).
-- Silenciar tipo de notificación (Fase 2).
+- Configurar email por categoría en `/configuracion/notificaciones` ([D-114]).
+- OWNER/ADMIN: política de CC email + digest en `/configuracion/politicas`.
 
 ## 9. Pantallas y vistas necesarias
 - Campana en header: dropdown con las **últimas 5** no archivadas, badge solo si hay no leídas, enlace “Ver todas” (acceso principal a la bandeja; **sin** ítem en el sidebar de empresa ni de obra — [D-087]; **sin** ítem en Configuración).
@@ -35,7 +36,8 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - `/notificaciones/alertas` y `/notificaciones/emails` (OWNER/ADMIN). Alertas: cron diario **12:00 UTC** en prod; panel = corrida manual. Vencimientos = día calendario **UTC**.
 
 ## 10. Reglas de negocio
-- Notificaciones respetan tenant; audiencia por permiso + **CC OWNER/ADMIN** ([D-054]).
+- Notificaciones in-app respetan tenant; audiencia por permiso + **CC OWNER/ADMIN** ([D-054]).
+- **Email ([D-114]):** después de crear la fila in-app, `sendNotificationEmail*` consulta categoría + preferencia usuario + política tenant + default por rol. Skip logueado (`user_preference` / `role_default`). Flujo diario OFF para OA por default; escalamientos ON. Digest matutino estilo Pendientes para OA.
 - Leído es por usuario: marcar leída no afecta otras copias.
 - Dedupe de alertas operativas: misma entidad + destinatario en ventana de 7 días.
 - Alertas operativas de estado (AR/AP, stock, etc.): job batch automático (cron) + runner manual opcional; AR/AP vencidos **materializan** `OVERDUE` y notifican. **Canal:** in-app (campana) **+ email best-effort** en todos los runners operativos (AR/AP vencidas, stock negativo, certificaciones sin factura, uploads pendientes, procurement SLA + D-097). Los emails van loguéados con `emailType: OPERATIONAL_ALERT` — el `sendNotificationEmailAsSystem` aplica ese tag automáticamente para cualquier notificación en `OPERATIONAL_NOTIFICATION_TYPES`, o se puede usar el wrapper explícito `sendOperationalAlertEmailAsSystem`.
@@ -75,4 +77,4 @@ Bandeja personal: cualquier usuario autenticado con tenant. Alertas operativas y
 In-app + campana con polling ([D-054]); email según [Q-009] / [D-050].
 
 ## 19. Preguntas abiertas
-- Preferencias / mute, Web Push, RBAC “solo su proyecto” (R-USR-007 sobre `ProjectTeamMember`), SLA de partes SUBMITTED, nuevos tipos (cobros, transferencias): diferidos — ver limitaciones en arquitectura.
+- Mute de campana in-app, Web Push, RBAC “solo su proyecto” (R-USR-007 sobre `ProjectTeamMember`), SLA de partes SUBMITTED, nuevos tipos (cobros, transferencias): diferidos — ver limitaciones en arquitectura. Preferencias email + digest: [D-114].

@@ -1,4 +1,4 @@
-import type { LinkedEntityType, NotificationType } from "@bloqer/database";
+import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { createSystemNotification } from "../notifications/notification.service";
 import { sendNotificationEmailAsSystem } from "../notifications/notification-email.service";
@@ -55,6 +55,8 @@ async function notifyRecipients(params: {
   /** Default true. SLA reminders pass false because recipients are already OWNER/ADMIN. */
   alwaysCcOwnerAdmin?: boolean;
   permissionTargets?: NotificationPermissionTarget[];
+  /** Optional metadata (e.g. highLevelApproval for email category override [D-114]). */
+  metadata?: Prisma.JsonObject | null;
 }): Promise<number> {
   const unique = await resolveNotificationAudience({
     tenantId: params.ctx.tenantId,
@@ -83,8 +85,10 @@ async function notifyRecipients(params: {
         linkedEntityId: params.linkedEntityId,
         projectId: params.projectId,
         actionUrl: params.actionUrl,
+        metadata: params.metadata ?? undefined,
       });
       // Best-effort email (D-050 / BR-PUR-015); never abort the business flow.
+      // [D-114] Preference gate inside sendNotificationEmailAsSystem.
       await sendNotificationEmailAsSystem(notificationId, params.ctx).catch(() => undefined);
       created += 1;
     } catch {
@@ -248,6 +252,7 @@ export async function notifyPurchaseOrderPendingApproval(params: {
     actionUrl: `/proyectos/${params.projectId}/ordenes-compra/${params.purchaseOrderId}`,
     excludeUserId: params.ctx.actorUserId,
     alwaysCcOwnerAdmin: false,
+    metadata: params.requiresHighLevel ? ({ highLevelApproval: true } satisfies Prisma.JsonObject) : null,
   });
 }
 

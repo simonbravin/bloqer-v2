@@ -8,8 +8,10 @@ import {
   getApprovedBudgetEditsPolicy,
   getCompanies,
   getCompanyProcurementSettings,
+  getTenantNotificationEmailPolicy,
   getTenantProjectAccessMode,
   hasTenantWideProjectAccess,
+  isMissingNotificationEmailPrefsSchema,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -19,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { CompanyProcurementSettingsForm } from "@/features/procurement/components/company-procurement-settings-form";
 import { ApprovedBudgetEditsPolicyForm } from "@/features/budgets/components/approved-budget-edits-policy-form";
 import { ProjectAccessModeSection } from "@/features/tenant-config/components/project-access-mode-section";
+import { TenantNotificationEmailPolicyForm } from "@/features/notifications/components/tenant-notification-email-policy-form";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
@@ -64,7 +67,25 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
   const canEditProjectAccess =
     can(current.tenantCtx.roles, "EDIT", "TENANT_SETTINGS") ||
     hasTenantWideProjectAccess(current.tenantCtx.roles);
+  const canEditEmailPolicy = current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
   const projectAccessMode = await getTenantProjectAccessMode(ctx.tenantId);
+
+  let emailPolicy: Awaited<ReturnType<typeof getTenantNotificationEmailPolicy>> | null = null;
+  let emailPolicyMissingSchema = false;
+  let emailPolicyError: string | null = null;
+  if (canEditEmailPolicy) {
+    try {
+      emailPolicy = await getTenantNotificationEmailPolicy(ctx);
+    } catch (err) {
+      if (isMissingNotificationEmailPrefsSchema(err)) {
+        emailPolicyMissingSchema = true;
+      } else if (err instanceof ServiceError) {
+        emailPolicyError = err.message;
+      } else {
+        emailPolicyError = "No se pudo cargar la política de email.";
+      }
+    }
+  }
 
   let budgetPolicy: Awaited<ReturnType<typeof getApprovedBudgetEditsPolicy>> | null = null;
   let budgetPolicyMissingSchema = false;
@@ -86,7 +107,7 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
     <PageShell variant="default" className="space-y-12">
       <PageListHeader
         title="Políticas"
-        subtitle="Reglas de acceso a obras, compras y excepciones de presupuesto de la organización."
+        subtitle="Reglas de acceso a obras, compras, email a dirección y excepciones de presupuesto de la organización."
       />
 
       <section id="acceso-obras" className="space-y-5 scroll-mt-6">
@@ -146,6 +167,44 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
           canEdit={canEditCompras}
         />
       </section>
+
+      {canEditEmailPolicy ? (
+        <section id="email-direccion" className="space-y-5 scroll-mt-6">
+          <div className="space-y-1">
+            <h2 className="text-lg font-semibold tracking-tight">Email a dirección</h2>
+            <p className="text-sm text-muted-foreground max-w-3xl">
+              Política de correo para Propietario / Administrador: CC del flujo diario y digest
+              matutino. Cada usuario afina categorías en Configuración → Notificaciones.
+            </p>
+          </div>
+          {emailPolicyMissingSchema ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
+            >
+              <p className="font-medium">Falta aplicar la migración de base de datos (D-114)</p>
+              <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+                Esta sección necesita las tablas de preferencias de email. Corré{" "}
+                <code className="rounded bg-black/5 px-1 dark:bg-white/10">pnpm db:migrate:deploy</code>{" "}
+                contra la base de este entorno y volvé a cargar.
+              </p>
+            </div>
+          ) : emailPolicyError ? (
+            <div
+              role="alert"
+              className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+            >
+              {emailPolicyError}
+            </div>
+          ) : emailPolicy ? (
+            <TenantNotificationEmailPolicyForm
+              leadershipDailyFlowEmailCc={emailPolicy.leadershipDailyFlowEmailCc}
+              digestEnabledDefault={emailPolicy.digestEnabledDefault}
+              digestHourLocal={emailPolicy.digestHourLocal}
+            />
+          ) : null}
+        </section>
+      ) : null}
 
       <section id="presupuestos" className="space-y-5 scroll-mt-6">
         <div className="space-y-1">

@@ -4,11 +4,14 @@ import {
   ServiceError,
   updateProjectApprovedBudgetEditsPolicy,
   updateTenantApprovedBudgetEditsPolicy,
+  updateTenantNotificationEmailPolicy,
   upsertCompanyProcurementSettings,
 } from "@bloqer/services";
 import {
   upsertCompanyProcurementSettingsSchema,
+  updateTenantNotificationEmailPolicySchema,
   type UpsertCompanyProcurementSettingsInput,
+  type UpdateTenantNotificationEmailPolicyInput,
 } from "@bloqer/validators";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { redirect } from "next/navigation";
@@ -32,6 +35,25 @@ export async function updateCompanyProcurementSettingsAction(
   try {
     await upsertCompanyProcurementSettings(companyId, parsed.data, ctx);
     revalidatePath("/configuracion/politicas");
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ServiceError) return { error: err.message };
+    return { error: "Error inesperado" };
+  }
+}
+
+export async function updateTenantNotificationEmailPolicyAction(
+  data: UpdateTenantNotificationEmailPolicyInput,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  const parsed = updateTenantNotificationEmailPolicySchema.safeParse(data);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  }
+  try {
+    await updateTenantNotificationEmailPolicy(parsed.data, ctx);
+    revalidatePath("/configuracion/politicas");
+    revalidatePath("/configuracion/notificaciones");
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };

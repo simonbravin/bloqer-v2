@@ -233,7 +233,7 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 | Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
 | Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Flujo de caja → `/tesoreria/flujo-caja` · **Conciliación** → `/tesoreria/conciliacion` |
 | Contabilidad | Resumen → `/contabilidad` · **Plan de cuentas** → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` |
-| Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · **Políticas** → `/configuracion/politicas` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
+| Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · **Notificaciones** → `/configuracion/notificaciones` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · **Políticas** → `/configuracion/politicas` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
 
 > **Contabilidad — libros:** Libro diario, Sumas y saldos, Situación y Resultados no están en el menú izquierdo: se llegan desde la **subnav** del hub (§15.1). En esa barra, Plan de cuentas aparece como **Cuentas**.
 
@@ -253,7 +253,7 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF). En **reportes programados**, cada envío tiene su propia zona: la **próxima / última ejecución** se muestra en la zona del envío (no en UTC del servidor).
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
-- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas**): bloque **Acceso a proyectos** (todas las obras vs solo asignadas, [D-111]); umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
+- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas**): bloque **Acceso a proyectos** (todas las obras vs solo asignadas, [D-111]); umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); bloque **Email a dirección** ([D-114]: CC email flujo diario a Propietario/Administrador, digest matutino); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
 
 <!-- capture:02 configuracion-zona-horaria -->
 ![Bloqer — Configuración + zona horaria](./guides/assets/screenshots/02-configuracion-zona-horaria.png)
@@ -267,9 +267,15 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 - **Fechas y horas** en la zona de la empresa (§1.3), no en UTC del servidor ni en la zona del navegador. El detalle al hacer click debe coincidir con la columna Fecha.
 - Exports CSV/PDF usan la misma zona (el encabezado CSV indica la zona, ej. `Fecha (Buenos Aires (GMT-3))`).
 
-### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091 / D-094
+### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091 / D-094 / D-114
 
 Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **campana del encabezado**.
+
+**Preferencias de email ([D-114]):** Configuración → **Notificaciones** → `/configuracion/notificaciones`. Cada usuario elige categorías de correo (compras flujo / escalamientos, CxP, CxC, libro de obra, etc.). La **campana no se apaga**. Por defecto Propietario/Administrador **no** reciben el flujo diario SC/OC por email (sí ven la campana); Compras y Jefe de obra sí. Pueden prenderlo. Auth/invitación siempre se envían.
+
+**Política empresa:** Configuración → **Políticas** → sección **Email a dirección** (solo Propietario/Administrador): restaurar CC email del flujo diario a dirección; digest matutino on/off por default + hora local.
+
+**Digest diario:** un mail matutino a Propietario/Administrador con colas estilo Pendientes + alertas críticas sin leer (si hay algo que reportar). Cron horario; se envía cuando coincide la hora local de la organización.
 
 **Reportes de la empresa ([D-098]):** menú General → **Reportes** → `/reportes`. Las cards están agrupadas en **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario). Los reportes de una obra siguen en Planificación → Reportes dentro del proyecto.
 
@@ -277,15 +283,17 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 |------------|------------------------|
 | **Campana** | Dropdown con las **últimas 5** no archivadas; badge solo si hay no leídas; pie **Ver todas** → `/notificaciones`. Polling cada **30 s** (pestaña visible); al abrir el dropdown se refresca. |
 | **Inbox** | `/notificaciones` — filtros Todas / No leídas / Leídas / Archivadas; **Marcar todas como leídas**; marcar como no leída; archivar. |
-| **Alertas operativas** | `/notificaciones/alertas` — solo `OWNER`/`ADMIN`: AR vencida, AP vencida, stock negativo, certificaciones aprobadas sin factura, uploads pendientes, compras demoradas (SLA), OC entrega vencida, SC fecha requerida vencida, OC recibida sin factura + card **Última actividad**. Cron diario **12:00 UTC**, dedup 7 días por tipo/entidad/recipient. Cada alerta genera **campana + email** (best-effort) al destinatario resuelto por permiso; los emails se loguean como `OPERATIONAL_ALERT` y aparecen en `/notificaciones/emails?emailType=OPERATIONAL_ALERT`. |
-| **Emails enviados** | `/notificaciones/emails` — historial (NOTIFICATION, OPERATIONAL_ALERT, REPORT_*). |
+| **Notificaciones (email)** | `/configuracion/notificaciones` — toggles por categoría de correo ([D-114]). |
+| **Alertas operativas** | `/notificaciones/alertas` — solo `OWNER`/`ADMIN`: AR vencida, AP vencida, stock negativo, certificaciones aprobadas sin factura, uploads pendientes, compras demoradas (SLA), OC entrega vencida, SC fecha requerida vencida, OC recibida sin factura + card **Última actividad**. Cron diario **12:00 UTC**, dedup 7 días por tipo/entidad/recipient. Cada alerta genera **campana**; el **email** respeta preferencias ([D-114]). Los emails se loguean como `OPERATIONAL_ALERT` y aparecen en `/notificaciones/emails?emailType=OPERATIONAL_ALERT`. |
+| **Emails enviados** | `/notificaciones/emails` — historial (NOTIFICATION, OPERATIONAL_ALERT, NOTIFICATION_DIGEST, REPORT_*). |
 
 **Quién las recibe**
 
-- Destinatarios primarios y/o por permiso del evento, con **CC siempre a OWNER/ADMIN** activos (salvo exclusiones del actor).
-- **Excepción anti-ruido:** `CERTIFICATION_APPROVED` llega al creador ∪ OWNER/ADMIN (no se difunde a todo quien tenga VER certificaciones).
-- **Libro de obra ([D-091]):** al **enviar** un parte → campana + email a OWNER/ADMIN y a miembros del **Equipo de obra** que puedan aprobar (PM); al **devolver** o **aprobar** → autor del parte ∪ OWNER/ADMIN. Ver §8.1.
-- **Compras ([D-094]):** SC enviada → campana a quien **aprueba** SC/OC (no a todo el que puede cotizar: un PM la ve en **Pendientes** aunque no le llegue ese aviso). OC aprobada → origen + quien puede confirmar. OC confirmada → quien puede **recibir** con CTA **Registrar recepción** (abre el formulario); el origen solo informativo ve la ficha de la OC. CxP **Listo para pagar** sigue solo en campana (no en el globo de Pendientes).
+- Destinatarios primarios y/o por permiso del evento, con **CC in-app siempre a OWNER/ADMIN** activos (salvo exclusiones del actor) — [D-054].
+- **Email:** misma audiencia filtrada por preferencia/categoría ([D-114]). Escalamiento (SLA, umbral alto OC, D-097) llega por email a dirección por default.
+- **Excepción anti-ruido:** `CERTIFICATION_APPROVED` llega al creador ∪ OWNER/ADMIN (no se difunde a todo quien tenga VER certificaciones); solo in-app.
+- **Libro de obra ([D-091]):** al **enviar** un parte → campana a OWNER/ADMIN y a miembros del **Equipo de obra** que puedan aprobar (PM); email según preferencia `JOBSITE_LOG`. Al **devolver** o **aprobar** → autor del parte ∪ OWNER/ADMIN (campana); email según preferencia. Ver §8.1.
+- **Compras ([D-094]):** SC enviada → campana a quien **aprueba** SC/OC. Email del flujo diario a Compras/Jefe de obra/Depósito según rol; no a Propietario/Administrador salvo opt-in o política CC. CxP **Listo para pagar** sigue solo en campana (no en el globo de Pendientes); email vía categoría AP + canal D-070.
 - Cada usuario tiene su propia fila: marcar leída **no** afecta la copia de otro.
 - Compras (SC/OC), CxP/CxC, libro de obra y reportes: el **asunto** lleva `[organización]` y el cuerpo identifica proyecto, contraparte y actor cuando aplica. Invitaciones al equipo muestran organización, quién invitó y roles. Útil si el mismo usuario es OWNER/ADMIN de más de un workspace.
 
@@ -1648,7 +1656,7 @@ flowchart LR
 | **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |
 | **Cobrar ahora en factura de obra** | Disponible en alta manual de factura de proyecto ([D-077] / Q-055); requiere `EDIT TREASURY`. Certificación sigue: emitir → cobrar aparte. Corporativo: cobro opcional en Transacciones. |
 | **Ajustes de caja** | **Hay UI** de ajuste manual por cuenta (§4.3). Ajustes de **stock** siguen sin pantalla dedicada de ajuste genérico. |
-| **Notificaciones** | Sin Web Push / preferencias mute; polling 30 s en pestaña visible (D-054). Libro de obra: in-app + email ([D-091]). |
+| **Notificaciones** | Preferencias email por categoría + digest OA ([D-114]); sin mute de campana / Web Push; polling 30 s (D-054). Libro de obra: in-app + email filtrado ([D-091]/[D-114]). |
 | **Permisos** | La matriz es de solo lectura; los roles son fijos. Roster `ProjectTeamMember` solo para avisos ([D-091]); techos “solo su proyecto” (R-USR-007) aún sin enforcement. |
 | **Nómina / RRHH** | Bloqer **no** liquida haberes ni aportes. El sueldo se registra como **gasto** ligado al empleado (§12.2.1). |
 | **Segundo factor (2FA)** | No disponible; acceso con Google o email/contraseña. |

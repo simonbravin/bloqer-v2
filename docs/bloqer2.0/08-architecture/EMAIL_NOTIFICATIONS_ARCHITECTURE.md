@@ -30,7 +30,14 @@ Enviar correos transaccionales con **Resend** cuando el proyecto tenga variables
 - **`sendReportByEmail`:** crea fila `PENDING` antes de generar adjunto; `SKIPPED` + `email_not_configured` si Resend no está configurado; `SENT` / `FAILED` según `sendEmail`; `idempotencyKey` informativa por minuto (no bloquea reenvíos manuales).
 - **`sendNotificationEmail` / `sendOperationalAlertEmail`:** registran cada intento (`NOTIFICATION` / `OPERATIONAL_ALERT`); skips tempranos crean fila `SKIPPED` con placeholder de email interno cuando no hubo destinatario real; **no** se activa envío automático al crear notificaciones in-app.
 - **UI:** `/notificaciones/emails` — tabla con filtros básicos (OWNER/ADMIN).
-- **Pendiente (post-17E):** preferencias por usuario, cola de reintentos automáticos, destinatarios externos, dedupe estricta global. **Reportes programados:** ver [`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md).
+- **Pendiente (post-17E):** cola de reintentos automáticos, destinatarios externos, dedupe estricta global. **Preferencias usuario + digest:** [D-114]. **Reportes programados:** ver [`SCHEDULED_REPORTS_ARCHITECTURE.md`](./SCHEDULED_REPORTS_ARCHITECTURE.md).
+
+## Phase D-114 — Preferencias email + digest
+
+- **Gate:** `shouldSendNotificationEmailForRecipient` en el path de `sendNotificationEmail*` (no cambia audiencia in-app).
+- **Modelos:** `TenantNotificationEmailPolicy`, `UserNotificationEmailPreference`; `EmailDeliveryType.NOTIFICATION_DIGEST`.
+- **UI:** `/configuracion/notificaciones`; política en `/configuracion/politicas` § Email a dirección.
+- **Cron:** `/api/cron/notification-digest` cada hora (`5 * * * *`); filtra por `digestHourLocal` en timezone del tenant.
 
 ## Justificación para Bloqer 2.0
 
@@ -61,8 +68,8 @@ Enviar correos transaccionales con **Resend** cuando el proyecto tenga variables
 | ID | Descripción |
 |----|-------------|
 | **P-EMAIL-01** | **Phase 9D (base):** `EmailDeliveryLog` en Prisma + servicio + UI listado; ampliar con dedupe estricta / retención / export si hace falta |
-| **P-EMAIL-02** | Preferencias por usuario (opt-in/opt-out por tipo de notificación) |
-| **P-EMAIL-03** | Digest diario/semanal de no leídas |
+| **P-EMAIL-02** | **Hecho ([D-114]):** preferencias por usuario por categoría + defaults por rol + política tenant |
+| **P-EMAIL-03** | **Hecho MVP ([D-114]):** digest diario OWNER/ADMIN (conteos Pendientes + críticos). Pendiente: digest otros roles / semanal |
 | **P-EMAIL-04** | Cola de reintentos / worker para envíos fallidos |
 | **P-EMAIL-05** | Envíos **programados** — **MVP implementado** (Phase 17B–17E): CRUD, cron, `REPORT_SCHEDULED`, ejecutar ahora / reintentar fallidos. Pendiente: cola automática, externos, digest ZIP |
 

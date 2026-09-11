@@ -30,12 +30,14 @@ const EMAIL_TYPE_LABEL: Record<EmailDeliveryType, string> = {
   OPERATIONAL_ALERT: "Alerta operativa",
   REPORT_MANUAL: "Reporte manual",
   REPORT_SCHEDULED: "Reporte programado",
+  NOTIFICATION_DIGEST: "Resumen diario",
 };
 const EMAIL_TYPES: EmailDeliveryType[] = [
   "NOTIFICATION",
   "OPERATIONAL_ALERT",
   "REPORT_MANUAL",
   "REPORT_SCHEDULED",
+  "NOTIFICATION_DIGEST",
 ];
 
 function parseEnumParam<T extends string>(

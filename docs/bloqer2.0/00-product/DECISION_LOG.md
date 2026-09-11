@@ -1788,6 +1788,25 @@
 
 ---
 
+### D-114 — Preferencias de email por categoría + digest diario (P-EMAIL-02 / P-EMAIL-03)
+
+- **Fecha:** 2026-09-11
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** OWNER/ADMIN recibían CC por email de casi todo el flujo SC/OC ([D-054] aplicado también al correo), generando ruido. Compras y Jefe de obra sí necesitan el mail transaccional del paso. Benchmark: Procore (prefs por herramienta + digest ejecutivo); Odoo (email vs inbox demasiado grueso).
+- **Decisión:**
+  1. **Campana in-app** sigue con CC OWNER/ADMIN ([D-054] intacto).
+  2. **Email** se filtra por **categoría** (`PROCUREMENT_FLOW`, `PROCUREMENT_ESCALATION`, `AP_PAYMENT`, `AR_COLLECTION`, `AP_OVERDUE`, `JOBSITE_LOG`, `OPERATIONAL_OTHER`, `DAILY_DIGEST`) con defaults por rol: flujo diario OFF para Propietario/Administrador; ON para Compras / Jefe de obra / Depósito según categoría. Escalamientos (SLA, D-097, OC umbral alto vía metadata `highLevelApproval`) ON para leadership.
+  3. **Política tenant** (`TenantNotificationEmailPolicy`): `leadershipDailyFlowEmailCc` (default false) restaura CC email a OA en categorías cotidianas; `digestEnabledDefault` + `digestHourLocal` (default 7, zona del tenant).
+  4. **Preferencia usuario** (`UserNotificationEmailPreference`): fila opcional por categoría; ausencia = default de rol (+ política). UI: `/configuracion/notificaciones` (todos); bloque empresa en `/configuracion/politicas` (solo OA).
+  5. **Digest diario** para OA: cron horario `/api/cron/notification-digest`; envía solo si la hora local del tenant coincide; conteos estilo Pendientes + críticos sin leer; skip si vacío; log `NOTIFICATION_DIGEST`.
+  6. Auth / invitación / reset **no** son configurables.
+  7. Gate único en `sendNotificationEmail` / system variants (skip logueado `user_preference` / `role_default`).
+- **Implicancias:** migración Prisma; domain `email-categories`; services preference + digest; plantilla digest; guía/help; cierra P-EMAIL-02 y P-EMAIL-03 (MVP).
+- **Documentos afectados:** [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`08-architecture/EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/EMAIL_NOTIFICATIONS_ARCHITECTURE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §1.4, help `usar-notificaciones`.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

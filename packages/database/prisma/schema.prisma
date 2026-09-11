@@ -555,6 +555,7 @@ model User {
   scheduledReportRecipients ScheduledReportRecipient[] @relation("ScheduledReportRecipientUser")
   projectTeamMemberships    ProjectTeamMember[]
   projectMemberships        ProjectMembership[]
+  notificationEmailPreferences UserNotificationEmailPreference[]
 
   @@map("users")
 }
@@ -680,6 +681,8 @@ model Tenant {
   scheduledReports            ScheduledReport[]
   projectTeamMembers          ProjectTeamMember[]
   projectMemberships          ProjectMembership[]
+  notificationEmailPolicy     TenantNotificationEmailPolicy?
+  notificationEmailPreferences UserNotificationEmailPreference[]
 
   @@map("tenants")
 }
@@ -3161,6 +3164,18 @@ enum EmailDeliveryType {
   OPERATIONAL_ALERT
   REPORT_MANUAL
   REPORT_SCHEDULED
+  NOTIFICATION_DIGEST
+}
+
+enum NotificationEmailCategory {
+  PROCUREMENT_FLOW
+  PROCUREMENT_ESCALATION
+  AP_PAYMENT
+  AR_COLLECTION
+  AP_OVERDUE
+  JOBSITE_LOG
+  OPERATIONAL_OTHER
+  DAILY_DIGEST
 }
 
 enum EmailDeliveryStatus {
@@ -3236,7 +3251,44 @@ model EmailDeliveryLog {
   @@index([tenantId, emailType, createdAt])
   @@index([tenantId, relatedEntityType, relatedEntityId])
   @@index([tenantId, idempotencyKey])
+  /// Partial unique for NOTIFICATION_DIGEST claims: SQL migration 20260911190000 (PENDING|SENT|digest_empty).
   @@map("email_delivery_logs")
+}
+
+/// Tenant-wide email policy for leadership CC + digest defaults ([D-114]).
+model TenantNotificationEmailPolicy {
+  id                         String   @id @default(uuid())
+  tenantId                   String   @unique
+  /// When true, OWNER/ADMIN receive email for daily-flow categories (legacy CC). Default false.
+  leadershipDailyFlowEmailCc Boolean  @default(false)
+  /// Default digest opt-in for OWNER/ADMIN when they have no preference row.
+  digestEnabledDefault       Boolean  @default(true)
+  /// Local hour (0–23) in tenant timezone to send the daily digest.
+  digestHourLocal            Int      @default(7)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_notification_email_policies")
+}
+
+/// Per-user email category preference. Missing row = role default ([D-114] / P-EMAIL-02).
+model UserNotificationEmailPreference {
+  id           String                     @id @default(uuid())
+  tenantId     String
+  userId       String
+  category     NotificationEmailCategory
+  emailEnabled Boolean
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, category])
+  @@index([tenantId, userId])
+  @@map("user_notification_email_preferences")
 }
 
 // ─── Scheduled email reports (Phase 17B — config only; runner Phase 17D) ───────

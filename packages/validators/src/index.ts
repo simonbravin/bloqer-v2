@@ -32,5 +32,6 @@ export * from "./period-close";
 export * from "./audit-log";
 export * from "./ar-advance";
 export * from "./scheduled-report";
+export * from "./notification-email-preferences";
 export * from "./money";
 export * from "./credentials-auth";

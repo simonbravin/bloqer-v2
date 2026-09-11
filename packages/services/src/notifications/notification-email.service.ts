@@ -29,6 +29,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
 import { OPERATIONAL_NOTIFICATION_TYPES } from "./operational-alerts.service";
 import { resolveNotificationEmailContext, notificationLeadBody } from "./notification-email-context";
+import { shouldSendNotificationEmailForRecipient } from "./notification-email-preference.service";
 
 const OPERATIONAL_NOTIFICATION_TYPE_SET: ReadonlySet<NotificationType> = new Set(
   OPERATIONAL_NOTIFICATION_TYPES,
@@ -52,7 +53,10 @@ export type SendNotificationEmailResult = {
     | "no_recipient_email"
     | "archived"
     | "invalid_status"
-    | "recipient_not_in_tenant";
+    | "recipient_not_in_tenant"
+    | "user_preference"
+    | "role_default"
+    | "category_no_email";
   provider?: EmailSendResult["provider"];
   messageId?: string;
   error?: string;
@@ -223,6 +227,26 @@ async function dispatchNotificationEmail(
   if (!inTenant) {
     await logNotificationEmailSkipped(ctx, emailType, n, "recipient_not_in_tenant");
     return { ok: true, skipped: "recipient_not_in_tenant", provider: "disabled" };
+  }
+
+  // [D-114] Preference gate — in-app already created; email is opt-in by category/role.
+  const prefGate = await shouldSendNotificationEmailForRecipient({
+    tenantId: ctx.tenantId,
+    recipientUserId: n.recipientUserId,
+    notificationType: n.type,
+    metadata: n.metadata,
+  });
+  if (!prefGate.send) {
+    const reason = prefGate.reason ?? "role_default";
+    await logNotificationEmailSkipped(ctx, emailType, n, reason);
+    const skipped: NonNullable<SendNotificationEmailResult["skipped"]> =
+      reason === "user_preference" ||
+      reason === "role_default" ||
+      reason === "category_no_email" ||
+      reason === "recipient_not_in_tenant"
+        ? reason
+        : "role_default";
+    return { ok: true, skipped, provider: "disabled" };
   }
 
   if (!isEmailConfigured()) {

@@ -481,7 +481,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     title: "Tablero de mano de obra",
     summary:
       "APU LABOR: necesidad vs pedido y facturado. Pedí por SC/OC o registrá factura tipada. No es subcontrato.",
-    intents: ["pedir-material", "gasto-obra", "pagar-sueldo"],
+    intents: ["pedir-material", "gasto-obra"],
     modules: ["presupuesto", "compras", "finanzas"],
     level: "project",
     typicalRoles: ["PM", "Compras", "Finanzas"],

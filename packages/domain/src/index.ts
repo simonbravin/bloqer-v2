@@ -1,5 +1,21 @@
 export type { UserRole } from "./permissions/roles";
 export { COMPANY_FINANCE_ROLES, hasCompanyFinanceRole, USER_ROLE_LABEL_ES } from "./permissions/roles";
+export {
+  NOTIFICATION_EMAIL_CATEGORIES,
+  NOTIFICATION_EMAIL_CATEGORY_LABEL_ES,
+  NOTIFICATION_EMAIL_CATEGORY_DESCRIPTION_ES,
+  NOTIFICATION_TYPES_WITHOUT_EMAIL,
+  LEADERSHIP_DAILY_FLOW_CATEGORIES,
+  notificationTypeToEmailCategory,
+  defaultEmailEnabledForCategory,
+  visibleEmailCategoriesForRoles,
+  resolveNotificationEmailPreference,
+} from "./notifications/email-categories";
+export type {
+  NotificationEmailCategory,
+  NotificationTypeKey,
+  ResolveNotificationEmailPreferenceInput,
+} from "./notifications/email-categories";
 export type { PermissionAction, PermissionModule } from "./permissions/matrix";
 export { can, canManageProjectLifecycleAdmin } from "./permissions/matrix";
 export {
