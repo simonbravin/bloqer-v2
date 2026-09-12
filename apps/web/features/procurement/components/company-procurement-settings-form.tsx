@@ -8,13 +8,6 @@ import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { SwitchField } from "@/components/ui/switch-field";
 import { updateCompanyProcurementSettingsAction } from "@/app/(app)/configuracion/politicas/actions";
@@ -74,18 +67,6 @@ export function CompanyProcurementSettingsForm({
   const [extraPct, setExtraPct] = useState(settings.varianceExtraApprovalPct);
   const [overReceiptPct, setOverReceiptPct] = useState(settings.overReceiptTolerancePct);
   const [invoiceMatchPct, setInvoiceMatchPct] = useState(settings.invoiceMatchTolerancePct);
-  const [apPaymentNotificationChannel, setApPaymentNotificationChannel] = useState(
-    settings.apPaymentNotificationChannel,
-  );
-  const [deliveryAlertsEnabled, setDeliveryAlertsEnabled] = useState(
-    settings.deliveryAlertsEnabled,
-  );
-  const [neededByAlertsEnabled, setNeededByAlertsEnabled] = useState(
-    settings.neededByAlertsEnabled,
-  );
-  const [receiptToInvoiceAlertsEnabled, setReceiptToInvoiceAlertsEnabled] = useState(
-    settings.receiptToInvoiceAlertsEnabled,
-  );
 
   const togglesDisabled = !canEdit || pending;
 
@@ -94,8 +75,8 @@ export function CompanyProcurementSettingsForm({
       <CardHeader className="border-b bg-muted/30">
         <CardTitle className="text-base">Política de compras — {companyName}</CardTitle>
         <CardDescription>
-          Umbrales de aprobación, cotizaciones, desvíos, alertas de vencimiento y canal de avisos
-          de pago a proveedores.
+          Umbrales de aprobación, cotizaciones, desvíos y atajos del circuito OC. Las alertas de
+          vencimiento y el canal de avisos de pago están en Políticas → Notificaciones.
         </CardDescription>
       </CardHeader>
       <CardContent className="pt-6">
@@ -110,9 +91,6 @@ export function CompanyProcurementSettingsForm({
               const slaRaw = Number(fd.get("approvalSlaHours"));
               const minQuotes = Number(fd.get("minQuotesRequired"));
               const maxQuotes = Number(fd.get("maxQuotesAllowed"));
-              const deliveryGraceRaw = Number(fd.get("deliveryOverdueGraceDays"));
-              const neededByGraceRaw = Number(fd.get("neededByOverdueGraceDays"));
-              const receiptToInvoiceRaw = Number(fd.get("receiptToInvoiceSlaDays"));
               const res = await updateCompanyProcurementSettingsAction(companyId, {
                 poApprovalThresholdArs: fd.get("poApprovalThresholdArs")?.toString() || null,
                 purchaseRequestRequiredAboveArs:
@@ -132,22 +110,6 @@ export function CompanyProcurementSettingsForm({
                 overReceiptTolerancePct: fd.get("overReceiptTolerancePct")?.toString() ?? "0",
                 invoiceMatchTolerancePct: fd.get("invoiceMatchTolerancePct")?.toString() ?? "0",
                 approvalSlaHours: Number.isFinite(slaRaw) && slaRaw > 0 ? slaRaw : 72,
-                deliveryOverdueGraceDays:
-                  Number.isFinite(deliveryGraceRaw) && deliveryGraceRaw >= 0
-                    ? deliveryGraceRaw
-                    : 0,
-                neededByOverdueGraceDays:
-                  Number.isFinite(neededByGraceRaw) && neededByGraceRaw >= 0
-                    ? neededByGraceRaw
-                    : 0,
-                receiptToInvoiceSlaDays:
-                  Number.isFinite(receiptToInvoiceRaw) && receiptToInvoiceRaw >= 0
-                    ? receiptToInvoiceRaw
-                    : 5,
-                deliveryAlertsEnabled,
-                neededByAlertsEnabled,
-                receiptToInvoiceAlertsEnabled,
-                apPaymentNotificationChannel,
               });
               if ("error" in res) {
                 setError(res.error);
@@ -312,115 +274,6 @@ export function CompanyProcurementSettingsForm({
                   ([BR-PUR-015]). Default 72.
                 </p>
               </div>
-            </div>
-          </Section>
-
-          <Separator />
-
-          <Section
-            title="Alertas de vencimiento"
-            description="Recordatorios diarios para recepción, fecha requerida y facturación ([D-097])."
-          >
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="space-y-2">
-                <Label htmlFor="deliveryOverdueGraceDays">Días de gracia entrega OC</Label>
-                <Input
-                  id="deliveryOverdueGraceDays"
-                  name="deliveryOverdueGraceDays"
-                  type="number"
-                  min={0}
-                  max={60}
-                  defaultValue={settings.deliveryOverdueGraceDays}
-                  disabled={togglesDisabled}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Colchón antes de marcar como vencida una OC confirmada sin recibir. Default 0.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="neededByOverdueGraceDays">Días de gracia fecha requerida SC</Label>
-                <Input
-                  id="neededByOverdueGraceDays"
-                  name="neededByOverdueGraceDays"
-                  type="number"
-                  min={0}
-                  max={60}
-                  defaultValue={settings.neededByOverdueGraceDays}
-                  disabled={togglesDisabled}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Colchón antes de alertar SC con fecha requerida pasada y sin OC. Default 0.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="receiptToInvoiceSlaDays">Días recepción → factura</Label>
-                <Input
-                  id="receiptToInvoiceSlaDays"
-                  name="receiptToInvoiceSlaDays"
-                  type="number"
-                  min={0}
-                  max={60}
-                  defaultValue={settings.receiptToInvoiceSlaDays}
-                  disabled={togglesDisabled}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Días desde primera recepción antes de alertar que falta registrar factura.
-                  Default 5.
-                </p>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <SwitchField
-                id="deliveryAlertsEnabled"
-                label="Alertar OC con entrega prevista vencida sin recibir"
-                checked={deliveryAlertsEnabled}
-                onCheckedChange={setDeliveryAlertsEnabled}
-                disabled={togglesDisabled}
-              />
-              <SwitchField
-                id="neededByAlertsEnabled"
-                label="Alertar SC con fecha requerida vencida y sin OC confirmada"
-                checked={neededByAlertsEnabled}
-                onCheckedChange={setNeededByAlertsEnabled}
-                disabled={togglesDisabled}
-              />
-              <SwitchField
-                id="receiptToInvoiceAlertsEnabled"
-                label="Alertar OC recibida sin factura del proveedor registrada"
-                checked={receiptToInvoiceAlertsEnabled}
-                onCheckedChange={setReceiptToInvoiceAlertsEnabled}
-                disabled={togglesDisabled}
-              />
-            </div>
-          </Section>
-
-          <Separator />
-
-          <Section
-            title="Avisos de pago"
-            description="Canal cuando hay CxP lista para pagar o se confirma un pago."
-          >
-            <div className="space-y-2 max-w-md">
-              <Label htmlFor="apPaymentNotificationChannel">Avisos de pago a proveedores</Label>
-              <Select
-                value={apPaymentNotificationChannel}
-                onValueChange={(v) =>
-                  setApPaymentNotificationChannel(v as "IN_APP" | "IN_APP_AND_EMAIL")
-                }
-                disabled={togglesDisabled}
-              >
-                <SelectTrigger id="apPaymentNotificationChannel">
-                  <SelectValue placeholder="Canal de avisos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="IN_APP_AND_EMAIL">In-app + email</SelectItem>
-                  <SelectItem value="IN_APP">Solo in-app</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                El email requiere Resend configurado; si no, queda solo la notificación en la
-                plataforma.
-              </p>
             </div>
           </Section>
 

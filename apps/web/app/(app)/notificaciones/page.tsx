@@ -92,25 +92,41 @@ export default async function NotificacionesPage({ searchParams }: PageProps) {
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Notificaciones</h1>
-          {canRunOperationalAlerts(ctx) && (
-            <p className="text-sm text-muted-foreground">
-              <Link
-                href="/notificaciones/alertas"
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                Alertas operativas
-              </Link>
-              {" · "}
-              <Link
-                href="/notificaciones/emails"
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                Emails enviados
-              </Link>
-            </p>
-          )}
+          <p className="text-sm text-muted-foreground">
+            <Link
+              href="/configuracion/notificaciones"
+              className="text-primary underline-offset-4 hover:underline"
+            >
+              Configurar emails
+            </Link>
+            {canRunOperationalAlerts(ctx) ? (
+              <>
+                {" · "}
+                <Link
+                  href="/configuracion/politicas#notificaciones"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Políticas de notificaciones
+                </Link>
+                {" · "}
+                <Link
+                  href="/notificaciones/alertas"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Alertas operativas
+                </Link>
+                {" · "}
+                <Link
+                  href="/notificaciones/emails"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Emails enviados
+                </Link>
+              </>
+            ) : null}
+          </p>
         </div>
         <form action={markAllNotificationsReadAction}>
           <Button type="submit" variant="outline" size="sm">

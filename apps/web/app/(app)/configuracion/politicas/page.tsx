@@ -19,10 +19,12 @@ import { PageListHeader } from "@/components/ui/page-list-header";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { CompanyProcurementSettingsForm } from "@/features/procurement/components/company-procurement-settings-form";
+import { CompanyProcurementNotificationSettingsForm } from "@/features/procurement/components/company-procurement-notification-settings-form";
 import { ApprovedBudgetEditsPolicyForm } from "@/features/budgets/components/approved-budget-edits-policy-form";
 import { ProjectAccessModeSection } from "@/features/tenant-config/components/project-access-mode-section";
 import { TenantNotificationEmailPolicyForm } from "@/features/notifications/components/tenant-notification-email-policy-form";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 interface PageProps {
   searchParams: Promise<{ companyId?: string }>;
@@ -107,7 +109,7 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
     <PageShell variant="default" className="space-y-12">
       <PageListHeader
         title="Políticas"
-        subtitle="Reglas de acceso a obras, compras, email a dirección y excepciones de presupuesto de la organización."
+        subtitle="Reglas de acceso a obras, compras, notificaciones de la empresa y excepciones de presupuesto."
       />
 
       <section id="acceso-obras" className="space-y-5 scroll-mt-6">
@@ -128,8 +130,12 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-tight">Compras</h2>
           <p className="text-sm text-muted-foreground max-w-3xl">
-            Umbrales de solicitudes, cotizaciones, aprobación de OC, alertas de vencimiento y
-            avisos cuando hay CxP lista para pagar o se confirma un pago.
+            Umbrales de solicitudes, cotizaciones, aprobación de OC y atajos operativos. Las
+            alertas de vencimiento y el canal de avisos de pago están en{" "}
+            <a href="#notificaciones" className="font-medium text-foreground underline-offset-4 hover:underline">
+              Notificaciones
+            </a>
+            .
           </p>
         </div>
 
@@ -168,43 +174,95 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
         />
       </section>
 
-      {canEditEmailPolicy ? (
-        <section id="email-direccion" className="space-y-5 scroll-mt-6">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold tracking-tight">Email a dirección</h2>
-            <p className="text-sm text-muted-foreground max-w-3xl">
-              Política de correo para Propietario / Administrador: CC del flujo diario y digest
-              matutino. Cada usuario afina categorías en Configuración → Notificaciones.
-            </p>
-          </div>
-          {emailPolicyMissingSchema ? (
-            <div
-              role="alert"
-              className="rounded-lg border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
+      <section id="notificaciones" className="space-y-5 scroll-mt-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-tight">Notificaciones</h2>
+          <p className="text-sm text-muted-foreground max-w-3xl">
+            Políticas de la empresa: qué alertas se generan y el canal CxP. Cada usuario elige qué
+            correos quiere recibir en{" "}
+            <Link
+              href="/configuracion/notificaciones"
+              className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              <p className="font-medium">Falta aplicar la migración de base de datos (D-114)</p>
-              <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
-                Esta sección necesita las tablas de preferencias de email. Corré{" "}
-                <code className="rounded bg-black/5 px-1 dark:bg-white/10">pnpm db:migrate:deploy</code>{" "}
-                contra la base de este entorno y volvé a cargar.
+              Configuración → Notificaciones
+            </Link>
+            . La campana in-app no se apaga desde ahí.
+          </p>
+        </div>
+
+        {companies.length > 1 ? (
+          <form
+            method="get"
+            action="/configuracion/politicas"
+            className="flex flex-wrap items-end gap-3 rounded-lg border bg-muted/20 px-4 py-3"
+          >
+            <div className="space-y-1.5">
+              <Label htmlFor="companyIdNotif">Empresa</Label>
+              <select
+                id="companyIdNotif"
+                name="companyId"
+                defaultValue={company.id}
+                className={selectClassName}
+              >
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button type="submit" variant="secondary">
+              Ver empresa
+            </Button>
+          </form>
+        ) : null}
+
+        <CompanyProcurementNotificationSettingsForm
+          companyId={company.id}
+          companyName={company.name}
+          settings={settings}
+          canEdit={canEditCompras}
+        />
+
+        {canEditEmailPolicy ? (
+          <div id="email-direccion" className="space-y-5 scroll-mt-6">
+            <div className="space-y-1">
+              <h3 className="text-base font-semibold tracking-tight">Email a dirección</h3>
+              <p className="text-sm text-muted-foreground max-w-3xl">
+                CC del flujo diario y digest matutino para Propietario / Administrador.
               </p>
             </div>
-          ) : emailPolicyError ? (
-            <div
-              role="alert"
-              className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
-            >
-              {emailPolicyError}
-            </div>
-          ) : emailPolicy ? (
-            <TenantNotificationEmailPolicyForm
-              leadershipDailyFlowEmailCc={emailPolicy.leadershipDailyFlowEmailCc}
-              digestEnabledDefault={emailPolicy.digestEnabledDefault}
-              digestHourLocal={emailPolicy.digestHourLocal}
-            />
-          ) : null}
-        </section>
-      ) : null}
+            {emailPolicyMissingSchema ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-amber-500/40 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/30 dark:text-amber-100"
+              >
+                <p className="font-medium">Falta aplicar la migración de base de datos (D-114)</p>
+                <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+                  Esta sección necesita las tablas de preferencias de email. Corré{" "}
+                  <code className="rounded bg-black/5 px-1 dark:bg-white/10">
+                    pnpm db:migrate:deploy
+                  </code>{" "}
+                  contra la base de este entorno y volvé a cargar.
+                </p>
+              </div>
+            ) : emailPolicyError ? (
+              <div
+                role="alert"
+                className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              >
+                {emailPolicyError}
+              </div>
+            ) : emailPolicy ? (
+              <TenantNotificationEmailPolicyForm
+                leadershipDailyFlowEmailCc={emailPolicy.leadershipDailyFlowEmailCc}
+                digestEnabledDefault={emailPolicy.digestEnabledDefault}
+                digestHourLocal={emailPolicy.digestHourLocal}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </section>
 
       <section id="presupuestos" className="space-y-5 scroll-mt-6">
         <div className="space-y-1">

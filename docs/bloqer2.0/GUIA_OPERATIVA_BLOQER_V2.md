@@ -253,7 +253,7 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF). En **reportes programados**, cada envío tiene su propia zona: la **próxima / última ejecución** se muestra en la zona del envío (no en UTC del servidor).
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
-- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas**): bloque **Acceso a proyectos** (todas las obras vs solo asignadas, [D-111]); umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); bloque **Email a dirección** ([D-114]: CC email flujo diario a Propietario/Administrador, digest matutino); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
+- **Políticas:** `/configuracion/politicas` (Configuración → **Políticas**): bloque **Acceso a proyectos** (todas las obras vs solo asignadas, [D-111]); umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); bloque **Notificaciones** ([D-114]/[D-070]/[D-097]: alertas de vencimiento, canal CxP campana vs campana+email, CC email flujo diario a Propietario/Administrador, digest matutino); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
 
 <!-- capture:02 configuracion-zona-horaria -->
 ![Bloqer — Configuración + zona horaria](./guides/assets/screenshots/02-configuracion-zona-horaria.png)
@@ -269,11 +269,11 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 
 ### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091 / D-094 / D-114
 
-Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **campana del encabezado**.
+Las notificaciones in-app se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral de módulos).
 
-**Preferencias de email ([D-114]):** Configuración → **Notificaciones** → `/configuracion/notificaciones`. Cada usuario elige categorías de correo (compras flujo / escalamientos, CxP, CxC, libro de obra, etc.). La **campana no se apaga**. Por defecto Propietario/Administrador **no** reciben el flujo diario SC/OC por email (sí ven la campana); Compras y Jefe de obra sí. Pueden prenderlo. Auth/invitación siempre se envían.
+**Preferencias personales de email ([D-114]):** Configuración → **Notificaciones** → `/configuracion/notificaciones`. Cada usuario elige categorías de correo (compras flujo / escalamientos, CxP, CxC, libro de obra, etc.) según su rol. La **campana no se apaga**. Por defecto Propietario/Administrador **no** reciben el flujo diario SC/OC por email (sí ven la campana); Compras y Jefe de obra sí. Pueden prenderlo. Auth/invitación siempre se envían. Desde el inbox `/notificaciones` hay un enlace **Configurar emails**.
 
-**Política empresa:** Configuración → **Políticas** → sección **Email a dirección** (solo Propietario/Administrador): restaurar CC email del flujo diario a dirección; digest matutino on/off por default + hora local.
+**Políticas de notificaciones (empresa):** Configuración → **Políticas** → sección **Notificaciones** (`/configuracion/politicas#notificaciones`): alertas de vencimiento y canal CxP (campana vs campana+email, [D-070]/[D-097]); más **Email a dirección** (solo Propietario/Administrador): CC del flujo diario y digest matutino on/off + hora local ([D-114]).
 
 **Digest diario:** un mail matutino a Propietario/Administrador con colas estilo Pendientes + alertas críticas sin leer (si hay algo que reportar). Cron horario; se envía cuando coincide la hora local de la organización.
 
@@ -282,8 +282,9 @@ Las notificaciones **no** tienen ítem en el menú lateral: se usan desde la **c
 | Superficie | Ruta / comportamiento |
 |------------|------------------------|
 | **Campana** | Dropdown con las **últimas 5** no archivadas; badge solo si hay no leídas; pie **Ver todas** → `/notificaciones`. Polling cada **30 s** (pestaña visible); al abrir el dropdown se refresca. |
-| **Inbox** | `/notificaciones` — filtros Todas / No leídas / Leídas / Archivadas; **Marcar todas como leídas**; marcar como no leída; archivar. |
-| **Notificaciones (email)** | `/configuracion/notificaciones` — toggles por categoría de correo ([D-114]). |
+| **Inbox** | `/notificaciones` — filtros Todas / No leídas / Leídas / Archivadas; **Marcar todas como leídas**; enlace **Configurar emails** → `/configuracion/notificaciones` (OA también: Políticas de notificaciones). |
+| **Notificaciones (email personal)** | `/configuracion/notificaciones` — toggles por categoría de correo ([D-114]). |
+| **Políticas de notificaciones** | `/configuracion/politicas#notificaciones` — alertas empresa, canal CxP, Email a dirección. |
 | **Alertas operativas** | `/notificaciones/alertas` — solo `OWNER`/`ADMIN`: AR vencida, AP vencida, stock negativo, certificaciones aprobadas sin factura, uploads pendientes, compras demoradas (SLA), OC entrega vencida, SC fecha requerida vencida, OC recibida sin factura + card **Última actividad**. Cron diario **12:00 UTC**, dedup 7 días por tipo/entidad/recipient. Cada alerta genera **campana**; el **email** respeta preferencias ([D-114]). Los emails se loguean como `OPERATIONAL_ALERT` y aparecen en `/notificaciones/emails?emailType=OPERATIONAL_ALERT`. |
 | **Emails enviados** | `/notificaciones/emails` — historial (NOTIFICATION, OPERATIONAL_ALERT, NOTIFICATION_DIGEST, REPORT_*). |
 

@@ -260,15 +260,16 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     hrefs: [
       { kind: "company", path: "/notificaciones", label: "Inbox de notificaciones" },
       { kind: "company", path: "/configuracion/notificaciones", label: "Preferencias de email" },
+      { kind: "company", path: "/configuracion/politicas#notificaciones", label: "Políticas de notificaciones" },
     ],
     steps: [
       "Abrí la campana (badge si hay no leídas).",
       "Ver todas → /notificaciones (filtros Todas / No leídas / Leídas / Archivadas).",
+      "Desde el inbox: Configurar emails → elegí qué categorías recibís por correo.",
       "Compras: Nueva solicitud (a quien aprueba SC/OC), OC pendiente / aprobada / confirmada. Si podés recibir, el aviso de OC confirmada abre el formulario de recepción.",
       "Compras — vencimientos ([D-097]): OC con entrega prevista pasada, SC con fecha requerida pasada, OC recibida sin factura. Campana con CC OWNER/ADMIN; el email respeta tus preferencias.",
       "Libro de obra: Parte pendiente / Parte devuelto / Parte aprobado en campana.",
       "OWNER/ADMIN: Alertas operativas en /notificaciones/alertas (cron diario 12:00 UTC). Campana siempre; email según preferencia.",
-      "Para elegir qué llega por correo: Configuración → Notificaciones (ver ficha Configurar emails de notificación).",
       "En mobile: Más → Notificaciones. La cola de acciones (Pendientes) es otra cosa: no confundir con esta campana.",
     ],
     effects: [
@@ -319,14 +320,15 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     where: { menu: "Configuración → Notificaciones" },
     hrefs: [
       { kind: "company", path: "/configuracion/notificaciones", label: "Mis notificaciones por email" },
-      { kind: "company", path: "/configuracion/politicas#email-direccion", label: "Política Email a dirección" },
+      { kind: "company", path: "/configuracion/politicas#notificaciones", label: "Políticas de notificaciones" },
+      { kind: "company", path: "/notificaciones", label: "Inbox (Configurar emails)" },
     ],
     steps: [
-      "Configuración → Notificaciones (`/configuracion/notificaciones`).",
+      "Configuración → Notificaciones (`/configuracion/notificaciones`), o desde el inbox → Configurar emails.",
       "Vas a ver categorías agrupadas (Compras, Finanzas, Obra, Otras alertas, Resumen diario si sos dirección).",
       "Cada interruptor es «Recibir por email». El badge indica si es el default de tu rol o una preferencia que guardaste.",
       "Por defecto: Compras / Jefe de obra / Depósito reciben el flujo diario SC/OC; Propietario/Administrador no (sí ven la campana). Escalamientos (SLA, umbral alto) sí llegan a dirección.",
-      "Propietario/Administrador: opcionalmente Configuración → Políticas → Email a dirección para copiar el flujo diario por correo a toda la dirección, prender/apagar el digest por default y elegir la hora local.",
+      "Propietario/Administrador: Políticas → Notificaciones para alertas de empresa, canal CxP, CC del flujo diario a dirección, digest on/off y hora local.",
       "El digest es un mail matutino con colas estilo Pendientes + críticos; si no hay nada pendiente, no se envía.",
     ],
     effects: [
@@ -334,7 +336,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Invitaciones, verificar email y restablecer contraseña siempre se envían (no aparecen acá).",
     ],
     pitfalls: [
-      "No confundir con el canal de avisos de pago AP en Políticas → Compras (D-070): eso es solo CxP listo para pagar / pago confirmado a nivel empresa.",
+      "No confundir preferencias personales con Políticas → Notificaciones (empresa: alertas + canal CxP + CC dirección).",
       "Apagar el email no saca el aviso de la campana ni de Pendientes.",
     ],
     relatedSlugs: [

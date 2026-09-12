@@ -80,7 +80,7 @@ export function TenantNotificationEmailPolicyForm({
           >
             Configuración → Notificaciones
           </Link>
-          .
+          . Alertas de vencimiento y canal CxP están arriba en esta misma sección.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 pt-6">

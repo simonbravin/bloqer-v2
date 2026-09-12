@@ -184,21 +184,22 @@ export function NotificationEmailPreferencesForm({
   return (
     <div className="space-y-6">
       <div className="rounded-lg border border-border/70 bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
-        Estos controles solo afectan el <span className="font-medium text-foreground">correo</span>.
-        La campana del encabezado no se apaga. Invitaciones, verificar email y restablecer
-        contraseña siempre se envían.
+        <p>
+          Acá elegís <span className="font-medium text-foreground">qué correos querés recibir vos</span>.
+          La campana del encabezado no se apaga. Invitaciones, verificar email y restablecer
+          contraseña siempre se envían.
+        </p>
         {showLeadershipPolicyLink ? (
-          <>
-            {" "}
-            La política de la organización (CC a dirección y hora del digest) está en{" "}
+          <p className="mt-2">
+            Las políticas de la empresa (alertas, canal CxP, CC a dirección y digest) están en{" "}
             <Link
-              href="/configuracion/politicas#email-direccion"
+              href="/configuracion/politicas#notificaciones"
               className="font-medium text-foreground underline-offset-4 hover:underline"
             >
-              Políticas → Email a dirección
+              Políticas → Notificaciones
             </Link>
             .
-          </>
+          </p>
         ) : null}
       </div>
 
