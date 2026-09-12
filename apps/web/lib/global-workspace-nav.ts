@@ -126,6 +126,7 @@ const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
     items: [
       { label: "General", href: "/configuracion", matchExact: true },
       { label: "Mi perfil", href: "/configuracion/perfil" },
+      { label: "Notificaciones", href: "/configuracion/notificaciones" },
       { label: "Equipo", href: "/configuracion/equipo" },
       { label: "Permisos", href: "/configuracion/permisos" },
       { label: "Políticas", href: "/configuracion/politicas" },
@@ -155,7 +156,7 @@ export function buildGlobalNavSections(
 
     for (const item of def.items) {
       if (def.title === "Configuración") {
-        if (item.href === "/configuracion/perfil") {
+        if (item.href === "/configuracion/perfil" || item.href === "/configuracion/notificaciones") {
           items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
           continue;
         }
