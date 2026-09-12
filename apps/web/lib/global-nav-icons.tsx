@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeftRight,
   BarChart3,
+  Bell,
   BookOpen,
   Briefcase,
   Building2,
@@ -53,6 +54,7 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/finanzas/cuentas-por-pagar": FileSpreadsheet,
   "/configuracion": Settings,
   "/configuracion/perfil": User,
+  "/configuracion/notificaciones": Bell,
   "/configuracion/equipo": Users,
   "/configuracion/permisos": Shield,
   "/configuracion/politicas": Scale,
