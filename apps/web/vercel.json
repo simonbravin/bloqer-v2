@@ -16,7 +16,7 @@
     },
     {
       "path": "/api/cron/notification-digest",
-      "schedule": "5 * * * *"
+      "schedule": "5 10 * * *"
     }
   ]
 }

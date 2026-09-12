@@ -275,7 +275,7 @@ Las notificaciones in-app se abren desde la **campana del encabezado** (no tiene
 
 **Políticas de notificaciones (empresa):** Configuración → **Políticas** → sección **Notificaciones** (`/configuracion/politicas#notificaciones`): alertas de vencimiento y canal CxP (campana vs campana+email, [D-070]/[D-097]); más **Email a dirección** (solo Propietario/Administrador): CC del flujo diario y digest matutino on/off + hora local ([D-114]).
 
-**Digest diario:** un mail matutino a Propietario/Administrador con colas estilo Pendientes + alertas críticas sin leer (si hay algo que reportar). Cron horario; se envía cuando coincide la hora local de la organización.
+**Digest diario:** un mail matutino a Propietario/Administrador con colas estilo Pendientes + alertas críticas sin leer (si hay algo que reportar). Cron diario en Vercel (10:05 UTC ≈ 07:05 ART); se envía cuando coincide la hora local de la organización o la ventana de catch-up del mismo día.
 
 **Reportes de la empresa ([D-098]):** menú General → **Reportes** → `/reportes`. Las cards están agrupadas en **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario). Los reportes de una obra siguen en Planificación → Reportes dentro del proyecto.
 

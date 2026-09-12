@@ -1799,7 +1799,7 @@
   2. **Email** se filtra por **categoría** (`PROCUREMENT_FLOW`, `PROCUREMENT_ESCALATION`, `AP_PAYMENT`, `AR_COLLECTION`, `AP_OVERDUE`, `JOBSITE_LOG`, `OPERATIONAL_OTHER`, `DAILY_DIGEST`) con defaults por rol: flujo diario OFF para Propietario/Administrador; ON para Compras / Jefe de obra / Depósito según categoría. Escalamientos (SLA, D-097, OC umbral alto vía metadata `highLevelApproval`) ON para leadership.
   3. **Política tenant** (`TenantNotificationEmailPolicy`): `leadershipDailyFlowEmailCc` (default false) restaura CC email a OA en categorías cotidianas; `digestEnabledDefault` + `digestHourLocal` (default 7, zona del tenant).
   4. **Preferencia usuario** (`UserNotificationEmailPreference`): fila opcional por categoría; ausencia = default de rol (+ política). UI: `/configuracion/notificaciones` (todos); bloque empresa en `/configuracion/politicas` (solo OA).
-  5. **Digest diario** para OA: cron horario `/api/cron/notification-digest`; envía solo si la hora local del tenant coincide; conteos estilo Pendientes + críticos sin leer; skip si vacío; log `NOTIFICATION_DIGEST`.
+  5. **Digest diario** para OA: cron diario `/api/cron/notification-digest` (`5 10 * * *` UTC; Hobby no permite horario); envía si la hora local del tenant coincide o cae en la ventana de catch-up; conteos estilo Pendientes + críticos sin leer; skip si vacío; log `NOTIFICATION_DIGEST`.
   6. Auth / invitación / reset **no** son configurables.
   7. Gate único en `sendNotificationEmail` / system variants (skip logueado `user_preference` / `role_default`).
 - **Implicancias:** migración Prisma; domain `email-categories`; services preference + digest; plantilla digest; guía/help; cierra P-EMAIL-02 y P-EMAIL-03 (MVP).

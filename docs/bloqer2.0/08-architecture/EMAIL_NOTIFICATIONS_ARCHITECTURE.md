@@ -37,7 +37,7 @@ Enviar correos transaccionales con **Resend** cuando el proyecto tenga variables
 - **Gate:** `shouldSendNotificationEmailForRecipient` en el path de `sendNotificationEmail*` (no cambia audiencia in-app).
 - **Modelos:** `TenantNotificationEmailPolicy`, `UserNotificationEmailPreference`; `EmailDeliveryType.NOTIFICATION_DIGEST`.
 - **UI:** `/configuracion/notificaciones`; política en `/configuracion/politicas` § Email a dirección.
-- **Cron:** `/api/cron/notification-digest` cada hora (`5 * * * *`); filtra por `digestHourLocal` en timezone del tenant.
+- **Cron:** `/api/cron/notification-digest` diario `5 10 * * *` (10:05 UTC ≈ 07:05 ART). Hobby no permite crons horarios. El runner respeta `digestHourLocal` + ventana de catch-up el mismo día local.
 
 ## Justificación para Bloqer 2.0
 
