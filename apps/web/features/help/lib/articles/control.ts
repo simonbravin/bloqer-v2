@@ -337,6 +337,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "No confundir preferencias personales con Políticas → Notificaciones (empresa: alertas + canal CxP + CC dirección).",
+      "Canal CxP «in-app + email» habilita mail de listo para pagar (categoría CxP) y de pago confirmado (categoría Compras — flujo diario).",
       "Apagar el email no saca el aviso de la campana ni de Pendientes.",
     ],
     relatedSlugs: [

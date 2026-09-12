@@ -23,6 +23,7 @@ import { CompanyProcurementNotificationSettingsForm } from "@/features/procureme
 import { ApprovedBudgetEditsPolicyForm } from "@/features/budgets/components/approved-budget-edits-policy-form";
 import { ProjectAccessModeSection } from "@/features/tenant-config/components/project-access-mode-section";
 import { TenantNotificationEmailPolicyForm } from "@/features/notifications/components/tenant-notification-email-policy-form";
+import { ScrollToHash } from "@/components/navigation/scroll-to-element";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
@@ -107,6 +108,7 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
 
   return (
     <PageShell variant="default" className="space-y-12">
+      <ScrollToHash />
       <PageListHeader
         title="Políticas"
         subtitle="Reglas de acceso a obras, compras, notificaciones de la empresa y excepciones de presupuesto."
@@ -167,6 +169,7 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
         ) : null}
 
         <CompanyProcurementSettingsForm
+          key={`compras-${company.id}`}
           companyId={company.id}
           companyName={company.name}
           settings={settings}
@@ -218,6 +221,7 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
         ) : null}
 
         <CompanyProcurementNotificationSettingsForm
+          key={`notif-${company.id}`}
           companyId={company.id}
           companyName={company.name}
           settings={settings}

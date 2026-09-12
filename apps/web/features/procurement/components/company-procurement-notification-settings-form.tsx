@@ -252,8 +252,9 @@ export function CompanyProcurementNotificationSettingsForm({
               </Select>
               <p className="text-xs text-muted-foreground">
                 El email requiere Resend configurado; si no, queda solo la notificación en la
-                plataforma. Aunque el canal permita email, cada usuario puede apagar la categoría
-                CxP en sus preferencias.
+                plataforma. Aunque el canal permita email, cada usuario puede apagarlo en
+                Configuración → Notificaciones: categoría «CxP — listo para pagar» y, para pago
+                confirmado, «Compras — flujo diario (SC / OC)».
               </p>
             </div>
           </Section>

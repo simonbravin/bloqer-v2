@@ -97,12 +97,15 @@ export function NotificationEmailPreferencesForm({
   const previousByCategory = useRef(
     new Map<NotificationEmailCategory, PreferenceRow>(),
   );
+  const inflightRef = useRef(inflight);
+  inflightRef.current = inflight;
 
   useEffect(() => {
-    // Don't clobber in-flight optimistic edits when the server revalidates.
-    if (inflight.size > 0) return;
+    // Sync from server when RSC props change. Ignore while a toggle is in flight so a
+    // stale preferences prop cannot overwrite a successful optimistic/server result.
+    if (inflightRef.current.size > 0) return;
     setRows(preferences);
-  }, [preferences, inflight]);
+  }, [preferences]);
 
   const sections = useMemo(
     () =>
@@ -144,7 +147,6 @@ export function NotificationEmailPreferencesForm({
     );
     startTransition(async () => {
       const result = await upsertMyNotificationEmailPreferenceAction({ category, emailEnabled });
-      markInflight(category, false);
       if ("error" in result) {
         setError(result.error);
         const rollback = previousByCategory.current.get(category);
@@ -153,6 +155,7 @@ export function NotificationEmailPreferencesForm({
             prev.map((r) => (r.category === category ? rollback : r)),
           );
         }
+        markInflight(category, false);
         return;
       }
       if (result.preference) {
@@ -160,6 +163,7 @@ export function NotificationEmailPreferencesForm({
           prev.map((r) => (r.category === category ? { ...r, ...result.preference } : r)),
         );
       }
+      markInflight(category, false);
     });
   }
 
@@ -168,9 +172,9 @@ export function NotificationEmailPreferencesForm({
     markInflight(category, true);
     startTransition(async () => {
       const result = await resetMyNotificationEmailPreferenceAction({ category });
-      markInflight(category, false);
       if ("error" in result) {
         setError(result.error);
+        markInflight(category, false);
         return;
       }
       if (result.preference) {
@@ -178,6 +182,7 @@ export function NotificationEmailPreferencesForm({
           prev.map((r) => (r.category === category ? { ...r, ...result.preference } : r)),
         );
       }
+      markInflight(category, false);
     });
   }
 
