@@ -11,8 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
+import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { updateSalesInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 
@@ -133,20 +133,14 @@ export function InvoiceEditForm({
         />
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="notes">Notas</Label>
-        <Textarea id="notes" name="notes" rows={2} defaultValue={defaults.notes} />
-      </div>
+      <ExpandableNotesField label="Notas" defaultValue={defaults.notes} />
 
-      <div className="space-y-1">
-        <Label htmlFor="internalNotes">Notas internas</Label>
-        <Textarea
-          id="internalNotes"
-          name="internalNotes"
-          rows={2}
-          defaultValue={defaults.internalNotes}
-        />
-      </div>
+      <ExpandableNotesField
+        id="internalNotes"
+        name="internalNotes"
+        label="Notas internas"
+        defaultValue={defaults.internalNotes}
+      />
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={() => router.back()}>

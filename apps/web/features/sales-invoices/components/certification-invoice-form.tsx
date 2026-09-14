@@ -7,8 +7,8 @@ import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
@@ -105,24 +105,15 @@ export function CertificationInvoiceForm({
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
-        <DocumentClassCreateHint
-          classLabel={
-            classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
-          }
-          classFamily={
-            classifySalesInvoice({ projectId, certificationId: cert.id }).family
-          }
-          hint="Factura respaldada por la certificación de avance."
-        />
-
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {showLetter ? (
-            <div className="col-span-2">
+            <div className="sm:col-span-2 flex flex-wrap items-start justify-between gap-3">
               <InvoiceLetterSelect
                 id="invoiceLetter"
+                className="min-w-[12rem] flex-1"
                 value={invoiceLetter}
                 required
                 onValueChange={(v) => {
@@ -131,8 +122,30 @@ export function CertificationInvoiceForm({
                 }}
                 hint={invoiceLetterHint(invoiceLetter)}
               />
+              <DocumentClassCreateHint
+                variant="inline"
+                className="pt-7"
+                classLabel={
+                  classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
+                }
+                classFamily={
+                  classifySalesInvoice({ projectId, certificationId: cert.id }).family
+                }
+              />
             </div>
-          ) : null}
+          ) : (
+            <div className="sm:col-span-2">
+              <DocumentClassCreateHint
+                variant="inline"
+                classLabel={
+                  classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
+                }
+                classFamily={
+                  classifySalesInvoice({ projectId, certificationId: cert.id }).family
+                }
+              />
+            </div>
+          )}
           <div className="space-y-1">
             <Label htmlFor="issueDate">Fecha de emisión</Label>
             <Input id="issueDate" name="issueDate" type="date" required defaultValue={today} />
@@ -177,12 +190,9 @@ export function CertificationInvoiceForm({
           />
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="notes">Notas</Label>
-          <Textarea id="notes" name="notes" rows={2} />
-        </div>
+        <ExpandableNotesField label="Notas" />
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
           <Button type="button" variant="outline" onClick={() => router.back()}>
             Cancelar
           </Button>

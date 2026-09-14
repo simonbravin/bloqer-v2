@@ -95,7 +95,7 @@ export function InvoiceLetterSelect({
 }) {
   const selectValue = value ?? (required ? undefined : NONE);
   return (
-    <div className={cn("space-y-2", className)}>
+    <div className={cn("space-y-1.5", className)}>
       {label ? (
         <Label htmlFor={id}>
           {label}
@@ -134,6 +134,7 @@ export function PricesIncludeTaxCheckbox({
   onCheckedChange,
   className,
   editModeHint,
+  compact,
 }: {
   id?: string;
   checked: boolean;
@@ -141,9 +142,18 @@ export function PricesIncludeTaxCheckbox({
   className?: string;
   /** When editing DRAFT: stored unit prices are already net. */
   editModeHint?: boolean;
+  /** Denser panel for half-width form columns. */
+  compact?: boolean;
 }) {
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div
+      className={cn(
+        compact
+          ? "rounded-md border border-border/80 bg-muted/20 px-3 py-2.5"
+          : "space-y-1.5",
+        className,
+      )}
+    >
       <div className="flex items-start gap-2">
         <Checkbox
           id={id}
@@ -155,7 +165,7 @@ export function PricesIncludeTaxCheckbox({
           <Label htmlFor={id} className="font-normal leading-snug cursor-pointer">
             El precio unitario incluye IVA
           </Label>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground leading-snug">
             {editModeHint
               ? "Los precios ya guardados son netos. Activá solo si reingresás un precio final con IVA."
               : "Típico en Factura B: el total de línea es cantidad × precio ingresado; el sistema calcula neto e IVA."}

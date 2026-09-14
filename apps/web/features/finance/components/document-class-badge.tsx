@@ -47,13 +47,27 @@ export function DocumentClassCreateHint({
   classLabel,
   classFamily,
   hint,
+  variant = "banner",
+  className,
 }: {
   classLabel: string;
   classFamily?: string | null;
   hint?: string | null;
+  /** `inline` sits beside labels (e.g. next to Imputación de costo). */
+  variant?: "banner" | "inline";
+  className?: string;
 }) {
+  if (variant === "inline") {
+    return (
+      <div className={cn("flex flex-wrap items-center gap-1.5 text-xs", className)}>
+        <span className="text-muted-foreground">Se registrará como</span>
+        <DocumentClassBadge classLabel={classLabel} classFamily={classFamily} />
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+    <div className={cn("rounded-md border bg-muted/30 px-3 py-2 text-sm", className)}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-muted-foreground">Se registrará como:</span>
         <DocumentClassBadge classLabel={classLabel} classFamily={classFamily} />

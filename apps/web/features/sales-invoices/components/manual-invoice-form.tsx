@@ -9,12 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
@@ -24,6 +24,7 @@ import {
   registerProjectArSaleAction,
 } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { cn } from "@/lib/utils";
 
 export type ClientOption = {
   id: string;
@@ -262,22 +263,25 @@ export function ManualInvoiceForm({
     });
   }
 
+  const salesClass = useMemo(() => classifySalesInvoice({ projectId }), [projectId]);
+
   return (
-    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
+    <div className={variant === "card" ? "rounded-lg border bg-card p-5 sm:p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
-        <DocumentClassCreateHint
-          classLabel={classifySalesInvoice({ projectId }).classLabel}
-          classFamily={classifySalesInvoice({ projectId }).family}
-          hint="Factura de venta imputada a esta obra."
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
-            <Label>Cliente</Label>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={cn("space-y-1", !showLetter && "sm:col-span-2")}>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+              <Label>Cliente</Label>
+              <DocumentClassCreateHint
+                variant="inline"
+                classLabel={salesClass.classLabel}
+                classFamily={salesClass.family}
+              />
+            </div>
             {clients.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No hay clientes activos en el directorio. Cree un contacto con rol Cliente primero.
@@ -299,38 +303,33 @@ export function ManualInvoiceForm({
           </div>
 
           {showLetter ? (
-            <div className="col-span-2 space-y-3">
-              <InvoiceLetterSelect
-                id="invoiceLetter"
-                value={invoiceLetter}
-                required
-                onValueChange={(v) => {
-                  setLetterTouched(true);
-                  setInvoiceLetter(v);
-                  if (v) setTaxRate(defaultTaxRateForInvoiceLetter(v));
-                  if (!pricesIncludeTaxTouched) setPricesIncludeTax(v === "B");
-                }}
-                hint={invoiceLetterHint(invoiceLetter)}
-              />
-              <PricesIncludeTaxCheckbox
-                checked={pricesIncludeTax}
-                onCheckedChange={(v) => {
-                  setPricesIncludeTaxTouched(true);
-                  setPricesIncludeTax(v);
-                }}
-              />
-            </div>
-          ) : (
-            <div className="col-span-2">
-              <PricesIncludeTaxCheckbox
-                checked={pricesIncludeTax}
-                onCheckedChange={(v) => {
-                  setPricesIncludeTaxTouched(true);
-                  setPricesIncludeTax(v);
-                }}
-              />
-            </div>
-          )}
+            <InvoiceLetterSelect
+              id="invoiceLetter"
+              value={invoiceLetter}
+              required
+              onValueChange={(v) => {
+                setLetterTouched(true);
+                setInvoiceLetter(v);
+                if (v === "C" || v === "E") {
+                  setPricesIncludeTax(false);
+                } else if (!pricesIncludeTaxTouched) {
+                  setPricesIncludeTax(v === "B");
+                }
+                if (v) setTaxRate(defaultTaxRateForInvoiceLetter(v));
+              }}
+              hint={invoiceLetterHint(invoiceLetter)}
+            />
+          ) : null}
+
+          <PricesIncludeTaxCheckbox
+            compact
+            className="sm:col-span-2"
+            checked={pricesIncludeTax}
+            onCheckedChange={(v) => {
+              setPricesIncludeTaxTouched(true);
+              setPricesIncludeTax(v);
+            }}
+          />
 
           <div className="space-y-1">
             <Label htmlFor="issueDate">Fecha de emisión</Label>
@@ -342,67 +341,65 @@ export function ManualInvoiceForm({
           </div>
         </div>
 
-        <hr />
-        <p className="text-sm font-medium">Línea 1</p>
+        <div className="space-y-3 border-t border-border/60 pt-4">
+          <p className="text-sm font-medium">Línea 1</p>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
-            <Label htmlFor="description">Descripción</Label>
-            <Input id="description" name="description" required />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="quantity">Cantidad</Label>
-            <DecimalInput id="quantity" name="quantity" required value={quantity} onValueChange={setQuantity} placeholder="1,00" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="unitPrice">
-              {pricesIncludeTax ? "Precio unitario (c/IVA)" : "Precio unitario"}
-            </Label>
-            <DecimalInput id="unitPrice" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} placeholder="0,00" />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="discountPct">Desc. %</Label>
-            <DecimalInput id="discountPct" name="discountPct" value={discountPct} onValueChange={setDiscountPct} placeholder="0" />
-          </div>
-          <div className="space-y-1">
-            <TaxRateSelect
-              id="taxRate"
-              value={taxRate}
-              onValueChange={setTaxRate}
-              showConstructionHint
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1 sm:col-span-2">
+              <Label htmlFor="description">Descripción</Label>
+              <Input id="description" name="description" required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="quantity">Cantidad</Label>
+              <DecimalInput id="quantity" name="quantity" required value={quantity} onValueChange={setQuantity} placeholder="1,00" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="unitPrice">
+                {pricesIncludeTax ? "Precio unitario (c/IVA)" : "Precio unitario"}
+              </Label>
+              <DecimalInput id="unitPrice" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} placeholder="0,00" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="discountPct">Desc. %</Label>
+              <DecimalInput id="discountPct" name="discountPct" value={discountPct} onValueChange={setDiscountPct} placeholder="0" />
+            </div>
+            <div className="space-y-1">
+              <TaxRateSelect
+                id="taxRate"
+                value={taxRate}
+                onValueChange={setTaxRate}
+                showConstructionHint
+              />
+              {evaluateInvoiceLetterTaxConsistency({
+                invoiceLetter,
+                taxAmount: isZeroIvaRate(taxRate) ? "0" : "1",
+              }).map((i) => (
+                  <p
+                    key={i.message}
+                    className={
+                      i.severity === "error"
+                        ? "text-[11px] text-destructive"
+                        : "text-[11px] text-amber-700 dark:text-amber-300"
+                    }
+                  >
+                    {i.message}
+                  </p>
+                ))}
+            </div>
+            <IibbPerceptionFields
+              id="iibbPerceptionRate"
+              rate={iibbPerceptionRate}
+              onRateChange={setIibbPerceptionRate}
+              subtotal={lineNetSubtotal}
+              label="Alícuota IIBB (%)"
             />
-            {evaluateInvoiceLetterTaxConsistency({
-              invoiceLetter,
-              taxAmount: isZeroIvaRate(taxRate) ? "0" : "1",
-            }).map((i) => (
-                <p
-                  key={i.message}
-                  className={
-                    i.severity === "error"
-                      ? "text-[11px] text-destructive"
-                      : "text-[11px] text-amber-700 dark:text-amber-300"
-                  }
-                >
-                  {i.message}
-                </p>
-              ))}
           </div>
-          <IibbPerceptionFields
-            id="iibbPerceptionRate"
-            rate={iibbPerceptionRate}
-            onRateChange={setIibbPerceptionRate}
-            subtotal={lineNetSubtotal}
-            label="Alícuota IIBB (%)"
-          />
         </div>
 
-        <div className="space-y-1">
-          <Label htmlFor="notes">Notas</Label>
-          <Textarea id="notes" name="notes" rows={2} />
-        </div>
+        <ExpandableNotesField label="Notas" />
 
         {storageConfigured && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label>Comprobante (opcional)</Label>
             <p className="text-xs text-muted-foreground">
               Foto o PDF de la factura. Se adjunta después de crear el documento.
@@ -417,7 +414,7 @@ export function ManualInvoiceForm({
         )}
 
         {showCollectNow && (
-          <div className="rounded-md border p-3 space-y-3">
+          <div className="space-y-3 rounded-md border bg-muted/10 p-3">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
@@ -438,8 +435,8 @@ export function ManualInvoiceForm({
                   en esa moneda para poder cobrar ahora.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-1">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
                     <Label>Cuenta de cobro</Label>
                     <SearchableCombobox
                       options={treasuryOptions}
@@ -453,7 +450,7 @@ export function ManualInvoiceForm({
                     <Label htmlFor="collectionDate">Fecha de cobro</Label>
                     <Input id="collectionDate" name="collectionDate" type="date" required />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <SettlementFields
                       idPrefix="project-collect-now"
                       paymentMethod={collectMethod}
@@ -466,7 +463,7 @@ export function ManualInvoiceForm({
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
           <Button
             type="button"
             variant="outline"

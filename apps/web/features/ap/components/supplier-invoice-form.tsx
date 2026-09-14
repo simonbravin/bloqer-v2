@@ -8,7 +8,6 @@ import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoice
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
 import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
@@ -18,6 +17,7 @@ import { DocumentUploadZone } from "@/features/documents/components/document-upl
 import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { AP_PAYEE_PICKER_HINT } from "../lib/ap-payee-options";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
+import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import {
@@ -377,6 +377,8 @@ export function SupplierInvoiceForm({
     }
     const fd = new FormData(e.currentTarget);
     const letterPayload = showLetter ? invoiceLetter : null;
+    const forceZeroTax = letterPayload === "C" || letterPayload === "E";
+    const pricesIncludeTaxPayload = forceZeroTax ? false : pricesIncludeTax;
     startTransition(async () => {
       if (companyFinanzas) {
         const res = await createCompanySupplierInvoiceAction({
@@ -385,11 +387,15 @@ export function SupplierInvoiceForm({
           dueDate:       fd.get("dueDate") as string,
           currency:      INVOICE_CURRENCY,
           invoiceLetter: letterPayload,
-          pricesIncludeTax,
+          pricesIncludeTax: pricesIncludeTaxPayload,
           notes:         (fd.get("notes") as string) || null,
           internalNotes: null,
           iibbPerceptionRate,
-          lines:         lines.map((l, i) => ({ ...l, sortOrder: i })),
+          lines:         lines.map((l, i) => ({
+            ...l,
+            taxRate: forceZeroTax ? "0" : l.taxRate,
+            sortOrder: i,
+          })),
         });
         if ("error" in res) {
           setError(res.error);
@@ -422,12 +428,13 @@ export function SupplierInvoiceForm({
           dueDate: fd.get("dueDate") as string,
           currency: INVOICE_CURRENCY,
           invoiceLetter: letterPayload,
-          pricesIncludeTax,
+          pricesIncludeTax: pricesIncludeTaxPayload,
           notes: (fd.get("notes") as string) || null,
           purchaseOrderId: apSpendMode === "AGAINST_PO" ? purchaseOrderId : null,
           iibbPerceptionRate,
           lines: lines.map((l, i) => ({
             ...l,
+            taxRate: forceZeroTax ? "0" : l.taxRate,
             sortOrder: i,
             purchaseOrderLineId: apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
           })),
@@ -463,13 +470,14 @@ export function SupplierInvoiceForm({
         dueDate:         fd.get("dueDate")    as string,
         currency:        INVOICE_CURRENCY,
         invoiceLetter:   letterPayload,
-        pricesIncludeTax,
+        pricesIncludeTax: pricesIncludeTaxPayload,
         notes:           (fd.get("notes") as string) || null,
         internalNotes:   null,
         purchaseOrderId: apSpendMode === "AGAINST_PO" ? purchaseOrderId : null,
         iibbPerceptionRate,
         lines: lines.map((l, i) => ({
           ...l,
+          taxRate: forceZeroTax ? "0" : l.taxRate,
           sortOrder: i,
           purchaseOrderLineId: apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
         })),
@@ -488,20 +496,14 @@ export function SupplierInvoiceForm({
   }
 
   return (
-    <div className={variant === "card" ? "rounded-lg border bg-card p-6" : undefined}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+    <div className={variant === "card" ? "rounded-lg border bg-card p-5 sm:p-6" : undefined}>
+      <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
-        <DocumentClassCreateHint
-          classLabel={derivedClass.classLabel}
-          classFamily={derivedClass.family}
-          hint={classHint}
-        />
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className={cn("space-y-1", !showLetter && "sm:col-span-2")}>
             <Label>A quién se le paga</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -528,110 +530,132 @@ export function SupplierInvoiceForm({
           </div>
 
           {showLetter ? (
-            <div className="col-span-2 space-y-3">
-              <InvoiceLetterSelect
-                id="invoiceLetter"
-                value={invoiceLetter}
-                required
-                onValueChange={(v) => {
-                  setLetterTouched(true);
-                  setInvoiceLetter(v);
-                  if (!pricesIncludeTaxTouched) setPricesIncludeTax(v === "B");
-                  if (!v) return;
-                  const nextRate = defaultTaxRateForInvoiceLetter(v);
-                  setLines((prev) =>
-                    prev.map((l) => ({
-                      ...l,
-                      taxRate:
-                        v === "C" || v === "E"
-                          ? "0"
-                          : isZeroIvaRate(l.taxRate)
-                            ? nextRate
-                            : l.taxRate,
-                    })),
-                  );
-                }}
-                hint={invoiceLetterHint(invoiceLetter)}
-              />
-              <PricesIncludeTaxCheckbox
-                checked={pricesIncludeTax}
-                onCheckedChange={(v) => {
-                  setPricesIncludeTaxTouched(true);
-                  setPricesIncludeTax(v);
-                }}
-              />
-            </div>
-          ) : (
-            <div className="col-span-2">
-              <PricesIncludeTaxCheckbox
-                checked={pricesIncludeTax}
-                onCheckedChange={(v) => {
-                  setPricesIncludeTaxTouched(true);
-                  setPricesIncludeTax(v);
-                }}
-              />
-            </div>
-          )}
+            <InvoiceLetterSelect
+              id="invoiceLetter"
+              value={invoiceLetter}
+              required
+              onValueChange={(v) => {
+                setLetterTouched(true);
+                setInvoiceLetter(v);
+                if (v === "C" || v === "E") {
+                  setPricesIncludeTax(false);
+                } else if (!pricesIncludeTaxTouched) {
+                  setPricesIncludeTax(v === "B");
+                }
+                if (!v) return;
+                const nextRate = defaultTaxRateForInvoiceLetter(v);
+                setLines((prev) =>
+                  prev.map((l) => ({
+                    ...l,
+                    taxRate:
+                      v === "C" || v === "E"
+                        ? "0"
+                        : isZeroIvaRate(l.taxRate)
+                          ? nextRate
+                          : l.taxRate,
+                  })),
+                );
+              }}
+              hint={invoiceLetterHint(invoiceLetter)}
+            />
+          ) : null}
 
-          {Boolean(projectId) && !companyFinanzas && (
-            <div className="col-span-2 space-y-2">
-              <Label>Imputación de costo</Label>
-              <div
-                className="inline-flex flex-wrap rounded-lg border bg-muted/40 p-1"
-                role="group"
-                aria-label="Contra OC o costo directo"
-              >
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => selectApSpendMode("AGAINST_PO")}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    apSpendMode === "AGAINST_PO"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Contra orden de compra
-                </button>
-                <button
-                  type="button"
-                  disabled={isPending}
-                  onClick={() => selectApSpendMode("DIRECT")}
-                  className={cn(
-                    "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                    apSpendMode === "DIRECT"
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                >
-                  Costo directo
-                </button>
-              </div>
-              {apSpendMode === "DIRECT" ? (
-                <p className="text-xs text-muted-foreground">
-                  No reduce el comprometido de una OC. Si el monto supera el umbral de la empresa,
-                  puede requerir OC o permiso de aprobación AP.
-                </p>
-              ) : filteredPOs.length === 0 ? (
-                <p className="text-xs text-muted-foreground">
-                  No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
-                </p>
-              ) : (
-                <div className="space-y-1">
-                  <Label>Orden de compra</Label>
-                  <SearchableCombobox
-                    options={poComboboxOptions}
-                    value={purchaseOrderId ?? SEARCHABLE_NONE}
-                    onValueChange={(v) =>
-                      onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
-                    }
-                    placeholder="Seleccionar OC…"
-                    searchPlaceholder="Buscar OC…"
+          {Boolean(projectId) && !companyFinanzas ? (
+            <>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                  <Label>Imputación de costo</Label>
+                  <DocumentClassCreateHint
+                    variant="inline"
+                    classLabel={derivedClass.classLabel}
+                    classFamily={derivedClass.family}
                   />
                 </div>
-              )}
-            </div>
+                <p className="text-xs text-muted-foreground">{classHint}</p>
+                <div
+                  className="inline-flex flex-wrap rounded-md border bg-muted/30 p-0.5"
+                  role="group"
+                  aria-label="Contra OC o costo directo"
+                >
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => selectApSpendMode("AGAINST_PO")}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      apSpendMode === "AGAINST_PO"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Contra orden de compra
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => selectApSpendMode("DIRECT")}
+                    className={cn(
+                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      apSpendMode === "DIRECT"
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    Costo directo
+                  </button>
+                </div>
+                {apSpendMode === "DIRECT" ? (
+                  <p className="text-xs text-muted-foreground">
+                    No reduce el comprometido de una OC. Si el monto supera el umbral de la empresa,
+                    puede requerir OC o permiso de aprobación AP.
+                  </p>
+                ) : filteredPOs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
+                  </p>
+                ) : (
+                  <div className="space-y-1">
+                    <Label>Orden de compra</Label>
+                    <SearchableCombobox
+                      options={poComboboxOptions}
+                      value={purchaseOrderId ?? SEARCHABLE_NONE}
+                      onValueChange={(v) =>
+                        onPurchaseOrderChange(v === SEARCHABLE_NONE ? null : v)
+                      }
+                      placeholder="Seleccionar OC…"
+                      searchPlaceholder="Buscar OC…"
+                    />
+                  </div>
+                )}
+              </div>
+              <PricesIncludeTaxCheckbox
+                compact
+                checked={pricesIncludeTax}
+                onCheckedChange={(v) => {
+                  setPricesIncludeTaxTouched(true);
+                  setPricesIncludeTax(v);
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <div className="space-y-1.5">
+                <DocumentClassCreateHint
+                  variant="inline"
+                  classLabel={derivedClass.classLabel}
+                  classFamily={derivedClass.family}
+                />
+                <p className="text-xs text-muted-foreground">{classHint}</p>
+              </div>
+              <PricesIncludeTaxCheckbox
+                compact
+                checked={pricesIncludeTax}
+                onCheckedChange={(v) => {
+                  setPricesIncludeTaxTouched(true);
+                  setPricesIncludeTax(v);
+                }}
+              />
+            </>
           )}
 
           <div className="space-y-1">
@@ -652,34 +676,29 @@ export function SupplierInvoiceForm({
           />
         )}
 
-        <hr />
-
-        <InvoiceLinesEditor
-          lines={lines}
-          onChange={setLines}
-          requireWbs={Boolean(projectId) && !companyFinanzas}
-          wbsOptions={wbsOptions}
-          pricesIncludeTax={pricesIncludeTax}
-          iibbPerceptionRate={iibbPerceptionRate}
-          onIibbPerceptionRateChange={setIibbPerceptionRate}
-          seedFirstLineCostTypeAsManual={Boolean(
-            initialLine?.costType === "LABOR" ||
-              initialLine?.costType === "EQUIPMENT" ||
-              initialLine?.costType === "MATERIAL" ||
-              initialLine?.costType === "SUBCONTRACT" ||
-              initialLine?.costType === "OTHER",
-          )}
-        />
-
-        <hr />
-
-        <div className="space-y-1">
-          <Label htmlFor="notes">Notas (opcional)</Label>
-          <Textarea id="notes" name="notes" rows={2} />
+        <div className="border-t border-border/60 pt-4">
+          <InvoiceLinesEditor
+            lines={lines}
+            onChange={setLines}
+            requireWbs={Boolean(projectId) && !companyFinanzas}
+            wbsOptions={wbsOptions}
+            pricesIncludeTax={pricesIncludeTax}
+            iibbPerceptionRate={iibbPerceptionRate}
+            onIibbPerceptionRateChange={setIibbPerceptionRate}
+            seedFirstLineCostTypeAsManual={Boolean(
+              initialLine?.costType === "LABOR" ||
+                initialLine?.costType === "EQUIPMENT" ||
+                initialLine?.costType === "MATERIAL" ||
+                initialLine?.costType === "SUBCONTRACT" ||
+                initialLine?.costType === "OTHER",
+            )}
+          />
         </div>
 
+        <ExpandableNotesField />
+
         {storageConfigured && (
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Label>Comprobante (opcional)</Label>
             <p className="text-xs text-muted-foreground">
               Foto o PDF de la factura. Se adjunta después de crear el documento.
@@ -694,7 +713,7 @@ export function SupplierInvoiceForm({
         )}
 
         {showPayNow && (
-          <div className="rounded-md border p-3 space-y-3">
+          <div className="space-y-3 rounded-md border bg-muted/10 p-3">
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
                 type="checkbox"
@@ -715,8 +734,8 @@ export function SupplierInvoiceForm({
                   en esa moneda para poder pagar ahora.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2 space-y-1">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-1 sm:col-span-2">
                     <Label>Cuenta de pago</Label>
                     <SearchableCombobox
                       options={treasuryOptions}
@@ -730,7 +749,7 @@ export function SupplierInvoiceForm({
                     <Label htmlFor="paymentDate">Fecha de pago</Label>
                     <Input id="paymentDate" name="paymentDate" type="date" required />
                   </div>
-                  <div className="col-span-2">
+                  <div className="sm:col-span-2">
                     <SettlementFields
                       idPrefix="supplier-pay-now"
                       paymentMethod={payMethod}
@@ -743,7 +762,7 @@ export function SupplierInvoiceForm({
           </div>
         )}
 
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
           <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
             Cancelar
           </Button>

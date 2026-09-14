@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
@@ -16,6 +15,7 @@ import { classifySalesInvoice } from "@bloqer/domain";
 import { registerArAdvanceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
+import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import type { ClientOption } from "./manual-invoice-form";
 
 type TreasuryAccountOption = {
@@ -122,8 +122,8 @@ export function AdvanceInvoiceForm({
           hint="Anticipo de obra: se etiqueta como venta de obra (sin señal persistida aparte)."
         />
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
             <Label>Cliente</Label>
             {clients.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -196,7 +196,7 @@ export function AdvanceInvoiceForm({
             />
           </div>
 
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <SettlementFields
               idPrefix="advance"
               paymentMethod={paymentMethod}
@@ -204,9 +204,8 @@ export function AdvanceInvoiceForm({
             />
           </div>
 
-          <div className="col-span-2 space-y-1">
-            <Label htmlFor="notes">Notas (opcional)</Label>
-            <Textarea id="notes" name="notes" rows={2} placeholder="Referencia contractual, etc." />
+          <div className="sm:col-span-2">
+            <ExpandableNotesField placeholder="Referencia contractual, etc." />
           </div>
         </div>
 
