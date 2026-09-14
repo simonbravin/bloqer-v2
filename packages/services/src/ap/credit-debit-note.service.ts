@@ -24,7 +24,7 @@ import { classFieldsForSupplierInvoice } from "../finance/document-class.service
 import { isCrossCompany } from "../company-scope";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canMutateApForScope } from "./ap-access";
+import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { auditAp } from "./ap-audit";
 import {
   assertSupplierInvoiceEditable,
@@ -179,10 +179,10 @@ async function createNoteDraft(
         currency: parent.currency,
         fxRate: parent.fxRate,
         invoiceLetter: parent.invoiceLetter,
+        // NC amount is the credit to apply (gross). Do not inherit parent IIBB or the
+        // partial/dialog amount is silently inflated by recalcSupplierInvoiceTotals.
         iibbPerceptionRate:
-          kind === "CREDIT_NOTE" && (!input.lines || input.lines.length === 0)
-            ? new Prisma.Decimal(0)
-            : parent.iibbPerceptionRate,
+          kind === "CREDIT_NOTE" ? new Prisma.Decimal(0) : parent.iibbPerceptionRate,
         notes: input.notes ?? null,
         createdBy: ctx.actorUserId,
         updatedBy: ctx.actorUserId,
@@ -283,37 +283,10 @@ async function createNoteDraft(
       );
       const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id: note.id } });
       if (refreshed.totalAmount.greaterThan(balance)) {
-        const firstLine = parent.lines[0];
-        await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: note.id } });
-        await tx.supplierInvoiceLine.create({
-          data: {
-            invoiceId: note.id,
-            description: `Nota de crédito s/ factura ${parent.number}`,
-            quantity: new Prisma.Decimal(1),
-            unitPrice: balance,
-            taxRate: new Prisma.Decimal(0),
-            discountPct: new Prisma.Decimal(0),
-            lineSubtotal: balance,
-            lineTax: new Prisma.Decimal(0),
-            lineTotal: balance,
-            sortOrder: 0,
-            wbsNodeId: parent.projectId ? (firstLine?.wbsNodeId ?? null) : null,
-            costType: firstLine?.costType ?? null,
-            purchaseOrderLineId: null,
-            costAnalysisLineId: null,
-          },
-        });
-        await tx.supplierInvoice.update({
-          where: { id: note.id },
-          data: {
-            iibbPerceptionRate: new Prisma.Decimal(0),
-            iibbPerceptionAmount: new Prisma.Decimal(0),
-            subtotal: balance,
-            taxAmount: new Prisma.Decimal(0),
-            totalAmount: balance,
-            amountArs: balance,
-          },
-        });
+        throw new ServiceError(
+          "CONFLICT",
+          `La NC (${serializeMoneyDecimal(refreshed.totalAmount)}) supera el saldo pendiente (${serializeMoneyDecimal(balance)}).`,
+        );
       }
     }
 
@@ -889,5 +862,76 @@ export async function countActiveCreditDebitNotesForSupplierInvoice(
       documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
       status: "ISSUED",
     },
+  });
+}
+
+export type RelatedSupplierFiscalNoteRow = {
+  id: string;
+  code: string;
+  documentKind: "CREDIT_NOTE" | "DEBIT_NOTE";
+  status: string;
+  totalAmount: string;
+  currency: string;
+  issueDate: Date;
+};
+
+/** NC/ND (any status) that reference this supplier invoice — for detail UI. */
+export async function listCreditDebitNotesForSupplierInvoice(
+  supplierInvoiceId: string,
+  ctx: ServiceContext,
+  projectScopeId?: string,
+): Promise<RelatedSupplierFiscalNoteRow[]> {
+  await assertApTenantModule(ctx);
+  const parent = await prisma.supplierInvoice.findUnique({
+    where: { id: supplierInvoiceId },
+    select: { id: true, tenantId: true, companyId: true, projectId: true },
+  });
+  if (!parent || parent.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
+  }
+  if (isCrossCompany(parent.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  if (projectScopeId !== undefined && parent.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
+  if (parent.projectId === null) {
+    if (!canViewCompanyAp(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor a nivel empresa");
+    }
+  } else if (!canViewApProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor");
+  }
+  await requireProjectAccessIfPresent(parent.projectId, ctx);
+
+  const notes = await prisma.supplierInvoice.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      referencedSupplierInvoiceId: supplierInvoiceId,
+      documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
+    },
+    orderBy: [{ issueDate: "desc" }, { number: "desc" }],
+    select: {
+      id: true,
+      number: true,
+      documentKind: true,
+      status: true,
+      totalAmount: true,
+      currency: true,
+      issueDate: true,
+    },
+  });
+
+  return notes.map((n) => {
+    const prefix = n.documentKind === "CREDIT_NOTE" ? "NC" : "ND";
+    return {
+      id: n.id,
+      code: `${prefix}-${String(n.number).padStart(5, "0")}`,
+      documentKind: n.documentKind as "CREDIT_NOTE" | "DEBIT_NOTE",
+      status: n.status,
+      totalAmount: serializeMoneyDecimal(n.totalAmount),
+      currency: n.currency,
+      issueDate: n.issueDate,
+    };
   });
 }

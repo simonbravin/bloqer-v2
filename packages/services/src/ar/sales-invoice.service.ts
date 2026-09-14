@@ -8,12 +8,16 @@ import type {
 import { auditAr } from "./ar-audit";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import {
+  computeObligationBalanceDue,
+  normalizeObligationBalanceDue,
+} from "../finance/obligation-balance";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
 import { resolveSuggestedArInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canEditArArea, canMutateArForScope, canViewArProjectArea } from "./ar-access";
+import { canEditArArea, canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
@@ -109,6 +113,39 @@ export async function getSalesInvoiceById(
   return serializeInvoice(inv);
 }
 
+/**
+ * Corporate sales invoice by id: tenant-safe and enforces `projectId === null`.
+ * Use from `/finanzas/facturas/...` only (not project workspace).
+ */
+export async function getCompanySalesInvoiceById(
+  id: string,
+  ctx: ServiceContext,
+): Promise<SalesInvoiceWithLines> {
+  await assertArTenantModule(ctx);
+  if (!canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de venta a nivel empresa");
+  }
+  const inv = await prisma.salesInvoice.findUnique({
+    where: { id },
+    include: {
+      lines: { orderBy: { sortOrder: "asc" } },
+      clientContact: { select: { legalName: true, fantasyName: true } },
+    },
+  });
+  if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+  if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (inv.projectId !== null) {
+    throw new ServiceError(
+      "FORBIDDEN",
+      "Esta factura está asignada a un proyecto; usá el espacio de trabajo del proyecto",
+    );
+  }
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  return serializeInvoice(inv);
+}
+
 export async function getActiveInvoiceForCertification(
   certificationId: string,
   ctx: ServiceContext,
@@ -154,11 +191,54 @@ export async function getActiveInvoiceForCertification(
 export type ProjectSalesInvoiceListFilters = {
   page?: number;
   pageSize?: number;
+  search?: string;
   /** Derived document class filter ([D-102]). */
   class?: string;
+  /** Fiscal document kind filter ([D-115]). */
+  documentKind?: "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE";
 };
 
 export type ProjectSalesInvoiceListRow = Omit<SalesInvoiceWithLines, "lines">;
+
+/** Parse "FAC-12", "NC-00003", "ND-1", or bare digits. */
+function parseSalesInvoiceNumberSearch(
+  search: string,
+): { number: number; documentKind?: "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE" } | undefined {
+  const trimmed = search.trim();
+  if (!trimmed) return undefined;
+  const match = /^(?:(FAC|NC|ND)-?)?0*(\d+)$/i.exec(trimmed);
+  if (!match?.[2]) return undefined;
+  const n = Number(match[2]);
+  if (!Number.isFinite(n)) return undefined;
+  const prefix = match[1]?.toUpperCase();
+  const documentKind =
+    prefix === "NC"
+      ? ("CREDIT_NOTE" as const)
+      : prefix === "ND"
+        ? ("DEBIT_NOTE" as const)
+        : prefix === "FAC"
+          ? ("INVOICE" as const)
+          : undefined;
+  return { number: n, documentKind };
+}
+
+function salesInvoiceSearchWhere(search: string): Prisma.SalesInvoiceWhereInput {
+  const parsed = parseSalesInvoiceNumberSearch(search);
+  return {
+    OR: [
+      { clientContact: { legalName: { contains: search, mode: "insensitive" } } },
+      { clientContact: { fantasyName: { contains: search, mode: "insensitive" } } },
+      ...(parsed
+        ? [
+            {
+              number: parsed.number,
+              ...(parsed.documentKind ? { documentKind: parsed.documentKind } : {}),
+            },
+          ]
+        : []),
+    ],
+  };
+}
 
 export async function listInvoicesByProject(
   projectId: string,
@@ -176,11 +256,15 @@ export async function listInvoicesByProject(
     pageSize: filters?.pageSize,
   });
 
+  const search = filters?.search?.trim();
   const classCode = parseSalesInvoiceClassFilter(filters?.class);
   const where: Prisma.SalesInvoiceWhereInput = {
     projectId,
     tenantId: ctx.tenantId,
+    status: { not: "CANCELLED" },
     ...(classCode ? salesInvoiceClassWhere(classCode) : {}),
+    ...(filters?.documentKind ? { documentKind: filters.documentKind } : {}),
+    ...(search ? salesInvoiceSearchWhere(search) : {}),
   };
 
   const [invoices, total] = await Promise.all([
@@ -212,7 +296,12 @@ export async function countOpenSalesInvoicesByProject(
   await requireProjectAccess(projectId, ctx);
 
   return prisma.salesInvoice.count({
-    where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      status: "ISSUED",
+      documentKind: "INVOICE",
+    },
   });
 }
 
@@ -512,16 +601,22 @@ export async function updateSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
   }
   await assertProjectGuardIfPresent(inv.projectId, ctx);
-  if (inv.documentKind !== "INVOICE") {
-    throw new ServiceError(
-      "VALIDATION",
-      "Las notas de crédito/débito no se editan con el formulario de factura. Anulá y creá una nueva si hace falta ajustar el monto.",
-    );
-  }
   assertInvoiceEditable(inv);
 
   const zeroTaxForLetter =
     input.invoiceLetter === "C" || input.invoiceLetter === "E";
+  const isFiscalNote =
+    inv.documentKind === "CREDIT_NOTE" || inv.documentKind === "DEBIT_NOTE";
+  const isCreditNote = inv.documentKind === "CREDIT_NOTE";
+  if (input.lines && !isFiscalNote) {
+    throw new ServiceError(
+      "VALIDATION",
+      "Las líneas de una factura de venta no se editan desde este formulario.",
+    );
+  }
+  if (input.lines && isFiscalNote && input.lines.length === 0) {
+    throw new ServiceError("VALIDATION", "La nota debe tener al menos una línea");
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
     const updatedInvoice = await tx.salesInvoice.update({
@@ -530,9 +625,12 @@ export async function updateSalesInvoice(
         issueDate:     input.issueDate ? new Date(input.issueDate) : undefined,
         dueDate:       input.dueDate   ? new Date(input.dueDate)   : undefined,
         ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
-        ...(input.iibbPerceptionRate !== undefined
-          ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
-          : {}),
+        // NC credit amount is gross; never inherit/persist parent IIBB on draft edits.
+        ...(isCreditNote
+          ? { iibbPerceptionRate: new Prisma.Decimal(0) }
+          : input.iibbPerceptionRate !== undefined
+            ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
+            : {}),
         notes:         input.notes         ?? undefined,
         internalNotes: input.internalNotes ?? undefined,
         updatedBy: ctx.actorUserId,
@@ -543,8 +641,36 @@ export async function updateSalesInvoice(
       },
     });
 
-    // Header-only edit can set letter C/E while lines still carry IVA — zero rates ([D-084]).
-    if (zeroTaxForLetter && updatedInvoice.lines.some((l) => !l.taxRate.equals(0))) {
+    if (input.lines && isFiscalNote) {
+      await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: id } });
+      for (const [i, line] of input.lines.entries()) {
+        const taxRate = zeroTaxForLetter
+          ? new Prisma.Decimal(0)
+          : new Prisma.Decimal(line.taxRate ?? "0");
+        const { lineSubtotal, lineTax, lineTotal } = calcLine(
+          new Prisma.Decimal(line.quantity),
+          new Prisma.Decimal(line.unitPrice),
+          taxRate,
+          new Prisma.Decimal(line.discountPct ?? "0"),
+        );
+        await tx.salesInvoiceLine.create({
+          data: {
+            invoiceId: id,
+            description: line.description,
+            quantity: new Prisma.Decimal(line.quantity),
+            unitPrice: new Prisma.Decimal(line.unitPrice),
+            taxRate,
+            discountPct: new Prisma.Decimal(line.discountPct ?? "0"),
+            lineSubtotal,
+            lineTax,
+            lineTotal,
+            sortOrder: line.sortOrder ?? i,
+            certificationLineId: null,
+          },
+        });
+      }
+      await recalcInvoiceTotals(tx as never, id);
+    } else if (zeroTaxForLetter && updatedInvoice.lines.some((l) => !l.taxRate.equals(0))) {
       for (const line of updatedInvoice.lines) {
         const { lineSubtotal, lineTax, lineTotal } = calcLine(
           line.quantity,
@@ -558,8 +684,38 @@ export async function updateSalesInvoice(
         });
       }
       await recalcInvoiceTotals(tx as never, id);
-    } else if (input.iibbPerceptionRate !== undefined) {
+    } else if (isCreditNote || input.iibbPerceptionRate !== undefined) {
       await recalcInvoiceTotals(tx as never, id);
+    }
+
+    if (isCreditNote) {
+      if (!inv.referencedSalesInvoiceId) {
+        throw new ServiceError("VALIDATION", "La NC requiere factura de referencia.");
+      }
+      const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
+      const parent = await tx.salesInvoice.findUnique({
+        where: { id: inv.referencedSalesInvoiceId },
+        include: { receivable: true },
+      });
+      if (!parent || parent.tenantId !== ctx.tenantId) {
+        throw new ServiceError("NOT_FOUND", "Factura de referencia no encontrada");
+      }
+      if (!parent.receivable || parent.receivable.status === "CANCELLED") {
+        throw new ServiceError("CONFLICT", "La factura no tiene cuenta por cobrar activa.");
+      }
+      const balanceDue = normalizeObligationBalanceDue(
+        computeObligationBalanceDue(
+          parent.receivable.originalAmount,
+          parent.receivable.paidAmount,
+          parent.receivable.creditedAmount,
+        ),
+      );
+      if (refreshed.totalAmount.greaterThan(balanceDue)) {
+        throw new ServiceError(
+          "CONFLICT",
+          `La NC (${serializeMoneyDecimal(refreshed.totalAmount)}) supera el saldo pendiente (${serializeMoneyDecimal(balanceDue)}).`,
+        );
+      }
     }
 
     await auditAr(
@@ -571,11 +727,13 @@ export async function updateSalesInvoice(
       {
         after: {
           number: updatedInvoice.number,
+          documentKind: updatedInvoice.documentKind,
           ...(input.issueDate !== undefined ? { issueDate: input.issueDate } : {}),
           ...(input.dueDate !== undefined ? { dueDate: input.dueDate } : {}),
           ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
           ...(input.internalNotes !== undefined ? { internalNotes: input.internalNotes } : {}),
+          ...(input.lines ? { linesUpdated: true } : {}),
           ...(zeroTaxForLetter ? { taxRatesZeroedForLetter: input.invoiceLetter } : {}),
         },
         tx,

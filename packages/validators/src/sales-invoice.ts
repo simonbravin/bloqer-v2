@@ -72,6 +72,8 @@ export const updateSalesInvoiceSchema = z.object({
   iibbPerceptionRate: ratePctString.optional(),
   notes:         z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
+  /** Line edits allowed only on DRAFT credit/debit notes ([D-115]). */
+  lines:         z.array(invoiceLineSchema).min(1).optional(),
 });
 
 

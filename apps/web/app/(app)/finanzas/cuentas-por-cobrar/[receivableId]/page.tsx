@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -76,7 +77,7 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
         <ReceivableFieldDetailView
           clientName={receivable.clientName}
           invoiceCode={receivable.salesInvoiceCode}
-          invoiceHref={null}
+          invoiceHref={`/finanzas/facturas/${receivable.salesInvoiceId}`}
           projectName={null}
           issueDate={receivable.issueDate}
           dueDate={receivable.dueDate}
@@ -178,7 +179,18 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
           </div>
           <div>
             <p className="text-muted-foreground">Factura</p>
-            <p className="font-medium">{receivable.salesInvoiceCode ?? "—"}</p>
+            <p className="font-medium">
+              {receivable.salesInvoiceId && receivable.salesInvoiceCode ? (
+                <Link
+                  href={`/finanzas/facturas/${receivable.salesInvoiceId}`}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  {receivable.salesInvoiceCode}
+                </Link>
+              ) : (
+                (receivable.salesInvoiceCode ?? "—")
+              )}
+            </p>
           </div>
           <div>
             <p className="text-muted-foreground">Moneda</p>
@@ -204,6 +216,14 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
               {formatMoneyAmount(receivable.paidAmount, receivable.currency)}
             </p>
           </div>
+          {Number(receivable.creditedAmount) > 0 ? (
+            <div>
+              <p className="text-muted-foreground">Créditos NC</p>
+              <p className="font-medium tabular-nums">
+                {formatMoneyAmount(receivable.creditedAmount, receivable.currency)}
+              </p>
+            </div>
+          ) : null}
           <div>
             <p className="text-muted-foreground font-semibold">Saldo pendiente</p>
             <p className="font-bold tabular-nums text-lg">

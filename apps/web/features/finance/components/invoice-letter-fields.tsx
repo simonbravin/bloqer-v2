@@ -79,7 +79,7 @@ export function InvoiceLetterSelect({
   name,
   value,
   onValueChange,
-  label = "Tipo de factura",
+  label = "Letra del comprobante",
   hint,
   className,
   required,

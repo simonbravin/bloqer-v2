@@ -12,6 +12,7 @@ import {
   issueSupplierCreditNote,
   issueSupplierDebitNote,
   cancelSupplierCreditNote,
+  getSupplierInvoiceById,
   registerApExpense,
   ServiceError,
   type PurchaseOrderInvoiceDraftPreview,
@@ -201,11 +202,28 @@ export async function cancelSupplierInvoiceAction(
 export async function createSupplierCreditNoteFromInvoiceAction(
   parentInvoiceId: string,
   projectId: string,
+  options?: { amount?: string },
 ): Promise<{ id: string } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getSupplierInvoiceById(parentInvoiceId, ctx, projectId);
     const note = await createSupplierCreditNoteFromInvoice(
-      { parentSupplierInvoiceId: parentInvoiceId },
+      {
+        parentSupplierInvoiceId: parentInvoiceId,
+        ...(options?.amount
+          ? {
+              lines: [
+                {
+                  description: "Nota de crédito",
+                  quantity: "1",
+                  unitPrice: options.amount,
+                  taxRate: "0",
+                  discountPct: "0",
+                },
+              ],
+            }
+          : {}),
+      },
       ctx,
     );
     revalidateProjectApPaths(projectId, [
@@ -223,6 +241,7 @@ export async function createSupplierDebitNoteFromInvoiceAction(
 ): Promise<{ id: string } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getSupplierInvoiceById(parentInvoiceId, ctx, projectId);
     const note = await createSupplierDebitNoteFromInvoice(
       { parentSupplierInvoiceId: parentInvoiceId },
       ctx,

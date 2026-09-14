@@ -1,33 +1,30 @@
 import { notFound, redirect } from "next/navigation";
-import { can, fiscalDocumentKindLabel, type InvoiceLetterCode } from "@bloqer/domain";
+import { fiscalDocumentKindLabel, type InvoiceLetterCode } from "@bloqer/domain";
 import { InvoiceEditForm } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  canEditCompanyAr,
   getCompanyById,
+  getCompanySalesInvoiceById,
   getContactById,
   getReceivableBySalesInvoiceId,
-  getSalesInvoiceById,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
-  params: Promise<{ id: string; invoiceId: string }>;
+  params: Promise<{ invoiceId: string }>;
 }
 
 function toDateInput(d: Date): string {
   return new Date(d).toISOString().split("T")[0]!;
 }
 
-export default async function EditarFacturaPage({ params }: PageProps) {
+export default async function EditarFacturaVentaCorporativaPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
-  const { id, invoiceId } = await params;
-  if (!can(current.tenantCtx.roles, "EDIT", "AR")) {
-    redirect(`/proyectos/${id}/facturas/${invoiceId}`);
-  }
-
+  const { invoiceId } = await params;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -35,28 +32,28 @@ export default async function EditarFacturaPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  if (!canEditCompanyAr(ctx.roles)) {
+    redirect(`/finanzas/facturas/${invoiceId}`);
+  }
+
   let invoice;
   try {
-    invoice = await getSalesInvoiceById(invoiceId, ctx, id);
+    invoice = await getCompanySalesInvoiceById(invoiceId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
+      notFound();
+    }
     throw err;
+  }
+
+  if (invoice.projectId) {
+    redirect(`/proyectos/${invoice.projectId}/facturas/${invoiceId}/editar`);
   }
 
   const kindLabel = fiscalDocumentKindLabel(invoice.documentKind);
 
   if (invoice.status !== "DRAFT") {
-    return (
-      <PageShell variant="default" className="space-y-4" breadcrumbLabel={invoice.code}>
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold tracking-tight">Editar {kindLabel.toLowerCase()}</h1>
-        </div>
-        <p className="rounded border bg-card p-4 text-sm text-muted-foreground">
-          Solo se pueden editar comprobantes en estado <strong>Borrador</strong>. Este está en
-          estado &quot;{invoice.status}&quot;.
-        </p>
-      </PageShell>
-    );
+    redirect(`/finanzas/facturas/${invoiceId}`);
   }
 
   let maxCreditAmount: string | null = null;
@@ -65,7 +62,6 @@ export default async function EditarFacturaPage({ params }: PageProps) {
       const parentReceivable = await getReceivableBySalesInvoiceId(
         invoice.referencedSalesInvoiceId,
         ctx,
-        id,
       );
       maxCreditAmount = parentReceivable?.balanceDue ?? null;
     } catch {
@@ -78,11 +74,15 @@ export default async function EditarFacturaPage({ params }: PageProps) {
   try {
     const company = await getCompanyById(invoice.companyId, ctx);
     companyCountry = company.country;
-  } catch { /* optional */ }
+  } catch {
+    /* optional */
+  }
   try {
     const client = await getContactById(invoice.clientContactId, ctx);
     clientCountry = client.country;
-  } catch { /* optional */ }
+  } catch {
+    /* optional */
+  }
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
@@ -95,7 +95,7 @@ export default async function EditarFacturaPage({ params }: PageProps) {
 
       <div className="rounded-lg border bg-card p-6">
         <InvoiceEditForm
-          projectId={id}
+          companyFinanzas
           invoiceId={invoiceId}
           companyCountry={companyCountry}
           clientCountry={clientCountry}

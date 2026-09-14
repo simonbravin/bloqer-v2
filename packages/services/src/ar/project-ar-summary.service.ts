@@ -26,7 +26,12 @@ export async function summarizeProjectBillingVsCollections(
   const [invoicedGroups, collectedGroups] = await Promise.all([
     prisma.salesInvoice.groupBy({
       by: ["currency"],
-      where: { ...baseWhere, status: "ISSUED" },
+      where: {
+        ...baseWhere,
+        status: "ISSUED",
+        // [D-115] Facturado = facturas + ND; NC no suma (reduce saldo vía creditedAmount).
+        documentKind: { in: ["INVOICE", "DEBIT_NOTE"] },
+      },
       _sum: { totalAmount: true },
     }),
     prisma.collection.groupBy({

@@ -236,6 +236,7 @@ export async function getProjectIncomeExpenseReport(
           tenantId: ctx.tenantId,
           projectId,
           status: "ISSUED",
+          documentKind: { in: ["INVOICE", "DEBIT_NOTE"] },
           issueDate: { gte: dateFrom, lte: dateTo },
         },
         select: { currency: true },

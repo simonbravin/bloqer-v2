@@ -1,8 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
+import { can, fiscalDocumentKindLabel } from "@bloqer/domain";
 import {
   getCompanyById,
+  getPayableBySupplierInvoiceId,
   getSupplierInvoiceById,
   listAllContacts,
   listLinkablePurchaseOrders,
@@ -49,6 +50,20 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
   }
 
+  let maxCreditAmount: string | null = null;
+  if (invoice.documentKind === "CREDIT_NOTE" && invoice.referencedSupplierInvoiceId) {
+    try {
+      const parentPayable = await getPayableBySupplierInvoiceId(
+        invoice.referencedSupplierInvoiceId,
+        ctx,
+        id,
+      );
+      maxCreditAmount = parentPayable?.balanceDue ?? null;
+    } catch {
+      /* optional */
+    }
+  }
+
   const suppliers = withCurrentApPayee(
     suppliersResult.map(toApPayeeOption),
     { id: invoice.supplierContactId, name: invoice.supplierName },
@@ -79,7 +94,9 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
       <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Editar factura {invoice.code}</h1>
+        <h1 className="text-2xl font-bold tracking-tight">
+          Editar {fiscalDocumentKindLabel(invoice.documentKind).toLowerCase()} {invoice.code}
+        </h1>
       </div>
 
       <SupplierInvoiceEditForm
@@ -90,6 +107,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
         companyIvaCondition={companyIvaCondition}
         poOptions={poOptions}
         wbsOptions={wbsOptions}
+        maxCreditAmount={maxCreditAmount}
       />
     </PageShell>
   );

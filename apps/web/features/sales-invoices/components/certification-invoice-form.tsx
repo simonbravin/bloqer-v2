@@ -64,7 +64,7 @@ export function CertificationInvoiceForm({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (showLetter && !invoiceLetter) {
-      setError("Seleccioná el tipo de factura (A, B, C o E)");
+      setError("Seleccioná la letra del comprobante (A, B, C o E)");
       return;
     }
     const fd = new FormData(e.currentTarget);

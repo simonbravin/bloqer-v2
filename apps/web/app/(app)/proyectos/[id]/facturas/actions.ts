@@ -5,6 +5,7 @@ import {
   updateSalesInvoice, issueSalesInvoice, cancelSalesInvoice,
   createSalesCreditNoteFromInvoice, createSalesDebitNoteFromInvoice,
   issueSalesCreditNote, issueSalesDebitNote, cancelSalesCreditNote,
+  getSalesInvoiceById,
   cancelReceivable,
   registerArAdvance,
   registerArSale,
@@ -177,11 +178,28 @@ export async function cancelSalesInvoiceAction(
 export async function createSalesCreditNoteFromInvoiceAction(
   parentInvoiceId: string,
   projectId: string,
+  options?: { amount?: string },
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
   try {
+    await getSalesInvoiceById(parentInvoiceId, ctx, projectId);
     const note = await createSalesCreditNoteFromInvoice(
-      { parentSalesInvoiceId: parentInvoiceId },
+      {
+        parentSalesInvoiceId: parentInvoiceId,
+        ...(options?.amount
+          ? {
+              lines: [
+                {
+                  description: "Nota de crédito",
+                  quantity: "1",
+                  unitPrice: options.amount,
+                  taxRate: "0",
+                  discountPct: "0",
+                },
+              ],
+            }
+          : {}),
+      },
       ctx,
     );
     revalidatePath(`/proyectos/${projectId}/facturas`);
@@ -198,6 +216,7 @@ export async function createSalesDebitNoteFromInvoiceAction(
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
   try {
+    await getSalesInvoiceById(parentInvoiceId, ctx, projectId);
     const note = await createSalesDebitNoteFromInvoice(
       { parentSalesInvoiceId: parentInvoiceId },
       ctx,

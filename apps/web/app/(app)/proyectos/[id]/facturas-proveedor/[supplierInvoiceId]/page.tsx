@@ -24,6 +24,7 @@ import {
   getPurchaseOrderCodeForApLink,
   getSupplierInvoiceById,
   getSupplierInvoicePurchaseOrderWarnings,
+  listCreditDebitNotesForSupplierInvoice,
   listEntityDocuments,
   canRegisterApPayment,
   ServiceError,
@@ -32,8 +33,6 @@ import { PageShell } from "@/components/layout/page-shell";
 import {
   issueSupplierInvoiceAction,
   cancelSupplierInvoiceAction,
-  createSupplierCreditNoteFromInvoiceAction,
-  createSupplierDebitNoteFromInvoiceAction,
   issueSupplierCreditNoteAction,
   issueSupplierDebitNoteAction,
   cancelSupplierCreditNoteAction,
@@ -43,6 +42,9 @@ import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProcessStepper } from "@/components/ui/process-stepper";
+import { CreateFiscalNoteDialog } from "@/features/finance/components/create-fiscal-note-dialog";
+import { RelatedFiscalNotesPanel } from "@/features/finance/components/related-fiscal-notes-panel";
+import { compareDecimal } from "@bloqer/utils";
 
 interface PageProps {
   params: Promise<{ id: string; supplierInvoiceId: string }>;
@@ -67,10 +69,19 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
   let payable = null;
   let warnings: string[] = [];
   let poCode: string | null = null;
+  let relatedNotes: Awaited<ReturnType<typeof listCreditDebitNotesForSupplierInvoice>> = [];
+  let referencedCode: string | null = null;
 
   try {
     invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx, id);
     payable = await getPayableBySupplierInvoiceId(supplierInvoiceId, ctx, id);
+    if ((invoice.documentKind ?? "INVOICE") === "INVOICE") {
+      relatedNotes = await listCreditDebitNotesForSupplierInvoice(supplierInvoiceId, ctx, id);
+    }
+    if (invoice.referencedSupplierInvoiceId) {
+      const parent = await getSupplierInvoiceById(invoice.referencedSupplierInvoiceId, ctx, id);
+      referencedCode = parent.code;
+    }
     if (invoice.purchaseOrderId) {
       warnings = await getSupplierInvoicePurchaseOrderWarnings(supplierInvoiceId, ctx);
       poCode = await getPurchaseOrderCodeForApLink(invoice.purchaseOrderId, ctx);
@@ -97,7 +108,13 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
   const isCreditNote = kind === "CREDIT_NOTE";
   const isDebitNote = kind === "DEBIT_NOTE";
   const openPayableBalance =
-    payable != null && Number(payable.balanceDue) > 0;
+    payable != null && (() => {
+      try {
+        return compareDecimal(payable.balanceDue, "0") > 0;
+      } catch {
+        return false;
+      }
+    })();
   const canIssueNc =
     canEditAp && isIssued && isInvoice && payable != null && openPayableBalance;
   const canIssueNd = canEditAp && isIssued && isInvoice;
@@ -115,20 +132,113 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
-        <SupplierInvoiceStatusBadge status={invoice.status} />
-        <FiscalDocumentKindBadge documentKind={kind} />
-        {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
-          <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {formatInvoiceLetterBadge(invoice.invoiceLetter)}
-          </span>
-        ) : null}
-        {invoice.classLabel ? (
-          <DocumentClassBadge
-            classLabel={invoice.classLabel}
-            classFamily={invoice.classFamily}
-          />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
+          <SupplierInvoiceStatusBadge status={invoice.status} />
+          <FiscalDocumentKindBadge documentKind={kind} />
+          {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
+            <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {formatInvoiceLetterBadge(invoice.invoiceLetter)}
+            </span>
+          ) : null}
+          {invoice.classLabel ? (
+            <DocumentClassBadge
+              classLabel={invoice.classLabel}
+              classFamily={invoice.classFamily}
+            />
+          ) : null}
+        </div>
+
+        {canEditAp ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {isDraft && (isInvoice || isCreditNote || isDebitNote) && (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}/editar`}>
+                    Editar
+                  </Link>
+                </Button>
+                {isInvoice ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      const result = await issueSupplierInvoiceAction(supplierInvoiceId, id);
+                      if ("error" in result) redirectWithActionError(detailPath, result.error);
+                      redirect(detailPath);
+                    }}
+                  >
+                    <Button type="submit" size="sm">
+                      Emitir factura
+                    </Button>
+                  </form>
+                ) : null}
+              </>
+            )}
+            {isDraft && isCreditNote && (
+              <form
+                action={async () => {
+                  "use server";
+                  const result = await issueSupplierCreditNoteAction(supplierInvoiceId, id);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit" size="sm">
+                  Emitir nota de crédito
+                </Button>
+              </form>
+            )}
+            {isDraft && isDebitNote && (
+              <form
+                action={async () => {
+                  "use server";
+                  const result = await issueSupplierDebitNoteAction(supplierInvoiceId, id);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit" size="sm">
+                  Emitir nota de débito
+                </Button>
+              </form>
+            )}
+            {canIssueNc ? (
+              <CreateFiscalNoteDialog
+                kind="CREDIT_NOTE"
+                parentInvoiceId={supplierInvoiceId}
+                parentCode={invoice.code}
+                currency={invoice.currency}
+                openBalance={payable!.balanceDue}
+                scope={{ type: "project-ap", projectId: id }}
+              />
+            ) : null}
+            {canIssueNd ? (
+              <CreateFiscalNoteDialog
+                kind="DEBIT_NOTE"
+                parentInvoiceId={supplierInvoiceId}
+                parentCode={invoice.code}
+                currency={invoice.currency}
+                scope={{ type: "project-ap", projectId: id }}
+              />
+            ) : null}
+            {(isDraft || isIssued) && !isCancelled && (
+              <form
+                action={async () => {
+                  "use server";
+                  const result = isCreditNote
+                    ? await cancelSupplierCreditNoteAction(supplierInvoiceId, id)
+                    : await cancelSupplierInvoiceAction(supplierInvoiceId, id);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground">
+                  Anular
+                </Button>
+              </form>
+            )}
+          </div>
         ) : null}
       </div>
 
@@ -157,6 +267,11 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
       )}
 
       <ActionErrorBanner message={sp.actionError} />
+
+      <RelatedFiscalNotesPanel
+        notes={relatedNotes}
+        hrefFor={(noteId) => `/proyectos/${id}/facturas-proveedor/${noteId}`}
+      />
 
       {showRelated ? (
         <Card>
@@ -214,7 +329,7 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
                   href={`/proyectos/${id}/facturas-proveedor/${invoice.referencedSupplierInvoiceId}`}
                   className="text-primary underline-offset-4 hover:underline"
                 >
-                  Ver factura
+                  {referencedCode ?? "Ver factura"}
                 </Link>
               </p>
             </div>
@@ -339,104 +454,6 @@ export default async function SupplierInvoiceDetailPage({ params, searchParams }
             </div>
           </CardContent>
         </Card>
-      ) : null}
-
-      {canEditAp ? (
-        <div className="flex gap-2 flex-wrap">
-          {isDraft && isInvoice && (
-            <>
-              <Button asChild variant="outline">
-                <Link href={`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}/editar`}>
-                  Editar
-                </Link>
-              </Button>
-              <form
-                action={async () => {
-                  "use server";
-                  const result = await issueSupplierInvoiceAction(supplierInvoiceId, id);
-                  if ("error" in result) redirectWithActionError(detailPath, result.error);
-                  redirect(detailPath);
-                }}
-              >
-                <Button type="submit">Emitir factura</Button>
-              </form>
-            </>
-          )}
-          {isDraft && isCreditNote && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await issueSupplierCreditNoteAction(supplierInvoiceId, id);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button type="submit">Emitir nota de crédito</Button>
-            </form>
-          )}
-          {isDraft && isDebitNote && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await issueSupplierDebitNoteAction(supplierInvoiceId, id);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button type="submit">Emitir nota de débito</Button>
-            </form>
-          )}
-          {canIssueNc ? (
-            <form
-              action={async () => {
-                "use server";
-                const result = await createSupplierCreditNoteFromInvoiceAction(
-                  supplierInvoiceId,
-                  id,
-                );
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(`/proyectos/${id}/facturas-proveedor/${result.id}`);
-              }}
-            >
-              <Button type="submit" variant="outline">
-                Nota de crédito
-              </Button>
-            </form>
-          ) : null}
-          {canIssueNd ? (
-            <form
-              action={async () => {
-                "use server";
-                const result = await createSupplierDebitNoteFromInvoiceAction(
-                  supplierInvoiceId,
-                  id,
-                );
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(`/proyectos/${id}/facturas-proveedor/${result.id}`);
-              }}
-            >
-              <Button type="submit" variant="outline">
-                Nota de débito
-              </Button>
-            </form>
-          ) : null}
-          {(isDraft || isIssued) && !isCancelled && (
-            <form
-              action={async () => {
-                "use server";
-                const result = isCreditNote
-                  ? await cancelSupplierCreditNoteAction(supplierInvoiceId, id)
-                  : await cancelSupplierInvoiceAction(supplierInvoiceId, id);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button type="submit" variant="destructive">
-                Anular
-              </Button>
-            </form>
-          )}
-        </div>
       ) : null}
 
       <EntityDocumentsPanel

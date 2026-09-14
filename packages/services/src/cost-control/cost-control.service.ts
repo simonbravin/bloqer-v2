@@ -407,12 +407,13 @@ export async function getProjectCostControl(
       ? prisma.supplierInvoice.findMany({
           where: {
             projectId, tenantId: ctx.tenantId, status: "ISSUED",
+            documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
             purchaseOrderId: { not: null },
             subcontractCertificationId: null,
             ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
           },
           select: {
-            id: true, totalAmount: true, purchaseOrderId: true,
+            id: true, totalAmount: true, purchaseOrderId: true, documentKind: true,
             lines: {
               select: {
                 lineSubtotal: true,
@@ -437,11 +438,13 @@ export async function getProjectCostControl(
       ? prisma.supplierInvoice.findMany({
           where: {
             projectId, tenantId: ctx.tenantId, status: "ISSUED",
+            documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
             purchaseOrderId: null, subcontractCertificationId: null,
             ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
           },
           select: {
             totalAmount: true,
+            documentKind: true,
             lines: { select: { wbsNodeId: true, lineSubtotal: true, lineTotal: true, costType: true } },
           },
         })
@@ -609,14 +612,17 @@ export async function getProjectCostControl(
 
   // E. Accrued from ISSUED SupplierInvoices (PO-linked) — prefer line FK ([D-066]), else PO weights.
   // Net basis (lineSubtotal) so accruedLinked consumes open_committed consistently with D-095.
+  // [D-115] CREDIT_NOTE reduces accrued (signed negative).
   for (const inv of poLinkedInvoices) {
     if (!inv.purchaseOrder) continue;
+    const signed = (amount: Prisma.Decimal) =>
+      inv.documentKind === "CREDIT_NOTE" ? amount.negated() : amount;
     const linkedLines = inv.lines.filter((l) => l.purchaseOrderLineId);
     if (linkedLines.length > 0) {
       const commitmentTypeByWbs = dominantCostTypeByWbs(inv.purchaseOrder.lines);
       for (const line of linkedLines) {
         const wbsId = line.purchaseOrderLine?.wbsNodeId ?? line.wbsNodeId;
-        const amount = new Prisma.Decimal(line.lineSubtotal);
+        const amount = signed(new Prisma.Decimal(line.lineSubtotal));
         const spentType = resolveLineCostType({
           costType: line.costType ?? line.purchaseOrderLine?.costType ?? null,
           apuCategory: null,
@@ -641,7 +647,7 @@ export async function getProjectCostControl(
       // same OC commitment, also count as linked so open_committed shrinks ([D-065]).
       const orphanLines = inv.lines.filter((l) => !l.purchaseOrderLineId);
       for (const line of orphanLines) {
-        const amount = new Prisma.Decimal(line.lineSubtotal);
+        const amount = signed(new Prisma.Decimal(line.lineSubtotal));
         const wbsId = line.wbsNodeId;
         const spentType = resolveLineCostType({ costType: line.costType, apuCategory: null });
         if (wbsId && wbsNodeIds.has(wbsId)) {
@@ -661,9 +667,11 @@ export async function getProjectCostControl(
 
     const poLines2 = inv.purchaseOrder.lines;
     const poTotal = poLines2.reduce((s, l) => s.add(l.lineSubtotal), ZERO);
-    const invNet = inv.lines.length > 0
-      ? inv.lines.reduce((s, l) => s.add(l.lineSubtotal), ZERO)
-      : new Prisma.Decimal(inv.totalAmount);
+    const invNet = signed(
+      inv.lines.length > 0
+        ? inv.lines.reduce((s, l) => s.add(l.lineSubtotal), ZERO)
+        : new Prisma.Decimal(inv.totalAmount),
+    );
     if (poTotal.isZero()) {
       unalloc.accruedCost = unalloc.accruedCost.add(invNet);
       continue;
@@ -684,12 +692,15 @@ export async function getProjectCostControl(
   }
 
   // F. Direct project invoices (no PO, no sub cert) — prefer line WBS ([D-055]); NOT linked to commitment
+  // [D-115] CREDIT_NOTE reduces accrued.
   for (const inv of unallocatedInvoices) {
+    const signed = (amount: Prisma.Decimal) =>
+      inv.documentKind === "CREDIT_NOTE" ? amount.negated() : amount;
     const linesWithWbs = inv.lines.filter((l) => l.wbsNodeId);
     if (linesWithWbs.length > 0) {
       for (const line of linesWithWbs) {
         const wbsId = line.wbsNodeId!;
-        const amount = new Prisma.Decimal(line.lineSubtotal);
+        const amount = signed(new Prisma.Decimal(line.lineSubtotal));
         if (wbsNodeIds.has(wbsId)) {
           add(accMap, wbsId, "accruedCost", amount);
           addTyped(
@@ -705,10 +716,10 @@ export async function getProjectCostControl(
       }
       const linesWithoutWbs = inv.lines.filter((l) => !l.wbsNodeId);
       for (const line of linesWithoutWbs) {
-        unalloc.accruedCost = unalloc.accruedCost.add(line.lineSubtotal);
+        unalloc.accruedCost = unalloc.accruedCost.add(signed(new Prisma.Decimal(line.lineSubtotal)));
       }
     } else {
-      unalloc.accruedCost = unalloc.accruedCost.add(inv.totalAmount);
+      unalloc.accruedCost = unalloc.accruedCost.add(signed(new Prisma.Decimal(inv.totalAmount)));
     }
   }
   const unallocWithoutLineWbs = unallocatedInvoices.filter(
@@ -1135,6 +1146,7 @@ export async function getWbsItemCostDetail(
               projectId,
               tenantId: ctx.tenantId,
               status: "ISSUED",
+              documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
               ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
             },
           },
@@ -1142,6 +1154,7 @@ export async function getWbsItemCostDetail(
             invoice: {
               select: {
                 id: true, number: true, status: true, issueDate: true, totalAmount: true, purchaseOrderId: true,
+                documentKind: true,
               },
             },
           },
@@ -1157,6 +1170,7 @@ export async function getWbsItemCostDetail(
               projectId,
               tenantId: ctx.tenantId,
               status: "ISSUED",
+              documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
               ...(dateWhere(dateFrom, dateTo) ? { issueDate: dateWhere(dateFrom, dateTo) } : {}),
             },
           },
@@ -1164,6 +1178,7 @@ export async function getWbsItemCostDetail(
             invoice: {
               select: {
                 id: true, number: true, status: true, issueDate: true, totalAmount: true, purchaseOrderId: true,
+                documentKind: true,
               },
             },
           },
@@ -1177,6 +1192,7 @@ export async function getWbsItemCostDetail(
             projectId,
             tenantId: ctx.tenantId,
             status: "ISSUED",
+            documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
             purchaseOrder: { lines: { some: { wbsNodeId } } },
             lines: {
               none: {
@@ -1190,6 +1206,7 @@ export async function getWbsItemCostDetail(
           },
           select: {
             id: true, number: true, status: true, issueDate: true, totalAmount: true, purchaseOrderId: true,
+            documentKind: true,
           },
           orderBy: { issueDate: "desc" },
         })
@@ -1208,13 +1225,17 @@ export async function getWbsItemCostDetail(
       "costType" in row && row.costType
         ? String(row.costType)
         : null;
+    const signedTotal =
+      row.invoice.documentKind === "CREDIT_NOTE"
+        ? new Prisma.Decimal(row.invoice.totalAmount).negated()
+        : row.invoice.totalAmount;
     if (!existing) {
       invoiceById.set(row.invoice.id, {
         invoiceId: row.invoice.id,
         invoiceNumber: row.invoice.number,
         status: row.invoice.status,
         issueDate: row.invoice.issueDate,
-        totalAmount: serializeMoneyDecimal(row.invoice.totalAmount),
+        totalAmount: serializeMoneyDecimal(signedTotal),
         purchaseOrderId: row.invoice.purchaseOrderId,
         costTypes: new Set(lineType ? [lineType] : []),
       });
@@ -1224,12 +1245,16 @@ export async function getWbsItemCostDetail(
   }
   for (const inv of invoicesViaPoHeader) {
     if (!invoiceById.has(inv.id)) {
+      const signedTotal =
+        inv.documentKind === "CREDIT_NOTE"
+          ? new Prisma.Decimal(inv.totalAmount).negated()
+          : inv.totalAmount;
       invoiceById.set(inv.id, {
         invoiceId: inv.id,
         invoiceNumber: inv.number,
         status: inv.status,
         issueDate: inv.issueDate,
-        totalAmount: serializeMoneyDecimal(inv.totalAmount),
+        totalAmount: serializeMoneyDecimal(signedTotal),
         purchaseOrderId: inv.purchaseOrderId,
         costTypes: new Set(),
       });

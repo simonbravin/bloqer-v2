@@ -180,6 +180,9 @@ export function parseCompanySupplierInvoiceExportFilters(
     ...(issueDateFrom ? { issueDateFrom } : {}),
     ...(issueDateTo ? { issueDateTo } : {}),
     ...(sp.class ? { class: sp.class } : {}),
+    ...(sp.kind === "INVOICE" || sp.kind === "CREDIT_NOTE" || sp.kind === "DEBIT_NOTE"
+      ? { documentKind: sp.kind }
+      : {}),
   };
 }
 
@@ -531,6 +534,7 @@ export async function exportCompanySupplierInvoicesCsv(
   }
   const headers = [
     "Codigo",
+    "Tipo",
     "Proveedor",
     "Clase",
     "Emision",
@@ -541,6 +545,11 @@ export async function exportCompanySupplierInvoicesCsv(
   ];
   const rows = data.map((inv) => [
     inv.code,
+    inv.documentKind === "CREDIT_NOTE"
+      ? "Nota de credito"
+      : inv.documentKind === "DEBIT_NOTE"
+        ? "Nota de debito"
+        : "Factura",
     inv.supplierName,
     inv.classLabel,
     inv.issueDate instanceof Date ? inv.issueDate.toISOString().slice(0, 10) : String(inv.issueDate).slice(0, 10),

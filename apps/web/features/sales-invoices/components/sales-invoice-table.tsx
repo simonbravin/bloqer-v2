@@ -22,13 +22,23 @@ import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-do
 export function SalesInvoiceTable({
   invoices,
   projectId,
+  emptyTitle,
+  emptyDescription,
+  emptyMessage = "Sin facturas. Cree la primera manualmente o desde una certificación aprobada.",
 }: {
   invoices: SalesInvoiceListItem[];
   projectId: string;
+  emptyTitle?: string;
+  emptyDescription?: string;
+  emptyMessage?: string;
 }) {
   if (invoices.length === 0) {
     return (
-      <ListEmptyState message="Sin facturas. Cree la primera manualmente o desde una certificación aprobada." />
+      <ListEmptyState
+        title={emptyTitle}
+        description={emptyDescription}
+        message={emptyTitle ? undefined : emptyMessage}
+      />
     );
   }
 

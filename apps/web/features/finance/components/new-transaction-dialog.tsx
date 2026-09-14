@@ -365,7 +365,7 @@ export function NewTransactionDialog({
           return;
         }
         if (showLetterAp && !invoiceLetter) {
-          setError("Seleccioná el tipo de factura (A, B, C o E)");
+          setError("Seleccioná la letra del comprobante (A, B, C o E)");
           return;
         }
         if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
@@ -443,7 +443,7 @@ export function NewTransactionDialog({
           return;
         }
         if (showLetterAr && !invoiceLetter) {
-          setError("Seleccioná el tipo de factura (A, B, C o E)");
+          setError("Seleccioná la letra del comprobante (A, B, C o E)");
           return;
         }
         if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {

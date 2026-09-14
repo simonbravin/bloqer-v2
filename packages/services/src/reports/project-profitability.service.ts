@@ -179,6 +179,8 @@ export async function getProjectProfitabilityReport(
         tenantId: ctx.tenantId,
         projectId,
         status: "ISSUED",
+        // [D-115] Revenue = facturas + ND; NC no tiene certificationId y no suma acá.
+        documentKind: { in: ["INVOICE", "DEBIT_NOTE"] },
         certification: { budgetId: cc.budgetId },
       },
       select: { totalAmount: true, currency: true, amountArs: true, fxRate: true },

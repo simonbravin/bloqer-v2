@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { useDebouncedSearchParam } from "@/hooks/use-debounced-search-param";
 import { TransaccionesDateFilters } from "@/features/finance/components/transacciones-date-filters";
 import { DocumentClassFilter } from "@/features/finance/components/document-class-filter";
+import { FiscalDocumentKindFilter } from "@/features/finance/components/fiscal-document-kind-filter";
 
 type Props = {
   /** Query keys preserved when clearing/applying date filters. */
@@ -13,13 +14,16 @@ type Props = {
   searchPlaceholder?: string;
   /** When set, shows Clase filter (`?class=`). */
   classFilterScope?: "supplier" | "supplier-project";
+  /** Show Tipo de documento filter (`?kind=`). */
+  showKindFilter?: boolean;
 };
 
 export function SupplierInvoiceListFilters({
-  preserveParams = ["status", "search", "sort", "dir", "view", "class"],
+  preserveParams = ["status", "search", "sort", "dir", "view", "class", "kind"],
   showDateFilters = true,
   searchPlaceholder = "Buscar por código o proveedor…",
   classFilterScope,
+  showKindFilter = true,
 }: Props) {
   const { defaultValue, setDebounced } = useDebouncedSearchParam("search");
 
@@ -39,6 +43,7 @@ export function SupplierInvoiceListFilters({
             className="max-w-md"
           />
         </div>
+        {showKindFilter ? <FiscalDocumentKindFilter /> : null}
         {classFilterScope ? <DocumentClassFilter scope={classFilterScope} /> : null}
       </div>
       {showDateFilters ? (

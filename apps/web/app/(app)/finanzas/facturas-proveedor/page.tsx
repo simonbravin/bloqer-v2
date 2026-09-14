@@ -15,12 +15,13 @@ import {
 } from "@/features/ap";
 import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
+import { can, isFiscalDocumentKind } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import { listCompanySupplierInvoices, listAllContacts, getCompanyFiscalContext, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
+import { fiscalDocumentListEmptyCopy } from "@/features/finance/lib/fiscal-document-list-empty";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
@@ -37,6 +38,7 @@ interface PageProps {
     dir?: string;
     view?: string;
     class?: string;
+    kind?: string;
   }>;
 }
 
@@ -50,6 +52,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     sp.status && (STATUSES as readonly string[]).includes(sp.status)
       ? (sp.status as (typeof STATUSES)[number])
       : undefined;
+  const documentKind = isFiscalDocumentKind(sp.kind) ? sp.kind : undefined;
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -72,6 +75,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
       page,
       pageSize: PAGE_SIZE,
       class: sp.class,
+      documentKind,
     });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -124,33 +128,18 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     if (next.dir) p.set("dir", next.dir);
     if (next.sort) p.set("sort", next.sort);
     if (next.class) p.set("class", next.class);
+    if (next.kind) p.set("kind", next.kind);
     const s = p.toString();
     return s ? `?${s}` : "";
   }
 
-  const hasExtraFilters = Boolean(sp.search?.trim() || sp.class || sp.from || sp.to);
+  const hasExtraFilters = Boolean(sp.search?.trim() || sp.class || sp.from || sp.to || sp.kind);
 
-  const emptyCopy = !status
-    ? {
-        title: hasExtraFilters ? "No hay facturas activas con estos filtros" : "No hay facturas activas",
-        description: hasExtraFilters
-          ? "Probá otra búsqueda, clase o rango. También podés revisar Anuladas."
-          : "Usá Anuladas para ver las facturas anuladas, o registrá una nueva.",
-        showCancelledCta: true,
-      }
-    : status === "CANCELLED"
-      ? {
-          title: hasExtraFilters ? "No hay facturas anuladas con estos filtros" : "No hay facturas anuladas",
-          description: hasExtraFilters
-            ? "Probá otra búsqueda, clase o rango de fechas."
-            : "No hay comprobantes anulados.",
-          showCancelledCta: false,
-        }
-      : {
-          title: "No hay facturas con los filtros actuales",
-          description: "Probá otro estado, clase o rango de fechas.",
-          showCancelledCta: false,
-        };
+  const emptyCopy = fiscalDocumentListEmptyCopy({
+    kind: sp.kind,
+    hasExtraFilters,
+    status,
+  });
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -164,7 +153,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           </Suspense>
           <ReportExportActions
             exportPath="/api/reports/finanzas/facturas-proveedor-corporativo.csv"
-            params={{ status: status ?? "ACTIVE", from: sp.from, to: sp.to, class: sp.class }}
+            params={{ status: status ?? "ACTIVE", from: sp.from, to: sp.to, class: sp.class, kind: sp.kind }}
             pdf
             label="Exportar"
           />
@@ -186,7 +175,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
         <span className="text-xs text-muted-foreground mr-1">Estado:</span>
         <Button asChild variant={!status ? "secondary" : "outline"} size="sm">
           <Link
-            href={`/finanzas/facturas-proveedor${q({ from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+            href={`/finanzas/facturas-proveedor${q({ from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class, kind: sp.kind })}`}
           >
             Activas
           </Link>
@@ -194,7 +183,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
         {STATUSES.map((s) => (
           <Button key={s} asChild variant={status === s ? "secondary" : "outline"} size="sm">
             <Link
-              href={`/finanzas/facturas-proveedor${q({ status: s, from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+              href={`/finanzas/facturas-proveedor${q({ status: s, from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class, kind: sp.kind })}`}
             >
               {s === "DRAFT" ? "Borrador" : s === "ISSUED" ? "Emitidas" : "Anuladas"}
             </Link>
@@ -213,7 +202,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           {!status && emptyCopy.showCancelledCta ? (
             <Button asChild size="sm" variant="outline">
               <Link
-                href={`/finanzas/facturas-proveedor${q({ status: "CANCELLED", from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class })}`}
+                href={`/finanzas/facturas-proveedor${q({ status: "CANCELLED", from: sp.from, to: sp.to, search: sp.search, dir: sp.dir, sort: sp.sort, class: sp.class, kind: sp.kind })}`}
               >
                 Ver anuladas
               </Link>

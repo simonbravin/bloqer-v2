@@ -3,7 +3,7 @@
  * CREDIT_NOTE: non-cash application onto parent Receivable.
  * DEBIT_NOTE: new Receivable 1:1 (increases AR).
  */
-import { Prisma, prisma, type SalesInvoice } from "@bloqer/database";
+import { Prisma, prisma, type SalesInvoice, type SalesInvoiceStatus } from "@bloqer/database";
 import { productCalendarDateUtc } from "@bloqer/utils";
 import {
   computeObligationBalanceDue,
@@ -24,7 +24,7 @@ import { classFieldsForSalesInvoice } from "../finance/document-class.service";
 import { isCrossCompany } from "../company-scope";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canMutateArForScope } from "./ar-access";
+import { canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
 import { auditAr } from "./ar-audit";
 import {
   assertInvoiceEditable,
@@ -176,10 +176,10 @@ async function createNoteDraft(
         currency: parent.currency,
         fxRate: parent.fxRate,
         invoiceLetter: parent.invoiceLetter,
+        // NC amount is the credit to apply (gross). Do not inherit parent IIBB or the
+        // partial/dialog amount is silently inflated by recalcInvoiceTotals.
         iibbPerceptionRate:
-          kind === "CREDIT_NOTE" && (!input.lines || input.lines.length === 0)
-            ? new Prisma.Decimal(0)
-            : parent.iibbPerceptionRate,
+          kind === "CREDIT_NOTE" ? new Prisma.Decimal(0) : parent.iibbPerceptionRate,
         notes: input.notes ?? null,
         createdBy: ctx.actorUserId,
         updatedBy: ctx.actorUserId,
@@ -269,32 +269,10 @@ async function createNoteDraft(
       );
       const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id: note.id } });
       if (refreshed.totalAmount.greaterThan(balance)) {
-        await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: note.id } });
-        await tx.salesInvoiceLine.create({
-          data: {
-            invoiceId: note.id,
-            description: `Nota de crédito s/ factura ${parent.number}`,
-            quantity: new Prisma.Decimal(1),
-            unitPrice: balance,
-            taxRate: new Prisma.Decimal(0),
-            discountPct: new Prisma.Decimal(0),
-            lineSubtotal: balance,
-            lineTax: new Prisma.Decimal(0),
-            lineTotal: balance,
-            sortOrder: 0,
-          },
-        });
-        await tx.salesInvoice.update({
-          where: { id: note.id },
-          data: {
-            iibbPerceptionRate: new Prisma.Decimal(0),
-            iibbPerceptionAmount: new Prisma.Decimal(0),
-            subtotal: balance,
-            taxAmount: new Prisma.Decimal(0),
-            totalAmount: balance,
-            amountArs: balance,
-          },
-        });
+        throw new ServiceError(
+          "CONFLICT",
+          `La NC (${serializeMoneyDecimal(refreshed.totalAmount)}) supera el saldo pendiente (${serializeMoneyDecimal(balance)}).`,
+        );
       }
     }
 
@@ -859,5 +837,76 @@ export async function countActiveCreditDebitNotesForSalesInvoice(
       documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
       status: "ISSUED",
     },
+  });
+}
+
+export type RelatedFiscalNoteRow = {
+  id: string;
+  code: string;
+  documentKind: "CREDIT_NOTE" | "DEBIT_NOTE";
+  status: SalesInvoiceStatus;
+  totalAmount: string;
+  currency: string;
+  issueDate: Date;
+};
+
+/** NC/ND (any status) that reference this sales invoice — for detail UI. */
+export async function listCreditDebitNotesForSalesInvoice(
+  salesInvoiceId: string,
+  ctx: ServiceContext,
+  projectScopeId?: string,
+): Promise<RelatedFiscalNoteRow[]> {
+  await assertArTenantModule(ctx);
+  const parent = await prisma.salesInvoice.findUnique({
+    where: { id: salesInvoiceId },
+    select: { id: true, tenantId: true, companyId: true, projectId: true },
+  });
+  if (!parent || parent.tenantId !== ctx.tenantId) {
+    throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+  }
+  if (isCrossCompany(parent.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  if (projectScopeId !== undefined && parent.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
+  }
+  if (parent.projectId === null) {
+    if (!canViewCompanyAr(ctx.roles)) {
+      throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de venta a nivel empresa");
+    }
+  } else if (!canViewArProjectArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
+  }
+  await requireProjectAccessIfPresent(parent.projectId, ctx);
+
+  const notes = await prisma.salesInvoice.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      referencedSalesInvoiceId: salesInvoiceId,
+      documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
+    },
+    orderBy: [{ issueDate: "desc" }, { number: "desc" }],
+    select: {
+      id: true,
+      number: true,
+      documentKind: true,
+      status: true,
+      totalAmount: true,
+      currency: true,
+      issueDate: true,
+    },
+  });
+
+  return notes.map((n) => {
+    const prefix = n.documentKind === "CREDIT_NOTE" ? "NC" : "ND";
+    return {
+      id: n.id,
+      code: `${prefix}-${String(n.number).padStart(5, "0")}`,
+      documentKind: n.documentKind as "CREDIT_NOTE" | "DEBIT_NOTE",
+      status: n.status,
+      totalAmount: serializeMoneyDecimal(n.totalAmount),
+      currency: n.currency,
+      issueDate: n.issueDate,
+    };
   });
 }

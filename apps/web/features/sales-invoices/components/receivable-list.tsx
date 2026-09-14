@@ -39,5 +39,5 @@ export function receivableInvoiceHref(
   if (r.projectId) {
     return `/proyectos/${r.projectId}/facturas/${r.salesInvoiceId}`;
   }
-  return null;
+  return `/finanzas/facturas/${r.salesInvoiceId}`;
 }

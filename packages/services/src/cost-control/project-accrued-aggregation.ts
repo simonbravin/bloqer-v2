@@ -85,28 +85,31 @@ export async function getProjectAccruedByMonth(
         projectId,
         tenantId: ctx.tenantId,
         status: "ISSUED",
+        // [D-115] Factura + ND suman accrued; NC se resta (puede venir sin OC).
+        documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
         purchaseOrderId: { not: null },
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, totalAmount: true },
+      select: { issueDate: true, totalAmount: true, documentKind: true },
     }),
     prisma.supplierInvoice.findMany({
       where: {
         projectId,
         tenantId: ctx.tenantId,
         status: "ISSUED",
+        documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
         purchaseOrderId: null,
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, totalAmount: true },
+      select: { issueDate: true, totalAmount: true, documentKind: true },
     }),
   ]);
 
   if (unallocatedInvoices.length > 0) {
     warnings.push(
-      `${unallocatedInvoices.length} factura(s) de proveedor sin OC ni certificación de subcontrato vinculada — incluidas en devengado a nivel proyecto.`,
+      `${unallocatedInvoices.length} comprobante(s) de proveedor sin OC ni certificación de subcontrato vinculada — incluidos en devengado a nivel proyecto.`,
     );
   }
 
@@ -121,10 +124,18 @@ export async function getProjectAccruedByMonth(
   // Use document currency totals (same as getProjectCostControl) so control-costos
   // and ingresos-gastos stay aligned. ARS consolidation belongs to currencyView, not here.
   for (const inv of poLinkedInvoices) {
-    entries.push({ date: inv.issueDate, amount: new Prisma.Decimal(inv.totalAmount) });
+    const signed =
+      inv.documentKind === "CREDIT_NOTE"
+        ? new Prisma.Decimal(inv.totalAmount).negated()
+        : new Prisma.Decimal(inv.totalAmount);
+    entries.push({ date: inv.issueDate, amount: signed });
   }
   for (const inv of unallocatedInvoices) {
-    entries.push({ date: inv.issueDate, amount: new Prisma.Decimal(inv.totalAmount) });
+    const signed =
+      inv.documentKind === "CREDIT_NOTE"
+        ? new Prisma.Decimal(inv.totalAmount).negated()
+        : new Prisma.Decimal(inv.totalAmount);
+    entries.push({ date: inv.issueDate, amount: signed });
   }
 
   const series = groupAccruedAmountsByMonth(entries);

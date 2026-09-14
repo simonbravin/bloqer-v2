@@ -3,6 +3,7 @@ export { ReceivableStatusBadge } from "./components/receivable-status-badge";
 export { SalesInvoiceTable } from "./components/sales-invoice-table";
 export { SalesInvoiceCards } from "./components/sales-invoice-cards";
 export { SalesInvoiceListSection } from "./components/sales-invoice-list-section";
+export { SalesInvoiceListFilters } from "./components/sales-invoice-list-filters";
 export { ReceivableTable } from "./components/receivable-table";
 export { ReceivableCards } from "./components/receivable-cards";
 export { ReceivableListSection } from "./components/receivable-list-section";

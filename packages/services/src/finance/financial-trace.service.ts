@@ -46,9 +46,7 @@ export function buildFinancialHref(
     case "Payment":
       return `/finanzas/pagos-proveedor/${entityId}`;
     case "SalesInvoice":
-      return options?.receivableId
-        ? `/finanzas/cuentas-por-cobrar/${options.receivableId}`
-        : `/finanzas/cuentas-por-cobrar`;
+      return `/finanzas/facturas/${entityId}`;
     case "Receivable":
       return `/finanzas/cuentas-por-cobrar/${entityId}`;
     case "Collection":

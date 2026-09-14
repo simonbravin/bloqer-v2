@@ -230,7 +230,7 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 | Sección | Ítems (etiqueta → ruta) |
 |---------|--------------------------|
 | General | Inicio → `/dashboard` · **Pendientes** → `/pendientes` · Proyectos → `/proyectos` · **Reportes** → `/reportes` · Directorio → `/directorio` · Inventario → `/inventario` |
-| Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
+| Finanzas | Tablero → `/finanzas` · Transacciones → `/finanzas/transacciones` · Facturas y gastos → `/finanzas/facturas-proveedor` · Facturas de venta (detalle) → `/finanzas/facturas/[id]` · Cuentas por cobrar → `/finanzas/cuentas-por-cobrar` · Cuentas por pagar → `/finanzas/cuentas-por-pagar` · Imputación GG → `/finanzas/gastos-generales` |
 | Tesorería | Resumen → `/tesoreria` · Cuentas → `/tesoreria/cuentas` · Flujo de caja → `/tesoreria/flujo-caja` · **Conciliación** → `/tesoreria/conciliacion` |
 | Contabilidad | Resumen → `/contabilidad` · **Plan de cuentas** → `/contabilidad/cuentas` · Asientos → `/contabilidad/asientos` · **Cierres** → `/contabilidad/cierres` · Reglas → `/contabilidad/reglas` |
 | Configuración | General → `/configuracion` · Mi perfil → `/configuracion/perfil` · **Notificaciones** → `/configuracion/notificaciones` · Equipo → `/configuracion/equipo` · Permisos → `/configuracion/permisos` · **Políticas** → `/configuracion/politicas` · Reportes programados → `/configuracion/reportes` · Registro → `/configuracion/registro` |
@@ -1169,8 +1169,8 @@ flowchart LR
 
 #### Obra (proyecto)
 
-- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía. En la línea: **Desc. %** opcional (antes de IVA; el precio unitario es de lista). En el pie: **Percepción IIBB** (alícuota editable, default 3% sobre el neto [D-112]).
-- **Tipo de documento ([D-115]):** desde una factura **emitida**: **Nota de crédito** (reduce CxC sin caja; requiere saldo pendiente) o **Nota de débito** (abre CxC adicional). Badge **Tipo de documento** distinto de **Clase**. Códigos `NC-…` / `ND-…`. Anular NC restaura el saldo. No anular la factura padre si hay NC/ND emitidas.
+- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía. En la línea: **Desc. %** opcional (antes de IVA; el precio unitario es de lista). En el pie: **Percepción IIBB** (alícuota editable, default 3% sobre el neto [D-112]). En el listado: buscador por código (`FAC-` / `NC-` / `ND-`) o cliente, y filtro **Tipo de documento**. El campo fiscal de letra es **Letra del comprobante** (A/B/C/E), no “tipo de factura”.
+- **Tipo de documento ([D-115]):** desde una factura **emitida**: **Nota de crédito** (abre diálogo con saldo pendiente y monto; NC parcial ≤ saldo) o **Nota de débito** (confirmá y se crea borrador). Badge **Tipo de documento** distinto de **Clase**. Códigos `NC-…` / `ND-…`. El borrador NC/ND se puede **editar** (monto/líneas) antes de emitir; en edición se muestra el **máximo** = saldo pendiente. En el detalle de la factura padre: panel **Notas vinculadas**. Acciones (Editar / Emitir / NC / ND / Anular) van en el **encabezado** del detalle (venta y proveedor, obra y empresa). **No** hay NC/ND “desde cero” sin factura de referencia (crédito abierto = fuera de v1). Anular NC restaura el saldo. No anular la factura padre si hay NC/ND emitidas.
 - **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Saldo = original − cobrado − créditos NC. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales), **método** (Efectivo / Transferencia / Cheque / Tarjeta / Otro) y referencia opcional. Para saldar el total, dejá el saldo que muestra el sistema. Solo la **cobranza confirmada** acredita tesorería ([D-072]).
 - **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo. En el detalle, **Cancelar** muestra el error en pantalla si falla (p. ej. movimiento ya conciliado o período cerrado); no se “traga” el mensaje.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): factura + CxC (+ cobro opcional) en un paso.
@@ -1183,7 +1183,7 @@ Casos como capacitaciones, venta de materiales o servicios de estructura **sin p
 1. **Finanzas → Transacciones** (`/finanzas/transacciones`) → **Registrar transacción** → tab **Ingreso / cobro**.
 2. Modo **Factura / cuenta por cobrar** (`AR_INCOME`): cliente, fechas, líneas (cantidad, precio, **Desc. %**, IVA), **Percepción IIBB** (default 3% sobre neto [D-112]), vencimiento; N° comprobante externo opcional; **Cobrar ahora (ingreso a caja)** opcional (cuenta + fecha; requiere permiso de tesorería).
 3. Si solo necesitás mover caja **sin** CxC (aportes de socios, préstamos recibidos, un tercero que **devuelve plata a la empresa**): modo **Solo caja** (`TREASURY_INFLOW`). Eso **no** es el reintegro a un empleado (ese es un **egreso**, §12.2.2).
-4. Gestionar saldos en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → **Cobrar**). Filas sin obra se etiquetan **Empresa**.
+4. Gestionar saldos en **Cuentas por cobrar** (`/finanzas/cuentas-por-cobrar` → **Cobrar**). Filas sin obra se etiquetan **Empresa**. Desde el detalle de la CxC (o el código de factura) abrís la **factura corporativa** (`/finanzas/facturas/[id]`): ahí están **Nota de crédito / Nota de débito** [D-115], igual que en obra.
 
 <!-- capture:31 factura-emitida-cxc-cobranza -->
 ![Bloqer — Factura emitida → CxC / cobranza](./guides/assets/screenshots/31-factura-emitida-cxc-cobranza.png)
@@ -1210,11 +1210,11 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | Pantalla | Ruta |
 |----------|------|
 | Listado / alta | `/proyectos/[id]/facturas-proveedor` · `/nueva` |
-| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador de factura · **NC/ND** [D-115]). Debajo del título: **pista de proceso** Borrador → Emitir → Pagar (pago según CxP; parcial «Pagar (parcial)», vencida «Pagar (vencida)»). NC aplica crédito sin egreso; ND abre CxP nueva. |
+| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador de factura o NC/ND · **NC/ND** [D-115]). Debajo del título: **pista de proceso** Borrador → Emitir → Pagar (pago según CxP; parcial «Pagar (parcial)», vencida «Pagar (vencida)»). NC aplica crédito sin egreso; ND abre CxP nueva. |
 | CxP | `/proyectos/[id]/cuentas-por-pagar` → `/[payableId]/pagar` |
 | Pagos (consulta) | `/proyectos/[id]/pagos` (también desde CxP / trazabilidad) |
 
-**Listado FP (obra y empresa):** por defecto **Activas** (oculta anuladas). Chips **Borrador / Emitidas / Anuladas** para filtrar; usá **Anuladas** para ver las canceladas.
+**Listado FP (obra y empresa):** por defecto **Activas** (oculta anuladas). Chips **Borrador / Emitidas / Anuladas** para filtrar; usá **Anuladas** para ver las canceladas. Buscador por código (`FP-` / `NC-` / `ND-`) o proveedor. Filtro **Tipo de documento** (Factura / Nota de crédito / Nota de débito); el vacío del listado nombra el tipo filtrado.
 
 **Alta en obra (`/nueva`):**
 
@@ -1355,7 +1355,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 - **Finanzas corporativas** (`/finanzas`): tablero con **Indicadores** en grilla 4+4 (no copia los KPIs de Tesorería: saldo / ingresos-egresos del mes). **Fila 1 (empresa):** Egresos imputados a obras · Egresos corporativos · Facturas borrador (siempre visible, también en 0) · Pagos esperados (90d) (C×P corporativas abiertas con vencimiento ≤90d, incluye vencidas). **Fila 2 (CxP/CxC):** C×P corporativas · C×P vencidas · C×C abiertas · C×C vencidas. Luego **Tendencia mensual** (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses; pestaña Caja para tesorería), proyección de liquidez y actividad consolidada. Contabilidad se abre desde el menú **Contabilidad**, no desde una card del tablero.
 - **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación). El listado es el ledger de caja operativa (sin transferencias internas). Clic en la descripción = detalle del movimiento.
-- **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`.
+- **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`. La factura vinculada abre `/finanzas/facturas/[id]` (NC/ND [D-115]).
 - **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*
 - **Inventario corporativo** (`/inventario`): hub con **Productos**, **Depósitos**, **Movimientos**, **Transferencias** y **Reportes** (misma subnav en todas las pantallas). Productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos), transferencias (`/inventario/transferencias`) y reportes (`/inventario/reportes`: **Stock actual** y **Movimientos** confirmados).
 

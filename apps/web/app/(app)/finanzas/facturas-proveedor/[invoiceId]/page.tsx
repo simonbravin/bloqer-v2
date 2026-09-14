@@ -22,6 +22,7 @@ import { isStorageConfigured } from "@bloqer/config";
 import {
   getCompanySupplierInvoiceById,
   getPayableBySupplierInvoiceId,
+  listCreditDebitNotesForSupplierInvoice,
   listEntityDocuments,
   canRegisterApPayment,
   ServiceError,
@@ -30,8 +31,6 @@ import { PageShell } from "@/components/layout/page-shell";
 import {
   issueCompanySupplierInvoiceAction,
   cancelCompanySupplierInvoiceAction,
-  createCompanySupplierCreditNoteFromInvoiceAction,
-  createCompanySupplierDebitNoteFromInvoiceAction,
   issueCompanySupplierCreditNoteAction,
   issueCompanySupplierDebitNoteAction,
   cancelCompanySupplierCreditNoteAction,
@@ -40,6 +39,9 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ProcessStepper } from "@/components/ui/process-stepper";
+import { CreateFiscalNoteDialog } from "@/features/finance/components/create-fiscal-note-dialog";
+import { RelatedFiscalNotesPanel } from "@/features/finance/components/related-fiscal-notes-panel";
+import { compareDecimal } from "@bloqer/utils";
 
 interface PageProps {
   params: Promise<{ invoiceId: string }>;
@@ -64,8 +66,20 @@ export default async function FinanzasFacturaProveedorDetailPage({
   };
 
   let invoice;
+  let relatedNotes: Awaited<ReturnType<typeof listCreditDebitNotesForSupplierInvoice>> = [];
+  let referencedCode: string | null = null;
   try {
     invoice = await getCompanySupplierInvoiceById(invoiceId, ctx);
+    if ((invoice.documentKind ?? "INVOICE") === "INVOICE") {
+      relatedNotes = await listCreditDebitNotesForSupplierInvoice(invoiceId, ctx);
+    }
+    if (invoice.referencedSupplierInvoiceId) {
+      const parent = await getCompanySupplierInvoiceById(
+        invoice.referencedSupplierInvoiceId,
+        ctx,
+      );
+      referencedCode = parent.code;
+    }
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
       notFound();
@@ -94,7 +108,13 @@ export default async function FinanzasFacturaProveedorDetailPage({
   const isCreditNote = kind === "CREDIT_NOTE";
   const isDebitNote = kind === "DEBIT_NOTE";
   const openPayableBalance =
-    payable != null && Number(payable.balanceDue) > 0;
+    payable != null && (() => {
+      try {
+        return compareDecimal(payable.balanceDue, "0") > 0;
+      } catch {
+        return false;
+      }
+    })();
   const canIssueNc =
     canEditAp && isIssued && isInvoice && payable != null && openPayableBalance;
   const canIssueNd = canEditAp && isIssued && isInvoice;
@@ -108,20 +128,111 @@ export default async function FinanzasFacturaProveedorDetailPage({
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={invoice.code}>
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
-        <SupplierInvoiceStatusBadge status={invoice.status} />
-        <FiscalDocumentKindBadge documentKind={kind} />
-        {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
-          <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {formatInvoiceLetterBadge(invoice.invoiceLetter)}
-          </span>
-        ) : null}
-        {invoice.classLabel ? (
-          <DocumentClassBadge
-            classLabel={invoice.classLabel}
-            classFamily={invoice.classFamily}
-          />
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
+          <SupplierInvoiceStatusBadge status={invoice.status} />
+          <FiscalDocumentKindBadge documentKind={kind} />
+          {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
+            <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
+              {formatInvoiceLetterBadge(invoice.invoiceLetter)}
+            </span>
+          ) : null}
+          {invoice.classLabel ? (
+            <DocumentClassBadge
+              classLabel={invoice.classLabel}
+              classFamily={invoice.classFamily}
+            />
+          ) : null}
+        </div>
+
+        {canEditAp ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {isDraft && (isInvoice || isCreditNote || isDebitNote) && (
+              <>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={`/finanzas/facturas-proveedor/${invoiceId}/editar`}>Editar</Link>
+                </Button>
+                {isInvoice ? (
+                  <form
+                    action={async () => {
+                      "use server";
+                      const result = await issueCompanySupplierInvoiceAction(invoiceId);
+                      if ("error" in result) redirectWithActionError(detailPath, result.error);
+                      redirect(detailPath);
+                    }}
+                  >
+                    <Button type="submit" size="sm">
+                      Emitir factura
+                    </Button>
+                  </form>
+                ) : null}
+              </>
+            )}
+            {isDraft && isCreditNote && (
+              <form
+                action={async () => {
+                  "use server";
+                  const result = await issueCompanySupplierCreditNoteAction(invoiceId);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit" size="sm">
+                  Emitir nota de crédito
+                </Button>
+              </form>
+            )}
+            {isDraft && isDebitNote && (
+              <form
+                action={async () => {
+                  "use server";
+                  const result = await issueCompanySupplierDebitNoteAction(invoiceId);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit" size="sm">
+                  Emitir nota de débito
+                </Button>
+              </form>
+            )}
+            {canIssueNc ? (
+              <CreateFiscalNoteDialog
+                kind="CREDIT_NOTE"
+                parentInvoiceId={invoiceId}
+                parentCode={invoice.code}
+                currency={invoice.currency}
+                openBalance={payable!.balanceDue}
+                scope={{ type: "company-ap" }}
+              />
+            ) : null}
+            {canIssueNd ? (
+              <CreateFiscalNoteDialog
+                kind="DEBIT_NOTE"
+                parentInvoiceId={invoiceId}
+                parentCode={invoice.code}
+                currency={invoice.currency}
+                scope={{ type: "company-ap" }}
+              />
+            ) : null}
+            {(isDraft || isIssued) && !isCancelled && (
+              <form
+                action={async () => {
+                  "use server";
+                  const result = isCreditNote
+                    ? await cancelCompanySupplierCreditNoteAction(invoiceId)
+                    : await cancelCompanySupplierInvoiceAction(invoiceId);
+                  if ("error" in result) redirectWithActionError(detailPath, result.error);
+                  redirect(detailPath);
+                }}
+              >
+                <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground">
+                  Anular
+                </Button>
+              </form>
+            )}
+          </div>
         ) : null}
       </div>
 
@@ -151,6 +262,11 @@ export default async function FinanzasFacturaProveedorDetailPage({
 
       <ActionErrorBanner message={sp.actionError} />
 
+      <RelatedFiscalNotesPanel
+        notes={relatedNotes}
+        hrefFor={(noteId) => `/finanzas/facturas-proveedor/${noteId}`}
+      />
+
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
@@ -165,7 +281,7 @@ export default async function FinanzasFacturaProveedorDetailPage({
                   href={`/finanzas/facturas-proveedor/${invoice.referencedSupplierInvoiceId}`}
                   className="text-primary underline-offset-4 hover:underline"
                 >
-                  Ver factura
+                  {referencedCode ?? "Ver factura"}
                 </Link>
               </p>
             </div>
@@ -284,96 +400,6 @@ export default async function FinanzasFacturaProveedorDetailPage({
             </div>
           </CardContent>
         </Card>
-      ) : null}
-
-      {canEditAp ? (
-        <div className="flex flex-wrap gap-2">
-          {isDraft && isInvoice && (
-            <>
-              <Button asChild variant="outline">
-                <Link href={`/finanzas/facturas-proveedor/${invoiceId}/editar`}>Editar</Link>
-              </Button>
-              <form
-                action={async () => {
-                  "use server";
-                  const result = await issueCompanySupplierInvoiceAction(invoiceId);
-                  if ("error" in result) redirectWithActionError(detailPath, result.error);
-                  redirect(detailPath);
-                }}
-              >
-                <Button type="submit">Emitir factura</Button>
-              </form>
-            </>
-          )}
-          {isDraft && isCreditNote && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await issueCompanySupplierCreditNoteAction(invoiceId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button type="submit">Emitir nota de crédito</Button>
-            </form>
-          )}
-          {isDraft && isDebitNote && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await issueCompanySupplierDebitNoteAction(invoiceId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button type="submit">Emitir nota de débito</Button>
-            </form>
-          )}
-          {canIssueNc ? (
-            <form
-              action={async () => {
-                "use server";
-                const result = await createCompanySupplierCreditNoteFromInvoiceAction(invoiceId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(`/finanzas/facturas-proveedor/${result.id}`);
-              }}
-            >
-              <Button type="submit" variant="outline">
-                Nota de crédito
-              </Button>
-            </form>
-          ) : null}
-          {canIssueNd ? (
-            <form
-              action={async () => {
-                "use server";
-                const result = await createCompanySupplierDebitNoteFromInvoiceAction(invoiceId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(`/finanzas/facturas-proveedor/${result.id}`);
-              }}
-            >
-              <Button type="submit" variant="outline">
-                Nota de débito
-              </Button>
-            </form>
-          ) : null}
-          {(isDraft || isIssued) && !isCancelled && (
-            <form
-              action={async () => {
-                "use server";
-                const result = isCreditNote
-                  ? await cancelCompanySupplierCreditNoteAction(invoiceId)
-                  : await cancelCompanySupplierInvoiceAction(invoiceId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button type="submit" variant="destructive">
-                Anular
-              </Button>
-            </form>
-          )}
-        </div>
       ) : null}
 
       <EntityDocumentsPanel

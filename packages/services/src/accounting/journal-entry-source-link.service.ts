@@ -230,35 +230,63 @@ export async function getJournalEntrySourceLink(
         noAccessHint: canInv ? null : noInv,
       };
     }
-    case "SALES_INVOICE": {
+    case "SALES_INVOICE":
+    case "SALES_CREDIT_NOTE":
+    case "SALES_DEBIT_NOTE": {
       const inv = await prisma.salesInvoice.findFirst({
         where: { id: sourceId, tenantId: ctx.tenantId },
       });
+      const kindLabel =
+        sourceType === "SALES_CREDIT_NOTE"
+          ? "Nota de crédito (venta)"
+          : sourceType === "SALES_DEBIT_NOTE"
+            ? "Nota de débito (venta)"
+            : "Factura de venta";
       if (!inv || inv.companyId !== companyId) {
-        return { kindLabel: "Factura de venta", detail: "Factura no encontrada.", href: null, noAccessHint: null };
+        return { kindLabel, detail: "Comprobante no encontrado.", href: null, noAccessHint: null };
       }
-      const detail = `Factura #${inv.number} · ${fmtDate(inv.issueDate)}`;
+      const prefix =
+        inv.documentKind === "CREDIT_NOTE"
+          ? "NC"
+          : inv.documentKind === "DEBIT_NOTE"
+            ? "ND"
+            : "Factura";
+      const detail = `${prefix} #${inv.number} · ${fmtDate(inv.issueDate)}`;
       const href =
         inv.projectId && canViewArProjectArea(ctx.roles)
           ? `/proyectos/${inv.projectId}/facturas/${inv.id}`
           : !inv.projectId && canViewCompanyAr(ctx.roles)
-            ? `/finanzas/cuentas-por-cobrar`
+            ? `/finanzas/facturas/${inv.id}`
             : null;
       return {
-        kindLabel: "Factura de venta",
+        kindLabel,
         detail,
         href,
         noAccessHint: href ? null : noAr,
       };
     }
-    case "SUPPLIER_INVOICE": {
+    case "SUPPLIER_INVOICE":
+    case "SUPPLIER_CREDIT_NOTE":
+    case "SUPPLIER_DEBIT_NOTE": {
       const inv = await prisma.supplierInvoice.findFirst({
         where: { id: sourceId, tenantId: ctx.tenantId },
       });
+      const kindLabel =
+        sourceType === "SUPPLIER_CREDIT_NOTE"
+          ? "Nota de crédito (proveedor)"
+          : sourceType === "SUPPLIER_DEBIT_NOTE"
+            ? "Nota de débito (proveedor)"
+            : "Factura de proveedor";
       if (!inv || inv.companyId !== companyId) {
-        return { kindLabel: "Factura de proveedor", detail: "Factura no encontrada.", href: null, noAccessHint: null };
+        return { kindLabel, detail: "Comprobante no encontrado.", href: null, noAccessHint: null };
       }
-      const detail = `Factura proveedor #${inv.number} · ${fmtDate(inv.issueDate)}`;
+      const prefix =
+        inv.documentKind === "CREDIT_NOTE"
+          ? "NC"
+          : inv.documentKind === "DEBIT_NOTE"
+            ? "ND"
+            : "Factura proveedor";
+      const detail = `${prefix} #${inv.number} · ${fmtDate(inv.issueDate)}`;
       const href =
         inv.projectId && canViewApProjectArea(ctx.roles)
           ? `/proyectos/${inv.projectId}/facturas-proveedor/${inv.id}`
@@ -266,7 +294,7 @@ export async function getJournalEntrySourceLink(
             ? `/finanzas/facturas-proveedor/${inv.id}`
             : null;
       return {
-        kindLabel: "Factura de proveedor",
+        kindLabel,
         detail,
         href,
         noAccessHint: href ? null : noAp,

@@ -11,6 +11,10 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertCanCancelSupplierInvoice } from "./supplier-invoice-cancel-guards";
 import { supplierInvoiceListStatusWhere } from "./supplier-invoice-list-status";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import {
+  computeObligationBalanceDue,
+  normalizeObligationBalanceDue,
+} from "../finance/obligation-balance";
 import { resolvePagination } from "../finance/pagination";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPayableReadyToPay } from "./ap-notifications.service";
@@ -335,6 +339,8 @@ export type ProjectSupplierInvoiceListFilters = {
   sortDir?: "asc" | "desc";
   /** Derived document class filter ([D-102]). */
   class?: string;
+  /** Fiscal document kind filter ([D-115]). */
+  documentKind?: "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE";
   status?: "DRAFT" | "ISSUED" | "CANCELLED";
   /** When true and status omitted, include CANCELLED (export ALL). Default: hide cancelled. */
   includeCancelled?: boolean;
@@ -344,23 +350,42 @@ export type ProjectSupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> &
   payable: SupplierInvoiceListPayable;
 };
 
-/** Parse "FP-00012", "fp-12", or "12" into invoice number for list search. */
-function parseSupplierInvoiceNumberSearch(search: string): number | undefined {
+/** Parse "FP-00012", "NC-3", "ND-00001", "fp-12", or "12" into invoice number (+ optional kind). */
+function parseSupplierInvoiceNumberSearch(
+  search: string,
+): { number: number; documentKind?: "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE" } | undefined {
   const trimmed = search.trim();
   if (!trimmed) return undefined;
-  const match = /^(?:FP-?)?0*(\d+)$/i.exec(trimmed);
-  if (!match?.[1]) return undefined;
-  const n = Number(match[1]);
-  return Number.isFinite(n) ? n : undefined;
+  const match = /^(?:(FP|NC|ND)-?)?0*(\d+)$/i.exec(trimmed);
+  if (!match?.[2]) return undefined;
+  const n = Number(match[2]);
+  if (!Number.isFinite(n)) return undefined;
+  const prefix = match[1]?.toUpperCase();
+  const documentKind =
+    prefix === "NC"
+      ? ("CREDIT_NOTE" as const)
+      : prefix === "ND"
+        ? ("DEBIT_NOTE" as const)
+        : prefix === "FP"
+          ? ("INVOICE" as const)
+          : undefined;
+  return { number: n, documentKind };
 }
 
 function supplierInvoiceSearchWhere(search: string): Prisma.SupplierInvoiceWhereInput {
-  const numberEq = parseSupplierInvoiceNumberSearch(search);
+  const parsed = parseSupplierInvoiceNumberSearch(search);
   return {
     OR: [
       { supplierContact: { legalName: { contains: search, mode: "insensitive" } } },
       { supplierContact: { fantasyName: { contains: search, mode: "insensitive" } } },
-      ...(numberEq !== undefined ? [{ number: numberEq }] : []),
+      ...(parsed
+        ? [
+            {
+              number: parsed.number,
+              ...(parsed.documentKind ? { documentKind: parsed.documentKind } : {}),
+            },
+          ]
+        : []),
     ],
   };
 }
@@ -389,6 +414,7 @@ export async function listSupplierInvoicesByProject(
     ...supplierInvoiceListStatusWhere(filters),
     ...(search ? supplierInvoiceSearchWhere(search) : {}),
     ...(classCode ? supplierInvoiceClassWhere(classCode) : {}),
+    ...(filters?.documentKind ? { documentKind: filters.documentKind } : {}),
   };
 
   const issueDir = filters?.sortDir === "asc" ? "asc" : "desc";
@@ -426,7 +452,12 @@ export async function countOpenSupplierInvoicesByProject(
   await requireProjectAccess(projectId, ctx);
 
   return prisma.supplierInvoice.count({
-    where: { projectId, tenantId: ctx.tenantId, status: "ISSUED" },
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      status: "ISSUED",
+      documentKind: "INVOICE",
+    },
   });
 }
 
@@ -443,6 +474,8 @@ export type CompanySupplierInvoiceListFilters = {
   pageSize?:          number;
   /** Derived document class filter ([D-102]). */
   class?: string;
+  /** Fiscal document kind filter ([D-115]). */
+  documentKind?: "INVOICE" | "CREDIT_NOTE" | "DEBIT_NOTE";
 };
 
 export type CompanySupplierInvoiceListRow = Omit<SupplierInvoiceView, "lines"> & {
@@ -483,6 +516,7 @@ export async function listCompanySupplierInvoices(
       : {}),
     ...(search ? supplierInvoiceSearchWhere(search) : {}),
     ...(classCode ? supplierInvoiceClassWhere(classCode) : {}),
+    ...(filters?.documentKind ? { documentKind: filters.documentKind } : {}),
   };
 
   const issueDir = filters?.sortDir === "asc" ? "asc" : "desc";
@@ -784,11 +818,28 @@ export async function updateSupplierInvoice(
   if (existing.projectId) {
     await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   }
-  if (existing.documentKind !== "INVOICE") {
-    throw new ServiceError(
-      "VALIDATION",
-      "Las notas de crédito/débito no se editan con el formulario de factura. Anulá y creá una nueva si hace falta ajustar el monto.",
-    );
+  const isFiscalNote =
+    existing.documentKind === "CREDIT_NOTE" || existing.documentKind === "DEBIT_NOTE";
+  const isCreditNote = existing.documentKind === "CREDIT_NOTE";
+  if (isFiscalNote) {
+    if (
+      input.supplierContactId &&
+      input.supplierContactId !== existing.supplierContactId
+    ) {
+      throw new ServiceError(
+        "VALIDATION",
+        "No se puede cambiar el proveedor de una nota de crédito/débito.",
+      );
+    }
+    if (
+      input.purchaseOrderId !== undefined &&
+      input.purchaseOrderId !== existing.purchaseOrderId
+    ) {
+      throw new ServiceError(
+        "VALIDATION",
+        "No se puede vincular una orden de compra a una nota de crédito/débito.",
+      );
+    }
   }
   assertSupplierInvoiceEditable(existing);
 
@@ -882,9 +933,11 @@ export async function updateSupplierInvoice(
         purchaseOrderId: nextPurchaseOrderId,
         fxRate: input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined,
         ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
-        ...(input.iibbPerceptionRate !== undefined
-          ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
-          : {}),
+        ...(isCreditNote
+          ? { iibbPerceptionRate: new Prisma.Decimal(0) }
+          : input.iibbPerceptionRate !== undefined
+            ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
+            : {}),
         updatedBy:       ctx.actorUserId,
       },
     });
@@ -960,10 +1013,10 @@ export async function updateSupplierInvoice(
       }
       if (changed) {
         await recalcSupplierInvoiceTotals(tx, id);
-      } else if (input.iibbPerceptionRate !== undefined) {
+      } else if (isCreditNote || input.iibbPerceptionRate !== undefined) {
         await recalcSupplierInvoiceTotals(tx, id);
       }
-    } else if (input.iibbPerceptionRate !== undefined) {
+    } else if (isCreditNote || input.iibbPerceptionRate !== undefined) {
       await recalcSupplierInvoiceTotals(tx, id);
     }
 
@@ -974,6 +1027,35 @@ export async function updateSupplierInvoice(
         supplierContact: { select: { legalName: true, fantasyName: true } },
       },
     });
+
+    if (isCreditNote) {
+      if (!existing.referencedSupplierInvoiceId) {
+        throw new ServiceError("VALIDATION", "La NC requiere factura de referencia.");
+      }
+      const parent = await tx.supplierInvoice.findUnique({
+        where: { id: existing.referencedSupplierInvoiceId },
+        include: { payable: true },
+      });
+      if (!parent || parent.tenantId !== ctx.tenantId) {
+        throw new ServiceError("NOT_FOUND", "Factura de referencia no encontrada");
+      }
+      if (!parent.payable || parent.payable.status === "CANCELLED") {
+        throw new ServiceError("CONFLICT", "La factura no tiene cuenta por pagar activa.");
+      }
+      const balanceDue = normalizeObligationBalanceDue(
+        computeObligationBalanceDue(
+          parent.payable.originalAmount,
+          parent.payable.paidAmount,
+          parent.payable.creditedAmount,
+        ),
+      );
+      if (inv.totalAmount.greaterThan(balanceDue)) {
+        throw new ServiceError(
+          "CONFLICT",
+          `La NC (${serializeMoneyDecimal(inv.totalAmount)}) supera el saldo pendiente (${serializeMoneyDecimal(balanceDue)}).`,
+        );
+      }
+    }
 
     await auditAp(
       ctx,

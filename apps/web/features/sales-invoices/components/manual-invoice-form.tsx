@@ -167,7 +167,7 @@ export function ManualInvoiceForm({
     e.preventDefault();
     if (!clientContactId) { setError("Debe seleccionar un cliente"); return; }
     if (showLetter && !invoiceLetter) {
-      setError("Seleccioná el tipo de factura (A, B, C o E)");
+      setError("Seleccioná la letra del comprobante (A, B, C o E)");
       return;
     }
     if (collectNow && showCollectNow && !collectAccountId) {

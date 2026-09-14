@@ -21,7 +21,15 @@ import { updateCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/factura
 import type { SupplierInvoiceView } from "@bloqer/services";
 import type { SupplierOption, POOption } from "./supplier-invoice-form";
 import { classifySupplierInvoice } from "@bloqer/domain";
+import {
+  addDecimal,
+  calcDocumentHeaderTaxTotals,
+  calcExclusiveLineAmounts,
+  compareDecimal,
+  roundMoney,
+} from "@bloqer/utils";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +48,8 @@ interface Props {
   companyIvaCondition?: string | null;
   poOptions?: POOption[];
   wbsOptions?: InvoiceWbsOption[];
+  /** Parent open balance when editing a DRAFT credit note. */
+  maxCreditAmount?: string | null;
 }
 
 function toDateStr(d: Date | string): string {
@@ -55,6 +65,7 @@ export function SupplierInvoiceEditForm({
   companyIvaCondition = null,
   poOptions = [],
   wbsOptions = [],
+  maxCreditAmount = null,
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -67,11 +78,20 @@ export function SupplierInvoiceEditForm({
   /** Stored unit prices are net — keep off unless user re-enters gross ([D-086]). */
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
   const [purchaseOrderId, setPurchaseOrderId] = useState<string | null>(invoice.purchaseOrderId ?? null);
-  const payeeLocked = Boolean(invoice.subcontractCertificationId);
+  const payeeLocked =
+    Boolean(invoice.subcontractCertificationId) ||
+    invoice.documentKind === "CREDIT_NOTE" ||
+    invoice.documentKind === "DEBIT_NOTE";
+  const certificationLocked = Boolean(invoice.subcontractCertificationId);
+  const isFiscalNote =
+    invoice.documentKind === "CREDIT_NOTE" || invoice.documentKind === "DEBIT_NOTE";
+  const isCreditNote = invoice.documentKind === "CREDIT_NOTE";
   const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">(
-    invoice.purchaseOrderId || invoice.lines.some((l) => l.purchaseOrderLineId)
-      ? "AGAINST_PO"
-      : "DIRECT",
+    isFiscalNote
+      ? "DIRECT"
+      : invoice.purchaseOrderId || invoice.lines.some((l) => l.purchaseOrderLineId)
+        ? "AGAINST_PO"
+        : "DIRECT",
   );
   const [lines, setLines] = useState<InvoiceLine[]>(
     invoice.lines.length > 0
@@ -188,7 +208,7 @@ export function SupplierInvoiceEditForm({
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (showLetter && !invoiceLetter) {
-      setError("Seleccioná el tipo de factura (A, B, C o E) antes de guardar");
+      setError("Seleccioná la letra del comprobante (A, B, C o E) antes de guardar");
       return;
     }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
@@ -209,8 +229,39 @@ export function SupplierInvoiceEditForm({
       setError("Seleccioná la orden de compra o cambiá a costo directo");
       return;
     }
-    const fd = new FormData(e.currentTarget);
     const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
+    const iibbForSave = isCreditNote ? "0" : iibbPerceptionRate;
+    if (isCreditNote && maxCreditAmount) {
+      try {
+        let subtotal = "0";
+        let taxAmount = "0";
+        for (const line of lines) {
+          const amounts = calcExclusiveLineAmounts({
+            quantity: line.quantity || "0",
+            unitPriceNet: line.unitPrice || "0",
+            taxRatePercent: forceZeroTax ? "0" : line.taxRate || "0",
+            discountPct: line.discountPct || "0",
+          });
+          subtotal = roundMoney(addDecimal(subtotal, amounts.lineSubtotal));
+          taxAmount = roundMoney(addDecimal(taxAmount, amounts.lineTax));
+        }
+        const total = calcDocumentHeaderTaxTotals({
+          subtotal,
+          taxAmount,
+          iibbPerceptionRatePercent: iibbForSave,
+        }).totalAmount;
+        if (compareDecimal(total, maxCreditAmount) > 0) {
+          setError(
+            `El total no puede superar el saldo pendiente (${formatMoneyAmount(maxCreditAmount, invoice.currency)}).`,
+          );
+          return;
+        }
+      } catch {
+        setError("Revisá los montos de las líneas");
+        return;
+      }
+    }
+    const fd = new FormData(e.currentTarget);
     const payload = {
       supplierContactId: payeeLocked ? invoice.supplierContactId : supplierContactId,
       issueDate:       fd.get("issueDate") as string,
@@ -220,7 +271,7 @@ export function SupplierInvoiceEditForm({
       pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
       notes:           (fd.get("notes") as string) || null,
       purchaseOrderId: companyFinanzas || apSpendMode === "DIRECT" ? null : purchaseOrderId ?? null,
-      iibbPerceptionRate,
+      iibbPerceptionRate: iibbForSave,
       lines:           lines.map((l, i) => ({
         ...l,
         taxRate: forceZeroTax ? "0" : l.taxRate,
@@ -246,13 +297,15 @@ export function SupplierInvoiceEditForm({
     });
   }
 
-  const classHint = payeeLocked
+  const classHint = certificationLocked
     ? "Vinculada a certificación de subcontrato."
-    : companyFinanzas || !projectId
-      ? "Gasto de estructura (sin obra)."
-      : apSpendMode === "AGAINST_PO"
-        ? "Baja el comprometido abierto de esa OC."
-        : "No reduce el comprometido. Imputá partida y tipo de costo.";
+    : isFiscalNote
+      ? "Nota vinculada a la factura de referencia; el proveedor no se cambia."
+      : companyFinanzas || !projectId
+        ? "Gasto de estructura (sin obra)."
+        : apSpendMode === "AGAINST_PO"
+          ? "Baja el comprometido abierto de esa OC."
+          : "No reduce el comprometido. Imputá partida y tipo de costo.";
 
   return (
     <div className="rounded-lg border bg-card p-5 sm:p-6">
@@ -276,7 +329,9 @@ export function SupplierInvoiceEditForm({
             />
             {payeeLocked ? (
               <p className="text-xs text-muted-foreground">
-                Esta factura nace de una certificación de subcontrato; el destinatario no se cambia acá.
+                {certificationLocked
+                  ? "Esta factura nace de una certificación de subcontrato; el destinatario no se cambia acá."
+                  : "El proveedor viene de la factura de referencia y no se cambia acá."}
               </p>
             ) : (
               <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
@@ -418,14 +473,27 @@ export function SupplierInvoiceEditForm({
         </div>
 
         <div className="border-t border-border/60 pt-4">
+          {isFiscalNote && invoice.documentKind === "CREDIT_NOTE" && maxCreditAmount ? (
+            <p className="mb-3 text-sm text-muted-foreground">
+              Máximo para esta NC:{" "}
+              <span className="font-mono font-medium">
+                {formatMoneyAmount(maxCreditAmount, invoice.currency)}
+              </span>{" "}
+              (saldo pendiente de la factura de referencia).
+            </p>
+          ) : isFiscalNote && invoice.documentKind === "CREDIT_NOTE" ? (
+            <p className="mb-3 text-sm text-muted-foreground">
+              La NC no puede superar el saldo pendiente de la factura de referencia al emitir.
+            </p>
+          ) : null}
           <InvoiceLinesEditor
             lines={lines}
             onChange={setLines}
             requireWbs={!companyFinanzas && Boolean(projectId)}
             wbsOptions={wbsOptions}
             pricesIncludeTax={pricesIncludeTax}
-            iibbPerceptionRate={iibbPerceptionRate}
-            onIibbPerceptionRateChange={setIibbPerceptionRate}
+            iibbPerceptionRate={isCreditNote ? undefined : iibbPerceptionRate}
+            onIibbPerceptionRateChange={isCreditNote ? undefined : setIibbPerceptionRate}
           />
         </div>
 

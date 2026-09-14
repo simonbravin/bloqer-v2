@@ -208,6 +208,14 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
               {fmtMoney(receivable.paidAmount, receivable.currency)}
             </dd>
           </div>
+          {Number(receivable.creditedAmount) > 0 ? (
+            <div>
+              <dt className="text-muted-foreground">Créditos NC</dt>
+              <dd className="font-medium font-mono">
+                {fmtMoney(receivable.creditedAmount, receivable.currency)}
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-muted-foreground font-semibold">Saldo pendiente</dt>
             <dd className="font-bold font-mono text-lg">

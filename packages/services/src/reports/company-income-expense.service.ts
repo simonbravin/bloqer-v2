@@ -159,11 +159,13 @@ export async function getCompanyIncomeExpenseReport(
         tenantId: ctx.tenantId,
         projectId: null,
         status: "ISSUED",
+        // [D-115] Factura + ND suman; NC resta en costAccrued.
+        documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
         issueDate: { gte: dateFrom, lte: dateTo },
         // SupplierInvoice.companyId es NOT NULL → scope directo por empresa.
         ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       },
-      select: { issueDate: true, totalAmount: true },
+      select: { issueDate: true, totalAmount: true, documentKind: true },
     });
     for (const inv of corpInvoices) {
       const key = monthKey(inv.issueDate);
@@ -178,7 +180,11 @@ export async function getCompanyIncomeExpenseReport(
         grossMarginAccrued: "0.00",
         grossMarginCash: "0.00",
       };
-      existing.costAccrued = new Prisma.Decimal(existing.costAccrued).plus(inv.totalAmount).toFixed(2);
+      const signed =
+        inv.documentKind === "CREDIT_NOTE"
+          ? new Prisma.Decimal(inv.totalAmount).negated()
+          : new Prisma.Decimal(inv.totalAmount);
+      existing.costAccrued = new Prisma.Decimal(existing.costAccrued).plus(signed).toFixed(2);
       monthlyMap.set(key, recomputeMargins(existing));
     }
   }

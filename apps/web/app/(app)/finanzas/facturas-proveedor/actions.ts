@@ -112,11 +112,27 @@ export async function cancelCompanySupplierInvoiceAction(
 
 export async function createCompanySupplierCreditNoteFromInvoiceAction(
   parentInvoiceId: string,
+  options?: { amount?: string },
 ): Promise<{ id: string } | { error: string }> {
   const ctx = await getCtx();
   try {
     const note = await createSupplierCreditNoteFromInvoice(
-      { parentSupplierInvoiceId: parentInvoiceId },
+      {
+        parentSupplierInvoiceId: parentInvoiceId,
+        ...(options?.amount
+          ? {
+              lines: [
+                {
+                  description: "Nota de crédito",
+                  quantity: "1",
+                  unitPrice: options.amount,
+                  taxRate: "0",
+                  discountPct: "0",
+                },
+              ],
+            }
+          : {}),
+      },
       ctx,
     );
     revalidateCompanyApPaths(undefined, [`${FIN_LIST}/${note.id}`]);

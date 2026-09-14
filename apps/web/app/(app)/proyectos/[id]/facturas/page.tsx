@@ -7,13 +7,14 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
 import {
   NewProjectSalesInvoiceDialog,
+  SalesInvoiceListFilters,
   SalesInvoiceListSection,
   type ClientOption,
   type SalesInvoiceListItem,
   type TreasuryAccountOption,
 } from "@/features/sales-invoices";
 import { getCurrentUser } from "@/lib/auth";
-import { can } from "@bloqer/domain";
+import { can, isFiscalDocumentKind } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
 import {
   canEditArArea,
@@ -28,13 +29,19 @@ import {
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 import { toContactPickerOption } from "@/lib/searchable-options";
-import { DocumentClassFilter } from "@/features/finance/components/document-class-filter";
+import { fiscalDocumentListEmptyCopy } from "@/features/finance/lib/fiscal-document-list-empty";
 
 const PAGE_SIZE = 20;
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ page?: string; create?: string; class?: string }>;
+  searchParams: Promise<{
+    page?: string;
+    create?: string;
+    class?: string;
+    kind?: string;
+    search?: string;
+  }>;
 }
 
 export default async function FacturasPage({ params, searchParams }: PageProps) {
@@ -44,6 +51,8 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
   const { id } = await params;
   const sp = await searchParams;
   const page = parsePage(sp.page);
+  const documentKind = isFiscalDocumentKind(sp.kind) ? sp.kind : undefined;
+  const search = sp.search?.trim() || undefined;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -66,6 +75,8 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
       page,
       pageSize: PAGE_SIZE,
       class: sp.class,
+      documentKind,
+      search,
     });
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
@@ -140,11 +151,18 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     }
   }
 
+  const hasExtraFilters = Boolean(search || sp.class || documentKind);
+  const emptyCopy = fiscalDocumentListEmptyCopy({
+    kind: documentKind,
+    hasExtraFilters,
+    cancelledTabAvailable: false,
+  });
+
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Facturas emitidas"
-        subtitle={`${invoicesTotal} ${invoicesTotal === 1 ? "factura" : "facturas"}`}
+        subtitle={`${invoicesTotal} ${invoicesTotal === 1 ? "comprobante" : "comprobantes"}`}
         actions={
           <ProjectFinanceListHeaderActions
             listViewStorageKey={`facturas-${id}`}
@@ -170,13 +188,16 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
       />
 
       <Suspense fallback={null}>
-        <div className="rounded-lg border bg-card p-4">
-          <DocumentClassFilter scope="sales-project" />
-        </div>
+        <SalesInvoiceListFilters />
       </Suspense>
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <SalesInvoiceListSection invoices={items} projectId={id} />
+        <SalesInvoiceListSection
+          invoices={items}
+          projectId={id}
+          emptyTitle={emptyCopy.title}
+          emptyDescription={emptyCopy.description}
+        />
       </Suspense>
 
       <Suspense fallback={null}>

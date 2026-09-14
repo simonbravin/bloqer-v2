@@ -166,7 +166,7 @@ export default async function PayableDetailPage({ params, searchParams }: PagePr
 
         <hr />
 
-        <div className="grid grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-4">
           <div>
             <p className="text-muted-foreground">Total original</p>
             <p className="font-medium tabular-nums">
@@ -179,6 +179,14 @@ export default async function PayableDetailPage({ params, searchParams }: PagePr
               {formatMoneyAmount(payable.paidAmount, payable.currency)}
             </p>
           </div>
+          {Number(payable.creditedAmount) > 0 ? (
+            <div>
+              <p className="text-muted-foreground">Créditos NC</p>
+              <p className="font-medium tabular-nums">
+                {formatMoneyAmount(payable.creditedAmount, payable.currency)}
+              </p>
+            </div>
+          ) : null}
           <div>
             <p className="text-muted-foreground font-semibold">Saldo pendiente</p>
             <p className="font-semibold tabular-nums">
