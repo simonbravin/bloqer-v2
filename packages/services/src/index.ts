@@ -80,6 +80,7 @@ export type {
 
 export * from "./finance/document-class.service";
 export * from "./ar/sales-invoice.service";
+export * from "./ar/credit-debit-note.service";
 export * from "./ar/receivable.service";
 export * from "./ar/ar-notifications.service";
 export * from "./ar/project-ar-summary.service";
@@ -107,6 +108,7 @@ export {
   canRegisterApPayment,
 } from "./ap/ap-access";
 export * from "./ap/supplier-invoice.service";
+export * from "./ap/credit-debit-note.service";
 export * from "./ap/supplier-invoice-from-po.service";
 export * from "./ap/payable.service";
 export * from "./ap/payment.service";

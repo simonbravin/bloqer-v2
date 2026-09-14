@@ -12,8 +12,9 @@ import {
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SalesInvoiceStatusBadge } from "@/features/sales-invoices";
-import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
+import { formatInvoiceLetterBadge, IIBB_PERCEPTION_LABEL_ES, fiscalDocumentKindLabel } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
+import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-document-kind-badge";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
@@ -24,7 +25,15 @@ import {
   listEntityDocuments,
   ServiceError,
 } from "@bloqer/services";
-import { issueSalesInvoiceAction, cancelSalesInvoiceAction } from "../actions";
+import {
+  issueSalesInvoiceAction,
+  cancelSalesInvoiceAction,
+  createSalesCreditNoteFromInvoiceAction,
+  createSalesDebitNoteFromInvoiceAction,
+  issueSalesCreditNoteAction,
+  issueSalesDebitNoteAction,
+  cancelSalesCreditNoteAction,
+} from "../actions";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
@@ -42,6 +51,11 @@ function fmtDate(d: Date) {
 
 function fmtMoney(value: string, currency: string) {
   return formatMoneyAmount(value, currency);
+}
+
+function hasOpenBalanceDue(balanceDue: string): boolean {
+  const n = Number(balanceDue);
+  return Number.isFinite(n) && n > 0;
 }
 
 export default async function FacturaDetailPage({ params, searchParams }: PageProps) {
@@ -76,21 +90,34 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
   const canEditAttachments = canEditAr;
 
   const returnPath = `/proyectos/${id}/facturas/${invoiceId}`;
+  const kind = invoice.documentKind ?? "INVOICE";
+  const isInvoice = kind === "INVOICE";
+  const isCreditNote = kind === "CREDIT_NOTE";
+  const isDebitNote = kind === "DEBIT_NOTE";
   const canCollect =
     canEditAr &&
+    !isCreditNote &&
     receivable &&
     (receivable.status === "OPEN" ||
       receivable.status === "PARTIAL" ||
       receivable.status === "OVERDUE");
+  const canIssueNc =
+    canEditAr &&
+    invoice.status === "ISSUED" &&
+    isInvoice &&
+    receivable != null &&
+    hasOpenBalanceDue(receivable.balanceDue);
+  const canIssueNd = canEditAr && invoice.status === "ISSUED" && isInvoice;
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={invoice.code}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold tracking-tight">{invoice.code}</h1>
               <SalesInvoiceStatusBadge status={invoice.status} />
+              <FiscalDocumentKindBadge documentKind={kind} />
               {formatInvoiceLetterBadge(invoice.invoiceLetter) ? (
                 <span className="rounded-md border px-2 py-0.5 text-xs font-medium text-muted-foreground">
                   {formatInvoiceLetterBadge(invoice.invoiceLetter)}
@@ -107,8 +134,8 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {canEditAr && invoice.status === "DRAFT" && (
+        <div className="flex flex-wrap items-center gap-2">
+          {canEditAr && invoice.status === "DRAFT" && isInvoice && (
             <>
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/proyectos/${id}/facturas/${invoiceId}/editar`}>Editar</Link>
@@ -125,11 +152,65 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
               </form>
             </>
           )}
+          {canEditAr && invoice.status === "DRAFT" && isCreditNote && (
+            <form
+              action={async () => {
+                "use server";
+                const result = await issueSalesCreditNoteAction(invoiceId, id);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(returnPath);
+              }}
+            >
+              <Button size="sm">Emitir nota de crédito</Button>
+            </form>
+          )}
+          {canEditAr && invoice.status === "DRAFT" && isDebitNote && (
+            <form
+              action={async () => {
+                "use server";
+                const result = await issueSalesDebitNoteAction(invoiceId, id);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(returnPath);
+              }}
+            >
+              <Button size="sm">Emitir nota de débito</Button>
+            </form>
+          )}
+          {canIssueNc ? (
+            <form
+              action={async () => {
+                "use server";
+                const result = await createSalesCreditNoteFromInvoiceAction(invoiceId, id);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(`/proyectos/${id}/facturas/${result.id}`);
+              }}
+            >
+              <Button variant="outline" size="sm">
+                Nota de crédito
+              </Button>
+            </form>
+          ) : null}
+          {canIssueNd ? (
+            <form
+              action={async () => {
+                "use server";
+                const result = await createSalesDebitNoteFromInvoiceAction(invoiceId, id);
+                if ("error" in result) redirectWithActionError(returnPath, result.error);
+                redirect(`/proyectos/${id}/facturas/${result.id}`);
+              }}
+            >
+              <Button variant="outline" size="sm">
+                Nota de débito
+              </Button>
+            </form>
+          ) : null}
           {canEditAr && invoice.status !== "CANCELLED" && (
             <form
               action={async () => {
                 "use server";
-                const result = await cancelSalesInvoiceAction(invoiceId, id);
+                const result = isCreditNote
+                  ? await cancelSalesCreditNoteAction(invoiceId, id)
+                  : await cancelSalesInvoiceAction(invoiceId, id);
                 if ("error" in result) redirectWithActionError(returnPath, result.error);
                 redirect(returnPath);
               }}
@@ -148,9 +229,14 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
         <div className="rounded-lg border bg-card px-4 py-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-medium">Cuenta por cobrar vinculada</p>
+              <p className="font-medium">
+                {isDebitNote ? "Cuenta por cobrar de esta ND" : "Cuenta por cobrar vinculada"}
+              </p>
               <p className="text-xs text-muted-foreground">
                 Saldo pendiente: {fmtMoney(receivable.balanceDue, receivable.currency)}
+                {Number(receivable.creditedAmount) > 0
+                  ? ` · Créditos NC: ${fmtMoney(receivable.creditedAmount, receivable.currency)}`
+                  : null}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -167,7 +253,16 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
             </div>
           </div>
         </div>
-      ) : invoice.status === "DRAFT" ? (
+      ) : isCreditNote ? (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+          <p className="font-medium">Nota de crédito</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {invoice.status === "DRAFT"
+              ? "Al emitir, reduce el saldo de la factura de referencia sin movimiento de caja."
+              : "Aplicada a la CxC de la factura de referencia (sin cobranza)."}
+          </p>
+        </div>
+      ) : invoice.status === "DRAFT" && isInvoice ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
           <p className="font-medium">Borrador sin cuenta por cobrar</p>
           <p className="mt-1 text-xs">
@@ -175,7 +270,14 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
             banco: la cobranza posterior, con cuenta de tesorería, es el paso de caja.
           </p>
         </div>
-      ) : invoice.status === "ISSUED" ? (
+      ) : invoice.status === "DRAFT" && isDebitNote ? (
+        <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
+          <p className="font-medium">Nota de débito en borrador</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Al emitir abre una CxC nueva (aumenta la deuda del cliente).
+          </p>
+        </div>
+      ) : invoice.status === "ISSUED" && isInvoice ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
           <p className="font-medium">Factura emitida sin CxC vinculada</p>
           <p className="mt-1 text-xs">
@@ -187,9 +289,26 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
 
       <div className="rounded-lg border bg-card">
         <div className="border-b px-6 py-4">
-          <h2 className="font-semibold">Datos de la factura</h2>
+          <h2 className="font-semibold">Datos del comprobante</h2>
         </div>
         <dl className="grid grid-cols-2 gap-4 px-6 py-4 text-sm">
+          <div>
+            <dt className="text-muted-foreground">Tipo de documento</dt>
+            <dd className="font-medium">{fiscalDocumentKindLabel(kind)}</dd>
+          </div>
+          {invoice.referencedSalesInvoiceId ? (
+            <div>
+              <dt className="text-muted-foreground">Factura de referencia</dt>
+              <dd className="font-medium">
+                <Link
+                  href={`/proyectos/${id}/facturas/${invoice.referencedSalesInvoiceId}`}
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  Ver factura
+                </Link>
+              </dd>
+            </div>
+          ) : null}
           <div>
             <dt className="text-muted-foreground">Emisión</dt>
             <dd className="font-medium">{fmtDate(invoice.issueDate)}</dd>

@@ -77,6 +77,7 @@ export async function getCompanyCashProjectionReport(
           dueDate: true,
           originalAmount: true,
           paidAmount: true,
+          creditedAmount: true,
           status: true,
         },
       }));
@@ -119,7 +120,7 @@ export function isCorporatePayableInProjectionHorizon(
   row: CorporatePayableSnapshotRow,
   horizonEnd: string,
 ): boolean {
-  const bal = row.originalAmount.minus(row.paidAmount);
+  const bal = row.originalAmount.minus(row.paidAmount).minus(row.creditedAmount);
   if (bal.lessThanOrEqualTo(0)) return false;
   if (!ACTIVE_OBLIGATION_STATUSES.includes(row.status as (typeof ACTIVE_OBLIGATION_STATUSES)[number])) {
     return false;

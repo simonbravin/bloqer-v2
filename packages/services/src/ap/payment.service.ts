@@ -4,6 +4,7 @@ import { auditAp } from "./ap-audit";
 import { applyPaymentToPayable } from "./apply-payment-to-payable";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
+import { computeObligationBalanceDue } from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -254,7 +255,11 @@ export async function createPayment(
           throw new ServiceError("CONFLICT", "La cuenta por pagar ya está totalmente pagada");
         }
 
-        const balanceDue = payable.originalAmount.minus(payable.paidAmount);
+        const balanceDue = computeObligationBalanceDue(
+          payable.originalAmount,
+          payable.paidAmount,
+          payable.creditedAmount,
+        );
         // D-053: payFullBalance applies stored balance; never round-then-reapply from UI.
         // Also treat amount that rounds to the same 2dp as balance as full (API clients).
         let amount: Prisma.Decimal;
@@ -463,11 +468,16 @@ export async function cancelPayment(
     const payable = await tx.payable.findUnique({ where: { id: p.payableId } });
     if (payable && payable.status !== "CANCELLED") {
       const newPaid    = Prisma.Decimal.max(payable.paidAmount.minus(p.amount), new Prisma.Decimal(0));
-      const newStatus  = resolveObligationStoredStatus(newPaid, payable.originalAmount);
+      const newStatus  = resolveObligationStoredStatus(
+        newPaid,
+        payable.originalAmount,
+        payable.creditedAmount,
+      );
       const payableReverse = await tx.payable.updateMany({
         where: {
           id: payable.id,
           paidAmount: payable.paidAmount,
+          creditedAmount: payable.creditedAmount,
           status: { not: "CANCELLED" },
         },
         data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },

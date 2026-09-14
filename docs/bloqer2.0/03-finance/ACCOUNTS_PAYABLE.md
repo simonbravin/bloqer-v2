@@ -14,7 +14,11 @@ Obligación de la empresa hacia **proveedores/subcontratos/servicios** por factu
 **Payment** con aplicaciones simétricas a AR ([D-010]).
 
 ## Estados y aging
-Igual patrón que Receivable.
+Igual patrón que Receivable. Saldo: `balanceDue = originalAmount − paidAmount − creditedAmount` ([D-115]).
+
+## Notas de crédito / débito ([D-115])
+- **ND** en `SupplierInvoice`: al emitir crea `Payable` propia.
+- **NC**: aplica `creditedAmount` a la Payable de la factura referenciada (sin egreso de caja).
 
 ## Relación tesorería
 **AccountMovement OUTCOME** al confirmar pago.

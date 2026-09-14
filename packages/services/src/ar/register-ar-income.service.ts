@@ -5,7 +5,10 @@ import { auditAr } from "./ar-audit";
 import { canEditCompanyAr } from "./ar-access";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
-import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
+import {
+  computeObligationBalanceDue,
+  effectiveObligationPaidAfterPayment,
+} from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
@@ -303,7 +306,7 @@ export async function registerArIncome(
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
         const maxNum = await tx.salesInvoice.aggregate({
-          where: { tenantId: ctx.tenantId, companyId },
+          where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
           _max: { number: true },
         });
         const number = (maxNum._max.number ?? 0) + 1;
@@ -407,7 +410,11 @@ export async function registerArIncome(
           if (collectAmount.lessThanOrEqualTo(0)) {
             throw new ServiceError("VALIDATION", "El monto de cobro debe ser mayor a 0");
           }
-          const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
+          const balanceDue = computeObligationBalanceDue(
+            receivable.originalAmount,
+            receivable.paidAmount,
+            receivable.creditedAmount,
+          );
           if (collectAmount.greaterThan(balanceDue)) {
             throw new ServiceError(
               "CONFLICT",
@@ -498,13 +505,19 @@ export async function registerArIncome(
           const newPaid = effectiveObligationPaidAfterPayment(
             receivable.originalAmount,
             receivable.paidAmount.plus(collectAmount),
+            receivable.creditedAmount,
           );
-          const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
+          const newStatus = resolveObligationStoredStatus(
+            newPaid,
+            receivable.originalAmount,
+            receivable.creditedAmount,
+          );
           const receivableUpdate = await tx.receivable.updateMany({
             where: {
               id: receivable.id,
               tenantId: ctx.tenantId,
               paidAmount: receivable.paidAmount,
+              creditedAmount: receivable.creditedAmount,
               status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
             },
             data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },

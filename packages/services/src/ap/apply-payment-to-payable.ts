@@ -1,7 +1,11 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
-import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
+import {
+  computeObligationBalanceDue,
+  effectiveObligationPaidAfterPayment,
+  normalizeObligationBalanceDue,
+} from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
@@ -30,6 +34,7 @@ export type ApplyPaymentPayableSnapshot = {
   currency: string;
   originalAmount: Prisma.Decimal;
   paidAmount: Prisma.Decimal;
+  creditedAmount: Prisma.Decimal;
 };
 
 export type ApplyPaymentToPayableInput = {
@@ -64,7 +69,13 @@ export async function applyPaymentToPayable(
   const { payable, accountId, paymentDate, notes, paymentMethod, reference } = input;
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
-  const balanceDue = payable.originalAmount.minus(payable.paidAmount);
+  const balanceDue = normalizeObligationBalanceDue(
+    computeObligationBalanceDue(
+      payable.originalAmount,
+      payable.paidAmount,
+      payable.creditedAmount,
+    ),
+  );
   // D-053: if caller passes the exact stored balance (payFullBalance), keep it;
   // otherwise quantize partial payments to 2 dp.
   const amountToApply = input.amount.eq(balanceDue)
@@ -181,13 +192,19 @@ export async function applyPaymentToPayable(
   const newPaid = effectiveObligationPaidAfterPayment(
     payable.originalAmount,
     payable.paidAmount.plus(amountToApply),
+    payable.creditedAmount,
   );
-  const newStatus = resolveObligationStoredStatus(newPaid, payable.originalAmount);
+  const newStatus = resolveObligationStoredStatus(
+    newPaid,
+    payable.originalAmount,
+    payable.creditedAmount,
+  );
   const payableUpdate = await tx.payable.updateMany({
     where: {
       id: payable.id,
       tenantId: ctx.tenantId,
       paidAmount: payable.paidAmount,
+      creditedAmount: payable.creditedAmount,
       status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
     },
     data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },

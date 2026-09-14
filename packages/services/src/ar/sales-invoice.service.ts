@@ -281,7 +281,7 @@ export async function createSalesInvoice(
   const pricesIncludeTax = forceZeroTax ? false : Boolean(input.pricesIncludeTax);
 
   const maxNum = await prisma.salesInvoice.aggregate({
-    where: { tenantId: ctx.tenantId, companyId },
+    where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
     _max: { number: true },
   });
   const number = (maxNum._max.number ?? 0) + 1;
@@ -418,7 +418,7 @@ export async function createInvoiceFromCertification(
       }
 
       const maxNum = await tx.salesInvoice.aggregate({
-        where: { tenantId: ctx.tenantId, companyId },
+        where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
         _max: { number: true },
       });
       const number = (maxNum._max.number ?? 0) + 1;
@@ -512,6 +512,12 @@ export async function updateSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
   }
   await assertProjectGuardIfPresent(inv.projectId, ctx);
+  if (inv.documentKind !== "INVOICE") {
+    throw new ServiceError(
+      "VALIDATION",
+      "Las notas de crédito/débito no se editan con el formulario de factura. Anulá y creá una nueva si hace falta ajustar el monto.",
+    );
+  }
   assertInvoiceEditable(inv);
 
   const zeroTaxForLetter =
@@ -626,6 +632,15 @@ export async function issueSalesInvoice(
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     assertInvoiceEditable(inv);
+
+    if (inv.documentKind !== "INVOICE") {
+      throw new ServiceError(
+        "VALIDATION",
+        inv.documentKind === "CREDIT_NOTE"
+          ? "Usá emitir nota de crédito para este comprobante."
+          : "Usá emitir nota de débito para este comprobante.",
+      );
+    }
 
     if (inv.lines.length === 0) {
       throw new ServiceError("CONFLICT", "No se puede emitir una factura sin líneas");
@@ -788,14 +803,34 @@ export async function cancelSalesInvoice(
       inv.status === "ISSUED"
         ? await tx.receivable.findUnique({
             where: { salesInvoiceId: id },
-            select: { id: true, paidAmount: true, projectId: true, companyId: true },
+            select: {
+              id: true,
+              paidAmount: true,
+              creditedAmount: true,
+              projectId: true,
+              companyId: true,
+            },
           })
         : null;
+    const activeNoteCount =
+      inv.status === "ISSUED" && inv.documentKind === "INVOICE"
+        ? await tx.salesInvoice.count({
+            where: {
+              tenantId: ctx.tenantId,
+              referencedSalesInvoiceId: id,
+              documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
+              status: "ISSUED",
+            },
+          })
+        : 0;
     assertCanCancelSalesInvoice({
       status: inv.status,
+      documentKind: inv.documentKind,
       hasReceivable: receivable != null,
       activeCollectionCount,
       receivablePaidAmount: receivable?.paidAmount ?? null,
+      receivableCreditedAmount: receivable?.creditedAmount ?? null,
+      activeCreditDebitNoteCount: activeNoteCount,
     });
 
     // BR-AR-004: cascade cancel linked Receivable (optimistic lock on paidAmount)
@@ -804,7 +839,7 @@ export async function cancelSalesInvoice(
         salesInvoiceId: id,
         status: { not: "CANCELLED" },
         ...(inv.status === "ISSUED" && receivable
-          ? { paidAmount: receivable.paidAmount }
+          ? { paidAmount: receivable.paidAmount, creditedAmount: receivable.creditedAmount }
           : {}),
       },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
@@ -866,9 +901,15 @@ type RawInvoiceListRow = SalesInvoice & {
 };
 
 function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceListRow {
+  const codePrefix =
+    inv.documentKind === "CREDIT_NOTE"
+      ? "NC"
+      : inv.documentKind === "DEBIT_NOTE"
+        ? "ND"
+        : "FAC";
   return {
     ...inv,
-    code: `FAC-${String(inv.number).padStart(5, "0")}`,
+    code: `${codePrefix}-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),
@@ -901,9 +942,15 @@ type RawInvoice = SalesInvoice & {
 };
 
 function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
+  const codePrefix =
+    inv.documentKind === "CREDIT_NOTE"
+      ? "NC"
+      : inv.documentKind === "DEBIT_NOTE"
+        ? "ND"
+        : "FAC";
   return {
     ...inv,
-    code: `FAC-${String(inv.number).padStart(5, "0")}`,
+    code: `${codePrefix}-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),

@@ -7,6 +7,11 @@ import {
   updateSupplierInvoice,
   issueSupplierInvoice,
   cancelSupplierInvoice,
+  createSupplierCreditNoteFromInvoice,
+  createSupplierDebitNoteFromInvoice,
+  issueSupplierCreditNote,
+  issueSupplierDebitNote,
+  cancelSupplierCreditNote,
   registerApExpense,
   ServiceError,
   type PurchaseOrderInvoiceDraftPreview,
@@ -186,6 +191,86 @@ export async function cancelSupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await cancelSupplierInvoice(invoiceId, ctx, projectId);
+    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function createSupplierCreditNoteFromInvoiceAction(
+  parentInvoiceId: string,
+  projectId: string,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    const note = await createSupplierCreditNoteFromInvoice(
+      { parentSupplierInvoiceId: parentInvoiceId },
+      ctx,
+    );
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${note.id}`,
+    ]);
+    return { id: note.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function createSupplierDebitNoteFromInvoiceAction(
+  parentInvoiceId: string,
+  projectId: string,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    const note = await createSupplierDebitNoteFromInvoice(
+      { parentSupplierInvoiceId: parentInvoiceId },
+      ctx,
+    );
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${note.id}`,
+    ]);
+    return { id: note.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function issueSupplierCreditNoteAction(
+  invoiceId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await issueSupplierCreditNote(invoiceId, ctx, projectId);
+    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function issueSupplierDebitNoteAction(
+  invoiceId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await issueSupplierDebitNote(invoiceId, ctx, projectId);
+    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function cancelSupplierCreditNoteAction(
+  invoiceId: string,
+  projectId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await cancelSupplierCreditNote(invoiceId, ctx, projectId);
     revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
     return { ok: true };
   } catch (err) {

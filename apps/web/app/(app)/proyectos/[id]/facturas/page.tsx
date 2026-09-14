@@ -86,6 +86,7 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
     currency: inv.currency,
     clientName: inv.clientName,
     invoiceLetter: inv.invoiceLetter,
+    documentKind: inv.documentKind,
     classCode: inv.classCode,
     classLabel: inv.classLabel,
     classFamily: inv.classFamily,

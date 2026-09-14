@@ -32,9 +32,10 @@ import {
 
 // ─── View type ────────────────────────────────────────────────────────────────
 
-export type PayableView = Omit<Payable, "originalAmount" | "paidAmount"> & {
+export type PayableView = Omit<Payable, "originalAmount" | "paidAmount" | "creditedAmount"> & {
   originalAmount: string;
   paidAmount: string;
+  creditedAmount: string;
   balanceDue: string;
   supplierName: string;
 } & FinancialClassFields;
@@ -186,6 +187,7 @@ export async function summarizePayablesByProject(
       currency: true,
       originalAmount: true,
       paidAmount: true,
+      creditedAmount: true,
       dueDate: true,
       status: true,
     },
@@ -207,6 +209,7 @@ function aggregateOpenPayableBalances(
     currency: string;
     originalAmount: Prisma.Decimal;
     paidAmount: Prisma.Decimal;
+    creditedAmount: Prisma.Decimal;
     dueDate: Date;
     status: string;
   }>,
@@ -217,7 +220,7 @@ function aggregateOpenPayableBalances(
 
   for (const p of rows) {
     if (p.status === "CANCELLED") continue;
-    const bal = p.originalAmount.minus(p.paidAmount);
+    const bal = computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount);
     if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) continue;
     const cur = p.currency;
     total.set(cur, (total.get(cur) ?? zero).add(bal));
@@ -526,7 +529,11 @@ async function reconcilePayableStatusIfSettled(
   ctx: ServiceContext,
 ): Promise<Payable> {
   if (payable.status === "PAID" || payable.status === "CANCELLED") return payable;
-  const balanceDue = computeObligationBalanceDue(payable.originalAmount, payable.paidAmount);
+  const balanceDue = computeObligationBalanceDue(
+    payable.originalAmount,
+    payable.paidAmount,
+    payable.creditedAmount,
+  );
   if (hasOpenObligationBalance(balanceDue)) return payable;
 
   const updated = await prisma.payable.updateMany({
@@ -553,7 +560,7 @@ type RawPayable = Payable & {
 };
 
 export function serializePayable(p: RawPayable): PayableView {
-  const rawBalance = computeObligationBalanceDue(p.originalAmount, p.paidAmount);
+  const rawBalance = computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount);
   const balanceDue = normalizeObligationBalanceDue(rawBalance);
   const status = deriveObligationDisplayStatus(p.status, rawBalance, p.dueDate, undefined, p.paidAmount);
   const inv = p.supplierInvoice;
@@ -568,6 +575,7 @@ export function serializePayable(p: RawPayable): PayableView {
     status,
     originalAmount: serializeMoneyDecimal(p.originalAmount),
     paidAmount:     serializeMoneyDecimal(p.paidAmount),
+    creditedAmount: serializeMoneyDecimal(p.creditedAmount),
     balanceDue:     serializeMoneyDecimal(balanceDue),
     supplierName:   p.supplierContact.fantasyName ?? p.supplierContact.legalName,
     ...classFields,

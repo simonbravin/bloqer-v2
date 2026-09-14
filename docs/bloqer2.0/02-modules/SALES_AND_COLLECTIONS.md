@@ -51,7 +51,19 @@ Etiqueta de solo lectura. Helper `classifySalesInvoice` / movimientos:
 | `INCOME_CASH` | Ingreso solo caja | movimiento `INFLOW` + `MANUAL_ADJUSTMENT` |
 | `COLLECTION` / `PAYMENT` | Cobranza / Pago | `sourceType` del movimiento |
 
-UI: columna/filtro **Clase** en listados; chip “Se registrará como…” en altas. No confundir con letra A/B/C/E ni con NC/ND futuras.
+UI: columna/filtro **Clase** en listados; chip “Se registrará como…” en altas. No confundir con letra A/B/C/E ni con **Tipo de documento** (Factura / Nota de crédito / Nota de débito — [D-115]).
+
+## Tipo de documento ([D-115])
+
+Campo persistido `documentKind` en `SalesInvoice`:
+
+| Valor | UI | Al emitir |
+|---|---|---|
+| `INVOICE` | Factura | Crea `Receivable` 1:1 |
+| `CREDIT_NOTE` | Nota de crédito | Aplica crédito a CxC de la factura referenciada (sin caja) |
+| `DEBIT_NOTE` | Nota de débito | Crea `Receivable` nueva; referencia factura origen |
+
+NC/ND exigen factura `ISSUED` del mismo cliente/moneda/alcance. Series de numeración separadas por tipo.
 
 ## 10. Reglas de negocio
 - Factura de venta **manual de proyecto**: “Emitir y cobrar ahora” opcional ([D-077] / Q-055); visible con `EDIT TREASURY`.

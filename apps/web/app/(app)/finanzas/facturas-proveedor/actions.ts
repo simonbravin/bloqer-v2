@@ -6,6 +6,11 @@ import {
   issueSupplierInvoice,
   cancelSupplierInvoice,
   updateSupplierInvoice,
+  createSupplierCreditNoteFromInvoice,
+  createSupplierDebitNoteFromInvoice,
+  issueSupplierCreditNote,
+  issueSupplierDebitNote,
+  cancelSupplierCreditNote,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -35,6 +40,14 @@ function handle(err: unknown): { error: string } {
 }
 
 const FIN_LIST = "/finanzas/facturas-proveedor";
+
+function revalidateCompanyApPaths(invoiceId?: string, extra?: string[]) {
+  revalidatePath(FIN_LIST);
+  if (invoiceId) revalidatePath(`${FIN_LIST}/${invoiceId}`);
+  revalidatePath("/finanzas/cuentas-por-pagar");
+  revalidatePath("/finanzas/transacciones");
+  for (const p of extra ?? []) revalidatePath(p);
+}
 
 export async function createCompanySupplierInvoiceAction(
   data: Omit<CreateSupplierInvoiceInput, "projectId">,
@@ -77,10 +90,7 @@ export async function issueCompanySupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await issueSupplierInvoice(invoiceId, ctx);
-    revalidatePath(FIN_LIST);
-    revalidatePath(`${FIN_LIST}/${invoiceId}`);
-    revalidatePath("/finanzas/cuentas-por-pagar");
-    revalidatePath("/finanzas/transacciones");
+    revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -93,10 +103,78 @@ export async function cancelCompanySupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await cancelSupplierInvoice(invoiceId, ctx);
-    revalidatePath(FIN_LIST);
-    revalidatePath(`${FIN_LIST}/${invoiceId}`);
-    revalidatePath("/finanzas/cuentas-por-pagar");
-    revalidatePath("/finanzas/transacciones");
+    revalidateCompanyApPaths(invoiceId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function createCompanySupplierCreditNoteFromInvoiceAction(
+  parentInvoiceId: string,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    const note = await createSupplierCreditNoteFromInvoice(
+      { parentSupplierInvoiceId: parentInvoiceId },
+      ctx,
+    );
+    revalidateCompanyApPaths(undefined, [`${FIN_LIST}/${note.id}`]);
+    return { id: note.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function createCompanySupplierDebitNoteFromInvoiceAction(
+  parentInvoiceId: string,
+): Promise<{ id: string } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    const note = await createSupplierDebitNoteFromInvoice(
+      { parentSupplierInvoiceId: parentInvoiceId },
+      ctx,
+    );
+    revalidateCompanyApPaths(undefined, [`${FIN_LIST}/${note.id}`]);
+    return { id: note.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function issueCompanySupplierCreditNoteAction(
+  invoiceId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await issueSupplierCreditNote(invoiceId, ctx);
+    revalidateCompanyApPaths(invoiceId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function issueCompanySupplierDebitNoteAction(
+  invoiceId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await issueSupplierDebitNote(invoiceId, ctx);
+    revalidateCompanyApPaths(invoiceId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function cancelCompanySupplierCreditNoteAction(
+  invoiceId: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await cancelSupplierCreditNote(invoiceId, ctx);
+    revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);

@@ -16,6 +16,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import type { SupplierInvoiceListItem } from "@/features/ap";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
+import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-document-kind-badge";
 
 function ggPeriodFromIssueDate(issueDate: string | Date): string {
   const d = typeof issueDate === "string" ? new Date(issueDate) : issueDate;
@@ -50,7 +51,9 @@ export function CorporateGgRecentInvoices({ invoices }: Props) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((inv) => (
+              {invoices.map((inv) => {
+                const letter = formatInvoiceLetterBadge(inv.invoiceLetter);
+                return (
                 <TableRow key={inv.id}>
                   <TableCell className="font-mono text-sm">
                     <Link
@@ -58,10 +61,11 @@ export function CorporateGgRecentInvoices({ invoices }: Props) {
                       className="text-primary hover:underline"
                     >
                       {inv.code}
+                      {letter ? ` · ${letter}` : ""}
                     </Link>
                   </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatInvoiceLetterBadge(inv.invoiceLetter) ?? "—"}
+                  <TableCell>
+                    <FiscalDocumentKindBadge documentKind={inv.documentKind} />
                   </TableCell>
                   <TableCell className={cn(tableNameCellClass, "font-medium")} title={inv.supplierName}>
                     {inv.supplierName}
@@ -79,7 +83,8 @@ export function CorporateGgRecentInvoices({ invoices }: Props) {
                     <SupplierInvoiceStatusBadge status={inv.status} />
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableScroll>

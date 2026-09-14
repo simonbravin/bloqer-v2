@@ -1170,7 +1170,8 @@ flowchart LR
 #### Obra (proyecto)
 
 - **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía. En la línea: **Desc. %** opcional (antes de IVA; el precio unitario es de lista). En el pie: **Percepción IIBB** (alícuota editable, default 3% sobre el neto [D-112]).
-- **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales), **método** (Efectivo / Transferencia / Cheque / Tarjeta / Otro) y referencia opcional. Para saldar el total, dejá el saldo que muestra el sistema. Solo la **cobranza confirmada** acredita tesorería ([D-072]).
+- **Tipo de documento ([D-115]):** desde una factura **emitida**: **Nota de crédito** (reduce CxC sin caja; requiere saldo pendiente) o **Nota de débito** (abre CxC adicional). Badge **Tipo de documento** distinto de **Clase**. Códigos `NC-…` / `ND-…`. Anular NC restaura el saldo. No anular la factura padre si hay NC/ND emitidas.
+- **Cuentas por cobrar** (`/proyectos/[id]/cuentas-por-cobrar`): estados Pendiente / Parcial / Pagado / Vencido. Saldo = original − cobrado − créditos NC. Desde el detalle → **Cobrar** (`…/[receivableId]/cobrar`): cuenta, fecha, monto (2 decimales), **método** (Efectivo / Transferencia / Cheque / Tarjeta / Otro) y referencia opcional. Para saldar el total, dejá el saldo que muestra el sistema. Solo la **cobranza confirmada** acredita tesorería ([D-072]).
 - **Cobranzas** (`/proyectos/[id]/cobranzas`): ingresan dinero (`INFLOW`) y bajan el saldo. En el detalle, **Cancelar** muestra el error en pantalla si falla (p. ej. movimiento ya conciliado o período cerrado); no se “traga” el mensaje.
 - **Venta rápida / anticipo** (`/proyectos/[id]/facturas/anticipo/nueva`): factura + CxC (+ cobro opcional) en un paso.
 - **No disponible hoy:** “Cobrar ahora” **inline** al crear una factura de venta **de proyecto** (diferido; el cobro se hace desde CxC). El cobro inmediato corporativo sí existe en Transacciones (abajo).
@@ -1209,7 +1210,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 | Pantalla | Ruta |
 |----------|------|
 | Listado / alta | `/proyectos/[id]/facturas-proveedor` · `/nueva` |
-| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador). Debajo del título: **pista de proceso** Borrador → Emitir → Pagar (pago según CxP; parcial «Pagar (parcial)», vencida «Pagar (vencida)»). |
+| Detalle | `/proyectos/[id]/facturas-proveedor/[id]` (Emitir · Anular · adjuntos · editar borrador de factura · **NC/ND** [D-115]). Debajo del título: **pista de proceso** Borrador → Emitir → Pagar (pago según CxP; parcial «Pagar (parcial)», vencida «Pagar (vencida)»). NC aplica crédito sin egreso; ND abre CxP nueva. |
 | CxP | `/proyectos/[id]/cuentas-por-pagar` → `/[payableId]/pagar` |
 | Pagos (consulta) | `/proyectos/[id]/pagos` (también desde CxP / trazabilidad) |
 
@@ -1231,7 +1232,7 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 | Pantalla | Ruta / etiqueta |
 |----------|-----------------|
-| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto). Detalle: misma **pista de proceso** Borrador → Emitir → Pagar. |
+| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto). Detalle: misma **pista de proceso** Borrador → Emitir → Pagar; también **NC/ND** [D-115] como en obra. |
 | Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → **A quién se le paga** → opcional **Pagar ahora (egreso de caja)** |
 | CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |
 | Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |

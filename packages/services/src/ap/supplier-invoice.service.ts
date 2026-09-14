@@ -679,7 +679,7 @@ export async function createSupplierInvoice(
   const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
   const maxNum = await prisma.supplierInvoice.aggregate({
-    where: { tenantId: ctx.tenantId, companyId },
+    where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
     _max: { number: true },
   });
   const number = (maxNum._max.number ?? 0) + 1;
@@ -783,6 +783,12 @@ export async function updateSupplierInvoice(
   }
   if (existing.projectId) {
     await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
+  }
+  if (existing.documentKind !== "INVOICE") {
+    throw new ServiceError(
+      "VALIDATION",
+      "Las notas de crédito/débito no se editan con el formulario de factura. Anulá y creá una nueva si hace falta ajustar el monto.",
+    );
   }
   assertSupplierInvoiceEditable(existing);
 
@@ -1029,6 +1035,14 @@ export async function issueSupplierInvoice(
     if (inv.status !== "DRAFT") {
       throw new ServiceError("CONFLICT", "Solo se pueden emitir facturas en estado Borrador");
     }
+    if (inv.documentKind !== "INVOICE") {
+      throw new ServiceError(
+        "VALIDATION",
+        inv.documentKind === "CREDIT_NOTE"
+          ? "Usá emitir nota de crédito para este comprobante."
+          : "Usá emitir nota de débito para este comprobante.",
+      );
+    }
 
     assertInvoiceLetterOnIssue({
       invoiceLetter: inv.invoiceLetter,
@@ -1204,22 +1218,42 @@ export async function cancelSupplierInvoice(
       throw new ServiceError("CONFLICT", "La factura ya está cancelada");
     }
 
-    // BR-AP-003: if ISSUED, cancel linked Payable only if no active payments
+    // BR-AP-003 / [D-115]: if ISSUED, cancel linked Payable only if no payments/credits/child notes
     if (inv.status === "ISSUED") {
       const payable = await tx.payable.findUnique({
         where: { supplierInvoiceId: id },
-        select: { id: true, paidAmount: true, projectId: true, companyId: true },
+        select: {
+          id: true,
+          paidAmount: true,
+          creditedAmount: true,
+          projectId: true,
+          companyId: true,
+        },
       });
       const activePaymentCount = payable
         ? await tx.payment.count({
             where: { payableId: payable.id, status: "CONFIRMED", tenantId: ctx.tenantId },
           })
         : 0;
+      const activeNoteCount =
+        inv.documentKind === "INVOICE"
+          ? await tx.supplierInvoice.count({
+              where: {
+                tenantId: ctx.tenantId,
+                referencedSupplierInvoiceId: id,
+                documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
+                status: "ISSUED",
+              },
+            })
+          : 0;
       assertCanCancelSupplierInvoice({
         status: inv.status,
+        documentKind: inv.documentKind,
         hasPayable: payable != null,
         activePaymentCount,
         payablePaidAmount: payable?.paidAmount ?? null,
+        payableCreditedAmount: payable?.creditedAmount ?? null,
+        activeCreditDebitNoteCount: activeNoteCount,
       });
       if (payable) {
         const payableCancel = await tx.payable.updateMany({
@@ -1227,6 +1261,7 @@ export async function cancelSupplierInvoice(
             id: payable.id,
             status: { not: "CANCELLED" },
             paidAmount: payable.paidAmount,
+            creditedAmount: payable.creditedAmount,
           },
           data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
         });
@@ -1250,6 +1285,14 @@ export async function cancelSupplierInvoice(
           },
         );
       }
+    } else {
+      assertCanCancelSupplierInvoice({
+        status: inv.status,
+        documentKind: inv.documentKind,
+        hasPayable: false,
+        activePaymentCount: 0,
+        payablePaidAmount: null,
+      });
     }
 
     const flipped = await tx.supplierInvoice.updateMany({
@@ -1330,7 +1373,15 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
     iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
-    code:        `FP-${String(inv.number).padStart(5, "0")}`,
+    code:        (() => {
+      const prefix =
+        inv.documentKind === "CREDIT_NOTE"
+          ? "NC"
+          : inv.documentKind === "DEBIT_NOTE"
+            ? "ND"
+            : "FP";
+      return `${prefix}-${String(inv.number).padStart(5, "0")}`;
+    })(),
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
     subcontractId: null,
@@ -1352,6 +1403,12 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
     hasPoLineLink,
     subcontractCertificationId: inv.subcontractCertificationId,
   });
+  const codePrefix =
+    inv.documentKind === "CREDIT_NOTE"
+      ? "NC"
+      : inv.documentKind === "DEBIT_NOTE"
+        ? "ND"
+        : "FP";
   return {
     ...inv,
     subtotal:    serializeMoneyDecimal(inv.subtotal),
@@ -1359,7 +1416,7 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
     iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
     iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
-    code:        `FP-${String(inv.number).padStart(5, "0")}`,
+    code:        `${codePrefix}-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: inv.subcontractCertification
       ? `CERT-SC-${String(inv.subcontractCertification.number).padStart(3, "0")}`

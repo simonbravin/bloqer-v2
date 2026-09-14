@@ -40,3 +40,48 @@ test("assertCanCancelSupplierInvoice rejects confirmed payments", () => {
     (e: unknown) => e instanceof ServiceError && e.code === "CONFLICT",
   );
 });
+
+test("assertCanCancelSupplierInvoice rejects CREDIT_NOTE ([D-115])", () => {
+  assert.throws(
+    () =>
+      assertCanCancelSupplierInvoice({
+        status: "DRAFT",
+        documentKind: "CREDIT_NOTE",
+        hasPayable: false,
+        activePaymentCount: 0,
+        payablePaidAmount: null,
+      }),
+    (e: unknown) => e instanceof ServiceError && e.code === "VALIDATION",
+  );
+});
+
+test("assertCanCancelSupplierInvoice rejects active NC/ND ([BR-NC-005])", () => {
+  assert.throws(
+    () =>
+      assertCanCancelSupplierInvoice({
+        status: "ISSUED",
+        documentKind: "INVOICE",
+        hasPayable: true,
+        activePaymentCount: 0,
+        payablePaidAmount: new Prisma.Decimal(0),
+        payableCreditedAmount: new Prisma.Decimal(0),
+        activeCreditDebitNoteCount: 1,
+      }),
+    (e: unknown) => e instanceof ServiceError && e.code === "CONFLICT",
+  );
+});
+
+test("assertCanCancelSupplierInvoice rejects creditedAmount ([D-115])", () => {
+  assert.throws(
+    () =>
+      assertCanCancelSupplierInvoice({
+        status: "ISSUED",
+        documentKind: "INVOICE",
+        hasPayable: true,
+        activePaymentCount: 0,
+        payablePaidAmount: new Prisma.Decimal(0),
+        payableCreditedAmount: new Prisma.Decimal(10),
+      }),
+    (e: unknown) => e instanceof ServiceError && e.code === "CONFLICT",
+  );
+});

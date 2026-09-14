@@ -341,13 +341,15 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-009].
 
 ### BR-AR-002 — Estado se deriva del saldo
-- **Regla:** el `status` de Receivable/Payable se calcula:
-  - `OPEN` si `paid_amount = 0` y no vencida.
-  - `PARTIAL` si `0 < paid_amount < total`.
-  - `PAID` si `paid_amount = total`.
-  - `OVERDUE` si vencida y `paid_amount < total`.
-  - `CANCELLED` si anulada manualmente.
+- **Regla:** el `status` de Receivable/Payable se calcula sobre
+  `balanceDue = originalAmount − paidAmount − creditedAmount` ([D-115], dust [D-053]):
+  - `OPEN` si `balanceDue > 0`, `paidAmount = 0`, `creditedAmount = 0` y no vencida.
+  - `PARTIAL` si `balanceDue > 0` y (`paidAmount > 0` o `creditedAmount > 0`).
+  - `PAID` si `balanceDue = 0` (tras dust).
+  - `OVERDUE` si vencida y `balanceDue > 0` (derivado en lectura / job).
+  - `CANCELLED` si anulada.
 - No se setea a mano salvo `CANCELLED`.
+- `paidAmount` = solo cobranzas/pagos de tesorería; `creditedAmount` = solo NC aplicadas.
 
 ### BR-AR-003 — Project_id opcional
 - **Regla:** Receivable y Payable pueden no tener proyecto (deuda/crédito general de la empresa). En schema, `SalesInvoice` / `Receivable` / `Collection` y la cadena AP tienen `projectId` nullable ([D-051] AR, Phase 16B AP).
@@ -362,6 +364,34 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
   - Factura / gasto **sin OC**: el contacto debe tener rol `SUPPLIER` **o** `EMPLOYEE` activo.
   - Factura generada desde certificación de subcontrato `APPROVED`: el payee es el `SUBCONTRACTOR` del subcontrato; no se exige rol `SUPPLIER`.
 - **Origen:** [D-089].
+
+### BR-NC-001 — NC/ND referencian factura emitida
+- **Regla:** `CREDIT_NOTE` y `DEBIT_NOTE` exigen `referenced*InvoiceId` a un comprobante `ISSUED` del mismo tenant, company, contacto, moneda y `projectId` (null=null). El referenciado debe ser `documentKind = INVOICE` (no NC/ND sobre NC/ND en v1).
+- **Origen:** [D-115].
+
+### BR-NC-002 — NC no excede saldo del padre
+- **Regla:** al emitir una NC, `totalAmount ≤ balanceDue` de la obligación del comprobante referenciado (después de dust [D-053]).
+- **Origen:** [D-115].
+
+### BR-NC-003 — NC sin movimiento de tesorería
+- **Regla:** emitir/anular NC no crea ni anula `AccountMovement`, `Collection` ni `Payment`. Solo muta `creditedAmount` vía `*CreditApplication`.
+- **Origen:** [D-115].
+
+### BR-NC-004 — Una NC aplica a una sola obligación
+- **Regla:** en v1, cada NC `ISSUED` tiene exactamente una `*CreditApplication` 1:1 con la obligación del padre.
+- **Origen:** [D-115].
+
+### BR-ND-001 — ND abre obligación propia
+- **Regla:** al emitir ND se crea `Receivable`/`Payable` 1:1 con `originalAmount = totalAmount`. No muta `originalAmount` del padre.
+- **Origen:** [D-115].
+
+### BR-NC-005 — Anulación de padre bloqueada con NC/ND activas
+- **Regla:** no se puede anular un comprobante `INVOICE` referenciado por NC/ND en estado `ISSUED`. Primero anular las notas.
+- **Origen:** [D-115].
+
+### BR-NC-006 — Certificación solo cuenta facturas INVOICE
+- **Regla:** el unique “una factura activa por certificación” aplica solo a `documentKind = INVOICE`. NC/ND no ocupan ese cupo y no setean `certificationId` operativo.
+- **Origen:** [D-115].
 
 ---
 

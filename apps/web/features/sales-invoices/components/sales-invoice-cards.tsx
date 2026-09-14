@@ -6,6 +6,7 @@ import type { SalesInvoiceListItem } from "./sales-invoice-list";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
+import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-document-kind-badge";
 
 export function SalesInvoiceCards({
   invoices,
@@ -39,14 +40,15 @@ export function SalesInvoiceCards({
                 <SalesInvoiceStatusBadge status={inv.status} />
               </span>
             </div>
-            {inv.classLabel ? (
-              <div className="mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <FiscalDocumentKindBadge documentKind={inv.documentKind} />
+              {inv.classLabel ? (
                 <DocumentClassBadge
                   classLabel={inv.classLabel}
                   classFamily={inv.classFamily}
                 />
-              </div>
-            ) : null}
+              ) : null}
+            </div>
             <h3 className="mt-2 truncate font-semibold leading-snug" title={inv.clientName}>
               {inv.clientName}
             </h3>

@@ -18,8 +18,12 @@ export const journalEntryStatusSchema = z.enum(["DRAFT", "POSTED", "CANCELLED"])
 export const journalEntrySourceTypeSchema = z.enum([
   "MANUAL",
   "SALES_INVOICE",
+  "SALES_CREDIT_NOTE",
+  "SALES_DEBIT_NOTE",
   "COLLECTION",
   "SUPPLIER_INVOICE",
+  "SUPPLIER_CREDIT_NOTE",
+  "SUPPLIER_DEBIT_NOTE",
   "PAYMENT",
   "INTERNAL_TRANSFER",
   "STOCK_MOVEMENT",
@@ -38,7 +42,11 @@ export const accountingMappingEventTypeSchema = z.enum([
   "MANUAL_CAPITAL_CONTRIBUTION",
   "MANUAL_OWNER_LOAN",
   "SALES_INVOICE_ISSUED",
+  "SALES_CREDIT_NOTE_ISSUED",
+  "SALES_DEBIT_NOTE_ISSUED",
   "SUPPLIER_INVOICE_ISSUED",
+  "SUPPLIER_CREDIT_NOTE_ISSUED",
+  "SUPPLIER_DEBIT_NOTE_ISSUED",
 ]);
 
 export const journalLineInputSchema = z.object({

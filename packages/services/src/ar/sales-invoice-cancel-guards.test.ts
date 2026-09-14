@@ -54,13 +54,16 @@ test("assertCanCancelSalesInvoice rejects paidAmount > 0", () => {
   );
 });
 
-test("assertCanCancelSalesInvoice allows ISSUED with no collections and zero paid", () => {
-  assert.doesNotThrow(() =>
-    assertCanCancelSalesInvoice({
-      status: "ISSUED",
-      hasReceivable: true,
-      activeCollectionCount: 0,
-      receivablePaidAmount: new Prisma.Decimal(0),
-    }),
+test("assertCanCancelSalesInvoice rejects CREDIT_NOTE regardless of status ([D-115])", () => {
+  assert.throws(
+    () =>
+      assertCanCancelSalesInvoice({
+        status: "DRAFT",
+        documentKind: "CREDIT_NOTE",
+        hasReceivable: false,
+        activeCollectionCount: 0,
+        receivablePaidAmount: null,
+      }),
+    (e: unknown) => e instanceof ServiceError && e.code === "VALIDATION",
   );
 });

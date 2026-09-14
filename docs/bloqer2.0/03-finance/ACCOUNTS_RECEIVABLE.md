@@ -9,7 +9,11 @@ Obligación del **cliente** hacia la empresa por facturas/certificaciones emitid
 3. **Solo caja (sin CxC):** `TREASURY_INFLOW` / `MANUAL_ADJUSTMENT` — no crea `Receivable` ([D-037], [D-049]).
 
 ## Campos principales
-`total_amount`, `paid_amount`, `balance`, `due_date`, `currency`, `project_id?`, `client_id`, `status`.
+`originalAmount`, `paidAmount`, `creditedAmount`, `balanceDue` (calculado = original − paid − credited), `dueDate`, `currency`, `projectId?`, `clientContactId`, `status`.
+
+## Notas de crédito / débito ([D-115])
+- **ND** (`documentKind = DEBIT_NOTE`): al emitir crea Receivable propia (aumenta deuda).
+- **NC** (`documentKind = CREDIT_NOTE`): al emitir aplica crédito a la Receivable de la factura referenciada (`creditedAmount`); no crea Receivable ni movimiento de caja.
 
 ## Estados derivados
 Ver máquina Receivable ([`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md)); `OVERDUE` por job diario.

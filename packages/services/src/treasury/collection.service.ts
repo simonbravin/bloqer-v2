@@ -4,7 +4,11 @@ import type { CreateCollectionInput } from "@bloqer/validators";
 import { auditAr } from "../ar/ar-audit";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
-import { effectiveObligationPaidAfterPayment } from "../finance/obligation-balance";
+import {
+  computeObligationBalanceDue,
+  effectiveObligationPaidAfterPayment,
+  normalizeObligationBalanceDue,
+} from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -208,7 +212,13 @@ export async function createCollection(
           throw new ServiceError("CONFLICT", "No se puede cobrar una factura de venta cancelada");
         }
 
-        const balanceDue = receivable.originalAmount.minus(receivable.paidAmount);
+        const balanceDue = normalizeObligationBalanceDue(
+          computeObligationBalanceDue(
+            receivable.originalAmount,
+            receivable.paidAmount,
+            receivable.creditedAmount,
+          ),
+        );
         // D-053: collectFullBalance applies stored balance; never round-then-reapply from UI.
         let amount: Prisma.Decimal;
         if (input.collectFullBalance) {
@@ -317,13 +327,19 @@ export async function createCollection(
         const newPaid = effectiveObligationPaidAfterPayment(
           receivable.originalAmount,
           receivable.paidAmount.plus(amount),
+          receivable.creditedAmount,
         );
-        const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
+        const newStatus = resolveObligationStoredStatus(
+          newPaid,
+          receivable.originalAmount,
+          receivable.creditedAmount,
+        );
 
         const receivableUpdate = await tx.receivable.updateMany({
           where: {
             id: receivable.id,
             paidAmount: receivable.paidAmount,
+            creditedAmount: receivable.creditedAmount,
             status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
           },
           data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },
@@ -486,11 +502,16 @@ export async function cancelCollection(
     const receivable = await tx.receivable.findUnique({ where: { id: c.receivableId } });
     if (receivable && receivable.status !== "CANCELLED") {
       const newPaid = Prisma.Decimal.max(receivable.paidAmount.minus(c.amount), new Prisma.Decimal(0));
-      const newStatus = resolveObligationStoredStatus(newPaid, receivable.originalAmount);
+      const newStatus = resolveObligationStoredStatus(
+        newPaid,
+        receivable.originalAmount,
+        receivable.creditedAmount,
+      );
       const receivableReverse = await tx.receivable.updateMany({
         where: {
           id: receivable.id,
           paidAmount: receivable.paidAmount,
+          creditedAmount: receivable.creditedAmount,
           status: { not: "CANCELLED" },
         },
         data: { paidAmount: newPaid, status: newStatus, updatedBy: ctx.actorUserId },

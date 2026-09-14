@@ -41,9 +41,10 @@ const MAX_COLLECTIBLE_RECEIVABLES = 500;
 
 // ─── View type ────────────────────────────────────────────────────────────────
 
-export type ReceivableView = Omit<Receivable, "originalAmount" | "paidAmount"> & {
+export type ReceivableView = Omit<Receivable, "originalAmount" | "paidAmount" | "creditedAmount"> & {
   originalAmount: string;
   paidAmount: string;
+  creditedAmount: string;
   balanceDue: string;
   clientName: string;
 } & FinancialClassFields;
@@ -457,6 +458,7 @@ export async function summarizeReceivablesByProject(
       currency: true,
       originalAmount: true,
       paidAmount: true,
+      creditedAmount: true,
       dueDate: true,
       status: true,
     },
@@ -468,7 +470,7 @@ export async function summarizeReceivablesByProject(
 
   for (const r of rows) {
     if (r.status === "CANCELLED") continue;
-    const bal = r.originalAmount.minus(r.paidAmount);
+    const bal = computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount);
     if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) continue;
     const cur = r.currency;
     total.set(cur, (total.get(cur) ?? zero).add(bal));
@@ -564,7 +566,11 @@ async function reconcileReceivableStatusIfSettled(
   ctx: ServiceContext,
 ): Promise<Receivable> {
   if (receivable.status === "PAID" || receivable.status === "CANCELLED") return receivable;
-  const balanceDue = computeObligationBalanceDue(receivable.originalAmount, receivable.paidAmount);
+  const balanceDue = computeObligationBalanceDue(
+    receivable.originalAmount,
+    receivable.paidAmount,
+    receivable.creditedAmount,
+  );
   if (hasOpenObligationBalance(balanceDue)) return receivable;
 
   const updated = await prisma.receivable.updateMany({
@@ -586,7 +592,7 @@ async function reconcileReceivableStatusIfSettled(
 }
 
 function serializeReceivable(r: RawReceivable): ReceivableView {
-  const rawBalance = computeObligationBalanceDue(r.originalAmount, r.paidAmount);
+  const rawBalance = computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount);
   const balanceDue = normalizeObligationBalanceDue(rawBalance);
   const status = deriveObligationDisplayStatus(r.status, rawBalance, r.dueDate, undefined, r.paidAmount);
   const classFields = classFieldsForSalesInvoice({
@@ -598,6 +604,7 @@ function serializeReceivable(r: RawReceivable): ReceivableView {
     status,
     originalAmount: serializeMoneyDecimal(r.originalAmount),
     paidAmount: serializeMoneyDecimal(r.paidAmount),
+    creditedAmount: serializeMoneyDecimal(r.creditedAmount),
     balanceDue: serializeMoneyDecimal(balanceDue),
     clientName: r.clientContact.fantasyName ?? r.clientContact.legalName,
     ...classFields,

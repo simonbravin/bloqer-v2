@@ -62,6 +62,7 @@ export default async function GastosGeneralesPage() {
         currency: inv.currency,
         status: inv.status,
         invoiceLetter: inv.invoiceLetter,
+        documentKind: inv.documentKind,
       }));
     } catch (err) {
       if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;

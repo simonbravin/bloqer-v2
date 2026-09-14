@@ -4,6 +4,7 @@ import { canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
 import { assertApTenantModule, assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { deriveObligationDisplayStatus, hasOpenObligationBalance, obligationDaysOverdue, parseObligationAsOfDate, startOfDayUtc } from "../finance/obligation-date";
+import { computeObligationBalanceDue } from "../finance/obligation-balance";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { requireProjectAccess } from "../security/access";
 
@@ -184,8 +185,11 @@ export async function getReceivableAgingReport(
   const curMap     = new Map<string, BucketAcc>();
 
   for (const r of rows) {
-    // balanceDue: source of truth is originalAmount - paidAmount (maintained by AR service)
-    const balanceDue = r.originalAmount.minus(r.paidAmount);
+    const balanceDue = computeObligationBalanceDue(
+      r.originalAmount,
+      r.paidAmount,
+      r.creditedAmount,
+    );
     if (!filters.includePaid && !hasOpenObligationBalance(balanceDue)) continue;
 
     const contactName  = r.clientContact.fantasyName ?? r.clientContact.legalName;
@@ -284,7 +288,11 @@ export async function getPayableAgingReport(
   const curMap    = new Map<string, BucketAcc>();
 
   for (const p of rows) {
-    const balanceDue = p.originalAmount.minus(p.paidAmount);
+    const balanceDue = computeObligationBalanceDue(
+      p.originalAmount,
+      p.paidAmount,
+      p.creditedAmount,
+    );
     if (!filters.includePaid && !hasOpenObligationBalance(balanceDue)) continue;
 
     const contactName   = p.supplierContact.fantasyName ?? p.supplierContact.legalName;

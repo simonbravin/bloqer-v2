@@ -463,6 +463,10 @@ export async function ensureDraftJournalFromSalesInvoice(
     if (!inv || inv.status !== "ISSUED") {
       return { status: "skipped", reason: "not_found_or_not_issued" };
     }
+    // [D-115] NC/ND use dedicated source types later; do not post as SALES_INVOICE.
+    if (inv.documentKind !== "INVOICE") {
+      return { status: "skipped", reason: "non_invoice_document_kind" };
+    }
 
     const moduleOn = await isTenantModuleEnabled(ctx, "ACCOUNTING");
     if (!moduleOn) {
@@ -549,6 +553,10 @@ export async function ensureDraftJournalFromSupplierInvoice(
     });
     if (!inv || inv.status !== "ISSUED") {
       return { status: "skipped", reason: "not_found_or_not_issued" };
+    }
+    // [D-115] NC/ND must not post as SUPPLIER_INVOICE accrual.
+    if (inv.documentKind !== "INVOICE") {
+      return { status: "skipped", reason: "non_invoice_document_kind" };
     }
 
     const moduleOn = await isTenantModuleEnabled(ctx, "ACCOUNTING");

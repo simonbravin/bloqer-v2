@@ -55,6 +55,8 @@ export type HelpIntent =
   | "certificacion-cliente"
   | "facturar-certificacion"
   | "cobrar"
+  | "nota-credito"
+  | "nota-debito"
   | "ingreso-corporativo"
   | "ingreso-solo-caja"
   | "pagar-sueldo"

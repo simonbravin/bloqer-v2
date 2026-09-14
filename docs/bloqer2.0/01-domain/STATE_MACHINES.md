@@ -211,28 +211,29 @@ Atributo **derivado** (solo lectura en operación normal): `UNPAID` | `PARTIALLY
 
 ---
 
-## 6. SalesInvoice (Factura de venta)
+## 6. SalesInvoice (Factura de venta) / NC / ND
+
+> Comprobante fiscal operativo con `documentKind` ∈ {`INVOICE`, `CREDIT_NOTE`, `DEBIT_NOTE`} ([D-115]).
+> Lifecycle del **documento**: solo `DRAFT` → `ISSUED` | `CANCELLED`.
+> `PAID` / `PARTIAL` / `OVERDUE` viven en la `Receivable` (si aplica), no en el comprobante.
 
 ```mermaid
 stateDiagram-v2
   [*] --> DRAFT
   DRAFT --> ISSUED : emitir
   DRAFT --> CANCELLED : cancelar
-  ISSUED --> PAID : cobranza completa
-  ISSUED --> OVERDUE : vencida sin pagar
-  OVERDUE --> PAID : se paga
   ISSUED --> CANCELLED : anular
-  OVERDUE --> CANCELLED : anular
-  PAID --> CANCELLED : anular (excepcional, requiere reversion)
-  PAID --> [*]
   CANCELLED --> [*]
 ```
 
 ### Reglas
 
-- `OVERDUE` es **derivado** de `due_date` y saldo. Materialización opcional.
-- `PAID` es derivado del saldo de la `Receivable` asociada.
-- Anular una factura en `PAID` requiere revertir cobranzas previamente.
+- Montos siempre positivos; el signo lo define `documentKind`.
+- **`INVOICE` / `DEBIT_NOTE`:** al emitir crean `Receivable` 1:1. ND exige `referencedSalesInvoiceId` (factura `ISSUED`).
+- **`CREDIT_NOTE`:** al emitir no crea `Receivable`; aplica `creditedAmount` vía `ReceivableCreditApplication` sobre la obligación del referenciado. Sin tesorería.
+- Anular `INVOICE`/`DEBIT_NOTE` requiere revertir cobranzas y no tener NC/ND `ISSUED` que lo referencien ([BR-NC-005]).
+- Anular `CREDIT_NOTE` revierte la aplicación de crédito.
+- Unique “una activa por certificación” solo para `documentKind = INVOICE`.
 
 ---
 
@@ -389,28 +390,26 @@ stateDiagram-v2
 
 ---
 
-## 10. PurchaseInvoice (Factura de compra)
+## 10. PurchaseInvoice / SupplierInvoice (Factura de compra) / NC / ND
+
+> En código: `SupplierInvoice` con el mismo `documentKind` que ventas ([D-115]).
+> Lifecycle del documento: `DRAFT` → `ISSUED` | `CANCELLED` (no hay `APPROVED` en schema).
 
 ```mermaid
 stateDiagram-v2
   [*] --> DRAFT
-  DRAFT --> ISSUED : registrar como recibida
+  DRAFT --> ISSUED : emitir
   DRAFT --> CANCELLED : cancelar
-  ISSUED --> APPROVED : aprobar para pago
   ISSUED --> CANCELLED : anular
-  APPROVED --> PAID : pago completo
-  APPROVED --> OVERDUE : vencida sin pagar
-  OVERDUE --> PAID : se paga
-  APPROVED --> CANCELLED : anular
-  PAID --> [*]
   CANCELLED --> [*]
 ```
 
 ### Reglas
 
-- `ISSUED` significa que la factura del proveedor está cargada en el sistema.
-- `APPROVED` significa que internamente se aprobó para pagar.
-- `PAID` deriva del saldo de la `Payable` asociada.
+- **`INVOICE` / `DEBIT_NOTE`:** al emitir crean `Payable` 1:1. ND exige `referencedSupplierInvoiceId`.
+- **`CREDIT_NOTE`:** aplica crédito a la `Payable` del referenciado (`PayableCreditApplication` + `creditedAmount`). Sin egreso de caja.
+- `PAID` / `PARTIAL` / `OVERDUE` viven en `Payable`.
+- Mismas reglas de anulación espejo AR ([BR-NC-005]).
 
 ---
 
@@ -435,11 +434,14 @@ stateDiagram-v2
 
 ### Reglas
 
-- Estado se **deriva del saldo** ([BR-AR-002]).
-- `PAID` cuando `paid_amount = total_amount`.
-- `OVERDUE` cuando vencida y saldo > 0.
+- Estado se **deriva del saldo** ([BR-AR-002], [D-115]):
+  `balanceDue = originalAmount − paidAmount − creditedAmount` (dust [D-053]).
+- `paidAmount` = solo cobranzas de tesorería; `creditedAmount` = NC aplicadas.
+- `PAID` cuando `balanceDue = 0` (tras dust).
+- `OVERDUE` cuando vencida y `balanceDue > 0`.
 - `CANCELLED` requiere motivo.
 - Puede existir **sin proyecto** (`projectId` null) — AR corporativo ([D-051], [BR-AR-003]).
+- Solo nace de `SalesInvoice` con `documentKind` ∈ {`INVOICE`, `DEBIT_NOTE`} emitida.
 
 ---
 
@@ -974,13 +976,13 @@ stateDiagram-v2
 | Contract | DRAFT, ACTIVE, EXPIRED, CANCELLED |
 | Addendum | DRAFT, IN_REVIEW, APPROVED, SIGNED, CANCELLED |
 | Certification | DRAFT, ISSUED, APPROVED, REJECTED, CANCELLED (+ `payment_status` derivado) |
-| SalesInvoice | DRAFT, ISSUED, PAID, OVERDUE, CANCELLED |
+| SalesInvoice | DRAFT, ISSUED, CANCELLED (+ documentKind INVOICE/CREDIT_NOTE/DEBIT_NOTE) |
 | PurchaseOrder | DRAFT, SUBMITTED, APPROVED, CONFIRMED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED |
 | PurchaseRequest | DRAFT, SUBMITTED, QUOTE_SELECTED, COMPLETED, CANCELLED |
 | ProcurementQuote | DRAFT, RECEIVED, SELECTED, REJECTED, SUPERSEDED |
 | Receipt | DRAFT, CONFIRMED, CANCELLED |
 | StockMovement | DRAFT, CONFIRMED, CANCELLED |
-| PurchaseInvoice | DRAFT, ISSUED, APPROVED, PAID, OVERDUE, CANCELLED |
+| PurchaseInvoice / SupplierInvoice | DRAFT, ISSUED, CANCELLED (+ documentKind INVOICE/CREDIT_NOTE/DEBIT_NOTE) |
 | Receivable | OPEN, PARTIAL, PAID, OVERDUE, CANCELLED |
 | Payable | OPEN, PARTIAL, PAID, OVERDUE, CANCELLED |
 | AccountMovement | DRAFT, CONFIRMED, RECONCILED, CANCELLED |

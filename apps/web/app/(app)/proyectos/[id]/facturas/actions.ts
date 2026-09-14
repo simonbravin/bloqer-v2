@@ -3,6 +3,8 @@
 import {
   createSalesInvoice, createInvoiceFromCertification,
   updateSalesInvoice, issueSalesInvoice, cancelSalesInvoice,
+  createSalesCreditNoteFromInvoice, createSalesDebitNoteFromInvoice,
+  issueSalesCreditNote, issueSalesDebitNote, cancelSalesCreditNote,
   cancelReceivable,
   registerArAdvance,
   registerArSale,
@@ -170,6 +172,89 @@ export async function cancelSalesInvoiceAction(
     revalidateTreasuryPaths();
     return { ok: true };
   } catch (err) { return handle(err); }
+}
+
+export async function createSalesCreditNoteFromInvoiceAction(
+  parentInvoiceId: string,
+  projectId: string,
+): Promise<{ id: string } | Err> {
+  const ctx = await getCtx();
+  try {
+    const note = await createSalesCreditNoteFromInvoice(
+      { parentSalesInvoiceId: parentInvoiceId },
+      ctx,
+    );
+    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    return { id: note.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function createSalesDebitNoteFromInvoiceAction(
+  parentInvoiceId: string,
+  projectId: string,
+): Promise<{ id: string } | Err> {
+  const ctx = await getCtx();
+  try {
+    const note = await createSalesDebitNoteFromInvoice(
+      { parentSalesInvoiceId: parentInvoiceId },
+      ctx,
+    );
+    revalidatePath(`/proyectos/${projectId}/facturas`);
+    return { id: note.id };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function issueSalesCreditNoteAction(
+  invoiceId: string,
+  projectId: string,
+): Promise<Ok | Err> {
+  const ctx = await getCtx();
+  try {
+    await issueSalesCreditNote(invoiceId, ctx, projectId);
+    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function issueSalesDebitNoteAction(
+  invoiceId: string,
+  projectId: string,
+): Promise<Ok | Err> {
+  const ctx = await getCtx();
+  try {
+    await issueSalesDebitNote(invoiceId, ctx, projectId);
+    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function cancelSalesCreditNoteAction(
+  invoiceId: string,
+  projectId: string,
+): Promise<Ok | Err> {
+  const ctx = await getCtx();
+  try {
+    await cancelSalesCreditNote(invoiceId, ctx, projectId);
+    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateProjectCostAndFinancePaths(projectId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function cancelReceivableAction(

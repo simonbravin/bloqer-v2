@@ -1586,9 +1586,10 @@
   2. **No** persistir `EconomicNature` ni `DocumentKind`. **No** tabla `DocumentType` / `MovementCategory`. Letra A/B/C/E sigue en `invoiceLetter` ([D-084]). Recibo = `Collection` / `Payment`. Anticipo cae en `SALE_PROJECT` (sin flag nuevo).
   3. Precedencia AP: `SUBCONTRACT` > `PURCHASE_COMMITTED` > `DIRECT_PROJECT` | `OVERHEAD`.
   4. Fase 1 UX: en alta/edición de factura de proveedor **de obra**, segmented **Contra orden de compra** | **Costo directo** (explícito; el backend ya distinguía vía [D-065]/[D-066]). Corporativo / Transacciones AP = Gasto general sin WBS.
-  5. Fuera de alcance: NC/ND operativas, fondo de reparo ([Q-023]), split J/G por línea, ledger JC como posting.
+  5. Fuera de alcance **en esa decisión:** NC/ND operativas (ahora [D-115]), fondo de reparo ([Q-023]), split J/G por línea, ledger JC como posting.
 - **Implicancias:** Listados/detalle/exports/filtros `?class=` muestran la clase. Indari se “cataloga” al listar (cero backfill SQL).
 - **Documentos afectados:** [`ENTITY_RELATIONSHIPS.md`](../01-domain/ENTITY_RELATIONSHIPS.md), [`MASTER_DATA.md`](../01-domain/MASTER_DATA.md), [`ACCOUNTS_PAYABLE.md`](../03-finance/ACCOUNTS_PAYABLE.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §12, help `clase-de-documento-financiero` + fichas de gasto/ingreso.
+- **Nota:** el punto 5 sobre NC/ND queda **parcialmente superseded** por [D-115](#d-115--notas-de-crédito-y-débito-operativas-arap). Clase vs Tipo de documento se mantiene.
 
 ---
 
@@ -1804,6 +1805,29 @@
   7. Gate único en `sendNotificationEmail` / system variants (skip logueado `user_preference` / `role_default`).
 - **Implicancias:** migración Prisma; domain `email-categories`; services preference + digest; plantilla digest; guía/help; cierra P-EMAIL-02 y P-EMAIL-03 (MVP).
 - **Documentos afectados:** [`02-modules/NOTIFICATIONS.md`](../02-modules/NOTIFICATIONS.md), [`08-architecture/EMAIL_NOTIFICATIONS_ARCHITECTURE.md`](../08-architecture/EMAIL_NOTIFICATIONS_ARCHITECTURE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md) §1.4, help `usar-notificaciones`.
+
+---
+
+### D-115 — Notas de crédito y débito operativas (AR/AP)
+
+- **Fecha:** 2026-09-14
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** [D-102] reservó el label UI **Tipo de documento** para NC/ND y las dejó fuera de alcance. La corrección operativa era solo anular (sin caja) + reemitir. Se necesita el patrón de softwares de gestión (Odoo / Tango / Softland): comprobantes NC/ND que mueven saldos de CxC/CxP sin confundirse con la **Clase** financiera derivada.
+- **Decisión:**
+  1. **Alcance v1:** AR (`SalesInvoice`) y AP (`SupplierInvoice`), con `projectId` null (empresa) o set (obra).
+  2. **Persistencia:** extender las tablas de factura con `documentKind` enum `INVOICE` | `CREDIT_NOTE` | `DEBIT_NOTE` (default `INVOICE`) + FK `referenced*InvoiceId` al comprobante origen. **No** tablas NC/ND separadas. **No** catálogo `DocumentType` en v1 (sigue [`MASTER_DATA.md`](../01-domain/MASTER_DATA.md) §2.6 futuro / AFIP).
+  3. **Clase vs Tipo:** [D-102] intacto para **Clase** derivada. UI muestra **Tipo de documento** = `documentKind` (Factura / Nota de crédito / Nota de débito). Letra A/B/C/E sigue en `invoiceLetter` ([D-084]).
+  4. **Montos:** siempre **positivos** en el documento; el signo lo define el tipo.
+  5. **NC v1:** `referenced*InvoiceId` **obligatorio**; el referenciado debe estar `ISSUED`, mismo tenant/company/contacto/moneda/`projectId`. Al **emitir**, **no** crea `Receivable`/`Payable` propia: crea `*CreditApplication` (1:1 NC↔obligación padre) y suma `creditedAmount` en la obligación. **Sin** `AccountMovement` / cobranza / pago. `totalAmount` ≤ `balanceDue` del padre al emitir ([BR-NC-002]).
+  6. **ND v1:** `referenced*InvoiceId` obligatorio (trazabilidad); al emitir crea obligación **nueva** 1:1 como una factura (aumenta deuda). No muta `originalAmount` del padre.
+  7. **Saldo:** `balanceDue = originalAmount − paidAmount − creditedAmount` ([D-053] dust). `paidAmount` = solo tesorería; `creditedAmount` = solo NC aplicadas.
+  8. **Numeración:** `@@unique([tenantId, companyId, documentKind, number])` — series separadas por tipo.
+  9. **Certificación:** el unique “una factura activa por certificación” aplica **solo** a `documentKind = INVOICE`. NC/ND no llevan `certificationId` operativo que ocupe ese cupo.
+  10. **Anulación:** no anular factura padre si hay NC/ND `ISSUED` que la referencian ([BR-NC-005]). Anular NC revierte la aplicación. Anular ND = mismas reglas que anular factura (bloquea si hay caja).
+  11. **Fuera de v1:** crédito abierto (NC sin factura), una NC a varias facturas, AFIP/CAE, devolución de caja por NC, fondo de reparo ([Q-023]), pantalla de estado de cuenta corrido.
+- **Implicancias:** migración Prisma; `obligation-balance` + aging/KPIs; services issue/cancel NC/ND AR/AP; cost-control AP (factura+ND suman, NC resta accrued); UI empresa/obra; guía/help/AI ([D-090]).
+- **Documentos afectados:** [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md), [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md), [`ENTITY_RELATIONSHIPS.md`](../01-domain/ENTITY_RELATIONSHIPS.md), [`SALES_AND_COLLECTIONS.md`](../02-modules/SALES_AND_COLLECTIONS.md), [`EXPENSES_AND_PAYMENTS.md`](../02-modules/EXPENSES_AND_PAYMENTS.md), [`ACCOUNTS_RECEIVABLE.md`](../03-finance/ACCOUNTS_RECEIVABLE.md), [`ACCOUNTS_PAYABLE.md`](../03-finance/ACCOUNTS_PAYABLE.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), help finance, [D-102](#d-102--clase-financiera-derivada-sin-enums-persistidos--job-cost-explícito-en-alta-ap).
 
 ---
 

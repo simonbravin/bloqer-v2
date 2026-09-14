@@ -21,6 +21,7 @@ import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
+import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-document-kind-badge";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -62,6 +63,7 @@ export function SupplierInvoiceTable({
         <TableHeader>
           <TableRow>
             <TableHead>Código</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Letra</TableHead>
             <TableHead>Clase</TableHead>
             <TableHead>Proveedor</TableHead>
@@ -81,7 +83,8 @@ export function SupplierInvoiceTable({
               Boolean(payableHrefPrefix) &&
               inv.payableId &&
               inv.payableStatus &&
-              PAYABLE_OPEN.has(inv.payableStatus);
+              PAYABLE_OPEN.has(inv.payableStatus) &&
+              inv.documentKind !== "CREDIT_NOTE";
             const letter = formatInvoiceLetterBadge(inv.invoiceLetter);
             return (
               <TableRow key={inv.id}>
@@ -92,6 +95,9 @@ export function SupplierInvoiceTable({
                   >
                     {inv.code}
                   </Link>
+                </TableCell>
+                <TableCell>
+                  <FiscalDocumentKindBadge documentKind={inv.documentKind} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {letter ?? "—"}

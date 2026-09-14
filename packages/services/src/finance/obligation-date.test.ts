@@ -92,6 +92,7 @@ describe("aggregateCorporatePayableBalances", () => {
         dueDate: new Date("2026-05-01T00:00:00.000Z"),
         originalAmount: new Prisma.Decimal("100"),
         paidAmount: new Prisma.Decimal(0),
+        creditedAmount: new Prisma.Decimal(0),
         status: "OPEN",
       },
       {
@@ -99,6 +100,7 @@ describe("aggregateCorporatePayableBalances", () => {
         dueDate: new Date("2026-06-15T00:00:00.000Z"),
         originalAmount: new Prisma.Decimal("50"),
         paidAmount: new Prisma.Decimal(0),
+        creditedAmount: new Prisma.Decimal(0),
         status: "OPEN",
       },
     ];
@@ -117,6 +119,7 @@ describe("aggregateCorporateProjectionOutflows", () => {
         dueDate: new Date("2024-01-01T00:00:00.000Z"),
         originalAmount: new Prisma.Decimal("80"),
         paidAmount: new Prisma.Decimal(0),
+        creditedAmount: new Prisma.Decimal(0),
         status: "OPEN",
       },
       {
@@ -124,6 +127,7 @@ describe("aggregateCorporateProjectionOutflows", () => {
         dueDate: new Date("2027-01-01T00:00:00.000Z"),
         originalAmount: new Prisma.Decimal("999"),
         paidAmount: new Prisma.Decimal(0),
+        creditedAmount: new Prisma.Decimal(0),
         status: "OPEN",
       },
     ];
@@ -141,6 +145,7 @@ describe("isCorporatePayableInProjectionHorizon", () => {
       dueDate: startOfDayUtc(new Date("2026-07-01T00:00:00.000Z")),
       originalAmount: new Prisma.Decimal("10"),
       paidAmount: new Prisma.Decimal(0),
+      creditedAmount: new Prisma.Decimal(0),
       status: "PARTIAL",
     };
     assert.equal(isCorporatePayableInProjectionHorizon(row, "2026-12-31"), true);

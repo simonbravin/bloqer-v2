@@ -420,7 +420,7 @@ export async function registerApExpense(
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
             const maxNum = await tx.supplierInvoice.aggregate({
-              where: { tenantId: ctx.tenantId, companyId },
+              where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
               _max: { number: true },
             });
             const number = (maxNum._max.number ?? 0) + 1;

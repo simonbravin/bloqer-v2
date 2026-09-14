@@ -15,6 +15,7 @@ export type CorporatePayableSnapshotRow = {
   dueDate: Date;
   originalAmount: Prisma.Decimal;
   paidAmount: Prisma.Decimal;
+  creditedAmount: Prisma.Decimal;
   status: string;
 };
 
@@ -56,6 +57,7 @@ export async function fetchCorporatePayableSnapshotRows(
       dueDate: true,
       originalAmount: true,
       paidAmount: true,
+      creditedAmount: true,
       status: true,
     },
   });
@@ -77,7 +79,7 @@ export async function countCorporateDraftInvoices(ctx: ServiceContext): Promise<
 
 function openBalance(row: CorporatePayableSnapshotRow): Prisma.Decimal | null {
   if (row.status === "CANCELLED") return null;
-  const bal = row.originalAmount.minus(row.paidAmount);
+  const bal = row.originalAmount.minus(row.paidAmount).minus(row.creditedAmount);
   if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) return null;
   return bal;
 }

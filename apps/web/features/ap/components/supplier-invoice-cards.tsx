@@ -8,6 +8,7 @@ import type { SupplierInvoiceListItem } from "./supplier-invoice-list";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
+import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-document-kind-badge";
 
 const PAYABLE_OPEN = new Set(["OPEN", "PARTIAL", "OVERDUE"]);
 
@@ -50,7 +51,8 @@ export function SupplierInvoiceCards({
           Boolean(payableHrefPrefix) &&
           inv.payableId &&
           inv.payableStatus &&
-          PAYABLE_OPEN.has(inv.payableStatus);
+          PAYABLE_OPEN.has(inv.payableStatus) &&
+          inv.documentKind !== "CREDIT_NOTE";
         const letter = formatInvoiceLetterBadge(inv.invoiceLetter);
         return (
           <div
@@ -67,14 +69,15 @@ export function SupplierInvoiceCards({
                   <SupplierInvoiceStatusBadge status={inv.status} />
                 </span>
               </div>
-              {inv.classLabel ? (
-                <div className="mt-2">
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <FiscalDocumentKindBadge documentKind={inv.documentKind} />
+                {inv.classLabel ? (
                   <DocumentClassBadge
                     classLabel={inv.classLabel}
                     classFamily={inv.classFamily}
                   />
-                </div>
-              ) : null}
+                ) : null}
+              </div>
               <p className="mt-2 truncate font-semibold" title={inv.supplierName}>
                 {inv.supplierName}
               </p>

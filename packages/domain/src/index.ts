@@ -156,6 +156,13 @@ export {
 } from "./finance/document-classification";
 
 export {
+  FISCAL_DOCUMENT_KIND_LABELS,
+  fiscalDocumentKindLabel,
+  isFiscalDocumentKind,
+  type FiscalDocumentKindCode,
+} from "./finance/fiscal-document-kind";
+
+export {
   PURCHASE_ORDER_PROCESS_STEP_DEFS,
   PURCHASE_REQUEST_PROCESS_STEP_DEFS,
   SUPPLIER_INVOICE_PROCESS_STEP_DEFS,

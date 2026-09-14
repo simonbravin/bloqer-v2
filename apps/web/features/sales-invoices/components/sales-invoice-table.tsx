@@ -17,6 +17,7 @@ import type { SalesInvoiceListItem } from "./sales-invoice-list";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatInvoiceLetterBadge } from "@bloqer/domain";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
+import { FiscalDocumentKindBadge } from "@/features/finance/components/fiscal-document-kind-badge";
 
 export function SalesInvoiceTable({
   invoices,
@@ -37,6 +38,7 @@ export function SalesInvoiceTable({
         <TableHeader>
           <TableRow>
             <TableHead>N°</TableHead>
+            <TableHead>Tipo</TableHead>
             <TableHead>Letra</TableHead>
             <TableHead>Clase</TableHead>
             <TableHead>Cliente</TableHead>
@@ -57,6 +59,9 @@ export function SalesInvoiceTable({
                   >
                     {inv.code}
                   </Link>
+                </TableCell>
+                <TableCell>
+                  <FiscalDocumentKindBadge documentKind={inv.documentKind} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {letter ?? "—"}

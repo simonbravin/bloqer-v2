@@ -12,6 +12,10 @@ const LABELS: Record<AccountingMappingEventType, string> = {
   MANUAL_OWNER_LOAN:             "Préstamo de socio (manual)",
   SALES_INVOICE_ISSUED:          "Factura de venta emitida",
   SUPPLIER_INVOICE_ISSUED:       "Factura de proveedor emitida",
+  SALES_CREDIT_NOTE_ISSUED:      "Nota de crédito de venta emitida",
+  SALES_DEBIT_NOTE_ISSUED:       "Nota de débito de venta emitida",
+  SUPPLIER_CREDIT_NOTE_ISSUED:   "Nota de crédito de proveedor emitida",
+  SUPPLIER_DEBIT_NOTE_ISSUED:    "Nota de débito de proveedor emitida",
 };
 
 export function AccountingEventTypeBadge({ eventType }: { eventType: AccountingMappingEventType }) {

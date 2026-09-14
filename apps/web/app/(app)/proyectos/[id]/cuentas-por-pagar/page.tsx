@@ -145,6 +145,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
     currency: inv.currency,
     status: inv.status,
     invoiceLetter: inv.invoiceLetter,
+    documentKind: inv.documentKind,
     classLabel: inv.classLabel,
     classFamily: inv.classFamily,
   }));

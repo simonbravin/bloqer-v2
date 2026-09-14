@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import { Prisma } from "@bloqer/database";
 import {
   computeObligationBalanceDue,
+  effectiveObligationCreditedAfterCredit,
   effectiveObligationPaidAfterPayment,
   normalizeObligationBalanceDue,
 } from "./obligation-balance";
@@ -49,6 +50,17 @@ describe("computeObligationBalanceDue", () => {
     );
   });
 
+  it("subtracts paid and credited ([D-115])", () => {
+    assert.equal(
+      computeObligationBalanceDue(
+        new Prisma.Decimal("1000"),
+        new Prisma.Decimal("400"),
+        new Prisma.Decimal("200"),
+      ).toString(),
+      "400",
+    );
+  });
+
   it("partial collection: two payments leave the remaining receivable balance (Phase 3)", () => {
     const original = new Prisma.Decimal("1000.00");
     const afterFirst = effectiveObligationPaidAfterPayment(
@@ -64,5 +76,17 @@ describe("computeObligationBalanceDue", () => {
     );
     assert.equal(afterSecond.toString(), "750");
     assert.equal(computeObligationBalanceDue(original, afterSecond).toString(), "250");
+  });
+});
+
+describe("effectiveObligationCreditedAfterCredit", () => {
+  it("writes off dust onto credited when settling", () => {
+    const original = new Prisma.Decimal("100");
+    const paid = new Prisma.Decimal("40");
+    const credited = new Prisma.Decimal("59.997");
+    assert.equal(
+      effectiveObligationCreditedAfterCredit(original, paid, credited).toString(),
+      "60",
+    );
   });
 });

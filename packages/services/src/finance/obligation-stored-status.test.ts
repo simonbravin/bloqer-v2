@@ -25,10 +25,25 @@ describe("resolveObligationStoredStatus", () => {
     );
   });
 
-  it("returns OPEN when nothing paid", () => {
+  it("returns PARTIAL when credited without cash ([D-115])", () => {
     assert.equal(
-      resolveObligationStoredStatus(new Prisma.Decimal(0), new Prisma.Decimal("100")),
-      "OPEN",
+      resolveObligationStoredStatus(
+        new Prisma.Decimal(0),
+        new Prisma.Decimal("100"),
+        new Prisma.Decimal("40"),
+      ),
+      "PARTIAL",
+    );
+  });
+
+  it("returns PAID when paid + credited settle original ([D-115])", () => {
+    assert.equal(
+      resolveObligationStoredStatus(
+        new Prisma.Decimal("60"),
+        new Prisma.Decimal("100"),
+        new Prisma.Decimal("40"),
+      ),
+      "PAID",
     );
   });
 });

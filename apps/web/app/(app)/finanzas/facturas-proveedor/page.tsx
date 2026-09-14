@@ -95,6 +95,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
     totalAmount: inv.totalAmount,
     currency: inv.currency,
     status: inv.status,
+    documentKind: inv.documentKind,
     payableId: inv.payable?.id ?? null,
     payableStatus: inv.payable?.status ?? null,
     invoiceLetter: inv.invoiceLetter,

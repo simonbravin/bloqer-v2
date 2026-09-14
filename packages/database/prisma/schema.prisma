@@ -99,8 +99,12 @@ enum JournalEntryStatus {
 enum JournalEntrySourceType {
   MANUAL
   SALES_INVOICE
+  SALES_CREDIT_NOTE
+  SALES_DEBIT_NOTE
   COLLECTION
   SUPPLIER_INVOICE
+  SUPPLIER_CREDIT_NOTE
+  SUPPLIER_DEBIT_NOTE
   PAYMENT
   INTERNAL_TRANSFER
   STOCK_MOVEMENT
@@ -123,8 +127,16 @@ enum AccountingMappingEventType {
   MANUAL_OWNER_LOAN
   /// Phase 11E — sales invoice issued (accrual on totalAmount).
   SALES_INVOICE_ISSUED
+  /// [D-115] sales credit note issued (reduces AR via creditedAmount).
+  SALES_CREDIT_NOTE_ISSUED
+  /// [D-115] sales debit note issued (new AR obligation).
+  SALES_DEBIT_NOTE_ISSUED
   /// Phase 11E — supplier invoice issued (accrual on totalAmount).
   SUPPLIER_INVOICE_ISSUED
+  /// [D-115] supplier credit note issued.
+  SUPPLIER_CREDIT_NOTE_ISSUED
+  /// [D-115] supplier debit note issued.
+  SUPPLIER_DEBIT_NOTE_ISSUED
 }
 
 enum UserRole {
@@ -184,6 +196,20 @@ enum InvoiceLetter {
   B
   C
   E
+}
+
+/// Fiscal voucher kind on SalesInvoice / SupplierInvoice ([D-115]).
+/// Distinct from derived financial Clase ([D-102]) and from InvoiceLetter.
+enum FiscalDocumentKind {
+  INVOICE
+  CREDIT_NOTE
+  DEBIT_NOTE
+}
+
+/// Non-cash credit application from an issued CREDIT_NOTE onto a Receivable/Payable ([D-115]).
+enum CreditApplicationStatus {
+  CONFIRMED
+  CANCELLED
 }
 
 enum ProjectStatus {
@@ -643,6 +669,7 @@ model Tenant {
   certifications              Certification[]
   salesInvoices               SalesInvoice[]
   receivables                 Receivable[]
+  receivableCreditApplications ReceivableCreditApplication[]
   treasuryAccounts            TreasuryAccount[]
   accountMovements            AccountMovement[]
   bankReconciliations         BankReconciliation[]
@@ -652,6 +679,7 @@ model Tenant {
   internalTransfers           InternalTransfer[]
   supplierInvoices            SupplierInvoice[]
   payables                    Payable[]
+  payableCreditApplications   PayableCreditApplication[]
   payments                    Payment[]
   purchaseOrders              PurchaseOrder[]
   purchaseReceipts            PurchaseReceipt[]
@@ -770,11 +798,13 @@ model Company {
   certifications              Certification[]
   salesInvoices               SalesInvoice[]
   receivables                 Receivable[]
+  receivableCreditApplications ReceivableCreditApplication[]
   treasuryAccounts            TreasuryAccount[]
   collections                 Collection[]
   internalTransfers           InternalTransfer[]
   supplierInvoices            SupplierInvoice[]
   payables                    Payable[]
+  payableCreditApplications   PayableCreditApplication[]
   payments                    Payment[]
   purchaseOrders              PurchaseOrder[]
   purchaseReceipts            PurchaseReceipt[]
@@ -1523,19 +1553,23 @@ model CertificationLine {
 // BR-CERT-007: no INVOICED in Certification.status — check SalesInvoice FK instead.
 // BR-NUM-001: number is sequential per company (Q-002 scope TBD — see PENDING_ARCHITECTURE_ITEMS.md).
 // BR-AR-004: cancelling invoice cascades to cancel linked Receivable (service layer).
-
 // BR-AR-003 / D-051: projectId nullable — corporate AR (no obra) mirrors SupplierInvoice.
+// D-115: documentKind + referencedSalesInvoiceId for NC/ND; INVOICE/DEBIT_NOTE create Receivable.
 model SalesInvoice {
   id                 String             @id @default(uuid())
   tenantId           String
   companyId          String
   projectId          String?
   clientContactId    String
-  /// At most one non-CANCELLED invoice per certification — partial unique index
-  /// `sales_invoices_one_active_per_certification_key` (migration 20260807200000).
+  /// At most one non-CANCELLED INVOICE per certification — partial unique index
+  /// `sales_invoices_one_active_per_certification_key` (updated [D-115]).
   /// Not a Prisma @@unique (that would incorrectly block CANCELLED rows).
   certificationId    String?
   number             Int
+  /// Fiscal voucher kind ([D-115]). Default INVOICE for legacy rows.
+  documentKind       FiscalDocumentKind @default(INVOICE)
+  /// Required for CREDIT_NOTE / DEBIT_NOTE — must reference an ISSUED INVOICE ([BR-NC-001]).
+  referencedSalesInvoiceId String?
   /// Letra de comprobante A/B/C/E ([D-084]); required on issue when operation is AR.
   invoiceLetter      InvoiceLetter?
   issueDate          DateTime           @db.Date
@@ -1561,20 +1595,25 @@ model SalesInvoice {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  tenant        Tenant             @relation(fields: [tenantId], references: [id])
-  company       Company            @relation(fields: [companyId], references: [id])
-  project       Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  clientContact Contact            @relation(fields: [clientContactId], references: [id])
-  certification Certification?     @relation(fields: [certificationId], references: [id])
-  lines         SalesInvoiceLine[]
-  receivable    Receivable?
-  collections   Collection[]
+  tenant                   Tenant             @relation(fields: [tenantId], references: [id])
+  company                  Company            @relation(fields: [companyId], references: [id])
+  project                  Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  clientContact            Contact            @relation(fields: [clientContactId], references: [id])
+  certification            Certification?     @relation(fields: [certificationId], references: [id])
+  referencedSalesInvoice   SalesInvoice?      @relation("SalesInvoiceCreditDebitOf", fields: [referencedSalesInvoiceId], references: [id])
+  creditDebitNotes         SalesInvoice[]     @relation("SalesInvoiceCreditDebitOf")
+  lines                    SalesInvoiceLine[]
+  receivable               Receivable?
+  collections              Collection[]
+  creditApplicationAsNote  ReceivableCreditApplication?
 
-  @@unique([tenantId, companyId, number])
+  @@unique([tenantId, companyId, documentKind, number])
   @@index([tenantId, projectId])
   @@index([tenantId, certificationId])
   @@index([tenantId, status])
   @@index([tenantId, invoiceLetter])
+  @@index([tenantId, documentKind])
+  @@index([referencedSalesInvoiceId])
   @@map("sales_invoices")
 }
 
@@ -1605,9 +1644,10 @@ model SalesInvoiceLine {
   @@map("sales_invoice_lines")
 }
 
-// BR-AR-001: Receivable created from issued SalesInvoice (1:1).
-// BR-AR-002: status derived from paidAmount — maintained by service layer.
+// BR-AR-001: Receivable created from issued SalesInvoice INVOICE or DEBIT_NOTE (1:1).
+// BR-AR-002: status derived from balanceDue = original − paid − credited — service layer.
 // BR-AR-003 / D-051: projectId nullable — corporate AR without obra (mirrors Payable).
+// D-115: creditedAmount from ReceivableCreditApplication (NC); paidAmount = treasury only.
 model Receivable {
   id              String           @id @default(uuid())
   tenantId        String
@@ -1620,6 +1660,8 @@ model Receivable {
   currency        String
   originalAmount  Decimal          @db.Decimal(18, 4)
   paidAmount      Decimal          @default(0) @db.Decimal(18, 4)
+  /// Sum of CONFIRMED credit applications from CREDIT_NOTE ([D-115]).
+  creditedAmount  Decimal          @default(0) @db.Decimal(18, 4)
   status          ReceivableStatus @default(OPEN)
   notes           String?
   createdBy       String?
@@ -1627,17 +1669,42 @@ model Receivable {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  tenant        Tenant       @relation(fields: [tenantId], references: [id])
-  company       Company      @relation(fields: [companyId], references: [id])
-  project       Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  clientContact Contact      @relation(fields: [clientContactId], references: [id])
-  salesInvoice  SalesInvoice @relation(fields: [salesInvoiceId], references: [id])
-  collections   Collection[]
+  tenant             Tenant                         @relation(fields: [tenantId], references: [id])
+  company            Company                        @relation(fields: [companyId], references: [id])
+  project            Project?                       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  clientContact      Contact                        @relation(fields: [clientContactId], references: [id])
+  salesInvoice       SalesInvoice                   @relation(fields: [salesInvoiceId], references: [id])
+  collections        Collection[]
+  creditApplications ReceivableCreditApplication[]
 
   @@index([tenantId, projectId])
   @@index([tenantId, projectId, dueDate])
   @@index([tenantId, status])
   @@map("receivables")
+}
+
+/// Non-cash application of a sales CREDIT_NOTE onto a Receivable ([D-115] / BR-NC-003).
+model ReceivableCreditApplication {
+  id                     String                  @id @default(uuid())
+  tenantId               String
+  companyId              String
+  receivableId           String
+  creditNoteSalesInvoiceId String                @unique
+  amount                 Decimal                 @db.Decimal(18, 4)
+  status                 CreditApplicationStatus @default(CONFIRMED)
+  createdBy              String?
+  updatedBy              String?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+
+  tenant               Tenant       @relation(fields: [tenantId], references: [id])
+  company              Company      @relation(fields: [companyId], references: [id])
+  receivable           Receivable   @relation(fields: [receivableId], references: [id])
+  creditNoteSalesInvoice SalesInvoice @relation(fields: [creditNoteSalesInvoiceId], references: [id])
+
+  @@index([tenantId, receivableId])
+  @@index([tenantId, status])
+  @@map("receivable_credit_applications")
 }
 
 // ─── Accounting ledger (Phase 11A) ───────────────────────────────────────────
@@ -1999,6 +2066,7 @@ model InternalTransfer {
 // BR-AP-003: CANCELLED invoice cancels Payable if no active Payments exist.
 
 // Phase 16B: projectId null = company-level AP (general expenses), not a fake project.
+// D-115: documentKind + referencedSupplierInvoiceId for NC/ND.
 model SupplierInvoice {
   id                String                @id @default(uuid())
   tenantId          String
@@ -2006,6 +2074,10 @@ model SupplierInvoice {
   projectId         String?
   supplierContactId String
   number            Int
+  /// Fiscal voucher kind ([D-115]). Default INVOICE for legacy rows.
+  documentKind      FiscalDocumentKind    @default(INVOICE)
+  /// Required for CREDIT_NOTE / DEBIT_NOTE — must reference an ISSUED INVOICE ([BR-NC-001]).
+  referencedSupplierInvoiceId String?
   /// Letra de comprobante A/B/C/E del comprobante recibido ([D-084]).
   invoiceLetter     InvoiceLetter?
   issueDate         DateTime              @db.Date
@@ -2034,22 +2106,27 @@ model SupplierInvoice {
   // Optional link to SubcontractCertification — set on certification approve.
   subcontractCertificationId String? @unique
 
-  tenant                   Tenant                    @relation(fields: [tenantId], references: [id])
-  company                  Company                   @relation(fields: [companyId], references: [id])
-  project                  Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  supplierContact          Contact                   @relation(fields: [supplierContactId], references: [id])
-  purchaseOrder            PurchaseOrder?            @relation(fields: [purchaseOrderId], references: [id])
-  subcontractCertification SubcontractCertification? @relation(fields: [subcontractCertificationId], references: [id])
-  lines                    SupplierInvoiceLine[]
-  payable                  Payable?
+  tenant                      Tenant                    @relation(fields: [tenantId], references: [id])
+  company                     Company                   @relation(fields: [companyId], references: [id])
+  project                     Project?                  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  supplierContact             Contact                   @relation(fields: [supplierContactId], references: [id])
+  purchaseOrder               PurchaseOrder?            @relation(fields: [purchaseOrderId], references: [id])
+  subcontractCertification    SubcontractCertification? @relation(fields: [subcontractCertificationId], references: [id])
+  referencedSupplierInvoice   SupplierInvoice?          @relation("SupplierInvoiceCreditDebitOf", fields: [referencedSupplierInvoiceId], references: [id])
+  creditDebitNotes            SupplierInvoice[]         @relation("SupplierInvoiceCreditDebitOf")
+  lines                       SupplierInvoiceLine[]
+  payable                     Payable?
   /// Partial payments against this invoice (`Payment.supplierInvoiceId`).
-  apPayments               Payment[]
+  apPayments                  Payment[]
+  creditApplicationAsNote     PayableCreditApplication?
 
-  @@unique([tenantId, companyId, number])
+  @@unique([tenantId, companyId, documentKind, number])
   @@index([tenantId, projectId])
   @@index([tenantId, status])
   @@index([tenantId, supplierContactId])
   @@index([tenantId, invoiceLetter])
+  @@index([tenantId, documentKind])
+  @@index([referencedSupplierInvoiceId])
   @@map("supplier_invoices")
 }
 
@@ -2092,9 +2169,10 @@ model SupplierInvoiceLine {
   @@map("supplier_invoice_lines")
 }
 
-// BR-AP-002: Payable created from issued SupplierInvoice (1:1).
-// BR-AP-004: status derived from paidAmount — maintained by service layer.
+// BR-AP-002: Payable created from issued SupplierInvoice INVOICE or DEBIT_NOTE (1:1).
+// BR-AP-004: status derived from balanceDue = original − paid − credited — service layer.
 // OVERDUE computed on read if dueDate passed and balanceDue > 0 (same as ReceivableStatus / D5).
+// D-115: creditedAmount from PayableCreditApplication (NC); paidAmount = treasury only.
 model Payable {
   id                String        @id @default(uuid())
   tenantId          String
@@ -2107,6 +2185,8 @@ model Payable {
   currency          String
   originalAmount    Decimal       @db.Decimal(18, 4)
   paidAmount        Decimal       @default(0) @db.Decimal(18, 4)
+  /// Sum of CONFIRMED credit applications from CREDIT_NOTE ([D-115]).
+  creditedAmount    Decimal       @default(0) @db.Decimal(18, 4)
   status            PayableStatus @default(OPEN)
   notes             String?
   createdBy         String?
@@ -2114,17 +2194,42 @@ model Payable {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
-  tenant          Tenant          @relation(fields: [tenantId], references: [id])
-  company         Company         @relation(fields: [companyId], references: [id])
-  project         Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  supplierContact Contact         @relation(fields: [supplierContactId], references: [id])
-  supplierInvoice SupplierInvoice @relation(fields: [supplierInvoiceId], references: [id])
-  payments        Payment[]
+  tenant             Tenant                      @relation(fields: [tenantId], references: [id])
+  company            Company                     @relation(fields: [companyId], references: [id])
+  project            Project?                    @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  supplierContact    Contact                     @relation(fields: [supplierContactId], references: [id])
+  supplierInvoice    SupplierInvoice             @relation(fields: [supplierInvoiceId], references: [id])
+  payments           Payment[]
+  creditApplications PayableCreditApplication[]
 
   @@index([tenantId, projectId])
   @@index([tenantId, supplierContactId, dueDate])
   @@index([tenantId, status])
   @@map("payables")
+}
+
+/// Non-cash application of a supplier CREDIT_NOTE onto a Payable ([D-115] / BR-NC-003).
+model PayableCreditApplication {
+  id                          String                  @id @default(uuid())
+  tenantId                    String
+  companyId                   String
+  payableId                   String
+  creditNoteSupplierInvoiceId String                  @unique
+  amount                      Decimal                 @db.Decimal(18, 4)
+  status                      CreditApplicationStatus @default(CONFIRMED)
+  createdBy                   String?
+  updatedBy                   String?
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+
+  tenant                      Tenant          @relation(fields: [tenantId], references: [id])
+  company                     Company         @relation(fields: [companyId], references: [id])
+  payable                     Payable         @relation(fields: [payableId], references: [id])
+  creditNoteSupplierInvoice   SupplierInvoice @relation(fields: [creditNoteSupplierInvoiceId], references: [id])
+
+  @@index([tenantId, payableId])
+  @@index([tenantId, status])
+  @@map("payable_credit_applications")
 }
 
 // BR-AP-005: Payment amount cannot exceed Payable.balanceDue (no overpayment).
