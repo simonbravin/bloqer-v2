@@ -23,6 +23,7 @@ import { entryDateGte, entryDateLte, sanitizeIsoDate } from "./accounting-date";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 import { assertPeriodOpenUnderCompanyLock } from "../treasury/treasury-write-locks";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 
 /** Sourced journals mirror an operational document [D-063]. */
 export function isSourcedJournalEntry(entry: {
@@ -944,7 +945,7 @@ export async function reversePostedJournalEntry(
   }
 
   const entryDateStr =
-    opts?.entryDate ?? new Date().toISOString().slice(0, 10);
+    opts?.entryDate ?? toIsoDateInTimeZone();
   const entryDate = new Date(`${entryDateStr}T00:00:00.000Z`);
 
   const reverse = await prisma.$transaction(async (tx) => {

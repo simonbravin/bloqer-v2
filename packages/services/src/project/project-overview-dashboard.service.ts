@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import type { PermissionModule } from "@bloqer/domain";
 import { can } from "@bloqer/domain";
 import { formatWbsIncidencePercent } from "@bloqer/domain";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { fmtDecimalEs, pushMoneyRowsKpi } from "../dashboard/kpi-helpers";
 import { listBudgetsByProject } from "../budget/budget.service";
@@ -154,24 +155,23 @@ function fmtDate(d: Date | null | undefined): string | null {
 
 function computeScheduleProgress(startIso: string | null, endIso: string | null): ProjectOverviewScheduleProgress {
   if (!startIso) return { percent: null, note: "Sin fecha de inicio" };
-  const start = new Date(`${startIso}T12:00:00`);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const s = new Date(start);
-  s.setHours(0, 0, 0, 0);
-  if (today < s) return { percent: 0, note: null };
+  const todayIso = toIsoDateInTimeZone();
+  if (todayIso < startIso) return { percent: 0, note: null };
   if (!endIso) {
     return {
       percent: null,
       note: "Agregá la fecha de fin estimada para ver el avance temporal frente a hoy.",
     };
   }
-  const end = new Date(`${endIso}T12:00:00`);
-  end.setHours(0, 0, 0, 0);
-  if (today >= end) return { percent: 100, note: null };
-  const span = end.getTime() - s.getTime();
-  if (span <= 0) return { percent: null, note: "La fecha de fin estimada es anterior al inicio." };
-  const elapsed = today.getTime() - s.getTime();
+  if (todayIso >= endIso) return { percent: 100, note: null };
+  const s = Date.parse(`${startIso}T12:00:00.000Z`);
+  const e = Date.parse(`${endIso}T12:00:00.000Z`);
+  const t = Date.parse(`${todayIso}T12:00:00.000Z`);
+  const span = e - s;
+  if (!(span > 0) || Number.isNaN(s) || Number.isNaN(e) || Number.isNaN(t)) {
+    return { percent: null, note: "La fecha de fin estimada es anterior al inicio." };
+  }
+  const elapsed = t - s;
   return { percent: Math.min(100, Math.max(0, Math.round((elapsed / span) * 100))), note: null };
 }
 

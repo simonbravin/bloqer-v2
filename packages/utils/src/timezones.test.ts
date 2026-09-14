@@ -86,6 +86,15 @@ describe("formatDateTime with timeZone", () => {
     assert.match(label, /12:30/);
   });
 
+  it("defaults to product TZ when timeZone is omitted", () => {
+    const instant = new Date("2026-07-15T15:30:00.000Z");
+    const withDefault = formatDateTime(instant);
+    const withExplicit = formatDateTime(instant, {
+      timeZone: "America/Argentina/Buenos_Aires",
+    });
+    assert.equal(withDefault, withExplicit);
+  });
+
   it("keeps string fallback overload", () => {
     assert.equal(formatDateTime(null, "n/a"), "n/a");
   });

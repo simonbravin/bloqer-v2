@@ -1,5 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { calendarPartsInTimeZone, formatCalendarDate } from "@bloqer/utils";
 import { getPayableAgingReport, getReceivableAgingReport, type AgingReport } from "../aging/aging.service";
 import { canViewCompanyAp } from "../ap/ap-access";
 import { canViewCompanyAr } from "../ar/ar-access";
@@ -226,18 +227,27 @@ function safeRun<T>(_label: string, fn: () => Promise<T>): Promise<T | null> {
 
 /** Latest APPROVED/CLOSED budget per project (first row wins after version desc sort). */
 function cashFlowRangeDates(range: DashboardCashFlowRange): { dateFrom: string; dateTo: string } {
-  const to = new Date();
-  const from = new Date(to);
+  const now = new Date();
+  const parts = calendarPartsInTimeZone(now);
+  const dateTo = formatCalendarDate(parts);
   if (range === "month") {
-    from.setDate(1);
-  } else if (range === "3m") {
-    from.setMonth(from.getMonth() - 3);
-  } else if (range === "6m") {
-    from.setMonth(from.getMonth() - 6);
-  } else {
-    from.setFullYear(from.getFullYear() - 1);
+    return {
+      dateFrom: `${parts.year}-${String(parts.month).padStart(2, "0")}-01`,
+      dateTo,
+    };
   }
-  return { dateFrom: from.toISOString().slice(0, 10), dateTo: to.toISOString().slice(0, 10) };
+  const pivot = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0));
+  if (range === "3m") pivot.setUTCMonth(pivot.getUTCMonth() - 3);
+  else if (range === "6m") pivot.setUTCMonth(pivot.getUTCMonth() - 6);
+  else pivot.setUTCFullYear(pivot.getUTCFullYear() - 1);
+  return {
+    dateFrom: formatCalendarDate({
+      year: pivot.getUTCFullYear(),
+      month: pivot.getUTCMonth() + 1,
+      day: pivot.getUTCDate(),
+    }),
+    dateTo,
+  };
 }
 
 function cashFlowPeriodForRange(range: DashboardCashFlowRange): "day" | "week" | "month" {
@@ -246,7 +256,8 @@ function cashFlowPeriodForRange(range: DashboardCashFlowRange): "day" | "week" |
 
 async function sumMonthlyTreasuryOutflows(ctx: ServiceContext): Promise<Map<string, Prisma.Decimal>> {
   const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const parts = calendarPartsInTimeZone(now);
+  const start = new Date(Date.UTC(parts.year, parts.month - 1, 1));
   const movements = await prisma.accountMovement.findMany({
     where: {
       tenantId: ctx.tenantId,

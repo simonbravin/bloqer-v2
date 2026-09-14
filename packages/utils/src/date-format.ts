@@ -1,4 +1,5 @@
 /** Locale fijo para UI es-AR: fechas siempre dd/mm/yyyy. */
+import { PRODUCT_TIMEZONE } from "./calendar-date";
 import { resolveDisplayTimeZone } from "./timezones";
 
 const LOCALE = "es-AR";
@@ -88,13 +89,15 @@ function localeOptions(
 }
 
 /**
- * Zone for date-only display: explicit override, else UTC for `@db.Date` wire format.
- * Do not use for `formatDateTime` — timestamps need a wall-clock zone.
+ * Zone for date-only display:
+ * - explicit override
+ * - UTC for Prisma `@db.Date` (midnight wire format)
+ * - product TZ for real timestamps shown as a calendar day (SSR = client)
  */
-function resolveDateDisplayTimeZone(d: Date, timeZone?: string): string | undefined {
-  if (timeZone != null && timeZone !== "") return timeZone;
+function resolveDateDisplayTimeZone(d: Date, timeZone?: string): string {
+  if (timeZone != null && timeZone !== "") return resolveDisplayTimeZone(timeZone);
   if (isPrismaDateOnlyInstant(d)) return "UTC";
-  return undefined;
+  return PRODUCT_TIMEZONE;
 }
 
 /**
@@ -102,7 +105,7 @@ function resolveDateDisplayTimeZone(d: Date, timeZone?: string): string | undefi
  *
  * Prefer `formatDbDate` for Prisma `@db.Date` columns. `formatDate` also auto-pins UTC
  * when the instant is UTC midnight (typical `@db.Date` payload), so list/detail stay aligned.
- * For real timestamps (`createdAt`, etc.) pass `timeZone` if SSR and client must match.
+ * Timestamps without an explicit zone use the product timezone.
  */
 export function formatDate(
   value: Date | string | number | null | undefined,
@@ -139,7 +142,7 @@ export function formatDateRange(
   return `${formatDate(from)}${separator}${formatDate(to)}`;
 }
 
-/** Fecha y hora: dd/mm/yyyy, hh:mm — pass `timeZone` so SSR and client match. */
+/** Fecha y hora: dd/mm/yyyy, hh:mm — defaults to product TZ so SSR and client match. */
 export function formatDateTime(
   value: Date | string | number | null | undefined,
   fallbackOrOptions: string | FormatDateOptions = "—",
@@ -147,7 +150,10 @@ export function formatDateTime(
   const { fallback, timeZone } = resolveFormatOptions(fallbackOrOptions, "—");
   const d = value == null ? null : toDate(value);
   if (!d) return fallback;
-  return d.toLocaleString(LOCALE, localeOptions(DATE_TIME_PARTS, timeZone));
+  return d.toLocaleString(
+    LOCALE,
+    localeOptions(DATE_TIME_PARTS, resolveDisplayTimeZone(timeZone)),
+  );
 }
 
 /** Fecha larga para detalle: "lunes, 26 de mayo de 2026" */

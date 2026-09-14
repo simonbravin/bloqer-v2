@@ -1,4 +1,5 @@
 import { prisma } from "@bloqer/database";
+import { productCalendarDateUtc } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
@@ -23,16 +24,10 @@ const INBOX_LIMIT = 80;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** UTC midnight of today, aligned to Prisma @db.Date semantics. */
-function todayUtcMidnight(): Date {
-  const d = new Date();
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-}
-
-/** Whole days between a Date column and today's UTC midnight. Negative → not yet due (returns 0). */
+/** Whole days between a Date column and the product calendar “today”. Negative → not yet due (0). */
 function daysOverdueFromDate(reference: Date | null | undefined): number {
   if (!reference) return 0;
-  const today = todayUtcMidnight().getTime();
+  const today = productCalendarDateUtc().getTime();
   const ref = new Date(
     Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()),
   ).getTime();

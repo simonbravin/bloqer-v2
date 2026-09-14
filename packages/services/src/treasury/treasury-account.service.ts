@@ -1,6 +1,7 @@
 import { Prisma, prisma, TreasuryAccount } from "@bloqer/database";
 import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import type { CreateTreasuryAccountInput, UpdateTreasuryAccountInput } from "@bloqer/validators";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canRegisterApPayment } from "../ap/ap-access";
@@ -153,7 +154,7 @@ export async function createTreasuryAccount(
       // Guard above ensures companyId when openingBalance > 0.
       const openingCompanyId = companyId!;
       // Calendar UTC date (same convention as adjustments / recon) — avoid wall-clock TZ drift.
-      const todayIso = new Date().toISOString().slice(0, 10);
+      const todayIso = toIsoDateInTimeZone();
       const movementDate = new Date(`${todayIso}T00:00:00.000Z`);
       await assertPeriodOpenUnderCompanyLock(tx, {
         tenantId: ctx.tenantId,

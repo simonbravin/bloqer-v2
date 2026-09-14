@@ -6,6 +6,7 @@ import {
   parseFilterDate,
   parseTrendMonths,
   pickCurrentMonthItem,
+  productMonthKey,
   projectionBucketKey,
   trendDateRange,
 } from "./report-month";
@@ -39,9 +40,9 @@ describe("parseTrendMonths", () => {
 });
 
 describe("pickCurrentMonthItem", () => {
-  it("returns the item for the current UTC month and ignores older points", () => {
+  it("returns the item for the current product-TZ month and ignores older points", () => {
     const now = new Date("2026-08-29T18:00:00.000Z");
-    const current = monthKey(now);
+    const current = productMonthKey(now);
     const items = [{ periodKey: "2026-07" }, { periodKey: current }, { periodKey: "2026-06" }];
     assert.equal(pickCurrentMonthItem(items, now)?.periodKey, current);
   });
@@ -53,14 +54,19 @@ describe("pickCurrentMonthItem", () => {
 });
 
 describe("trendDateRange", () => {
-  it("uses the current UTC calendar month for este mes", () => {
-    const { dateFrom, dateTo } = trendDateRange(1);
-    const now = new Date();
-    const expectedFrom = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
-      .toISOString()
-      .slice(0, 10);
-    assert.equal(dateFrom, expectedFrom);
-    assert.equal(dateTo, now.toISOString().slice(0, 10));
+  it("uses the product calendar month for este mes", () => {
+    const now = new Date("2026-08-29T18:00:00.000Z"); // 15:00 ART
+    const { dateFrom, dateTo } = trendDateRange(1, now);
+    assert.equal(dateFrom, "2026-08-01");
+    assert.equal(dateTo, "2026-08-29");
+  });
+
+  it("uses ART day near UTC midnight (not raw UTC day)", () => {
+    // 02:30 UTC = 23:30 ART previous calendar day
+    const nearUtcMidnight = new Date("2026-08-29T02:30:00.000Z");
+    const { dateFrom, dateTo } = trendDateRange(1, nearUtcMidnight);
+    assert.equal(dateFrom, "2026-08-01");
+    assert.equal(dateTo, "2026-08-28");
   });
 });
 

@@ -55,4 +55,9 @@ describe("formatDate auto-pins UTC for @db.Date instants", () => {
     assert.match(label, /septiembre/i);
     assert.match(label, /2026/);
   });
+
+  it("pins product TZ for non-midnight timestamps shown as dates", () => {
+    // 02:30 UTC = 23:30 ART previous day
+    assert.equal(formatDate(new Date("2026-09-14T02:30:00.000Z")), "13/09/2026");
+  });
 });
