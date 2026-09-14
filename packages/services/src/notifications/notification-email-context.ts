@@ -1,6 +1,6 @@
 import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { formatDate } from "@bloqer/utils";
+import { formatDbDate } from "@bloqer/utils";
 import type { EmailContextField } from "@bloqer/email";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { resolveUserDisplayNames, userDisplayNameFromMap } from "../user/resolve-user-display-names";
@@ -9,9 +9,9 @@ const MAX_ITEMS = 8;
 const MAX_NOTES = 280;
 const MAX_ITEM_DESC = 160;
 
-/** Prisma `@db.Date` is UTC midnight; format in UTC so AR servers don't shift the day. */
+/** Prisma `@db.Date` is UTC midnight — formatDbDate keeps the calendar day stable. */
 function formatEmailCalendarDate(value: Date): string {
-  return formatDate(value, { timeZone: "UTC" });
+  return formatDbDate(value);
 }
 
 const DOCUMENT_CATEGORY_LABEL_ES: Record<string, string> = {

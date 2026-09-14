@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import {
   Table,
@@ -94,7 +94,7 @@ export function PurchaseOrderTable({
               <TableCell className={cn(tableNameCellClass, "font-medium")} title={order.supplierName}>
                 {order.supplierName}
               </TableCell>
-              <TableCell className="text-sm text-muted-foreground">{formatDate(order.issueDate)}</TableCell>
+              <TableCell className="text-sm text-muted-foreground">{formatDbDate(order.issueDate)}</TableCell>
               <TableCell className="text-sm text-muted-foreground">
                 {order.expectedDeliveryDate ? (
                   (() => {
@@ -104,7 +104,7 @@ export function PurchaseOrderTable({
                     );
                     return (
                       <span className="inline-flex flex-wrap items-center gap-1.5">
-                        <span>{formatDate(order.expectedDeliveryDate)}</span>
+                        <span>{formatDbDate(order.expectedDeliveryDate)}</span>
                         {overdue > 0 ? (
                           <Badge variant="destructive" className="whitespace-nowrap">
                             Vencida {overdue} d

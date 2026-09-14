@@ -1,6 +1,6 @@
 import type { LinkedEntityType } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { formatDate } from "@bloqer/utils";
+import { formatDbDate } from "@bloqer/utils";
 import { formatProjectLabel, truncatePlainText } from "./notification-email-context";
 
 const TITLE_MAX = 80;
@@ -34,7 +34,7 @@ export function formatNotificationTitle(eventLabel: string, entityLabel?: string
 }
 
 export function formatJobsiteLogDate(logDate: Date): string {
-  return formatDate(logDate, { timeZone: "UTC", fallback: "" });
+  return formatDbDate(logDate, "");
 }
 
 export function formatJobsiteLogLabel(logDate: Date): string {

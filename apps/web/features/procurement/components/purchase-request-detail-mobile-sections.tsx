@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDbDate } from "@/lib/format";
 import {
   formatMoneyAmount,
   formatRatePctFromString,
@@ -80,7 +80,7 @@ export function PurchaseRequestDetailMobileSections({
           </div>
           <div className="col-span-2">
             <dt className="text-xs text-muted-foreground">Fecha requerida</dt>
-            <dd>{pr.neededByDate ? formatDate(pr.neededByDate) : "—"}</dd>
+            <dd>{formatDbDate(pr.neededByDate)}</dd>
           </div>
         </dl>
         {pr.notes ? <p className="text-sm text-muted-foreground">{pr.notes}</p> : null}

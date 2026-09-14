@@ -14,7 +14,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SortableTableHead } from "@/components/ui/sortable-table-head";
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { useClientTableSort } from "@/hooks/use-client-table-sort";
 import type { PurchaseRequestView } from "@bloqer/services";
@@ -151,7 +151,7 @@ export function PurchaseRequestTable({
                       );
                       return (
                         <span className="inline-flex flex-wrap items-center gap-1.5">
-                          <span>{formatDate(pr.neededByDate)}</span>
+                          <span>{formatDbDate(pr.neededByDate)}</span>
                           {overdue > 0 ? (
                             <Badge variant="destructive" className="whitespace-nowrap">
                               Vencida {overdue} d

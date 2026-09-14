@@ -1,6 +1,6 @@
 import { IIBB_PERCEPTION_LABEL_ES } from "@bloqer/domain";
 import { Suspense } from "react";
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import {
   formatMoneyAmount,
   formatQtyFromString,
@@ -410,12 +410,12 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </div>
           <div>
             <p className="text-muted-foreground">Fecha de emisión</p>
-            <p className="font-medium">{formatDate(order.issueDate)}</p>
+            <p className="font-medium">{formatDbDate(order.issueDate)}</p>
           </div>
           {order.expectedDeliveryDate && (
             <div>
               <p className="text-muted-foreground">Entrega esperada</p>
-              <p className="font-medium">{formatDate(order.expectedDeliveryDate)}</p>
+              <p className="font-medium">{formatDbDate(order.expectedDeliveryDate)}</p>
             </div>
           )}
         </div>

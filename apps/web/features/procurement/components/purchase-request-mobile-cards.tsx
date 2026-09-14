@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDbDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +73,7 @@ export function PurchaseRequestMobileCards({
                 const overdue = purchaseRequestNeededByOverdueDays(pr.status, pr.neededByDate);
                 return (
                   <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-                    <span>Necesaria {formatDate(pr.neededByDate)}</span>
+                    <span>Necesaria {formatDbDate(pr.neededByDate)}</span>
                     {overdue > 0 ? (
                       <Badge variant="destructive" className="whitespace-nowrap">
                         Vencida {overdue} d

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import {
   Table,
   TableBody,
@@ -53,7 +53,7 @@ export function PurchaseReceiptTable({
                 {r.supplierName}
               </TableCell>
               <TableCell className="text-sm text-muted-foreground">
-                {formatDate(r.receiptDate)}
+                {formatDbDate(r.receiptDate)}
               </TableCell>
               <TableCell
                 className="max-w-[8rem] truncate text-sm text-muted-foreground"

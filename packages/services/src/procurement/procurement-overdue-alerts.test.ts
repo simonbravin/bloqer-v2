@@ -2,10 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { daysOverdue, todayUtcDate } from "./procurement-overdue-alerts.service";
 
-test("todayUtcDate collapses time-of-day to UTC midnight of the same day", () => {
-  const noonLocal = new Date("2026-08-28T13:45:12.789Z");
-  const result = todayUtcDate(noonLocal);
-  assert.equal(result.toISOString(), "2026-08-28T00:00:00.000Z");
+test("todayUtcDate is UTC midnight of the product calendar day (ART)", () => {
+  // Noon UTC = 10:00 ART same calendar day
+  const noonUtc = new Date("2026-08-28T13:45:12.789Z");
+  assert.equal(todayUtcDate(noonUtc).toISOString(), "2026-08-28T00:00:00.000Z");
+
+  // 02:30 UTC = 23:30 ART previous calendar day — must not use raw UTC day
+  const nearUtcMidnight = new Date("2026-08-28T02:30:00.000Z");
+  assert.equal(todayUtcDate(nearUtcMidnight).toISOString(), "2026-08-27T00:00:00.000Z");
 });
 
 test("daysOverdue returns 0 when reference is today", () => {

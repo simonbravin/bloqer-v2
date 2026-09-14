@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseReceiptStatusBadge } from "./purchase-receipt-status-badge";
 import type { PurchaseReceiptListItem } from "./purchase-receipt-list";
@@ -41,7 +41,7 @@ export function PurchaseReceiptCards({
             </p>
           ) : null}
           <p className="mt-3 text-sm text-muted-foreground">
-            {formatDate(r.receiptDate)}
+            {formatDbDate(r.receiptDate)}
           </p>
           {r.receivedByName ? (
             <p className="mt-1 truncate text-sm text-muted-foreground" title={r.receivedByName}>

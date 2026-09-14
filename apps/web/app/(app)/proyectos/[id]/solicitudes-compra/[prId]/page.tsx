@@ -16,7 +16,7 @@ import {
 import { PurchaseRequestAwardMatrix } from "@/features/procurement/components/purchase-request-award-matrix";
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatDbDate } from "@/lib/format";
 import { formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import {
   submitPurchaseRequestAction,
@@ -288,7 +288,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         {pr.neededByDate && (
           <p>
             <span className="text-muted-foreground">Necesaria para: </span>
-            {formatDate(pr.neededByDate)}
+            {formatDbDate(pr.neededByDate)}
           </p>
         )}
         {pr.notes && (

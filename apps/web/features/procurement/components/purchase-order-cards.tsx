@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { PurchaseOrderStatusBadge } from "./purchase-order-status-badge";
@@ -53,7 +53,7 @@ export function PurchaseOrderCards({
               );
               return (
                 <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-muted-foreground">
-                  <span>Entrega prevista {formatDate(order.expectedDeliveryDate)}</span>
+                  <span>Entrega prevista {formatDbDate(order.expectedDeliveryDate)}</span>
                   {overdue > 0 ? (
                     <Badge variant="destructive" className="whitespace-nowrap">
                       Vencida {overdue} d

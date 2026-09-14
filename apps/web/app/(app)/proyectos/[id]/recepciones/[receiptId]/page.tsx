@@ -1,4 +1,4 @@
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import type { ReactNode } from "react";
@@ -267,7 +267,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
             </div>
             <div>
               <p className="text-muted-foreground">Fecha de recepción</p>
-              <p className="font-medium">{formatDate(receipt.receiptDate)}</p>
+              <p className="font-medium">{formatDbDate(receipt.receiptDate)}</p>
             </div>
           </div>
 

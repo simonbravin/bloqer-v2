@@ -1,4 +1,4 @@
-import { formatDate } from "@/lib/format";
+import { formatDbDate } from "@/lib/format";
 import {
   formatMoneyAmount,
   formatQtyFromString,
@@ -80,12 +80,12 @@ export function PurchaseOrderMobileFiche({
           </div>
           <div>
             <dt className="text-xs text-muted-foreground">Fecha</dt>
-            <dd>{formatDate(order.issueDate)}</dd>
+            <dd>{formatDbDate(order.issueDate)}</dd>
           </div>
           {order.expectedDeliveryDate ? (
             <div>
               <dt className="text-xs text-muted-foreground">Entrega esperada</dt>
-              <dd>{formatDate(order.expectedDeliveryDate)}</dd>
+              <dd>{formatDbDate(order.expectedDeliveryDate)}</dd>
             </div>
           ) : null}
         </dl>

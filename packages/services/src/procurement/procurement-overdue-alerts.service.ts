@@ -1,5 +1,6 @@
 import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
+import { productCalendarDateUtc } from "@bloqer/utils";
 import { createSystemNotification } from "../notifications/notification.service";
 import { sendOperationalAlertEmailAsSystem } from "../notifications/notification-email.service";
 import {
@@ -63,12 +64,15 @@ function emptySummary(): ProcurementOverdueRunSummary {
   return { checkedCount: 0, createdCount: 0, skippedCount: 0 };
 }
 
-/** UTC midnight of a reference (today by default), aligned to Prisma @db.Date semantics. */
+/**
+ * UTC midnight of the product calendar day (America/Argentina/Buenos_Aires by default).
+ * Kept as `todayUtcDate` for callers; uses product TZ so ART evening ≠ next UTC day early overdue.
+ */
 export function todayUtcDate(now: Date = new Date()): Date {
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return productCalendarDateUtc(now);
 }
 
-/** Whole days elapsed between `reference` and today (UTC midnights). Never negative. */
+/** Whole days elapsed between `reference` and the product calendar “today”. Never negative. */
 export function daysOverdue(reference: Date, now: Date = new Date()): number {
   const today = todayUtcDate(now).getTime();
   const ref = new Date(

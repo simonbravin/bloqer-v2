@@ -33,8 +33,27 @@ function toDate(value: Date | string | number): Date | null {
   }
   const raw = String(value).trim();
   if (!raw) return null;
-  const d = new Date(raw.includes("T") ? raw : `${raw}T12:00:00`);
+  // Bare YYYY-MM-DD = calendar day → UTC noon (stable across browser TZs).
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(raw)
+    ? `${raw}T12:00:00.000Z`
+    : raw.includes("T")
+      ? raw
+      : `${raw}T12:00:00`;
+  const d = new Date(normalized);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Prisma `@db.Date` is serialized as UTC midnight (`…T00:00:00.000Z`).
+ * Detecting that lets `formatDate` pin UTC so SSR and browsers west of UTC agree.
+ */
+export function isPrismaDateOnlyInstant(d: Date): boolean {
+  return (
+    d.getUTCHours() === 0 &&
+    d.getUTCMinutes() === 0 &&
+    d.getUTCSeconds() === 0 &&
+    d.getUTCMilliseconds() === 0
+  );
 }
 
 export type FormatDateOptions = {
@@ -68,7 +87,23 @@ function localeOptions(
   return base;
 }
 
-/** Fecha corta: dd/mm/yyyy */
+/**
+ * Zone for date-only display: explicit override, else UTC for `@db.Date` wire format.
+ * Do not use for `formatDateTime` — timestamps need a wall-clock zone.
+ */
+function resolveDateDisplayTimeZone(d: Date, timeZone?: string): string | undefined {
+  if (timeZone != null && timeZone !== "") return timeZone;
+  if (isPrismaDateOnlyInstant(d)) return "UTC";
+  return undefined;
+}
+
+/**
+ * Fecha corta: dd/mm/yyyy.
+ *
+ * Prefer `formatDbDate` for Prisma `@db.Date` columns. `formatDate` also auto-pins UTC
+ * when the instant is UTC midnight (typical `@db.Date` payload), so list/detail stay aligned.
+ * For real timestamps (`createdAt`, etc.) pass `timeZone` if SSR and client must match.
+ */
 export function formatDate(
   value: Date | string | number | null | undefined,
   fallbackOrOptions: string | FormatDateOptions = "—",
@@ -76,7 +111,23 @@ export function formatDate(
   const { fallback, timeZone } = resolveFormatOptions(fallbackOrOptions, "—");
   const d = value == null ? null : toDate(value);
   if (!d) return fallback;
-  return d.toLocaleDateString(LOCALE, localeOptions(DATE_PARTS, timeZone));
+  return d.toLocaleDateString(
+    LOCALE,
+    localeOptions(DATE_PARTS, resolveDateDisplayTimeZone(d, timeZone)),
+  );
+}
+
+/**
+ * Display helper for Prisma `@db.Date` (calendar day, UTC midnight on the wire).
+ *
+ * Named `formatDbDate` (not `formatDateOnly`) to avoid colliding with schedule’s
+ * ISO `YYYY-MM-DD` helper in `schedule-helpers.ts`.
+ */
+export function formatDbDate(
+  value: Date | string | number | null | undefined,
+  fallback = "—",
+): string {
+  return formatDate(value, { fallback, timeZone: "UTC" });
 }
 
 /** Rango corto: dd/mm/yyyy → dd/mm/yyyy (para ISO strings y Date). */
@@ -116,7 +167,7 @@ export function formatDateLong(
         month: "long",
         year: "numeric",
       },
-      timeZone,
+      resolveDateDisplayTimeZone(d, timeZone),
     ),
   );
 }
