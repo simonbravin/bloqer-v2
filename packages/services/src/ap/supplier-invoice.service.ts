@@ -44,6 +44,7 @@ import {
 import {
   looksLikeGeneratedFromPurchaseOrderNotes,
   parseAutoFromPoPurchaseOrderId,
+  isSupplierInvoiceLockedFromPurchaseOrder,
 } from "./supplier-invoice-from-po-pure";
 
 import { PO_INVOICE_LINKABLE_STATUSES } from "../procurement/procurement-constants";
@@ -925,8 +926,7 @@ export async function updateSupplierInvoice(
   if (
     input.supplierContactId &&
     input.supplierContactId !== existing.supplierContactId &&
-    (parseAutoFromPoPurchaseOrderId(existing.internalNotes) ||
-      looksLikeGeneratedFromPurchaseOrderNotes(existing.notes))
+    isSupplierInvoiceLockedFromPurchaseOrder(existing.internalNotes, existing.notes)
   ) {
     throw new ServiceError(
       "CONFLICT",
@@ -939,6 +939,21 @@ export async function updateSupplierInvoice(
     await assertApInvoicePayee(input.supplierContactId, ctx.tenantId, {
       linkedToPurchaseOrder: Boolean(poId),
     });
+    if (poId) {
+      const po = await prisma.purchaseOrder.findUnique({
+        where: { id: poId },
+        select: { supplierContactId: true, tenantId: true },
+      });
+      if (!po || po.tenantId !== ctx.tenantId) {
+        throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+      }
+      if (po.supplierContactId !== input.supplierContactId) {
+        throw new ServiceError(
+          "CONFLICT",
+          "La orden de compra corresponde a un proveedor diferente",
+        );
+      }
+    }
   }
 
   // Optional PO link validation on update
@@ -1167,6 +1182,7 @@ export async function issueSupplierInvoice(
       projectId: true,
       companyId: true,
       purchaseOrderId: true,
+      supplierContactId: true,
       internalNotes: true,
       notes: true,
     },
@@ -1190,6 +1206,26 @@ export async function issueSupplierInvoice(
     existingPurchaseOrderId: invPreview.purchaseOrderId,
     action: "issue",
   });
+
+  if (invPreview.purchaseOrderId) {
+    const po = await prisma.purchaseOrder.findUnique({
+      where: { id: invPreview.purchaseOrderId },
+      select: { status: true, tenantId: true, projectId: true, supplierContactId: true },
+    });
+    if (!po || po.tenantId !== ctx.tenantId) {
+      throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+    }
+    assertPurchaseOrderLinkableForAp(po.status);
+    if (invPreview.projectId && po.projectId !== invPreview.projectId) {
+      throw new ServiceError("CONFLICT", "La orden de compra no pertenece al mismo proyecto");
+    }
+    if (po.supplierContactId !== invPreview.supplierContactId) {
+      throw new ServiceError(
+        "CONFLICT",
+        "La orden de compra corresponde a un proveedor diferente",
+      );
+    }
+  }
 
   const directSpendSettings =
     invPreview.projectId && !invPreview.purchaseOrderId

@@ -18,11 +18,8 @@ import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { updateCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
-import {
-  looksLikeGeneratedFromPurchaseOrderNotes,
-  parseAutoFromPoPurchaseOrderId,
-  type SupplierInvoiceView,
-} from "@bloqer/services";
+import type { SupplierInvoiceView } from "@bloqer/services";
+import { isSupplierInvoiceLockedFromPurchaseOrder } from "@bloqer/services/supplier-invoice-from-po-markers";
 import type { SupplierOption, POOption } from "./supplier-invoice-form";
 import { classifySupplierInvoice } from "@bloqer/domain";
 import {
@@ -90,9 +87,10 @@ export function SupplierInvoiceEditForm({
     invoice.documentKind === "CREDIT_NOTE" || invoice.documentKind === "DEBIT_NOTE";
   const isCreditNote = invoice.documentKind === "CREDIT_NOTE";
   /** Auto drafts from OC/receipt must keep AGAINST_PO + same payee (server also enforces). */
-  const lockedFromPurchaseOrder =
-    Boolean(parseAutoFromPoPurchaseOrderId(invoice.internalNotes)) ||
-    looksLikeGeneratedFromPurchaseOrderNotes(invoice.notes);
+  const lockedFromPurchaseOrder = isSupplierInvoiceLockedFromPurchaseOrder(
+    invoice.internalNotes,
+    invoice.notes,
+  );
   const supplierLocked = payeeLocked || lockedFromPurchaseOrder;
   const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">(
     isFiscalNote
@@ -125,6 +123,7 @@ export function SupplierInvoiceEditForm({
   );
 
   function onPurchaseOrderChange(nextId: string | null) {
+    if (lockedFromPurchaseOrder) return;
     if (nextId === purchaseOrderId) return;
     setPurchaseOrderId(nextId);
     if (nextId) setApSpendMode("AGAINST_PO");

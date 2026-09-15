@@ -38,14 +38,14 @@ import {
   invoiceExceedsReceivedWithTolerance,
 } from "../procurement/three-way-match-pure";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
+import { PO_INVOICE_LINKABLE_STATUSES } from "../procurement/procurement-constants";
 
 export {
   buildAutoFromPoInternalNotes,
   looksLikeGeneratedFromPurchaseOrderNotes,
   parseAutoFromPoPurchaseOrderId,
-} from "./supplier-invoice-from-po-pure";
-
-const LINKABLE_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+  isSupplierInvoiceLockedFromPurchaseOrder,
+} from "./supplier-invoice-from-po-markers";
 
 export type PurchaseOrderBillingSummary = {
   receivedAmount: string;
@@ -448,7 +448,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   if (po.projectId !== input.projectId) {
     throw new ServiceError("CONFLICT", "La orden de compra no pertenece a este proyecto");
   }
-  if (!LINKABLE_PO_STATUSES.includes(po.status as (typeof LINKABLE_PO_STATUSES)[number])) {
+  if (!PO_INVOICE_LINKABLE_STATUSES.includes(po.status as (typeof PO_INVOICE_LINKABLE_STATUSES)[number])) {
     throw new ServiceError(
       "CONFLICT",
       "Solo se puede facturar desde órdenes de compra emitidas o con recepción",

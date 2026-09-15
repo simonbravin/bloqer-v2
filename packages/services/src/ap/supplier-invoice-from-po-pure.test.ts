@@ -7,6 +7,7 @@ import {
   clampReceiptQuantitiesToPendingInvoice,
   computePendingToInvoiceAmount,
   formatInvoiceLineQuantity,
+  isSupplierInvoiceLockedFromPurchaseOrder,
   looksLikeGeneratedFromPurchaseOrderNotes,
   parseAutoFromPoPurchaseOrderId,
   poLineReceivedAmount,
@@ -53,6 +54,19 @@ test("looksLikeGeneratedFromPurchaseOrderNotes matches OC/receipt copy", () => {
     true,
   );
   assert.equal(looksLikeGeneratedFromPurchaseOrderNotes("Factura manual"), false);
+});
+
+test("isSupplierInvoiceLockedFromPurchaseOrder combines markers", () => {
+  const poId = "c75d26cf-5afa-44e3-aceb-c2a49c3e8f6c";
+  assert.equal(
+    isSupplierInvoiceLockedFromPurchaseOrder(buildAutoFromPoInternalNotes(poId), null),
+    true,
+  );
+  assert.equal(
+    isSupplierInvoiceLockedFromPurchaseOrder(null, "Generada desde OC-017"),
+    true,
+  );
+  assert.equal(isSupplierInvoiceLockedFromPurchaseOrder(null, "Manual"), false);
 });
 
 test("poLineReceivedAmount is proportional to received qty", () => {
