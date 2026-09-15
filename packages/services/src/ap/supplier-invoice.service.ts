@@ -41,8 +41,66 @@ import {
   supplierInvoiceClassWhere,
   type FinancialClassFields,
 } from "../finance/document-class.service";
+import {
+  looksLikeGeneratedFromPurchaseOrderNotes,
+  parseAutoFromPoPurchaseOrderId,
+} from "./supplier-invoice-from-po-pure";
 
 const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+
+/**
+ * Drafts created from OC/receipt (`bloqer:auto-from-po:…`) must keep the PO header.
+ * Clearing it orphans Pendientes ("Recibida sin factura") and breaks 3-way coverage.
+ */
+function assertAutoFromPoKeepsPurchaseOrderLink(params: {
+  internalNotes: string | null;
+  notes: string | null;
+  nextPurchaseOrderId: string | null | undefined;
+  existingPurchaseOrderId: string | null;
+  action: "update" | "issue";
+}): void {
+  const autoPoId = parseAutoFromPoPurchaseOrderId(params.internalNotes);
+  const legacyFromOc =
+    !autoPoId && looksLikeGeneratedFromPurchaseOrderNotes(params.notes);
+
+  if (!autoPoId && !legacyFromOc) return;
+
+  if (params.action === "update" && params.nextPurchaseOrderId === null) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Esta factura se generó desde una orden de compra. No se puede pasar a costo directo: mantené la OC o anulá el borrador.",
+    );
+  }
+
+  if (params.action === "issue") {
+    const poId = params.existingPurchaseOrderId;
+    if (!poId) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Esta factura se generó desde una OC pero perdió el vínculo. Revinculá la orden de compra antes de emitir.",
+      );
+    }
+    if (autoPoId && poId !== autoPoId) {
+      throw new ServiceError(
+        "CONFLICT",
+        "La orden de compra vinculada no coincide con la OC de origen del borrador automático.",
+      );
+    }
+  }
+
+  if (
+    params.action === "update" &&
+    autoPoId &&
+    params.nextPurchaseOrderId !== undefined &&
+    params.nextPurchaseOrderId !== null &&
+    params.nextPurchaseOrderId !== autoPoId
+  ) {
+    throw new ServiceError(
+      "CONFLICT",
+      "No se puede cambiar la OC de un borrador generado automáticamente. Anulá y regenerá desde la orden correcta.",
+    );
+  }
+}
 
 export async function resolveInvoiceLineCostTypes(
   lines: Array<{
@@ -843,6 +901,16 @@ export async function updateSupplierInvoice(
   }
   assertSupplierInvoiceEditable(existing);
 
+  if (input.purchaseOrderId !== undefined) {
+    assertAutoFromPoKeepsPurchaseOrderLink({
+      internalNotes: existing.internalNotes,
+      notes: existing.notes,
+      nextPurchaseOrderId: input.purchaseOrderId,
+      existingPurchaseOrderId: existing.purchaseOrderId,
+      action: "update",
+    });
+  }
+
   if (
     existing.subcontractCertificationId &&
     input.supplierContactId &&
@@ -1082,7 +1150,14 @@ export async function issueSupplierInvoice(
 
   const invPreview = await prisma.supplierInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true, companyId: true, purchaseOrderId: true },
+    select: {
+      tenantId: true,
+      projectId: true,
+      companyId: true,
+      purchaseOrderId: true,
+      internalNotes: true,
+      notes: true,
+    },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -1095,6 +1170,14 @@ export async function issueSupplierInvoice(
   if (invPreview.projectId) {
     await assertProjectAllowsOperationalMutation(invPreview.projectId, ctx);
   }
+
+  assertAutoFromPoKeepsPurchaseOrderLink({
+    internalNotes: invPreview.internalNotes,
+    notes: invPreview.notes,
+    nextPurchaseOrderId: invPreview.purchaseOrderId,
+    existingPurchaseOrderId: invPreview.purchaseOrderId,
+    action: "issue",
+  });
 
   const directSpendSettings =
     invPreview.projectId && !invPreview.purchaseOrderId

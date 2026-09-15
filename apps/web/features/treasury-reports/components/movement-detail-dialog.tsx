@@ -37,6 +37,7 @@ export type MovementDetailDialogRow = Pick<
   | "projectName"
   | "projectId"
   | "counterpartyName"
+  | "documentRef"
   | "externalInvoiceRef"
   | "currency"
   | "signedAmount"
@@ -109,6 +110,9 @@ export function MovementDetailDialog({
           </DetailField>
           {row.counterpartyName ? (
             <DetailField label="Contraparte">{row.counterpartyName}</DetailField>
+          ) : null}
+          {row.documentRef ? (
+            <DetailField label="Factura">{row.documentRef}</DetailField>
           ) : null}
           {row.externalInvoiceRef ? (
             <DetailField label="Comprobante">{row.externalInvoiceRef}</DetailField>

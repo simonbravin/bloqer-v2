@@ -18,6 +18,7 @@ import {
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { requireIdempotencyKey } from "../idempotency/idempotency";
+import { formatSupplierInvoiceCode } from "../notifications/notification-copy";
 
 type TxClient = Omit<
   typeof prisma,
@@ -47,6 +48,8 @@ export type ApplyPaymentToPayableInput = {
   paymentMethod?: "CASH" | "BANK_TRANSFER" | "CHECK" | "CARD" | "OTHER" | null;
   reference?: string | null;
   idempotencyKey: string;
+  /** Internal supplier invoice number for movement description (FP-#####). */
+  supplierInvoiceNumber: number;
 };
 
 export type ApplyPaymentToPayableResult = {
@@ -146,6 +149,7 @@ export async function applyPaymentToPayable(
   }
 
   const fx = computeDocumentFxAmounts(payable.currency, amountToApply);
+  const invoiceCode = formatSupplierInvoiceCode(input.supplierInvoiceNumber);
 
   const payment = await tx.payment.create({
     data: {
@@ -183,7 +187,7 @@ export async function applyPaymentToPayable(
       sourceId: payment.id,
       currency: payable.currency,
       amount: amountToApply,
-      description: `Pago factura proveedor ${payable.supplierInvoiceId}`,
+      description: `Pago factura proveedor ${invoiceCode}`,
       status: "CONFIRMED",
       createdBy: ctx.actorUserId,
     },

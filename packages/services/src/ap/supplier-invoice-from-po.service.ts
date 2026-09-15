@@ -39,6 +39,12 @@ import {
 } from "../procurement/three-way-match-pure";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 
+export {
+  buildAutoFromPoInternalNotes,
+  looksLikeGeneratedFromPurchaseOrderNotes,
+  parseAutoFromPoPurchaseOrderId,
+} from "./supplier-invoice-from-po-pure";
+
 const LINKABLE_PO_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
 
 export type PurchaseOrderBillingSummary = {

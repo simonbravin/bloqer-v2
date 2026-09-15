@@ -36,6 +36,7 @@ import {
   requireIdempotencyKey,
   withIdempotentCreate,
 } from "../idempotency/idempotency";
+import { formatSalesInvoiceCode } from "../notifications/notification-copy";
 
 export type CollectionView = Omit<Collection, "amount"> & {
   amount: string;
@@ -317,7 +318,7 @@ export async function createCollection(
             sourceId:    created.id,
             currency:    receivable.currency,
             amount,
-            description: `Cobranza factura ${receivable.salesInvoiceId}`,
+            description: `Cobranza factura ${formatSalesInvoiceCode(salesInvoice.number)}`,
             status:      "CONFIRMED",
             createdBy:   ctx.actorUserId,
           },

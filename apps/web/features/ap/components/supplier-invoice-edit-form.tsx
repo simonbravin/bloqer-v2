@@ -85,10 +85,16 @@ export function SupplierInvoiceEditForm({
   const isFiscalNote =
     invoice.documentKind === "CREDIT_NOTE" || invoice.documentKind === "DEBIT_NOTE";
   const isCreditNote = invoice.documentKind === "CREDIT_NOTE";
+  /** Auto drafts from OC/receipt must keep AGAINST_PO (server also enforces). */
+  const lockedFromPurchaseOrder =
+    Boolean(invoice.internalNotes?.startsWith("bloqer:auto-from-po:")) ||
+    Boolean(invoice.notes?.match(/^Generada desde (OC-|recepción vinculada a )/i));
   const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">(
     isFiscalNote
       ? "DIRECT"
-      : invoice.purchaseOrderId || invoice.lines.some((l) => l.purchaseOrderLineId)
+      : lockedFromPurchaseOrder ||
+          invoice.purchaseOrderId ||
+          invoice.lines.some((l) => l.purchaseOrderLineId)
         ? "AGAINST_PO"
         : "DIRECT",
   );
@@ -122,6 +128,12 @@ export function SupplierInvoiceEditForm({
 
   function selectApSpendMode(mode: "AGAINST_PO" | "DIRECT") {
     if (payeeLocked) return;
+    if (mode === "DIRECT" && lockedFromPurchaseOrder) {
+      setError(
+        "Esta factura se generó desde una orden de compra. No se puede pasar a costo directo.",
+      );
+      return;
+    }
     setApSpendMode(mode);
     if (mode === "DIRECT") {
       setPurchaseOrderId(null);
@@ -280,7 +292,16 @@ export function SupplierInvoiceEditForm({
       }
     }
     const fd = new FormData(e.currentTarget);
-    const clearPoLink = !payeeLocked && (companyFinanzas || apSpendMode === "DIRECT");
+    const clearPoLink =
+      !payeeLocked &&
+      !lockedFromPurchaseOrder &&
+      (companyFinanzas || apSpendMode === "DIRECT");
+    if (lockedFromPurchaseOrder && (companyFinanzas || apSpendMode === "DIRECT") && !purchaseOrderId) {
+      setError(
+        "Esta factura se generó desde una orden de compra. Mantené la OC vinculada.",
+      );
+      return;
+    }
     const payload = {
       supplierContactId: payeeLocked ? invoice.supplierContactId : supplierContactId,
       issueDate:       fd.get("issueDate") as string,
@@ -445,14 +466,20 @@ export function SupplierInvoiceEditForm({
                       </button>
                       <button
                         type="button"
-                        disabled={isPending}
+                        disabled={isPending || lockedFromPurchaseOrder}
                         aria-pressed={apSpendMode === "DIRECT"}
+                        title={
+                          lockedFromPurchaseOrder
+                            ? "Borrador generado desde OC: no se puede pasar a costo directo"
+                            : undefined
+                        }
                         onClick={() => selectApSpendMode("DIRECT")}
                         className={cn(
                           "rounded-md px-3 py-1.5 text-sm transition-colors",
                           apSpendMode === "DIRECT"
                             ? "bg-primary text-primary-foreground font-semibold shadow-sm"
                             : "font-medium text-muted-foreground hover:bg-background/80 hover:text-foreground",
+                          lockedFromPurchaseOrder && "opacity-50 cursor-not-allowed",
                         )}
                       >
                         Costo directo

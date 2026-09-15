@@ -295,6 +295,7 @@ export async function createPayment(
             paymentMethod: input.paymentMethod ?? null,
             reference: input.reference ?? null,
             idempotencyKey,
+            supplierInvoiceNumber: supplierInvoice.number,
           },
           ctx,
         );

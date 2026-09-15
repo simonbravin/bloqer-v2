@@ -9,6 +9,10 @@ import {
   type AccountBalanceSummary,
 } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import {
+  humanizeCashMovementDescription,
+  loadCashSourceMeta,
+} from "../treasury-reports/cash-source-meta";
 
 const ZERO = new Prisma.Decimal(0);
 const RECENT_MOVEMENTS = 8;
@@ -129,11 +133,21 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
         amount: true,
         currency: true,
         type: true,
+        sourceType: true,
+        sourceId: true,
         accountId: true,
         account: { select: { name: true } },
       },
     }),
   ]);
+
+  const paymentIds = recentRows
+    .filter((m) => m.sourceType === "PAYMENT" && m.sourceId)
+    .map((m) => m.sourceId!);
+  const collectionIds = recentRows
+    .filter((m) => m.sourceType === "COLLECTION" && m.sourceId)
+    .map((m) => m.sourceId!);
+  const { documentRefs } = await loadCashSourceMeta(ctx.tenantId, paymentIds, collectionIds);
 
   const monthlyInflowByCurrency = sumByCurrency(
     monthlyRows
@@ -149,7 +163,12 @@ export async function getTreasuryHubOverview(ctx: ServiceContext): Promise<Treas
   const recentMovements: TreasuryHubMovementRow[] = recentRows.map((m) => ({
     id: m.id,
     movementDate: isoDate(m.movementDate),
-    description: m.description,
+    description: humanizeCashMovementDescription(
+      m.description,
+      m.sourceType,
+      m.sourceId,
+      documentRefs,
+    ),
     amount: serializeMoneyDecimal(m.amount),
     currency: m.currency,
     type: m.type,

@@ -34,10 +34,10 @@ export function DocumentClassBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("font-normal", tone, className)}
+      className={cn("min-w-0 max-w-full font-normal", tone, className)}
       title="Clase derivada (no se elige a mano)"
     >
-      {classLabel}
+      <span className="truncate">{classLabel}</span>
     </Badge>
   );
 }

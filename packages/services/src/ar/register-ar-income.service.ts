@@ -38,16 +38,13 @@ import {
   assertPeriodOpenUnderCompanyLock,
   lockTreasuryAccountRow,
 } from "../treasury/treasury-write-locks";
+import { formatSalesInvoiceCode } from "../notifications/notification-copy";
 
 function isUniqueConstraintError(err: unknown): boolean {
   return (
     err instanceof Prisma.PrismaClientKnownRequestError &&
     err.code === "P2002"
   );
-}
-
-function salesInvoiceCode(number: number): string {
-  return `FAC-${String(number).padStart(5, "0")}`;
 }
 
 type ArIncomeOutcome = {
@@ -178,7 +175,7 @@ function buildArIncomeTraceChain(outcome: ArIncomeOutcome): FinancialTraceLink[]
     {
       entityType: "SalesInvoice",
       entityId: outcome.invoiceId,
-      code: salesInvoiceCode(outcome.number),
+      code: formatSalesInvoiceCode(outcome.number),
       href: buildFinancialHref("SalesInvoice", outcome.invoiceId, {
         receivableId: outcome.receivableId,
       }),
@@ -495,7 +492,7 @@ export async function registerArIncome(
               sourceId: collection.id,
               currency: receivable.currency,
               amount: collectAmount,
-              description: `Cobranza factura ${salesInvoiceCode(number)}`,
+              description: `Cobranza factura ${formatSalesInvoiceCode(number)}`,
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,
             },

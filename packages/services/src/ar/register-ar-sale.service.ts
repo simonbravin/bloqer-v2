@@ -34,6 +34,7 @@ import {
   ensureDraftJournalFromSalesInvoice,
 } from "../accounting/accounting-auto-draft.service";
 import { notifyReceivableReadyToCollect } from "./ar-notifications.service";
+import { formatSalesInvoiceCode } from "../notifications/notification-copy";
 import {
   assertPeriodOpenUnderCompanyLock,
   lockTreasuryAccountRow,
@@ -535,7 +536,7 @@ export async function registerArSale(
               sourceId: collection.id,
               currency: receivable.currency,
               amount: collectAmount,
-              description: `Cobranza factura ${receivable.salesInvoiceId}`,
+              description: `Cobranza factura ${formatSalesInvoiceCode(number)}`,
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,
             },

@@ -11,6 +11,15 @@ import {
   classFieldsForAccountMovement,
   parseMovementClassFilter,
 } from "../finance/document-class.service";
+import {
+  displayMovementDescription,
+} from "./movement-document-ref";
+import {
+  documentRefForCashSource,
+  loadCashSourceMeta,
+} from "./cash-source-meta";
+
+export { displayMovementDescription } from "./movement-document-ref";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -143,6 +152,8 @@ export type MovementReportRow = {
   projectId:          string | null;
   projectName:        string | null;
   counterpartyName:   string | null;
+  /** Internal invoice code (FP-##### / FAC-#####) for PAYMENT/COLLECTION; else null. */
+  documentRef:        string | null;
   externalInvoiceRef: string | null;
   runningBalance?:    string;
   /** Derived document class ([D-102]). */
@@ -305,50 +316,52 @@ type RawMovementRow = {
   counterparty: { fantasyName: string | null; legalName: string } | null;
 };
 
-async function resolveMovementProjectIds(
+async function resolveMovementCashMeta(
   rawRows: RawMovementRow[],
   tenantId: string,
-): Promise<Map<string, string | null>> {
-  const resolved = new Map<string, string | null>();
+): Promise<{
+  projectIdByMovement: Map<string, string | null>;
+  documentRefByMovement: Map<string, string | null>;
+}> {
+  const projectIdByMovement = new Map<string, string | null>();
+  const documentRefByMovement = new Map<string, string | null>();
+
   for (const m of rawRows) {
-    resolved.set(m.id, m.projectId);
+    projectIdByMovement.set(m.id, m.projectId);
+    documentRefByMovement.set(m.id, null);
   }
 
-  const paymentSourceIds = rawRows
-    .filter((m) => m.projectId === null && m.sourceType === "PAYMENT")
+  const paymentIds = rawRows
+    .filter((m) => m.sourceType === "PAYMENT" && m.sourceId)
     .map((m) => m.sourceId);
-  const collectionSourceIds = rawRows
-    .filter((m) => m.projectId === null && m.sourceType === "COLLECTION")
+  const collectionIds = rawRows
+    .filter((m) => m.sourceType === "COLLECTION" && m.sourceId)
     .map((m) => m.sourceId);
 
-  const [payments, collections] = await Promise.all([
-    paymentSourceIds.length > 0
-      ? prisma.payment.findMany({
-          where: { tenantId, id: { in: paymentSourceIds } },
-          select: { id: true, projectId: true },
-        })
-      : Promise.resolve([]),
-    collectionSourceIds.length > 0
-      ? prisma.collection.findMany({
-          where: { tenantId, id: { in: collectionSourceIds } },
-          select: { id: true, projectId: true },
-        })
-      : Promise.resolve([]),
-  ]);
+  if (paymentIds.length === 0 && collectionIds.length === 0) {
+    return { projectIdByMovement, documentRefByMovement };
+  }
 
-  const paymentProject = new Map(payments.map((p) => [p.id, p.projectId]));
-  const collectionProject = new Map(collections.map((c) => [c.id, c.projectId]));
+  const { documentRefs, projects } = await loadCashSourceMeta(
+    tenantId,
+    paymentIds,
+    collectionIds,
+  );
 
   for (const m of rawRows) {
+    documentRefByMovement.set(
+      m.id,
+      documentRefForCashSource(m.sourceType, m.sourceId, documentRefs),
+    );
     if (m.projectId !== null) continue;
     if (m.sourceType === "PAYMENT") {
-      resolved.set(m.id, paymentProject.get(m.sourceId) ?? null);
+      projectIdByMovement.set(m.id, projects.byPaymentId.get(m.sourceId) ?? null);
     } else if (m.sourceType === "COLLECTION") {
-      resolved.set(m.id, collectionProject.get(m.sourceId) ?? null);
+      projectIdByMovement.set(m.id, projects.byCollectionId.get(m.sourceId) ?? null);
     }
   }
 
-  return resolved;
+  return { projectIdByMovement, documentRefByMovement };
 }
 
 async function loadProjectNames(
@@ -531,7 +544,10 @@ export async function getAccountMovementReport(
   }
 
   const typedRawRows = rawRows as RawMovementRow[];
-  const projectIdByMovement = await resolveMovementProjectIds(typedRawRows, ctx.tenantId);
+  const { projectIdByMovement, documentRefByMovement } = await resolveMovementCashMeta(
+    typedRawRows,
+    ctx.tenantId,
+  );
   const uniqueProjectIds = [
     ...new Set(
       [...projectIdByMovement.values()].filter((id): id is string => id !== null),
@@ -546,6 +562,7 @@ export async function getAccountMovementReport(
       runningBalance = runningBalance.plus(signed);
     }
     const resolvedProjectId = projectIdByMovement.get(m.id) ?? null;
+    const documentRef = documentRefByMovement.get(m.id) ?? null;
     const counterpartyName = m.counterparty
       ? (m.counterparty.fantasyName ?? m.counterparty.legalName)
       : null;
@@ -571,7 +588,7 @@ export async function getAccountMovementReport(
       amount: serializeMoneyDecimal(m.amount),
       signedAmount: serializeMoneyDecimal(signed),
       currency: m.currency,
-      description: m.description,
+      description: displayMovementDescription(m.description, sourceType, documentRef),
       detailHref: resolveMovementDetailHref({
         sourceType,
         sourceId: m.sourceId,
@@ -584,6 +601,7 @@ export async function getAccountMovementReport(
       projectId: resolvedProjectId,
       projectName: resolvedProjectId ? (projectNames.get(resolvedProjectId) ?? null) : null,
       counterpartyName,
+      documentRef,
       externalInvoiceRef: m.externalInvoiceRef,
       ...(runningBalance !== undefined ? { runningBalance: serializeMoneyDecimal(runningBalance) } : {}),
       ...classFields,

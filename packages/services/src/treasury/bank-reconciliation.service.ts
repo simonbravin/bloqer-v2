@@ -28,6 +28,11 @@ import { ServiceContext, ServiceError } from "../types";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 import { assertPeriodOpenUnderCompanyLock } from "./treasury-write-locks";
+import {
+  humanizeCashMovementDescription,
+  loadCashSourceMeta,
+  type CashSourceDocumentRefMaps,
+} from "../treasury-reports/cash-source-meta";
 
 type TxClient = Omit<
   typeof prisma,
@@ -79,6 +84,8 @@ async function loadSessionOrThrow(id: string, ctx: ServiceContext, tx: TxClient 
                   amount: true,
                   description: true,
                   status: true,
+                  sourceType: true,
+                  sourceId: true,
                 },
               },
             },
@@ -96,6 +103,7 @@ async function loadSessionOrThrow(id: string, ctx: ServiceContext, tx: TxClient 
 
 function serializeSession(
   session: Awaited<ReturnType<typeof loadSessionOrThrow>>,
+  documentRefs: CashSourceDocumentRefMaps,
 ) {
   const lineViews = session.lines.map((line) => ({
     id: line.id,
@@ -115,7 +123,12 @@ function serializeSession(
             movementDate: line.match.accountMovement.movementDate,
             type: line.match.accountMovement.type,
             amount: serializeMoneyDecimal(line.match.accountMovement.amount),
-            description: line.match.accountMovement.description,
+            description: humanizeCashMovementDescription(
+              line.match.accountMovement.description,
+              line.match.accountMovement.sourceType,
+              line.match.accountMovement.sourceId,
+              documentRefs,
+            ),
             status: line.match.accountMovement.status,
           },
         }
@@ -152,6 +165,22 @@ function serializeSession(
   };
 }
 
+async function documentRefsForSession(
+  tenantId: string,
+  session: Awaited<ReturnType<typeof loadSessionOrThrow>>,
+): Promise<CashSourceDocumentRefMaps> {
+  const paymentIds: string[] = [];
+  const collectionIds: string[] = [];
+  for (const line of session.lines) {
+    const m = line.match?.accountMovement;
+    if (!m?.sourceId) continue;
+    if (m.sourceType === "PAYMENT") paymentIds.push(m.sourceId);
+    if (m.sourceType === "COLLECTION") collectionIds.push(m.sourceId);
+  }
+  const { documentRefs } = await loadCashSourceMeta(tenantId, paymentIds, collectionIds);
+  return documentRefs;
+}
+
 export type BankReconciliationView = ReturnType<typeof serializeSession>;
 
 export async function getBankReconciliationById(
@@ -161,7 +190,8 @@ export async function getBankReconciliationById(
   await assertBankReconciliationModules(ctx);
   assertCanViewBankReconciliation(ctx.roles);
   const session = await loadSessionOrThrow(id, ctx);
-  return serializeSession(session);
+  const documentRefs = await documentRefsForSession(ctx.tenantId, session);
+  return serializeSession(session, documentRefs);
 }
 
 export type BankReconciliationListItem = BankReconciliationView & {
@@ -253,15 +283,30 @@ export async function listCandidateMovementsForReconciliation(
       amount: true,
       description: true,
       status: true,
+      sourceType: true,
+      sourceId: true,
     },
   });
+
+  const paymentIds = movements
+    .filter((m) => m.sourceType === "PAYMENT" && m.sourceId)
+    .map((m) => m.sourceId!);
+  const collectionIds = movements
+    .filter((m) => m.sourceType === "COLLECTION" && m.sourceId)
+    .map((m) => m.sourceId!);
+  const { documentRefs } = await loadCashSourceMeta(ctx.tenantId, paymentIds, collectionIds);
 
   return movements.map((m) => ({
     id: m.id,
     movementDate: m.movementDate,
     type: m.type,
     amount: serializeMoneyDecimal(m.amount),
-    description: m.description,
+    description: humanizeCashMovementDescription(
+      m.description,
+      m.sourceType,
+      m.sourceId,
+      documentRefs,
+    ),
     status: m.status,
   }));
 }

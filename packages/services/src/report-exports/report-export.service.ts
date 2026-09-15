@@ -453,6 +453,7 @@ export async function exportTreasuryMovementsCsv(
     "Descripcion",
     "TransferenciaInterna",
     "SaldoAcumulado",
+    "FacturaInterna",
   ];
   const data = rows.map((r) => [
     r.movementDate,
@@ -469,6 +470,7 @@ export async function exportTreasuryMovementsCsv(
     r.description,
     r.isInternalTransfer ? "Si" : "No",
     r.runningBalance ?? "",
+    r.documentRef ?? "",
   ]);
   return {
     content: buildCsv(headers, data),

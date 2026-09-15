@@ -470,7 +470,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "En listados y detalle vas a ver un badge Clase (venta de obra, compra comprometida, costo directo, gasto general, etc.). En caja, Pago es rojo e Ingreso / Cobranza verdes.",
       "En el alta de factura de proveedor (obra), junto a Imputación de costo aparece el badge Compra comprometida o Costo directo de obra según el toggle Contra OC / Costo directo. En otros altas (venta, transacciones) puede verse el chip «Se registrará como…».",
       "En obra, al cargar factura de proveedor elegí Contra OC o Costo directo: eso define Compra comprometida vs Costo directo.",
-      "Podés filtrar por Clase en los listados (?class=). En Transacciones (y en el extracto de cuenta) no hace falta filtrar por Origen: es el mismo eje técnico.",
+      "Podés filtrar por Clase en los listados (?class=). En Transacciones / extracto la tabla muestra Clase (no Tipo ni Origen); tipo y origen están en el detalle al clic en la descripción.",
       "En Facturas proveedor (obra) y Facturas y gastos (empresa), el chip Activas (por defecto) oculta las anuladas; usá Anuladas para verlas.",
     ],
     effects: [

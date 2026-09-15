@@ -7,6 +7,8 @@ import {
   clampReceiptQuantitiesToPendingInvoice,
   computePendingToInvoiceAmount,
   formatInvoiceLineQuantity,
+  looksLikeGeneratedFromPurchaseOrderNotes,
+  parseAutoFromPoPurchaseOrderId,
   poLineReceivedAmount,
   sumPoLinesReceivedAmount,
   type PoLineForInvoiceDraft,
@@ -31,6 +33,26 @@ test("buildAutoFromPoInternalNotes includes receipt when provided", () => {
     buildAutoFromPoInternalNotes("po-1", "rcpt-1"),
     "bloqer:auto-from-po:po-1:receipt:rcpt-1",
   );
+});
+
+test("parseAutoFromPoPurchaseOrderId reads uuid marker", () => {
+  const poId = "c75d26cf-5afa-44e3-aceb-c2a49c3e8f6c";
+  assert.equal(parseAutoFromPoPurchaseOrderId(buildAutoFromPoInternalNotes(poId)), poId);
+  assert.equal(
+    parseAutoFromPoPurchaseOrderId(buildAutoFromPoInternalNotes(poId, "rcpt-1")),
+    poId,
+  );
+  assert.equal(parseAutoFromPoPurchaseOrderId("manual note"), null);
+  assert.equal(parseAutoFromPoPurchaseOrderId(null), null);
+});
+
+test("looksLikeGeneratedFromPurchaseOrderNotes matches OC/receipt copy", () => {
+  assert.equal(looksLikeGeneratedFromPurchaseOrderNotes("Generada desde OC-002"), true);
+  assert.equal(
+    looksLikeGeneratedFromPurchaseOrderNotes("Generada desde recepción vinculada a 27"),
+    true,
+  );
+  assert.equal(looksLikeGeneratedFromPurchaseOrderNotes("Factura manual"), false);
 });
 
 test("poLineReceivedAmount is proportional to received qty", () => {

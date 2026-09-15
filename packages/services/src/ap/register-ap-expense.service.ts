@@ -536,6 +536,7 @@ export async function registerApExpense(
                   paymentMethod: input.payNow.paymentMethod ?? null,
                   reference: input.payNow.reference ?? null,
                   idempotencyKey: input.payNow.idempotencyKey,
+                  supplierInvoiceNumber: refreshed.number,
                 },
                 ctx,
               );

@@ -614,18 +614,20 @@ export async function exportTreasuryMovementsPdf(
         currency: filters.currency,
       })}
       columns={[
-        { key: "date", label: "Fecha", flex: 0.85 },
-        { key: "account", label: "Cuenta", flex: 1 },
-        { key: "type", label: "Tipo", flex: 0.7 },
-        { key: "counterparty", label: "Contraparte", flex: 1 },
-        { key: "amount", label: "Importe", flex: 0.85 },
-        { key: "currency", label: "Mon.", flex: 0.45 },
-        { key: "desc", label: "Descripción", flex: 1.2 },
+        { key: "date", label: "Fecha", flex: 0.8 },
+        { key: "account", label: "Cuenta", flex: 0.95 },
+        { key: "class", label: "Clase", flex: 0.9 },
+        { key: "invoice", label: "Factura", flex: 0.7 },
+        { key: "counterparty", label: "Contraparte", flex: 0.95 },
+        { key: "amount", label: "Importe", flex: 0.8 },
+        { key: "currency", label: "Mon.", flex: 0.4 },
+        { key: "desc", label: "Descripción", flex: 1.1 },
       ]}
       rows={rows.map((r) => ({
         date: r.movementDate,
         account: r.accountName,
-        type: r.type,
+        class: r.classLabel || "",
+        invoice: r.documentRef ?? "",
         counterparty: r.counterpartyName
           ? r.externalInvoiceRef
             ? `${r.counterpartyName} (${r.externalInvoiceRef})`
