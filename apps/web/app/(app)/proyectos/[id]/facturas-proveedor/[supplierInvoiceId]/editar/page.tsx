@@ -33,14 +33,9 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     roles: current.tenantCtx.roles,
   };
 
-  let invoice, suppliersResult, linkablePOs, wbsNodes;
+  let invoice;
   try {
-    [invoice, suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
-      getSupplierInvoiceById(supplierInvoiceId, ctx, id),
-      listAllContacts(LIST_AP_DIRECT_PAYEES, ctx),
-      listLinkablePurchaseOrders(id, ctx),
-      listProcurementWbsOptions(id, ctx),
-    ]);
+    invoice = await getSupplierInvoiceById(supplierInvoiceId, ctx, id);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     throw err;
@@ -48,6 +43,20 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
 
   if (invoice.status !== "DRAFT") {
     redirect(`/proyectos/${id}/facturas-proveedor/${supplierInvoiceId}`);
+  }
+
+  let suppliersResult, linkablePOs, wbsNodes;
+  try {
+    [suppliersResult, linkablePOs, wbsNodes] = await Promise.all([
+      listAllContacts(LIST_AP_DIRECT_PAYEES, ctx),
+      listLinkablePurchaseOrders(id, ctx, {
+        includeIds: invoice.purchaseOrderId ? [invoice.purchaseOrderId] : undefined,
+      }),
+      listProcurementWbsOptions(id, ctx),
+    ]);
+  } catch (err) {
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    throw err;
   }
 
   let maxCreditAmount: string | null = null;

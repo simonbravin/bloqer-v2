@@ -12,7 +12,7 @@ import {
   canEditPurchaseOrders,
   canViewProcurementProjectArea,
 } from "./procurement-access";
-import { PO_RECEIPT_ELIGIBLE_STATUSES } from "./procurement-constants";
+import { PO_INVOICE_LINKABLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
@@ -240,9 +240,17 @@ export type LinkablePurchaseOrder = {
   status: string;
 };
 
+/**
+ * Purchase orders that can be linked on a supplier invoice (create/edit).
+ * Includes fully received OCs — invoicing is the next step after receipt.
+ *
+ * `includeIds`: always return these project POs (same tenant) even if status is
+ * outside the linkable set — used when editing a draft that already points at one.
+ */
 export async function listLinkablePurchaseOrders(
   projectId: string,
   ctx: ServiceContext,
+  opts?: { includeIds?: string[] },
 ): Promise<LinkablePurchaseOrder[]> {
   await assertProcurementTenantModule(ctx);
   if (!canViewProcurementProjectArea(ctx.roles)) {
@@ -250,11 +258,16 @@ export async function listLinkablePurchaseOrders(
   }
   await requireProjectAccess(projectId, ctx);
 
+  const includeIds = [...new Set((opts?.includeIds ?? []).filter(Boolean))];
+
   const orders = await prisma.purchaseOrder.findMany({
     where: {
       projectId,
       tenantId: ctx.tenantId,
-      status: { in: [...PO_RECEIPT_ELIGIBLE_STATUSES] },
+      OR: [
+        { status: { in: [...PO_INVOICE_LINKABLE_STATUSES] } },
+        ...(includeIds.length > 0 ? [{ id: { in: includeIds } }] : []),
+      ],
     },
     select: { id: true, number: true, supplierContactId: true, currency: true, status: true },
     orderBy: { number: "asc" },

@@ -18,7 +18,11 @@ import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { updateCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
-import type { SupplierInvoiceView } from "@bloqer/services";
+import {
+  looksLikeGeneratedFromPurchaseOrderNotes,
+  parseAutoFromPoPurchaseOrderId,
+  type SupplierInvoiceView,
+} from "@bloqer/services";
 import type { SupplierOption, POOption } from "./supplier-invoice-form";
 import { classifySupplierInvoice } from "@bloqer/domain";
 import {
@@ -85,10 +89,11 @@ export function SupplierInvoiceEditForm({
   const isFiscalNote =
     invoice.documentKind === "CREDIT_NOTE" || invoice.documentKind === "DEBIT_NOTE";
   const isCreditNote = invoice.documentKind === "CREDIT_NOTE";
-  /** Auto drafts from OC/receipt must keep AGAINST_PO (server also enforces). */
+  /** Auto drafts from OC/receipt must keep AGAINST_PO + same payee (server also enforces). */
   const lockedFromPurchaseOrder =
-    Boolean(invoice.internalNotes?.startsWith("bloqer:auto-from-po:")) ||
-    Boolean(invoice.notes?.match(/^Generada desde (OC-|recepción vinculada a )/i));
+    Boolean(parseAutoFromPoPurchaseOrderId(invoice.internalNotes)) ||
+    looksLikeGeneratedFromPurchaseOrderNotes(invoice.notes);
+  const supplierLocked = payeeLocked || lockedFromPurchaseOrder;
   const [apSpendMode, setApSpendMode] = useState<"AGAINST_PO" | "DIRECT">(
     isFiscalNote
       ? "DIRECT"
@@ -127,11 +132,12 @@ export function SupplierInvoiceEditForm({
   }
 
   function selectApSpendMode(mode: "AGAINST_PO" | "DIRECT") {
-    if (payeeLocked) return;
-    if (mode === "DIRECT" && lockedFromPurchaseOrder) {
-      setError(
-        "Esta factura se generó desde una orden de compra. No se puede pasar a costo directo.",
-      );
+    if (payeeLocked || lockedFromPurchaseOrder) {
+      if (mode === "DIRECT" && lockedFromPurchaseOrder) {
+        setError(
+          "Esta factura se generó desde una orden de compra. No se puede pasar a costo directo.",
+        );
+      }
       return;
     }
     setApSpendMode(mode);
@@ -146,6 +152,13 @@ export function SupplierInvoiceEditForm({
       return classifySupplierInvoice({
         projectId: invoice.projectId,
         subcontractCertificationId: invoice.subcontractCertificationId,
+      });
+    }
+    if (lockedFromPurchaseOrder) {
+      return classifySupplierInvoice({
+        projectId: invoice.projectId ?? projectId ?? null,
+        purchaseOrderId: purchaseOrderId ?? invoice.purchaseOrderId,
+        hasPoLineLink: true,
       });
     }
     if (companyFinanzas || !projectId) {
@@ -165,8 +178,10 @@ export function SupplierInvoiceEditForm({
     });
   }, [
     payeeLocked,
+    lockedFromPurchaseOrder,
     invoice.projectId,
     invoice.subcontractCertificationId,
+    invoice.purchaseOrderId,
     companyFinanzas,
     projectId,
     apSpendMode,
@@ -179,16 +194,29 @@ export function SupplierInvoiceEditForm({
   );
   const showLetter = requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
 
-  const filteredPOs = poOptions.filter(
-    (po) => !supplierContactId || po.supplierContactId === supplierContactId,
-  );
+  const filteredPOs = useMemo(() => {
+    const bySupplier = poOptions.filter(
+      (po) => !supplierContactId || po.supplierContactId === supplierContactId,
+    );
+    if (!purchaseOrderId || bySupplier.some((po) => po.id === purchaseOrderId)) {
+      return bySupplier;
+    }
+    // Keep a locked/already-linked OC visible if the payee filter would hide it.
+    if (!lockedFromPurchaseOrder) return bySupplier;
+    const linked = poOptions.find((po) => po.id === purchaseOrderId);
+    return linked ? [linked, ...bySupplier] : bySupplier;
+  }, [poOptions, supplierContactId, purchaseOrderId, lockedFromPurchaseOrder]);
+
   const poComboboxOptions = useMemo(
     () => toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
     [filteredPOs],
   );
 
   useEffect(() => {
-    if (payeeLocked) return;
+    if (payeeLocked || lockedFromPurchaseOrder) return;
+    // Clear OC only when it no longer belongs to the selected payee.
+    // Do not special-case invoice.purchaseOrderId: that would keep a stale OC
+    // after changing proveedor and fail server-side with supplier mismatch.
     if (purchaseOrderId && !filteredPOs.some((po) => po.id === purchaseOrderId)) {
       setPurchaseOrderId(null);
       setLines((prev) => prev.map((l) => ({ ...l, purchaseOrderLineId: null })));
@@ -198,7 +226,7 @@ export function SupplierInvoiceEditForm({
 
   // Mirror create form: re-suggest letter/tax when payee changes and user has not overridden.
   useEffect(() => {
-    if (payeeLocked || !supplierContactId || letterTouched) return;
+    if (supplierLocked || !supplierContactId || letterTouched) return;
     const suggested = suggestInvoiceLetter({
       issuerIvaCondition: (selectedSupplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
       receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
@@ -219,7 +247,7 @@ export function SupplierInvoiceEditForm({
       })),
     );
   }, [
-    payeeLocked,
+    supplierLocked,
     supplierContactId,
     selectedSupplier,
     companyIvaCondition,
@@ -228,7 +256,7 @@ export function SupplierInvoiceEditForm({
   ]);
 
   function handleSupplierChange(id: string) {
-    if (payeeLocked) return;
+    if (supplierLocked) return;
     setSupplierContactId(id);
     setLetterTouched(false);
   }
@@ -252,7 +280,7 @@ export function SupplierInvoiceEditForm({
       projectId &&
       !payeeLocked &&
       apSpendMode === "AGAINST_PO" &&
-      !purchaseOrderId
+      !(purchaseOrderId ?? invoice.purchaseOrderId)
     ) {
       setError("Seleccioná la orden de compra o cambiá a costo directo");
       return;
@@ -303,7 +331,7 @@ export function SupplierInvoiceEditForm({
       return;
     }
     const payload = {
-      supplierContactId: payeeLocked ? invoice.supplierContactId : supplierContactId,
+      supplierContactId: supplierLocked ? invoice.supplierContactId : supplierContactId,
       issueDate:       fd.get("issueDate") as string,
       dueDate:         fd.get("dueDate")   as string,
       // Clear letter when AR gate is off (foreign supplier / non-AR company).
@@ -311,17 +339,20 @@ export function SupplierInvoiceEditForm({
       pricesIncludeTax: pricesIncludeTaxPayload,
       notes:           (fd.get("notes") as string) || null,
       // Fiscal notes / certification: never rewrite PO linkage from the DIRECT UI path.
+      // Auto-from-PO drafts always keep the existing OC id.
       ...(payeeLocked
         ? {}
         : {
-            purchaseOrderId: clearPoLink ? null : purchaseOrderId ?? null,
+            purchaseOrderId: clearPoLink
+              ? null
+              : purchaseOrderId ?? invoice.purchaseOrderId ?? null,
           }),
       iibbPerceptionRate: iibbForSave,
       lines:           lines.map((l, i) => ({
         ...l,
         taxRate: forceZeroTax ? "0" : l.taxRate,
         wbsNodeId: companyFinanzas ? null : l.wbsNodeId,
-        purchaseOrderLineId: payeeLocked
+        purchaseOrderLineId: payeeLocked || lockedFromPurchaseOrder
           ? l.purchaseOrderLineId
           : clearPoLink
             ? null
@@ -349,6 +380,8 @@ export function SupplierInvoiceEditForm({
     ? "Vinculada a certificación de subcontrato."
     : isFiscalNote
       ? "Nota vinculada a la factura de referencia; el proveedor no se cambia."
+      : lockedFromPurchaseOrder
+        ? "Borrador generado desde la OC; el proveedor y el vínculo a la orden no se cambian."
       : companyFinanzas || !projectId
         ? "Gasto de estructura (sin obra)."
         : null;
@@ -367,16 +400,18 @@ export function SupplierInvoiceEditForm({
               options={toSearchableOptions(suppliers)}
               value={supplierContactId}
               onValueChange={handleSupplierChange}
-              disabled={payeeLocked}
+              disabled={supplierLocked}
               placeholder="Seleccionar proveedor o empleado…"
               searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
               emptyText="Ningún proveedor o empleado coincide."
               popoverWidth="wide"
             />
-            {payeeLocked ? (
+            {supplierLocked ? (
               <p className="text-xs text-muted-foreground">
                 {certificationLocked
                   ? "Esta factura nace de una certificación de subcontrato; el destinatario no se cambia acá."
+                  : lockedFromPurchaseOrder
+                    ? "Esta factura nace de una orden de compra; el proveedor no se cambia acá."
                   : "El proveedor viene de la factura de referencia y no se cambia acá."}
               </p>
             ) : null}
@@ -486,8 +521,9 @@ export function SupplierInvoiceEditForm({
                       </button>
                     </div>
                     {apSpendMode === "DIRECT" ? null : filteredPOs.length === 0 ? (
-                      <p className="text-xs text-muted-foreground">
-                        No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
+                      <p className="text-xs text-destructive">
+                        No hay OC confirmadas/recibidas para este proveedor. Cambiá el payee o usá
+                        costo directo.
                       </p>
                     ) : (
                       <div className="space-y-1">
@@ -500,6 +536,7 @@ export function SupplierInvoiceEditForm({
                           }
                           placeholder="Seleccionar OC…"
                           searchPlaceholder="Buscar OC…"
+                          disabled={lockedFromPurchaseOrder}
                         />
                       </div>
                     )}

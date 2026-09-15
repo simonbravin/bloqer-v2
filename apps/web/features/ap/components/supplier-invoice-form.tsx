@@ -604,7 +604,7 @@ export function SupplierInvoiceForm({
                 </div>
                 {apSpendMode === "DIRECT" ? null : filteredPOs.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
+                    No hay OC confirmadas/recibidas para este proveedor. Cambiá el payee o usá costo directo.
                   </p>
                 ) : (
                   <div className="space-y-1">

@@ -46,7 +46,7 @@ import {
   parseAutoFromPoPurchaseOrderId,
 } from "./supplier-invoice-from-po-pure";
 
-const PO_AP_LINKABLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
+import { PO_INVOICE_LINKABLE_STATUSES } from "../procurement/procurement-constants";
 
 /**
  * Drafts created from OC/receipt (`bloqer:auto-from-po:…`) must keep the PO header.
@@ -180,7 +180,7 @@ export function assertPurchaseOrderLinkableForAp(status: string): void {
   if (status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "No se puede vincular a una orden de compra anulada");
   }
-  if (!PO_AP_LINKABLE_STATUSES.includes(status as (typeof PO_AP_LINKABLE_STATUSES)[number])) {
+  if (!PO_INVOICE_LINKABLE_STATUSES.includes(status as (typeof PO_INVOICE_LINKABLE_STATUSES)[number])) {
     throw new ServiceError(
       "CONFLICT",
       "La orden debe estar confirmada al proveedor antes de vincular una factura",
@@ -919,6 +919,18 @@ export async function updateSupplierInvoice(
     throw new ServiceError(
       "CONFLICT",
       "No se puede cambiar a quién se le paga en una factura originada por certificación de subcontrato",
+    );
+  }
+
+  if (
+    input.supplierContactId &&
+    input.supplierContactId !== existing.supplierContactId &&
+    (parseAutoFromPoPurchaseOrderId(existing.internalNotes) ||
+      looksLikeGeneratedFromPurchaseOrderNotes(existing.notes))
+  ) {
+    throw new ServiceError(
+      "CONFLICT",
+      "No se puede cambiar el proveedor de una factura generada desde una orden de compra",
     );
   }
 

@@ -1083,6 +1083,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "**Mano de obra externa** (cuadrilla, empresa de albañilería, jornal facturado): tipá la línea como **Mano de obra**. No hace falta subcontrato; SUB es solo con módulo Subcontratos + certificación.",
       "**Alquiler de equipos** facturado por proveedor: tipá como **Equipos**.",
       "Si cambiás la partida EDT, se limpia el vínculo APU: volvé a elegir el insumo si necesitás cobertura en el tablero.",
+      "Al vincular Contra orden de compra, el picker muestra OC **confirmadas, parcialmente recibidas y recibidas** del mismo proveedor. Una OC ya recibida sigue siendo elegible para facturar.",
+      "Si la factura nació desde la OC (**Completar factura**), no pases a **Costo directo** ni cambies el proveedor: el vínculo a la OC queda fijo.",
     ],
     relatedSlugs: [
       "pagar-una-cuenta-por-pagar",

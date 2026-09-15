@@ -7,6 +7,17 @@ export const PO_COMMITTED_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIV
  */
 export const PO_RECEIPT_ELIGIBLE_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED"] as const;
 
+/**
+ * PO statuses that can be linked to a supplier invoice ([D-066] / AP).
+ * Includes `RECEIVED`: billing normally happens after goods are received.
+ * Must stay aligned with `assertPurchaseOrderLinkableForAp`.
+ */
+export const PO_INVOICE_LINKABLE_STATUSES = [
+  "CONFIRMED",
+  "PARTIALLY_RECEIVED",
+  "RECEIVED",
+] as const;
+
 /** PO statuses considered "open" for project cancellation guards. */
 export const PO_OPEN_FOR_PROJECT_CANCEL_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED"] as const;
 
