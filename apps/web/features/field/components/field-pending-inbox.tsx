@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { FieldPendingGroup, FieldPendingItem, FieldPendingList, FieldPendingCounts } from "@bloqer/services";
-import { fieldPendingComprasStageLabel } from "@bloqer/services";
+import { fieldPendingComprasStageLabel } from "@bloqer/services/field-pending-labels";
 import { FieldPendingCard } from "./field-pending-card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

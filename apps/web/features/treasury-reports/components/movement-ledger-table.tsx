@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { formatDate } from "@/lib/format";
-import {
-  treasuryMovementSupportsAccountingDraft,
-  type MovementReportRow,
-} from "@bloqer/services";
+import type { MovementReportRow } from "@bloqer/services";
+import { treasuryMovementSupportsAccountingDraft } from "@bloqer/services/accounting-treasury-gl-eligibility";
 import { TreasuryMovementAccountingButton } from "@/features/accounting";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { Button } from "@/components/ui/button";

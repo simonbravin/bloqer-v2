@@ -11,6 +11,11 @@ import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
 import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
 import { ServiceError } from "../types";
 
+export {
+  FIELD_PENDING_COMPRAS_STAGE_LABEL,
+  fieldPendingComprasStageLabel,
+} from "./field-pending-labels";
+
 /**
  * Pending inbox sources ([D-087] + [D-094] + [D-097]).
  * Procurement follow-through (quote / confirm / receive / invoice) lives alongside approvals.
@@ -76,27 +81,11 @@ export const FIELD_PENDING_COMPRAS_STAGE_ORDER: Record<
   PURCHASE_ORDER_INVOICE: 5,
 };
 
-export const FIELD_PENDING_COMPRAS_STAGE_LABEL: Record<
-  keyof typeof FIELD_PENDING_COMPRAS_STAGE_ORDER,
-  string
-> = {
-  PURCHASE_REQUEST: "Cotizar",
-  PURCHASE_ORDER: "Aprobación",
-  PURCHASE_ORDER_CONFIRM: "Confirmar",
-  PURCHASE_ORDER_RECEIPT: "Recibir",
-  PURCHASE_ORDER_INVOICE: "Facturar",
-};
-
 export function fieldPendingComprasStageOrder(source: FieldPendingSource): number {
-  return FIELD_PENDING_COMPRAS_STAGE_ORDER[
-    source as keyof typeof FIELD_PENDING_COMPRAS_STAGE_ORDER
-  ] ?? 99;
-}
-
-export function fieldPendingComprasStageLabel(source: FieldPendingSource): string | null {
   return (
-    FIELD_PENDING_COMPRAS_STAGE_LABEL[source as keyof typeof FIELD_PENDING_COMPRAS_STAGE_LABEL] ??
-    null
+    FIELD_PENDING_COMPRAS_STAGE_ORDER[
+      source as keyof typeof FIELD_PENDING_COMPRAS_STAGE_ORDER
+    ] ?? 99
   );
 }
 

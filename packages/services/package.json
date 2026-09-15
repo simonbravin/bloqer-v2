@@ -22,7 +22,9 @@
     "./payables-field": "./src/ap/payables-field.ts",
     "./receivables-field": "./src/ar/receivables-field.ts",
     "./cost-type-slice": "./src/cost-control/cost-type-slice.ts",
-    "./supplier-invoice-from-po-markers": "./src/ap/supplier-invoice-from-po-markers.ts"
+    "./supplier-invoice-from-po-markers": "./src/ap/supplier-invoice-from-po-markers.ts",
+    "./accounting-treasury-gl-eligibility": "./src/accounting/accounting-treasury-gl-eligibility.ts",
+    "./field-pending-labels": "./src/field/field-pending-labels.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

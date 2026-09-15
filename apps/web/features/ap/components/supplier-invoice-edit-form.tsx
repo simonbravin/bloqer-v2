@@ -19,7 +19,7 @@ import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { updateSupplierInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { updateCompanySupplierInvoiceAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
 import type { SupplierInvoiceView } from "@bloqer/services";
-import { isSupplierInvoiceLockedFromPurchaseOrder } from "@bloqer/services/supplier-invoice-from-po-markers";
+import { isSupplierInvoiceLockedFromPurchaseOrder } from "../lib/auto-from-po-lock";
 import type { SupplierOption, POOption } from "./supplier-invoice-form";
 import { classifySupplierInvoice } from "@bloqer/domain";
 import {
