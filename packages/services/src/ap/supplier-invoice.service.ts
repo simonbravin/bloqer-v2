@@ -912,6 +912,17 @@ export async function updateSupplierInvoice(
     });
   }
 
+  if (input.internalNotes !== undefined) {
+    const prevAuto = parseAutoFromPoPurchaseOrderId(existing.internalNotes);
+    const nextAuto = parseAutoFromPoPurchaseOrderId(input.internalNotes);
+    if (prevAuto && prevAuto !== nextAuto) {
+      throw new ServiceError(
+        "CONFLICT",
+        "No se puede quitar el vínculo interno de una factura generada desde una orden de compra",
+      );
+    }
+  }
+
   if (
     existing.subcontractCertificationId &&
     input.supplierContactId &&
@@ -1266,12 +1277,18 @@ export async function issueSupplierInvoice(
 
     const lines = await tx.supplierInvoiceLine.findMany({
       where: { invoiceId: id },
-      select: { wbsNodeId: true },
+      select: { wbsNodeId: true, purchaseOrderLineId: true },
     });
     if (lines.length === 0) {
       throw new ServiceError("CONFLICT", "La factura debe tener al menos una línea");
     }
     await assertSupplierInvoiceLinesWbs(inv.projectId, lines, ctx.tenantId);
+    await assertSupplierInvoiceLinesPoLink(
+      inv.projectId,
+      inv.purchaseOrderId,
+      lines,
+      ctx.tenantId,
+    );
 
     // Re-fetch totals
     await recalcSupplierInvoiceTotals(tx, id);

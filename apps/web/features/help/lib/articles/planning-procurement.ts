@@ -926,7 +926,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Confirmar al proveedor → CONFIRMED = Comprometido en EDT y costos. Quien puede confirmar la ve en Pendientes; Depósito/Compras reciben campana al confirmar para registrar recepción.",
       "Atajo (política / Atajos operativos): **Un paso: autorizar y comprometer** — bajo umbral: PM/Compras; alto nivel: Admin ([D-106]). Si D-105 y D-107 están ON en Pend. aprobación, Autorizar es el botón primario.",
       "Si la OC queda Confirmada o Recep. parcial y pasa la Entrega prevista, aparece un badge rojo Vencida N d junto a Entrega prevista en el listado y en Pendientes.",
-      "Al recibir: panel Facturación arriba. Con política [D-108] puede crearse borrador de factura automáticamente (emitir = CxP). Pendientes muestra **Registrar factura** o **Completar factura** hasta ISSUED.",
+      "Al recibir: panel Facturación arriba. Con política [D-108] puede crearse borrador de factura automáticamente (emitir = CxP). Si ya hay borrador, el panel muestra **Completar factura** (y **Actualizar borrador** si aún hay cantidad pendiente). Pendientes también lista **Registrar factura** / **Completar factura** hasta ISSUED.",
       "Luego recepción y factura (el tipo se hereda de la línea de OC).",
     ],
     figure: {

@@ -138,6 +138,29 @@ test("buildInvoiceDraftLinesFromPo scales remaining basis", () => {
   assert.equal(lines[0]!.quantity, "2.5");
 });
 
+test("buildInvoiceDraftLinesFromPo remaining uses per-line invoiced qty", () => {
+  const lineA = { ...sampleLine, id: "a", receivedQuantity: "10", orderQuantity: "10" };
+  const lineB = {
+    ...sampleLine,
+    id: "b",
+    description: "Arena",
+    receivedQuantity: "10",
+    orderQuantity: "10",
+  };
+  const lines = buildInvoiceDraftLinesFromPo([lineA, lineB], {
+    basis: "remaining",
+    receivedAmount: new Prisma.Decimal(2000),
+    invoicedAmount: new Prisma.Decimal(1000),
+    invoicedQtyByPoLine: new Map([
+      ["a", new Prisma.Decimal(10)],
+      ["b", new Prisma.Decimal(0)],
+    ]),
+  });
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0]!.purchaseOrderLineId, "b");
+  assert.equal(lines[0]!.quantity, "10");
+});
+
 test("buildInvoiceDraftLinesFromPo filters by receipt quantities", () => {
   const lines = buildInvoiceDraftLinesFromPo(
     [sampleLine, { ...sampleLine, id: "line-2", description: "Arena", receivedQuantity: "3" }],

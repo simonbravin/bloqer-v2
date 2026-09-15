@@ -112,6 +112,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     pendingToInvoice: "0",
     hasReceivedQuantity: false,
     draftInvoiceCount: 0,
+    openDraftInvoiceId: null,
     lineMatches: [],
     matchWarningCount: 0,
   };

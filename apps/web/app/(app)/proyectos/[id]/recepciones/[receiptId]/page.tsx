@@ -90,6 +90,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
     pendingToInvoice: "0",
     hasReceivedQuantity: false,
     draftInvoiceCount: 0,
+    openDraftInvoiceId: null,
     lineMatches: [],
     matchWarningCount: 0,
   };

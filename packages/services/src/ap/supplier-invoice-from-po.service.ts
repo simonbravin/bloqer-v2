@@ -21,6 +21,8 @@ import {
   type ProjectSupplierInvoiceListRow,
   type SupplierInvoiceView,
 } from "./supplier-invoice.service";
+import { recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { classFieldsForSupplierInvoice } from "../finance/document-class.service";
 import {
   buildAutoFromPoInternalNotes,
@@ -58,6 +60,8 @@ export type PurchaseOrderBillingSummary = {
   pendingToInvoice: string;
   hasReceivedQuantity: boolean;
   draftInvoiceCount: number;
+  /** Oldest open DRAFT on this OC (for Completar factura CTA). */
+  openDraftInvoiceId: string | null;
   /** Per-line 3-way qty status ([D-067]). */
   lineMatches: Array<{
     poLineId: string;
@@ -138,19 +142,23 @@ export async function getPurchaseOrderBillingSummary(
       status: { in: ["DRAFT", "ISSUED"] },
     },
     select: {
+      id: true,
       subtotal: true,
       taxAmount: true,
       totalAmount: true,
       status: true,
+      createdAt: true,
       payable: { select: { paidAmount: true, status: true } },
       lines: { select: { purchaseOrderLineId: true, quantity: true } },
     },
+    orderBy: { createdAt: "asc" },
   });
 
   let invoicedAmount = new Prisma.Decimal(0);
   let draftReservedAmount = new Prisma.Decimal(0);
   let paidAmount = new Prisma.Decimal(0);
   let draftInvoiceCount = 0;
+  let openDraftInvoiceId: string | null = null;
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
@@ -158,6 +166,7 @@ export async function getPurchaseOrderBillingSummary(
     const goodsTaxAmount = inv.subtotal.plus(inv.taxAmount);
     if (inv.status === "DRAFT") {
       draftInvoiceCount += 1;
+      if (!openDraftInvoiceId) openDraftInvoiceId = inv.id;
       draftReservedAmount = draftReservedAmount.add(goodsTaxAmount);
       // Reserve draft qty so clamp / pending cannot double-create ([D-108] vs panel).
       for (const line of inv.lines) {
@@ -205,6 +214,7 @@ export async function getPurchaseOrderBillingSummary(
     pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
     hasReceivedQuantity,
     draftInvoiceCount,
+    openDraftInvoiceId,
     lineMatches,
     matchWarningCount,
   };
@@ -242,6 +252,12 @@ export async function getPurchaseOrderInvoiceDraftPreview(
   const summary = await getPurchaseOrderBillingSummary(purchaseOrderId, ctx);
   const poLines = po.lines.map(toPoLineDraft);
   const receivedAmount = sumPoLinesReceivedAmount(poLines);
+  const issuedQtyByPoLine = new Map(
+    summary.lineMatches.map((l) => {
+      // lineMatches.include draft+issued; for Traer líneas we want pending vs all reserved.
+      return [l.poLineId, new Prisma.Decimal(l.invoicedQty)] as const;
+    }),
+  );
   const coveredAmount = new Prisma.Decimal(summary.invoicedAmount).add(
     new Prisma.Decimal(summary.draftReservedAmount),
   );
@@ -250,6 +266,7 @@ export async function getPurchaseOrderInvoiceDraftPreview(
     basis,
     receivedAmount,
     invoicedAmount: coveredAmount,
+    invoicedQtyByPoLine: issuedQtyByPoLine,
   });
 
   return {
@@ -281,6 +298,7 @@ export async function listSupplierInvoicesByPurchaseOrder(
     include: {
       supplierContact: { select: { legalName: true, fantasyName: true } },
       payable: { select: { id: true, status: true } },
+      lines: { select: { purchaseOrderLineId: true } },
     },
     orderBy: [{ number: "asc" }, { id: "asc" }],
   });
@@ -300,7 +318,7 @@ export async function listSupplierInvoicesByPurchaseOrder(
     ...classFieldsForSupplierInvoice({
       projectId: inv.projectId,
       purchaseOrderId: inv.purchaseOrderId,
-      hasPoLineLink: Boolean(inv.purchaseOrderId),
+      hasPoLineLink: inv.lines.some((l) => Boolean(l.purchaseOrderLineId)),
       subcontractCertificationId: inv.subcontractCertificationId,
     }),
   }));
@@ -473,16 +491,6 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       supplierContact: { select: { legalName: true, fantasyName: true } },
     },
   });
-  if (existingDraft) {
-    if (options?.asSystemFromReceiptPolicy) {
-      // Avoid VIEW AP gate on idempotent re-entry (warehouse confirm path).
-      return serializeSupplierInvoice({
-        ...existingDraft,
-        subcontractCertification: null,
-      });
-    }
-    return getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
-  }
 
   let receiptQuantities: Map<string, string> | undefined;
   if (input.purchaseReceiptId) {
@@ -504,18 +512,18 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   }
 
   const poLines = po.lines.map(toPoLineDraft);
-  const summary = await getPurchaseOrderBillingSummary(input.purchaseOrderId, ctx);
-  const invoicedAmount = new Prisma.Decimal(summary.invoicedAmount);
-  const coveredAmount = invoicedAmount.add(new Prisma.Decimal(summary.draftReservedAmount));
+  // Exclude the open auto-draft so a later receipt can refresh its lines ([D-108]).
+  const coveredQtyByPoLine = await loadCoveredQtyByPoLine(
+    input.purchaseOrderId,
+    ctx.tenantId,
+    existingDraft?.id ?? null,
+  );
 
   if (receiptQuantities) {
-    const invoicedQtyByPoLine = new Map(
-      summary.lineMatches.map((l) => [l.poLineId, new Prisma.Decimal(l.invoicedQty)]),
-    );
     receiptQuantities = clampReceiptQuantitiesToPendingInvoice(
       receiptQuantities,
       poLines,
-      invoicedQtyByPoLine,
+      coveredQtyByPoLine,
     );
   }
 
@@ -531,6 +539,11 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     : sumPoLinesReceivedAmount(poLines);
 
   if (receivedAmount.lessThanOrEqualTo(0)) {
+    if (existingDraft) {
+      return options?.asSystemFromReceiptPolicy
+        ? serializeSupplierInvoice({ ...existingDraft, subcontractCertification: null })
+        : getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
+    }
     throw new ServiceError(
       "CONFLICT",
       input.purchaseReceiptId
@@ -539,21 +552,68 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     );
   }
 
-  // Receipt path: quantities already clamped to pending; OC path scales by remaining when needed.
-  const basis = input.purchaseReceiptId
-    ? "received"
-    : coveredAmount.greaterThan(0)
-      ? "remaining"
-      : (input.basis ?? "received");
-  const draftLines = buildInvoiceDraftLinesFromPo(poLines, {
-    basis,
-    receiptQuantities,
-    receivedAmount,
-    invoicedAmount: coveredAmount,
-  });
+  const coveredMoney = poLines.reduce((acc, line) => {
+    const coveredQty = coveredQtyByPoLine.get(line.id);
+    if (!coveredQty || coveredQty.lessThanOrEqualTo(0)) return acc;
+    const orderQty = new Prisma.Decimal(line.orderQuantity);
+    const lineTotal = new Prisma.Decimal(line.lineTotal);
+    if (orderQty.lessThanOrEqualTo(0)) return acc;
+    return acc.add(lineTotal.mul(coveredQty).div(orderQty));
+  }, new Prisma.Decimal(0));
+
+  // Receipt path (new draft): quantities already clamped to pending.
+  // Refresh of an open auto-draft: rebuild full per-line remaining vs other docs.
+  const draftLines = existingDraft
+    ? buildInvoiceDraftLinesFromPo(poLines, {
+        basis: "remaining",
+        receivedAmount: sumPoLinesReceivedAmount(poLines),
+        invoicedAmount: coveredMoney,
+        invoicedQtyByPoLine: coveredQtyByPoLine,
+      })
+    : buildInvoiceDraftLinesFromPo(poLines, {
+        basis: input.purchaseReceiptId
+          ? "received"
+          : coveredMoney.greaterThan(0)
+            ? "remaining"
+            : (input.basis ?? "received"),
+        receiptQuantities,
+        receivedAmount: sumPoLinesReceivedAmount(poLines),
+        invoicedAmount: coveredMoney,
+        invoicedQtyByPoLine: coveredQtyByPoLine,
+      });
 
   if (draftLines.length === 0) {
+    if (existingDraft) {
+      return options?.asSystemFromReceiptPolicy
+        ? serializeSupplierInvoice({ ...existingDraft, subcontractCertification: null })
+        : getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
+    }
     throw new ServiceError("CONFLICT", "No hay líneas pendientes de facturación para esta OC");
+  }
+
+  if (existingDraft) {
+    await syncAutoFromPoDraftLines({
+      draftId: existingDraft.id,
+      existingLines: existingDraft.lines,
+      draftLines,
+      invoiceLetter: existingDraft.invoiceLetter,
+      actorUserId: ctx.actorUserId,
+      internalNotes,
+    });
+    if (options?.asSystemFromReceiptPolicy) {
+      const refreshed = await prisma.supplierInvoice.findUniqueOrThrow({
+        where: { id: existingDraft.id },
+        include: {
+          lines: { orderBy: { sortOrder: "asc" } },
+          supplierContact: { select: { legalName: true, fantasyName: true } },
+        },
+      });
+      return serializeSupplierInvoice({
+        ...refreshed,
+        subcontractCertification: null,
+      });
+    }
+    return getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
   }
 
   const suggestedLetter = await resolveSuggestedApInvoiceLetter({
@@ -591,4 +651,113 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       ? { bypassApMutateGate: true, trustedSystemPath: "receipt-auto-draft" }
       : undefined,
   );
+}
+
+/** Qty already on ISSUED + other DRAFTs (optionally excluding one auto-draft being refreshed). */
+async function loadCoveredQtyByPoLine(
+  purchaseOrderId: string,
+  tenantId: string,
+  excludeDraftId: string | null,
+): Promise<Map<string, Prisma.Decimal>> {
+  const invoices = await prisma.supplierInvoice.findMany({
+    where: {
+      tenantId,
+      purchaseOrderId,
+      status: { in: ["DRAFT", "ISSUED"] },
+      ...(excludeDraftId ? { id: { not: excludeDraftId } } : {}),
+    },
+    select: { lines: { select: { purchaseOrderLineId: true, quantity: true } } },
+  });
+  const map = new Map<string, Prisma.Decimal>();
+  for (const inv of invoices) {
+    for (const line of inv.lines) {
+      if (!line.purchaseOrderLineId) continue;
+      const prev = map.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+      map.set(line.purchaseOrderLineId, prev.add(line.quantity));
+    }
+  }
+  return map;
+}
+
+function autoDraftLinesAlreadyCover(
+  existingLines: Array<{ purchaseOrderLineId: string | null; quantity: Prisma.Decimal }>,
+  targets: InvoiceDraftLineInput[],
+): boolean {
+  const byPo = new Map<string, string>();
+  for (const l of existingLines) {
+    if (!l.purchaseOrderLineId) continue;
+    byPo.set(l.purchaseOrderLineId, serializeQtyDecimal(l.quantity));
+  }
+  if (byPo.size !== targets.length) return false;
+  for (const t of targets) {
+    if (!t.purchaseOrderLineId) return false;
+    if (byPo.get(t.purchaseOrderLineId) !== t.quantity) return false;
+  }
+  return true;
+}
+
+/**
+ * Refresh an open auto-from-PO DRAFT so later receipts / Registrar factura do not
+ * leave under-covered lines ([D-108] idempotent hit).
+ */
+async function syncAutoFromPoDraftLines(params: {
+  draftId: string;
+  existingLines: Array<{ purchaseOrderLineId: string | null; quantity: Prisma.Decimal }>;
+  draftLines: InvoiceDraftLineInput[];
+  invoiceLetter: string | null;
+  actorUserId: string;
+  internalNotes: string;
+}): Promise<void> {
+  if (autoDraftLinesAlreadyCover(params.existingLines, params.draftLines)) {
+    return;
+  }
+
+  const forceZeroTax = params.invoiceLetter === "C" || params.invoiceLetter === "E";
+
+  await prisma.$transaction(async (tx) => {
+    const claim = await tx.supplierInvoice.updateMany({
+      where: { id: params.draftId, status: "DRAFT" },
+      data: {
+        internalNotes: params.internalNotes,
+        updatedBy: params.actorUserId,
+      },
+    });
+    if (claim.count !== 1) {
+      throw new ServiceError("CONFLICT", "La factura ya no está en borrador");
+    }
+
+    await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: params.draftId } });
+    for (let i = 0; i < params.draftLines.length; i++) {
+      const line = params.draftLines[i]!;
+      const qty = new Prisma.Decimal(line.quantity);
+      const price = new Prisma.Decimal(line.unitPrice);
+      const rate = new Prisma.Decimal(forceZeroTax ? "0" : line.taxRate);
+      const money = resolveInvoiceLineMoney({
+        quantity: qty,
+        unitPrice: price,
+        taxRate: rate,
+        discountPct: parseDiscountPct(line.discountPct),
+        pricesIncludeTax: false,
+      });
+      await tx.supplierInvoiceLine.create({
+        data: {
+          invoiceId: params.draftId,
+          description: line.description,
+          quantity: qty,
+          unitPrice: money.unitPriceNet,
+          taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
+          lineSubtotal: money.lineSubtotal,
+          lineTax: money.lineTax,
+          lineTotal: money.lineTotal,
+          wbsNodeId: line.wbsNodeId ?? null,
+          purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+          costAnalysisLineId: line.costAnalysisLineId ?? null,
+          costType: (line.costType as "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER") ?? "MATERIAL",
+          sortOrder: i,
+        },
+      });
+    }
+    await recalcSupplierInvoiceTotals(tx, params.draftId);
+  });
 }

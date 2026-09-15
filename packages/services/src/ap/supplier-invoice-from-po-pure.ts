@@ -101,6 +101,9 @@ export function clampReceiptQuantitiesToPendingInvoice(
 /**
  * Build supplier invoice line inputs from PO lines.
  * When receiptQuantities is set, only those PO lines with qty > 0 are included.
+ *
+ * For `basis: "remaining"`, prefer per-line `invoicedQtyByPoLine` (received − invoiced)
+ * so uneven coverage across lines does not distort quantities via a money factor.
  */
 export function buildInvoiceDraftLinesFromPo(
   lines: PoLineForInvoiceDraft[],
@@ -109,10 +112,16 @@ export function buildInvoiceDraftLinesFromPo(
     receiptQuantities?: ReadonlyMap<string, string>;
     receivedAmount: Prisma.Decimal;
     invoicedAmount: Prisma.Decimal;
+    /** Qty already covered by ISSUED (+ other drafts when refreshing is not desired). */
+    invoicedQtyByPoLine?: ReadonlyMap<string, Prisma.Decimal>;
   },
 ): InvoiceDraftLineInput[] {
+  const usePerLineRemaining =
+    opts.basis === "remaining" && opts.invoicedQtyByPoLine !== undefined;
   const remainingFactor =
-    opts.basis === "remaining" && opts.receivedAmount.greaterThan(0)
+    opts.basis === "remaining" &&
+    !usePerLineRemaining &&
+    opts.receivedAmount.greaterThan(0)
       ? computePendingToInvoiceAmount(opts.receivedAmount, opts.invoicedAmount).div(
           opts.receivedAmount,
         )
@@ -126,11 +135,15 @@ export function buildInvoiceDraftLinesFromPo(
       const receiptQty = opts.receiptQuantities.get(line.id);
       if (!receiptQty) continue;
       qty = new Prisma.Decimal(receiptQty);
+    } else if (usePerLineRemaining) {
+      const received = new Prisma.Decimal(line.receivedQuantity);
+      const invoiced = opts.invoicedQtyByPoLine!.get(line.id) ?? ZERO;
+      qty = received.greaterThan(invoiced) ? received.sub(invoiced) : ZERO;
     } else {
       qty = new Prisma.Decimal(line.receivedQuantity);
     }
 
-    if (opts.basis === "remaining") {
+    if (opts.basis === "remaining" && !usePerLineRemaining && !opts.receiptQuantities) {
       qty = qty.mul(remainingFactor);
     }
 

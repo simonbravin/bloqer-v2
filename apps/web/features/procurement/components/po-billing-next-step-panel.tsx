@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { can } from "@bloqer/domain";
@@ -29,7 +30,10 @@ export function PoBillingNextStepPanel({
   highlighted = false,
 }: Props) {
   const pending = isPositiveMoneyAmount(billing.pendingToInvoice);
-  const showAction = billing.hasReceivedQuantity && pending;
+  const showRegister = billing.hasReceivedQuantity && pending;
+  const draftHref = billing.openDraftInvoiceId
+    ? `/proyectos/${projectId}/facturas-proveedor/${billing.openDraftInvoiceId}`
+    : null;
 
   return (
     <div
@@ -75,48 +79,61 @@ export function PoBillingNextStepPanel({
             </ul>
           </ProcurementAmberCallout>
         ) : null}
-        {showAction ? (
+        {showRegister ? (
           <p className="text-xs text-muted-foreground">
             La recepción no genera deuda automáticamente. Registrá la factura del proveedor y
-            emitila para crear la cuenta por pagar.
+            emitila para crear la cuenta por pagar
+            {draftHref ? " (o completá el borrador abierto)." : "."}
           </p>
         ) : billing.draftInvoiceCount > 0 ? (
           <p className="text-xs text-muted-foreground">
             Hay factura(s) en borrador vinculada(s) a esta OC
             {billing.draftInvoiceCount === 1 ? "" : ` (${billing.draftInvoiceCount})`}. Completala y
-            emitila desde Facturas proveedor para crear la CxP
-            {billing.hasReceivedQuantity && !pending
-              ? ""
-              : " (o usá Registrar factura si aún falta cantidad)."}.
+            emitila para crear la CxP.
           </p>
         ) : null}
       </div>
 
       {canEditAp ? (
-        showAction ? (
-          <form
-            action={async () => {
-              "use server";
-              const res = await createSupplierInvoiceFromPurchaseOrderAction(projectId, {
-                purchaseOrderId,
-                purchaseReceiptId: purchaseReceiptId ?? null,
-                basis: "received",
-              });
-              if ("error" in res) {
-                const errQuery = new URLSearchParams({ invoiceError: res.error });
-                redirect(`${errorReturnPath}?${errQuery.toString()}`);
-              }
-              redirect(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
-            }}
-          >
-            <Button type="submit" className={procurementActionBtnClass}>
-              Registrar factura
+        <div className="flex flex-wrap items-center gap-2">
+          {draftHref ? (
+            <Button asChild className={procurementActionBtnClass}>
+              <Link href={draftHref}>Completar factura</Link>
             </Button>
-          </form>
-        ) : null
-      ) : showAction ? (
+          ) : null}
+          {showRegister ? (
+            <form
+              action={async () => {
+                "use server";
+                const res = await createSupplierInvoiceFromPurchaseOrderAction(projectId, {
+                  purchaseOrderId,
+                  purchaseReceiptId: purchaseReceiptId ?? null,
+                  basis: "received",
+                });
+                if ("error" in res) {
+                  const errQuery = new URLSearchParams({ invoiceError: res.error });
+                  redirect(`${errorReturnPath}?${errQuery.toString()}`);
+                }
+                redirect(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
+              }}
+            >
+              <Button
+                type="submit"
+                variant={draftHref ? "outline" : "default"}
+                className={draftHref ? undefined : procurementActionBtnClass}
+              >
+                {draftHref ? "Actualizar borrador" : "Registrar factura"}
+              </Button>
+            </form>
+          ) : null}
+        </div>
+      ) : showRegister ? (
         <p className="text-xs text-muted-foreground">
           Pedile a Finanzas que registre la factura del proveedor vinculada a esta OC.
+        </p>
+      ) : draftHref ? (
+        <p className="text-xs text-muted-foreground">
+          Pedile a Finanzas que complete y emita el borrador de factura.
         </p>
       ) : null}
     </div>
