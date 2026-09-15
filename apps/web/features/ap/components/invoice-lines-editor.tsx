@@ -380,7 +380,7 @@ export function InvoiceLinesEditor({
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label htmlFor={unitPriceId} className="text-xs">
-                    {pricesIncludeTax ? "Precio unit. (c/IVA)" : "Precio unit."}
+                    {pricesIncludeTax ? "P. unit. (c/IVA)" : "P. unit."}
                   </Label>
                   <DecimalInput
                     id={unitPriceId}

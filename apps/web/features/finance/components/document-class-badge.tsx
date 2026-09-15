@@ -42,12 +42,14 @@ export function DocumentClassBadge({
   );
 }
 
-/** Hint shown on create forms: “Se registrará como: …”. */
+/** Hint shown on create forms: optional “Se registrará como” + class badge ([D-102]). */
 export function DocumentClassCreateHint({
   classLabel,
   classFamily,
   hint,
   variant = "banner",
+  /** When false, only the class badge is shown (e.g. next to Imputación de costo). */
+  showPrefix = true,
   className,
 }: {
   classLabel: string;
@@ -55,12 +57,13 @@ export function DocumentClassCreateHint({
   hint?: string | null;
   /** `inline` sits beside labels (e.g. next to Imputación de costo). */
   variant?: "banner" | "inline";
+  showPrefix?: boolean;
   className?: string;
 }) {
   if (variant === "inline") {
     return (
       <div className={cn("flex flex-wrap items-center gap-1.5 text-xs", className)}>
-        <span className="text-muted-foreground">Se registrará como</span>
+        {showPrefix ? <span className="text-muted-foreground">Se registrará como</span> : null}
         <DocumentClassBadge classLabel={classLabel} classFamily={classFamily} />
       </div>
     );
@@ -69,7 +72,7 @@ export function DocumentClassCreateHint({
   return (
     <div className={cn("rounded-md border bg-muted/30 px-3 py-2 text-sm", className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground">Se registrará como:</span>
+        {showPrefix ? <span className="text-muted-foreground">Se registrará como:</span> : null}
         <DocumentClassBadge classLabel={classLabel} classFamily={classFamily} />
       </div>
       {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}

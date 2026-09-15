@@ -468,7 +468,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "En listados y detalle vas a ver un badge Clase (venta de obra, compra comprometida, costo directo, gasto general, etc.). En caja, Pago es rojo e Ingreso / Cobranza verdes.",
-      "En el alta, el chip «Se registrará como…» anticipa esa etiqueta según obra / OC / certificación / solo caja.",
+      "En el alta de factura de proveedor (obra), junto a Imputación de costo aparece el badge Compra comprometida o Costo directo de obra según el toggle Contra OC / Costo directo. En otros altas (venta, transacciones) puede verse el chip «Se registrará como…».",
       "En obra, al cargar factura de proveedor elegí Contra OC o Costo directo: eso define Compra comprometida vs Costo directo.",
       "Podés filtrar por Clase en los listados (?class=). En Transacciones (y en el extracto de cuenta) no hace falta filtrar por Origen: es el mismo eje técnico.",
       "En Facturas proveedor (obra) y Facturas y gastos (empresa), el chip Activas (por defecto) oculta las anuladas; usá Anuladas para verlas.",
@@ -616,7 +616,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       { kind: "company", path: "/finanzas/transacciones", label: "Transacciones" },
     ],
     steps: [
-      "En cada línea cargá Precio unit. (lista) y, si aplica, Desc. % (0 a 100).",
+      "En cada línea cargá P. unit. (lista) y, si aplica, Desc. % (0 a 100).",
       "Para el mismo % en todas: escribí Descuento general % (0 a 100) → Aplicar a todas. Vacío no copia ni limpia.",
       "El descuento baja el subtotal; el IVA se calcula sobre el restante. El precio de lista no se pisa.",
       "En Factura B con precio c/IVA, el % se aplica al neto extraído, no al bruto.",

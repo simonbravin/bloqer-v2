@@ -79,7 +79,7 @@ export function InvoiceLetterSelect({
   name,
   value,
   onValueChange,
-  label = "Letra del comprobante",
+  label = "Comprobante",
   hint,
   className,
   required,
@@ -165,11 +165,11 @@ export function PricesIncludeTaxCheckbox({
           <Label htmlFor={id} className="font-normal leading-snug cursor-pointer">
             El precio unitario incluye IVA
           </Label>
-          <p className="text-xs text-muted-foreground leading-snug">
-            {editModeHint
-              ? "Los precios ya guardados son netos. Activá solo si reingresás un precio final con IVA."
-              : "Típico en Factura B: el total de línea es cantidad × precio ingresado; el sistema calcula neto e IVA."}
-          </p>
+          {editModeHint ? (
+            <p className="text-xs text-muted-foreground leading-snug">
+              Los precios ya guardados son netos. Activá solo si reingresás un precio final con IVA.
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

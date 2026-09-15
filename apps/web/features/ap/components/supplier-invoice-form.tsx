@@ -9,13 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions } from "@/lib/searchable-options";
 import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
 import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
-import { AP_PAYEE_PICKER_HINT } from "../lib/ap-payee-options";
 import { InvoiceLetterSelect, PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
@@ -294,21 +293,11 @@ export function SupplierInvoiceForm({
   }, [companyFinanzas, projectId, apSpendMode, purchaseOrderId]);
 
   const classHint =
-    companyFinanzas || !projectId
-      ? "Gasto de estructura (sin obra)."
-      : apSpendMode === "AGAINST_PO"
-        ? "Baja el comprometido abierto de esa OC."
-        : "No reduce el comprometido. Imputá partida y tipo de costo.";
+    companyFinanzas || !projectId ? "Gasto de estructura (sin obra)." : null;
 
   const poComboboxOptions = useMemo(
-    () =>
-      apSpendMode === "AGAINST_PO"
-        ? toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code })))
-        : withNoneOption(
-            toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
-            { label: "Sin OC vinculada" },
-          ),
-    [filteredPOs, apSpendMode],
+    () => toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
+    [filteredPOs],
   );
 
   const compatibleAccounts = useMemo(
@@ -351,7 +340,7 @@ export function SupplierInvoiceForm({
     setError(null);
     if (!supplierContactId) { setError("Debe seleccionar a quién se le paga"); return; }
     if (showLetter && !invoiceLetter) {
-      setError("Seleccioná la letra del comprobante (A, B, C o E)");
+      setError("Seleccioná el comprobante (A, B, C o E)");
       return;
     }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
@@ -502,8 +491,8 @@ export function SupplierInvoiceForm({
           <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className={cn("space-y-1", !showLetter && "sm:col-span-2")}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+          <div className={cn("space-y-1", showLetter ? "sm:col-span-4" : "sm:col-span-6")}>
             <Label>A quién se le paga</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -511,27 +500,25 @@ export function SupplierInvoiceForm({
                 rol Proveedor o Empleado; no alcanza con Cliente.
               </p>
             ) : (
-              <>
-                <SearchableCombobox
-                  options={toSearchableOptions(suppliers)}
-                  value={supplierContactId}
-                  onValueChange={(id) => {
-                    setSupplierContactId(id);
-                    setLetterTouched(false);
-                  }}
-                  placeholder="Seleccionar proveedor o empleado…"
-                  searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
-                  emptyText="Ningún proveedor o empleado coincide."
-                  popoverWidth="wide"
-                />
-                <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
-              </>
+              <SearchableCombobox
+                options={toSearchableOptions(suppliers)}
+                value={supplierContactId}
+                onValueChange={(id) => {
+                  setSupplierContactId(id);
+                  setLetterTouched(false);
+                }}
+                placeholder="Seleccionar proveedor o empleado…"
+                searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
+                emptyText="Ningún proveedor o empleado coincide."
+                popoverWidth="wide"
+              />
             )}
           </div>
 
           {showLetter ? (
             <InvoiceLetterSelect
               id="invoiceLetter"
+              className="sm:col-span-2"
               value={invoiceLetter}
               required
               onValueChange={(v) => {
@@ -560,32 +547,42 @@ export function SupplierInvoiceForm({
             />
           ) : null}
 
+          <div className="space-y-1 sm:col-span-3">
+            <Label htmlFor="issueDate">Fecha de emisión</Label>
+            <Input id="issueDate" name="issueDate" type="date" required />
+          </div>
+          <div className="space-y-1 sm:col-span-3">
+            <Label htmlFor="dueDate">Fecha de vencimiento</Label>
+            <Input id="dueDate" name="dueDate" type="date" required />
+          </div>
+
           {Boolean(projectId) && !companyFinanzas ? (
             <>
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-3">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <Label>Imputación de costo</Label>
                   <DocumentClassCreateHint
                     variant="inline"
+                    showPrefix={false}
                     classLabel={derivedClass.classLabel}
                     classFamily={derivedClass.family}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">{classHint}</p>
                 <div
-                  className="inline-flex flex-wrap rounded-md border bg-muted/30 p-0.5"
+                  className="inline-flex flex-wrap rounded-md border border-border bg-muted/40 p-1"
                   role="group"
                   aria-label="Contra OC o costo directo"
                 >
                   <button
                     type="button"
                     disabled={isPending}
+                    aria-pressed={apSpendMode === "AGAINST_PO"}
                     onClick={() => selectApSpendMode("AGAINST_PO")}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      "rounded-md px-3 py-1.5 text-sm transition-colors",
                       apSpendMode === "AGAINST_PO"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                        : "font-medium text-muted-foreground hover:bg-background/80 hover:text-foreground",
                     )}
                   >
                     Contra orden de compra
@@ -593,23 +590,19 @@ export function SupplierInvoiceForm({
                   <button
                     type="button"
                     disabled={isPending}
+                    aria-pressed={apSpendMode === "DIRECT"}
                     onClick={() => selectApSpendMode("DIRECT")}
                     className={cn(
-                      "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                      "rounded-md px-3 py-1.5 text-sm transition-colors",
                       apSpendMode === "DIRECT"
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
+                        ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                        : "font-medium text-muted-foreground hover:bg-background/80 hover:text-foreground",
                     )}
                   >
                     Costo directo
                   </button>
                 </div>
-                {apSpendMode === "DIRECT" ? (
-                  <p className="text-xs text-muted-foreground">
-                    No reduce el comprometido de una OC. Si el monto supera el umbral de la empresa,
-                    puede requerir OC o permiso de aprobación AP.
-                  </p>
-                ) : filteredPOs.length === 0 ? (
+                {apSpendMode === "DIRECT" ? null : filteredPOs.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
                     No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
                   </p>
@@ -630,6 +623,7 @@ export function SupplierInvoiceForm({
               </div>
               <PricesIncludeTaxCheckbox
                 compact
+                className="sm:col-span-3"
                 checked={pricesIncludeTax}
                 onCheckedChange={(v) => {
                   setPricesIncludeTaxTouched(true);
@@ -639,16 +633,20 @@ export function SupplierInvoiceForm({
             </>
           ) : (
             <>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-3">
                 <DocumentClassCreateHint
                   variant="inline"
+                  showPrefix={false}
                   classLabel={derivedClass.classLabel}
                   classFamily={derivedClass.family}
                 />
-                <p className="text-xs text-muted-foreground">{classHint}</p>
+                {classHint ? (
+                  <p className="text-xs text-muted-foreground">{classHint}</p>
+                ) : null}
               </div>
               <PricesIncludeTaxCheckbox
                 compact
+                className="sm:col-span-3"
                 checked={pricesIncludeTax}
                 onCheckedChange={(v) => {
                   setPricesIncludeTaxTouched(true);
@@ -657,15 +655,6 @@ export function SupplierInvoiceForm({
               />
             </>
           )}
-
-          <div className="space-y-1">
-            <Label htmlFor="issueDate">Fecha de emisión</Label>
-            <Input id="issueDate" name="issueDate" type="date" required />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="dueDate">Fecha de vencimiento</Label>
-            <Input id="dueDate" name="dueDate" type="date" required />
-          </div>
         </div>
 
         {supportsPoPreview && purchaseOrderId && (

@@ -24,8 +24,8 @@ import { classifySupplierInvoice } from "@bloqer/domain";
 import {
   addDecimal,
   calcDocumentHeaderTaxTotals,
-  calcExclusiveLineAmounts,
   compareDecimal,
+  resolveDocumentLineAmounts,
   roundMoney,
 } from "@bloqer/utils";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
@@ -35,8 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions, withNoneOption } from "@/lib/searchable-options";
-import { AP_PAYEE_PICKER_HINT } from "../lib/ap-payee-options";
+import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions } from "@/lib/searchable-options";
 
 interface Props {
   /** Required when `companyFinanzas` is false */
@@ -172,14 +171,8 @@ export function SupplierInvoiceEditForm({
     (po) => !supplierContactId || po.supplierContactId === supplierContactId,
   );
   const poComboboxOptions = useMemo(
-    () =>
-      apSpendMode === "AGAINST_PO"
-        ? toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code })))
-        : withNoneOption(
-            toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
-            { label: "Sin OC vinculada" },
-          ),
-    [filteredPOs, apSpendMode],
+    () => toSearchableOptions(filteredPOs.map((po) => ({ id: po.id, label: po.code }))),
+    [filteredPOs],
   );
 
   useEffect(() => {
@@ -191,24 +184,47 @@ export function SupplierInvoiceEditForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierContactId]);
 
+  // Mirror create form: re-suggest letter/tax when payee changes and user has not overridden.
+  useEffect(() => {
+    if (payeeLocked || !supplierContactId || letterTouched) return;
+    const suggested = suggestInvoiceLetter({
+      issuerIvaCondition: (selectedSupplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
+      receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
+      receiverCountry: companyCountry,
+    });
+    setInvoiceLetter(suggested);
+    if (!suggested) return;
+    const nextRate = defaultTaxRateForInvoiceLetter(suggested);
+    setLines((prev) =>
+      prev.map((l) => ({
+        ...l,
+        taxRate:
+          suggested === "C" || suggested === "E"
+            ? "0"
+            : isZeroIvaRate(l.taxRate)
+              ? nextRate
+              : l.taxRate,
+      })),
+    );
+  }, [
+    payeeLocked,
+    supplierContactId,
+    selectedSupplier,
+    companyIvaCondition,
+    companyCountry,
+    letterTouched,
+  ]);
+
   function handleSupplierChange(id: string) {
     if (payeeLocked) return;
     setSupplierContactId(id);
-    if (letterTouched) return;
-    const supplier = suppliers.find((s) => s.id === id);
-    setInvoiceLetter(
-      suggestInvoiceLetter({
-        issuerIvaCondition: (supplier?.ivaCondition as IvaConditionCode | null | undefined) ?? null,
-        receiverIvaCondition: (companyIvaCondition as IvaConditionCode | null) ?? null,
-        receiverCountry: companyCountry,
-      }),
-    );
+    setLetterTouched(false);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (showLetter && !invoiceLetter) {
-      setError("Seleccioná la letra del comprobante (A, B, C o E) antes de guardar");
+      setError("Seleccioná el comprobante (A, B, C o E) antes de guardar");
       return;
     }
     if (lines.some((l) => !l.description.trim() || !l.quantity || !l.unitPrice)) {
@@ -230,17 +246,19 @@ export function SupplierInvoiceEditForm({
       return;
     }
     const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
+    const pricesIncludeTaxPayload = forceZeroTax ? false : pricesIncludeTax;
     const iibbForSave = isCreditNote ? "0" : iibbPerceptionRate;
     if (isCreditNote && maxCreditAmount) {
       try {
         let subtotal = "0";
         let taxAmount = "0";
         for (const line of lines) {
-          const amounts = calcExclusiveLineAmounts({
+          const amounts = resolveDocumentLineAmounts({
             quantity: line.quantity || "0",
-            unitPriceNet: line.unitPrice || "0",
+            unitPrice: line.unitPrice || "0",
             taxRatePercent: forceZeroTax ? "0" : line.taxRate || "0",
             discountPct: line.discountPct || "0",
+            pricesIncludeTax: pricesIncludeTaxPayload,
           });
           subtotal = roundMoney(addDecimal(subtotal, amounts.lineSubtotal));
           taxAmount = roundMoney(addDecimal(taxAmount, amounts.lineTax));
@@ -262,22 +280,31 @@ export function SupplierInvoiceEditForm({
       }
     }
     const fd = new FormData(e.currentTarget);
+    const clearPoLink = !payeeLocked && (companyFinanzas || apSpendMode === "DIRECT");
     const payload = {
       supplierContactId: payeeLocked ? invoice.supplierContactId : supplierContactId,
       issueDate:       fd.get("issueDate") as string,
       dueDate:         fd.get("dueDate")   as string,
-      // Only patch letter when AR gating is known; avoid wiping on failed country load.
-      ...(showLetter ? { invoiceLetter } : {}),
-      pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
+      // Clear letter when AR gate is off (foreign supplier / non-AR company).
+      invoiceLetter: showLetter ? invoiceLetter : null,
+      pricesIncludeTax: pricesIncludeTaxPayload,
       notes:           (fd.get("notes") as string) || null,
-      purchaseOrderId: companyFinanzas || apSpendMode === "DIRECT" ? null : purchaseOrderId ?? null,
+      // Fiscal notes / certification: never rewrite PO linkage from the DIRECT UI path.
+      ...(payeeLocked
+        ? {}
+        : {
+            purchaseOrderId: clearPoLink ? null : purchaseOrderId ?? null,
+          }),
       iibbPerceptionRate: iibbForSave,
       lines:           lines.map((l, i) => ({
         ...l,
         taxRate: forceZeroTax ? "0" : l.taxRate,
         wbsNodeId: companyFinanzas ? null : l.wbsNodeId,
-        purchaseOrderLineId:
-          companyFinanzas || apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
+        purchaseOrderLineId: payeeLocked
+          ? l.purchaseOrderLineId
+          : clearPoLink
+            ? null
+            : l.purchaseOrderLineId,
         sortOrder: i,
       })),
     };
@@ -303,9 +330,7 @@ export function SupplierInvoiceEditForm({
       ? "Nota vinculada a la factura de referencia; el proveedor no se cambia."
       : companyFinanzas || !projectId
         ? "Gasto de estructura (sin obra)."
-        : apSpendMode === "AGAINST_PO"
-          ? "Baja el comprometido abierto de esa OC."
-          : "No reduce el comprometido. Imputá partida y tipo de costo.";
+        : null;
 
   return (
     <div className="rounded-lg border bg-card p-5 sm:p-6">
@@ -314,8 +339,8 @@ export function SupplierInvoiceEditForm({
           <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className={cn("space-y-1", !showLetter && "sm:col-span-2")}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+          <div className={cn("space-y-1", showLetter ? "sm:col-span-4" : "sm:col-span-6")}>
             <Label>A quién se le paga</Label>
             <SearchableCombobox
               options={toSearchableOptions(suppliers)}
@@ -333,14 +358,13 @@ export function SupplierInvoiceEditForm({
                   ? "Esta factura nace de una certificación de subcontrato; el destinatario no se cambia acá."
                   : "El proveedor viene de la factura de referencia y no se cambia acá."}
               </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">{AP_PAYEE_PICKER_HINT}</p>
-            )}
+            ) : null}
           </div>
 
           {showLetter ? (
             <InvoiceLetterSelect
               id="invoiceLetter"
+              className="sm:col-span-2"
               value={invoiceLetter}
               required
               onValueChange={(v) => {
@@ -367,34 +391,54 @@ export function SupplierInvoiceEditForm({
             />
           ) : null}
 
+          <div className="space-y-1 sm:col-span-3">
+            <Label htmlFor="issueDate">Fecha de emisión</Label>
+            <Input
+              id="issueDate" name="issueDate" type="date" required
+              defaultValue={toDateStr(invoice.issueDate)}
+            />
+          </div>
+          <div className="space-y-1 sm:col-span-3">
+            <Label htmlFor="dueDate">Fecha de vencimiento</Label>
+            <Input
+              id="dueDate" name="dueDate" type="date" required
+              defaultValue={toDateStr(invoice.dueDate)}
+            />
+          </div>
+
           {!companyFinanzas && projectId ? (
             <>
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-3">
                 <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                   <Label>Imputación de costo</Label>
                   <DocumentClassCreateHint
                     variant="inline"
+                    showPrefix={false}
                     classLabel={derivedClass.classLabel}
                     classFamily={derivedClass.family}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">{classHint}</p>
-                {payeeLocked ? null : (
+                {payeeLocked ? (
+                  classHint ? (
+                    <p className="text-xs text-muted-foreground">{classHint}</p>
+                  ) : null
+                ) : (
                   <>
                     <div
-                      className="inline-flex flex-wrap rounded-md border bg-muted/30 p-0.5"
+                      className="inline-flex flex-wrap rounded-md border border-border bg-muted/40 p-1"
                       role="group"
                       aria-label="Contra OC o costo directo"
                     >
                       <button
                         type="button"
                         disabled={isPending}
+                        aria-pressed={apSpendMode === "AGAINST_PO"}
                         onClick={() => selectApSpendMode("AGAINST_PO")}
                         className={cn(
-                          "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                          "rounded-md px-3 py-1.5 text-sm transition-colors",
                           apSpendMode === "AGAINST_PO"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                            : "font-medium text-muted-foreground hover:bg-background/80 hover:text-foreground",
                         )}
                       >
                         Contra orden de compra
@@ -402,18 +446,23 @@ export function SupplierInvoiceEditForm({
                       <button
                         type="button"
                         disabled={isPending}
+                        aria-pressed={apSpendMode === "DIRECT"}
                         onClick={() => selectApSpendMode("DIRECT")}
                         className={cn(
-                          "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                          "rounded-md px-3 py-1.5 text-sm transition-colors",
                           apSpendMode === "DIRECT"
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground hover:text-foreground",
+                            ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                            : "font-medium text-muted-foreground hover:bg-background/80 hover:text-foreground",
                         )}
                       >
                         Costo directo
                       </button>
                     </div>
-                    {apSpendMode === "AGAINST_PO" && (
+                    {apSpendMode === "DIRECT" ? null : filteredPOs.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        No hay OC confirmadas para este proveedor. Cambiá el payee o usá costo directo.
+                      </p>
+                    ) : (
                       <div className="space-y-1">
                         <Label>Orden de compra</Label>
                         <SearchableCombobox
@@ -432,6 +481,7 @@ export function SupplierInvoiceEditForm({
               </div>
               <PricesIncludeTaxCheckbox
                 compact
+                className="sm:col-span-3"
                 checked={pricesIncludeTax}
                 onCheckedChange={setPricesIncludeTax}
                 editModeHint
@@ -439,37 +489,26 @@ export function SupplierInvoiceEditForm({
             </>
           ) : (
             <>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 sm:col-span-3">
                 <DocumentClassCreateHint
                   variant="inline"
+                  showPrefix={false}
                   classLabel={derivedClass.classLabel}
                   classFamily={derivedClass.family}
                 />
-                <p className="text-xs text-muted-foreground">{classHint}</p>
+                {classHint ? (
+                  <p className="text-xs text-muted-foreground">{classHint}</p>
+                ) : null}
               </div>
               <PricesIncludeTaxCheckbox
                 compact
+                className="sm:col-span-3"
                 checked={pricesIncludeTax}
                 onCheckedChange={setPricesIncludeTax}
                 editModeHint
               />
             </>
           )}
-
-          <div className="space-y-1">
-            <Label htmlFor="issueDate">Fecha de emisión</Label>
-            <Input
-              id="issueDate" name="issueDate" type="date" required
-              defaultValue={toDateStr(invoice.issueDate)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="dueDate">Fecha de vencimiento</Label>
-            <Input
-              id="dueDate" name="dueDate" type="date" required
-              defaultValue={toDateStr(invoice.dueDate)}
-            />
-          </div>
         </div>
 
         <div className="border-t border-border/60 pt-4">
