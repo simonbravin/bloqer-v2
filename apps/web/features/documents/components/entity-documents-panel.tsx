@@ -16,6 +16,10 @@ import {
   isImageLikeDocument,
 } from "../lib/document-file-utils";
 import { DocumentThumbnail } from "./document-thumbnail";
+import {
+  DocumentImageGalleryProvider,
+  useDocumentImageGallery,
+} from "./document-image-gallery-provider";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
   Table,
@@ -128,6 +132,7 @@ function EntityDocumentMobileList({
   emptyMessage: string;
   mutationOpts: { isCompany: boolean; projectId: string | null; revalidateExtra: string[] };
 }) {
+  const gallery = useDocumentImageGallery();
   if (docs.length === 0) {
     return <ListEmptyState message={emptyMessage} />;
   }
@@ -138,12 +143,20 @@ function EntityDocumentMobileList({
         const showThumb =
           canAccessDocumentFile(doc) &&
           isImageLikeDocument(doc.mimeType, doc.originalFileName);
+        const openGallery =
+          gallery != null && gallery.canOpenInGallery(doc.id)
+            ? () => gallery.openAt(doc.id)
+            : undefined;
 
         return (
           <li key={doc.id} className="rounded-lg border bg-card p-3 space-y-2">
             <div className="flex items-center gap-3">
               {showThumb ? (
-                <DocumentThumbnail documentId={doc.id} />
+                <DocumentThumbnail
+                  documentId={doc.id}
+                  alt={doc.originalFileName}
+                  onClick={openGallery}
+                />
               ) : (
                 <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-md bg-muted">
                   <FileText className="h-5 w-5 text-muted-foreground" aria-hidden />
@@ -366,113 +379,115 @@ export function EntityDocumentsPanel({
     : "También visibles en la biblioteca de documentos del proyecto.";
 
   return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold">Adjuntos</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+    <DocumentImageGalleryProvider docs={docs}>
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold">Adjuntos</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+          </div>
+          {canEdit && (
+            <DocumentUploadDialog
+              projectId={projectIdForForm}
+              storageConfigured={storageConfigured}
+              linkedEntity={linkedEntity}
+              defaultCategory={defaultCategory}
+              afterUploadPath={afterUploadPath}
+              revalidatePaths={revalidateExtra}
+              triggerLabel="Adjuntar"
+              title="Adjuntar archivo"
+              description={uploadHint ?? undefined}
+              submitLabel="Subir adjunto"
+              placeholderWarning="El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."
+            />
+          )}
         </div>
-        {canEdit && (
-          <DocumentUploadDialog
-            projectId={projectIdForForm}
-            storageConfigured={storageConfigured}
-            linkedEntity={linkedEntity}
-            defaultCategory={defaultCategory}
-            afterUploadPath={afterUploadPath}
-            revalidatePaths={revalidateExtra}
-            triggerLabel="Adjuntar"
-            title="Adjuntar archivo"
-            description={uploadHint ?? undefined}
-            submitLabel="Subir adjunto"
-            placeholderWarning="El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."
-          />
+
+        {!storageConfigured ? (
+          <div
+            role="note"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"
+          >
+            Almacenamiento no configurado: las nuevas subidas quedarán como{" "}
+            <strong>Archivo no almacenado</strong> (solo metadata).
+          </div>
+        ) : null}
+
+        {docs.length === 0 ? (
+          <ListEmptyState message={emptyMessage} />
+        ) : (
+          <>
+            <EntityDocumentMobileList
+              docs={docs}
+              projectId={projectIdForTable}
+              emptyMessage={emptyMessage}
+              mutationOpts={{ isCompany, projectId: projectIdForTable, revalidateExtra }}
+            />
+            <TableScroll className="hidden md:block">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="h-9">Archivo</TableHead>
+                    <TableHead className="h-9">Categoría</TableHead>
+                    <TableHead className="h-9">Estado</TableHead>
+                    <TableHead className="h-9">Tamaño</TableHead>
+                    <TableHead className="h-9">Fecha</TableHead>
+                    <TableHead className="h-9 w-px text-right">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {docs.map((doc) => {
+                    const mutations = getAttachmentMutations(doc, {
+                      isCompany,
+                      projectId: projectIdForTable,
+                      revalidateExtra,
+                    });
+                    return (
+                      <TableRow key={doc.id}>
+                        <TableCell className="py-1.5">
+                          {projectIdForTable ? (
+                            <Link
+                              href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
+                              className="font-medium hover:underline underline-offset-2"
+                            >
+                              {doc.originalFileName}
+                            </Link>
+                          ) : (
+                            <span className="font-medium">{doc.originalFileName}</span>
+                          )}
+                          {doc.description && (
+                            <p className="mt-0.5 max-w-[200px] truncate text-xs text-muted-foreground">
+                              {doc.description}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <DocumentCategoryBadge category={doc.category} />
+                        </TableCell>
+                        <TableCell className="py-1.5">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <DocumentStatusBadge status={doc.status} />
+                            <DocumentStorageBadge storageProvider={doc.storageProvider} />
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-1.5 text-xs tabular-nums text-muted-foreground">
+                          {fmtSize(doc.sizeBytes)}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap py-1.5 text-xs text-muted-foreground">
+                          {fmtDate(doc.createdAt)}
+                        </TableCell>
+                        <TableCell className="w-px py-1.5 text-right">
+                          <AttachmentActionsRow doc={doc} mutations={mutations} />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableScroll>
+          </>
         )}
       </div>
-
-      {!storageConfigured ? (
-        <div
-          role="note"
-          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"
-        >
-          Almacenamiento no configurado: las nuevas subidas quedarán como{" "}
-          <strong>Archivo no almacenado</strong> (solo metadata).
-        </div>
-      ) : null}
-
-      {docs.length === 0 ? (
-        <ListEmptyState message={emptyMessage} />
-      ) : (
-        <>
-          <EntityDocumentMobileList
-            docs={docs}
-            projectId={projectIdForTable}
-            emptyMessage={emptyMessage}
-            mutationOpts={{ isCompany, projectId: projectIdForTable, revalidateExtra }}
-          />
-        <TableScroll className="hidden md:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="h-9">Archivo</TableHead>
-                <TableHead className="h-9">Categoría</TableHead>
-                <TableHead className="h-9">Estado</TableHead>
-                <TableHead className="h-9">Tamaño</TableHead>
-                <TableHead className="h-9">Fecha</TableHead>
-                <TableHead className="h-9 w-px text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {docs.map((doc) => {
-                const mutations = getAttachmentMutations(doc, {
-                  isCompany,
-                  projectId: projectIdForTable,
-                  revalidateExtra,
-                });
-                return (
-                  <TableRow key={doc.id}>
-                    <TableCell className="py-1.5">
-                      {projectIdForTable ? (
-                        <Link
-                          href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
-                          className="font-medium hover:underline underline-offset-2"
-                        >
-                          {doc.originalFileName}
-                        </Link>
-                      ) : (
-                        <span className="font-medium">{doc.originalFileName}</span>
-                      )}
-                      {doc.description && (
-                        <p className="mt-0.5 max-w-[200px] truncate text-xs text-muted-foreground">
-                          {doc.description}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <DocumentCategoryBadge category={doc.category} />
-                    </TableCell>
-                    <TableCell className="py-1.5">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <DocumentStatusBadge status={doc.status} />
-                        <DocumentStorageBadge storageProvider={doc.storageProvider} />
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-1.5 text-xs tabular-nums text-muted-foreground">
-                      {fmtSize(doc.sizeBytes)}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap py-1.5 text-xs text-muted-foreground">
-                      {fmtDate(doc.createdAt)}
-                    </TableCell>
-                    <TableCell className="w-px py-1.5 text-right">
-                      <AttachmentActionsRow doc={doc} mutations={mutations} />
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </TableScroll>
-        </>
-      )}
-    </div>
+    </DocumentImageGalleryProvider>
   );
 }

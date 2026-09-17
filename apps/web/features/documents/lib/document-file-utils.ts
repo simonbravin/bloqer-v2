@@ -71,3 +71,31 @@ export function canAccessDocumentFile(opts: {
     (opts.status === "ACTIVE" || opts.status === "ARCHIVED")
   );
 }
+
+/** Item shown in the in-app image gallery (jpeg/png/webp only). */
+export type DocumentGalleryItem = {
+  id: string;
+  fileName: string;
+};
+
+/**
+ * Filter attachments that can open in the in-app image gallery carousel.
+ * Requires R2 + ACTIVE/ARCHIVED and a raster MIME safe for `<img>`.
+ */
+export function toDocumentGalleryItems(
+  docs: Array<{
+    id: string;
+    originalFileName: string;
+    mimeType: string;
+    storageProvider: string;
+    status: string;
+  }>,
+): DocumentGalleryItem[] {
+  return docs
+    .filter(
+      (doc) =>
+        canAccessDocumentFile(doc) &&
+        canInlineImagePreview(doc.mimeType, doc.originalFileName),
+    )
+    .map((doc) => ({ id: doc.id, fileName: doc.originalFileName }));
+}

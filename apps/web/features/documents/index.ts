@@ -20,3 +20,6 @@ export { DocumentLibraryActions } from "./components/document-library-actions";
 export { DocumentMutateIconActions } from "./components/document-mutate-icon-actions";
 export { DocumentThumbnail } from "./components/document-thumbnail";
 export { DocumentInlineImagePreview } from "./components/document-inline-image-preview";
+export { DocumentDetailGalleryScope } from "./components/document-detail-gallery-scope";
+export { DocumentImageGalleryProvider } from "./components/document-image-gallery-provider";
+export { DocumentImageGallery } from "./components/document-image-gallery";

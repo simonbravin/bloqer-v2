@@ -8,6 +8,7 @@ import {
   DocumentStorageBadge,
   DocumentLibraryActions,
   DocumentInlineImagePreview,
+  DocumentDetailGalleryScope,
 } from "@/features/documents";
 import {
   canInlineImagePreview,
@@ -59,8 +60,8 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
 
   const linkedLabel = linkedEntityTypeLabelEs(doc.linkedEntityType);
 
-  return (
-    <PageShell variant="default" className="space-y-6" breadcrumbLabel={doc.originalFileName}>
+  const content = (
+    <>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h1 className="max-w-md truncate text-xl font-bold tracking-tight">
@@ -175,6 +176,24 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
           )}
         </dl>
       </div>
+    </>
+  );
+
+  return (
+    <PageShell variant="default" className="space-y-6" breadcrumbLabel={doc.originalFileName}>
+      {showInlineImage ? (
+        <DocumentDetailGalleryScope
+          documentId={documentId}
+          originalFileName={doc.originalFileName}
+          mimeType={doc.mimeType}
+          storageProvider={doc.storageProvider}
+          status={doc.status}
+        >
+          <div className="space-y-6">{content}</div>
+        </DocumentDetailGalleryScope>
+      ) : (
+        content
+      )}
     </PageShell>
   );
 }

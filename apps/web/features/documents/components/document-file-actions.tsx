@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   canAccessDocumentFile,
+  canInlineImagePreview,
   canPreviewInBrowser,
   documentDownloadHref,
 } from "../lib/document-file-utils";
+import { useDocumentImageGallery } from "./document-image-gallery-provider";
 
 const iconButtonClass = "h-7 w-7 shrink-0";
 const iconSvgClass = "h-3.5 w-3.5";
@@ -29,6 +31,7 @@ export function DocumentFileActions({
   status,
   className,
 }: DocumentFileActionsProps) {
+  const gallery = useDocumentImageGallery();
   const canAccess = canAccessDocumentFile({ storageProvider, status });
   if (!canAccess) {
     if (
@@ -54,21 +57,39 @@ export function DocumentFileActions({
   }
 
   const showView = canPreviewInBrowser(mimeType, originalFileName);
+  const openInGallery =
+    gallery != null &&
+    canInlineImagePreview(mimeType, originalFileName) &&
+    gallery.canOpenInGallery(documentId);
 
   return (
     <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
       {showView ? (
-        <Button variant="outline" size="icon" className={iconButtonClass} asChild>
-          <a
-            href={documentDownloadHref(documentId, "inline")}
-            target="_blank"
-            rel="noopener noreferrer"
+        openInGallery && gallery ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            className={iconButtonClass}
             aria-label="Ver"
             title="Ver"
+            onClick={() => gallery.openAt(documentId)}
           >
             <Eye className={iconSvgClass} aria-hidden />
-          </a>
-        </Button>
+          </Button>
+        ) : (
+          <Button variant="outline" size="icon" className={iconButtonClass} asChild>
+            <a
+              href={documentDownloadHref(documentId, "inline")}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Ver"
+              title="Ver"
+            >
+              <Eye className={iconSvgClass} aria-hidden />
+            </a>
+          </Button>
+        )
       ) : null}
       <Button variant="outline" size="icon" className={iconButtonClass} asChild>
         <a

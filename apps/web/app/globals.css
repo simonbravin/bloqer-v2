@@ -220,4 +220,31 @@
     @apply mt-2 text-center text-xs text-white/80;
     max-width: min(96vw, 48rem);
   }
+
+  .image-lightbox-caption-row {
+    @apply mt-3 flex max-w-[min(96vw,48rem)] flex-wrap items-center justify-center gap-x-3 gap-y-1.5 px-2 text-xs;
+  }
+
+  .image-lightbox-download {
+    @apply inline-flex items-center gap-1 rounded-md bg-background/90 px-2 py-1 text-xs font-medium text-foreground shadow-sm ring-1 ring-border transition-colors hover:bg-muted;
+  }
+
+  .image-lightbox-nav {
+    @apply fixed z-[60] inline-flex h-11 w-11 items-center justify-center rounded-full bg-background/90 text-foreground shadow-md ring-1 ring-border;
+    @apply transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  .image-lightbox-nav-prev {
+    left: max(0.5rem, env(safe-area-inset-left, 0px));
+  }
+
+  .image-lightbox-nav-next {
+    right: max(0.5rem, env(safe-area-inset-right, 0px));
+  }
+
+  .image-lightbox-error {
+    max-width: min(92vw, 24rem);
+  }
 }
