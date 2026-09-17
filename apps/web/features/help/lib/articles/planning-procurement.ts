@@ -312,7 +312,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Elegí una carpeta a la izquierda (o Todos). Las carpetas de sistema (Libro de Obra, OC, facturas…) se llenan solas con adjuntos de cada ficha.",
       "En Planos o General podés crear subcarpetas (p. ej. Arq, Est, Elect) desde el menú de la carpeta.",
       "Agregar documento solo aparece en Planos, General, sus subcarpetas o en Todos. Al subir, elegí el tipo (Contrato, Plano, Presupuesto, Cotización, etc.).",
-      "En Acciones: el ojo abre el archivo. En fotos jpeg/png/webp abre un visor a pantalla completa (flechas si hay varias en el listado); los PDF se abren en pestaña nueva. La descarga lo baja. El nombre abre el detalle (clic en la preview también amplía).",
+      "En Acciones: el ojo abre el archivo. En fotos jpeg/png/webp, clic en el nombre o en Ver abre un visor a pantalla completa (flechas si hay varias); los PDF se abren en pestaña nueva o desde el detalle. La descarga lo baja.",
       "En adjuntos de parte, OC o factura: mismos iconos de ver/descargar y archivar (mismo visor de fotos); esos no se eliminan.",
     ],
     pitfalls: [

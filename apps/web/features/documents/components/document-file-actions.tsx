@@ -58,8 +58,6 @@ export function DocumentFileActions({
 
   const showView = canPreviewInBrowser(mimeType, originalFileName);
   const isInlineImage = canInlineImagePreview(mimeType, originalFileName);
-  const openInGallery =
-    gallery != null && isInlineImage && gallery.canOpenInGallery(documentId);
 
   return (
     <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
@@ -73,10 +71,7 @@ export function DocumentFileActions({
             aria-label="Ver"
             title="Ver"
             onClick={() => {
-              if (openInGallery && gallery) {
-                gallery.openAt(documentId);
-                return;
-              }
+              if (gallery?.openAt(documentId)) return;
               window.open(
                 documentDownloadHref(documentId, "inline"),
                 "_blank",

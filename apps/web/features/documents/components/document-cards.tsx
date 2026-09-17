@@ -1,4 +1,5 @@
-import Link from "next/link";
+"use client";
+
 import { formatDate } from "@/lib/format";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { DocumentAttachmentView } from "@bloqer/services";
@@ -6,6 +7,7 @@ import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
 import { DocumentStorageBadge } from "./document-storage-badge";
 import { DocumentLibraryActions } from "./document-library-actions";
+import { DocumentGalleryFileName } from "./document-gallery-file-name";
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -31,13 +33,12 @@ export function DocumentCards({
           key={doc.id}
           className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
-          <Link
-            href={`/proyectos/${projectId}/documentos/${doc.id}`}
-            className="truncate font-semibold leading-snug hover:underline underline-offset-2"
-            title={doc.originalFileName}
-          >
-            {doc.originalFileName}
-          </Link>
+          <DocumentGalleryFileName
+            doc={doc}
+            projectId={projectId}
+            className="truncate font-semibold leading-snug"
+            titleAttr={doc.originalFileName}
+          />
           {doc.description ? (
             <p className="mt-1 truncate text-xs text-muted-foreground" title={doc.description}>
               {doc.description}

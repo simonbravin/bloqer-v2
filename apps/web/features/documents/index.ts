@@ -23,3 +23,4 @@ export { DocumentInlineImagePreview } from "./components/document-inline-image-p
 export { DocumentDetailGalleryScope } from "./components/document-detail-gallery-scope";
 export { DocumentImageGalleryProvider } from "./components/document-image-gallery-provider";
 export { DocumentImageGallery } from "./components/document-image-gallery";
+export { DocumentGalleryFileName } from "./components/document-gallery-file-name";

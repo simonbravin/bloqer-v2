@@ -1,5 +1,6 @@
+"use client";
+
 import { formatDate } from "@/lib/format";
-import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -13,22 +14,23 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
-import { DocumentStatusBadge }   from "./document-status-badge";
-import { DocumentStorageBadge }  from "./document-storage-badge";
+import { DocumentStatusBadge } from "./document-status-badge";
+import { DocumentStorageBadge } from "./document-storage-badge";
 import { DocumentLibraryActions } from "./document-library-actions";
+import { DocumentGalleryFileName } from "./document-gallery-file-name";
 
 function fmtDate(iso: string) {
   return formatDate(iso);
 }
 
 function fmtSize(bytes: number) {
-  if (bytes < 1024)        return `${bytes} B`;
+  if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 interface Props {
-  docs:      DocumentAttachmentView[];
+  docs: DocumentAttachmentView[];
   projectId: string;
 }
 
@@ -54,13 +56,12 @@ export function DocumentList({ docs, projectId }: Props) {
           {docs.map((doc) => (
             <TableRow key={doc.id}>
               <TableCell className={tableNameStackCellClass}>
-                <Link
-                  href={`/proyectos/${projectId}/documentos/${doc.id}`}
-                  className="block truncate font-medium hover:underline"
-                  title={doc.originalFileName}
-                >
-                  {doc.originalFileName}
-                </Link>
+                <DocumentGalleryFileName
+                  doc={doc}
+                  projectId={projectId}
+                  className="block truncate"
+                  titleAttr={doc.originalFileName}
+                />
                 {doc.description ? (
                   <p className="mt-0.5 truncate text-xs text-muted-foreground" title={doc.description}>
                     {doc.description}
@@ -76,7 +77,9 @@ export function DocumentList({ docs, projectId }: Props) {
                   <DocumentStorageBadge storageProvider={doc.storageProvider} />
                 </div>
               </TableCell>
-              <TableCell className="text-xs tabular-nums text-muted-foreground">{fmtSize(doc.sizeBytes)}</TableCell>
+              <TableCell className="text-xs tabular-nums text-muted-foreground">
+                {fmtSize(doc.sizeBytes)}
+              </TableCell>
               <TableCell className="text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>
               <TableCell className="w-px whitespace-nowrap text-right">
                 <DocumentLibraryActions doc={doc} projectId={projectId} />

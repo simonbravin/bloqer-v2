@@ -35,7 +35,9 @@ export function DocumentInlineImagePreview({ documentId, originalFileName }: Pro
     return (
       <button
         type="button"
-        onClick={() => gallery.openAt(documentId)}
+        onClick={() => {
+          gallery.openAt(documentId);
+        }}
         className="block w-full cursor-zoom-in overflow-hidden rounded-lg border bg-card p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label={`Ampliar imagen: ${originalFileName}`}
       >

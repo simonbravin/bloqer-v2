@@ -35,7 +35,6 @@ export function DocumentImageGallery({
   const current = count > 0 ? items[safeIndex]! : null;
   const hasNav = count > 1;
 
-  // If the list empties while open, close cleanly (keeps Radix scroll-lock teardown).
   useEffect(() => {
     if (open && count === 0) onOpenChange(false);
   }, [open, count, onOpenChange]);
@@ -69,15 +68,13 @@ export function DocumentImageGallery({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, hasNav, goPrev, goNext]);
 
-  // Stay mounted while open even if items briefly empty, so Dialog can close.
-  if (!open && !current) return null;
+  if (!open || !current) return null;
 
-  const src = current ? documentDownloadHref(current.id, "inline") : "";
-  const downloadHref = current ? documentDownloadHref(current.id, "attachment") : "";
-  const dialogOpen = open && current != null;
+  const src = documentDownloadHref(current.id, "inline");
+  const downloadHref = documentDownloadHref(current.id, "attachment");
 
   return (
-    <Dialog open={dialogOpen} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
         <DialogOverlay className="image-lightbox-overlay" />
         <DialogPrimitive.Content
@@ -86,19 +83,14 @@ export function DocumentImageGallery({
             if (event.target === event.currentTarget) onOpenChange(false);
           }}
         >
-          <DialogPrimitive.Title className="sr-only">
-            {current?.fileName ?? "Imagen"}
-          </DialogPrimitive.Title>
+          <DialogPrimitive.Title className="sr-only">{current.fileName}</DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
             {hasNav
               ? `Imagen ${safeIndex + 1} de ${count}. Usá las flechas para cambiar. Cerrar con Escape.`
               : "Imagen ampliada. Cerrar con Escape o el botón X."}
           </DialogPrimitive.Description>
 
-          <DialogPrimitive.Close
-            className="image-lightbox-close"
-            aria-label="Cerrar"
-          >
+          <DialogPrimitive.Close className="image-lightbox-close" aria-label="Cerrar">
             <X className="h-5 w-5" aria-hidden />
           </DialogPrimitive.Close>
 
@@ -129,57 +121,55 @@ export function DocumentImageGallery({
             </>
           ) : null}
 
-          {current ? (
-            <div className="image-lightbox-stage">
-              {failed ? (
-                <div
-                  role="note"
-                  className="image-lightbox-error rounded-lg border bg-background/95 px-6 py-8 text-center text-sm text-foreground shadow-lg"
-                >
-                  <p>
-                    No se puede previsualizar esta imagen. Usá{" "}
-                    <strong>Descargar</strong> para abrirla.
-                  </p>
-                  <Button asChild variant="outline" size="sm" className="mt-4">
-                    <a href={downloadHref}>
-                      <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-                      Descargar
-                    </a>
-                  </Button>
-                </div>
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element -- authenticated gallery preview
-                <img
-                  key={current.id}
-                  src={src}
-                  alt={current.fileName}
-                  className="image-lightbox-img"
-                  onError={() => setFailed(true)}
-                />
-              )}
-
-              <div className="image-lightbox-caption-row">
-                <span className="min-w-0 truncate text-white/80" title={current.fileName}>
-                  {current.fileName}
-                </span>
-                {hasNav ? (
-                  <span className="shrink-0 tabular-nums text-white/70">
-                    {safeIndex + 1} / {count}
-                  </span>
-                ) : null}
-                <a
-                  href={downloadHref}
-                  className="image-lightbox-download shrink-0"
-                  aria-label={`Descargar ${current.fileName}`}
-                  title="Descargar"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <Download className="h-3.5 w-3.5" aria-hidden />
-                  Descargar
-                </a>
+          <div className="image-lightbox-stage">
+            {failed ? (
+              <div
+                role="note"
+                className="image-lightbox-error rounded-lg border bg-background/95 px-6 py-8 text-center text-sm text-foreground shadow-lg"
+              >
+                <p>
+                  No se puede previsualizar esta imagen. Usá{" "}
+                  <strong>Descargar</strong> para abrirla.
+                </p>
+                <Button asChild variant="outline" size="sm" className="mt-4">
+                  <a href={downloadHref}>
+                    <Download className="mr-1.5 h-3.5 w-3.5" aria-hidden />
+                    Descargar
+                  </a>
+                </Button>
               </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- authenticated gallery preview
+              <img
+                key={current.id}
+                src={src}
+                alt={current.fileName}
+                className="image-lightbox-img"
+                onError={() => setFailed(true)}
+              />
+            )}
+
+            <div className="image-lightbox-caption-row">
+              <span className="min-w-0 truncate text-white/80" title={current.fileName}>
+                {current.fileName}
+              </span>
+              {hasNav ? (
+                <span className="shrink-0 tabular-nums text-white/70">
+                  {safeIndex + 1} / {count}
+                </span>
+              ) : null}
+              <a
+                href={downloadHref}
+                className="image-lightbox-download shrink-0"
+                aria-label={`Descargar ${current.fileName}`}
+                title="Descargar"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Download className="h-3.5 w-3.5" aria-hidden />
+                Descargar
+              </a>
             </div>
-          ) : null}
+          </div>
         </DialogPrimitive.Content>
       </DialogPortal>
     </Dialog>

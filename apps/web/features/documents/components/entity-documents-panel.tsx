@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FileText } from "lucide-react";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { formatDate } from "@/lib/format";
@@ -22,6 +21,7 @@ import {
   DocumentImageGalleryProvider,
   useDocumentImageGallery,
 } from "./document-image-gallery-provider";
+import { DocumentGalleryFileName } from "./document-gallery-file-name";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import {
   Table,
@@ -139,50 +139,9 @@ function AttachmentFileName({
   projectId: string | null;
   className?: string;
 }) {
-  const gallery = useDocumentImageGallery();
-  const isInlineImage =
-    canAccessDocumentFile(doc) &&
-    canInlineImagePreview(doc.mimeType, doc.originalFileName);
-
-  if (isInlineImage) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          if (gallery?.canOpenInGallery(doc.id)) {
-            gallery.openAt(doc.id);
-            return;
-          }
-          // Fallback: open the file itself, never the document detail page.
-          window.open(
-            documentDownloadHref(doc.id, "inline"),
-            "_blank",
-            "noopener,noreferrer",
-          );
-        }}
-        className={cn(
-          "max-w-full truncate text-left font-medium underline-offset-2 hover:underline cursor-zoom-in",
-          className,
-        )}
-        title="Ver imagen"
-      >
-        {doc.originalFileName}
-      </button>
-    );
-  }
-
-  if (projectId) {
-    return (
-      <Link
-        href={`/proyectos/${projectId}/documentos/${doc.id}`}
-        className={cn("font-medium underline-offset-2 hover:underline", className)}
-      >
-        {doc.originalFileName}
-      </Link>
-    );
-  }
-
-  return <span className={cn("font-medium", className)}>{doc.originalFileName}</span>;
+  return (
+    <DocumentGalleryFileName doc={doc} projectId={projectId} className={className} />
+  );
 }
 
 function EntityDocumentMobileList({
@@ -206,10 +165,16 @@ function EntityDocumentMobileList({
         const showThumb =
           canAccessDocumentFile(doc) &&
           isImageLikeDocument(doc.mimeType, doc.originalFileName);
-        const openGallery =
-          gallery != null && gallery.canOpenInGallery(doc.id)
-            ? () => gallery.openAt(doc.id)
-            : undefined;
+        const openGallery = canInlineImagePreview(doc.mimeType, doc.originalFileName)
+          ? () => {
+              if (gallery?.openAt(doc.id)) return;
+              window.open(
+                documentDownloadHref(doc.id, "inline"),
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }
+          : undefined;
 
         return (
           <li key={doc.id} className="rounded-lg border bg-card p-3 space-y-2">
