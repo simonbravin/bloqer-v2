@@ -13,6 +13,8 @@ import { DocumentFileActions } from "./document-file-actions";
 import { DocumentMutateIconActions } from "./document-mutate-icon-actions";
 import {
   canAccessDocumentFile,
+  canInlineImagePreview,
+  documentDownloadHref,
   isImageLikeDocument,
 } from "../lib/document-file-utils";
 import { DocumentThumbnail } from "./document-thumbnail";
@@ -124,6 +126,9 @@ function AttachmentActionsRow({
 /**
  * Image attachments open the in-panel gallery carousel; other files link to the
  * document detail page (when a project scope exists).
+ *
+ * Important: jpeg/png/webp must NEVER navigate to `/documentos/[id]` from this
+ * panel — that was the confusing UX (full page instead of popup).
  */
 function AttachmentFileName({
   doc,
@@ -135,13 +140,26 @@ function AttachmentFileName({
   className?: string;
 }) {
   const gallery = useDocumentImageGallery();
-  const openInGallery = gallery != null && gallery.canOpenInGallery(doc.id);
+  const isInlineImage =
+    canAccessDocumentFile(doc) &&
+    canInlineImagePreview(doc.mimeType, doc.originalFileName);
 
-  if (openInGallery && gallery) {
+  if (isInlineImage) {
     return (
       <button
         type="button"
-        onClick={() => gallery.openAt(doc.id)}
+        onClick={() => {
+          if (gallery?.canOpenInGallery(doc.id)) {
+            gallery.openAt(doc.id);
+            return;
+          }
+          // Fallback: open the file itself, never the document detail page.
+          window.open(
+            documentDownloadHref(doc.id, "inline"),
+            "_blank",
+            "noopener,noreferrer",
+          );
+        }}
         className={cn(
           "max-w-full truncate text-left font-medium underline-offset-2 hover:underline cursor-zoom-in",
           className,

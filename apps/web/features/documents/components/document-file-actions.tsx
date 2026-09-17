@@ -57,15 +57,14 @@ export function DocumentFileActions({
   }
 
   const showView = canPreviewInBrowser(mimeType, originalFileName);
+  const isInlineImage = canInlineImagePreview(mimeType, originalFileName);
   const openInGallery =
-    gallery != null &&
-    canInlineImagePreview(mimeType, originalFileName) &&
-    gallery.canOpenInGallery(documentId);
+    gallery != null && isInlineImage && gallery.canOpenInGallery(documentId);
 
   return (
     <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
       {showView ? (
-        openInGallery && gallery ? (
+        isInlineImage ? (
           <Button
             type="button"
             variant="outline"
@@ -73,7 +72,17 @@ export function DocumentFileActions({
             className={iconButtonClass}
             aria-label="Ver"
             title="Ver"
-            onClick={() => gallery.openAt(documentId)}
+            onClick={() => {
+              if (openInGallery && gallery) {
+                gallery.openAt(documentId);
+                return;
+              }
+              window.open(
+                documentDownloadHref(documentId, "inline"),
+                "_blank",
+                "noopener,noreferrer",
+              );
+            }}
           >
             <Eye className={iconSvgClass} aria-hidden />
           </Button>
