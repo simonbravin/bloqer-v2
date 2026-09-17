@@ -51,12 +51,7 @@ export function DocumentImageGalleryProvider({
   children: ReactNode;
 }) {
   const fingerprint = galleryDocsFingerprint(docs);
-  const items = useMemo(
-    () => toDocumentGalleryItems(docs),
-    // Fingerprint captures every field that affects gallery membership/order.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- docs read when fingerprint changes
-    [fingerprint],
-  );
+  const items = useMemo(() => toDocumentGalleryItems(docs), [docs, fingerprint]);
 
   const [open, setOpen] = useState(false);
   /** Prefer id over raw index so list mutations don't show the wrong photo. */

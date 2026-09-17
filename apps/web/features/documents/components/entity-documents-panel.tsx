@@ -121,6 +121,52 @@ function AttachmentActionsRow({
   );
 }
 
+/**
+ * Image attachments open the in-panel gallery carousel; other files link to the
+ * document detail page (when a project scope exists).
+ */
+function AttachmentFileName({
+  doc,
+  projectId,
+  className,
+}: {
+  doc: DocumentAttachmentView;
+  projectId: string | null;
+  className?: string;
+}) {
+  const gallery = useDocumentImageGallery();
+  const openInGallery = gallery != null && gallery.canOpenInGallery(doc.id);
+
+  if (openInGallery && gallery) {
+    return (
+      <button
+        type="button"
+        onClick={() => gallery.openAt(doc.id)}
+        className={cn(
+          "max-w-full truncate text-left font-medium underline-offset-2 hover:underline cursor-zoom-in",
+          className,
+        )}
+        title="Ver imagen"
+      >
+        {doc.originalFileName}
+      </button>
+    );
+  }
+
+  if (projectId) {
+    return (
+      <Link
+        href={`/proyectos/${projectId}/documentos/${doc.id}`}
+        className={cn("font-medium underline-offset-2 hover:underline", className)}
+      >
+        {doc.originalFileName}
+      </Link>
+    );
+  }
+
+  return <span className={cn("font-medium", className)}>{doc.originalFileName}</span>;
+}
+
 function EntityDocumentMobileList({
   docs,
   projectId,
@@ -139,7 +185,6 @@ function EntityDocumentMobileList({
   return (
     <ul className="space-y-2 md:hidden">
       {docs.map((doc) => {
-        const href = projectId ? `/proyectos/${projectId}/documentos/${doc.id}` : undefined;
         const showThumb =
           canAccessDocumentFile(doc) &&
           isImageLikeDocument(doc.mimeType, doc.originalFileName);
@@ -163,16 +208,11 @@ function EntityDocumentMobileList({
                 </div>
               )}
               <div className="min-w-0 flex-1">
-                {href ? (
-                  <Link
-                    href={href}
-                    className="block truncate text-sm font-medium hover:underline underline-offset-2"
-                  >
-                    {doc.originalFileName}
-                  </Link>
-                ) : (
-                  <p className="truncate text-sm font-medium">{doc.originalFileName}</p>
-                )}
+                <AttachmentFileName
+                  doc={doc}
+                  projectId={projectId}
+                  className="block w-full text-sm"
+                />
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <DocumentCategoryBadge category={doc.category} />
                 </div>
@@ -445,16 +485,7 @@ export function EntityDocumentsPanel({
                     return (
                       <TableRow key={doc.id}>
                         <TableCell className="py-1.5">
-                          {projectIdForTable ? (
-                            <Link
-                              href={`/proyectos/${projectIdForTable}/documentos/${doc.id}`}
-                              className="font-medium hover:underline underline-offset-2"
-                            >
-                              {doc.originalFileName}
-                            </Link>
-                          ) : (
-                            <span className="font-medium">{doc.originalFileName}</span>
-                          )}
+                          <AttachmentFileName doc={doc} projectId={projectIdForTable} />
                           {doc.description && (
                             <p className="mt-0.5 max-w-[200px] truncate text-xs text-muted-foreground">
                               {doc.description}

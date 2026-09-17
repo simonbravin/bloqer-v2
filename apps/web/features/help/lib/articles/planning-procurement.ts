@@ -249,7 +249,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Operación → Libro de obra → nuevo parte.",
       "Clima, cuadrilla, fotos. En Notas generales: viñetas, numeración o negrita para listar tareas o problemas. En avance: agregá una fila, elegí la partida EDT (% del día restante y cantidad se precargan). Si cambiás el % o la cantidad, el otro campo se alinea al presupuesto de la partida. En mano de obra, buscá el contacto por razón social o nombre fantasía.",
-      "En Adjuntos: iconos de ojo (ver), flecha (descargar) y caja (archivar). En fotos jpeg/png/webp, Ver abre un visor a pantalla completa; si hay varias, pasá con las flechas. Los PDF se abren en pestaña nueva. Los adjuntos del parte no se eliminan (son respaldo); si no los querés ver, archivá.",
+      "En Adjuntos: clic en el nombre de una foto jpeg/png/webp (o el ojo Ver / la miniatura) abre un visor a pantalla completa con carrusel si hay varias. PDF se abre en pestaña nueva. También hay flecha (descargar) y caja (archivar). Los adjuntos del parte no se eliminan (son respaldo); si no los querés ver, archivá.",
       "Enviar (SUBMITTED): el PM del Equipo de obra (y OWNER/ADMIN) reciben campana + email.",
       "Si te lo devuelven, corregí desde el enlace de la notificación.",
       "Desde el detalle: Exportar PDF (incluye fotos jpeg/png/webp si hay adjuntos).",

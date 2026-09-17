@@ -178,11 +178,11 @@
   }
 
   .image-lightbox-overlay {
-    @apply bg-black/85;
+    @apply z-[100] bg-black/85;
   }
 
   .image-lightbox-panel {
-    @apply fixed inset-0 z-50 flex flex-col items-center justify-center outline-none;
+    @apply fixed inset-0 z-[100] flex flex-col items-center justify-center outline-none;
     overscroll-behavior: contain;
     padding: 3.5rem 1rem 1.5rem;
     padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 3rem));
@@ -192,7 +192,7 @@
   }
 
   .image-lightbox-close {
-    @apply fixed inline-flex h-10 w-10 items-center justify-center rounded-full bg-background text-foreground shadow-md ring-1 ring-border;
+    @apply fixed z-[110] inline-flex h-10 w-10 items-center justify-center rounded-full bg-background text-foreground shadow-md ring-1 ring-border;
     @apply transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
     top: max(0.75rem, env(safe-area-inset-top, 0px));
     right: max(0.75rem, env(safe-area-inset-right, 0px));
@@ -230,7 +230,7 @@
   }
 
   .image-lightbox-nav {
-    @apply fixed z-[60] inline-flex h-11 w-11 items-center justify-center rounded-full bg-background/90 text-foreground shadow-md ring-1 ring-border;
+    @apply fixed z-[110] inline-flex h-11 w-11 items-center justify-center rounded-full bg-background text-foreground shadow-md ring-1 ring-border;
     @apply transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
     top: 50%;
     transform: translateY(-50%);

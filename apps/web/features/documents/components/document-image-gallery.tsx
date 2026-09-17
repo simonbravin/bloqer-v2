@@ -96,7 +96,7 @@ export function DocumentImageGallery({
           </DialogPrimitive.Description>
 
           <DialogPrimitive.Close
-            className="image-lightbox-close z-[60]"
+            className="image-lightbox-close"
             aria-label="Cerrar"
           >
             <X className="h-5 w-5" aria-hidden />
