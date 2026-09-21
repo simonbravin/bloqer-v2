@@ -69,6 +69,9 @@ export type ProjectFinanceBudgetSection = {
   /** Presupuesto aprobado o cerrado más reciente por número de versión, si hay datos. */
   latestApprovedBudgetName: string | null;
   latestApprovedBudgetVersion: number | null;
+  latestApprovedBudgetStatus: string | null;
+  /** APPROVED + CLOSED phases. The project sale total is their sum ([BR-BUD-003]). */
+  contractualBudgetCount: number;
   notes: string[];
 };
 
@@ -339,18 +342,22 @@ export async function getProjectFinanceOverview(
     const costControlLink = `${base}/control-costos`;
     let latestApprovedBudgetName: string | null = null;
     let latestApprovedBudgetVersion: number | null = null;
+    let latestApprovedBudgetStatus: string | null = null;
+    let contractualBudgetCount = 0;
     const budgetNotes: string[] = [];
 
     if (canBudgets) {
       try {
         const budgets = await listBudgetsByProject(projectId, ctx);
         const approved = budgets.filter((b) => b.status === "APPROVED" || b.status === "CLOSED");
+        contractualBudgetCount = approved.length;
         if (approved.length === 0) {
           budgetNotes.push("No hay presupuestos aprobados o cerrados para este proyecto.");
         } else {
           const pick = approved.reduce((a, b) => (a.versionNumber >= b.versionNumber ? a : b));
           latestApprovedBudgetName = pick.name;
           latestApprovedBudgetVersion = pick.versionNumber;
+          latestApprovedBudgetStatus = pick.status;
         }
       } catch {
         warnings.push({ module: "BUDGETS", section: "budget", reason: "NO_DATA" });
@@ -372,6 +379,8 @@ export async function getProjectFinanceOverview(
       costControlLink,
       latestApprovedBudgetName,
       latestApprovedBudgetVersion,
+      latestApprovedBudgetStatus,
+      contractualBudgetCount,
       notes:                     budgetNotes,
     };
   }

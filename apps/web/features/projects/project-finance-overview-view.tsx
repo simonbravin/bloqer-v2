@@ -168,7 +168,9 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
             <CardContent className="space-y-2 text-sm">
               {sections.budget.latestApprovedBudgetName != null ? (
                 <p>
-                  <span className="text-muted-foreground">Aprobado: </span>
+                  <span className="text-muted-foreground">
+                    {sections.budget.latestApprovedBudgetStatus === "CLOSED" ? "Cerrado: " : "Aprobado: "}
+                  </span>
                   <span className="font-medium">{sections.budget.latestApprovedBudgetName}</span>
                   {sections.budget.latestApprovedBudgetVersion != null ? (
                     <span className="text-muted-foreground"> (v{sections.budget.latestApprovedBudgetVersion})</span>
@@ -177,6 +179,11 @@ export function ProjectFinanceOverviewView({ overview }: { overview: ProjectFina
               ) : (
                 <p className="text-muted-foreground">Sin presupuesto aprobado.</p>
               )}
+              {sections.budget.contractualBudgetCount > 1 ? (
+                <p className="text-muted-foreground">
+                  El resumen de la obra suma el precio de venta de los {sections.budget.contractualBudgetCount} presupuestos aprobados o cerrados.
+                </p>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}

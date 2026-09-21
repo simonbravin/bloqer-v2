@@ -14,6 +14,7 @@ import { getCashFlowReport, type CashFlowReport } from "../treasury-reports/trea
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import { pickContractualBudgetCard } from "../budget/sum-contractual-budgets";
 import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 import { formatDashboardMoney } from "./dashboard-format";
 import {
@@ -306,7 +307,7 @@ function pushMoneyKpi(
   });
 }
 
-function pickLatestBudgetsPerProject(
+function contractualBudgetCardPerProject(
   rows: {
     projectId: string;
     totalSalePrice: Prisma.Decimal;
@@ -314,11 +315,22 @@ function pickLatestBudgetsPerProject(
     currency: string;
   }[],
 ): Map<string, { totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal; currency: string }> {
+  const grouped = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const list = grouped.get(row.projectId) ?? [];
+    list.push(row);
+    grouped.set(row.projectId, list);
+  }
+
   const map = new Map<string, { totalSalePrice: Prisma.Decimal; totalCost: Prisma.Decimal; currency: string }>();
-  for (const r of rows) {
-    if (!map.has(r.projectId)) {
-      map.set(r.projectId, { totalSalePrice: r.totalSalePrice, totalCost: r.totalCost, currency: r.currency });
-    }
+  for (const [projectId, list] of grouped) {
+    const summed = pickContractualBudgetCard(list);
+    if (!summed) continue;
+    map.set(projectId, {
+      totalSalePrice: summed.totalSalePrice,
+      totalCost: summed.totalCost,
+      currency: summed.currency,
+    });
   }
   return map;
 }
@@ -423,7 +435,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
           })
         : [];
 
-    const budgetByProject = pickLatestBudgetsPerProject(budgetRows);
+    const budgetByProject = contractualBudgetCardPerProject(budgetRows);
 
     // Tenant-wide "Presupuesto total (activos)" KPI removed: low signal on the home
     // panel and broke the 4-column KPI grid. Per-project amounts still show in the list below.

@@ -114,10 +114,14 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Se prellenan % económicos (GG, financiero, utilidad, IVA) y moneda del padre; editables.",
       "Armá la EDT/APU de la adenda (no se copia sola la EDT del padre).",
       "Enviá a revisión y aprobá cuando corresponda. El rótulo v{n} es presentación, no versionado contractual.",
+      "Para aprobar la adenda, cerrá antes el presupuesto que ya está Aprobado. En el Resumen, Presupuesto (venta) suma el precio de venta de todos los Aprobados y Cerrados.",
+    ],
+    effects: [
+      "Con la adenda Aprobada y el presupuesto anterior Cerrado, el KPI Presupuesto (venta) del Resumen y la fila Presupuesto (costo/venta, partida, capítulo) suman todas las fases de la misma moneda.",
     ],
     pitfalls: [
       "Contratos, adendas y órdenes de cambio formales aún no existen como módulo (§19).",
-      "Seguí teniendo un solo presupuesto APPROVED «activo» según las reglas de la obra.",
+      "Solo puede haber un presupuesto Aprobado a la vez. Un borrador no suma en el Resumen hasta aprobarse.",
     ],
     relatedSlugs: [
       "armar-presupuesto-edt-apu",
@@ -132,6 +136,8 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "orden de cambio",
       "parent budget",
       "crear adenda",
+      "presupuesto venta",
+      "suma presupuestos",
     ],
     guideRef: "§6.3 · §19",
   },

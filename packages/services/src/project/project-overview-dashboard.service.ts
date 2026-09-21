@@ -6,6 +6,7 @@ import { toIsoDateInTimeZone } from "@bloqer/utils";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { fmtDecimalEs, pushMoneyRowsKpi } from "../dashboard/kpi-helpers";
 import { listBudgetsByProject } from "../budget/budget.service";
+import { sumContractualBudgetsByCurrency } from "../budget/sum-contractual-budgets";
 import { computeBudgetSummaryKpis } from "../budget/budget-summary-kpis";
 import { getWbsTree } from "../budget/wbs.service";
 import { summarizeProjectBillingVsCollections } from "../ar/project-ar-summary.service";
@@ -222,8 +223,9 @@ export async function getProjectOverviewDashboard(
   const finance = await getProjectFinanceOverview(ctx, projectId, { gate });
 
   let budget: ProjectOverviewBudgetKpi | null = null;
-  let budgetPickId: string | null = null;
-  let budgetPickCurrency: string | null = null;
+  let insightBudgetIds: string[] = [];
+  let insightCurrency: string | null = null;
+  let insightMultiCurrency = false;
   const budgetsGate = gate.isEnabled("BUDGETS") && gate.isEnabled("PROJECTS");
   if (!gate.isEnabled("BUDGETS")) {
     sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "TENANT_MODULE_DISABLED" });
@@ -234,18 +236,29 @@ export async function getProjectOverviewDashboard(
   } else {
     try {
       const budgets = await listBudgetsByProject(projectId, ctx);
-      const approved = budgets.filter((b) => b.status === "APPROVED" || b.status === "CLOSED");
-      const pick =
-        approved.length === 0 ? null : approved.reduce((a, b) => (a.versionNumber >= b.versionNumber ? a : b));
-      const amountByCurrency: ProjectOverviewMoneyRow[] = pick
-        ? [{ currency: pick.currency, amount: serializeMoneyDecimal(pick.totalSalePrice) }]
-        : [];
-      budgetPickId = pick?.id ?? null;
-      budgetPickCurrency = pick?.currency ?? null;
+      const contractual = budgets.filter((b) => b.status === "APPROVED" || b.status === "CLOSED");
+      const sums = sumContractualBudgetsByCurrency(
+        contractual.map((b) => ({
+          currency: b.currency,
+          totalSalePrice: b.totalSalePrice,
+          totalCost: b.totalCost,
+        })),
+      );
+      const amountByCurrency: ProjectOverviewMoneyRow[] = sums.map((s) => ({
+        currency: s.currency,
+        amount: serializeMoneyDecimal(s.totalSalePrice),
+      }));
+      const currencies = new Set(contractual.map((b) => b.currency));
+      insightMultiCurrency = currencies.size > 1;
+      if (!insightMultiCurrency && contractual.length > 0) {
+        insightBudgetIds = contractual.map((b) => b.id);
+        insightCurrency = contractual[0]!.currency;
+      }
+      const sole = contractual.length === 1 ? contractual[0] : null;
       budget = {
         amountByCurrency,
-        status: pick?.status ?? null,
-        href: pick ? `${base}/presupuestos/${pick.id}` : `${base}/presupuestos`,
+        status: sole?.status ?? null,
+        href: sole ? `${base}/presupuestos/${sole.id}` : `${base}/presupuestos`,
       };
     } catch {
       sectionsExcluded.push({ module: "BUDGETS", section: "budget", reason: "MISSING_PERMISSION" });
@@ -612,8 +625,9 @@ export async function getProjectOverviewDashboard(
   const budgetHref = budget?.href ?? `${base}/presupuestos`;
   const budgetInsightKpis = canBudgetInsights
     ? await buildBudgetInsightKpis({
-        budgetId: budgetPickId,
-        currency: budgetPickCurrency,
+        budgetIds: insightBudgetIds,
+        currency: insightCurrency,
+        multiCurrency: insightMultiCurrency,
         href: budgetHref,
         ctx,
       })
@@ -649,8 +663,9 @@ export async function getProjectOverviewDashboard(
 }
 
 async function buildBudgetInsightKpis(args: {
-  budgetId: string | null;
+  budgetIds: string[];
   currency: string | null;
+  multiCurrency: boolean;
   href: string;
   ctx: ServiceContext;
 }): Promise<DashboardKpi[]> {
@@ -659,7 +674,9 @@ async function buildBudgetInsightKpis(args: {
       key: "budget_cost_to_sale",
       label: "Costo / venta",
       value: "—",
-      helper: "Presupuesto aprobado o cerrado",
+      helper: args.multiCurrency
+        ? "Hay fases en más de una moneda"
+        : "Presupuesto aprobado o cerrado",
       href: args.href,
       tone: "muted",
     },
@@ -686,12 +703,14 @@ async function buildBudgetInsightKpis(args: {
     },
   ];
 
-  if (!args.budgetId || !args.currency) return empty;
+  if (args.budgetIds.length === 0 || !args.currency) return empty;
 
   try {
-    const tree = await getWbsTree(args.budgetId, args.ctx);
-    const k = computeBudgetSummaryKpis(tree);
+    const trees = await Promise.all(args.budgetIds.map((id) => getWbsTree(id, args.ctx)));
+    const k = computeBudgetSummaryKpis(trees.flat());
     const currency = args.currency;
+    const phaseHelper =
+      args.budgetIds.length > 1 ? "Suma de las fases aprobadas y cerradas" : undefined;
 
     return [
       {
@@ -699,7 +718,9 @@ async function buildBudgetInsightKpis(args: {
         label: "Costo / venta",
         value:
           k.costToSalePct != null ? formatWbsIncidencePercent(k.costToSalePct) : "—",
-        helper: "Costo directo sobre precio de venta",
+        helper: phaseHelper
+          ? `Costo directo sobre precio de venta. ${phaseHelper}.`
+          : "Costo directo sobre precio de venta",
         href: args.href,
         tone: k.costToSalePct == null ? "muted" : "default",
       },

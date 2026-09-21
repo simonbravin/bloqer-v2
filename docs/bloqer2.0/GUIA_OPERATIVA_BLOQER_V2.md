@@ -765,6 +765,7 @@ stateDiagram-v2
 - Cambio contractual hoy = **adenda operativa**: nuevo presupuesto con vínculo opcional `parentBudgetId` al APPROVED/CLOSED (UI: **Crear adenda / fase**). No copia la EDT sola.
 - Al crear la adenda se **prellenan** los % económicos (GG, financiero, utilidad, IVA) y la moneda del presupuesto padre; son editables.
 - El rótulo `v{n}` en UI es numeración de presentación, no versionado contractual.
+- En el **Resumen** de la obra (`/proyectos/[id]`), el KPI **Presupuesto (venta)** es la suma del precio de venta de todos los presupuestos `APPROVED` y `CLOSED` de la misma moneda. La fila **Presupuesto** (costo/venta, partida, capítulo, categoría) usa la misma base. Si hay más de una moneda, el monto dice **Multimoneda** y esa fila no mezcla cifras. Un borrador no entra hasta que se aprueba. Solo puede haber un `APPROVED` a la vez: para aprobar la adenda hay que **Cerrar** el anterior; el cerrado sigue sumando. En el inicio de la empresa, el monto de cada obra usa la misma suma; si las fases no comparten moneda, ese monto no se muestra.
 - **Contratos, adendas y órdenes de cambio como entidades formales no están implementados** (ver §19).
 
 ---
