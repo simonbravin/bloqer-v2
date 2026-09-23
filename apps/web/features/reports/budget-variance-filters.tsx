@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/select";
 import type { AvailableBudget, CostVarianceLayer } from "@bloqer/services";
 import {
+  budgetFilterOptionLabel,
+  defaultContractualBudgetId,
+} from "@/features/budgets/components/budget-status-badge";
+import {
   REPORT_FILTER_CONTROL_CLASS,
   REPORT_FILTER_FIELD_CLASS,
   REPORT_FILTER_FORM_CLASS,
@@ -62,15 +66,18 @@ export function BudgetVarianceFilters({ budgets, currentBudgetId, currentLayer =
       {budgets.length > 1 && (
         <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs">Presupuesto</Label>
-          <Select name="budgetId" defaultValue={currentBudgetId ?? "__all__"}>
-            <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-52`}>
+          <Select
+            key={currentBudgetId ?? "principal"}
+            name="budgetId"
+            defaultValue={defaultContractualBudgetId(budgets, currentBudgetId)}
+          >
+            <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-72`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">— todos —</SelectItem>
               {budgets.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
-                  {b.name} ({b.status})
+                  {budgetFilterOptionLabel(b)}
                 </SelectItem>
               ))}
             </SelectContent>

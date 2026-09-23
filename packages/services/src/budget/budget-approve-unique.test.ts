@@ -16,7 +16,7 @@ describe("approveBudget unique (BUG-015)", () => {
       (caught: unknown) =>
         caught instanceof ServiceError &&
         caught.code === "CONFLICT" &&
-        /presupuesto aprobado/.test(caught.message),
+        /presupuesto principal aprobado/.test(caught.message),
     );
   });
 

@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/select";
 import { useDebouncedSearchParam } from "@/hooks/use-debounced-search-param";
 import type { AvailableBudget } from "@bloqer/services";
+import {
+  budgetFilterOptionLabel,
+  defaultContractualBudgetId,
+} from "@/features/budgets/components/budget-status-badge";
 
 type Props = {
   budgets: AvailableBudget[];
@@ -58,15 +62,18 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
       {budgets.length > 1 && (
         <div className="space-y-1">
           <Label className="text-xs">Presupuesto</Label>
-          <Select name="budgetId" defaultValue={currentBudgetId ?? "__all__"}>
-            <SelectTrigger className="h-8 w-52 text-xs">
+          <Select
+            key={currentBudgetId ?? "principal"}
+            name="budgetId"
+            defaultValue={defaultContractualBudgetId(budgets, currentBudgetId)}
+          >
+            <SelectTrigger className="h-8 w-72 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">— todos —</SelectItem>
               {budgets.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
-                  {b.name} ({b.status})
+                  {budgetFilterOptionLabel(b)}
                 </SelectItem>
               ))}
             </SelectContent>

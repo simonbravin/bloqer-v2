@@ -158,6 +158,7 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         id: n.id,
         code: n.code,
         name: n.name,
+        budgetName: n.budgetName,
         dominantCostType: n.dominantCostType,
       }));
       try {

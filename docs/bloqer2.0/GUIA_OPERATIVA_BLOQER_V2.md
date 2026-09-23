@@ -82,6 +82,8 @@ No hay un menú llamado **Afectaciones**. En obra, “afectar” = **imputar** u
 
 La pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectaciones por partida.
 
+La línea no guarda un presupuesto aparte: guarda la **partida**, y la partida pertenece a un presupuesto. En OC, solicitudes, subcontratos, facturas de proveedor y consumos, el selector muestra `código — nombre (presupuesto vN)` para no mezclar la misma partida del principal con la de una adenda.
+
 ### 0.3 Preguntale a Bloqer (asistente)
 
 Botón flotante **Preguntale a Bloqer** (esquina inferior derecha en el layout autenticado), cuando el entorno tiene Bloqer AI habilitado.
@@ -751,7 +753,7 @@ stateDiagram-v2
 | `CANCELLED` | Anulado |
 
 > **Hito:** con `APPROVED` o `CLOSED` se habilitan certificaciones al cliente, tablero Materiales (líneas MAT) y baseline de control de costos.  
-> **Solo un** presupuesto `APPROVED` por proyecto a la vez.
+> Hay **un** presupuesto **Principal** `APPROVED` (sin padre). Las **adendas** son presupuestos hijos y también se pueden aprobar sin cerrar el principal.
 
 **Excepción (OWNER/ADMIN):** si hace falta corregir un `APPROVED` (agregar partidas, APU, costos o venta), Configuración → **Políticas** → Presupuestos: habilitar el interruptor de la organización **y** el de la obra. Quien tenga permiso de editar presupuestos puede cambiar todo el presupuesto. Al terminar: **Congelar** en la obra (o deshabilitar el interruptor de la organización). Un `CLOSED` no entra: ahí se usa adenda.
 
@@ -765,7 +767,9 @@ stateDiagram-v2
 - Cambio contractual hoy = **adenda operativa**: nuevo presupuesto con vínculo opcional `parentBudgetId` al APPROVED/CLOSED (UI: **Crear adenda / fase**). No copia la EDT sola.
 - Al crear la adenda se **prellenan** los % económicos (GG, financiero, utilidad, IVA) y la moneda del presupuesto padre; son editables.
 - El rótulo `v{n}` en UI es numeración de presentación, no versionado contractual.
-- En el **Resumen** de la obra (`/proyectos/[id]`), el KPI **Presupuesto (venta)** es la suma del precio de venta de todos los presupuestos `APPROVED` y `CLOSED` de la misma moneda. La fila **Presupuesto** (costo/venta, partida, capítulo, categoría) usa la misma base. Si hay más de una moneda, el monto dice **Multimoneda** y esa fila no mezcla cifras. Un borrador no entra hasta que se aprueba. Solo puede haber un `APPROVED` a la vez: para aprobar la adenda hay que **Cerrar** el anterior; el cerrado sigue sumando. En el inicio de la empresa, el monto de cada obra usa la misma suma; si las fases no comparten moneda, ese monto no se muestra.
+- En el listado y en el detalle, el presupuesto sin padre se rotula **Principal** y el hijo **Adenda**.
+- La adenda se aprueba con el principal todavía **Aprobado**. No hace falta cerrarlo. Un segundo presupuesto sin padre sigue bloqueado mientras el principal esté `APPROVED`.
+- En el **Resumen** de la obra (`/proyectos/[id]`), el KPI **Presupuesto (venta)** es la suma del precio de venta de todos los presupuestos `APPROVED` y `CLOSED` de la misma moneda (principal + adendas). La fila **Presupuesto** (costo/venta, partida, capítulo, categoría) usa la misma base. Si hay más de una moneda, el monto dice **Multimoneda** y esa fila no mezcla cifras. Un borrador no entra hasta que se aprueba. En el inicio de la empresa, el monto de cada obra usa la misma suma; si las fases no comparten moneda, ese monto no se muestra. EDT y costos, cronograma, materiales, mano de obra, equipos, gastos generales y rentabilidad abren por defecto el **principal**. El filtro muestra `nombre · Principal|Adenda (estado)` para cambiar de fase.
 - **Contratos, adendas y órdenes de cambio como entidades formales no están implementados** (ver §19).
 
 ---
@@ -961,7 +965,7 @@ flowchart TD
 
 **Rol:** tablero de **cantidades** APU `LABOR` (necesidad vs pedido vs facturado). El **$** por tipo está en Planificación → **EDT y costos** (filtro *Mano de obra*).
 
-**Prerrequisito:** presupuesto `APPROVED`/`CLOSED` con líneas **LABOR** en APU (no `gl` / lump sin necesidad física). Con **varios presupuestos** aprobados, el tablero usa el baseline elegido (o el más reciente); al abrir una partida desde EDT, Bloqer resuelve el presupuesto dueño de ese nodo EDT.
+**Prerrequisito:** presupuesto `APPROVED`/`CLOSED` con líneas **LABOR** en APU (no `gl` / lump sin necesidad física). Con **varios presupuestos** aprobados, el tablero abre el **principal**; el filtro permite pasar a una adenda. Al abrir una partida desde EDT, Bloqer resuelve el presupuesto dueño de ese nodo EDT.
 
 1. Vista **Operativo** (default). Misma ventana de cronograma que Materiales. Si el módulo de cronograma está off o entrás desde EDT (drilldown), se muestra en ventana **todas** (solo cantidades).
 2. Columnas: EDT · Insumo APU · Necesidad · $ Presup. · Pedido · Facturado · Faltante. Tocá el **código EDT** → diálogo de detalle de partida (cerrar para volver); Ctrl/Cmd+clic = página completa.
@@ -1346,7 +1350,7 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 - **Operativos:** **EDT y costos** (control $ por partida + composición APU + gasto por tipo + filtro por tipo de costo, [D-099]), **Certificaciones**, **Proveedores** (`/reportes/proveedores`: tabla, líderes por pedidos/monto/saldo CxP, concentración), **Análisis de compras** (varianza OC vs APU, [D-044]; **no** solapa con EDT), **Materiales**, **Subcontratos**.
 - **Proveedores de la obra:** `/proyectos/[id]/reportes/proveedores`. Resumen (cantidad, comprometido, exposición, pagado, saldo CxP, concentración top 3), líderes por **monto**, **pedidos** y **saldo a pagar**, y tabla por proveedor. El filtro Desde/Hasta recorta OC, facturas y recepciones; el **saldo CxP** es el abierto de hoy. Las certificaciones de subcontrato no entran (van a **Subcontratos**). Exportar CSV / PDF.
 - **Rentabilidad:** `/proyectos/[id]/reportes/rentabilidad` (margen bruto; neto según overhead imputado, visible a `OWNER`/`ADMIN`).
-- **Gastos generales de obra:** `/proyectos/[id]/reportes/gastos-generales` — compara **presupuesto GG** (partidas cuyo nombre/grupo sugiere «Gastos generales», «Indirectos» o código `GG…`) vs **gastado** = **devengado** en esas partidas + **devengado** sin partida EDT + **GG de empresa imputados** (OWNER/ADMIN; solo si la moneda coincide). El comprometido abierto se muestra aparte. Si hay varios presupuestos aprobados/cerrados, hay que elegir uno (igual que EDT). Export CSV. Requiere permiso de control de costos. No reemplaza EDT y costos ni la Imputación GG corporativa.
+- **Gastos generales de obra:** `/proyectos/[id]/reportes/gastos-generales` — compara **presupuesto GG** (partidas cuyo nombre/grupo sugiere «Gastos generales», «Indirectos» o código `GG…`) vs **gastado** = **devengado** en esas partidas + **devengado** sin partida EDT + **GG de empresa imputados** (OWNER/ADMIN; solo si la moneda coincide). El comprometido abierto se muestra aparte. Si hay varios presupuestos aprobados/cerrados, abre el principal; el filtro permite ver una adenda. Export CSV. Requiere permiso de control de costos. No reemplaza EDT y costos ni la Imputación GG corporativa.
 - **Hub de empresa:** General → **Reportes** → `/reportes` — mismas secciones **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario) ([D-098]).
 - **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
 - **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y Configuración → **Reportes programados** → `/configuracion/reportes`. El listado muestra el catálogo por alcance (**Empresa general** / **Un proyecto**) y por sección (**Financieros** / **Operativos**). En el alta, elegí el alcance con las dos tarjetas. Formato **PDF** o **CSV (Excel)** según el reporte. *Presupuesto vs real* quedó absorbido por **EDT y costos** y no se ofrece en envíos nuevos. **Libro de obra — parte del día** ([D-100]): solo en alcance empresa, solo PDF, multi-obra ACTIVE, un adjunto por parte del día de la corrida (no aparece en el catálogo de una sola obra). En el detalle de un envío **Activo**, **Enviar ahora** (junto a Volver / Pausar / Eliminar) genera y manda el correo de inmediato; pide confirmación y **no** mueve la próxima ejecución programada. El job automático en Vercel Hobby corre **una vez al día** (05:05 UTC); si necesitás el adjunto ya, usá **Enviar ahora**.

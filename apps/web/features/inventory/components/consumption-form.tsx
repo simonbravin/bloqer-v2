@@ -18,7 +18,7 @@ import { createStockConsumptionAction } from "@/app/(app)/proyectos/[id]/consumo
 
 export type ProductOption   = { id: string; name: string; sku: string; unit: string };
 export type WarehouseOption = { id: string; name: string };
-export type WbsOption       = { id: string; code: string; name: string };
+export type WbsOption       = { id: string; code: string; name: string; budgetName?: string };
 
 /** Product calendar date as `YYYY-MM-DD` (avoids UTC off-by-one from toISOString). */
 function todayLocalInputDate(): string {

@@ -86,9 +86,9 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 
 ## 5. Reglas de presupuesto
 
-### BR-BUD-001 — Una versión activa por proyecto
-- **Regla:** un proyecto tiene **un único** presupuesto activo. Las adendas/fases nacen como Budgets adicionales con `parent_budget_id` apuntando al activo.
-- **Origen:** [D-002].
+### BR-BUD-001 — Un presupuesto principal por proyecto
+- **Regla:** un proyecto tiene **un único presupuesto principal** (`parent_budget_id` nulo) en estado `APPROVED`. Las adendas son Budgets hijos con `parent_budget_id` hacia un presupuesto `APPROVED` o `CLOSED`. Una adenda **también** puede estar `APPROVED` al mismo tiempo: no reemplaza al principal, lo complementa ([BR-BUD-003]). Un segundo presupuesto **sin** padre no se aprueba mientras el principal siga `APPROVED`.
+- **Origen:** [D-002], [D-116].
 
 ### BR-BUD-002 — Presupuesto cerrado solo se modifica con adenda
 - **Regla:** `Budget.status = CLOSED` es la **base contractual/comercial**. No se modifica directamente el cómputo vendido ni condiciones de venta. Cualquier cambio de **monto, alcance vendido, condiciones vendidas o WBS contractual** requiere **Adenda** (u homólogo formal) y **Budget** complementario / fase adicional ([D-005]). Un **Change Order** aprobado **no** alcanza solo para ese fin ([BR-CO-003]).

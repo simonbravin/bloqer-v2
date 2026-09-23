@@ -15,9 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { AvailableBudget } from "@bloqer/services";
 import type { ScheduleItemStatus } from "@bloqer/database";
-import { budgetStatusLabel } from "@/features/budgets/components/budget-status-badge";
+import type { AvailableBudget } from "@bloqer/services";
+import { budgetFilterOptionLabel } from "@/features/budgets/components/budget-status-badge";
 import { STATUS_LABELS } from "../adapters/schedule-view-types";
 import { ScheduleProgressLegend } from "./schedule-progress-dimensions";
 
@@ -82,13 +82,13 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
         <div className="space-y-1">
           <Label className="text-xs">Presupuesto</Label>
           <Select value={currentBudgetId} onValueChange={setBudget}>
-            <SelectTrigger className="h-8 w-52 text-xs">
+            <SelectTrigger className="h-8 w-72 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {budgets.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
-                  {b.name} ({budgetStatusLabel(b.status)})
+                  {budgetFilterOptionLabel(b)}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -94,9 +94,21 @@ function pctOf(num: Prisma.Decimal, den: Prisma.Decimal): string | null {
 }
 
 function toAvailableBudgets(
-  rows: Array<{ id: string; name: string; status: string }>,
+  rows: Array<{
+    id: string;
+    name: string;
+    status: string;
+    versionNumber: number;
+    parentBudgetId: string | null;
+  }>,
 ): AvailableBudget[] {
-  return rows.map((b) => ({ id: b.id, name: b.name, status: b.status }));
+  return rows.map((b) => ({
+    id: b.id,
+    name: b.name,
+    status: b.status,
+    versionNumber: b.versionNumber,
+    parentBudgetId: b.parentBudgetId,
+  }));
 }
 
 /**
@@ -121,11 +133,6 @@ export async function getProjectGgOverviewReport(
 
   if (approved.length === 0) {
     return { type: "NO_APPROVED_BUDGETS", availableBudgets };
-  }
-
-  if (!filters.budgetId && approved.length > 1) {
-    // Align with EDT: force explicit pick when several approved/closed budgets exist.
-    return { type: "BUDGET_SELECTION_REQUIRED", availableBudgets };
   }
 
   if (filters.budgetId && !approved.some((b) => b.id === filters.budgetId)) {

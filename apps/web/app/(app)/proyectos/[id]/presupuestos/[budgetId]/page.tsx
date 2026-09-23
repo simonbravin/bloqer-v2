@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
+  BudgetKindBadge,
   BudgetStatusBadge,
   WbsTree,
   BudgetLifecycleDialog,
@@ -154,6 +155,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight">{budget.name}</h1>
                 <span className="font-mono text-sm text-muted-foreground">v{budget.versionNumber}</span>
+                <BudgetKindBadge isAddendum={Boolean(budget.parentBudgetId)} />
                 <BudgetStatusBadge status={budget.status} />
               </div>
               <p className="text-sm text-muted-foreground">Moneda: {budget.currency}</p>

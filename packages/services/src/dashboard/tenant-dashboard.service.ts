@@ -226,7 +226,6 @@ function safeRun<T>(_label: string, fn: () => Promise<T>): Promise<T | null> {
   });
 }
 
-/** Latest APPROVED/CLOSED budget per project (first row wins after version desc sort). */
 function cashFlowRangeDates(range: DashboardCashFlowRange): { dateFrom: string; dateTo: string } {
   const now = new Date();
   const parts = calendarPartsInTimeZone(now);

@@ -1,4 +1,5 @@
 import { prisma } from "@bloqer/database";
+import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { ServiceContext } from "../types";
 
 export type ResolvedApprovedBudget = {
@@ -6,6 +7,8 @@ export type ResolvedApprovedBudget = {
   name: string;
   status: string;
   currency: string;
+  versionNumber: number;
+  parentBudgetId: string | null;
 };
 
 export async function resolveApprovedBudgetForProject(
@@ -15,12 +18,29 @@ export async function resolveApprovedBudgetForProject(
 ): Promise<ResolvedApprovedBudget | null> {
   const budgets = await prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
-    select: { id: true, name: true, status: true, currency: true },
-    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      currency: true,
+      parentBudgetId: true,
+      versionNumber: true,
+    },
+    orderBy: { versionNumber: "asc" },
   });
   if (budgets.length === 0) return null;
-  if (budgetId) return budgets.find((b) => b.id === budgetId) ?? null;
-  return budgets[0]!;
+  const picked = budgetId
+    ? budgets.find((b) => b.id === budgetId)
+    : pickPrincipalContractualBudget(budgets);
+  if (!picked) return null;
+  return {
+    id: picked.id,
+    name: picked.name,
+    status: picked.status,
+    currency: picked.currency,
+    versionNumber: picked.versionNumber,
+    parentBudgetId: picked.parentBudgetId,
+  };
 }
 
 export async function listApprovedBudgetsForProject(
@@ -29,7 +49,14 @@ export async function listApprovedBudgetsForProject(
 ): Promise<ResolvedApprovedBudget[]> {
   return prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
-    select: { id: true, name: true, status: true, currency: true },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      currency: true,
+      versionNumber: true,
+      parentBudgetId: true,
+    },
     orderBy: { updatedAt: "desc" },
   });
 }

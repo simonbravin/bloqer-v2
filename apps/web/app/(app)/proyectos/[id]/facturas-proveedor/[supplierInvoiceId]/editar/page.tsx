@@ -89,6 +89,7 @@ export default async function EditarFacturaProveedorPage({ params }: PageProps) 
     id: n.id,
     code: n.code,
     name: n.name,
+    budgetName: n.budgetName,
     dominantCostType: n.dominantCostType,
   }));
 

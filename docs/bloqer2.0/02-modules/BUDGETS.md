@@ -60,7 +60,7 @@ Regla fuerte: precio vendido / alcance contractual / WBS contractual cerrada ⇒
 - Comparativa entre versiones (Fase 2).
 
 ## 10. Reglas de negocio
-- **BR-BUD-001**: una sola versión **activa** por proyecto; adendas suman ([D-002], [BR-BUD-003]).
+- **BR-BUD-001**: un solo presupuesto **principal** `APPROVED` por proyecto; las adendas (hijo con `parent_budget_id`) también se aprueban y suman ([D-002], [D-116], [BR-BUD-003]).
 - **BR-BUD-002**: `CLOSED` no editable en lo vendido; vía adenda ([D-005]).
 - **BR-BUD-006**: `APPROVED` bloquea economía y EDT; permite metadata ([D-005]). Excepción [D-088]: ambos flags (tenant + obra) ON → edición completa (partidas + economía) auditada, incluso si es baseline de cronograma; `CLOSED` excluido.
 - **BR-BUD-007**: `IN_REVIEW` no es aprobado; sin cambios estructurales.

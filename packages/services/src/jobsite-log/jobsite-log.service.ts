@@ -9,6 +9,7 @@ import {
   notifyJobsiteLogSubmitted,
 } from "./jobsite-log-notifications.service";
 import { createJobsiteLogMaterialStockMovements } from "../inventory/stock-movement.service";
+import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { syncScheduleProgressFromJobsiteLog } from "../schedule/schedule-progress-sync.service";
 import {
   assertInventoryTenantModule,
@@ -1285,16 +1286,15 @@ export async function listProjectWbsItemsForLog(projectId: string, ctx: ServiceC
   });
   let budgetId = schedule?.baselineBudgetId ?? null;
   if (!budgetId) {
-    const ccBudget = await prisma.budget.findFirst({
+    const candidates = await prisma.budget.findMany({
       where: {
         projectId,
         tenantId: ctx.tenantId,
         status: { in: ["APPROVED", "CLOSED"] },
       },
-      orderBy: [{ status: "asc" }, { versionNumber: "desc" }],
-      select: { id: true },
+      select: { id: true, status: true, versionNumber: true, parentBudgetId: true },
     });
-    budgetId = ccBudget?.id ?? null;
+    budgetId = pickPrincipalContractualBudget(candidates)?.id ?? null;
   }
   if (!budgetId) return [];
 

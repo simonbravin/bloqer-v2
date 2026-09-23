@@ -8,6 +8,7 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { requireProjectAccess } from "../security/access";
 
+import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { computeCostExposureLayers } from "./cost-exposure";
 import { pctOfBudget, pctPhysicalProgressFromLibro, shouldWarnUnlinkedInvoiceAgainstPo } from "./cost-control-pct";
@@ -231,22 +232,24 @@ export async function getProjectCostControl(
   // ─ Budget selection ─
   const validBudgets = await prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
-    select: { id: true, name: true, status: true },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      versionNumber: true,
+      parentBudgetId: true,
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  let budget: { id: string; name: string; status: string };
-  if (filters.budgetId) {
-    const found = validBudgets.find((b) => b.id === filters.budgetId);
-    if (!found) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado o no está aprobado/cerrado");
-    budget = found;
-  } else if (validBudgets.length === 1) {
-    budget = validBudgets[0]!;
-  } else if (validBudgets.length === 0) {
-    return { type: "NO_APPROVED_BUDGETS" };
-  } else {
-    return { type: "BUDGET_SELECTION_REQUIRED", availableBudgets: validBudgets };
+  // D-116: one screen shows the principal. The filter can switch to an addendum.
+  const budget = filters.budgetId
+    ? validBudgets.find((b) => b.id === filters.budgetId)
+    : pickPrincipalContractualBudget(validBudgets);
+  if (filters.budgetId && !budget) {
+    throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado o no está aprobado/cerrado");
   }
+  if (!budget) return { type: "NO_APPROVED_BUDGETS" };
 
   const warnings: string[] = [];
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];

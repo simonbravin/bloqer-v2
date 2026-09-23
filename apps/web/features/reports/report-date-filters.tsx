@@ -14,6 +14,10 @@ import {
 } from "@/components/ui/select";
 import type { AvailableBudget } from "@bloqer/services";
 import {
+  budgetFilterOptionLabel,
+  defaultContractualBudgetId,
+} from "@/features/budgets/components/budget-status-badge";
+import {
   REPORT_FILTER_CONTROL_CLASS,
   REPORT_FILTER_FIELD_CLASS,
   REPORT_FILTER_FORM_CLASS,
@@ -38,7 +42,13 @@ export function ReportDateFilters({
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const [budgetId, setBudgetId] = useState(currentBudgetId ?? "__all__");
+  const resolvedBudgetId = defaultContractualBudgetId(budgets, currentBudgetId);
+  const [budgetId, setBudgetId] = useState(resolvedBudgetId);
+  const [syncedBudgetId, setSyncedBudgetId] = useState(currentBudgetId);
+  if (syncedBudgetId !== currentBudgetId) {
+    setSyncedBudgetId(currentBudgetId);
+    setBudgetId(resolvedBudgetId);
+  }
   const [currencyView, setCurrencyView] = useState(params.get("currencyView") ?? "ARS");
 
   /** Preserve page-specific query keys (e.g. materiales window/tab) across filter apply/clear. */
@@ -84,14 +94,13 @@ export function ReportDateFilters({
           </Label>
           <input type="hidden" name="budgetId" value={budgetId} />
           <Select value={budgetId} onValueChange={setBudgetId}>
-            <SelectTrigger id="report-budget-filter" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-52`}>
+            <SelectTrigger id="report-budget-filter" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-72`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">— todos —</SelectItem>
               {budgets.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
-                  {b.name} ({b.status})
+                  {budgetFilterOptionLabel(b)}
                 </SelectItem>
               ))}
             </SelectContent>

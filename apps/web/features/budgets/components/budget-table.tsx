@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { BudgetStatusBadge } from "./budget-status-badge";
+import { BudgetKindBadge, BudgetStatusBadge } from "./budget-status-badge";
 import type { BudgetListItem } from "./budget-list";
 
 export function BudgetTable({
@@ -65,7 +65,10 @@ export function BudgetTable({
                 )}
               </TableCell>
               <TableCell>
-                <BudgetStatusBadge status={b.status} />
+                <div className="flex flex-wrap items-center gap-1">
+                  <BudgetKindBadge isAddendum={Boolean(b.parentBudgetId)} />
+                  <BudgetStatusBadge status={b.status} />
+                </div>
               </TableCell>
               <TableCell className="text-right font-mono text-sm">
                 {formatMoneyAmount(b.totalCost, b.currency)}

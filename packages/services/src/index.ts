@@ -21,6 +21,7 @@ export * from "./project/project-team.service";
 export * from "./project/project-membership.service";
 export * from "./project/project-overview-dashboard.service";
 export * from "./budget/budget.service";
+export * from "./budget/pick-principal-budget";
 export * from "./budget/approved-budget-edits.service";
 export * from "./budget/budget-settings.service";
 export * from "./budget/wbs.service";

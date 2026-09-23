@@ -90,7 +90,13 @@ export type CostControlTotals = {
   projectedMargin: string;
 };
 
-export type AvailableBudget = { id: string; name: string; status: string };
+export type AvailableBudget = {
+  id: string;
+  name: string;
+  status: string;
+  versionNumber: number;
+  parentBudgetId: string | null;
+};
 
 export type ProjectCostControlReport = {
   type: "REPORT";

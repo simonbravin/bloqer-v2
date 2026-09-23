@@ -6,6 +6,7 @@ import {
   assertValidOverheadPeriod,
   type OverheadPeriodFilter,
 } from "./overhead-period";
+import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { ServiceContext, ServiceError } from "../types";
 
 export { assertValidOverheadPeriod } from "./overhead-period";
@@ -36,16 +37,15 @@ const HUNDRED = new Prisma.Decimal(100);
 export type ProjectOverheadPeriodFilter = OverheadPeriodFilter;
 
 async function resolveProjectBudgetCurrency(projectId: string, ctx: ServiceContext): Promise<string> {
-  const budget = await prisma.budget.findFirst({
+  const budgets = await prisma.budget.findMany({
     where: {
       projectId,
       tenantId: ctx.tenantId,
       status: { in: ["APPROVED", "CLOSED"] },
     },
-    select: { currency: true },
-    orderBy: { updatedAt: "desc" },
+    select: { currency: true, status: true, versionNumber: true, parentBudgetId: true },
   });
-  return budget?.currency ?? "ARS";
+  return pickPrincipalContractualBudget(budgets)?.currency ?? "ARS";
 }
 
 function manualRowInPeriod(period: string, filter?: ProjectOverheadPeriodFilter): boolean {
@@ -186,12 +186,24 @@ export async function listActiveProjectsForOverhead(
       projectId: { in: projects.map((p) => p.id) },
       status: { in: ["APPROVED", "CLOSED"] },
     },
-    select: { projectId: true, currency: true, updatedAt: true },
-    orderBy: { updatedAt: "desc" },
+    select: {
+      projectId: true,
+      currency: true,
+      status: true,
+      versionNumber: true,
+      parentBudgetId: true,
+    },
   });
+  const byProject = new Map<string, typeof budgets>();
+  for (const budget of budgets) {
+    const list = byProject.get(budget.projectId) ?? [];
+    list.push(budget);
+    byProject.set(budget.projectId, list);
+  }
   const currencyByProject = new Map<string, string>();
-  for (const b of budgets) {
-    if (!currencyByProject.has(b.projectId)) currencyByProject.set(b.projectId, b.currency);
+  for (const [projectId, list] of byProject) {
+    const picked = pickPrincipalContractualBudget(list);
+    if (picked) currencyByProject.set(projectId, picked.currency);
   }
 
   return projects.map((p) => ({

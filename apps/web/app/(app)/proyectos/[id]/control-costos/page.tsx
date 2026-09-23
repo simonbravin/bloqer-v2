@@ -21,6 +21,7 @@ import { CostTypeComparisonChart } from "@/features/projects/cost-type-compariso
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { budgetFilterOptionLabel } from "@/features/budgets/components/budget-status-badge";
 import { Button } from "@/components/ui/button";
 import { formatMoneyAmount } from "@/lib/format-money";
 
@@ -176,7 +177,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
                 href={`/proyectos/${projectId}/control-costos?budgetId=${b.id}`}
                 className="rounded-md border px-4 py-2 text-sm hover:bg-muted transition-colors"
               >
-                {b.name} <span className="text-muted-foreground">({b.status})</span>
+                {budgetFilterOptionLabel(b)}
               </Link>
             ))}
           </div>
@@ -185,7 +186,16 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
         <>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <span>
-              Presupuesto: <strong>{result.budgetName}</strong> ({result.budgetStatus})
+              Presupuesto:{" "}
+              <strong>
+                {budgetFilterOptionLabel(
+                  result.availableBudgets.find((b) => b.id === result.budgetId) ?? {
+                    name: result.budgetName,
+                    status: result.budgetStatus,
+                    parentBudgetId: null,
+                  },
+                )}
+              </strong>
             </span>
           </div>
 

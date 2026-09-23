@@ -113,15 +113,16 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Pulsá Crear adenda / fase (alta con parentBudgetId).",
       "Se prellenan % económicos (GG, financiero, utilidad, IVA) y moneda del padre; editables.",
       "Armá la EDT/APU de la adenda (no se copia sola la EDT del padre).",
-      "Enviá a revisión y aprobá cuando corresponda. El rótulo v{n} es presentación, no versionado contractual.",
-      "Para aprobar la adenda, cerrá antes el presupuesto que ya está Aprobado. En el Resumen, Presupuesto (venta) suma el precio de venta de todos los Aprobados y Cerrados.",
+      "Enviá a revisión y aprobá la adenda. El principal puede seguir Aprobado. En el listado se ve el rótulo Adenda.",
+      "En el Resumen, Presupuesto (venta) suma el precio de venta del principal y de las adendas Aprobadas o Cerradas.",
     ],
     effects: [
-      "Con la adenda Aprobada y el presupuesto anterior Cerrado, el KPI Presupuesto (venta) del Resumen y la fila Presupuesto (costo/venta, partida, capítulo) suman todas las fases de la misma moneda.",
+      "Con la adenda Aprobada, el KPI Presupuesto (venta) del Resumen y la fila Presupuesto (costo/venta, partida, capítulo) suman el principal y las adendas de la misma moneda.",
     ],
     pitfalls: [
       "Contratos, adendas y órdenes de cambio formales aún no existen como módulo (§19).",
-      "Solo puede haber un presupuesto Aprobado a la vez. Un borrador no suma en el Resumen hasta aprobarse.",
+      "Un segundo presupuesto sin padre no se aprueba si ya hay un Principal Aprobado. Tiene que nacer con Crear adenda / fase.",
+      "Un borrador no suma en el Resumen hasta aprobarse.",
     ],
     relatedSlugs: [
       "armar-presupuesto-edt-apu",
@@ -392,7 +393,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Planificación → Reportes → card **Gastos generales de obra**.",
-      "Si hay varios presupuestos aprobados/cerrados, elegí uno en el filtro.",
+      "Si hay varios presupuestos aprobados/cerrados, el reporte abre el principal. En el filtro podés pasar a una adenda (dice Adenda junto al nombre).",
       "Revisá KPIs: Presupuesto GG, Total gastado, Restante, GG empresa (OWNER/ADMIN).",
       "Presupuesto GG = partidas cuyo nombre/grupo dice «Gastos generales», «Indirectos» o «GG». Si no aparece nada, renombrá el capítulo en el presupuesto.",
       "Gastado = **devengado** en esas partidas + **devengado** sin partida EDT + GG empresa imputados (si misma moneda).",

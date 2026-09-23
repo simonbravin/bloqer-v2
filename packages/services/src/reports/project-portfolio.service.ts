@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { ProjectStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { getProjectCostControl } from "../cost-control/cost-control.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
@@ -114,10 +115,10 @@ export async function getProjectPortfolioReport(
         );
       }
       if (cc.type === "BUDGET_SELECTION_REQUIRED") {
-        const firstBudget = cc.availableBudgets[0];
+        const picked = pickPrincipalContractualBudget(cc.availableBudgets);
         const ccRetry = await getProjectCostControl(
           project.id,
-          { budgetId: firstBudget?.id },
+          { budgetId: picked?.id },
           ctx,
         );
         if (ccRetry.type !== "REPORT") {

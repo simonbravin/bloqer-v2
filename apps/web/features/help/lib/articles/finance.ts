@@ -14,7 +14,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     steps: [
       "Prerrequisito: contacto con rol Subcontratista.",
       "Compras → Subcontratos → Nuevo (buscá al subcontratista por razón social o nombre fantasía).",
-      "Alcance e imputación: cada línea con partida EDT (obligatoria antes de aprobar certificaciones).",
+      "Alcance e imputación: cada línea con partida EDT (obligatoria antes de aprobar certificaciones). Si hay adenda, la opción incluye el presupuesto (nombre vN).",
       "Opcional: Adjuntos — arrastrá, Seleccionar archivo o Tomar foto (máx. 8 archivos, 45 MB). Después también desde el detalle → Adjuntos.",
     ],
     pitfalls: [
@@ -363,7 +363,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     stepsTitle: "Caminito",
     steps: [
       "¿Es material con OC o un paquete de ejecución? Si sí → usá el caminito de compras o el de subcontrato. Este camino es gasto directo.",
-      "Facturas proveedor → Nueva → modo Costo directo. ¿Cada línea tiene partida hoja EDT? Si no → no se guarda.",
+      "Facturas proveedor → Nueva → modo Costo directo. ¿Cada línea tiene partida hoja EDT? Si no → no se guarda. Con adenda, la partida muestra el presupuesto entre paréntesis.",
       "Payee: Proveedor o Empleado. Tipo de costo en cada línea. Desde Mano de obra / Equipos → Factura llega tipado + insumo APU ([D-110]).",
       "Crear → Emitir = Devengado + CxP. En el pie de totales ajustá **Percepción IIBB** (default 3% sobre el neto) si aplica. ¿Pagar ahora? Si sí, hace falta fondos y mes abierto; si no, Bloqer bloquea. Si no pagás ahora, queda CxP.",
       "En el detalle ves una pista de proceso (Borrador → Emitir → Pagar) además del badge de estado; el paso Pagar sigue la CxP (parcial / vencida / pagada).",

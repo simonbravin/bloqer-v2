@@ -481,13 +481,13 @@ export async function returnBudgetForChanges(
   );
 }
 
-/** Unique `budgets_one_approved_per_project_key` must surface as CONFLICT, never 500. */
+/** Unique principal index must surface as CONFLICT, never 500. */
 export function rethrowIfBudgetApproveUniqueConflict(err: unknown): void {
   if (err instanceof ServiceError) throw err;
   if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
     throw new ServiceError(
       "CONFLICT",
-      "Ya existe un presupuesto aprobado para este proyecto. Ciérrelo antes de aprobar otro.",
+      "Ya existe un presupuesto principal aprobado para este proyecto. Cerralo antes de aprobar otro principal, o creá una adenda.",
     );
   }
 }
@@ -530,15 +530,39 @@ export async function approveBudget(
     );
   }
 
-  // BR-BUD-001: one APPROVED per project (service check + partial unique index in DB).
-  const existing = await prisma.budget.findFirst({
-    where: { projectId: budget.projectId, status: "APPROVED", id: { not: id } },
-  });
-  if (existing) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Ya existe un presupuesto aprobado para este proyecto. Ciérrelo antes de aprobar otro.",
-    );
+  // BR-BUD-001 / D-116: one APPROVED principal (no parent). Addenda may be APPROVED too.
+  if (!budget.parentBudgetId) {
+    const existingPrincipal = await prisma.budget.findFirst({
+      where: {
+        projectId: budget.projectId,
+        tenantId: ctx.tenantId,
+        status: "APPROVED",
+        parentBudgetId: null,
+        id: { not: id },
+      },
+      select: { id: true },
+    });
+    if (existingPrincipal) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Ya existe un presupuesto principal aprobado para este proyecto. Cerralo antes de aprobar otro principal, o creá una adenda.",
+      );
+    }
+  } else {
+    const parent = await prisma.budget.findFirst({
+      where: {
+        id: budget.parentBudgetId,
+        tenantId: ctx.tenantId,
+        projectId: budget.projectId,
+      },
+      select: { status: true },
+    });
+    if (!parent || (parent.status !== "APPROVED" && parent.status !== "CLOSED")) {
+      throw new ServiceError(
+        "CONFLICT",
+        "La adenda solo se puede aprobar si el presupuesto padre está aprobado o cerrado.",
+      );
+    }
   }
 
   let updated: Budget;

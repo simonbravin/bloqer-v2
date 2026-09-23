@@ -70,6 +70,7 @@ export async function getApprovedBudgetEditsPolicy(
             name: true,
             versionNumber: true,
             status: true,
+            parentBudgetId: true,
           },
           orderBy: [{ projectId: "asc" }, { versionNumber: "desc" }],
         });
@@ -85,7 +86,12 @@ export async function getApprovedBudgetEditsPolicy(
     tenantAllow: tenant.allowApprovedBudgetEconomicEdits,
     projects: projects.map((p) => {
       const list = budgetsByProject.get(p.id) ?? [];
-      const approved = list.find((b) => b.status === "APPROVED");
+      const approved =
+        list.find((b) => b.status === "APPROVED" && b.parentBudgetId == null) ??
+        list.find((b) => b.status === "APPROVED");
+      const approvedAddenda = list.filter(
+        (b) => b.status === "APPROVED" && b.parentBudgetId != null,
+      );
       const hasApprovedBudget = Boolean(approved);
       const approvedBudgetLabel = approved
         ? `v${approved.versionNumber} — ${approved.name}`
@@ -93,7 +99,13 @@ export async function getApprovedBudgetEditsPolicy(
 
       let budgetStatusLabel: string;
       if (approved) {
-        budgetStatusLabel = `Aprobado · ${approvedBudgetLabel}`;
+        const addendumNote =
+          approvedAddenda.length === 1
+            ? " + 1 adenda"
+            : approvedAddenda.length > 1
+              ? ` + ${approvedAddenda.length} adendas`
+              : "";
+        budgetStatusLabel = `Aprobado · ${approvedBudgetLabel}${addendumNote}`;
       } else if (list.length > 0) {
         // Prefer the latest version (ordered desc). Do not hide a newer draft
         // behind an older CLOSED label.

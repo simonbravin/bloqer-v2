@@ -99,6 +99,7 @@ export default async function ProyectoConsumosPage({ params, searchParams }: Pag
         id: w.id,
         code: w.code,
         name: w.name,
+        budgetName: w.budgetName,
       }));
       createOptionsReady = true;
     } catch (err) {

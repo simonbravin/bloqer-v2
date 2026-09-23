@@ -9,6 +9,7 @@ import { can } from "@bloqer/domain";
 import {
   listBudgetsByProject,
   listCertificationsByProject,
+  pickPrincipalContractualBudget,
   getProjectShellInfo,
   ServiceError,
 } from "@bloqer/services";
@@ -46,14 +47,17 @@ export default async function CertificacionesPage({ params, searchParams }: Page
     listBudgetsByProject(id, ctx),
   ]);
 
-  const eligibleBudgets = allBudgets
-    .filter((b) => b.status === "APPROVED" || b.status === "CLOSED")
-    .map((b) => ({
-      id: b.id,
-      name: b.name,
-      versionNumber: b.versionNumber,
-      status: b.status,
-    }));
+  const contractualBudgets = allBudgets.filter(
+    (b) => b.status === "APPROVED" || b.status === "CLOSED",
+  );
+  const eligibleBudgets = contractualBudgets.map((b) => ({
+    id: b.id,
+    name: b.name,
+    versionNumber: b.versionNumber,
+    status: b.status,
+    isAddendum: Boolean(b.parentBudgetId),
+  }));
+  const defaultBudget = pickPrincipalContractualBudget(contractualBudgets);
 
   const serialized = certs.map((c) => ({
     id: c.id,
@@ -83,9 +87,7 @@ export default async function CertificacionesPage({ params, searchParams }: Page
                 <NewCertificationDialog
                   projectId={id}
                   budgets={eligibleBudgets}
-                  defaultBudgetId={
-                    eligibleBudgets.length === 1 ? eligibleBudgets[0]!.id : undefined
-                  }
+                  defaultBudgetId={defaultBudget?.id}
                   onSubmit={createCertificationAction.bind(null, id)}
                   defaultOpen={sp.create === "1"}
                 />

@@ -14,6 +14,7 @@ import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ScheduleWorkspace } from "@/features/schedule";
 import { ScheduleFieldExperience } from "@/features/schedule/components/schedule-field-experience";
+import { budgetFilterOptionLabel } from "@/features/budgets/components/budget-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { isScheduleFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
@@ -137,7 +138,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
             {result.availableBudgets.map((b) => (
               <Button key={b.id} variant="outline" asChild>
                 <Link href={`/proyectos/${projectId}/cronograma?budgetId=${b.id}`}>
-                  {b.name} ({b.status})
+                  {budgetFilterOptionLabel(b)}
                 </Link>
               </Button>
             ))}

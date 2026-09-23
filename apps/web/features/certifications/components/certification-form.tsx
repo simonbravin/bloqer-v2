@@ -12,8 +12,15 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { createCertificationSchema, type CreateCertificationInput } from "@bloqer/validators";
+import { budgetStatusLabel } from "@/features/budgets/components/budget-status-badge";
 
-export type BudgetOption = { id: string; name: string; versionNumber: number; status: string };
+export type BudgetOption = {
+  id: string;
+  name: string;
+  versionNumber: number;
+  status: string;
+  isAddendum?: boolean;
+};
 
 interface CertificationFormProps {
   projectId: string;
@@ -76,7 +83,8 @@ export function CertificationForm({
               <SelectContent>
                 {budgets.map((b) => (
                   <SelectItem key={b.id} value={b.id}>
-                    v{b.versionNumber} — {b.name} ({b.status})
+                    v{b.versionNumber} — {b.name}
+                    {b.isAddendum ? " · Adenda" : " · Principal"} ({budgetStatusLabel(b.status)})
                   </SelectItem>
                 ))}
               </SelectContent>

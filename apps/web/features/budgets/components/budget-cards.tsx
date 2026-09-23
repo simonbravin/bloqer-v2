@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { BudgetStatusBadge } from "./budget-status-badge";
+import { BudgetKindBadge, BudgetStatusBadge } from "./budget-status-badge";
 import type { BudgetListItem } from "./budget-list";
 
 export function BudgetCards({
@@ -36,7 +36,8 @@ export function BudgetCards({
         >
           <div className="flex items-start justify-between gap-2">
             <span className="shrink-0 font-mono text-xs text-muted-foreground">v{b.versionNumber}</span>
-            <span className="shrink-0">
+            <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+              <BudgetKindBadge isAddendum={Boolean(b.parentBudgetId)} />
               <BudgetStatusBadge status={b.status} />
             </span>
           </div>

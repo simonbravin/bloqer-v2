@@ -105,6 +105,7 @@ export type InventoryConsumptionWbsOption = {
   id: string;
   code: string;
   name: string;
+  budgetName: string;
 };
 
 /** WBS items available to inventory consumption, independent of the PROCUREMENT module. */
@@ -135,9 +136,24 @@ export async function listInventoryConsumptionWbsOptions(
         status: { in: ["APPROVED", "CLOSED"] },
       },
     },
-    select: { id: true, code: true, name: true },
+    select: {
+      id: true,
+      code: true,
+      name: true,
+      budget: { select: { name: true, versionNumber: true } },
+    },
   });
-  return sortByWbsCode(nodes);
+  return sortByWbsCode(
+    nodes,
+    (a, b) =>
+      a.budget.name.localeCompare(b.budget.name, "es") ||
+      a.budget.versionNumber - b.budget.versionNumber,
+  ).map((node) => ({
+    id: node.id,
+    code: node.code,
+    name: node.name,
+    budgetName: `${node.budget.name} v${node.budget.versionNumber}`,
+  }));
 }
 
 // ─── Consumption (OUT) ────────────────────────────────────────────────────────

@@ -45,6 +45,8 @@ export type InvoiceWbsOption = {
   id: string;
   code: string;
   name: string;
+  /** Owning budget, so the same WBS code on an addendum is distinguishable. */
+  budgetName?: string;
   /** APU sole CostCategory used to pre-select `costType` ([D-099]). */
   dominantCostType?: CostCategoryOptionValue | null;
 };

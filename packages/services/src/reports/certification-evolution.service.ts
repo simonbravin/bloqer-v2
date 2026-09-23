@@ -4,6 +4,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
@@ -129,15 +130,26 @@ async function resolveBudget(
 > {
   const budgets = await prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
-    select: { id: true, name: true, status: true, totalSalePrice: true },
-    orderBy: { updatedAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      status: true,
+      totalSalePrice: true,
+      versionNumber: true,
+      parentBudgetId: true,
+    },
   });
   if (budgets.length === 0) return null;
-  if (budgetId) {
-    const found = budgets.find((b) => b.id === budgetId);
-    return found ?? null;
-  }
-  return budgets[0]!;
+  const picked = budgetId
+    ? budgets.find((b) => b.id === budgetId)
+    : pickPrincipalContractualBudget(budgets);
+  if (!picked) return null;
+  return {
+    id: picked.id,
+    name: picked.name,
+    status: picked.status,
+    totalSalePrice: picked.totalSalePrice,
+  };
 }
 
 export async function getCertificationEvolutionReport(

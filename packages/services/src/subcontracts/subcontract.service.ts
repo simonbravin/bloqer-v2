@@ -122,7 +122,7 @@ export async function listSubcontractsByProject(
 /** WBS lines from approved/closed budgets for subcontract create/edit forms (no Prisma in `apps/web` pages). */
 export type SubcontractFormWbsPickList = {
   companyId: string;
-  wbsOptions: Array<{ id: string; code: string; name: string; unit: string }>;
+  wbsOptions: Array<{ id: string; code: string; name: string; unit: string; budgetName: string }>;
 };
 
 export async function getSubcontractFormWbsPickList(
@@ -152,10 +152,19 @@ export async function getSubcontractFormWbsPickList(
     await prisma.wbsNode.findMany({
       where: {
         type: "ITEM",
-        budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
+        budget: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
       },
-      select: { id: true, code: true, name: true, costItem: { select: { unit: true } } },
+      select: {
+        id: true,
+        code: true,
+        name: true,
+        costItem: { select: { unit: true } },
+        budget: { select: { name: true, versionNumber: true } },
+      },
     }),
+    (a, b) =>
+      a.budget.name.localeCompare(b.budget.name, "es") ||
+      a.budget.versionNumber - b.budget.versionNumber,
   );
 
   return {
@@ -165,6 +174,7 @@ export async function getSubcontractFormWbsPickList(
       code: n.code,
       name: n.name,
       unit: n.costItem?.unit ?? "",
+      budgetName: `${n.budget.name} v${n.budget.versionNumber}`,
     })),
   };
 }

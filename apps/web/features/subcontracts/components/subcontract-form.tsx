@@ -34,7 +34,7 @@ import {
 } from "../lib/create-attachment-limits";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
-export type WbsOption           = { id: string; code: string; name: string; unit: string };
+export type WbsOption           = { id: string; code: string; name: string; unit: string; budgetName?: string };
 
 type LineState = {
   wbsNodeId:   string;

@@ -66,7 +66,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Completá EDT + APU (APU requerido para aprobar).",
       "Enviar a revisión → Aprobar.",
-      "Queda un solo APPROVED por obra (salvo reglas de versión documentadas).",
+      "Queda un solo Principal Aprobado por obra. Las adendas (presupuesto hijo) también se aprueban y suman.",
     ],
     figure: {
       src: "/help/mapa-presupuesto-edt.png",
@@ -432,7 +432,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/consumos", label: "Consumos" }],
     steps: [
       "Operación → Consumos (o el atajo Consumos en Materiales, o desde el flujo de libro de obra).",
-      "Indicá material, cantidad y partida EDT si el parte toca varias partidas.",
+      "Indicá material, cantidad y partida EDT si el parte toca varias partidas. Con adenda, la partida muestra el presupuesto (nombre vN).",
     ],
     relatedSlugs: ["cargar-libro-de-obra", "pedir-material-desde-faltante", "tablero-materiales"],
     keywords: ["consumo", "consumos", "stock", "materiales"],
@@ -522,7 +522,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Paquete con contrato y certificación no va acá: usá Compras → Subcontratos.",
       "Bloqer no liquida nóminas: el sueldo se registra como factura/gasto tipado.",
       "Si cambiás la partida EDT en la factura, se limpia el vínculo APU: revisá el tipado y el insumo.",
-      "Con varios presupuestos, abrí la partida desde EDT o elegí el baseline correcto: el tablero no mezcla nodos de otro presupuesto.",
+      "Con varios presupuestos, el tablero abre el principal. El filtro muestra si la opción es Principal o Adenda; no mezcla nodos de otro presupuesto.",
     ],
     relatedSlugs: [
       "tablero-equipos",

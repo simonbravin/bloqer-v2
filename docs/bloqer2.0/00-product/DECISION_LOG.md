@@ -1831,6 +1831,23 @@
 
 ---
 
+### D-116 — Adenda aprobable junto al presupuesto principal
+
+- **Fecha:** 2026-09-23
+- **Estado:** ACTIVA
+- **Decidido por:** Owner
+- **Contexto:** [D-002] y [BR-BUD-003] dicen que las fases complementan y suman. La implementación trataba “un presupuesto activo” como **un solo** `Budget` en `APPROVED` por obra (índice `budgets_one_approved_per_project_key`). Aprobar una adenda exigía cerrar el principal. En la práctica la adenda es otro presupuesto del mismo proyecto, identificable, y el principal sigue vigente.
+- **Decisión:**
+  1. **Principal:** el presupuesto con `parentBudgetId` nulo. Solo puede haber **uno** `APPROVED` por proyecto.
+  2. **Adenda:** presupuesto hijo (`parentBudgetId` hacia un `APPROVED` o `CLOSED`). Se puede **aprobar** con el principal todavía `APPROVED`. No lo reemplaza.
+  3. El monto del proyecto sigue siendo la **suma** de los `APPROVED` y `CLOSED` ([BR-BUD-003]).
+  4. Un segundo presupuesto **sin** padre no se aprueba mientras el principal esté `APPROVED`.
+  5. En UI el principal se rotula **Principal** y el hijo **Adenda**. Materiales, mano de obra, equipos y el parte (si no hay baseline de cronograma) abren por defecto el principal, no la adenda más nueva.
+- **Implicancias:** el índice único pasa a `status = APPROVED AND parentBudgetId IS NULL`. Hay que aplicarlo en Neon `production`.
+- **Documentos afectados:** [`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-BUD-001]), [`BUDGETS.md`](../02-modules/BUDGETS.md), [`GUIA_OPERATIVA_BLOQER_V2.md`](../GUIA_OPERATIVA_BLOQER_V2.md), help de adenda y de aprobar presupuesto, [D-002].
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_
