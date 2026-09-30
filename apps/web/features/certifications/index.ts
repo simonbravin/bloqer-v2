@@ -2,7 +2,7 @@ export { CertificationTable } from "./components/certification-table";
 export { CertificationCards } from "./components/certification-cards";
 export { CertificationListSection } from "./components/certification-list-section";
 export { CertificationForm } from "./components/certification-form";
-export { CertificationEditForm } from "./components/certification-edit-form";
+export { CertificationEditForm, CertificationHeaderDialog } from "./components/certification-edit-form";
 export { CertificationStatusBadge, certificationStatusLabel } from "./components/certification-status-badge";
 export { CertificationTotalsPanel } from "./components/certification-totals-panel";
 export { CertificationLineEditor } from "./components/certification-line-editor";

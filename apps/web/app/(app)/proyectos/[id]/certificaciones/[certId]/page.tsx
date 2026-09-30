@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   CertificationStatusBadge,
+  CertificationHeaderDialog,
   CertificationLineEditor,
   CertificationMeasurementWorksheet,
   CertificationFlowTrail,
@@ -32,18 +33,25 @@ import {
   removeCertificationLineAction,
   refreshPreviousQtyAction,
   saveCertificationMeasurementAction,
+  updateCertificationAction,
 } from "../actions";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string; certId: string }>;
+  searchParams: Promise<{ editar?: string }>;
 }
 
-export default async function CertificacionDetailPage({ params }: PageProps) {
+function toDateInput(d: Date | string) {
+  return new Date(d).toISOString().split("T")[0] ?? "";
+}
+
+export default async function CertificacionDetailPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, certId } = await params;
+  const { editar } = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -101,11 +109,18 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {editable && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href={`/proyectos/${projectId}/certificaciones/${certId}/editar`}>
-                Editar encabezado
-              </Link>
-            </Button>
+            <CertificationHeaderDialog
+              certId={certId}
+              projectId={projectId}
+              defaultOpen={editar === "1"}
+              defaults={{
+                periodStart: toDateInput(cert.periodStart),
+                periodEnd: toDateInput(cert.periodEnd),
+                notes: cert.notes ?? "",
+                internalNotes: cert.internalNotes ?? "",
+              }}
+              onSubmit={updateCertificationAction.bind(null, certId, projectId)}
+            />
           )}
           {canEditAr && cert.status === "APPROVED" && !existingInvoice && (
             <Button size="sm" asChild>

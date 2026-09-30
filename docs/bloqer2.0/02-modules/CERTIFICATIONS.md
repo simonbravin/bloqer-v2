@@ -34,7 +34,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Certification.
 - Anular con motivo (`CANCELLED`).
 
 ## 9. Pantallas y vistas necesarias
-- Planilla de medición en el borrador: por partida, lectura de presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos, subcontratos). La cantidad a certificar y el % físico se confirman aparte; la cantidad no se precarga con el saldo. **Usar libro del período** copia el avance del libro de esas fechas, topeado por el saldo.
+- Planilla de medición en el borrador: tabla con saldo, libro del período y cantidad ya medida. **Medir** abre un diálogo con presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos, subcontratos). La cantidad a certificar y el % físico se confirman ahí; la cantidad no se precarga con el saldo. **Usar libro del período** copia el avance del libro de esas fechas, topeado por el saldo. El encabezado (período y notas) se edita en diálogo.
 - Recorrido de solo lectura: medir, emitir, aprobar, emitir factura, cobrar. Aprobar no elige caja, banco ni cuenta contable. La factura abre Clientes / Ingresos por obras; la cobranza debita la cuenta de tesorería elegida y acredita Clientes.
 - Editor de líneas ya emitidas con columnas: ítem, % periodo, % acumulado, $ periodo, $ acumulado, techo presupuesto; indicador de **`status`** y de **`payment_status`** (derivado, solo lectura en flujo normal).
 - Alertas visuales sobrecertificación (privada).

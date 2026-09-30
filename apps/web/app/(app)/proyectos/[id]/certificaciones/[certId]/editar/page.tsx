@@ -1,22 +1,21 @@
 import { notFound, redirect } from "next/navigation";
-import { CertificationStatusBadge, CertificationEditForm } from "@/features/certifications";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { getCertificationById, ServiceError } from "@bloqer/services";
-import { updateCertificationAction } from "../../actions";
-import { PageShell } from "@/components/layout/page-shell";
 
 interface PageProps {
   params: Promise<{ id: string; certId: string }>;
 }
 
+/** El encabezado se edita en un diálogo del detalle. Esta ruta queda para enlaces viejos. */
 export default async function EditarCertificacionPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, certId } = await params;
+  const detail = `/proyectos/${projectId}/certificaciones/${certId}`;
   if (!can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS")) {
-    redirect(`/proyectos/${projectId}/certificaciones/${certId}`);
+    redirect(detail);
   }
 
   const ctx = {
@@ -35,36 +34,6 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
   }
 
   if (cert.projectId !== projectId) notFound();
-
-  if (cert.status !== "DRAFT") redirect(`/proyectos/${projectId}/certificaciones/${certId}`);
-
-  const toDateInput = (d: Date | string) => new Date(d).toISOString().split("T")[0];
-
-  return (
-    <PageShell variant="default" className="space-y-6" breadcrumbLabel={cert.code}>
-      <div className="flex items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold tracking-tight">Editar encabezado</h1>
-            <CertificationStatusBadge status={cert.status} />
-          </div>
-          <p className="text-sm text-muted-foreground font-mono">{cert.code}</p>
-        </div>
-      </div>
-
-      <div className="rounded-lg border bg-card p-6">
-        <CertificationEditForm
-          certId={certId}
-          projectId={projectId}
-          defaults={{
-            periodStart: toDateInput(cert.periodStart),
-            periodEnd: toDateInput(cert.periodEnd),
-            notes: cert.notes ?? "",
-            internalNotes: cert.internalNotes ?? "",
-          }}
-          onSubmit={updateCertificationAction.bind(null, certId, projectId)}
-        />
-      </div>
-    </PageShell>
-  );
+  if (cert.status !== "DRAFT") redirect(detail);
+  redirect(`${detail}?editar=1`);
 }

@@ -64,6 +64,8 @@ export type CertificationMeasurementSheet = {
   periodStart: string;
   periodEnd: string;
   currency: string;
+  /** Changes on every save so the planilla can soltar el bloqueo de refresco. */
+  revision: string;
   costAvailable: boolean;
   rows: CertificationMeasurementRow[];
 };
@@ -114,6 +116,7 @@ export async function getCertificationMeasurementSheet(
       budgetId: true,
       periodStart: true,
       periodEnd: true,
+      updatedAt: true,
       budget: { select: { currency: true } },
       lines: {
         select: { id: true, wbsNodeId: true, currentQty: true, physicalPct: true },
@@ -250,6 +253,7 @@ export async function getCertificationMeasurementSheet(
     periodStart,
     periodEnd,
     currency: cert.budget.currency,
+    revision: cert.updatedAt.toISOString(),
     costAvailable,
     rows,
   };
@@ -297,8 +301,10 @@ export async function saveCertificationMeasurement(
       where: { certificationId: cert.id },
     });
     const existingByWbs = new Map(existing.map((l) => [l.wbsNodeId, l]));
-
+    const reordersAllLines = existing.every((line) => seen.has(line.wbsNodeId));
     let sortOrder = 0;
+    let appendSort = existing.reduce((max, line) => Math.max(max, line.sortOrder), 0);
+
     for (const row of input.rows) {
       const line = existingByWbs.get(row.wbsNodeId);
       if (!row.included) {
@@ -309,7 +315,7 @@ export async function saveCertificationMeasurement(
       const currentQty = new Prisma.Decimal(parseMeasurementQty(row.currentQty)!);
       const physicalPct = new Prisma.Decimal(parseMeasurementPhysicalPct(row.physicalPct)!);
       const previousQty = await _computePreviousQty(tx as never, row.wbsNodeId, cert.id, ctx.tenantId);
-      sortOrder += 1;
+      const order = reordersAllLines ? ++sortOrder : (line?.sortOrder ?? ++appendSort);
 
       if (line) {
         const periodAmount = toMoneyDecimal(currentQty.times(line.unitSalePriceSnapshot));
@@ -321,7 +327,7 @@ export async function saveCertificationMeasurement(
             previousQty,
             cumulativeQty: previousQty.plus(currentQty),
             periodAmount,
-            sortOrder,
+            sortOrder: order,
           },
         });
         continue;
@@ -346,7 +352,7 @@ export async function saveCertificationMeasurement(
           currentQty,
           cumulativeQty: previousQty.plus(currentQty),
           periodAmount: toMoneyDecimal(currentQty.times(unitSalePriceSnapshot)),
-          sortOrder,
+          sortOrder: order,
         },
       });
     }

@@ -1110,7 +1110,7 @@ stateDiagram-v2
 ```
 
 1. **Nueva certificación** con período (desde / hasta).
-2. En el borrador, **Planilla de medición**. A la izquierda se lee, sin editar: cantidad de presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos y subcontratos, en pesos). La **cantidad a certificar** empieza vacía. **Usar libro del período** copia el avance del libro entre esas fechas, sin pasar el saldo. El **% físico** se carga aparte (**Aplicar % del libro** lo sugiere). **Guardar planilla** graba solo las partidas incluidas.
+2. En el borrador, **Planilla de medición**. La tabla muestra saldo, libro del período y, si ya se midió, la cantidad y el % físico. **Medir** (o **Editar**) abre un diálogo con presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos y subcontratos). La cantidad a certificar empieza vacía. **Usar libro del período** copia el avance del libro entre esas fechas, sin pasar el saldo. El **% físico** se carga aparte (**Aplicar % del libro** lo sugiere). **Guardar medición** graba esa partida. **Editar encabezado** abre el período y las notas en un diálogo, sin cambiar de página.
 3. Validar techos: obra **Pública** bloquea si supera 100% acumulado; **Privada** permite con **nota obligatoria**.
 4. **Emitir** → `ISSUED` (inmutable). Quien emite no elige cuenta.
 5. Según respuesta del mandante: marcar **Aprobar** (`APPROVED`) o rechazar (`REJECTED`). Aprobar reconoce el avance y no elige caja, banco ni cuenta contable.
