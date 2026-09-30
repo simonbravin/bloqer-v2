@@ -1110,10 +1110,11 @@ stateDiagram-v2
 ```
 
 1. **Nueva certificación** con período (desde / hasta).
-2. Por partida: cargar **Δ% físico** y/o **$ económico** del período (según el formulario).
+2. En el borrador, **Planilla de medición**. A la izquierda se lee, sin editar: cantidad de presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos y subcontratos, en pesos). La **cantidad a certificar** empieza vacía. **Usar libro del período** copia el avance del libro entre esas fechas, sin pasar el saldo. El **% físico** se carga aparte (**Aplicar % del libro** lo sugiere). **Guardar planilla** graba solo las partidas incluidas.
 3. Validar techos: obra **Pública** bloquea si supera 100% acumulado; **Privada** permite con **nota obligatoria**.
-4. **Emitir** → `ISSUED` (inmutable).
-5. Según respuesta del mandante: marcar **Aprobar** (`APPROVED`) o rechazar (`REJECTED`).
+4. **Emitir** → `ISSUED` (inmutable). Quien emite no elige cuenta.
+5. Según respuesta del mandante: marcar **Aprobar** (`APPROVED`) o rechazar (`REJECTED`). Aprobar reconoce el avance y no elige caja, banco ni cuenta contable.
+6. El detalle muestra el **recorrido** hasta la factura y la cobranza. La deuda nace al emitir la factura (debe Clientes, haber Ingresos por obras, asiento en borrador). La caja se mueve al confirmar la cobranza, en la cuenta de tesorería que elige tesorería.
 
 ### 11.3 Procedimiento — De la certificación a la factura de venta
 

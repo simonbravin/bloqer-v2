@@ -4,6 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import {
   CertificationStatusBadge,
   CertificationLineEditor,
+  CertificationMeasurementWorksheet,
+  CertificationFlowTrail,
   CertificationTotalsPanel,
 } from "@/features/certifications";
 import { EntityDocumentsPanel } from "@/features/documents";
@@ -13,6 +15,8 @@ import { isStorageConfigured } from "@bloqer/config";
 import {
   getCertificationById,
   getActiveInvoiceForCertification,
+  getCertificationMeasurementSheet,
+  listCertificationCollectionAccounts,
   listCertificationWbsHints,
   listEntityDocuments,
   ServiceError,
@@ -27,6 +31,7 @@ import {
   updateCertificationLineAction,
   removeCertificationLineAction,
   refreshPreviousQtyAction,
+  saveCertificationMeasurementAction,
 } from "../actions";
 import { Button } from "@/components/ui/button";
 
@@ -49,11 +54,15 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   let cert;
   let allItems: Awaited<ReturnType<typeof listCertificationWbsHints>> = [];
   let existingInvoice: Awaited<ReturnType<typeof getActiveInvoiceForCertification>> = null;
+  let measurementSheet: Awaited<ReturnType<typeof getCertificationMeasurementSheet>> | null = null;
+  let collectionAccounts: Awaited<ReturnType<typeof listCertificationCollectionAccounts>> = [];
   try {
     cert = await getCertificationById(certId, ctx);
-    [allItems, existingInvoice] = await Promise.all([
-      listCertificationWbsHints(certId, ctx),
+    [allItems, existingInvoice, measurementSheet, collectionAccounts] = await Promise.all([
+      cert.status === "DRAFT" ? Promise.resolve([]) : listCertificationWbsHints(certId, ctx),
       getActiveInvoiceForCertification(certId, ctx),
+      cert.status === "DRAFT" ? getCertificationMeasurementSheet(certId, ctx) : Promise.resolve(null),
+      listCertificationCollectionAccounts(certId, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
@@ -70,6 +79,7 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
   const canApproveCert = can(current.tenantCtx.roles, "APPROVE", "CERTIFICATIONS");
   const canEditAttachments = canEditCert;
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+  const canViewAr = can(current.tenantCtx.roles, "VIEW", "AR");
 
   const editable = canEditCert && cert.status === "DRAFT";
   const invoiceDraft = existingInvoice?.status === "DRAFT";
@@ -164,19 +174,37 @@ export default async function CertificacionDetailPage({ params }: PageProps) {
         </div>
       )}
 
+      <CertificationFlowTrail
+        projectId={projectId}
+        status={cert.status}
+        hasLines={cert.lines.length > 0}
+        currency={cert.currency}
+        moneyVisible={canViewAr}
+        invoice={existingInvoice}
+        collections={collectionAccounts}
+      />
+
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
-          <CertificationLineEditor
-            certificationId={certId}
-            lines={cert.lines}
-            availableItems={allItems}
-            currency={cert.currency}
-            editable={editable}
-            onAddLine={addCertificationLineAction.bind(null, projectId)}
-            onUpdateLine={updateCertificationLineAction.bind(null, projectId, certId)}
-            onRemoveLine={removeCertificationLineAction.bind(null, projectId, certId)}
-            onRefresh={refreshPreviousQtyAction.bind(null, projectId, certId)}
-          />
+          {measurementSheet ? (
+            <CertificationMeasurementWorksheet
+              sheet={measurementSheet}
+              editable={editable}
+              onSave={saveCertificationMeasurementAction.bind(null, projectId)}
+            />
+          ) : (
+            <CertificationLineEditor
+              certificationId={certId}
+              lines={cert.lines}
+              availableItems={allItems}
+              currency={cert.currency}
+              editable={editable}
+              onAddLine={addCertificationLineAction.bind(null, projectId)}
+              onUpdateLine={updateCertificationLineAction.bind(null, projectId, certId)}
+              onRemoveLine={removeCertificationLineAction.bind(null, projectId, certId)}
+              onRefresh={refreshPreviousQtyAction.bind(null, projectId, certId)}
+            />
+          )}
         </div>
 
         <div className="w-full shrink-0 lg:w-56">

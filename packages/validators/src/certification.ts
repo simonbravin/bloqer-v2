@@ -52,7 +52,19 @@ export const updateCertificationLineSchema = z.object({
   sortOrder:   z.number().int().min(0).optional(),
 });
 
+export const saveCertificationMeasurementSchema = z.object({
+  certificationId: z.string().uuid(),
+  rows: z.array(z.object({
+    wbsNodeId: z.string().uuid(),
+    included: z.boolean(),
+    /** Canonical decimal string. The service rounds to 4 dp; a JS number is not accepted. */
+    currentQty: z.string().trim().max(40).optional(),
+    physicalPct: z.string().trim().max(40).optional(),
+  })).max(2000),
+});
+
 export type CreateCertificationInput  = z.infer<typeof createCertificationSchema>;
 export type UpdateCertificationInput  = z.infer<typeof updateCertificationSchema>;
 export type AddCertificationLineInput    = z.infer<typeof addCertificationLineSchema>;
 export type UpdateCertificationLineInput = z.infer<typeof updateCertificationLineSchema>;
+export type SaveCertificationMeasurementInput = z.infer<typeof saveCertificationMeasurementSchema>;

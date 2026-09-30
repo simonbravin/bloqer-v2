@@ -6,6 +6,8 @@ export { CertificationEditForm } from "./components/certification-edit-form";
 export { CertificationStatusBadge, certificationStatusLabel } from "./components/certification-status-badge";
 export { CertificationTotalsPanel } from "./components/certification-totals-panel";
 export { CertificationLineEditor } from "./components/certification-line-editor";
+export { CertificationMeasurementWorksheet } from "./components/certification-measurement-sheet";
+export { CertificationFlowTrail } from "./components/certification-flow-trail";
 export { NewCertificationDialog } from "./components/new-certification-dialog";
 export type { CertificationListItem } from "./components/certification-list";
 export type { BudgetOption } from "./components/certification-form";

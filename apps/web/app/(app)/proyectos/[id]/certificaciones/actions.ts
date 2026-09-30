@@ -4,13 +4,16 @@ import {
   createCertification, updateCertification,
   issueCertification, approveCertification, rejectCertification, cancelCertification,
   addCertificationLine, updateCertificationLine, removeCertificationLine, refreshPreviousQty,
+  saveCertificationMeasurement,
   ServiceError,
 } from "@bloqer/services";
 import {
   createCertificationSchema, updateCertificationSchema,
   addCertificationLineSchema, updateCertificationLineSchema,
+  saveCertificationMeasurementSchema,
   type CreateCertificationInput, type UpdateCertificationInput,
   type AddCertificationLineInput, type UpdateCertificationLineInput,
+  type SaveCertificationMeasurementInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
@@ -142,6 +145,20 @@ export async function removeCertificationLineAction(
   try {
     await removeCertificationLine(lineId, ctx);
     revalidateCertificationPaths(projectId, certId);
+    return { ok: true };
+  } catch (err) { return handle(err); }
+}
+
+export async function saveCertificationMeasurementAction(
+  projectId: string,
+  data: SaveCertificationMeasurementInput,
+): Promise<Ok | Err> {
+  const ctx = await getCtx();
+  const parsed = saveCertificationMeasurementSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+  try {
+    await saveCertificationMeasurement(parsed.data, ctx);
+    revalidateCertificationPaths(projectId, data.certificationId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }

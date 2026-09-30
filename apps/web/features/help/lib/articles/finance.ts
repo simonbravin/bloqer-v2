@@ -66,7 +66,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
   {
     slug: "emitir-y-aprobar-certificacion",
     title: "Emitir y aprobar certificación al cliente",
-    summary: "Avance certificado sobre presupuesto APPROVED/CLOSED.",
+    summary: "Planilla de medición sobre presupuesto APPROVED/CLOSED. Aprobar no elige cuenta.",
     intents: ["certificacion-cliente"],
     modules: ["certificaciones"],
     level: "project",
@@ -75,12 +75,20 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/certificaciones", label: "Certificaciones" }],
     steps: [
       "Prerrequisito: presupuesto APPROVED o CLOSED.",
-      "Nueva certificación con período.",
-      "Cargá Δ% físico y/o $ económico por partida.",
-      "Emitir (ISSUED, inmutable) → Aprobar (APPROVED) o rechazar según el mandante.",
+      "Nueva certificación con período. El alta es solo el encabezado.",
+      "En el borrador, la planilla muestra presupuesto, saldo, libro y costo del período como referencia. La cantidad a certificar empieza vacía. Usar libro del período copia el avance de esas fechas, topeado por el saldo. El % físico es independiente. Guardar planilla graba solo las partidas incluidas.",
+      "Emitir (ISSUED, inmutable) → Aprobar (APPROVED) o rechazar según el mandante. Aprobar no elige cuenta ni abre la deuda.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "aprobar-el-presupuesto"],
-    keywords: ["certificacion", "certificar", "avance cliente", "certificado de avance", "certificado"],
+    keywords: [
+      "certificacion",
+      "certificar",
+      "avance cliente",
+      "certificado de avance",
+      "certificado",
+      "planilla de medicion",
+      "libro del periodo",
+    ],
     guideRef: "§11",
   },
   {
@@ -99,8 +107,8 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     stepsTitle: "Caminito",
     steps: [
       "¿Presupuesto APPROVED o CLOSED? Si no → no se certifica con normalidad.",
-      "Nueva certificación → cargar avance. ¿Supera 100%? Pública → Bloqer bloquea. Privada → sigue con nota obligatoria.",
-      "Emitir (inmutable). ¿El mandante aprueba? Si no → Rechazada, no se factura. Si sí → APPROVED (todavía no hay CxC).",
+      "Nueva certificación → en la planilla confirmá la cantidad (el libro y el costo son referencia; la cantidad no viene precargada con el saldo). ¿Supera 100%? Pública → Bloqer bloquea. Privada → sigue con nota obligatoria.",
+      "Emitir (inmutable). ¿El mandante aprueba? Si no → Rechazada, no se factura. Si sí → APPROVED (todavía no hay CxC; aprobar no elige cuenta).",
       "CTA Emitir factura → CxC. Cobrar desde Cuentas por cobrar. Solo la cobranza confirmada mueve caja. No hay Cobrar ahora en el alta de factura de obra.",
     ],
     figure: {

@@ -42,6 +42,7 @@ export {
 export type { WbsImportProfile } from "./budget/wbs-code-rules";
 export * from "./certification/certification.service";
 export * from "./certification/certification-line.service";
+export * from "./certification/certification-measurement";
 export {
   canViewArProjectArea,
   canEditArArea,
