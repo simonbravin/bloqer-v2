@@ -179,24 +179,6 @@ export async function createProcurementQuote(
     throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
   }
 
-  const settings = await getCompanyProcurementSettings(pr.companyId, ctx);
-  const activeQuotes = await prisma.procurementQuote.count({
-    where: {
-      purchaseRequestId: pr.id,
-      supplierContactId: input.supplierContactId,
-      status: { in: ["DRAFT", "RECEIVED", "SELECTED"] },
-    },
-  });
-  if (activeQuotes > 0) {
-    throw new ServiceError("CONFLICT", "Ya existe una cotización activa de este proveedor para la solicitud");
-  }
-  const totalQuotes = await prisma.procurementQuote.count({
-    where: { purchaseRequestId: pr.id, status: { notIn: ["REJECTED", "SUPERSEDED"] } },
-  });
-  if (totalQuotes >= settings.maxQuotesAllowed) {
-    throw new ServiceError("CONFLICT", `Máximo ${settings.maxQuotesAllowed} cotizaciones por solicitud`);
-  }
-
   await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   assertQuoteLinesMatchRequest(pr.lines, input.lines);
@@ -210,6 +192,26 @@ export async function createProcurementQuote(
     const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id } });
     if (current.status !== "SUBMITTED") {
       throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
+    }
+    // Check capacity only after acquiring the SC lock: another creator may have
+    // consumed the slot or added this supplier while this transaction waited.
+    const settings = await getCompanyProcurementSettings(current.companyId, ctx, tx);
+    const activeQuotes = await tx.procurementQuote.count({
+      where: {
+        tenantId: ctx.tenantId,
+        purchaseRequestId: pr.id,
+        supplierContactId: input.supplierContactId,
+        status: { in: ["DRAFT", "RECEIVED", "SELECTED"] },
+      },
+    });
+    if (activeQuotes > 0) {
+      throw new ServiceError("CONFLICT", "Ya existe una cotización activa de este proveedor para la solicitud");
+    }
+    const totalQuotes = await tx.procurementQuote.count({
+      where: { tenantId: ctx.tenantId, purchaseRequestId: pr.id, status: { notIn: ["REJECTED", "SUPERSEDED"] } },
+    });
+    if (totalQuotes >= settings.maxQuotesAllowed) {
+      throw new ServiceError("CONFLICT", `Máximo ${settings.maxQuotesAllowed} cotizaciones por solicitud`);
     }
     const iibbPerceptionRate = new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT);
     const created = await tx.procurementQuote.create({

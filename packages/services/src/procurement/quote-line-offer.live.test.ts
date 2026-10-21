@@ -148,4 +148,57 @@ describe("D-118 quote coverage and historical preservation (isolated database)",
       assert.equal(quote.lines[1]!.offerKind, "NOT_QUOTED");
     }
   });
+
+  it("rejects a concurrent duplicate supplier quote instead of counting two offers", async () => {
+    const concurrent = await createProcurementRegressionFixtures(prisma);
+    const original = await savedQuote(concurrent.quoteId);
+    await deleteProcurementQuote(original.id, concurrent.requestId, concurrent.ctx);
+    const input = {
+      purchaseRequestId: concurrent.requestId, supplierContactId: original.supplierContactId,
+      currency: "ARS", iibbPerceptionRate: "0",
+      lines: concurrent.lineIds.map((purchaseRequestLineId, sortOrder) => ({
+        purchaseRequestLineId, sortOrder, unitPrice: "100", taxRate: "21", discountPct: "0", offerKind: "QUOTED" as const,
+      })),
+    };
+    const results = await Promise.allSettled([
+      createProcurementQuote(input, concurrent.ctx), createProcurementQuote(input, concurrent.ctx),
+    ]);
+    assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+    const rejected = results.find(result => result.status === "rejected");
+    assert.ok(rejected?.status === "rejected" && rejected.reason instanceof ServiceError);
+    assert.equal(rejected.reason.code, "CONFLICT");
+    assert.match(rejected.reason.message, /cotización activa de este proveedor/);
+    assert.equal(await prisma.procurementQuote.count({ where: {
+      purchaseRequestId: concurrent.requestId, supplierContactId: original.supplierContactId,
+    } }), 1);
+  });
+
+  it("enforces the quote maximum for concurrent different suppliers", async () => {
+    const concurrent = await createProcurementRegressionFixtures(prisma);
+    const suppliers = [(await savedQuote(concurrent.quoteId)).supplierContactId,
+      (await savedQuote(concurrent.secondQuoteId)).supplierContactId];
+    await deleteProcurementQuote(concurrent.quoteId, concurrent.requestId, concurrent.ctx);
+    await deleteProcurementQuote(concurrent.secondQuoteId, concurrent.requestId, concurrent.ctx);
+    await prisma.companyProcurementSettings.update({
+      where: { companyId: concurrent.ctx.companyId! }, data: { maxQuotesAllowed: 1 },
+    });
+    try {
+      const results = await Promise.allSettled(suppliers.map(supplierContactId => createProcurementQuote({
+        purchaseRequestId: concurrent.requestId, supplierContactId, currency: "ARS", iibbPerceptionRate: "0",
+        lines: concurrent.lineIds.map((purchaseRequestLineId, sortOrder) => ({
+          purchaseRequestLineId, sortOrder, unitPrice: "100", taxRate: "21", discountPct: "0", offerKind: "QUOTED" as const,
+        })),
+      }, concurrent.ctx)));
+      assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+      const rejected = results.find(result => result.status === "rejected");
+      assert.ok(rejected?.status === "rejected" && rejected.reason instanceof ServiceError);
+      assert.equal(rejected.reason.code, "CONFLICT");
+      assert.match(rejected.reason.message, /Máximo 1 cotizaciones/);
+      assert.equal(await prisma.procurementQuote.count({ where: { purchaseRequestId: concurrent.requestId } }), 1);
+    } finally {
+      await prisma.companyProcurementSettings.update({
+        where: { companyId: concurrent.ctx.companyId! }, data: { maxQuotesAllowed: 3 },
+      });
+    }
+  });
 });

@@ -221,6 +221,8 @@ Hasta esa decisión, no convertir ceros históricos automáticamente ni prohibir
 
 ## 10. Estado y próximos entregables
 
+Este apartado conserva el corte inicial del plan. Estado actualizado de entrega y controles: §16.
+
 - **Completado:** arquitectura/modelo, Prisma, 69 migraciones ensayadas en DB aislada, comparación estructural sin diferencias, fixtures, 67 pruebas unitarias aprobadas y fichas privadas de conciliación actualizadas. Ver informe de fase 0.
 - **Fase 1 y pendientes técnicos en código:** selección parcial, importes/mensajes, precisión decimal, conservación de importes y concurrencia de borradores automáticos; ver §12. Integración de adjudicación/AP verificada en DB aislada. Publicación pendiente: alias Vercel (P-IND-03) y smoke UI.
 - **Diagnóstico actualizado:** P-IND-04 corregido; OC-051 requiere justificación por falta de referencia, según mensaje aportado y verificación de solo lectura (§12). B01 mantiene conciliación histórica pendiente: no hay resolución de datos ni diagnóstico único de las duplicaciones. P-IND-01 queda verificado estructuralmente con salvedad de procedencia.
@@ -352,6 +354,26 @@ El Owner aprobó Cotizado/No cotizado/Bonificado y luego el campo opcional, pres
 - **Documentación:** decisiones, preguntas, reglas, módulo, estados, ERD, guía §9.1, ayuda y smoke actualizados. Índice AI regenerado; sin nuevos tools AI ni dependencia npm.
 - **Validación B08:** los 6 escenarios de integración pasaron juntos en DB aislada (180,8 s), incluyendo preservación de OC histórica, bloqueo de readjudicación de cero sin clasificar, mínimo por ítem, rollback, atajo y edición concurrente. La primera ejecución reprodujo timeout de edición; además se corrigieron firma/aserción del test de anulación, sin relajar el control del producto. Regresión anterior: 7 casos de adjudicación/permisos/decimales aprobados en ejecución separada (112,0 s). Suite general final: 1.209 pruebas aprobadas en 6 paquetes. Tipos de 13 paquetes y lint correctos (warnings generales preexistentes); UI/ayuda: 23 pruebas y nueva comprobación de las 8 de selección tras ajustar la etiqueta histórica. Índice AI: 487 chunks verificados. Smoke visual y despliegue no ejecutados.
 - **Publicación:** este bloque agrega la primera migración de la intervención. Antes de push/deploy, verificar el destino Vercel/Neon y recuperación: el build migra automáticamente su DB, incluso en preview. P-IND-03 sigue pendiente; no anunciar la funcionalidad en portal ni emitir el informe final de correcciones disponibles todavía. El procedimiento de recuperación contempla que el código viejo desconoce No cotizado/Bonificado.
+
+## 16. Fase 4 — Revisión final y preparación de entrega (21/10/2026)
+
+Alcance: cambios INDARI de fases 1/2 y B08 de fase 3, junto con la migración aditiva D-118. No constituye auditoría exhaustiva de todos los módulos. Q-061/062/063 siguen pendientes; la solicitud de fase 4 no aprueba esas reglas ni autoriza regularizar datos históricos sin comprobantes.
+
+### Hallazgos y correcciones
+
+- **Crítico — Preview compartía conexiones con Production:** Vercel tenía `DATABASE_URL` y `DIRECT_URL` asignadas conjuntamente a ambos entornos. Como el build aplica migraciones, un push de revisión podía afectar la misma DB del portal. El Owner autorizó configurar ambas variables como secretos exclusivos de Preview para `codex/indari-pendientes-decimales`, apuntando a `bloqer_indari_phase0_20261021` en el compute dev. Vercel confirmó el guardado; Production no se editó. El aislamiento rige para el próximo despliegue de esa rama, no retroactivamente para previews anteriores. **Pendiente global:** otras ramas todavía heredan las variables compartidas; no extender a ellas esta verificación.
+- **Medio — proveedor duplicado por concurrencia:** dos cargas simultáneas de cotización del mismo proveedor podían superar el control previo y persistir ambas. Además de duplicar la oferta, podía inflarse el conteo del mínimo para adjudicar. La prueba en DB aislada reprodujo dos altas exitosas donde debía aceptarse una. El conteo de proveedor se realiza ahora dentro de la transacción, después del bloqueo SC compartido con adjudicación. No agrega una regla nueva ni un índice/migración; cumple la unicidad operativa ya documentada.
+- **Medio — máximo de cotizaciones por concurrencia:** dos proveedores podían ocupar simultáneamente el último cupo. Se reprodujo máximo 1 con dos altas exitosas. El máximo y los settings se consultan dentro de la misma transacción/bloqueo, de modo que la segunda operación observa el cupo consumido y devuelve el conflicto funcional existente. No se cambian los límites configurados del cliente.
+- **Leve — instrucciones de smoke desactualizadas:** el checklist de fase 1 todavía describía el atajo anterior que incluía todos los ítems libres. Se actualizó al alcance vigente D-118: solo cotizados positivos; bonificados por selección expresa. Se agregaron los dos escenarios concurrentes al checklist.
+
+### Verificación y situación de publicación
+
+- Consulta de producción estrictamente de lectura: INDARI no tiene grupos de cotizaciones activas duplicadas por SC/proveedor. La migración `20261021180000_quote_line_offer_kind` todavía no figura aplicada. No se escribieron datos de Casa Hogar.
+- Reproducción previa: los dos tests nuevos fallaron por aceptar dos altas, no por timeout. Evidencia privada `phase4-quote-race-before.txt`. Suite ampliada: **8/8 casos aprobados** juntos en DB aislada (255,4 s), evidencia `phase4-offers-verified.txt`. Se completó el descuento explícito cero exigido por el tipo de los fixtures; la semántica ejecutada sigue siendo descuento cero.
+- Suite general: 1.209 pruebas aprobadas en seis paquetes; tipos aprobados en 13 paquetes. Lint general aprobado con warnings preexistentes; lint dirigido de los dos archivos modificados sin errores. Índice AI vigente: 487 chunks, hash `40a375f5eb08…`; no cambia el flujo visible ni el contrato AI en esta corrección.
+- Vercel confirmó estado `success` para `b3d178cb` (fase 2). Es el resultado de ese despliegue, no evidencia de que `portal.bloqer.app` sirva esa versión.
+- **P-IND-03 parcialmente resuelto:** tras iniciar sesión, Vercel confirmó `portal.bloqer.app` en Production, deployment `G2wxsALbkwt2mWCeriW6SB9HjmGS`, SHA `527c824c9ad9009b0d9cf2d729a184dc5f2e31f9`. El próximo preview de esta rama tiene conexiones aisladas autorizadas y verificadas. Las variables Production son secretos no revelables; no se rotaron ni sustituyeron.
+- Pendientes de entrega: push/PR con CI de la revisión final y smoke del nuevo preview; recuperación Neon y migración/publicación de producción antes del cierre. El informe final a INDARI se emite después de confirmar qué correcciones están disponibles; no confundir implementación local con publicación.
 
 ## Referencias canónicas
 
