@@ -12,7 +12,8 @@ import {
 import {
   addDecimal,
   calcDocumentHeaderTaxTotals,
-  calcExclusiveLineAmounts,
+  resolveDocumentLineAmounts,
+  type StoredDocumentLineMoney,
   compareDecimal,
   roundMoney,
 } from "@bloqer/utils";
@@ -27,6 +28,8 @@ import { updateSalesInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/ac
 import { updateCompanySalesInvoiceAction } from "@/app/(app)/finanzas/facturas/actions";
 
 export type SalesNoteLineDraft = {
+  id?: string;
+  originalMoney?: StoredDocumentLineMoney;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -102,9 +105,10 @@ export function InvoiceEditForm({
     let subtotal = "0";
     let taxAmount = "0";
     for (const line of lines) {
-      const amounts = calcExclusiveLineAmounts({
+      const amounts = resolveDocumentLineAmounts({
+        previous: line.originalMoney,
         quantity: line.quantity || "0",
-        unitPriceNet: line.unitPrice || "0",
+        unitPrice: line.unitPrice || "0",
         taxRatePercent: invoiceLetter === "C" || invoiceLetter === "E" ? "0" : line.taxRate || "0",
         discountPct: line.discountPct || "0",
       });
@@ -156,6 +160,7 @@ export function InvoiceEditForm({
       ...(isFiscalNote
         ? {
             lines: lines.map((l, i) => ({
+              id: l.id,
               description: l.description.trim(),
               quantity: l.quantity || "1",
               unitPrice: l.unitPrice,

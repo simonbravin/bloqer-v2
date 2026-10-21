@@ -7,7 +7,11 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders } from "./procurement-access";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
-import { recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
+import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
+
+// Multi-supplier awards include locks, line writes and audit in one atomic transaction.
+// Bound their duration explicitly; the Prisma 5s default expired on the isolated Neon regression.
+const AWARD_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
 
 const CONFIRMED_PLUS: PurchaseOrderStatus[] = [
   "CONFIRMED",
@@ -193,6 +197,7 @@ async function createOnePoFromQuoteLinesInTx(
   options: {
     skipMinQuotesCheck?: boolean;
     skipPrLock?: boolean;
+    expectedPurchaseRequestId?: string;
     /** Pre-allocated OC number (batch awards in one TX). */
     documentNumber?: number;
   } = {},
@@ -211,12 +216,15 @@ async function createOnePoFromQuoteLinesInTx(
     throw new ServiceError("CONFLICT", "Solo se pueden adjudicar cotizaciones recibidas");
   }
   const pr = quote.purchaseRequest;
+  if (options.expectedPurchaseRequestId && pr.id !== options.expectedPurchaseRequestId) {
+    throw new ServiceError("CONFLICT", "La cotización no pertenece a esta solicitud");
+  }
   if (!["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)) {
     throw new ServiceError("CONFLICT", "Estado de solicitud incompatible");
   }
 
   if (!options.skipMinQuotesCheck) {
-    const settings = await getCompanyProcurementSettings(pr.companyId, ctx);
+    const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
     const receivedCount = await tx.procurementQuote.count({
       where: {
         purchaseRequestId: pr.id,
@@ -287,7 +295,7 @@ async function createOnePoFromQuoteLinesInTx(
   const wbsIdsForDominant = Array.from(
     new Set(prLines.map((l) => l.wbsNodeId).filter((id): id is string => Boolean(id))),
   );
-  const wbsDominant = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
+  const wbsDominant = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId, tx);
 
   let number = options.documentNumber;
   if (number == null) {
@@ -298,6 +306,12 @@ async function createOnePoFromQuoteLinesInTx(
     number = (maxNum._max.number ?? 0) + 1;
   }
 
+  const selectedQuoteLines = prLines.map((line) => quoteLineByPrLine.get(line.id)!);
+  const totals = headerTotalsWithIibbPerception({
+    lineSubtotals: selectedQuoteLines.map((line) => line.lineSubtotal),
+    lineTaxes: selectedQuoteLines.map((line) => line.lineTax),
+    iibbPerceptionRate: quote.iibbPerceptionRate,
+  });
   const po = await tx.purchaseOrder.create({
     data: {
       tenantId: ctx.tenantId,
@@ -312,13 +326,14 @@ async function createOnePoFromQuoteLinesInTx(
       currency: quote.currency,
       fxRate: quote.fxRate,
       iibbPerceptionRate: quote.iibbPerceptionRate,
+      ...totals,
       status: PurchaseOrderStatus.DRAFT,
       createdBy: ctx.actorUserId,
       updatedBy: ctx.actorUserId,
     },
   });
 
-  for (const prl of prLines) {
+  const poLines = prLines.map((prl) => {
     const ql = quoteLineByPrLine.get(prl.id)!;
     const costType = coerceFreeTextGoodsCostType(
       prl.lineType,
@@ -329,36 +344,33 @@ async function createOnePoFromQuoteLinesInTx(
         wbsDominantCostType: prl.wbsNodeId ? wbsDominant.get(prl.wbsNodeId) ?? null : null,
       }),
     );
-    await tx.purchaseOrderLine.create({
-      data: {
-        purchaseOrderId: po.id,
-        purchaseRequestLineId: prl.id,
-        procurementQuoteLineId: ql.id,
-        isActiveAward: true,
-        wbsNodeId: prl.wbsNodeId,
-        costAnalysisLineId: prl.costAnalysisLineId,
-        productId: prl.productId,
-        costType,
-        description: prl.description,
-        unit: prl.unit,
-        quantity: prl.quantity,
-        unitPrice: ql.unitPrice,
-        taxRate: ql.taxRate,
-        discountPct: ql.discountPct,
-        lineSubtotal: ql.lineSubtotal,
-        lineTax: ql.lineTax,
-        lineTotal: ql.lineTotal,
-        budgetUnitCostSnapshot: prl.budgetUnitCostSnapshot,
-        sortOrder: prl.sortOrder,
-      },
-    });
-    await tx.purchaseRequestLine.update({
-      where: { id: prl.id },
-      data: { awardedPurchaseOrderId: po.id },
-    });
-  }
-
-  await recalcPurchaseOrderTotals(tx, po.id);
+    return {
+      purchaseOrderId: po.id,
+      purchaseRequestLineId: prl.id,
+      procurementQuoteLineId: ql.id,
+      isActiveAward: true,
+      wbsNodeId: prl.wbsNodeId,
+      costAnalysisLineId: prl.costAnalysisLineId,
+      productId: prl.productId,
+      costType,
+      description: prl.description,
+      unit: prl.unit,
+      quantity: prl.quantity,
+      unitPrice: ql.unitPrice,
+      taxRate: ql.taxRate,
+      discountPct: ql.discountPct,
+      lineSubtotal: ql.lineSubtotal,
+      lineTax: ql.lineTax,
+      lineTotal: ql.lineTotal,
+      budgetUnitCostSnapshot: prl.budgetUnitCostSnapshot,
+      sortOrder: prl.sortOrder,
+    };
+  });
+  await tx.purchaseOrderLine.createMany({ data: poLines });
+  await tx.purchaseRequestLine.updateMany({
+    where: { purchaseRequestId: pr.id, id: { in: uniqueLineIds } },
+    data: { awardedPurchaseOrderId: po.id },
+  });
 
   await auditProcurement(
     ctx,
@@ -438,7 +450,7 @@ export async function createPurchaseOrderFromQuoteLines(
       );
     }
     return poId;
-  });
+  }, AWARD_TRANSACTION_OPTIONS);
 
   return { purchaseOrderId };
 }
@@ -471,7 +483,7 @@ export async function createPurchaseOrdersFromAwards(
     }
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
 
-    const settings = await getCompanyProcurementSettings(pr.companyId, ctx);
+    const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
     const receivedCount = await tx.procurementQuote.count({
       where: {
         purchaseRequestId,
@@ -493,13 +505,6 @@ export async function createPurchaseOrdersFromAwards(
 
     const ids: string[] = [];
     for (const group of groups) {
-      const quote = await tx.procurementQuote.findUnique({
-        where: { id: group.procurementQuoteId },
-        select: { purchaseRequestId: true },
-      });
-      if (!quote || quote.purchaseRequestId !== purchaseRequestId) {
-        throw new ServiceError("CONFLICT", "La cotización no pertenece a esta solicitud");
-      }
       const poId = await createOnePoFromQuoteLinesInTx(
         tx,
         ctx,
@@ -509,6 +514,7 @@ export async function createPurchaseOrdersFromAwards(
           skipMinQuotesCheck: true,
           skipPrLock: true,
           documentNumber: nextNumber,
+          expectedPurchaseRequestId: purchaseRequestId,
         },
       );
       nextNumber += 1;
@@ -527,7 +533,7 @@ export async function createPurchaseOrdersFromAwards(
       );
     }
     return ids;
-  });
+  }, AWARD_TRANSACTION_OPTIONS);
 
   return { purchaseOrderIds };
 }

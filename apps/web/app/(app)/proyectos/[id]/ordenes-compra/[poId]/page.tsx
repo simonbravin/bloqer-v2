@@ -329,6 +329,18 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         ) : null}
       </div>
 
+      <p className="text-sm text-muted-foreground">
+        Proveedor: <span className="font-medium text-foreground">{order.supplierName}</span>
+        {order.purchaseRequestId ? (
+          <>
+            {" · "}
+            <Link href={`/proyectos/${id}/solicitudes-compra/${order.purchaseRequestId}`} className="underline">
+              Ver solicitud de origen
+            </Link>
+          </>
+        ) : null}
+      </p>
+
       <ProcessStepper
         aria-label="Progreso de la orden de compra"
         steps={purchaseOrderProcessSteps({
@@ -355,7 +367,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
       {isDraft && canEditPo && linesNeedingJustification.length > 0 ? (
         <ProcurementAmberCallout>
           <p>
-            Desvío en{" "}
+            Justificación pendiente en{" "}
             {linesNeedingJustification.join("; ")}. Completá <strong>Justificación desvío</strong> en{" "}
             <Link href={`/proyectos/${id}/ordenes-compra/${poId}/editar`} className="underline">
               Editar

@@ -1848,6 +1848,23 @@
 
 ---
 
+### D-117 — Conservar importes de líneas sin cambios al editar
+
+- **Fecha:** 2026-10-21
+- **Estado:** ACTIVA
+- **Decidido por:** Owner, aprobación explícita en revisión INDARI: «Sí, conservar importes sin cambios y recalcular al editar».
+- **Contexto:** mostrar 2 decimales no debe truncar el unitario persistido a 4. Además, reconstruir un precio con IVA desde el neto redondeado puede convertir $10,00 en $9,99 o $3.330,00 en $3.330,02.
+- **Decisión:**
+  1. En edición, conservar los componentes monetarios guardados de la línea cuando cantidad, precio neto, alícuota y descuento sean numéricamente iguales. Cambios en notas, descripción u orden no obligan a recalcular dinero.
+  2. Al modificar cualquiera de esos valores, recalcular con el kernel vigente. Activar explícitamente precio con IVA también reinterpreta/recalcula.
+  3. En carga con IVA incluido y sin descuento, respetar D-086: total = cantidad × precio bruto a 2 dp, neto = total / factor, IVA = total − neto. Con descuento sigue D-093 (extraer neto primero y descontar).
+  4. Importes anteriores provienen del documento leído por el servidor dentro de la transacción, nunca de totales enviados por el navegador. Un identificador de línea en el payload no permite leer otro documento.
+  5. Mantener dinero 2 dp half-up; unitarios/cantidades/% 4 dp y FX 6 dp. En campos habilitados a 4 dp, mostrar la precisión al editar y 2 dp fuera del campo. No reescribir valores por enfocar, desenfocar o enviar sin editarlos.
+  6. No recalcular históricos emitidos/pagados ni regularizar diferencias por scripts. No cambia ERD ni agrega campos persistidos.
+- **Documentos afectados:** MONEY_MODEL, TAX_FORMULAS, guía §4.1, centro de ayuda, plan INDARI.
+
+---
+
 ## Decisiones SUPERSEDED
 
 _(ninguna por ahora)_

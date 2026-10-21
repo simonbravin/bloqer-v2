@@ -93,11 +93,12 @@ export function computeDominantCostTypeFromApuLines(
 export async function loadWbsDominantCostTypes(
   wbsNodeIds: string[],
   tenantId: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<Map<string, CostCategory | null>> {
   const result = new Map<string, CostCategory | null>();
   if (wbsNodeIds.length === 0) return result;
 
-  const rows = await prisma.wbsNode.findMany({
+  const rows = await db.wbsNode.findMany({
     where: { id: { in: wbsNodeIds }, budget: { project: { tenantId } } },
     select: {
       id: true,

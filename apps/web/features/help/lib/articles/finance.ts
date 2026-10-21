@@ -629,6 +629,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Para el mismo % en todas: escribí Descuento general % (0 a 100) → Aplicar a todas. Vacío no copia ni limpia.",
       "El descuento baja el subtotal; el IVA se calcula sobre el restante. El precio de lista no se pisa.",
       "En Factura B con precio c/IVA, el % se aplica al neto extraído, no al bruto.",
+      "Si guardás una línea existente sin cambiar cantidad, precio, IVA ni descuento, conserva sus importes. Los comprobantes emitidos o pagados no se ajustan automáticamente.",
       "Guardá en borrador (100% en una línea está permitido). Emitir o confirmar la OC exige total mayor a cero.",
     ],
     effects: [

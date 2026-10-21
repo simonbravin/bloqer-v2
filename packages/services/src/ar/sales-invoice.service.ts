@@ -20,7 +20,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
-import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
+import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
@@ -642,17 +642,18 @@ export async function updateSalesInvoice(
     });
 
     if (input.lines && isFiscalNote) {
+      const previousById = indexStoredDocumentLines(input.lines, updatedInvoice.lines);
       await tx.salesInvoiceLine.deleteMany({ where: { invoiceId: id } });
       for (const [i, line] of input.lines.entries()) {
         const taxRate = zeroTaxForLetter
           ? new Prisma.Decimal(0)
           : new Prisma.Decimal(line.taxRate ?? "0");
-        const { lineSubtotal, lineTax, lineTotal } = calcLine(
-          new Prisma.Decimal(line.quantity),
-          new Prisma.Decimal(line.unitPrice),
-          taxRate,
-          new Prisma.Decimal(line.discountPct ?? "0"),
-        );
+        const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+          quantity: new Prisma.Decimal(line.quantity),
+          unitPrice: new Prisma.Decimal(line.unitPrice),
+          taxRate, discountPct: new Prisma.Decimal(line.discountPct ?? "0"),
+          previous: line.id ? previousById.get(line.id) : undefined,
+        });
         await tx.salesInvoiceLine.create({
           data: {
             invoiceId: id,

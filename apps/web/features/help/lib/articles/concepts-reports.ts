@@ -504,8 +504,10 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/cuentas-por-pagar", label: "Cuentas por pagar" },
     ],
     steps: [
-      "Dinero (totales, saldos, caja, precios unitarios): siempre 2 decimales con miles (ej. 1.200.000,00).",
+      "Dinero (totales, saldos, caja): siempre 2 decimales con miles (ej. 1.200.000,00).",
       "Tipo de cambio: hasta 6 decimales.",
+      "En compras y líneas de facturas/gastos, los campos de cantidad, unitario y descuento habilitados a 4 decimales muestran esa precisión al editar. Guardar sin modificar conserva el valor completo.",
+      "Al editar cotizaciones, OC y facturas en borrador, cambiar notas o descripción conserva los importes de la línea. Cambiar cantidad, precio, IVA o descuento recalcula. Con IVA incluido sin descuento se conserva el total ingresado.",
       "Cantidades en pantalla: 2 decimales (ej. 1,00). % (IVA, descuento, desvíos, avance): 2 decimales (ej. 0,00 o 10,50).",
       "El mismo formato vale en OC, SC, facturas, tesorería, presupuesto, libro de obra, cronograma y políticas: coma decimal, punto de miles. Días/cotizaciones/personas siguen enteros.",
       "Al pagar o cobrar el total: click en el saldo pendiente o dejá el default; no reescribas un redondeo distinto.",
@@ -525,6 +527,9 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     keywords: [
       "decimales",
       "2 decimales",
+      "4 decimales",
+      "conservar importes",
+      "iva incluido",
       "redondeo",
       "montos",
       "puntuacion",
@@ -534,7 +539,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "saldo pendiente",
       "centavos",
     ],
-    guideRef: "§4.1 · D-053",
+    guideRef: "§4.1 · D-053 · D-117",
   },
   {
     slug: "ver-registro-de-actividad",

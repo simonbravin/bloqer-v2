@@ -11,7 +11,7 @@ import {
 export type GrossInclusiveLineAmounts = {
   /**
    * Net unit price to persist (4 dp — matches invoice line Decimal(18,4)).
-   * 4 dp is required so exclusive recompute (qty × unit → 2 dp) rebuilds the same line money.
+   * 4 dp is storage precision; it cannot always reconstruct the original gross total.
    */
   unitPriceNet: string;
   lineSubtotal: string;
@@ -23,7 +23,7 @@ export type GrossInclusiveLineAmounts = {
 /**
  * Factura B / precio final c/IVA ([D-086]): unit price entered is gross.
  * lineTotal = round(qty × gross); net = round(total / (1+rate/100)); tax = total − net.
- * unitPriceNet = Neto / qty at 4 dp so DRAFT re-save exclusive path does not drift.
+ * unitPriceNet = Neto / qty at 4 dp. Unchanged edits preserve stored line amounts (D-117).
  */
 export function calcLineAmountsFromGrossInclusive(params: {
   quantity: string | number;

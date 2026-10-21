@@ -78,6 +78,7 @@ export {
   normalizeDiscountPct,
   resolveDocumentLineAmounts,
   type DocumentLineAmounts,
+  type StoredDocumentLineMoney,
   type ExclusiveLineAmounts,
 } from "./line-amounts";
 export {

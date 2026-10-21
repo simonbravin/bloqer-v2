@@ -1,5 +1,7 @@
 "use client";
 
+import type { StoredDocumentLineMoney } from "@bloqer/utils";
+
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -27,6 +29,8 @@ import { DocumentTaxTotalsFooter } from "@/features/finance/components/iibb-perc
 import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type InvoiceLine = {
+  id?: string;
+  originalMoney?: StoredDocumentLineMoney;
   description: string;
   quantity: string;
   unitPrice: string;
@@ -77,6 +81,7 @@ const EMPTY_LINE: InvoiceLine = {
 function linePreview(l: InvoiceLine, pricesIncludeTax: boolean) {
   try {
     const r = resolveDocumentLineAmounts({
+      previous: l.originalMoney,
       quantity: safeDecimal(l.quantity),
       unitPrice: safeDecimal(l.unitPrice),
       taxRatePercent: safeDecimal(l.taxRate),
@@ -231,6 +236,7 @@ export function InvoiceLinesEditor({
             Descuento general %
           </Label>
           <DecimalInput
+            precision={4}
             id="invoice-header-discount"
             value={headerDiscount}
             onValueChange={setHeaderDiscount}
@@ -372,6 +378,7 @@ export function InvoiceLinesEditor({
                     Cantidad
                   </Label>
                   <DecimalInput
+                    precision={4}
                     id={quantityId}
                     required
                     value={line.quantity}
@@ -385,6 +392,7 @@ export function InvoiceLinesEditor({
                     {pricesIncludeTax ? "P. unit. (c/IVA)" : "P. unit."}
                   </Label>
                   <DecimalInput
+                    precision={4}
                     id={unitPriceId}
                     required
                     value={line.unitPrice}
@@ -398,6 +406,7 @@ export function InvoiceLinesEditor({
                     Desc. %
                   </Label>
                   <DecimalInput
+                    precision={4}
                     id={`${lineKey}-discount`}
                     value={line.discountPct ?? "0"}
                     onValueChange={(v) => update(i, "discountPct", v)}

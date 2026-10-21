@@ -111,6 +111,8 @@ export default async function EditarFacturaPage({ params }: PageProps) {
             iibbPerceptionRate: invoice.iibbPerceptionRate,
             subtotal: invoice.subtotal,
             lines: invoice.lines.map((l) => ({
+              id: l.id,
+              originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct ?? "0", lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },
               description: l.description,
               quantity: l.quantity,
               unitPrice: l.unitPrice,

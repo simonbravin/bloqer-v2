@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Prisma } from "@bloqer/database";
-import { resolveInvoiceLineMoney, parseDiscountPct } from "./invoice-line-money";
+import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "./invoice-line-money";
 import { ServiceError } from "../types";
 
 describe("resolveInvoiceLineMoney", () => {
@@ -120,5 +120,32 @@ describe("parseDiscountPct", () => {
       assert.ok(err instanceof ServiceError);
       return true;
     });
+  });
+});
+
+
+describe("preserving trusted saved money [D-117]", () => {
+  it("keeps gross 10.00 on unchanged net edit and recalculates a changed price", () => {
+    const quantity = new Prisma.Decimal(1);
+    const taxRate = new Prisma.Decimal(21);
+    const original = resolveInvoiceLineMoney({ quantity, unitPrice: new Prisma.Decimal(10), taxRate, pricesIncludeTax: true });
+    assert.equal(original.lineTotal.toFixed(2), "10.00");
+    const previous = { ...original, quantity, unitPrice: original.unitPriceNet, taxRate, discountPct: new Prisma.Decimal(0) };
+    const saved = resolveInvoiceLineMoney({ quantity, unitPrice: original.unitPriceNet, taxRate, previous });
+    assert.equal(saved.lineTotal.toFixed(2), "10.00");
+    assert.equal(saved.lineTax.toFixed(2), "1.74");
+    const changed = resolveInvoiceLineMoney({ quantity, unitPrice: new Prisma.Decimal(9), taxRate, previous });
+    assert.equal(changed.lineTotal.toFixed(2), "10.89");
+  });
+});
+
+
+describe("stored line scope", () => {
+  it("rejects foreign or duplicated IDs and allows new lines without an ID", () => {
+    const rows = [{ id: "own-line" }];
+    assert.equal(indexStoredDocumentLines([{ id: "own-line" }, {}], rows).get("own-line"), rows[0]);
+    for (const input of [[{ id: "foreign-line" }], [{ id: "own-line" }, { id: "own-line" }]]) {
+      assert.throws(() => indexStoredDocumentLines(input, rows), (error: unknown) => error instanceof ServiceError && error.code === "CONFLICT");
+    }
   });
 });

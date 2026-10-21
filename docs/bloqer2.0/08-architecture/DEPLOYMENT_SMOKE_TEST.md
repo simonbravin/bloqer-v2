@@ -6,6 +6,18 @@ Run after first production (or staging) deploy, **before** announcing availabili
 
 **Related:** for role-based training / UAT after UI freeze, use [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) (J-02). This file stays focused on post-deploy technical checks.
 
+## Regresión INDARI — fase 1 (pendiente de ejecutar)
+
+No anunciar B02 como disponible hasta resolver P-IND-04 y acreditar el alias del portal (P-IND-03). Preparar los casos mutantes con fixtures sintéticos en un entorno de prueba autorizado; no usar los registros de Casa Hogar. Antes del deploy, verificar integración de adjudicación, concurrencia y anulación. Después del deploy autorizado, comprobar la versión publicada y el recorrido con datos de prueba acordados.
+
+1. Escritorio y celular: SC enviada con dos líneas completas y cotizaciones vigentes. Seleccionar una; contador 1 de 2; **Generar órdenes seleccionadas** incluye solo esa línea y la otra queda libre. **Dejar pendiente** desmarca; con ninguna selección el botón queda deshabilitado. En celular comprobar selector y textos sin desborde a 360 px; en escritorio, matriz y teclado.
+2. Seleccionar dos proveedores para dos líneas; verificar una OC por grupo. Doble envío no duplica adjudicación. Anular una OC deja libre solo su línea; la otra sigue vinculada. La cobertura de SC respeta BR-PUR-024. El atajo **Adjudicar libres → OC** conserva su alcance de todos los ítems libres de esa cotización.
+3. Cotización: cantidad 2, unitario final 121 con IVA 21 %, descuento 10 % e IIBB 3 %. Neto 180,00; IVA 37,80; IIBB 5,40; total 223,20. Guardar y reabrir en modo neto conserva el resultado; no marcar de nuevo IVA incluido sin reingresar valores finales. La línea muestra 217,80 sin IIBB y la cotización 223,20 con IIBB. Verificar también IVA 0 legítimo con una cotización de prueba.
+4. OC borrador: probar referencia ausente, unidad distinta, partida global y precio sobre referencia. Verificar mensajes por causa y acceso a **Editar → Justificación desvío**, conservando umbrales y permisos. Partida global no se compara como precio unitario. Revisar código/proveedor y **Ver solicitud de origen**; una OC directa no muestra un origen ficticio.
+5. Consultar ayuda por «adjudicar algunos ítems», «precio con IVA» y «sin referencia presupuestaria»; verificar que guía, ayuda y respuestas documentales AI describan el mismo flujo. No usar estos checks para declarar resueltos OC-051 ni los datos históricos.
+
+## Comprobaciones generales
+
 | # | Check | Pass criteria |
 |---|--------|----------------|
 | 1 | App boots | Home/login loads without 500; no crash loop. |
@@ -39,3 +51,10 @@ Record who ran the checklist, date, and environment.
 | Date | Env | Operator | Notes |
 |---|---|---|---|
 | 2026-08-08 | local + portal.bloqer.app | Cursor agent | Technical pass recorded in [`PHASE_5_ASVS_LITE.md`](./PHASE_5_ASVS_LITE.md). Cron auth OK locally after excluding `/api/cron/*` from session middleware; production deploy of that fix still required for Vercel cron. |
+
+
+## Regresión INDARI — decimales y concurrencia (smoke UI pendiente)
+
+Tras verificar el deployment y alias, en datos de prueba autorizados: abrir y guardar sin tocar un unitario de 4 dp; entrar/salir del campo sin cambios; editarlo a 4 dp; confirmar dinero a 2 dp y FX a 6. Cargar 1 × $10,00 con IVA incluido al 21% y sin descuento: total de línea $10,00 (IIBB se informa aparte). Reabrir con precio neto y cambiar solo notas: mantener total; cambiar cantidad o precio: recalcular. Probar en escritorio y celular.
+
+Para concurrencia y datos sintéticos, usar `procurement-regression.live.test.ts` exclusivamente con el opt-in y las dos URLs a la DB aislada documentada en fase 0. Incluye panel OC/recepción simultáneos, cobertura parcial y resguardo de importes al editar. No ejecutar fixtures contra `neondb` ni `production`; el guard los rechaza.

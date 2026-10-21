@@ -447,6 +447,7 @@ export function PurchaseRequestForm({
                       <div className="space-y-2">
                         <Label htmlFor={`quantity-${line.rowKey}`}>Cantidad</Label>
                         <DecimalInput
+                          precision={4}
                           id={`quantity-${line.rowKey}`}
                           className="min-h-11 md:min-h-9"
                           value={line.quantity}

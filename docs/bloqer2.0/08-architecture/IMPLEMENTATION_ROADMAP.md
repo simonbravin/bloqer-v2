@@ -30,6 +30,12 @@ Ver [`MVP_TECHNICAL_SCOPE.md`](./MVP_TECHNICAL_SCOPE.md): define **qué debe est
 
 ## Próximo backlog de bases (post corte Phase 1 Q-001 / Q-030)
 
+Intervención específica posterior: [Plan de mejoras INDARI / Casa Hogar — 21/10/2026](./INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md). Define correcciones de compras/AP, controles de integridad y decisiones pendientes; sus fases no sustituyen las fases generales 0–5 de este roadmap.
+
+Preparación ejecutada: [Resultados de fase 0 INDARI](./INDARI_CASA_HOGAR_PHASE_0.md). Schema comparado sin diferencias en los objetos revisados; fixtures aislados y 67 pruebas unitarias aprobadas. Integración 3/4: timeout de adjudicación pendiente (P-IND-04), más confirmación del alias del portal antes de publicar.
+
+Fase 1 INDARI preparada en código el 21/10/2026: selección parcial escritorio/celular, desglose de importes y mensajes de justificación/procedencia. 76 pruebas aprobadas, tipos/lint correctos y ayuda/guía/knowledge alineados. **Sin deploy**; P-IND-03/P-IND-04 y validación integral siguen pendientes por indicación del usuario. Ver §11 del plan.
+
 **2026-05-14:** corte documentado — [D-036](../00-product/DECISION_LOG.md) (membresía única), [D-037](../00-product/DECISION_LOG.md) (ingreso corporativo sin obra vía GL+tesorería), [ADR-Phase1-06](./ARCHITECTURE_DECISION_RECORDS.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md).
 
 Orden sugerido **antes** de invertir fuerte en UX de cronograma/WBS ([Q-003](../00-product/OPEN_QUESTIONS.md), [Q-004](../00-product/OPEN_QUESTIONS.md)):

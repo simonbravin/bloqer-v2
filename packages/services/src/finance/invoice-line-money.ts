@@ -18,6 +18,16 @@ export function resolveInvoiceLineMoney(params: {
   taxRate: Prisma.Decimal;
   discountPct?: Prisma.Decimal;
   pricesIncludeTax?: boolean;
+  /** Trusted persisted row, read within the update transaction. */
+  previous?: {
+    quantity: Prisma.Decimal;
+    unitPrice: Prisma.Decimal;
+    taxRate: Prisma.Decimal;
+    discountPct: Prisma.Decimal;
+    lineSubtotal: Prisma.Decimal;
+    lineTax: Prisma.Decimal;
+    lineTotal: Prisma.Decimal;
+  };
 }): {
   unitPriceNet: Prisma.Decimal;
   lineSubtotal: Prisma.Decimal;
@@ -32,6 +42,17 @@ export function resolveInvoiceLineMoney(params: {
         taxRatePercent: serializeRatePctDecimal(params.taxRate),
         discountPct: params.discountPct != null ? serializeRatePctDecimal(params.discountPct) : "0",
         pricesIncludeTax: params.pricesIncludeTax,
+        previous: params.previous
+          ? {
+              quantity: params.previous.quantity.toString(),
+              unitPrice: params.previous.unitPrice.toString(),
+              taxRate: params.previous.taxRate.toString(),
+              discountPct: params.previous.discountPct.toString(),
+              lineSubtotal: params.previous.lineSubtotal.toFixed(2),
+              lineTax: params.previous.lineTax.toFixed(2),
+              lineTotal: params.previous.lineTotal.toFixed(2),
+            }
+          : undefined,
       });
     } catch (err) {
       const code = err instanceof Error ? err.message : "";
@@ -59,4 +80,24 @@ export function parseDiscountPct(raw?: string | null): Prisma.Decimal {
     }
     throw new ServiceError("VALIDATION", "Porcentaje de descuento inválido");
   }
+}
+
+/** IDs only select rows already loaded from this document under its tenant guard. */
+export function indexStoredDocumentLines<T extends { id: string }>(
+  input: Array<{ id?: string }>,
+  stored: T[],
+): Map<string, T> {
+  const byId = new Map(stored.map((line) => [line.id, line]));
+  const seen = new Set<string>();
+  for (const line of input) {
+    if (!line.id) continue;
+    if (!byId.has(line.id) || seen.has(line.id)) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Las líneas cambiaron o no pertenecen a este documento. Recargá e intentá de nuevo.",
+      );
+    }
+    seen.add(line.id);
+  }
+  return byId;
 }

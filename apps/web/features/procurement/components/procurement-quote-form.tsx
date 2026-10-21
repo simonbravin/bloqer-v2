@@ -1,5 +1,7 @@
 "use client";
 
+import type { StoredDocumentLineMoney } from "@bloqer/utils";
+
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -25,7 +27,7 @@ import {
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
 import type { SupplierOption } from "./purchase-order-form";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
-import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import { PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
 import {
   DocumentTaxTotalsFooter,
@@ -52,6 +54,7 @@ type PrLine = {
 type LineMoney = { unitPrice: string; discountPct: string; taxRate: string };
 
 type QuoteLineInitial = {
+  originalMoney?: StoredDocumentLineMoney;
   purchaseRequestLineId: string;
   unitPrice: string;
   taxRate: string;
@@ -89,6 +92,7 @@ function linePreview(
   taxRate: string,
   discountPct: string,
   pricesIncludeTax: boolean,
+  previous?: StoredDocumentLineMoney,
 ) {
   try {
     return resolveDocumentLineAmounts({
@@ -97,6 +101,7 @@ function linePreview(
       taxRatePercent: decimalOrZero(taxRate),
       discountPct: decimalOrZero(discountPct),
       pricesIncludeTax,
+      previous,
     });
   } catch {
     return null;
@@ -226,6 +231,7 @@ export function ProcurementQuoteForm({
         money?.taxRate ?? taxRate,
         money?.discountPct ?? "0",
         pricesIncludeTax,
+        lineInitialByPrId.get(line.id)?.originalMoney,
       );
       if (!preview) continue;
       subtotal = addDecimal(subtotal, preview.lineSubtotal);
@@ -243,7 +249,7 @@ export function ProcurementQuoteForm({
       total = roundMoney(addDecimal(subtotal, tax));
     }
     return { subtotal, tax, iibb, total };
-  }, [lineMoney, lines, pricesIncludeTax, taxRate, iibbPerceptionRate]);
+  }, [lineMoney, lines, pricesIncludeTax, taxRate, iibbPerceptionRate, lineInitialByPrId]);
 
   function buildPayload(
     leadTimeDays: number | null,
@@ -432,6 +438,14 @@ export function ProcurementQuoteForm({
         />
       </div>
 
+      <p className="text-xs text-muted-foreground" aria-live="polite">
+        {pricesIncludeTax
+          ? "Ingresá el precio de una unidad con IVA. El sistema separa el neto y el IVA; no vuelve a sumar ese IVA."
+          : "Ingresá el precio neto de una unidad, sin IVA. El IVA se suma según la alícuota de cada línea."}
+        {" "}El descuento se aplica antes de los impuestos. Cambiar el modo interpreta de otra manera
+        los números ingresados; revisá los precios y el total antes de guardar.
+      </p>
+
       {lines.map((line) => {
         const money = lineMoney[line.id] ?? {
           unitPrice: "0",
@@ -444,6 +458,7 @@ export function ProcurementQuoteForm({
           money.taxRate,
           money.discountPct,
           pricesIncludeTax,
+          lineInitialByPrId.get(line.id)?.originalMoney,
         );
         return (
           <div key={line.id} className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
@@ -459,9 +474,10 @@ export function ProcurementQuoteForm({
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="space-y-1">
                 <Label htmlFor={`unitPrice_${line.id}`}>
-                  {pricesIncludeTax ? "Precio unit. (c/IVA)" : "Precio unit."}
+                  {pricesIncludeTax ? "Precio unitario con IVA" : "Precio unitario neto (sin IVA)"}
                 </Label>
                 <DecimalInput
+                  precision={4}
                   id={`unitPrice_${line.id}`}
                   value={money.unitPrice}
                   onValueChange={(v) =>
@@ -484,6 +500,7 @@ export function ProcurementQuoteForm({
               <div className="space-y-1">
                 <Label htmlFor={`discountPct_${line.id}`}>Desc. %</Label>
                 <DecimalInput
+                  precision={4}
                   id={`discountPct_${line.id}`}
                   value={money.discountPct}
                   onValueChange={(v) =>
@@ -505,11 +522,16 @@ export function ProcurementQuoteForm({
               </div>
               {preview ? (
                 <div className="col-span-2 space-y-0.5 self-end text-xs text-muted-foreground">
-                  <p>Neto: {formatMoneyAmount(preview.lineSubtotal, "ARS")}</p>
-                  <p>IVA: {formatMoneyAmount(preview.lineTax, "ARS")}</p>
-                  <p className="font-medium text-foreground">
-                    Total línea: {formatMoneyAmount(preview.lineTotal, "ARS")}
+                  <p>
+                    {formatQtyFromString(line.quantity)} {line.unit} × {formatUnitPriceFromString(decimalOrZero(money.unitPrice))}
+                    {pricesIncludeTax ? " con IVA" : " neto"} · Descuento {formatRatePctFromString(decimalOrZero(money.discountPct))}%
                   </p>
+                  <p>Neto con descuento: {formatMoneyAmount(preview.lineSubtotal, "ARS")}</p>
+                  <p>IVA ({formatRatePctFromString(money.taxRate)}%): {formatMoneyAmount(preview.lineTax, "ARS")}</p>
+                  <p className="font-medium text-foreground">
+                    Total línea con IVA: {formatMoneyAmount(preview.lineTotal, "ARS")}
+                  </p>
+                  <p>La percepción IIBB se agrega en el total de la cotización.</p>
                 </div>
               ) : null}
             </div>

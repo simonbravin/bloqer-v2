@@ -18,7 +18,7 @@ import {
   type ProcurementQuoteEditValues,
 } from "./procurement-quote-form";
 import type { SupplierOption } from "./purchase-order-form";
-import { formatMoneyAmount, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyWithUnit, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
 
 type PrLine = {
   id: string;
@@ -38,12 +38,18 @@ type QuoteRow = {
   validUntil: string | null;
   leadTimeDays: number | null;
   iibbPerceptionRate?: string;
+  iibbPerceptionAmount: string;
   lines: Array<{
     purchaseRequestLineId: string;
     description: string;
     unitPrice: string;
     taxRate: string;
     discountPct: string;
+    quantity: string;
+    unit: string;
+    lineTotal: string;
+    lineSubtotal: string;
+    lineTax: string;
   }>;
 };
 
@@ -86,6 +92,7 @@ export function ProcurementQuotesSection({
         iibbPerceptionRate: editingQuote.iibbPerceptionRate,
         lines: editingQuote.lines.map((l) => ({
           purchaseRequestLineId: l.purchaseRequestLineId,
+          originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct, lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },
           unitPrice: l.unitPrice,
           taxRate: l.taxRate,
           discountPct: l.discountPct,
@@ -102,7 +109,7 @@ export function ProcurementQuotesSection({
             <TableRow>
               <TableHead>Proveedor</TableHead>
               <TableHead>Estado</TableHead>
-              <TableHead className="text-right">Total</TableHead>
+              <TableHead className="text-right">Total cotización con impuestos</TableHead>
               <TableHead className="text-right">Plazo (días)</TableHead>
               <TableHead>Vigencia</TableHead>
               <TableHead />
@@ -124,10 +131,11 @@ export function ProcurementQuotesSection({
                       <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                         {q.lines.map((l, i) => (
                           <li key={`${q.id}-${i}`}>
-                            {l.description}: {formatUnitPriceFromString(l.unitPrice)} neto · IVA {formatRatePctFromString(l.taxRate)}%
+                            {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} neto · IVA {formatRatePctFromString(l.taxRate)}%
                             {!isZeroRatePct(l.discountPct)
                               ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
                               : ""}
+                            {" · "}Total línea con IVA: {formatMoneyAmount(l.lineTotal, q.currency)} (sin IIBB)
                           </li>
                         ))}
                       </ul>
@@ -138,6 +146,9 @@ export function ProcurementQuotesSection({
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {formatMoneyAmount(q.totalAmount, q.currency)}
+                    <p className="text-xs text-muted-foreground">
+                      Incluye IIBB: {formatMoneyAmount(q.iibbPerceptionAmount, q.currency)}
+                    </p>
                   </TableCell>
                   <TableCell className="text-right tabular-nums">
                     {q.leadTimeDays ?? "—"}

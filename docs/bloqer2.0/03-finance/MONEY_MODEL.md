@@ -45,6 +45,14 @@ Definir cómo Bloqer representa **montos monetarios** de forma consistente, sin 
 - `amount_ars = roundMoney(amount × fx_rate)` a **2** dp; `fx_rate` a **6** dp.
 - **Pagar/cobrar todo:** aplicar saldo **almacenado** en servidor; display siempre 2 dp.
 
+## Conservación al editar — D-117
+
+Los componentes guardados de una línea se conservan si cantidad, precio neto, IVA y descuento siguen numéricamente iguales. El servidor compara contra las líneas del propio documento dentro de la transacción. Cambiar un dato monetario o reinterpretar el precio como bruto recalcula. El navegador nunca decide los importes históricos a persistir.
+
+Con IVA incluido **sin descuento**, aplica D-086: el total es cantidad × precio bruto redondeado; IVA es la diferencia entre ese total y el neto extraído. No reconstruir ese total desde el unitario neto de 4 dp: no siempre reproduce los centavos. Con descuento se mantiene D-093. Abrir/guardar un campo sin editarlo tampoco debe reemplazar 4 dp almacenados por los 2 dp del display.
+
+No hay migración ni regularización automática de documentos emitidos/pagados. Ver [D-117](../00-product/DECISION_LOG.md).
+
 ## Signos
 - **Ingresos** a tesorería: positivos en cuenta destino según convención ledger ([`ACCOUNT_MOVEMENTS.md`](./ACCOUNT_MOVEMENTS.md)).
 - **Saldo deudor AR/AP**: positivo = adeudado.

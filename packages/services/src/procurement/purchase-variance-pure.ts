@@ -75,7 +75,7 @@ export function resolveBudgetRefKind(
 
 export function varianceJustificationReasonEs(tier: PurchaseVarianceTier | string): string {
   if (tier === "UNIT_MISMATCH") return "unidad distinta al presupuesto";
-  if (tier === "NO_BUDGET_BASELINE") return "sin referencial de partida";
+  if (tier === "NO_BUDGET_BASELINE") return "sin referencia presupuestaria para calcular el desvío";
   if (tier === "EXTRA_APPROVAL") return "precio muy por encima del referencial";
   if (tier === "NOTE_REQUIRED") return "precio por encima del referencial";
   return "precio por encima del referencial";
@@ -83,13 +83,13 @@ export function varianceJustificationReasonEs(tier: PurchaseVarianceTier | strin
 
 export function formatMissingVarianceJustificationError(lineHints: string[]): string {
   if (lineHints.length === 0) {
-    return "Completá la justificación de desvío presupuestario en las líneas. Entrá a Editar y usá el campo Justificación desvío.";
+    return "Falta una justificación en las líneas. Entrá a Editar y usá el campo Justificación desvío.";
   }
   const shown = lineHints.slice(0, 4);
   const extra = lineHints.length - shown.length;
   const list = shown.join("; ");
   const suffix = extra > 0 ? `; y ${extra} más` : "";
-  return `Completá la justificación de desvío en: ${list}${suffix}. Entrá a Editar y usá el campo Justificación desvío de cada línea.`;
+  return `Falta una justificación en: ${list}${suffix}. Entrá a Editar y usá el campo Justificación desvío de cada línea. Revisá la referencia y la unidad; no cambies el precio solo para evitar el control.`;
 }
 
 function normalizeUnit(u: string): string {

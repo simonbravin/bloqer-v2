@@ -104,6 +104,8 @@ export function SupplierInvoiceEditForm({
   const [lines, setLines] = useState<InvoiceLine[]>(
     invoice.lines.length > 0
       ? invoice.lines.map((l) => ({
+          id: l.id,
+          originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct ?? "0", lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },
           description: l.description,
           quantity:    l.quantity,
           unitPrice:   l.unitPrice,
@@ -298,6 +300,7 @@ export function SupplierInvoiceEditForm({
             taxRatePercent: forceZeroTax ? "0" : line.taxRate || "0",
             discountPct: line.discountPct || "0",
             pricesIncludeTax: pricesIncludeTaxPayload,
+            previous: line.originalMoney,
           });
           subtotal = roundMoney(addDecimal(subtotal, amounts.lineSubtotal));
           taxAmount = roundMoney(addDecimal(taxAmount, amounts.lineTax));

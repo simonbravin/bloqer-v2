@@ -13,6 +13,7 @@ import { invoiceLetterSchema } from "./contact";
 import { idempotencyKeySchema } from "./idempotency";
 
 const invoiceLineSchema = z.object({
+  id: z.string().uuid().optional(),
   description: z.string().min(1),
   quantity:    qtyString,
   unitPrice:   unitPriceString,

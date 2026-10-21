@@ -19,7 +19,7 @@ import { resolvePagination } from "../finance/pagination";
 import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPayableReadyToPay } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
-import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
+import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
@@ -673,11 +673,14 @@ export async function createSupplierInvoice(
      * Skips AP mutate gate so warehouse can confirm receipt while Finance emits later.
      * Requires `trustedSystemPath: "receipt-auto-draft"` — not a free public bypass.
      */
+    /** Internal composition: keep PO coverage and draft creation in one transaction. */
+    tx?: Prisma.TransactionClient;
     bypassApMutateGate?: boolean;
     trustedSystemPath?: "receipt-auto-draft";
   },
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
+  const db = options?.tx ?? prisma;
 
   const projectId = input.projectId ?? null;
   const systemBypass =
@@ -688,7 +691,7 @@ export async function createSupplierInvoice(
 
   if (projectId) {
     await assertProjectAllowsOperationalMutation(projectId, ctx);
-    const project = await prisma.project.findUnique({
+    const project = await db.project.findUnique({
       where: { id: projectId },
       select: { tenantId: true, companyId: true },
     });
@@ -709,7 +712,7 @@ export async function createSupplierInvoice(
     if (!projectId) {
       throw new ServiceError("CONFLICT", "Una orden de compra solo puede vincularse a una factura con proyecto");
     }
-    const po = await prisma.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
+    const po = await db.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
     if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
     if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     assertPurchaseOrderLinkableForAp(po.status);
@@ -771,13 +774,12 @@ export async function createSupplierInvoice(
   await assertSupplierInvoiceLinesApu(projectId, input.lines, ctx.tenantId);
   const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
-  const maxNum = await prisma.supplierInvoice.aggregate({
-    where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
-    _max: { number: true },
-  });
-  const number = (maxNum._max.number ?? 0) + 1;
-
-  const inv = await prisma.$transaction(async (tx) => {
+  const writeInvoice = async (tx: Prisma.TransactionClient) => {
+    const maxNum = await tx.supplierInvoice.aggregate({
+      where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
+      _max: { number: true },
+    });
+    const number = (maxNum._max.number ?? 0) + 1;
     const created = await tx.supplierInvoice.create({
       data: {
         tenantId:          ctx.tenantId,
@@ -851,7 +853,8 @@ export async function createSupplierInvoice(
     );
 
     return inv;
-  });
+  };
+  const inv = options?.tx ? await writeInvoice(options.tx) : await prisma.$transaction(writeInvoice);
 
   return serializeInvoice(inv);
 }
@@ -1065,6 +1068,8 @@ export async function updateSupplierInvoice(
     const forceZeroTax = effectiveLetter === "C" || effectiveLetter === "E";
 
     if (input.lines) {
+      const previousLines = await tx.supplierInvoiceLine.findMany({ where: { invoiceId: id } });
+      const previousById = indexStoredDocumentLines(input.lines, previousLines);
       await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: id } });
       const pricesIncludeTax = Boolean(input.pricesIncludeTax);
       for (let i = 0; i < input.lines.length; i++) {
@@ -1078,6 +1083,7 @@ export async function updateSupplierInvoice(
           taxRate: rate,
           discountPct: parseDiscountPct(line.discountPct),
           pricesIncludeTax: forceZeroTax ? false : pricesIncludeTax,
+          previous: line.id ? previousById.get(line.id) : undefined,
         });
         await tx.supplierInvoiceLine.create({
           data: {

@@ -1,7 +1,6 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type { CreateProcurementQuoteInput, UpdateProcurementQuoteInput } from "@bloqer/validators";
-import { calcLine } from "./purchase-order-calc.service";
 import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
@@ -9,7 +8,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders, canViewPurchaseRequests } from "./procurement-access";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
-import { parseDiscountPct } from "../finance/invoice-line-money";
+import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { assertQuoteNotFrozenByActivePo } from "./purchase-request-to-po.service";
@@ -85,6 +84,7 @@ async function writeQuoteLines(
   inputLines: CreateProcurementQuoteInput["lines"],
   pricesIncludeTax: boolean,
   iibbPerceptionRate: Prisma.Decimal,
+  previousLines: QuoteWithRequest["lines"] = [],
 ): Promise<{
   subtotal: Prisma.Decimal;
   taxAmount: Prisma.Decimal;
@@ -99,7 +99,12 @@ async function writeQuoteLines(
     const qty = prLine.quantity;
     const price = new Prisma.Decimal(line.unitPrice);
     const rate = new Prisma.Decimal(line.taxRate ?? "0");
-    const calc = calcLine(qty, price, rate, parseDiscountPct(line.discountPct), pricesIncludeTax);
+    const previous = previousLines.find((saved) => saved.purchaseRequestLineId === line.purchaseRequestLineId);
+    const calc = resolveInvoiceLineMoney({
+      quantity: qty, unitPrice: price, taxRate: rate,
+      discountPct: parseDiscountPct(line.discountPct), pricesIncludeTax,
+      previous: previous ? { ...previous, quantity: qty } : undefined,
+    });
     lineSubtotals.push(calc.lineSubtotal);
     lineTaxes.push(calc.lineTax);
     await tx.procurementQuoteLine.create({
@@ -269,6 +274,7 @@ export async function updateProcurementQuote(
       );
     }
 
+    const previousLines = await tx.procurementQuoteLine.findMany({ where: { procurementQuoteId: quoteId } });
     await tx.procurementQuoteLine.deleteMany({ where: { procurementQuoteId: quoteId } });
 
     const iibbPerceptionRate = new Prisma.Decimal(
@@ -281,6 +287,7 @@ export async function updateProcurementQuote(
       input.lines,
       pricesIncludeTax,
       iibbPerceptionRate,
+      previousLines,
     );
 
     const fx = computeDocumentFxAmounts(
