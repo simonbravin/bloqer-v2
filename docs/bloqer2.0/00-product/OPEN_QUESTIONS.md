@@ -563,7 +563,7 @@
 ### Q-064 — Renglón no cotizado frente a renglón bonificado
 
 - **Categoría:** Compras / Cotizaciones
-- **Estado:** ABIERTA — relevamiento INDARI, 21/10/2026.
+- **Estado:** RESUELTA → D-118 (Owner, 21/10/2026). Clasificación explícita aprobada; históricos preservados, ceros pendientes requieren revisión. Implementación/publicación se siguen en el plan INDARI.
 - **Contexto:** una oferta puede tener una línea con precio cero si otra está valorizada. El cero por sí solo no permite distinguir ausencia de oferta de bonificación legítima.
 - **Pregunta:** ¿cómo se expresa esa diferencia y cómo afecta comparación, selección y mínimo de cotizaciones válidas?
 - **Recomendación para evaluar:** representación explícita y comprensible; no transformar los ceros históricos sin evidencia ni prohibir toda bonificación. Acordar primero la regla y después decidir si requiere persistencia nueva.

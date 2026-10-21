@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import type { QuoteLineOfferKind } from "@bloqer/domain";
+import { canQuickAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
 import {
   Table,
   TableBody,
@@ -40,6 +42,7 @@ type QuoteRow = {
   iibbPerceptionRate?: string;
   iibbPerceptionAmount: string;
   lines: Array<{
+    offerKind: QuoteLineOfferKind | null;
     purchaseRequestLineId: string;
     description: string;
     unitPrice: string;
@@ -86,11 +89,13 @@ export function ProcurementQuotesSection({
   const editValues: ProcurementQuoteEditValues | undefined = editingQuote
     ? {
         quoteId: editingQuote.id,
+        currency: editingQuote.currency,
         supplierName: editingQuote.supplierName,
         validUntil: editingQuote.validUntil,
         leadTimeDays: editingQuote.leadTimeDays,
         iibbPerceptionRate: editingQuote.iibbPerceptionRate,
         lines: editingQuote.lines.map((l) => ({
+          offerKind: l.offerKind,
           purchaseRequestLineId: l.purchaseRequestLineId,
           originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct, lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },
           unitPrice: l.unitPrice,
@@ -131,6 +136,7 @@ export function ProcurementQuotesSection({
                       <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
                         {q.lines.map((l, i) => (
                           <li key={`${q.id}-${i}`}>
+                            <strong>{quoteLineOfferLabel(l, freeLineIds.has(l.purchaseRequestLineId))}</strong>{" · "}
                             {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} neto · IVA {formatRatePctFromString(l.taxRate)}%
                             {!isZeroRatePct(l.discountPct)
                               ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
@@ -159,7 +165,7 @@ export function ProcurementQuotesSection({
                   <TableCell className="text-right">
                     {(q.status === "RECEIVED" || q.status === "SELECTED") && canQuote ? (
                       <div className="flex flex-col items-end gap-1">
-                        {q.lines.some((l) => freeLineIds.has(l.purchaseRequestLineId)) ? (
+                        {q.lines.some((l) => freeLineIds.has(l.purchaseRequestLineId) && canQuickAwardQuoteLine(l)) ? (
                           <SelectQuoteButton
                             quoteId={q.id}
                             projectId={projectId}

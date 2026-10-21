@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildPurchaseRequestAwardGroups } from "./purchase-request-award-selection";
+import { buildPurchaseRequestAwardGroups, canAwardQuoteLine, canQuickAwardQuoteLine, quoteLineOfferLabel } from "./purchase-request-award-selection";
 
 const lines = [{ id: "waterproofing" }, { id: "anchor" }];
 const quotes = ["supplier-a", "supplier-b"].map((id) => ({
   id,
   status: "RECEIVED",
-  lines: lines.map((l) => ({ purchaseRequestLineId: l.id })),
+  lines: lines.map((l) => ({ purchaseRequestLineId: l.id, lineTotal: "10.00" })),
 }));
 
 test("partial selection sends only the selected whole line", () => {
@@ -15,6 +15,24 @@ test("partial selection sends only the selected whole line", () => {
     buildPurchaseRequestAwardGroups(lines, quotes, { waterproofing: "supplier-a" }),
     [{ procurementQuoteId: "supplier-a", purchaseRequestLineIds: ["waterproofing"] }],
   );
+});
+
+test("zero historical and unquoted selections are rejected; gifts need explicit selection", () => {
+  for (const offerKind of [null, "NOT_QUOTED"] as const) {
+    const line = { purchaseRequestLineId: "anchor", offerKind, lineTotal: "0.00" };
+    assert.equal(canAwardQuoteLine(line), false);
+    assert.throws(() => buildPurchaseRequestAwardGroups(lines,
+      [{ ...quotes[0]!, lines: [line] }], { anchor: "supplier-a" }), /selección cambió/);
+  }
+  const gift = { purchaseRequestLineId: "anchor", offerKind: "BONIFIED" as const, lineTotal: "0.00" };
+  assert.equal(canAwardQuoteLine(gift), true);
+  assert.equal(canQuickAwardQuoteLine(gift), false);
+  assert.deepEqual(buildPurchaseRequestAwardGroups(lines,
+    [{ ...quotes[0]!, lines: [gift] }], { anchor: "supplier-a" }),
+    [{ procurementQuoteId: "supplier-a", purchaseRequestLineIds: ["anchor"] }]);
+  assert.equal(canQuickAwardQuoteLine({ offerKind: null, lineTotal: "0.01" }), true);
+  assert.equal(quoteLineOfferLabel({ offerKind: null, lineTotal: "0" }, false), "Sin clasificar (histórico)");
+  assert.equal(quoteLineOfferLabel({ offerKind: null, lineTotal: "0" }), "Cero sin clasificar · revisar");
 });
 
 test("groups whole lines by supplier without duplicating them", () => {

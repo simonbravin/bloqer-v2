@@ -1,4 +1,5 @@
 import { effectiveUnitPriceNet } from "@bloqer/utils";
+import { isQuoteLineAwardable } from "@bloqer/domain";
 import { loadWbsDominantCostTypes, coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
 import { parseDiscountPct } from "../finance/invoice-line-money";
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
@@ -195,13 +196,13 @@ async function createOnePoFromQuoteLinesInTx(
   procurementQuoteId: string,
   purchaseRequestLineIds: string[],
   options: {
-    skipMinQuotesCheck?: boolean;
-    skipPrLock?: boolean;
+    positiveQuotedOnly?: boolean;
     expectedPurchaseRequestId?: string;
     /** Pre-allocated OC number (batch awards in one TX). */
     documentNumber?: number;
   } = {},
 ): Promise<string> {
+  // Both callers hold the SC lock before loading the quote and its classification.
   const quote = await tx.procurementQuote.findUnique({
     where: { id: procurementQuoteId },
     include: {
@@ -223,28 +224,8 @@ async function createOnePoFromQuoteLinesInTx(
     throw new ServiceError("CONFLICT", "Estado de solicitud incompatible");
   }
 
-  if (!options.skipMinQuotesCheck) {
-    const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
-    const receivedCount = await tx.procurementQuote.count({
-      where: {
-        purchaseRequestId: pr.id,
-        status: { in: ["RECEIVED", "SELECTED"] },
-      },
-    });
-    if (receivedCount < settings.minQuotesRequired) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Se requieren al menos ${settings.minQuotesRequired} cotizaciones recibidas antes de adjudicar`,
-      );
-    }
-  }
-
   if (quote.validUntil && quote.validUntil < new Date()) {
     throw new ServiceError("CONFLICT", "La cotización está vencida");
-  }
-
-  if (!options.skipPrLock) {
-    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
   }
 
   const uniqueLineIds = [...new Set(purchaseRequestLineIds)];
@@ -263,6 +244,19 @@ async function createOnePoFromQuoteLinesInTx(
     throw new ServiceError("CONFLICT", "Hay ítems que no pertenecen a esta solicitud");
   }
 
+  const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
+  const competingLines = await tx.procurementQuoteLine.findMany({
+    where: {
+      purchaseRequestLineId: { in: uniqueLineIds },
+      procurementQuote: {
+        tenantId: ctx.tenantId,
+        purchaseRequestId: pr.id,
+        status: { in: ["RECEIVED", "SELECTED"] },
+      },
+    },
+    select: { purchaseRequestLineId: true, offerKind: true, lineTotal: true },
+  });
+
   for (const prl of prLines) {
     if (prl.awardedPurchaseOrderId) {
       throw new ServiceError(
@@ -275,6 +269,24 @@ async function createOnePoFromQuoteLinesInTx(
         "CONFLICT",
         `La cotización no incluye el ítem "${prl.description}"`,
       );
+    }
+    const selected = quoteLineByPrLine.get(prl.id)!;
+    if (options.positiveQuotedOnly &&
+      (selected.offerKind === "BONIFIED" || !selected.lineTotal.greaterThan(0))) {
+      throw new ServiceError("CONFLICT", "La oferta cambió. Los bonificados se seleccionan expresamente en Adjudicar por ítem.");
+    }
+    if (!isQuoteLineAwardable(selected.offerKind, selected.lineTotal.greaterThan(0))) {
+      throw new ServiceError("CONFLICT", selected.offerKind === "NOT_QUOTED"
+        ? `El ítem "${prl.description}" no fue cotizado por este proveedor`
+        : `El ítem "${prl.description}" tiene importe cero sin clasificar. Revisá la cotización antes de adjudicar.`);
+    }
+    const receivedCount = competingLines.filter((line) =>
+      line.purchaseRequestLineId === prl.id &&
+      isQuoteLineAwardable(line.offerKind, line.lineTotal.greaterThan(0)),
+    ).length;
+    if (receivedCount < settings.minQuotesRequired) {
+      throw new ServiceError("CONFLICT",
+        `Se requieren al menos ${settings.minQuotesRequired} ofertas para el ítem "${prl.description}"; hay ${receivedCount}. Los no cotizados y ceros sin clasificar no cuentan.`);
     }
   }
 
@@ -407,6 +419,7 @@ export async function createPurchaseOrderFromQuoteLines(
   procurementQuoteId: string,
   purchaseRequestLineIds: string[],
   ctx: ServiceContext,
+  options: { positiveQuotedOnly?: boolean } = {},
 ): Promise<{ purchaseOrderId: string }> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseOrders(ctx.roles)) {
@@ -428,7 +441,7 @@ export async function createPurchaseOrderFromQuoteLines(
       ctx,
       procurementQuoteId,
       purchaseRequestLineIds,
-      { skipPrLock: true },
+      { positiveQuotedOnly: options.positiveQuotedOnly },
     );
     const coverage = await syncPurchaseRequestStatusAfterCoverage(
       quote.purchaseRequestId,
@@ -483,20 +496,6 @@ export async function createPurchaseOrdersFromAwards(
     }
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
 
-    const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
-    const receivedCount = await tx.procurementQuote.count({
-      where: {
-        purchaseRequestId,
-        status: { in: ["RECEIVED", "SELECTED"] },
-      },
-    });
-    if (receivedCount < settings.minQuotesRequired) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Se requieren al menos ${settings.minQuotesRequired} cotizaciones recibidas antes de adjudicar`,
-      );
-    }
-
     const maxNum = await tx.purchaseOrder.aggregate({
       where: { tenantId: ctx.tenantId, companyId: pr.companyId },
       _max: { number: true },
@@ -511,8 +510,6 @@ export async function createPurchaseOrdersFromAwards(
         group.procurementQuoteId,
         group.purchaseRequestLineIds,
         {
-          skipMinQuotesCheck: true,
-          skipPrLock: true,
           documentNumber: nextNumber,
           expectedPurchaseRequestId: purchaseRequestId,
         },
@@ -539,7 +536,7 @@ export async function createPurchaseOrdersFromAwards(
 }
 
 /**
- * Legacy: award all still-free lines from the quote onto one DRAFT PO.
+ * Shortcut: award positive quoted free lines. Gifts require explicit matrix selection.
  */
 export async function selectProcurementQuoteAndCreatePo(
   procurementQuoteId: string,
@@ -564,16 +561,17 @@ export async function selectProcurementQuoteAndCreatePo(
   const freeLineIds = quote.purchaseRequest.lines
     .filter((l) => !l.awardedPurchaseOrderId)
     .map((l) => l.id)
-    .filter((id) => quote.lines.some((ql) => ql.purchaseRequestLineId === id));
+    .filter((id) => quote.lines.some((ql) => ql.purchaseRequestLineId === id &&
+      ql.offerKind !== "NOT_QUOTED" && ql.offerKind !== "BONIFIED" && ql.lineTotal.greaterThan(0)));
 
   if (freeLineIds.length === 0) {
     throw new ServiceError(
       "CONFLICT",
-      "No quedan ítems libres para adjudicar de esta cotización",
+      "No quedan ítems cotizados con importe positivo para este atajo. Los bonificados se seleccionan en Adjudicar por ítem.",
     );
   }
 
-  return createPurchaseOrderFromQuoteLines(procurementQuoteId, freeLineIds, ctx);
+  return createPurchaseOrderFromQuoteLines(procurementQuoteId, freeLineIds, ctx, { positiveQuotedOnly: true });
 }
 
 export async function onPurchaseOrderConfirmed(

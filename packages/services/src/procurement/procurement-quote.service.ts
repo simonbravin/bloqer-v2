@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT, type QuoteLineOfferKind } from "@bloqer/domain";
 import type { CreateProcurementQuoteInput, UpdateProcurementQuoteInput } from "@bloqer/validators";
 import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 import { auditProcurement } from "./procurement-audit";
@@ -17,8 +17,14 @@ type QuoteWithRequest = Prisma.ProcurementQuoteGetPayload<{
   include: { purchaseRequest: true; lines: true };
 }>;
 
-async function loadMutableQuote(quoteId: string, ctx: ServiceContext): Promise<QuoteWithRequest> {
-  const quote = await prisma.procurementQuote.findUnique({
+// Classification writes share the SC lock with awards. Allow the bounded award
+// transaction to complete instead of expiring at Prisma's default 5-second limit.
+const QUOTE_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
+
+async function loadMutableQuote(
+  quoteId: string, ctx: ServiceContext, db: Prisma.TransactionClient | typeof prisma = prisma,
+): Promise<QuoteWithRequest> {
+  const quote = await db.procurementQuote.findUnique({
     where: { id: quoteId },
     include: { purchaseRequest: true, lines: true },
   });
@@ -34,7 +40,7 @@ async function loadMutableQuote(quoteId: string, ctx: ServiceContext): Promise<Q
   if (quote.purchaseRequest.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", "La solicitud no admite cambios en cotizaciones en este estado");
   }
-  await assertQuoteNotFrozenByActivePo(quoteId, ctx.tenantId);
+  await assertQuoteNotFrozenByActivePo(quoteId, ctx.tenantId, db);
   return quote;
 }
 
@@ -90,9 +96,11 @@ async function writeQuoteLines(
   taxAmount: Prisma.Decimal;
   iibbPerceptionAmount: Prisma.Decimal;
   totalAmount: Prisma.Decimal;
+  offers: Array<{ purchaseRequestLineId: string; offerKind: QuoteLineOfferKind | null }>;
 }> {
   const lineSubtotals: Prisma.Decimal[] = [];
   const lineTaxes: Prisma.Decimal[] = [];
+  const offers: Array<{ purchaseRequestLineId: string; offerKind: QuoteLineOfferKind | null }> = [];
 
   for (const line of inputLines) {
     const prLine = prLines.find((l) => l.id === line.purchaseRequestLineId)!;
@@ -105,12 +113,32 @@ async function writeQuoteLines(
       discountPct: parseDiscountPct(line.discountPct), pricesIncludeTax,
       previous: previous ? { ...previous, quantity: qty } : undefined,
     });
+    // Missing input preserves historical classification on edit. New positive offers
+    // remain compatible with callers predating D-118; zero never implies a gift.
+    const offerKind = line.offerKind === undefined
+      ? previous ? previous.offerKind : "QUOTED"
+      : line.offerKind;
+    if (offerKind === null && (!previous || previous.offerKind !== null)) {
+      throw new ServiceError("VALIDATION", "No se puede quitar la clasificación de una oferta");
+    }
+    if (offerKind === "QUOTED" && !calc.lineTotal.greaterThan(0)) {
+      throw new ServiceError("VALIDATION", "Un ítem cotizado debe tener total positivo. Indicá No cotizado o Bonificado si corresponde.");
+    }
+    if ((offerKind === "NOT_QUOTED" || offerKind === "BONIFIED") &&
+      (!calc.lineSubtotal.isZero() || !calc.lineTax.isZero() || !calc.lineTotal.isZero())) {
+      throw new ServiceError("VALIDATION", "Un ítem no cotizado o bonificado debe tener importe cero");
+    }
+    if (offerKind === "NOT_QUOTED" && (!price.isZero() || !parseDiscountPct(line.discountPct).isZero())) {
+      throw new ServiceError("VALIDATION", "Un ítem no cotizado no lleva precio ni descuento");
+    }
     lineSubtotals.push(calc.lineSubtotal);
     lineTaxes.push(calc.lineTax);
+    offers.push({ purchaseRequestLineId: line.purchaseRequestLineId, offerKind });
     await tx.procurementQuoteLine.create({
       data: {
         procurementQuoteId: quoteId,
         purchaseRequestLineId: line.purchaseRequestLineId,
+        offerKind,
         unitPrice: calc.unitPriceNet,
         taxRate: rate,
         discountPct: parseDiscountPct(line.discountPct),
@@ -122,11 +150,15 @@ async function writeQuoteLines(
     });
   }
 
-  return headerTotalsWithIibbPerception({
+  const totals = headerTotalsWithIibbPerception({
     lineSubtotals,
     lineTaxes,
     iibbPerceptionRate,
   });
+  if (!totals.totalAmount.greaterThan(0)) {
+    throw new ServiceError("VALIDATION", "El total de la cotización debe ser mayor a cero");
+  }
+  return { ...totals, offers };
 }
 
 export async function createProcurementQuote(
@@ -174,6 +206,11 @@ export async function createProcurementQuote(
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
   const quote = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
+    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id } });
+    if (current.status !== "SUBMITTED") {
+      throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
+    }
     const iibbPerceptionRate = new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT);
     const created = await tx.procurementQuote.create({
       data: {
@@ -192,7 +229,7 @@ export async function createProcurementQuote(
       },
     });
 
-    const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount } = await writeQuoteLines(
+    const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount, offers } = await writeQuoteLines(
       tx,
       created.id,
       pr.lines,
@@ -225,11 +262,11 @@ export async function createProcurementQuote(
       "ProcurementQuote",
       created.id,
       { projectId: pr.projectId, companyId: pr.companyId },
-      { after: { purchaseRequestId: pr.id }, tx },
+      { after: { purchaseRequestId: pr.id, offers }, tx },
     );
 
     return created;
-  });
+  }, QUOTE_TRANSACTION_OPTIONS);
 
   return { id: quote.id };
 }
@@ -258,6 +295,8 @@ export async function updateProcurementQuote(
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
+    const quote = await loadMutableQuote(quoteId, ctx, tx);
     const locked = await tx.procurementQuote.updateMany({
       where: {
         id: quoteId,
@@ -280,7 +319,7 @@ export async function updateProcurementQuote(
     const iibbPerceptionRate = new Prisma.Decimal(
       input.iibbPerceptionRate ?? quote.iibbPerceptionRate.toString(),
     );
-    const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount } = await writeQuoteLines(
+    const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount, offers } = await writeQuoteLines(
       tx,
       quoteId,
       prLines,
@@ -325,9 +364,12 @@ export async function updateProcurementQuote(
       "ProcurementQuote",
       quoteId,
       { projectId: pr.projectId, companyId: pr.companyId },
-      { after: { purchaseRequestId: pr.id }, tx },
+      {
+        before: { offers: previousLines.map(line => ({ purchaseRequestLineId: line.purchaseRequestLineId, offerKind: line.offerKind })) },
+        after: { purchaseRequestId: pr.id, offers }, tx,
+      },
     );
-  });
+  }, QUOTE_TRANSACTION_OPTIONS);
 
   return { id: quoteId };
 }
@@ -347,6 +389,8 @@ export async function deleteProcurementQuote(
   const pr = quote.purchaseRequest;
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
+    await loadMutableQuote(quoteId, ctx, tx);
     const deleted = await tx.procurementQuote.deleteMany({
       where: {
         id: quoteId,
@@ -369,7 +413,7 @@ export async function deleteProcurementQuote(
       { projectId: pr.projectId, companyId: pr.companyId },
       { before: { purchaseRequestId: pr.id, supplierContactId: quote.supplierContactId }, tx },
     );
-  });
+  }, QUOTE_TRANSACTION_OPTIONS);
 }
 
 export async function listProcurementQuotesForRequest(
@@ -427,6 +471,7 @@ export async function listProcurementQuotesDetailedForRequest(
     iibbPerceptionAmount: string;
     lines: Array<{
       purchaseRequestLineId: string;
+      offerKind: QuoteLineOfferKind | null;
       description: string;
       unit: string;
       quantity: string;
@@ -477,6 +522,7 @@ export async function listProcurementQuotesDetailedForRequest(
     iibbPerceptionAmount: serializeMoneyDecimal(q.iibbPerceptionAmount),
     lines: q.lines.map((l) => ({
       purchaseRequestLineId: l.purchaseRequestLineId,
+      offerKind: l.offerKind,
       description: l.purchaseRequestLine.description,
       unit: l.purchaseRequestLine.unit,
       quantity: serializeQtyDecimal(l.purchaseRequestLine.quantity),

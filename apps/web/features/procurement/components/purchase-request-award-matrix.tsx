@@ -18,7 +18,8 @@ import {
   formatQtyWithUnit,
   formatUnitPriceFromString,
 } from "@/lib/format-money";
-import { buildPurchaseRequestAwardGroups } from "../lib/purchase-request-award-selection";
+import { buildPurchaseRequestAwardGroups, canAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
+import type { QuoteLineOfferKind } from "@bloqer/domain";
 
 type PrLine = {
   id: string;
@@ -29,6 +30,7 @@ type PrLine = {
 };
 
 type QuoteLineCol = {
+  offerKind: QuoteLineOfferKind | null;
   purchaseRequestLineId: string;
   unitPrice: string;
   /** Persisted line total after discount + IVA; excludes document-level IIBB. */
@@ -165,9 +167,9 @@ export function PurchaseRequestAwardMatrix({
                 {awardableQuotes.map((q) => {
                   const ql = quoteLineFor(q.id, line.id);
                   return (
-                    <option key={q.id} value={q.id} disabled={!ql}>
+                    <option key={q.id} value={q.id} disabled={!ql || !canAwardQuoteLine(ql)}>
                       {q.supplierName}
-                      {ql ? ` · ${formatMoneyAmount(ql.lineTotal, q.currency)}` : " · Sin renglón"}
+                      {ql ? ` · ${quoteLineOfferLabel(ql)} · ${formatMoneyAmount(ql.lineTotal, q.currency)}` : " · Sin renglón"}
                     </option>
                   );
                 })}
@@ -233,10 +235,11 @@ export function PurchaseRequestAwardMatrix({
                             aria-label={`${q.supplierName}: ${line.description}`}
                             checked={checked}
                             onChange={() => setSelection((prev) => ({ ...prev, [line.id]: q.id }))}
-                            disabled={pending || ql == null}
+                            disabled={pending || ql == null || !canAwardQuoteLine(ql)}
                           />
                           {ql != null ? (
                             <>
+                              <span className="text-xs">{quoteLineOfferLabel(ql)}</span>
                               <span className="text-xs tabular-nums text-muted-foreground">
                                 {formatUnitPriceFromString(ql.unitPrice)}
                               </span>

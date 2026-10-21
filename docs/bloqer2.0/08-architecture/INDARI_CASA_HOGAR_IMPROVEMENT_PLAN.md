@@ -187,6 +187,8 @@ Reutilizar ADR-013, validador y stub. Definir aplicación manual/automática, mo
 
 ### B08 · Ofertas incompletas y bonificaciones — Q-064
 
+**Actualización:** Q-064 resuelta por el Owner en D-118; implementación y evidencia en §15. Los párrafos siguientes registran el diagnóstico previo.
+
 Caso SC-097 y alcance de SC-076. Hoy una cotización puede contener un renglón cero si otro tiene precio; no es prueba suficiente de un ítem ofrecido gratis. Definir representación de «no cotizado» vs bonificación y su comportamiento al comparar, adjudicar y contar cotizaciones válidas.
 
 Hasta esa decisión, no convertir ceros históricos automáticamente ni prohibir toda bonificación. Evaluar cambio en validadores, servicios, matriz y formulario; actualizar ERD/Prisma solo si la representación elegida lo requiere. Aceptación: una omisión no se adjudica por error y una bonificación legítima es inequívoca.
@@ -222,7 +224,7 @@ Hasta esa decisión, no convertir ceros históricos automáticamente ni prohibir
 - **Completado:** arquitectura/modelo, Prisma, 69 migraciones ensayadas en DB aislada, comparación estructural sin diferencias, fixtures, 67 pruebas unitarias aprobadas y fichas privadas de conciliación actualizadas. Ver informe de fase 0.
 - **Fase 1 y pendientes técnicos en código:** selección parcial, importes/mensajes, precisión decimal, conservación de importes y concurrencia de borradores automáticos; ver §12. Integración de adjudicación/AP verificada en DB aislada. Publicación pendiente: alias Vercel (P-IND-03) y smoke UI.
 - **Diagnóstico actualizado:** P-IND-04 corregido; OC-051 requiere justificación por falta de referencia, según mensaje aportado y verificación de solo lectura (§12). B01 mantiene conciliación histórica pendiente: no hay resolución de datos ni diagnóstico único de las duplicaciones. P-IND-01 queda verificado estructuralmente con salvedad de procedencia.
-- **Pendiente de decisión:** Q-061 a Q-064. Estas decisiones no bloquean el bloque acotado.
+- **Pendiente de decisión:** Q-061, Q-062 y Q-063. Q-064 aprobada como D-118; seguimiento en §15.
 - **No ejecutado:** migraciones de producción, deploy ni modificaciones de registros de INDARI. Solo se migró la DB de ensayo en fase 0. Los cambios de aplicación de fase 1 están preparados localmente.
 
 ## 11. Implementación acotada de fase 1 — 21/10/2026
@@ -287,6 +289,69 @@ Alcance B01 / PR-04. La exclusión concurrente de panel OC/recepción ya se entr
 - **Pruebas:** los 6 escenarios de `ap/supplier-invoice-integrity.live.test.ts` pasaron en DB aislada. Incluyen rechazo de pérdida de vínculo en edición y emisión (sin crear CxP), rechazo por tenant/empresa/proyecto, emisión única, carga manual, NC/ND sin caja ni devolución física y variación exacta del devengado (-48,40 por NC 60,50 + ND 12,10; +12,10 neto tras anular la NC). Suite general 1.208 pruebas, typecheck de 13 paquetes y lint aprobados (warnings preexistentes). Índice AI: 484 chunks verificados. Regresión final dirigida: 3 casos aprobados (membresía/anulación y los 2 escenarios de concurrencia/segunda recepción de la suite anterior). Son 8 escenarios distintos validados en esta fase; no una única ejecución de 8.
 - **Documentación/AI:** guía §9.2 y ayuda «Factura desde OC» explican el aviso y el control. Regenerar/verificar knowledge; no cambia contrato de tools AI ni permisos nuevos.
 - **Límites:** continúa pendiente la publicación y smoke UI de P-IND-03. No se editan documentos históricos de INDARI; regularización exige comprobantes y decisión exacta de qué conservar/anular. Q-061 a Q-064 corresponden a fase 3, no quedan aprobadas por esta implementación.
+
+## 14. Preparación de fase 3 — propuesta pendiente de decisión (21/10/2026)
+
+El usuario solicitó continuar la fase 3. Se revisaron los puntos de entrada de compras/AP, los vínculos Prisma y ADR-013, y se solicitaron las definiciones de Q-061 a Q-064. Esta sección registra la **propuesta inicial**. Después el Owner aprobó Q-064 y el campo opcional, con preservación de procesados (D-118, §15). Q-061/062/063 siguen sin decisión; no son funcionalidad disponible.
+
+### Secuencia propuesta
+
+1. Resolver Q-064 y entregar B08 como cambio independiente: representación explícita de oferta por ítem, comparación y adjudicación.
+2. Resolver el alcance de Q-062 y aprobar el ADR de B06 antes de implementar la factura multi-OC.
+3. Para Q-061, separar los casos históricos que tienen procedimiento vigente de los que requieren una excepción nueva. La conciliación documental puede avanzar independientemente de B08/B06.
+4. Definir si B07 entra en esta entrega. Si entra, completar ADR-013 con aplicación, devolución, cancelación y contabilidad antes de crear entidades o migraciones.
+
+Cada bloque requiere sus propias pruebas y cierre; aprobar uno no aprueba los demás. Fases 1 y 2 están publicadas en la rama de revisión (`399128cf` y `b3d178cb`), sin confirmar disponibilidad en el portal de producción.
+
+### B08 — Propuesta y puntos comprobados
+
+Propuesta consultada: distinguir «Cotizado», «No cotizado» y «Bonificado». Una línea no cotizada no se adjudica ni aporta al mínimo exigido para ese ítem; una bonificación exige selección explícita. No reinterpretar automáticamente los ceros históricos. La forma persistida y su compatibilidad con registros anteriores se definirán después de acordar la regla.
+
+Hallazgos que el diseño debe resolver:
+
+- `procurement-quote.service.ts` exige actualmente una línea por cada ítem de la SC y al menos un **precio unitario** positivo. Esto no equivale a exigir **total final positivo**: un descuento del 100 % puede producir cero. La propuesta de total positivo es una restricción a aprobar, no una regla ya verificada del sistema.
+- `purchase-request-to-po.service.ts` cuenta cotizaciones `RECEIVED`/`SELECTED` por SC, tanto en adjudicación individual como en lote. El conteo actual no distingue cobertura del ítem ni filtra vigencia; la oferta seleccionada sí se valida por vencimiento. El diseño debe explicitar ambos criterios y aplicar la misma regla en ambos caminos.
+- Deben conservarse congelamiento de ofertas usadas por OC activas, exclusión concurrente por SC, atomicidad del lote y conservación de importes D-117.
+
+Pruebas previstas: ítem omitido no seleccionable ni adjudicable por petición directa; bonificación explícita; mínimo distinto entre ítems de una misma SC; entradas histórica/nueva; cotización vencida; lote mixto con rollback; reintento concurrente; edición sin alteración monetaria. Actualizar formulario, matriz de escritorio/celular, guía, ayuda y conocimiento AI en la misma entrega.
+
+### B06 — Propuesta y límites del diseño
+
+Primera versión consultada: una factura para OC del mismo tenant, empresa, obra, proveedor y moneda; cada renglón vinculado a un único ítem OC; una sola CxP y sus pagos. No contempla mezclar obras ni dividir un renglón entre varios ítems en esta propuesta.
+
+Prisma ya contiene `SupplierInvoiceLine.purchaseOrderLineId`, pero cabecera, validaciones y consumidores asumen una única `SupplierInvoice.purchaseOrderId`. Por eso no alcanza con permitir más IDs en el formulario ni con quitar un guard. El ADR debe decidir la representación de la relación y su convivencia con facturas de una OC, manuales, automáticas y NC/ND.
+
+Antes de implementar: inventariar lecturas por cabecera, definir imputación de impuestos/percepciones y pagos en resúmenes por OC, cobertura por recepción, tratamiento de borradores y notas fiscales, así como bloqueos de las OC involucradas en orden estable. No elegir una «OC principal» arbitraria ni sumar el total completo de la factura en cada OC. Toda distribución monetaria nueva requiere regla aprobada y conciliación exacta, incluyendo centavos residuales.
+
+Pruebas previstas: dos OC con recepciones parciales, factura única y CxP única; rechazo de alcance incompatible; concurrencia con generación automática; conservación de importes; NC/ND y anulaciones; resumen por OC, deuda y devengado sin duplicaciones. Ensayar cualquier migración en la DB aislada antes de producción, con compatibilidad y recuperación documentadas.
+
+### B05 — Revisión operativa posible con el circuito vigente
+
+- **Compra pendiente y oferta vencida:** solicitar reconfirmación real de precio y condiciones al proveedor. Registrar la documentación mediante el circuito permitido por el estado actual; no adjudicar una oferta vencida ni cambiar su vigencia solo para superar el control.
+- **Compra ya realizada o pagada:** conciliar factura, comprobantes de pago, recepción real y registros existentes antes de cargar nada. La factura manual y el pago parcial existentes pueden servir cuando hay documentos reales y no están ya registrados; no constituyen autorización para duplicar deuda, caja o costo.
+- **Unidad errónea con documentos posteriores:** identificar la cadena SC/cotización/OC/recepción/factura/pago y acreditar la unidad correcta. No asumir equivalencias barras/kg ni reabrir la SC sorteando BR-PUR-025. Definir la secuencia admitida por los estados concretos; si no existe, mantener el caso pendiente de diseño excepcional.
+
+Resultado por caso: evidencia, documento a conservar, operación soportada, efecto esperado y condición que falta. Ningún cambio histórico se ejecuta por esta propuesta; continúa pendiente la conciliación fiscal/bancaria de los pares identificados en la auditoría privada.
+
+### B07 — Definiciones requeridas para completar ADR-013
+
+El validador y el servicio stub no implementan la cuenta puente. Además de la prioridad, hacen falta decisiones sobre aplicación manual o automática, alcance proveedor/empresa/obra/moneda, saldo sin aplicar, devolución parcial, anulación de aplicación y de anticipo, cierre de períodos y asientos. El diseño debe incluir idempotencia del desembolso y de la aplicación, permisos y trazabilidad; el validador de proveedor actual no tiene la clave de idempotencia que sí tiene el anticipo de cliente.
+
+Con factura real, revisar el circuito existente de factura/pago parcial sin reducir ficticiamente la cotización ni registrar recepción inexistente. Sin factura, no reutilizar `Payment` sin `Payable`. Las decisiones financieras y el modelo del puente siguen pendientes: la referencia histórica a «Fase 2» en ADR/stub no significa que estén implementados en la fase 2 del plan INDARI.
+
+## 15. Fase 3 — B08 aprobado e implementación de D-118 (21/10/2026)
+
+El Owner aprobó Cotizado/No cotizado/Bonificado y luego el campo opcional, preservando documentos procesados y exigiendo revisión de ceros pendientes. Los otros bloques de fase 3 no quedan aprobados por estas respuestas.
+
+- **Datos históricos:** consulta de producción exclusivamente de lectura: 88 cotizaciones, 191 renglones, ningún total de cotización cero; 33 renglones de oferta con total cero. De ellos, 32 corresponden a ítems SC ya adjudicados (incluye ofertas descartadas, no significa 32 líneas de OC a cero). Solo un cero está pendiente: SC-097, cotización recibida sin OC activa, editable por el flujo vigente. No se modificó ningún registro del cliente.
+- **Modelo:** enum `QuoteLineOfferKind`, campo nullable `ProcurementQuoteLine.offerKind`, sin default/backfill. Los históricos quedan null. Migración `20261021180000_quote_line_offer_kind` aplicada únicamente en `bloqer_indari_phase0_20261021`; la DB aislada tiene ahora 70 migraciones. Producción todavía no migrada.
+- **Carga/edición:** validación financiera en services, con el cálculo decimal y conservación D-117. Cotizado requiere total de línea positivo; No cotizado exige precio/descuento/importes cero; Bonificado requiere importe cero explícito. Total de cotización positivo. No se permite borrar una clasificación explícita. Auditoría existente registra clasificación anterior/nueva por ítem, sin crear eventos nuevos. Se corrigió el formulario de edición para conservar la moneda original en vez de enviar siempre ARS.
+- **Adjudicación:** se cuenta oferta por ítem en ambas entradas, individual/lote. No cotizado y cero histórico sin clasificar no aportan al mínimo ni se adjudican. Se conservan estados y vigencia existentes. El atajo toma solo cotizados positivos y vuelve a exigir esa condición dentro de la transacción; bonificados requieren selección en matriz. Escritorio y celular muestran la clasificación y deshabilitan opciones no adjudicables.
+- **Concurrencia:** carga/edición/eliminación de cotizaciones comparten el bloqueo SC con adjudicación; edición y eliminación revalidan el congelamiento dentro de la transacción. La prueba reprodujo expiración a 5 s mientras la edición esperaba una adjudicación; se adoptó el límite local 30 s/espera 10 s del flujo de adjudicación. El test exige rechazo funcional, no acepta un timeout como victoria.
+- **Históricos procesados:** no se agrega el control nuevo al validar una OC existente; importes/FK/adjudicación quedan intactos. Una anulación seguida de nueva adjudicación sí debe cumplir D-118. Una oferta aún usada por otra OC permanece congelada; no se desbloquea para clasificar un cero pendiente.
+- **Documentación:** decisiones, preguntas, reglas, módulo, estados, ERD, guía §9.1, ayuda y smoke actualizados. Índice AI regenerado; sin nuevos tools AI ni dependencia npm.
+- **Validación B08:** los 6 escenarios de integración pasaron juntos en DB aislada (180,8 s), incluyendo preservación de OC histórica, bloqueo de readjudicación de cero sin clasificar, mínimo por ítem, rollback, atajo y edición concurrente. La primera ejecución reprodujo timeout de edición; además se corrigieron firma/aserción del test de anulación, sin relajar el control del producto. Regresión anterior: 7 casos de adjudicación/permisos/decimales aprobados en ejecución separada (112,0 s). Suite general final: 1.209 pruebas aprobadas en 6 paquetes. Tipos de 13 paquetes y lint correctos (warnings generales preexistentes); UI/ayuda: 23 pruebas y nueva comprobación de las 8 de selección tras ajustar la etiqueta histórica. Índice AI: 487 chunks verificados. Smoke visual y despliegue no ejecutados.
+- **Publicación:** este bloque agrega la primera migración de la intervención. Antes de push/deploy, verificar el destino Vercel/Neon y recuperación: el build migra automáticamente su DB, incluso en preview. P-IND-03 sigue pendiente; no anunciar la funcionalidad en portal ni emitir el informe final de correcciones disponibles todavía. El procedimiento de recuperación contempla que el código viejo desconoce No cotizado/Bonificado.
 
 ## Referencias canónicas
 

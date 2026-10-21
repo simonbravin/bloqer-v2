@@ -11,6 +11,9 @@ import {
   IVA_RATE_LABEL_ES,
   IVA_RATE_PRESETS,
   normalizeIvaRatePreset,
+  QUOTE_LINE_OFFER_KINDS,
+  QUOTE_LINE_OFFER_LABELS,
+  type QuoteLineOfferKind,
 } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,6 +57,7 @@ type PrLine = {
 type LineMoney = { unitPrice: string; discountPct: string; taxRate: string };
 
 type QuoteLineInitial = {
+  offerKind: QuoteLineOfferKind | null;
   originalMoney?: StoredDocumentLineMoney;
   purchaseRequestLineId: string;
   unitPrice: string;
@@ -63,6 +67,7 @@ type QuoteLineInitial = {
 
 export type ProcurementQuoteEditValues = {
   quoteId: string;
+  currency: string;
   supplierName: string;
   validUntil: string | null;
   leadTimeDays: number | null;
@@ -121,6 +126,7 @@ export function ProcurementQuoteForm({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isEdit = mode === "edit" && editValues != null;
+  const currency = isEdit ? editValues.currency : "ARS";
 
   const lineInitialByPrId = useMemo(() => {
     const map = new Map<string, QuoteLineInitial>();
@@ -158,6 +164,13 @@ export function ProcurementQuoteForm({
       }),
     ),
   );
+  const [offerKinds, setOfferKinds] = useState<Record<string, QuoteLineOfferKind | null>>(() =>
+    Object.fromEntries(lines.map((line) => [line.id,
+      isEdit ? lineInitialByPrId.get(line.id)?.offerKind ?? null : "QUOTED",
+    ])),
+  );
+  const offerKindsRef = useRef(offerKinds);
+  offerKindsRef.current = offerKinds;
 
   // Submit reads refs so DecimalInput flushSync-on-submit is visible (avoids stale closure).
   const supplierIdRef = useRef(supplierId);
@@ -193,6 +206,9 @@ export function ProcurementQuoteForm({
     iibbPerceptionRateRef.current = DEFAULT_IIBB_PERCEPTION_RATE_PCT;
     setLineMoney(nextMoney);
     lineMoneyRef.current = nextMoney;
+    const nextKinds = Object.fromEntries(lines.map((line) => [line.id, "QUOTED" as const]));
+    setOfferKinds(nextKinds);
+    offerKindsRef.current = nextKinds;
     setError(null);
     setCreateEpoch((n) => n + 1);
   }
@@ -265,7 +281,7 @@ export function ProcurementQuoteForm({
     return {
       purchaseRequestId,
       supplierContactId: opts.supplierContactId,
-      currency: "ARS" as const,
+      currency,
       validUntil,
       leadTimeDays,
       pricesIncludeTax: opts.pricesIncludeTax,
@@ -274,6 +290,7 @@ export function ProcurementQuoteForm({
         const money = moneyMap[line.id];
         return {
           purchaseRequestLineId: line.id,
+          offerKind: offerKindsRef.current[line.id],
           unitPrice: decimalOrZero(money?.unitPrice),
           taxRate: money?.taxRate ?? opts.taxRate,
           discountPct: decimalOrZero(money?.discountPct),
@@ -344,7 +361,7 @@ export function ProcurementQuoteForm({
         });
       }}
     >
-      <p className="font-medium text-sm">{isEdit ? "Editar cotización" : "Cargar cotización"}</p>
+      <p className="font-medium text-sm">{isEdit ? "Editar cotización" : "Cargar cotización"} · {currency}</p>
       {error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
@@ -445,6 +462,11 @@ export function ProcurementQuoteForm({
         {" "}El descuento se aplica antes de los impuestos. Cambiar el modo interpreta de otra manera
         los números ingresados; revisá los precios y el total antes de guardar.
       </p>
+      <p className="text-xs text-muted-foreground">
+        Indicá Cotizado, No cotizado o Bonificado en cada ítem. No cotizado no se puede adjudicar
+        ni cuenta para el mínimo de ofertas de ese ítem. Los ceros históricos sin clasificar
+        requieren revisión antes de adjudicar. El total de la cotización debe ser positivo.
+      </p>
 
       {lines.map((line) => {
         const money = lineMoney[line.id] ?? {
@@ -471,6 +493,37 @@ export function ProcurementQuoteForm({
                   : ""}
               </p>
             </div>
+            <div className="space-y-1">
+              <Label htmlFor={`offerKind_${line.id}`}>Oferta del ítem</Label>
+              <Select
+                value={offerKinds[line.id] ?? "LEGACY"}
+                disabled={pending}
+                onValueChange={(value) => {
+                  const kind = value === "LEGACY" ? null : value as QuoteLineOfferKind;
+                  const nextKinds = { ...offerKindsRef.current, [line.id]: kind };
+                  offerKindsRef.current = nextKinds;
+                  setOfferKinds(nextKinds);
+                  if (kind === "NOT_QUOTED" || (kind === "BONIFIED" &&
+                    (!preview || compareDecimal(preview.lineTotal, "0") !== 0))) {
+                    const nextMoney = { ...lineMoneyRef.current,
+                      [line.id]: { ...money, unitPrice: "0", discountPct: "0" },
+                    };
+                    lineMoneyRef.current = nextMoney;
+                    setLineMoney(nextMoney);
+                  }
+                }}
+              >
+                <SelectTrigger id={`offerKind_${line.id}`}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {isEdit && lineInitialByPrId.get(line.id)?.offerKind == null ? (
+                    <SelectItem value="LEGACY">Sin clasificar (histórico)</SelectItem>
+                  ) : null}
+                  {QUOTE_LINE_OFFER_KINDS.map((kind) => (
+                    <SelectItem key={kind} value={kind}>{QUOTE_LINE_OFFER_LABELS[kind]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <div className="space-y-1">
                 <Label htmlFor={`unitPrice_${line.id}`}>
@@ -479,6 +532,7 @@ export function ProcurementQuoteForm({
                 <DecimalInput
                   precision={4}
                   id={`unitPrice_${line.id}`}
+                  disabled={pending || offerKinds[line.id] === "NOT_QUOTED" || offerKinds[line.id] === "BONIFIED"}
                   value={money.unitPrice}
                   onValueChange={(v) =>
                     setLineMoney((prev) => {
@@ -502,6 +556,7 @@ export function ProcurementQuoteForm({
                 <DecimalInput
                   precision={4}
                   id={`discountPct_${line.id}`}
+                  disabled={pending || offerKinds[line.id] === "NOT_QUOTED" || offerKinds[line.id] === "BONIFIED"}
                   value={money.discountPct}
                   onValueChange={(v) =>
                     setLineMoney((prev) => {
@@ -526,10 +581,10 @@ export function ProcurementQuoteForm({
                     {formatQtyFromString(line.quantity)} {line.unit} × {formatUnitPriceFromString(decimalOrZero(money.unitPrice))}
                     {pricesIncludeTax ? " con IVA" : " neto"} · Descuento {formatRatePctFromString(decimalOrZero(money.discountPct))}%
                   </p>
-                  <p>Neto con descuento: {formatMoneyAmount(preview.lineSubtotal, "ARS")}</p>
-                  <p>IVA ({formatRatePctFromString(money.taxRate)}%): {formatMoneyAmount(preview.lineTax, "ARS")}</p>
+                  <p>Neto con descuento: {formatMoneyAmount(preview.lineSubtotal, currency)}</p>
+                  <p>IVA ({formatRatePctFromString(money.taxRate)}%): {formatMoneyAmount(preview.lineTax, currency)}</p>
                   <p className="font-medium text-foreground">
-                    Total línea con IVA: {formatMoneyAmount(preview.lineTotal, "ARS")}
+                    Total línea con IVA: {formatMoneyAmount(preview.lineTotal, currency)}
                   </p>
                   <p>La percepción IIBB se agrega en el total de la cotización.</p>
                 </div>
@@ -595,7 +650,7 @@ export function SelectQuoteButton({
         });
       }}
     >
-      {pending ? "Generando OC…" : "Adjudicar libres → OC"}
+      {pending ? "Generando OC…" : "Adjudicar cotizados → OC"}
     </Button>
   );
 }

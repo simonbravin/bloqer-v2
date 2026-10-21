@@ -71,3 +71,17 @@ En entorno y datos de prueba autorizados, después del deploy:
 5. NC parcial de factura pagada parcialmente: crédito reduce saldo sin nuevo pago ni movimiento. ND crea su CxP; no cambia cantidades recibidas. Reporte de devengado toma signos D-115.
 
 Integración reproducible: `packages/services/src/ap/supplier-invoice-integrity.live.test.ts`, con el mismo opt-in y guard de DB aislada de fase 0. Tests de costos, saldos y cancelación forman parte de `pnpm test`. Sin fixtures mutables contra producción.
+
+## Regresión INDARI — fase 3 / ofertas por ítem (D-118)
+
+Pendiente de smoke UI en versión publicada. Pruebas automatizadas: `packages/services/src/procurement/quote-line-offer.live.test.ts` en DB aislada, con el guard de fixtures existente. No ejecutar sobre la DB normal de dev ni producción.
+
+1. Antes de desplegar, confirmar entorno/URLs de Vercel y punto de recuperación Neon. El build aplica migraciones automáticamente; un push con esta migración no debe usarse para averiguar a qué DB apunta el preview. Aplicar `20261021180000_quote_line_offer_kind` en el destino correcto antes del código nuevo; para portal es Neon `production`.
+2. Verificar columna `offerKind` nullable, sin default, y enum `QuoteLineOfferKind`. La migración no contiene UPDATE/backfill ni toca importes/FK. Comparar totales, cantidades y relaciones de una muestra histórica antes/después. No inferir bonificaciones de precios cero.
+3. En datos de ensayo, cargar una oferta con Cotizado y No cotizado: este último aparece identificado, no permite selección escritorio/celular y no aporta al mínimo del ítem. Una petición directa debe fallar igual. Una cotización completamente gratuita o sin oferta se rechaza por total no positivo.
+4. Cambiar un ítem a Bonificado con comprobante de respaldo y mantener otro cotizado positivo. El bonificado puede seleccionarse en la matriz; el atajo Adjudicar cotizados → OC lo deja pendiente. Precio, descuento, IVA e IIBB deben conciliar con lo guardado.
+5. Histórico positivo sin clasificación: se puede adjudicar sin reescribir la cotización. Cero histórico pendiente: muestra Cero sin clasificar · revisar; clasificar solo mediante edición permitida. Histórico con OC activa: no cambia importes/vínculos ni habilita edición excepcional; la OC existente conserva su flujo. Anular y readjudicar sí aplica D-118.
+6. Mínimo dos: dos ofertas para A y solo una para B. A se puede adjudicar, B no; lote A+B inválido revierte ambas operaciones. Reintentar edición/adjudicación simultáneas debe producir una respuesta funcional y no una OC sobre una línea no cotizada.
+7. Ayuda y guía §9.1 deben coincidir con las etiquetas; verificar búsqueda «no cotizado», «bonificado» y «cero sin clasificar». No informar disponibilidad a INDARI hasta verificar versión del portal y este recorrido.
+
+**Recuperación:** no eliminar columna/enum ni migraciones aplicadas. El código anterior puede leer el esquema ampliado, pero desconoce la clasificación y permitiría adjudicar ceros. Si ya se cargaron ofertas nuevas, no reabrir adjudicaciones con esa versión: priorizar corrección hacia adelante o mantener ese flujo detenido hasta restaurar D-118. Revertir código no revierte documentos ni caja.

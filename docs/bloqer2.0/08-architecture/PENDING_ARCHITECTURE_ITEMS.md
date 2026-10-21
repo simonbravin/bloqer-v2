@@ -33,6 +33,7 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 - **Estado:** PARCIAL 21/10/2026. Último deployment GitHub Production `6764344935` exitoso con SHA `527c824c9ad9009b0d9cf2d729a184dc5f2e31f9`, base de la intervención. La vista previa de `399128cf` pasó Vercel y CI; no acredita el alias de producción. Falta acreditar la asignación actual del alias de portal desde Vercel autenticado.
 - **Entorno listo:** DB `bloqer_indari_phase0_20261021` en compute dev, con 69 migraciones y fixtures sintéticos protegidos. Integración ampliada: 13 casos distintos aprobados (12 juntos y el caso adicional de recepción posterior en una ejecución dirigida de 2 casos); ver P-IND-02/04. No equivale a E2E UI aprobado.
 - **Acción pendiente:** verificar alias/deployment antes de publicar y completar regresión de cada PR. `prisma validate` y pruebas unitarias no sustituyen esa comprobación.
+- **Fase 3 / D-118:** migración aditiva de clasificación aplicada en DB aislada (70 migraciones). Confirmar también las URLs efectivas del preview antes de push: `vercel-migrate-if-needed.mjs` aplica automáticamente las migraciones pendientes al entorno del build. La autorización del campo no acredita el destino. Producción aún no migrada; guía de recuperación y smoke en `DEPLOYMENT_SMOKE_TEST.md`.
 - **Cierre:** versión y destino de pruebas documentados por entrega. No usar datos reales de Casa Hogar como fixtures mutables.
 
 ### P-IND-04 — Timeout de adjudicación en integración aislada
