@@ -24,11 +24,13 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 - **Verificación:** panel OC y recepción simultáneos devuelven el mismo ID; una segunda recepción amplía ese borrador; anularlo permite uno nuevo sin contar el anulado. Cobertura final recibida 847, facturada 242, reservada 605, pendiente 0 y pagada 121 (datos sintéticos). Vínculos de líneas conservados. No cambia la numeración general de documentos de otras OC concurrentes (P-ERD-04).
 - **Cierre:** reproducción y fix de causa con regresión, o evidencia de que el control actual cubre el escenario. Regularización legacy separada y respaldada por comprobantes; no asociar por texto/importe silenciosamente.
 
+**Continuación fase 2 (21/10/2026):** controles D-066 de vínculos de líneas automáticas al crear/editar/emitir; aislamiento de lectura y edición por empresa y membresía de obra; avisos de cobertura por cantidad incompleta en facturas con vínculo solo de cabecera. Alta manual conserva ese caso válido. Suite AP aislada: 6 escenarios aprobados, incluyendo emisión única, NC/ND, crédito/deuda, caja y devengado. Sin migraciones ni regularización histórica. Ver §13 del plan.
+
 ### P-IND-03 — Acreditar versión de portal y entorno de regresión
 
 **Seguimiento 21/10/2026:** reabierto por pedido del usuario antes de fase 2. Se identificó el proyecto Vercel `bloqer-v2-web` y se ofreció su integración; aún falta conexión autenticada para acreditar el alias. El push a una rama de revisión no acredita producción.
 
-- **Estado:** PARCIAL 21/10/2026. Último deployment GitHub Production `6764344935` exitoso con SHA `527c824c9ad9009b0d9cf2d729a184dc5f2e31f9`, igual al local. Falta acreditar la asignación actual del alias de portal desde Vercel autenticado.
+- **Estado:** PARCIAL 21/10/2026. Último deployment GitHub Production `6764344935` exitoso con SHA `527c824c9ad9009b0d9cf2d729a184dc5f2e31f9`, base de la intervención. La vista previa de `399128cf` pasó Vercel y CI; no acredita el alias de producción. Falta acreditar la asignación actual del alias de portal desde Vercel autenticado.
 - **Entorno listo:** DB `bloqer_indari_phase0_20261021` en compute dev, con 69 migraciones y fixtures sintéticos protegidos. Integración ampliada: 13 casos distintos aprobados (12 juntos y el caso adicional de recepción posterior en una ejecución dirigida de 2 casos); ver P-IND-02/04. No equivale a E2E UI aprobado.
 - **Acción pendiente:** verificar alias/deployment antes de publicar y completar regresión de cada PR. `prisma validate` y pruebas unitarias no sustituyen esa comprobación.
 - **Cierre:** versión y destino de pruebas documentados por entrega. No usar datos reales de Casa Hogar como fixtures mutables.

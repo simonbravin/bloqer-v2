@@ -58,3 +58,16 @@ Record who ran the checklist, date, and environment.
 Tras verificar el deployment y alias, en datos de prueba autorizados: abrir y guardar sin tocar un unitario de 4 dp; entrar/salir del campo sin cambios; editarlo a 4 dp; confirmar dinero a 2 dp y FX a 6. Cargar 1 × $10,00 con IVA incluido al 21% y sin descuento: total de línea $10,00 (IIBB se informa aparte). Reabrir con precio neto y cambiar solo notas: mantener total; cambiar cantidad o precio: recalcular. Probar en escritorio y celular.
 
 Para concurrencia y datos sintéticos, usar `procurement-regression.live.test.ts` exclusivamente con el opt-in y las dos URLs a la DB aislada documentada en fase 0. Incluye panel OC/recepción simultáneos, cobertura parcial y resguardo de importes al editar. No ejecutar fixtures contra `neondb` ni `production`; el guard los rechaza.
+
+
+## Regresión INDARI — fase 2 (smoke UI pendiente)
+
+En entorno y datos de prueba autorizados, después del deploy:
+
+1. Crear factura desde una OC parcialmente recibida, editar descripción y emitir. Conservar OC e ítems de origen, total y una única CxP. Repetir emitir no crea otra deuda.
+2. Verificar una factura manual enlazada a cabecera sin ítems OC: panel y detalle explican que los importes están incluidos pero sus cantidades no se concilian por línea. No tratar el aviso como prueba de duplicación. La carga manual sigue permitida.
+3. Borrador automático histórico de prueba con vínculo de línea ausente: emitir debe pedir revisión, sin crear CxP. No restaurar por descripción/importe ni usar datos reales como caso de prueba.
+4. Usuario sin acceso a obra y contexto de otra empresa: no acceder al resumen, preview, listado ni avisos. Edición/anulación respetan el alcance existente.
+5. NC parcial de factura pagada parcialmente: crédito reduce saldo sin nuevo pago ni movimiento. ND crea su CxP; no cambia cantidades recibidas. Reporte de devengado toma signos D-115.
+
+Integración reproducible: `packages/services/src/ap/supplier-invoice-integrity.live.test.ts`, con el mismo opt-in y guard de DB aislada de fase 0. Tests de costos, saldos y cancelación forman parte de `pnpm test`. Sin fixtures mutables contra producción.

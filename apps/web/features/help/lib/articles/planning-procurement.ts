@@ -1102,6 +1102,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Si cambiás la partida EDT, se limpia el vínculo APU: volvé a elegir el insumo si necesitás cobertura en el tablero.",
       "Al vincular Contra orden de compra, el picker muestra OC **confirmadas, parcialmente recibidas y recibidas** del mismo proveedor. Una OC ya recibida sigue siendo elegible para facturar.",
       "Si la factura nació desde la OC (**Completar factura**), no pases a **Costo directo** ni cambies el proveedor: el vínculo a la OC queda fijo.",
+      "Las líneas de una factura automática deben conservar su vínculo con los ítems de origen. Si falta, guardar o emitir pide revisar el comprobante; no se reconstruye el vínculo por texto o importe.",
+      "El aviso de líneas sin vínculo en Facturación de la OC indica que los importes están incluidos, pero esas cantidades no se concilian por ítem. La carga manual sin ese vínculo sigue permitida: revisá los comprobantes antes de registrar o actualizar otra factura.",
     ],
     relatedSlugs: [
       "pagar-una-cuenta-por-pagar",
@@ -1115,6 +1117,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     keywords: [
       "factura desde oc",
+      "lineas sin vinculo",
+      "factura duplicada",
       "traer lineas",
       "factura proveedor",
       "factura de compra",

@@ -3,6 +3,8 @@ import { can } from "@bloqer/domain";
 import { toIsoDateInTimeZone, addCalendarDays, calendarPartsInTimeZone, formatCalendarDate } from "@bloqer/utils";
 import type { CreateSupplierInvoiceFromPurchaseOrderInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
+import { isCrossCompany } from "../company-scope";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -59,6 +61,8 @@ export type PurchaseOrderBillingSummary = {
   pendingToInvoice: string;
   hasReceivedQuantity: boolean;
   draftInvoiceCount: number;
+  /** Header-linked invoices whose quantities cannot be fully matched to PO lines. */
+  unlinkedInvoiceCount: number;
   /** Oldest open DRAFT on this OC (for Completar factura CTA). */
   openDraftInvoiceId: string | null;
   /** Per-line 3-way qty status ([D-067]). */
@@ -87,6 +91,10 @@ async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext, db
   });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(po.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La orden de compra no pertenece a la empresa activa");
+  }
+  await requireProjectAccess(po.projectId, ctx);
   return po;
 }
 
@@ -157,10 +165,12 @@ export async function getPurchaseOrderBillingSummary(
   let draftReservedAmount = new Prisma.Decimal(0);
   let paidAmount = new Prisma.Decimal(0);
   let draftInvoiceCount = 0;
+  let unlinkedInvoiceCount = 0;
   let openDraftInvoiceId: string | null = null;
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
+    if (inv.lines.some((line) => !line.purchaseOrderLineId)) unlinkedInvoiceCount += 1;
     // Coverage vs recibido uses neto+IVA only — IIBB is crédito fiscal, not goods coverage ([D-112]).
     const goodsTaxAmount = inv.subtotal.plus(inv.taxAmount);
     if (inv.status === "DRAFT") {
@@ -213,6 +223,7 @@ export async function getPurchaseOrderBillingSummary(
     pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
     hasReceivedQuantity,
     draftInvoiceCount,
+    unlinkedInvoiceCount,
     openDraftInvoiceId,
     lineMatches,
     matchWarningCount,
@@ -336,6 +347,7 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
     where: { id: supplierInvoiceId },
     select: {
       tenantId: true,
+      companyId: true,
       projectId: true,
       purchaseOrderId: true,
       subtotal: true,
@@ -349,15 +361,18 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  await requireProjectAccessIfPresent(inv.projectId, ctx);
   if (!inv.purchaseOrderId || inv.status === "CANCELLED") return [];
 
-  const po = await prisma.purchaseOrder.findUnique({
-    where: { id: inv.purchaseOrderId },
-    include: { lines: true },
-  });
-  if (!po) return [];
+  const po = await loadPoForBilling(inv.purchaseOrderId, ctx);
 
   const warnings: string[] = [];
+  if (inv.lines.some((line) => !line.purchaseOrderLineId)) {
+    warnings.push("Hay líneas sin vínculo con un ítem de la OC. El importe figura en la facturación, pero esas cantidades no se concilian por línea. Revisá los comprobantes antes de generar otra factura.");
+  }
   const receivedAmount = sumPoLinesReceivedAmount(po.lines.map(toPoLineDraft));
 
   const settings = inv.projectId
@@ -437,9 +452,10 @@ export async function getPurchaseOrderCodeForApLink(
   }
   const po = await prisma.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
-    select: { tenantId: true, number: true },
+    select: { tenantId: true, companyId: true, projectId: true, number: true },
   });
-  if (!po || po.tenantId !== ctx.tenantId) return null;
+  if (!po || po.tenantId !== ctx.tenantId || isCrossCompany(po.companyId, ctx)) return null;
+  await requireProjectAccess(po.projectId, ctx);
   return `OC-${String(po.number).padStart(3, "0")}`;
 }
 

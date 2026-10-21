@@ -1,6 +1,6 @@
 # Plan de mejoras — INDARI / Casa Hogar
 
-Fecha: 21/10/2026. Estado: **fase 0 documentada; fase 1 y cierre técnico de pendientes implementados y probados, pendientes de publicación en producción**. P-IND-02/P-IND-04 corregidos y verificados en DB aislada; P-IND-03 y regularizaciones históricas siguen pendientes. Ver [resultados de fase 0](./INDARI_CASA_HOGAR_PHASE_0.md), §11 como historial y §12 para el estado vigente.
+Fecha: 21/10/2026. Estado: **fase 0 documentada; fases 1 y 2 implementadas y probadas en entorno aislado, pendientes de publicación en producción**. P-IND-02/P-IND-04 corregidos y verificados en DB aislada; P-IND-03 y regularizaciones históricas siguen pendientes. Ver [resultados de fase 0](./INDARI_CASA_HOGAR_PHASE_0.md), §11 como historial y §12/13 para el estado vigente.
 
 Este plan convierte la auditoría del relevamiento de INDARI del 15/10/2026 en entregas revisables. Los identificadores B01–B08 mantienen la correspondencia con el alcance interno entregado. Las fases de este documento son propias de esta intervención; no renumeran el roadmap general del producto.
 
@@ -274,6 +274,19 @@ El usuario reabrió los pendientes antes de seguir fase 2. Esta sección actuali
 - **Validación final:** 13 casos distintos de integración aprobados en DB aislada (12 en la suite completa y el escenario nuevo de segunda recepción/anulación en una ejecución dirigida de 2). Suite general: 1.208 pruebas en 6 paquetes aprobadas; typecheck: 13 paquetes aprobados. Lint general aprobado con advertencias preexistentes; lint dirigido de cambios sin errores. El ensayo previo P-IND-02 falló por P2002; la regresión corregida devuelve el mismo borrador en ambos disparadores.
 - **Entrega:** rama de revisión con pruebas, guía/ayuda e índice AI. Falta verificar alias Vercel y smoke UI antes de producción; no hubo mutaciones sobre Casa Hogar. Regularización fiscal/bancaria y decisiones Q-061 a Q-064 conservan sus requisitos de evidencia/definición.
 - **Informe INDARI:** se prepara al final de la implementación y verificación de publicación, diferenciando corregido/disponible de pendiente. No se anuncia como disponible una corrección solo local.
+
+## 13. Fase 2 — Integridad AP y trazabilidad (21/10/2026)
+
+Alcance B01 / PR-04. La exclusión concurrente de panel OC/recepción ya se entregó en `399128cf`; esta continuación cubre edición/emisión, aislamiento y documentos manuales/fiscales. La evidencia de reproducción usa exclusivamente fixtures y servicios sobre la DB aislada.
+
+- **D-066:** reproducción confirmó que una petición de edición podía quitar el vínculo de línea de un borrador automático. Se exige conservar vínculos explícitos al crear/editar/emitir documentos identificados como automáticos. Un borrador histórico sin vínculo requiere revisión antes de emitir. No se infiere ninguna relación por descripción, importe o notas.
+- **Empresa y obra:** reproducción confirmó lectura de billing desde una empresa activa distinta y edición AP sin control de empresa. Se reutilizan `isCrossCompany` y `requireProjectAccess`; resumen, preview, listados, avisos y enlace OC respetan la empresa y la membresía de obra. La anulación también comprueba acceso a la obra, sin imponer estado ACTIVE para cancelar.
+- **Carga manual:** conserva sus líneas sin vínculo obligatorio a ítem OC, según D-066. El panel y detalle avisan de cobertura por cantidad incompleta cuando falta el vínculo; importes siguen incluidos. Es información para revisar, no un detector fiscal de duplicados ni un bloqueo nuevo.
+- **Creación manual AP:** en integración se reprodujo cierre de transacción antes de completar la auditoría con el límite por defecto de 5 s. Se acota creación a 30 s/espera 10 s, igual que el flujo automático; auditoría, líneas y cabecera siguen atómicas. No se cambian tiempos globales ni se eliminan controles.
+- **Modelo:** no cambia Prisma, ERD, cardinalidad, estados ni fórmulas. `unlinkedInvoiceCount` es un dato derivado del resumen, no una columna. NC/ND mantienen D-115 y no representan devolución física ni caja.
+- **Pruebas:** los 6 escenarios de `ap/supplier-invoice-integrity.live.test.ts` pasaron en DB aislada. Incluyen rechazo de pérdida de vínculo en edición y emisión (sin crear CxP), rechazo por tenant/empresa/proyecto, emisión única, carga manual, NC/ND sin caja ni devolución física y variación exacta del devengado (-48,40 por NC 60,50 + ND 12,10; +12,10 neto tras anular la NC). Suite general 1.208 pruebas, typecheck de 13 paquetes y lint aprobados (warnings preexistentes). Índice AI: 484 chunks verificados. Regresión final dirigida: 3 casos aprobados (membresía/anulación y los 2 escenarios de concurrencia/segunda recepción de la suite anterior). Son 8 escenarios distintos validados en esta fase; no una única ejecución de 8.
+- **Documentación/AI:** guía §9.2 y ayuda «Factura desde OC» explican el aviso y el control. Regenerar/verificar knowledge; no cambia contrato de tools AI ni permisos nuevos.
+- **Límites:** continúa pendiente la publicación y smoke UI de P-IND-03. No se editan documentos históricos de INDARI; regularización exige comprobantes y decisión exacta de qué conservar/anular. Q-061 a Q-064 corresponden a fase 3, no quedan aprobadas por esta implementación.
 
 ## Referencias canónicas
 

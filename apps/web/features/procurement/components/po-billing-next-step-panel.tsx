@@ -64,6 +64,15 @@ export function PoBillingNextStepPanel({
             proveedor.
           </p>
         )}
+        {billing.unlinkedInvoiceCount > 0 ? (
+          <ProcurementAmberCallout inset>
+            <p className="text-xs text-amber-900 dark:text-amber-100">
+              Hay {billing.unlinkedInvoiceCount} factura(s) con líneas sin vínculo a un ítem de esta OC.
+              Sus importes están incluidos, pero esas cantidades no se concilian por línea.
+              Revisá los comprobantes antes de registrar o actualizar otra factura.
+            </p>
+          </ProcurementAmberCallout>
+        ) : null}
         {billing.matchWarningCount > 0 ? (
           <ProcurementAmberCallout inset>
             <p className="text-xs font-medium text-amber-900 dark:text-amber-100">

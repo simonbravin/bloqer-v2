@@ -219,6 +219,7 @@ export async function createProcurementRegressionFixtures(db: PrismaClient) {
           issueDate: today,
           dueDate: future,
           status: "ISSUED",
+          invoiceLetter: "B",
           subtotal: "200",
           taxAmount: "42",
           totalAmount: "242",

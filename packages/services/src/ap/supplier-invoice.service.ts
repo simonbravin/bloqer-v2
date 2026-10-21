@@ -288,6 +288,22 @@ export async function assertSupplierInvoiceLinesApu(
   }
 }
 
+/** D-066: auto-generated lines must retain an explicit source, never infer it from amounts/text. */
+function assertAutomaticInvoiceLineLinks(
+  invoice: { internalNotes: string | null; notes: string | null },
+  lines: Array<{ purchaseOrderLineId?: string | null }>,
+): void {
+  if (
+    isSupplierInvoiceLockedFromPurchaseOrder(invoice.internalNotes, invoice.notes) &&
+    lines.some((line) => !line.purchaseOrderLineId)
+  ) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Las líneas de una factura generada desde OC deben conservar su vínculo con la línea de origen. Revisá la factura antes de guardar o emitir; no se vinculan líneas por descripción o importe.",
+    );
+  }
+}
+
 /**
  * [D-066] When a line references a PO line, it must belong to the linked OC (same tenant/project).
  * Corporate invoices cannot carry purchaseOrderLineId.
@@ -764,6 +780,7 @@ export async function createSupplierInvoice(
     assertProjectApDirectSpendAllowed(settings, estimatedFx.amountArs, ctx);
   }
 
+  assertAutomaticInvoiceLineLinks({ internalNotes: input.internalNotes ?? null, notes: input.notes ?? null }, input.lines);
   await assertSupplierInvoiceLinesWbs(projectId, input.lines, ctx.tenantId);
   await assertSupplierInvoiceLinesPoLink(
     projectId,
@@ -854,7 +871,9 @@ export async function createSupplierInvoice(
 
     return inv;
   };
-  const inv = options?.tx ? await writeInvoice(options.tx) : await prisma.$transaction(writeInvoice);
+  const inv = options?.tx
+    ? await writeInvoice(options.tx)
+    : await prisma.$transaction(writeInvoice, { maxWait: 10_000, timeout: 30_000 });
 
   return serializeInvoice(inv);
 }
@@ -871,6 +890,9 @@ export async function updateSupplierInvoice(
   const existing = await prisma.supplierInvoice.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(existing.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (!canMutateApForScope(ctx.roles, existing.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas de proveedor");
   }
@@ -992,6 +1014,7 @@ export async function updateSupplierInvoice(
   }
 
   if (input.lines) {
+      assertAutomaticInvoiceLineLinks(existing, input.lines);
       await assertSupplierInvoiceLinesWbs(existing.projectId, input.lines, ctx.tenantId);
       const poId =
         input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId;
@@ -1288,6 +1311,7 @@ export async function issueSupplierInvoice(
     if (lines.length === 0) {
       throw new ServiceError("CONFLICT", "La factura debe tener al menos una línea");
     }
+    assertAutomaticInvoiceLineLinks(inv, lines);
     await assertSupplierInvoiceLinesWbs(inv.projectId, lines, ctx.tenantId);
     await assertSupplierInvoiceLinesPoLink(
       inv.projectId,
@@ -1423,6 +1447,7 @@ export async function cancelSupplierInvoice(
   if (!canMutateApForScope(ctx.roles, invPreview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar facturas de proveedor");
   }
+  await requireProjectAccessIfPresent(invPreview.projectId, ctx);
   if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
