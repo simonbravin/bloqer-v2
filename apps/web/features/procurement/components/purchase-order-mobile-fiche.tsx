@@ -8,7 +8,6 @@ import {
 } from "@/lib/format-money";
 import { PurchaseOrderVarianceReadout } from "./purchase-order-variance-readout";
 import { PoLineBudgetRef } from "./po-line-budget-ref";
-import { ProcurementAmberCallout } from "./procurement-amber-callout";
 import type { PurchaseOrderView } from "@bloqer/services";
 import type { ReactNode } from "react";
 
@@ -45,11 +44,6 @@ export function PurchaseOrderMobileFiche({
 
   return (
     <div className="space-y-4 md:hidden">
-      {order.status === "APPROVED" ? (
-        <ProcurementAmberCallout>
-          Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.
-        </ProcurementAmberCallout>
-      ) : null}
       <section className="rounded-lg border bg-card p-4 space-y-3" data-testid="po-mobile-fiche">
         <dl className="grid grid-cols-2 gap-3 text-sm">
           <div className="col-span-2">

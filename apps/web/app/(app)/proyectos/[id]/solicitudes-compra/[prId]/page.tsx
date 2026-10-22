@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { PurchaseRequestStatusBadge } from "@/features/procurement/components/purchase-request-status-badge";
+import { PurchaseOrderStatusBadge } from "@/features/procurement/components/purchase-order-status-badge";
+import { PurchaseOrderNextStep } from "@/features/procurement/components/purchase-order-next-step";
 import {
   ProcurementQuotesSection,
 } from "@/features/procurement/components/procurement-quotes-section";
@@ -126,7 +128,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
     blockingQuoteCount === 0 &&
     linkedOrders.length === 0 &&
     awardedLineCount === 0;
-  const showQuotes = ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status);
+  const showQuotes = ["SUBMITTED", "QUOTE_SELECTED", "COMPLETED"].includes(pr.status);
   const storageConfigured = isStorageConfigured();
   const prAttachments = await listEntityDocuments("PURCHASE_REQUEST", prId, ctx, { projectId: id });
   const canEditAttachments =
@@ -220,7 +222,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           <p className="text-muted-foreground">
             Cobertura: {awardedLineCount}/{totalLineCount || pr.lines.length} ítems adjudicados
           </p>
-          <ul className="space-y-0.5">
+          <ul className="space-y-3">
             {linkedOrders.map((po) => (
               <li key={po.id}>
                 <span className="text-muted-foreground">OC: </span>
@@ -230,24 +232,48 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                 >
                   {po.code}
                 </Link>
-                <span className="text-muted-foreground"> ({po.status})</span>
+                {" "}<PurchaseOrderStatusBadge status={po.status} />
+                <PurchaseOrderNextStep status={po.status} />
               </li>
             ))}
           </ul>
         </div>
       )}
 
-      {pr.status === "SUBMITTED" && quotes.length === 0 ? (
-        <p className="rounded-lg border bg-muted/30 px-4 py-3 text-sm md:hidden">
-          Solicitud enviada. Pendiente de cotización.
+      {pr.status === "SUBMITTED" ? (
+        <p className="text-sm text-muted-foreground">
+          Enviada a Compras: no significa que una OC esté pendiente de aprobación.{" "}
+          {quotes.length === 0
+            ? "Compras debe cargar las cotizaciones para comparar y adjudicar."
+            : "Compará las ofertas y adjudicá solo los ítems que correspondan; los demás pueden quedar pendientes."}
         </p>
+      ) : null}
+
+      {pr.status === "COMPLETED" ? (
+        <p className="text-sm text-muted-foreground">
+          Solicitud completada: las OC de sus ítems están confirmadas. Revisá en cada OC las recepciones,
+          facturas y pagos; este estado no acredita que la compra esté pagada.
+        </p>
+      ) : null}
+
+      {showQuotes ? (
+        <details className="rounded-lg border px-4 py-3 text-sm">
+          <summary className="cursor-pointer font-medium">Si la compra ya se realizó o la oferta venció</summary>
+          <p className="mt-2 text-muted-foreground">
+            Para una compra nueva, pedí al proveedor condiciones y vigencia reales. Si ya compraron o pagaron,
+            reuní factura, remito y comprobante de pago y revisá los registros existentes antes de crear otros.
+            No cambies fechas solo para superar un bloqueo.
+          </p>
+          <Link href="/ayuda/revisar-compra-realizada-o-cotizacion-vencida" className="mt-2 inline-block underline">
+            Ver qué revisar antes de continuar
+          </Link>
+        </details>
       ) : null}
 
       <PurchaseRequestDetailMobileSections
         pr={pr}
         projectId={id}
         canAward={canQuote && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)}
-        linkedOrders={linkedOrders}
         quotes={quotes.map((q) => ({
           id: q.id,
           supplierName: q.supplierName,
@@ -255,6 +281,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           totalAmount: q.totalAmount,
           currency: q.currency,
           leadTimeDays: q.leadTimeDays,
+          validUntil: q.validUntil,
           iibbPerceptionAmount: q.iibbPerceptionAmount,
           lines: q.lines,
         }))}
@@ -350,13 +377,13 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
             prLines={pr.lines}
             suppliers={suppliers}
             quotes={quotes}
-            canQuote={canQuote}
+            canQuote={canQuote && pr.status !== "COMPLETED"}
             allowCreateQuotes={pr.status === "SUBMITTED"}
             frozenQuoteIds={frozenQuoteIds}
           />
 
           {quotes.length > 0 && (
-            <div className="hidden md:block space-y-4">
+            <div className="space-y-4">
               <h3 className="text-sm font-medium">Adjuntos por cotización</h3>
               {quoteAttachments.map((qa) => (
                 <div key={qa.quoteId} className="rounded-lg border p-4 space-y-2">
@@ -365,8 +392,10 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                     scope={{ kind: "project", projectId: id }}
                     linkedEntity={{ type: "PROCUREMENT_QUOTE", id: qa.quoteId }}
                     storageConfigured={storageConfigured}
-                    docs={qa.docs}
-                    canEdit={canQuote}
+                    docs={pr.status === "COMPLETED"
+                      ? qa.docs.map((doc) => ({ ...doc, canMutate: false, canDelete: false }))
+                      : qa.docs}
+                    canEdit={canQuote && pr.status !== "COMPLETED"}
                   />
                 </div>
               ))}

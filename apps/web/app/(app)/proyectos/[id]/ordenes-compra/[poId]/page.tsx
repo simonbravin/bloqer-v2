@@ -32,6 +32,7 @@ import {
   canRegisterApInvoice,
 } from "@/features/procurement";
 import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
+import { PurchaseOrderNextStep } from "@/features/procurement/components/purchase-order-next-step";
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
 import { AuthorizeAndCommitPoButton } from "@/features/procurement/components/authorize-and-commit-po-button";
 import { PurchaseOrderVarianceReadout } from "@/features/procurement/components/purchase-order-variance-readout";
@@ -357,11 +358,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         })}
       />
 
-      {isApproved ? (
-        <ProcurementAmberCallout className="hidden md:block">
-          Aprobada — falta Confirmar al proveedor para comprometer $ en EDT.
-        </ProcurementAmberCallout>
-      ) : null}
+      <PurchaseOrderNextStep status={order.status} />
 
       <ActionErrorBanner message={sp.actionError} />
       <ActionErrorBanner message={sp.invoiceError} />

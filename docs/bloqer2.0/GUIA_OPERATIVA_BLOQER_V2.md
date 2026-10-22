@@ -1015,7 +1015,19 @@ Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño 
 
 **Cómo leer los precios de cotización:** el campo indica **Precio unitario neto (sin IVA)** o **Precio unitario con IVA**. Es el precio de una unidad: el resumen muestra cantidad × unitario, descuento, neto con descuento, IVA y total de línea. Cambiar **El precio unitario incluye IVA** cambia la interpretación del número ingresado, no convierte automáticamente ese número. Al editar, los precios guardados se muestran netos; solo activá IVA incluido si reingresás precios finales. El total de línea excluye IIBB y el **Total cotización con impuestos** lo incluye, con su importe informado aparte.
 
+En el detalle de la SC, las OC vinculadas muestran su **estado en español** y **Próximo paso**, con acceso a la ficha de cada orden, tanto en escritorio como en celular. **Enviada** indica envío a Compras, no una OC pendiente de aprobación. **Completada** no acredita facturación ni pago. En celular se ve también **Vigencia** y **Adjuntos por cotización**. Las ofertas y sus adjuntos continúan disponibles para consulta al completar la SC; esto no habilita edición ni nueva adjudicación.
+
+### 9.1.1 Compra realizada o cotización vencida
+
+Desde la SC, desplegá **Si la compra ya se realizó o la oferta venció** y abrí **Ver qué revisar antes de continuar**. La ayuda `/ayuda/revisar-compra-realizada-o-cotizacion-vencida` reúne los antecedentes necesarios para revisar el caso; no ejecuta una regularización.
+
+Para una compra nueva, pedí al proveedor condiciones y vigencia reales y usá la edición permitida por el estado. Para una compra ya realizada o pagada, reuní factura completa, remito o conformidad del servicio y comprobante de pago; anotá proveedor, fecha, cantidades, unidades y SC/OC. Consultá las OC vinculadas, sus **Facturas vinculadas** y el listado de facturas del proyecto: una carga por otra vía puede no estar vinculada a la OC. Compará el número fiscal, los renglones y los pagos; FP es un código interno y una coincidencia de importe no demuestra duplicación ni doble pago bancario.
+
+Con diferencias de unidad, producto, impuestos o varias OC en una factura, pedí el desglose y acordá el tratamiento con Administración y soporte. No copies el total completo en varias facturas, cambies fechas para sortear controles, anules una compra real para editar una oferta, simules recepción ni reduzcas la compra al anticipo. Los casos procesados o potencialmente duplicados requieren identificar qué conservar y una secuencia admitida por sus estados antes de actuar.
+
 ### 9.2 Procedimiento — Orden de compra (OC)
+
+**Próximo paso**, visible en escritorio y celular, explica qué revisar y qué área interviene según el estado de la OC. Un borrador todavía no fue enviado; una orden pendiente de aprobación requiere revisión de un aprobador habilitado; una aprobada requiere confirmar al proveedor. En recepción parcial se revisa el saldo físico y, en recibida, facturas y pagos: **Recibida no significa pagada**. Es orientación de lectura; no agrega acciones, permisos ni cambia las políticas.
 
 La cabecera identifica código de OC y proveedor. **Ver solicitud de origen** lleva a la SC vinculada cuando existe; no se deduce la procedencia por el texto de las notas.
 

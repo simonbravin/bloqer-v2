@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { QuoteLineOfferKind } from "@bloqer/domain";
 import { canQuickAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
 import { formatDate, formatDbDate } from "@/lib/format";
@@ -22,6 +21,7 @@ type QuoteCard = {
   totalAmount: string;
   currency: string;
   leadTimeDays: number | null;
+  validUntil: string | null;
   iibbPerceptionAmount: string;
   lines?: Array<{
     offerKind: QuoteLineOfferKind | null;
@@ -42,14 +42,12 @@ export function PurchaseRequestDetailMobileSections({
   documents,
   projectId,
   canAward = false,
-  linkedOrders = [],
 }: {
   pr: PurchaseRequestView;
   quotes: QuoteCard[];
   documents: ReactNode;
   projectId: string;
   canAward?: boolean;
-  linkedOrders?: Array<{ id: string; code: string; status: string }>;
 }) {
   const line = pr.lines[0];
   const wbs =
@@ -92,24 +90,6 @@ export function PurchaseRequestDetailMobileSections({
           </div>
         </dl>
         {pr.notes ? <p className="text-sm text-muted-foreground">{pr.notes}</p> : null}
-        {linkedOrders.length > 0 ? (
-          <div className="space-y-1 text-sm">
-            <p className="text-xs text-muted-foreground">
-              Cobertura: {pr.lines.length - freeLineCount}/{pr.lines.length} ítems
-            </p>
-            {linkedOrders.map((po) => (
-              <p key={po.id}>
-                <Link
-                  href={`/proyectos/${projectId}/ordenes-compra/${po.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {po.code}
-                </Link>
-                <span className="text-muted-foreground"> ({po.status})</span>
-              </p>
-            ))}
-          </div>
-        ) : null}
       </section>
 
       <section className="rounded-lg border bg-card p-4 space-y-3">
@@ -139,7 +119,7 @@ export function PurchaseRequestDetailMobileSections({
         {documents}
       </section>
 
-      {quotes.length > 0 && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status) ? (
+      {quotes.length > 0 && ["SUBMITTED", "QUOTE_SELECTED", "COMPLETED"].includes(pr.status) ? (
         <section className="space-y-3">
           <h2 className="font-semibold">Cotizaciones</h2>
           {showAwardShortcut ? (
@@ -187,6 +167,9 @@ export function PurchaseRequestDetailMobileSections({
                 ) : null}
                 <p className="text-sm text-muted-foreground">
                   Plazo {q.leadTimeDays != null ? `${q.leadTimeDays} días` : "—"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Vigencia: {q.validUntil ? formatDbDate(q.validUntil) : "No informada"}
                 </p>
                 {canQuickAward ? (
                   <SelectQuoteButton

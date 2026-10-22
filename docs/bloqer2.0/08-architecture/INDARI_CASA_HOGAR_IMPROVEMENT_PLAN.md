@@ -390,6 +390,17 @@ El Owner indicó continuar directamente en producción y posponer la configuraci
 - **Informe al cliente:** preparado y revisado visualmente en dos páginas; separa mejoras publicadas, acciones de INDARI y alcance aún no implementado. No enviado por correo. Incluye conciliación prioritaria de posibles duplicados y validación de comprobantes, sin afirmar doble pago bancario.
 - **Pendientes explícitos:** Q-061/062/063, regularización histórica con evidencia, smoke operativo y separación completa de Preview. Los overrides de DB aprobados para esta rama se conservan; no se cambiaron las URLs ni AUTH_SECRET. No usar otras ramas Preview para ensayar migraciones mientras hereden la DB general.
 
+## 18. Ayudas de consulta solicitadas por el Owner (22/10/2026)
+
+Revisión adicional del Word: el Owner autorizó completar ayudas que faciliten el trabajo sin modificar operaciones. Se implementaron estas mejoras de presentación y documentación:
+
+- OC vinculadas de la SC con el badge canónico en español y **Próximo paso** según su estado, usando el mismo componente en el detalle de OC. Se eliminó la repetición de vínculos dentro del resumen móvil. No se alteraron botones, permisos, transiciones ni políticas.
+- Mensajes que distinguen SC enviada a Compras, OC pendiente de aprobación y SC completada de factura pagada. Atiende las confusiones de SC-078/089/071 y seguimiento de SC-073/085.
+- Vigencia visible en las tarjetas de cotización del celular y adjuntos por proveedor visibles en ambas pantallas. En SC completada se pueden consultar las cotizaciones y adjuntos que antes estaban ocultos; no se ofrecen edición/adjudicación ni mutaciones de esos adjuntos desde esa sección.
+- Orientación desplegable **Si la compra ya se realizó o la oferta venció** y nueva ayuda con los antecedentes a reunir. Acompaña SC-038/068, OC-040 y los pares a conciliar, vencimientos, unidades, factura compartida y anticipos. No crea un circuito excepcional ni resuelve Q-061/062/063.
+- Módulos funcionales, guía §9.1/9.1.1/9.2, catálogo y conocimiento AI actualizados (490 chunks verificados). Sin cambios en tools AI, Prisma, migraciones, services ni datos del cliente.
+- Verificación local: 27 pruebas web/ayuda aprobadas; tipos en 13 paquetes aprobados; lint dirigido sin warnings ni errores; revisión de gates de solo consulta y de enlaces. El smoke operativo sigue limitado por el contexto de cuenta documentado en §17. Publicación verificable por SHA y alias de Vercel antes de entregar el PDF consolidado.
+
 ## Referencias canónicas
 
 - [Solicitudes y cotizaciones](../02-modules/PURCHASE_REQUESTS.md), [OC y recepciones](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [Gastos y pagos](../02-modules/EXPENSES_AND_PAYMENTS.md).

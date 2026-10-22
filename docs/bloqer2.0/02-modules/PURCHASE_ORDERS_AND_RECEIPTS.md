@@ -55,6 +55,7 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 
 ## 9. Pantallas y vistas necesarias
 - Listado y detalle OC con estado de aprobación, recepción y facturación por línea.
+- Detalle con orientación de próximo paso y área interviniente según el estado existente, compartida con las OC vinculadas de la SC. Es lectura informativa: no determina permisos/transiciones ni afirma que recibido equivale a pagado.
 - Editor de líneas con WBS, precio, ref. presupuesto, justificación de desvío.
 - Registro de recepción; panel “siguiente paso: facturar desde OC”.
 

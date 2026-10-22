@@ -53,6 +53,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 ## 9. Pantallas y vistas necesarias
 - `/proyectos/[id]/solicitudes-compra` — listado; filtro pendientes de cotización.
 - Detalle SC: líneas con **costo referencial** y WBS; tabla comparativa de cotizaciones; adjuntos.
+- Orientación de consulta: OC vinculadas con estado en español y próximo paso; Enviada identifica el envío a Compras, no una aprobación de OC. Cotizaciones y adjuntos siguen consultables al completar la SC; celular muestra también vigencia y adjuntos por proveedor. Ayuda para ofertas vencidas/compras realizadas enlaza el procedimiento vigente, sin cambiar estados, permisos ni documentos.
 - Resumen del proyecto: contador de SC + alerta si hay enviadas sin cotizar.
 
 ## 10. Reglas de negocio
