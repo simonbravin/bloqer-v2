@@ -18,42 +18,41 @@ test("assertCertificationStatusEditable rejects ISSUED", () => {
   );
 });
 
-test("assertCertificationLineWithinBudget rejects PUBLIC over ceiling", () => {
+test("assertCertificationLineWithinBudget rejects quantity above the contractual ceiling", () => {
   assert.throws(
     () =>
       assertCertificationLineWithinBudget({
-        projectType: "PUBLIC",
         itemCode: "1.1",
         cumulative: new Prisma.Decimal("110"),
         budgetQty: new Prisma.Decimal("100"),
-        certificationNotes: "nota",
       }),
-    (err) => err instanceof ServiceError && err.code === "CONFLICT" && err.message.includes("BR-CERT-002"),
+    (err) =>
+      err instanceof ServiceError && err.code === "CONFLICT" && err.message.includes("BR-CERT-002"),
   );
 });
 
-test("assertCertificationLineWithinBudget rejects PRIVATE over ceiling without notes", () => {
+test("assertCertificationLineWithinBudget rejects physical progress independently of quantity", () => {
   assert.throws(
     () =>
       assertCertificationLineWithinBudget({
-        projectType: "PRIVATE",
         itemCode: "1.1",
-        cumulative: new Prisma.Decimal("110"),
+        cumulative: new Prisma.Decimal("50"),
         budgetQty: new Prisma.Decimal("100"),
-        certificationNotes: null,
+        cumulativePhysicalPct: new Prisma.Decimal("100.0001"),
       }),
-    (err) => err instanceof ServiceError && err.code === "CONFLICT" && err.message.includes("BR-CERT-002b"),
+    (err) =>
+      err instanceof ServiceError &&
+      err.code === "CONFLICT" &&
+      err.message.includes("BR-CERT-002b"),
   );
 });
 
-test("assertCertificationLineWithinBudget allows PRIVATE over ceiling with notes", () => {
-  assert.doesNotThrow(() =>
+test("assertCertificationLineWithinBudget rejects a four-decimal excess", () => {
+  assert.throws(() =>
     assertCertificationLineWithinBudget({
-      projectType: "PRIVATE",
       itemCode: "1.1",
-      cumulative: new Prisma.Decimal("110"),
+      cumulative: new Prisma.Decimal("100.0001"),
       budgetQty: new Prisma.Decimal("100"),
-      certificationNotes: "Adenda verbal / ajuste de cómputo",
     }),
   );
 });
@@ -61,11 +60,10 @@ test("assertCertificationLineWithinBudget allows PRIVATE over ceiling with notes
 test("assertCertificationLineWithinBudget allows under ceiling", () => {
   assert.doesNotThrow(() =>
     assertCertificationLineWithinBudget({
-      projectType: "PUBLIC",
       itemCode: "1.1",
       cumulative: new Prisma.Decimal("100"),
       budgetQty: new Prisma.Decimal("100"),
-      certificationNotes: null,
+      cumulativePhysicalPct: new Prisma.Decimal("100"),
     }),
   );
 });

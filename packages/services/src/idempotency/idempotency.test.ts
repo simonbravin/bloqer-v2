@@ -45,6 +45,12 @@ describe("requireIdempotencyKey", () => {
 });
 
 describe("payload matchers", () => {
+  it("collection replay preserves the manually entered FX even for full-balance collections", () => {
+    const existing = { receivableId: "r", accountId: "a", collectionDate: new Date("2026-10-22"), amount: new Prisma.Decimal("10"), fxRate: new Prisma.Decimal("1200.123456"), status: "CONFIRMED" };
+    const input = { receivableId: "r", accountId: "a", collectionDate: "2026-10-22", collectFullBalance: true, amount: undefined, fxRate: "1200.123456" };
+    assert.equal(collectionReplayMatches(existing, input), true);
+    assert.equal(collectionReplayMatches(existing, { ...input, fxRate: "1200.123457" }), false);
+  });
   it("payment: same key + payFullBalance ignores stored amount", () => {
     assert.equal(
       paymentReplayMatches(

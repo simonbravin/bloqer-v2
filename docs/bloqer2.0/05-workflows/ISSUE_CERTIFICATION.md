@@ -13,8 +13,8 @@ PM.
 ## 4. Pasos
 1. Crear certificación borrador por período.
 2. Ingresar por ítem: Δ% físico y monto económico período.
-3. Sistema valida acumulados vs tipo obra ([D-004]).
-4. Si obra privada y excede → ingresar **nota aclaratoria** obligatoria.
+3. Sistema valida cantidad y físico acumulados de otros certificados emitidos/aprobados, más el período, sin superar 100% (PUBLIC y PRIVATE, [D-119]).
+4. Si excede → corregir medición o tramitar alcance adicional por adenda. Una nota no habilita excedentes.
 5. **Emitir** → `ISSUED` (inmutable).
 
 ## 5. Postcondiciones
@@ -22,7 +22,7 @@ PM.
 - `payment_status` permanece **`UNPAID`** (sin AR vinculada) hasta facturación/cobranzas ([BR-CERT-PAYMENT-001]).
 
 ## 6. Eventos
-- `certification.issued`, `certification.over_budget_warning`
+- `certification.issued`. Un exceso bloquea la operación; no emite el antiguo evento de advertencia privada.
 
 ## Referencias
 - [`CERTIFICATION_FORMULAS.md`](../04-formulas/CERTIFICATION_FORMULAS.md)

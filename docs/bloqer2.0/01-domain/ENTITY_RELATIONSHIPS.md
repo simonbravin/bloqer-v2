@@ -418,8 +418,8 @@ flowchart LR
 
 ### Integridad de certificación
 
-- **R-INT-014**: la suma de `physical_progress_pct` acumulada por `CostItem` no puede exceder 100% sin que el proyecto sea de tipo `PRIVATE` con nota aclaratoria (D-004).
-- **R-INT-015**: la suma de `economic_amount` acumulada por `CostItem` no puede exceder el total presupuestado del item, salvo el mismo caso de D-004.
+- **R-INT-014**: la suma de `physical_progress_pct` de certificaciones ISSUED/APPROVED por partida más el período no puede exceder 100%, tanto PUBLIC como PRIVATE (D-119).
+- **R-INT-015**: la cantidad económica acumulada por partida no supera la cantidad contractual vigente (D-119); el importe de cada período usa su PU de venta snapshot, sin revalorizar históricos. Borradores no reservan saldo. La invariante agregada se verifica en services bajo bloqueo transaccional, sin duplicar acumulados en nuevas tablas.
 
 ### Integridad de adendas y documentos de obra
 

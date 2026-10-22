@@ -3,6 +3,7 @@ import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import {
   moneyAmountString,
   optionalMoneyAmountString,
+  optionalFxRateString,
   qtyString,
   ratePctString,
   discountPctString,
@@ -54,6 +55,7 @@ export const createSalesInvoiceSchema = z.object({
 
 export const createInvoiceFromCertificationSchema = z.object({
   certificationId: z.string().uuid(),
+  fxRate: optionalFxRateString,
   issueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   dueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   taxRate:         ratePctString.optional().default("0.0000"),

@@ -61,7 +61,7 @@
 ### D-004 — Sobrecertificación: regla diferenciada según tipo de obra
 
 - **Fecha:** 2026-05-07
-- **Estado:** ACTIVA
+- **Estado:** SUPERSEDED por D-119 (2026-10-22). Se conserva como histórico.
 - **Contexto:** las obras públicas tienen normativa estricta; las privadas tienen flexibilidad.
 - **Decisión:**
   - **Obra pública**: prohibido certificar por encima del presupuesto vigente. Si se requiere, primero hay que generar adenda/presupuesto adicional.
@@ -1879,9 +1879,23 @@
 
 ---
 
+### D-119 — Tope acumulado estricto y sugerencias editables de certificación
+
+- **Fecha:** 2026-10-22
+- **Estado:** ACTIVA
+- **Decidido por:** Owner, pedido explícito: «nunca puede superar el 100%» teniendo en cuenta todos los certificados; confirmó «Usar avance físico como sugerencia inicial y ofrecer compras/recepciones como alternativas editables».
+- **Decisión:** por partida, cantidad previa emitida/aprobada + cantidad del período no supera la cantidad contractual vigente; porcentaje físico previo + porcentaje del período no supera 100. Ambos controles son independientes y aplican a obras públicas y privadas, al guardar y al emitir. Una nota no habilita excedentes; el alcance adicional sigue el circuito de adendas existente.
+- **Acumulación:** todos los otros certificados ISSUED/APPROVED de la misma partida y tenant, sin filtrar por fecha. Borradores no reservan saldo; rechazados/cancelados no consumen. Guardado y emisión comparten bloqueo transaccional por proyecto y vuelven a leer los acumulados.
+- **Sugerencias:** físico aprobado al corte como valor inicial; compras/recepciones como alternativas explícitas. Se propone sólo la diferencia pendiente, nunca se suman las fuentes entre sí. La cantidad económica y el físico siguen independientes (D-003). Abrir Medir no escribe; guardar conserva el precio snapshot existente.
+- **Histórico:** no reescribir certificados emitidos ni corregir excesos históricos por migración. Nuevos guardados/emisiones detectan esos excesos y piden revisión operativa. No hay campos, estados ni tablas nuevos.
+- **Trazabilidad:** facturar conserva proyecto, empresa y moneda del presupuesto; D-008 exige FX manual para moneda extranjera. Factura emitida crea CxC; cobranza confirmada acredita una cuenta compatible de la empresa conservando el proyecto. Facturar y anular certificado comparten el mismo bloqueo para evitar carreras.
+- **Documentos afectados:** Q-065, CERTIFICATIONS, CERTIFICATION_FORMULAS, BUSINESS_RULES, ENTITY_RELATIONSHIPS, MASTER_DATA, EVENTS_AND_AUTOMATIONS, PROJECTS, CONTRACTS_AND_ADDENDUMS, PRODUCT_SCOPE, ISSUE_CERTIFICATION, guía, panorama y ayuda.
+
+---
+
 ## Decisiones SUPERSEDED
 
-_(ninguna por ahora)_
+- D-004 → D-119. Se conserva su contenido original arriba.
 
 ---
 

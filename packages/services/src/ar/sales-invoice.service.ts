@@ -6,6 +6,8 @@ import type {
   UpdateSalesInvoiceInput,
 } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
+import { _lockCertificationProject } from "../certification/certification-calc.service";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import {
@@ -19,7 +21,9 @@ import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcemen
 import { ServiceContext, ServiceError } from "../types";
 import { canEditArArea, canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
-import { calcLine, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { calcLine, lockSalesInvoiceRow, recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { assertManualInvoiceHasNoCertificationLinks } from "./manual-invoice-guards";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
@@ -159,13 +163,22 @@ export async function getActiveInvoiceForCertification(
   receivableId: string | null;
   canCollect: boolean;
 } | null> {
-  await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) return null;
+  if (!(await getTenantModuleGate(ctx)).isEnabled("AR")) return null;
+  const cert = await prisma.certification.findFirst({
+    where: { id: certificationId, tenantId: ctx.tenantId },
+    select: { projectId: true },
+  });
+  if (!cert) return null;
+  await requireProjectAccess(cert.projectId, ctx);
   const inv = await prisma.salesInvoice.findFirst({
     where: { certificationId, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
-    select: { id: true, number: true, status: true },
+    select: { id: true, number: true, status: true, companyId: true },
   });
   if (!inv) return null;
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
 
   let receivableId: string | null = null;
   let canCollect = false;
@@ -349,6 +362,7 @@ export async function createSalesInvoice(
   if (!canEditArArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas");
   }
+  assertManualInvoiceHasNoCertificationLinks(input);
 
   if (!input.projectId) {
     throw new ServiceError(
@@ -385,7 +399,7 @@ export async function createSalesInvoice(
         companyId,
         projectId: input.projectId,
         clientContactId: input.clientContactId,
-        certificationId: input.certificationId ?? null,
+        certificationId: null,
         number,
         issueDate: new Date(input.issueDate),
         dueDate: new Date(input.dueDate),
@@ -422,7 +436,7 @@ export async function createSalesInvoice(
           lineSubtotal,
           lineTax,
           lineTotal,
-          certificationLineId: line.certificationLineId ?? null,
+          certificationLineId: null,
           sortOrder: line.sortOrder ?? 0,
         },
       });
@@ -465,12 +479,14 @@ export async function createInvoiceFromCertification(
   const cert = await prisma.certification.findUnique({
     where: { id: input.certificationId },
     include: {
+      budget: { select: { currency: true } },
       project: true,
       lines: { include: { wbsNode: { include: { costItem: true } } } },
     },
   });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (cert.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (projectScopeId !== undefined && cert.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
   }
@@ -497,85 +513,106 @@ export async function createInvoiceFromCertification(
   // Letter C/E always force 0 ([D-084]).
   const forceZeroTax = suggestedLetter === "C" || suggestedLetter === "E";
   const taxRate = new Prisma.Decimal(forceZeroTax ? "0" : (input.taxRate ?? "0"));
+  // D-008: preserve contractual currency; foreign amounts require an explicit manual rate.
+  const fx = computeDocumentFxAmounts(
+    cert.budget.currency,
+    cert.totalAmount,
+    input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined,
+  );
 
   let inv;
   try {
-    inv = await prisma.$transaction(async (tx) => {
-      const existing = await tx.salesInvoice.findFirst({
-        where: { certificationId: input.certificationId, status: { not: "CANCELLED" } },
-        select: { id: true },
-      });
-      if (existing) {
-        throw new ServiceError("CONFLICT", "Esta certificación ya tiene una factura activa");
-      }
+    inv = await prisma.$transaction(
+      async (tx) => {
+        await _lockCertificationProject(tx, cert.projectId);
+        const currentCert = await tx.certification.findFirstOrThrow({
+          where: { id: cert.id, tenantId: ctx.tenantId },
+          select: { status: true },
+        });
+        if (currentCert.status !== "APPROVED") {
+          throw new ServiceError("CONFLICT", "Solo se pueden facturar certificaciones aprobadas");
+        }
+        const existing = await tx.salesInvoice.findFirst({
+          where: {
+            certificationId: input.certificationId,
+            tenantId: ctx.tenantId,
+            status: { not: "CANCELLED" },
+          },
+          select: { id: true },
+        });
+        if (existing) {
+          throw new ServiceError("CONFLICT", "Esta certificación ya tiene una factura activa");
+        }
 
-      const maxNum = await tx.salesInvoice.aggregate({
-        where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
-        _max: { number: true },
-      });
-      const number = (maxNum._max.number ?? 0) + 1;
+        const maxNum = await tx.salesInvoice.aggregate({
+          where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
+          _max: { number: true },
+        });
+        const number = (maxNum._max.number ?? 0) + 1;
 
-      const created = await tx.salesInvoice.create({
-        data: {
-          tenantId: ctx.tenantId,
-          companyId,
-          projectId: cert.projectId,
-          clientContactId: cert.project.clientContactId,
-          certificationId: cert.id,
-          number,
-          issueDate: new Date(input.issueDate),
-          dueDate: new Date(input.dueDate),
-          currency: cert.project.type === "PUBLIC" ? "ARS" : "ARS",
-          invoiceLetter: suggestedLetter,
-          iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "0"),
-          notes: input.notes ?? null,
-          internalNotes: input.internalNotes ?? null,
-          createdBy: ctx.actorUserId,
-          updatedBy: ctx.actorUserId,
-        },
-      });
-
-      let sortIdx = 0;
-      for (const line of cert.lines) {
-        const qty = line.currentQty;
-        const price = line.unitSalePriceSnapshot;
-        const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, taxRate);
-        await tx.salesInvoiceLine.create({
+        const created = await tx.salesInvoice.create({
           data: {
-            invoiceId: created.id,
-            description: `${line.wbsNode.code} - ${line.wbsNode.name}`,
-            quantity: qty,
-            unitPrice: price,
-            taxRate,
-            lineSubtotal,
-            lineTax,
-            lineTotal,
-            certificationLineId: line.id,
-            sortOrder: sortIdx++,
+            tenantId: ctx.tenantId,
+            companyId,
+            projectId: cert.projectId,
+            clientContactId: cert.project.clientContactId,
+            certificationId: cert.id,
+            number,
+            issueDate: new Date(input.issueDate),
+            dueDate: new Date(input.dueDate),
+            currency: cert.budget.currency,
+            fxRate: fx.fxRate,
+            invoiceLetter: suggestedLetter,
+            iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? "0"),
+            notes: input.notes ?? null,
+            internalNotes: input.internalNotes ?? null,
+            createdBy: ctx.actorUserId,
+            updatedBy: ctx.actorUserId,
           },
         });
-      }
 
-      await recalcInvoiceTotals(tx as never, created.id);
-      const createdInv = await tx.salesInvoice.findUniqueOrThrow({
-        where: { id: created.id },
-        include: {
-          lines: { orderBy: { sortOrder: "asc" } },
-          clientContact: { select: { legalName: true, fantasyName: true } },
-        },
-      });
+        await tx.salesInvoiceLine.createMany({
+          data: cert.lines.map((line, sortOrder) => {
+            const qty = line.currentQty;
+            const price = line.unitSalePriceSnapshot;
+            const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, taxRate);
+            return {
+              invoiceId: created.id,
+              description: `${line.wbsNode.code} - ${line.wbsNode.name}`,
+              quantity: qty,
+              unitPrice: price,
+              taxRate,
+              lineSubtotal,
+              lineTax,
+              lineTotal,
+              certificationLineId: line.id,
+              sortOrder,
+            };
+          }),
+        });
 
-      await auditAr(
-        ctx,
-        "sales_invoice.created_from_certification",
-        "SalesInvoice",
-        createdInv.id,
-        { projectId: createdInv.projectId, companyId: createdInv.companyId },
-        { after: { number: createdInv.number, certificationId: input.certificationId }, tx },
-      );
+        await recalcInvoiceTotals(tx as never, created.id);
+        const createdInv = await tx.salesInvoice.findUniqueOrThrow({
+          where: { id: created.id },
+          include: {
+            lines: { orderBy: { sortOrder: "asc" } },
+            clientContact: { select: { legalName: true, fantasyName: true } },
+          },
+        });
 
-      return createdInv;
-    });
+        await auditAr(
+          ctx,
+          "sales_invoice.created_from_certification",
+          "SalesInvoice",
+          createdInv.id,
+          { projectId: createdInv.projectId, companyId: createdInv.companyId },
+          { after: { number: createdInv.number, certificationId: input.certificationId }, tx },
+        );
+
+        return createdInv;
+      },
+      { timeout: 30_000, maxWait: 10_000 },
+    );
   } catch (err) {
     if (err instanceof ServiceError) throw err;
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
@@ -625,6 +662,8 @@ export async function updateSalesInvoice(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
+    assertInvoiceEditable(await tx.salesInvoice.findUniqueOrThrow({ where: { id } }));
     const updatedInvoice = await tx.salesInvoice.update({
       where: { id },
       data: {
@@ -786,6 +825,7 @@ export async function issueSalesInvoice(
   await assertProjectGuardIfPresent(invPreview.projectId, ctx);
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
       include: {
@@ -827,7 +867,6 @@ export async function issueSalesInvoice(
       taxAmount: refreshed.taxAmount,
     });
 
-    const { computeDocumentFxAmounts } = await import("../finance/fx-amount.service");
     const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
 
     // Conditional flip prevents issue↔cancel races leaving orphan receivables.
@@ -880,7 +919,7 @@ export async function issueSalesInvoice(
     );
 
     return issued;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await ensureDraftJournalFromSalesInvoice(result.id, ctx);
 

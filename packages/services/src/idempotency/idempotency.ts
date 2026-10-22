@@ -4,6 +4,7 @@ import { isUuid, normalizeRichNote } from "@bloqer/utils";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
+  serializeFxRateDecimal,
   serializeQtyDecimal,
   serializeRatePctDecimal,
   serializeUnitPriceDecimal,
@@ -82,6 +83,7 @@ export function collectionReplayMatches(
     accountId: string;
     collectionDate: Date;
     amount: { toString(): string };
+    fxRate?: { toString(): string };
     status: string;
   },
   input: {
@@ -90,12 +92,14 @@ export function collectionReplayMatches(
     collectionDate: string;
     collectFullBalance: boolean;
     amount: string | null | undefined;
+    fxRate?: string;
   },
 ): boolean {
   if (existing.status !== "CONFIRMED") return false;
   if (existing.receivableId !== input.receivableId) return false;
   if (existing.accountId !== input.accountId) return false;
   if (dateOnlyFingerprint(existing.collectionDate) !== input.collectionDate) return false;
+  if (input.fxRate != null && (!existing.fxRate || serializeFxRateDecimal(existing.fxRate) !== serializeFxRateDecimal(input.fxRate))) return false;
   if (input.collectFullBalance) return true;
   if (input.amount == null) return false;
   return moneyFingerprint(existing.amount) === moneyFingerprint(input.amount);

@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import type { CertificationStatus } from "@bloqer/database";
 
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -17,17 +16,22 @@ interface CertificationTotalsPanelProps {
   canEdit?: boolean;
   /** APPROVE CERTIFICATIONS — aprobar / rechazar */
   canApprove?: boolean;
-  onIssue:   () => Promise<{ ok: true } | { error: string }>;
+  onIssue: () => Promise<{ ok: true } | { error: string }>;
   onApprove: () => Promise<{ ok: true } | { error: string }>;
-  onReject:  () => Promise<{ ok: true } | { error: string }>;
-  onCancel:  () => Promise<{ ok: true } | { error: string }>;
+  onReject: () => Promise<{ ok: true } | { error: string }>;
+  onCancel: () => Promise<{ ok: true } | { error: string }>;
 }
 
 export function CertificationTotalsPanel({
-  status, currency, totalAmount,
+  status,
+  currency,
+  totalAmount,
   canEdit = false,
   canApprove = false,
-  onIssue, onApprove, onReject, onCancel,
+  onIssue,
+  onApprove,
+  onReject,
+  onCancel,
 }: CertificationTotalsPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -55,33 +59,50 @@ export function CertificationTotalsPanel({
   const showActions = showIssue || showReview || showCancel;
 
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-4">
-      <h3 className="text-sm font-semibold">Totales del período</h3>
+    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border bg-card px-4 py-3">
+      <div>
+        <h2 className="text-xs font-medium text-muted-foreground">Totales del período</h2>
 
-      <dl className="space-y-2 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-muted-foreground">Monto certificado</dt>
-          <dd className="font-mono font-semibold">{formatMoneyAmount(totalAmount, currency)}</dd>
-        </div>
-      </dl>
-
-      {!isTerminal && showActions && <Separator />}
+        <dl className="space-y-2 text-sm">
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <dt className="text-sm">Monto certificado</dt>
+            <dd className="font-mono text-xl font-semibold tracking-tight">
+              {formatMoneyAmount(totalAmount, currency)}{" "}
+              <span className="text-xs font-normal text-muted-foreground">{currency}</span>
+            </dd>
+          </div>
+        </dl>
+      </div>
 
       {!isTerminal && showActions && (
         <div className="space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Acciones</p>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {showIssue && (
-              <Button size="sm" className="min-h-11 md:min-h-9" disabled={isPending} onClick={() => run(onIssue, "Certificación emitida")}>
+              <Button
+                size="sm"
+                className="min-h-11 md:min-h-9"
+                disabled={isPending}
+                onClick={() => run(onIssue, "Certificación emitida")}
+              >
                 Emitir certificación
               </Button>
             )}
             {showReview && (
               <>
-                <Button size="sm" className="min-h-11 md:min-h-9" disabled={isPending} onClick={() => run(onApprove, "Certificación aprobada")}>
+                <Button
+                  size="sm"
+                  className="min-h-11 md:min-h-9"
+                  disabled={isPending}
+                  onClick={() => run(onApprove, "Certificación aprobada")}
+                >
                   Aprobar
                 </Button>
-                <Button size="sm" variant="outline" disabled={isPending} onClick={() => run(onReject, "Certificación rechazada")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending}
+                  onClick={() => run(onReject, "Certificación rechazada")}
+                >
                   Rechazar
                 </Button>
               </>

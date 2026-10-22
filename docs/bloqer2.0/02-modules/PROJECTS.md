@@ -45,7 +45,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - **BR-PROJ-004**: cancelación no elimina datos financieros ([D-042]).
 - **BR-PROJ-005**: cancelar obra en curso — OWNER/ADMIN, motivo, sin documentos abiertos ([D-042]).
 - **BR-PROJ-006**: reactivación de obra cancelada — OWNER/ADMIN, auditada ([D-042]).
-- Sobrecertificación depende de `project_type` ([D-004]).
+- El tope acumulado de certificación es estricto en ambos `project_type` ([D-119]).
 
 ## 11. Validaciones
 - `start_date <= end_date` si ambos informados.

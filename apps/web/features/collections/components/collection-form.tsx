@@ -16,6 +16,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { SettlementFields } from "@/features/treasury/components/settlement-fields";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-method-label";
 import { createCollectionAction } from "@/app/(app)/proyectos/[id]/cobranzas/actions";
 import { createCompanyCollectionAction } from "@/app/(app)/finanzas/cuentas-por-cobrar/actions";
@@ -69,6 +70,7 @@ export function CollectionForm({
   const matchingAccounts = accounts.filter((a) => a.currency === receivableCurrency);
   const balanceSerialized = serializeMoney(receivableBalance);
   const [amount, setAmount] = useState(balanceSerialized);
+  const [fxRate, setFxRate] = useState("");
   const [collectionDate, setCollectionDate] = useState(() => (fieldMode ? toIsoDateLocal() : ""));
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,6 +105,10 @@ export function CollectionForm({
       return;
     }
     try {
+      if (receivableCurrency !== "ARS" && (!fxRate || compareDecimal(fxRate, "0") <= 0)) {
+        setError("Ingresá un tipo de cambio mayor a 0.");
+        return;
+      }
       const rounded = roundMoney(amount);
       if (compareDecimal(rounded, balanceSerialized) > 0) {
         setError("El monto supera el saldo pendiente");
@@ -144,6 +150,7 @@ export function CollectionForm({
     const rawRef = String(fd.get("reference") ?? "").trim();
     const payload = {
       receivableId,
+      fxRate: receivableCurrency === "ARS" ? undefined : fxRate,
       accountId,
       collectionDate: (fd.get("collectionDate") as string) || collectionDate,
       amount: collectFullBalance ? undefined : rounded,
@@ -285,6 +292,7 @@ export function CollectionForm({
             </div>
           </div>
 
+          <ManualFxField currency={receivableCurrency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
           <SettlementFields
             idPrefix="collection"
             paymentMethod={paymentMethod}
@@ -316,6 +324,7 @@ export function CollectionForm({
                 <dt className="text-muted-foreground">Cuenta</dt>
                 <dd className="font-medium">{selectedAccountName()}</dd>
               </div>
+              {receivableCurrency !== "ARS" && <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Tipo de cambio</dt><dd>{fxRate} ARS por 1 {receivableCurrency}</dd></div>}
               <div className="flex justify-between gap-2">
                 <dt className="text-muted-foreground">Fecha</dt>
                 <dd className="font-medium">{formatDate(collectionDate)}</dd>

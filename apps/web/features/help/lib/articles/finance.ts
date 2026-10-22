@@ -66,7 +66,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
   {
     slug: "emitir-y-aprobar-certificacion",
     title: "Emitir y aprobar certificación al cliente",
-    summary: "Planilla de medición sobre presupuesto APPROVED/CLOSED. Aprobar no elige cuenta.",
+    summary: "Buscá partidas, desplegá rubros y compará Físico período con Avance real antes de emitir. El porcentaje guardado sigue visible después de emitir.",
     intents: ["certificacion-cliente"],
     modules: ["certificaciones"],
     level: "project",
@@ -76,10 +76,14 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     steps: [
       "Prerrequisito: presupuesto APPROVED o CLOSED.",
       "Nueva certificación con período. El alta es solo el encabezado.",
-      "En el borrador, Medir abre el diálogo de la partida: saldo, libro y costo del período son referencia. La cantidad a certificar empieza vacía. Usar libro del período copia el avance de esas fechas, topeado por el saldo. El % físico es independiente. Guardar medición graba esa partida. Editar encabezado abre período y notas en un diálogo.",
+      "La planilla muestra una fila por partida. Buscá por código o nombre, desplegá los rubros o usá Expandir todo / Contraer todo. Los padres sólo agrupan: no se miden. La búsqueda abre las coincidencias y conserva sus padres.",
+      "Medir propone el avance físico aprobado hasta el cierre, descontando los otros certificados emitidos o aprobados. Ejemplo: 37% real y 12% ya certificado → 25% pendiente. Compras y Recepciones son alternativas editables basadas en costo neto / presupuesto de costo; no modifican el % físico. Sin datos comparables no se inventa una sugerencia.",
+      "Revisá Cantidad de este período, % físico de este período y Monto a certificar. Cantidad y físico son independientes. Guardar medición graba sólo esa partida; Cancelar no guarda. Una medición existente conserva sus valores y precio de venta. Ver libro y costos de referencia despliega el detalle.",
+      "Totales del período y acciones aparecen arriba de la tabla. Editar encabezado abre período y notas en un diálogo.",
+      "Guardar y Emitir verifican que cantidad y físico acumulados no superen 100%, también en obras privadas. Una nota no autoriza excedentes. Si otro usuario actualizó el certificado, recargá antes de volver a guardar.",
       "Emitir (ISSUED, inmutable) → Aprobar (APPROVED) o rechazar según el mandante. Aprobar no elige cuenta ni abre la deuda.",
     ],
-    relatedSlugs: ["facturar-una-certificacion", "aprobar-el-presupuesto"],
+    relatedSlugs: ["facturar-una-certificacion", "aprobar-el-presupuesto", "leer-edt-y-costos"],
     keywords: [
       "certificacion",
       "certificar",
@@ -89,6 +93,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "planilla de medicion",
       "medir",
       "libro del periodo",
+      "buscar partida", "rubros desplegables", "avance acumulado", "sugerencia", "recepciones", "compras",
     ],
     guideRef: "§11",
   },
@@ -108,9 +113,10 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     stepsTitle: "Caminito",
     steps: [
       "¿Presupuesto APPROVED o CLOSED? Si no → no se certifica con normalidad.",
-      "Nueva certificación → Medir en la planilla (el libro y el costo son referencia en el diálogo; la cantidad no viene precargada con el saldo). ¿Supera 100%? Pública → Bloqer bloquea. Privada → sigue con nota obligatoria.",
+      "Nueva certificación → buscá la partida o desplegá su rubro → Medir. Se sugiere avance físico pendiente de certificar; compras y recepciones son alternativas editables. Guardar y emitir bloquean cantidad o físico acumulados mayores a 100% en obras públicas y privadas.",
       "Emitir (inmutable). ¿El mandante aprueba? Si no → Rechazada, no se factura. Si sí → APPROVED (todavía no hay CxC; aprobar no elige cuenta).",
-      "CTA Emitir factura → CxC. Cobrar desde Cuentas por cobrar. Solo la cobranza confirmada mueve caja. No hay Cobrar ahora en el alta de factura de obra.",
+      "Crear borrador de factura conserva la moneda del certificado; si es extranjera, ingresá Tipo de cambio (ARS por 1 unidad). Emitir la factura crea la CxC. Cobrar desde Cuentas por cobrar conserva la obra y acredita la cuenta elegida de la empresa.",
+      "El vínculo con la certificación se crea desde este flujo, no desde una venta manual. Con Cuentas por cobrar deshabilitado se puede consultar la medición, sin acciones de facturación. El recorrido distingue con saldo pendiente y sin saldo pendiente de cobro.",
     ],
     figure: {
       src: "/help/mapa-flujo-certificar-cobrar-si-no.png",
@@ -118,7 +124,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       caption: "Aprobar no cobra. La lámina con roles está en Ayuda → Mapas.",
     },
     relatedSlugs: ["cobrar-una-cxc-de-obra", "emitir-y-aprobar-certificacion", "emitir-nota-credito-o-debito"],
-    keywords: ["facturar certificacion", "factura venta", "emitir factura"],
+    keywords: ["facturar certificacion", "factura venta", "emitir factura", "moneda", "tipo de cambio", "USD", "saldo pendiente"],
     guideRef: "§11.3 · §12.1",
   },
   {
@@ -191,6 +197,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     steps: [
       "CxC del proyecto → detalle → Cobrar.",
       "Cuenta, fecha, monto (2 decimales; usá el saldo que muestra el sistema), método y referencia.",
+      "Para moneda extranjera ingresá el tipo de cambio de este cobro (ARS por 1 unidad). La cuenta debe tener la misma moneda y pertenecer a la empresa de la deuda. El cobro mantiene su proyecto para los reportes.",
       "Confirmá. Solo la cobranza confirmada mueve caja.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "ingreso-corporativo-con-factura"],

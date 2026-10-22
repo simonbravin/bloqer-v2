@@ -54,6 +54,7 @@ export const updateCertificationLineSchema = z.object({
 
 export const saveCertificationMeasurementSchema = z.object({
   certificationId: z.string().uuid(),
+  expectedRevision: z.string().datetime().optional(),
   rows: z.array(z.object({
     wbsNodeId: z.string().uuid(),
     included: z.boolean(),

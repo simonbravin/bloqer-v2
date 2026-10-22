@@ -71,7 +71,7 @@ Cada documento de módulo indica en su §18 a qué fase pertenece cada feature.
 - Avance físico **y** económico por ítem.
 - Avance financiero (cobrado) trackeado.
 - Sobrecertificación bloqueada en obra pública (requiere adenda).
-- Sobrecertificación permitida en obra privada con alerta y nota.
+- Tope acumulado de certificación estricto en obras públicas y privadas (D-119).
 - Generación de comprobante de certificación.
 - Histórico por proyecto y por ítem.
 

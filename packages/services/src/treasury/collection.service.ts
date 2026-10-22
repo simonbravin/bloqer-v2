@@ -116,10 +116,14 @@ export async function listCollectionsByReceivable(
 
   const receivable = await prisma.receivable.findUnique({
     where: { id: receivableId },
-    select: { tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
   assertResourceTenant(receivable.tenantId, ctx.tenantId);
+  if (isCrossCompany(receivable.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a la empresa activa");
+  }
+  await requireProjectAccessIfPresent(receivable.projectId, ctx);
 
   if (projectScopeId !== undefined) {
     if (!canViewArProjectArea(ctx.roles)) {
@@ -188,6 +192,7 @@ export async function createCollection(
         collectionDate: input.collectionDate,
         collectFullBalance: Boolean(input.collectFullBalance),
         amount: input.amount,
+        fxRate: input.fxRate,
       }),
     create: async () => {
       return prisma.$transaction(async (tx) => {
@@ -278,7 +283,7 @@ export async function createCollection(
           companyId,
           date: input.collectionDate,
         });
-        const fx = computeDocumentFxAmounts(receivable.currency, amount);
+        const fx = computeDocumentFxAmounts(receivable.currency, amount, input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined);
 
         // Create Collection
         const created = await tx.collection.create({
@@ -373,7 +378,7 @@ export async function createCollection(
         );
 
         return result;
-      });
+      }, { timeout: 30_000, maxWait: 10_000 });
     },
   });
 

@@ -65,7 +65,7 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Aplicable:** desde creación.
 
 ### BR-PROJ-002 — Tipo de obra inmutable después de primer presupuesto aprobado
-- **Regla:** `project.project_type` (`PUBLIC` / `PRIVATE`) no se cambia una vez que hay un presupuesto aprobado, porque cambia las reglas de sobrecertificación.
+- **Regla:** `project.project_type` (`PUBLIC` / `PRIVATE`) no se cambia una vez que hay un presupuesto aprobado. D-119 unifica el tope de certificación; no modifica esta restricción de clasificación histórica.
 
 ### BR-PROJ-003 — Estado del proyecto vs operación
 - **Regla:** un proyecto en estado `ON_HOLD`, `COMPLETED` o `CANCELLED` no admite nuevas certificaciones, OCs ni movimientos imputados a él. Solo lectura operativa. Un proyecto `DRAFT` no admite operaciones financieras ni operativas de obra; presupuesto/WBS en planificación sí ([D-042]).
@@ -121,11 +121,12 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 ### BR-CERT-001 — Solo sobre presupuesto vigente
 - **Regla:** certificar requiere que exista al menos un Budget en estado `APPROVED` o `CLOSED` para el proyecto.
 
-### BR-CERT-002 — Sobrecertificación según tipo de obra
+### BR-CERT-002 — Tope acumulado estricto por partida
 - **Regla:**
-  - **`PUBLIC`**: el avance acumulado por ítem no puede superar el 100% del presupuesto vigente. Si se requiere, primero adenda. **Bloqueante**.
-  - **`PRIVATE`**: permitido superar el 100%, requiere **nota aclaratoria** y muestra **alerta visible**. **No bloqueante**.
-- **Origen:** [D-004].
+  - En **PUBLIC y PRIVATE**, suma de cantidades de otros certificados ISSUED/APPROVED + cantidad actual ≤ cantidad presupuestada vigente. Guardar y emitir vuelven a validar en servidor bajo bloqueo por proyecto. Una nota no permite superar el techo; alcance adicional requiere adenda.
+  - **BR-CERT-002b:** suma de porcentajes físicos de otros certificados ISSUED/APPROVED + físico actual ≤ 100, independiente de la cantidad económica.
+  - Borradores, rechazados y cancelados no reservan saldo. No se filtra por período para evitar doble certificación entre fechas superpuestas.
+- **Origen:** [D-119], reemplaza [D-004].
 
 ### BR-CERT-003 — Avance físico y económico por línea
 - **Regla:** cada `CertificationLine` registra avance físico (%) y económico ($) **independientemente**. Pueden no coincidir (ej. acopio de materiales certificados como avance económico sin avance físico ejecutado).

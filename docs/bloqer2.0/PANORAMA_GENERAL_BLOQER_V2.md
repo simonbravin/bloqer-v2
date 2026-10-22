@@ -155,7 +155,7 @@ La aplicación tiene un **menú lateral por empresa** y, al entrar a una obra, s
 
 - **Proyecto:** unidad central. Tiene ciclo de vida `Borrador → Activo → (En pausa) → Completado`, con posibilidad de **cancelación no destructiva** y reactivación.
 - **Presupuesto / WBS / APU:** el plan económico versionado. La **WBS** es la estructura de cómputo (capítulos e ítems); el **APU** es el análisis de precio unitario de cada ítem (materiales, mano de obra, equipos, subcontratos, otros).
-- **Certificaciones:** documentos al cliente que reconocen avance y habilitan la facturación. Respetan techos según obra **pública** (no supera 100%) o **privada** (permite exceder con nota).
+- **Certificaciones:** documentos al cliente que reconocen avance y habilitan la facturación. Cantidad y físico acumulados no superan 100%, tanto en obra pública como privada (D-119).
 - **Control de costos y rentabilidad:** comparación de presupuesto vs. real por ítem WBS, con las capas comprometido/devengado/pagado, y márgenes.
 - **Documentos:** adjuntos (contratos, planos, actas, fotos) vinculados a entidades del proyecto.
 

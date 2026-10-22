@@ -112,7 +112,7 @@ export function ProcessStepper({
         aria-label={ariaLabel}
         aria-describedby={mobileSummary ? summaryId : undefined}
         className={cn(
-          "flex w-full list-none items-center justify-center gap-0 overflow-x-auto overscroll-x-contain pb-0.5",
+          "flex w-full list-none items-center justify-start gap-0 overflow-x-auto overscroll-x-contain px-1 py-1.5 sm:[&>li:first-child]:ml-auto sm:[&>li:last-child]:mr-auto",
           // Thin scrollbar on small screens (discoverability); hide chrome on sm+.
           "[scrollbar-width:thin] sm:[scrollbar-width:none] sm:[-ms-overflow-style:none] sm:[&::-webkit-scrollbar]:hidden",
         )}

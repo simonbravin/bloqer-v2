@@ -11,6 +11,7 @@ import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/component
 import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { formatMoneyAmount } from "@/lib/format-money";
 
@@ -58,6 +59,7 @@ export function CertificationInvoiceForm({
   // Certification PU already includes budget taxes — default 0; user may discriminate IVA.
   const [taxRate, setTaxRate] = useState("0");
   const [iibbPerceptionRate, setIibbPerceptionRate] = useState("0");
+  const [fxRate, setFxRate] = useState("");
 
   const today = toIsoDateInTimeZone();
 
@@ -72,6 +74,7 @@ export function CertificationInvoiceForm({
       const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
       const res = await createInvoiceFromCertificationAction(projectId, {
         certificationId: cert.id,
+        fxRate: cert.currency === "ARS" ? undefined : fxRate,
         issueDate: fd.get("issueDate") as string,
         dueDate:   fd.get("dueDate")   as string,
         taxRate: forceZeroTax ? "0" : (taxRate || "0"),
@@ -190,6 +193,7 @@ export function CertificationInvoiceForm({
           />
         </div>
 
+        <ManualFxField currency={cert.currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
         <ExpandableNotesField label="Notas" />
 
         <div className="flex justify-end gap-2 border-t border-border/60 pt-4">

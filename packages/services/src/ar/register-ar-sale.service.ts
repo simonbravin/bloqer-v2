@@ -27,6 +27,7 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { assertManualInvoiceHasNoCertificationLinks } from "./manual-invoice-guards";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import {
@@ -286,12 +287,7 @@ export async function registerArSale(
     contactNotFoundMessage: "Cliente no encontrado",
   });
 
-  if (input.certificationId) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Para facturar una certificación usá el flujo de factura desde certificación.",
-    );
-  }
+  assertManualInvoiceHasNoCertificationLinks(input);
 
   if (!input.projectId) {
     throw new ServiceError(
@@ -399,7 +395,7 @@ export async function registerArSale(
               lineSubtotal,
               lineTax,
               lineTotal,
-              certificationLineId: line.certificationLineId ?? null,
+              certificationLineId: null,
               sortOrder: line.sortOrder ?? 0,
             },
           });

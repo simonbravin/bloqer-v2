@@ -572,6 +572,13 @@
 
 ---
 
+### Q-065 — Tope acumulado de certificación en obras privadas
+
+- **Fecha:** 2026-10-22.
+- **Estado:** RESUELTA → D-119.
+- **Resolución:** el pedido explícito del Owner de no superar nunca el 100% entre todos los certificados reemplaza la excepción privada de D-004.
+- **Sugerencias:** Owner confirmó avance físico inicial y compras/recepciones como alternativas editables.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

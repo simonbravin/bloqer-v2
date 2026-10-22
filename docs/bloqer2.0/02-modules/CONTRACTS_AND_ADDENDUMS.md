@@ -37,7 +37,7 @@ Las certificaciones y pagos grandes necesitan respaldo contractual explícito; l
 
 ## 10. Reglas de negocio
 - **Adenda** es el instrumento **contractual/económico** que modifica monto, alcance vendido, condiciones o **WBS contractual**; puede originarse a partir de un **Change Order** aprobado, pero el CO **solo** no alcanza para ese efecto ([BR-CO-002], [BR-CO-003], [D-005]).
-- Adenda es el vehículo formal para ampliar alcance cuando obra pública no permite sobrecertificar sin base ([D-004]).
+- Adenda es el vehículo formal para ampliar alcance sin sobrecertificar una partida, en obras públicas y privadas ([D-119]).
 - Contrato cliente suele condicionar forma de certificación y plazos de pago.
 
 ### Change Order vs Adenda (resumen)

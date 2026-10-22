@@ -4,7 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import {
   CertificationStatusBadge,
   CertificationHeaderDialog,
-  CertificationLineEditor,
   CertificationMeasurementWorksheet,
   CertificationFlowTrail,
   CertificationTotalsPanel,
@@ -18,8 +17,8 @@ import {
   getActiveInvoiceForCertification,
   getCertificationMeasurementSheet,
   listCertificationCollectionAccounts,
-  listCertificationWbsHints,
   listEntityDocuments,
+  getTenantModuleGate,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -28,10 +27,6 @@ import {
   approveCertificationAction,
   rejectCertificationAction,
   cancelCertificationAction,
-  addCertificationLineAction,
-  updateCertificationLineAction,
-  removeCertificationLineAction,
-  refreshPreviousQtyAction,
   saveCertificationMeasurementAction,
   updateCertificationAction,
 } from "../actions";
@@ -58,18 +53,17 @@ export default async function CertificacionDetailPage({ params, searchParams }: 
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+  const moduleGate = await getTenantModuleGate(ctx);
 
   let cert;
-  let allItems: Awaited<ReturnType<typeof listCertificationWbsHints>> = [];
   let existingInvoice: Awaited<ReturnType<typeof getActiveInvoiceForCertification>> = null;
   let measurementSheet: Awaited<ReturnType<typeof getCertificationMeasurementSheet>> | null = null;
   let collectionAccounts: Awaited<ReturnType<typeof listCertificationCollectionAccounts>> = [];
   try {
     cert = await getCertificationById(certId, ctx);
-    [allItems, existingInvoice, measurementSheet, collectionAccounts] = await Promise.all([
-      cert.status === "DRAFT" ? Promise.resolve([]) : listCertificationWbsHints(certId, ctx),
+    [existingInvoice, measurementSheet, collectionAccounts] = await Promise.all([
       getActiveInvoiceForCertification(certId, ctx),
-      cert.status === "DRAFT" ? getCertificationMeasurementSheet(certId, ctx) : Promise.resolve(null),
+      getCertificationMeasurementSheet(certId, ctx),
       listCertificationCollectionAccounts(certId, ctx),
     ]);
   } catch (err) {
@@ -86,8 +80,8 @@ export default async function CertificacionDetailPage({ params, searchParams }: 
   const canEditCert = can(current.tenantCtx.roles, "EDIT", "CERTIFICATIONS");
   const canApproveCert = can(current.tenantCtx.roles, "APPROVE", "CERTIFICATIONS");
   const canEditAttachments = canEditCert;
-  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
-  const canViewAr = can(current.tenantCtx.roles, "VIEW", "AR");
+  const canEditAr = moduleGate.isEnabled("AR") && can(current.tenantCtx.roles, "EDIT", "AR");
+  const canViewAr = moduleGate.isEnabled("AR") && can(current.tenantCtx.roles, "VIEW", "AR");
 
   const editable = canEditCert && cert.status === "DRAFT";
   const invoiceDraft = existingInvoice?.status === "DRAFT";
@@ -157,7 +151,7 @@ export default async function CertificacionDetailPage({ params, searchParams }: 
         </div>
       </div>
 
-      {cert.status === "APPROVED" && !existingInvoice && (
+      {canViewAr && cert.status === "APPROVED" && !existingInvoice && (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 dark:border-blue-900 dark:bg-blue-950/20 dark:text-blue-100">
           <p className="font-medium">Certificación aprobada pendiente de facturación</p>
           <p className="mt-1 text-xs">
@@ -199,30 +193,8 @@ export default async function CertificacionDetailPage({ params, searchParams }: 
         collections={collectionAccounts}
       />
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-        <div className="min-w-0 flex-1">
-          {measurementSheet ? (
-            <CertificationMeasurementWorksheet
-              sheet={measurementSheet}
-              editable={editable}
-              onSave={saveCertificationMeasurementAction.bind(null, projectId)}
-            />
-          ) : (
-            <CertificationLineEditor
-              certificationId={certId}
-              lines={cert.lines}
-              availableItems={allItems}
-              currency={cert.currency}
-              editable={editable}
-              onAddLine={addCertificationLineAction.bind(null, projectId)}
-              onUpdateLine={updateCertificationLineAction.bind(null, projectId, certId)}
-              onRemoveLine={removeCertificationLineAction.bind(null, projectId, certId)}
-              onRefresh={refreshPreviousQtyAction.bind(null, projectId, certId)}
-            />
-          )}
-        </div>
-
-        <div className="w-full shrink-0 lg:w-56">
+      <div className="flex flex-col gap-4">
+        <div className="w-full">
           <CertificationTotalsPanel
             status={cert.status}
             currency={cert.currency}
@@ -234,6 +206,15 @@ export default async function CertificacionDetailPage({ params, searchParams }: 
             onReject={rejectCertificationAction.bind(null, certId, projectId)}
             onCancel={cancelCertificationAction.bind(null, certId, projectId)}
           />
+        </div>
+        <div className="min-w-0">
+          {measurementSheet ? (
+            <CertificationMeasurementWorksheet
+              sheet={measurementSheet}
+              editable={editable}
+              onSave={saveCertificationMeasurementAction.bind(null, projectId)}
+            />
+          ) : null}
         </div>
       </div>
 

@@ -5,8 +5,9 @@ import { log } from "../audit/audit.service";
 import { serializeQtyDecimal, serializeUnitPriceDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { requireProjectAccess } from "../security/access";
 import { assertCertificationEditable } from "./certification.service";
-import { _computePreviousQty, _recalcCertificationTotals } from "./certification-calc.service";
+import { _validateCertificationMeasurement, _lockEditableCertification, _recalcCertificationTotals } from "./certification-calc.service";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 
 export type CertificationWbsHint = {
@@ -33,10 +34,11 @@ export async function listCertificationWbsHints(
   }
   const cert = await prisma.certification.findUnique({
     where: { id: certificationId },
-    select: { id: true, tenantId: true, budgetId: true },
+    select: { id: true, tenantId: true, budgetId: true, projectId: true },
   });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await requireProjectAccess(cert.projectId, ctx);
 
   const nodes = sortByWbsCode(
     await prisma.wbsNode.findMany({
@@ -131,17 +133,12 @@ export async function addCertificationLine(
     throw new ServiceError("CONFLICT", "El nodo ITEM no tiene datos de costo asociados");
   }
 
-  const unitSalePriceSnapshot = wbsNode.costItem.unitSalePrice;
-  const budgetQty = wbsNode.costItem.quantity;
-
   const line = await prisma.$transaction(async (tx) => {
-    const previousQty = await _computePreviousQty(
-      tx as never,
-      input.wbsNodeId,
-      input.certificationId,
-      ctx.tenantId,
-    );
+    await _lockEditableCertification(tx, cert.id, ctx.tenantId);
     const currentQty = new Prisma.Decimal(input.currentQty);
+    const physicalPct = new Prisma.Decimal(input.physicalPct);
+    const { previousQty, budgetQty, costItem } = await _validateCertificationMeasurement(tx, cert, input.wbsNodeId, currentQty, physicalPct);
+    const unitSalePriceSnapshot = costItem.unitSalePrice;
     const cumulativeQty = previousQty.plus(currentQty);
     const periodAmount = toMoneyDecimal(currentQty.times(unitSalePriceSnapshot));
 
@@ -151,7 +148,7 @@ export async function addCertificationLine(
         wbsNodeId:       input.wbsNodeId,
         unitSalePriceSnapshot,
         budgetQty,
-        physicalPct:  new Prisma.Decimal(input.physicalPct),
+        physicalPct,
         previousQty,
         currentQty,
         cumulativeQty,
@@ -162,7 +159,7 @@ export async function addCertificationLine(
     });
     await _recalcCertificationTotals(tx as never, input.certificationId);
     return l;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await log({
     tenantId: ctx.tenantId,
@@ -190,23 +187,23 @@ export async function updateCertificationLine(
   await _guardLine(existing.certificationId, ctx);
 
   await prisma.$transaction(async (tx) => {
+    const cert = await _lockEditableCertification(tx, existing.certificationId, ctx.tenantId);
+    const live = await tx.certificationLine.findUnique({ where: { id: lineId } });
+    if (!live) throw new ServiceError("CONFLICT", "La partida fue quitada. Recargá la certificación.");
     const newCurrentQty = input.currentQty !== undefined
       ? new Prisma.Decimal(input.currentQty)
-      : existing.currentQty;
+      : live.currentQty;
 
-    const previousQty = await _computePreviousQty(
-      tx as never,
-      existing.wbsNodeId,
-      existing.certificationId,
-      ctx.tenantId,
-    );
+    const physicalPct = input.physicalPct !== undefined ? new Prisma.Decimal(input.physicalPct) : live.physicalPct;
+    const { previousQty, budgetQty } = await _validateCertificationMeasurement(tx, cert, live.wbsNodeId, newCurrentQty, physicalPct);
     const cumulativeQty = previousQty.plus(newCurrentQty);
-    const periodAmount = toMoneyDecimal(newCurrentQty.times(existing.unitSalePriceSnapshot));
+    const periodAmount = toMoneyDecimal(newCurrentQty.times(live.unitSalePriceSnapshot));
 
     await tx.certificationLine.update({
       where: { id: lineId },
       data: {
-        physicalPct:   input.physicalPct !== undefined ? new Prisma.Decimal(input.physicalPct) : undefined,
+        physicalPct,
+        budgetQty,
         currentQty:    newCurrentQty,
         previousQty,
         cumulativeQty,
@@ -216,7 +213,7 @@ export async function updateCertificationLine(
       },
     });
     await _recalcCertificationTotals(tx as never, existing.certificationId);
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await log({
     tenantId: ctx.tenantId,
@@ -238,9 +235,10 @@ export async function removeCertificationLine(lineId: string, ctx: ServiceContex
   await _guardLine(existing.certificationId, ctx);
 
   await prisma.$transaction(async (tx) => {
+    await _lockEditableCertification(tx, existing.certificationId, ctx.tenantId);
     await tx.certificationLine.delete({ where: { id: lineId } });
     await _recalcCertificationTotals(tx as never, existing.certificationId);
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await log({
     tenantId: ctx.tenantId,
@@ -263,18 +261,18 @@ export async function refreshPreviousQty(certId: string, ctx: ServiceContext): P
   await assertProjectAllowsOperationalMutation(cert.projectId, ctx);
   assertCertificationEditable(cert);
 
-  const lines = await prisma.certificationLine.findMany({ where: { certificationId: certId } });
-
   await prisma.$transaction(async (tx) => {
+    await _lockEditableCertification(tx, certId, ctx.tenantId);
+    const lines = await tx.certificationLine.findMany({ where: { certificationId: certId } });
     for (const line of lines) {
-      const previousQty = await _computePreviousQty(tx as never, line.wbsNodeId, certId, ctx.tenantId);
+      const { previousQty, budgetQty } = await _validateCertificationMeasurement(tx, cert, line.wbsNodeId, line.currentQty, line.physicalPct);
       const cumulativeQty = previousQty.plus(line.currentQty);
       const periodAmount = toMoneyDecimal(line.currentQty.times(line.unitSalePriceSnapshot));
       await tx.certificationLine.update({
         where: { id: line.id },
-        data: { previousQty, cumulativeQty, periodAmount },
+        data: { previousQty, cumulativeQty, periodAmount, budgetQty },
       });
     }
     await _recalcCertificationTotals(tx as never, certId);
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 }

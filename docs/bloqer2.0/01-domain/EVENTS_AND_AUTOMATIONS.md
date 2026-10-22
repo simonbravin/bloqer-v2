@@ -76,7 +76,7 @@
 | `certification.approved_by_client` | ISSUED → APPROVED |
 | `certification.rejected_by_client` | ISSUED → REJECTED |
 | `certification.cancelled` | * → CANCELLED (desde estados permitidos en [`STATE_MACHINES.md`](./STATE_MACHINES.md)) |
-| `certification.over_budget_warning` | sobrecertificación en obra privada |
+| `certification.over_budget_warning` | histórico D-004; retirado por D-119, el exceso ahora bloquea |
 
 La **facturación** no emite transición de `Certification.status` ([BR-CERT-007]): al **`sales_invoice.issued`** (con `certification_id`) se crea/actualiza AR y se dispara **recálculo** del derivado `payment_status` (vía `receivable.payment_status_recalculated` o proceso equivalente). Idem cobranzas/anulaciones: ver **`collection.confirmed`** consolidado en §3.3.
 
@@ -329,8 +329,8 @@ flowchart LR
 
 | Evento | Reacción |
 |---|---|
-| `certification.over_budget_warning` | genera notificación a OWNER / ADMIN / PM y exige nota aclaratoria (obra privada). |
-| sobrecertificación en obra pública | **bloqueo**: la transición a `ISSUED` falla. |
+| `certification.over_budget_warning` | histórico D-004; D-119 bloquea el exceso y no genera una advertencia que permita continuar. |
+| sobrecertificación en obra pública o privada | **bloqueo** al guardar y al emitir por cantidad o físico acumulado > 100% (D-119). |
 
 ### 3.7 Cambios de presupuesto
 

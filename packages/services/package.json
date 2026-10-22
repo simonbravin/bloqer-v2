@@ -5,6 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {
+    "./certification-measurement-pure": "./src/certification/certification-measurement-pure.ts",
     ".": "./src/index.ts",
     "./budget-import-pure": "./src/budget/budget-import-pure.ts",
     "./wbs-metrics": "./src/budget/wbs-metrics.ts",

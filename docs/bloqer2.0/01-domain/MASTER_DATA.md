@@ -234,7 +234,7 @@ Algunos parámetros viven en una entidad `TenantSettings` (no master data en sen
 | `period_close_enabled` | boolean | true | |
 | `numeration_scope` | enum | `COMPANY` | COMPANY / PROJECT / CONFIGURABLE — [Q-002] |
 | `po_approval_threshold_ars` | decimal? | null | si null = sin umbral |
-| `allow_overcertification_private` | boolean | true | obras privadas (D-004) |
+| `allow_overcertification_private` | boolean | false | retirado por D-119; no habilitar ni agregar columna. Tope estricto en ambos tipos de obra. |
 | `allow_self_approval` | boolean | true | |
 | `notifications_email_enabled` | boolean | true | depende de [Q-009] |
 | `documents_max_size_mb` | int | 25 | [Q-020] |

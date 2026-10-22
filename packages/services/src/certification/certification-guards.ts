@@ -2,29 +2,26 @@ import { Prisma } from "@bloqer/database";
 import { ServiceError } from "../types";
 
 export type CertificationCeilingInput = {
-  projectType: string;
   itemCode: string;
   cumulative: Prisma.Decimal;
   budgetQty: Prisma.Decimal;
-  certificationNotes: string | null | undefined;
+  cumulativePhysicalPct?: Prisma.Decimal;
 };
 
 /**
- * BR-CERT-002 / BR-CERT-002b — cumulative qty vs budget ceiling on issue.
+ * BR-CERT-002 / D-119: strict accumulated limits, including PRIVATE projects.
  */
 export function assertCertificationLineWithinBudget(input: CertificationCeilingInput): void {
-  if (!input.cumulative.greaterThan(input.budgetQty)) return;
-
-  if (input.projectType === "PUBLIC") {
+  if (input.cumulative.greaterThan(input.budgetQty)) {
     throw new ServiceError(
       "CONFLICT",
-      `Ítem "${input.itemCode}" supera el techo del presupuesto en obra pública. Requiere adenda. (BR-CERT-002)`,
+      `Ítem "${input.itemCode}": la cantidad acumulada supera el 100% del presupuesto. Revisá los certificados anteriores; una ampliación requiere adenda. (BR-CERT-002)`,
     );
   }
-  if (!input.certificationNotes?.trim()) {
+  if (input.cumulativePhysicalPct?.greaterThan(100)) {
     throw new ServiceError(
       "CONFLICT",
-      `Ítem "${input.itemCode}" supera el techo. Agregue una nota explicativa en la certificación. (BR-CERT-002b)`,
+      `Ítem "${input.itemCode}": el avance físico acumulado supera el 100%. Revisá el porcentaje de este período y los certificados anteriores. (BR-CERT-002b)`,
     );
   }
 }

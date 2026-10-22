@@ -30,7 +30,7 @@ import {
   assertInvoiceEditable,
   type SalesInvoiceWithLines,
 } from "./sales-invoice.service";
-import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { lockSalesInvoiceRow, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { requireProjectAccessIfPresent } from "../security/access";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import {
@@ -383,6 +383,7 @@ export async function issueSalesCreditNote(
   await assertArTenantModule(ctx);
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
       include: {
@@ -564,6 +565,7 @@ export async function issueSalesDebitNote(
   await assertArTenantModule(ctx);
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
       include: {

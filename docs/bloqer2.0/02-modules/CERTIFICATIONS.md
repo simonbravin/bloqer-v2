@@ -34,17 +34,27 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Certification.
 - Anular con motivo (`CANCELLED`).
 
 ## 9. Pantallas y vistas necesarias
-- Planilla de medición en el borrador: tabla con saldo, libro del período y cantidad ya medida. **Medir** abre un diálogo con presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos, subcontratos). La cantidad a certificar y el % físico se confirman ahí; la cantidad no se precarga con el saldo. **Usar libro del período** copia el avance del libro de esas fechas, topeado por el saldo. El encabezado (período y notas) se edita en diálogo.
+- Planilla compacta con una fila por partida, padres EDT desplegables (no medibles), búsqueda por código/nombre y totales/acciones sobre la tabla. La búsqueda conserva los ancestros y abre las coincidencias. El encabezado (período y notas) se edita en diálogo.
+- **Medir** propone el avance físico aprobado hasta el fin del período pendiente de certificar. Se muestran anteriores, este certificado, acumulado y saldo. La sugerencia y el importe se pueden revisar y modificar mediante la cantidad; abrir el diálogo no guarda ni incluye una partida. Una medición existente conserva sus valores y su precio de venta snapshot.
+- **Compras** y **Recepciones** son alternativas explícitas: porcentaje de costo comprado/recibido sobre costo presupuestado, convertido a cantidad contractual pendiente y valorizado al PU de venta. No se copian costos como ingresos ni se modifica automáticamente el % físico al elegir estas alternativas. Fuente, fecha de corte y ausencia de datos se muestran al usuario. Físico y económico siguen independientes (D-003).
 - Recorrido de solo lectura: medir, emitir, aprobar, emitir factura, cobrar. Aprobar no elige caja, banco ni cuenta contable. La factura abre Clientes / Ingresos por obras; la cobranza debita la cuenta de tesorería elegida y acredita Clientes.
 - Editor de líneas ya emitidas con columnas: ítem, % periodo, % acumulado, $ periodo, $ acumulado, techo presupuesto; indicador de **`status`** y de **`payment_status`** (derivado, solo lectura en flujo normal).
-- Alertas visuales sobrecertificación (privada).
+- Alertas y bloqueo de exceso acumulado de cantidad o físico en cualquier tipo de obra (D-119).
 - Histórico por proyecto.
+
+### Referencias UX evaluadas (2026-10-22)
+
+- [Procore: owner invoice](https://support.procore.com/products/online/user-guide/project-level/prime-contracts/tutorials/create-an-owner-invoice): separación de valores anteriores, período y acumulado; sugerencias revisables sobre la planilla contractual.
+- [Autodesk Build: payment application variables](https://help.autodesk.com/cloudhelp/ENG/Build-Cost/files/setup-cost/manage-documents-in-cost/variables/Cost_Payment_Application_Variables.html): distinguir monto previo, actual y acumulado en mediciones periódicas.
+- [Odoo: analytic accounting](https://www.odoo.com/documentation/19.0/applications/finance/accounting/reporting/analytic_accounting.html): conservar atribución analítica al proyecto aun cuando tesorería sea de la empresa.
+
+Se adoptan esos criterios de presentación y trazabilidad con las entidades y reglas de Bloqer. No se agregan retenciones, valuación automática de acopios ni conversión entre monedas: requieren sus decisiones de producto correspondientes.
 
 ## 10. Reglas de negocio
 - **BR-CERT-007**: sin estado `INVOICED` en `Certification.status`; facturación = vínculo a `SalesInvoice`/`Receivable` ([`BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md)).
 - **BR-CERT-PAYMENT-001**: `payment_status` derivado de receivables y cobranzas; no es parte del `status` de ciclo; recálculo vía `receivable.payment_status_recalculated` / `receivable.overdue_detected` según [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md).
-- **BR-CERT-002**: obra **PUBLIC** bloquea emitir si supera 100% acumulado por ítem sin adenda ([D-004]).
-- **BR-CERT-002b**: obra **PRIVATE** permite superar con **nota obligatoria** + alerta ([D-004]).
+- **BR-CERT-002**: guardar y emitir bloquean cantidad acumulada superior al presupuesto vigente en **PUBLIC y PRIVATE** ([D-119]).
+- **BR-CERT-002b**: guardar y emitir bloquean físico acumulado superior a 100%, sin excepción por nota ([D-119]).
 - **BR-CERT-003**: físico y económico independientes por línea ([D-003]).
 
 ## 11. Validaciones

@@ -4,6 +4,7 @@ import { idempotencyKeySchema } from "./idempotency";
 import {
   moneyAmountString,
   optionalMoneyAmountString,
+  optionalFxRateString,
   positiveMoneyAmountString,
 } from "./money";
 import { treasurySettlementFieldsSchema } from "./treasury-settlement";
@@ -32,6 +33,7 @@ export const updateTreasuryAccountSchema = z.object({
 export const createCollectionSchema = z
   .object({
     receivableId:       z.string().uuid(),
+    fxRate:             optionalFxRateString,
     accountId:          z.string().uuid(),
     collectionDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     amount:             optionalMoneyAmountString,

@@ -34,8 +34,20 @@ Acc_{fis} = \sum_{certificaciones \le t} \Delta \%_{fis}
 |---|---:|---:|---:|---:|---:|---:|
 | Mampostería | ARS 2.000.000 | 100 | 20.000 | 10 | 10% | ARS 200.000 |
 
-## Validación obra pública ([D-004])
-Si \(Acc_{econ} > \text{PrecioTotalPresupuestado}_{item}\) → **bloquear emisión** salvo adenda.
+## Validación acumulada ([D-119], reemplaza D-004)
+Para PUBLIC y PRIVATE: `q_previa + q_período ≤ q_presupuesto_vigente` y `p_físico_previo + p_físico_período ≤ 100`. Validar al guardar y nuevamente al emitir, en transacción bajo bloqueo de proyecto. El monto usa el PU snapshot de cada línea; no se revalorizan certificados históricos. Ampliaciones siguen el circuito de adenda existente; una nota no autoriza sobrecertificar.
+
+## Sugerencia editable de medición (2026-10-22)
+
+**Propósito:** proponer sólo el avance pendiente, sin volver a certificar lo ya emitido.
+
+- `q_base`: cantidad contractual vigente; `q_previa`: suma de cantidades en otras certificaciones ISSUED/APPROVED del mismo ítem, sin filtrar por fechas.
+- `p_fuente`: avance acumulado aprobado del libro hasta el fin del período (porcentaje explícito; fallback cantidad / q_base si nunca se informó porcentaje). Alternativamente, selección explícita de compras o recepciones: costo neto comprado/recibido hasta el corte / costo presupuestado × 100.
+- `q_sugerida = max(0, min(q_base - q_previa, q_base × min(100, max(0, p_fuente)) / 100 - q_previa))`.
+- `p_físico_sugerido = max(0, min(100, p_libro) - p_físico_previo)`. Se mantiene independiente de la cantidad económica.
+- `monto_sugerido = roundMoney(q_sugerida × PU_venta_snapshot)`; cantidad y porcentaje a 4 dp, dinero a 2 dp half-up. Sin base o fuente disponible no hay sugerencia; cero pendiente no significa información ausente.
+- Ejemplo: base 100, avance real 37%, previamente certificado 12 → sugerencia 25, acumulado 37. Reabrir otro certificado con el mismo corte no vuelve a sugerir los 37.
+- No se suman borradores, rechazados ni cancelados. Abrir el diálogo no escribe datos. El guardado y la emisión vuelven a validar el saldo en servidor.
 
 ## `payment_status` (derivado; no es `status`)
 

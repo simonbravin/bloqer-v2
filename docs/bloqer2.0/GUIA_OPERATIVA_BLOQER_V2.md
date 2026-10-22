@@ -612,7 +612,7 @@ En el listado **Proyectos** (`/proyectos`) la vista por defecto es **Tarjetas** 
    - **Código \*** (ej. `PRY-2026-001`)
    - **Tipo \***: **Privado** (`PRIVATE`) o **Público** (`PUBLIC`)
      - Público: techo estricto **100%** en certificaciones.
-     - Privado: permite exceder 100% con **nota obligatoria**.
+     - Privado: también bloquea superar 100% acumulado de cantidad o físico; una nota no habilita excedentes (D-119).
    - **Nombre \***
    - **Cliente \*** (buscador de contactos Cliente: razón social o nombre fantasía)
    - Ubicación / país (default AR) y fechas contractuales si aplica (metadata; **no** reemplazan al cronograma)
@@ -1139,19 +1139,26 @@ stateDiagram-v2
 ```
 
 1. **Nueva certificación** con período (desde / hasta).
-2. En el borrador, **Planilla de medición**. La tabla muestra saldo, libro del período y, si ya se midió, la cantidad y el % físico. **Medir** (o **Editar**) abre un diálogo con presupuesto, certificado previo, saldo, libro acumulado, libro del período y costo del período (comprometido, consumido, mano de obra, equipos y subcontratos). La cantidad a certificar empieza vacía. **Usar libro del período** copia el avance del libro entre esas fechas, sin pasar el saldo. El **% físico** se carga aparte (**Aplicar % del libro** lo sugiere). **Guardar medición** graba esa partida. **Editar encabezado** abre el período y las notas en un diálogo, sin cambiar de página.
-3. Validar techos: obra **Pública** bloquea si supera 100% acumulado; **Privada** permite con **nota obligatoria**.
+2. En **Planilla de medición**, cada partida ocupa una fila. Los rubros padres se despliegan; no se miden. **Buscar por código o nombre de partida** encuentra también dentro de rubros cerrados y muestra sus padres. **Expandir todo** / **Contraer todo** facilita recorrer la EDT. **Totales del período** y acciones aparecen sobre la tabla.
+   - **Medir** propone el avance físico aprobado hasta el cierre, descontando lo certificado en otros certificados emitidos/aprobados. Si el avance real es 37% y ya certificaste 12%, propone 25% adicionales. No toma partes posteriores al cierre ni reserva saldo por borradores.
+   - **Compras** y **Recepciones** permiten aplicar otras referencias explícitamente: costo neto comprado/recibido dividido por presupuesto de costo, valorizado al precio de venta. No son avance físico. Sin base, permisos o moneda comparable no se propone un valor.
+   - Ajustá **Cantidad de este período** y **% físico de este período** de forma independiente. El diálogo muestra **Monto a certificar**, **Certificado acumulado**, **Físico acumulado** y **Saldo luego de guardar**. **Guardar medición** incluye sólo esa partida; **Cancelar** no guarda. **Editar** conserva la medición y su precio de venta guardado. **Quitar partida** está disponible para una línea ya guardada.
+   - **Físico período** muestra el porcentaje guardado, incluso en certificados emitidos; **Avance real** muestra la referencia del libro. Son datos distintos y pueden diferir.
+   - **Ver libro y costos de referencia** despliega el detalle complementario. **Editar encabezado** abre período y notas sin cambiar de página. Si otro usuario cambió el certificado, recargá para revisar los valores vigentes.
+3. Validar techos: en obra **Pública y Privada** cantidad y físico acumulados no pueden superar 100%, considerando todos los certificados emitidos/aprobados de la partida. Se controla al guardar y al emitir. No cuentan borradores, rechazados ni cancelados. Una nota no permite exceder el techo; el alcance adicional se tramita por adenda.
 4. **Emitir** → `ISSUED` (inmutable). Quien emite no elige cuenta.
 5. Según respuesta del mandante: marcar **Aprobar** (`APPROVED`) o rechazar (`REJECTED`). Aprobar reconoce el avance y no elige caja, banco ni cuenta contable.
-6. El detalle muestra el **recorrido** hasta la factura y la cobranza. La deuda nace al emitir la factura (debe Clientes, haber Ingresos por obras, asiento en borrador). La caja se mueve al confirmar la cobranza, en la cuenta de tesorería que elige tesorería.
+6. El detalle muestra el **recorrido** hasta la factura y la cobranza y una explicación desplegable **Cómo sigue hasta el cobro**. La deuda nace al emitir la factura (debe Clientes, haber Ingresos por obras, asiento en borrador). La caja se mueve al confirmar la cobranza, en la cuenta de tesorería elegida. Factura, CxC, cobranza y movimiento conservan el proyecto: cobrar en un banco de la empresa no convierte el ingreso de obra en ingreso corporativo.
 
 ### 11.3 Procedimiento — De la certificación a la factura de venta
 
-1. Con certificación `APPROVED`, en el detalle usar CTA **Emitir factura** (o ver factura ya vinculada).
-2. La factura genera **cuenta por cobrar (Receivable)**.
+1. Con certificación `APPROVED`, en el detalle usar **Crear borrador de factura** (o ver factura ya vinculada). Los vínculos al certificado se crean desde este flujo; una venta manual no permite asignarlos. Si Cuentas por cobrar está deshabilitado, se puede consultar la medición pero no aparecen acciones de facturación.
+2. **Crear borrador de factura** conserva la moneda y los precios del certificado. En moneda extranjera, ingresá **Tipo de cambio · ARS por 1 [moneda]**. **Emitir** la factura genera la **cuenta por cobrar (Receivable)**; el borrador todavía no genera deuda.
 3. Cobrar desde **Cuentas por cobrar** del proyecto (no hay “Cobrar ahora” en el alta de factura de obra).
 4. **No** existe estado `INVOICED` en la certificación: el cobro se deriva de las cobranzas.
 5. La emisión de factura es **manual**; aprobar la certificación **no** crea la factura sola.
+6. Al cobrar en moneda extranjera, elegí una cuenta de esa misma moneda e ingresá el tipo de cambio de **ese cobro**. El monto original, su equivalente en pesos y la imputación al proyecto se conservan; no se convierte dinero entre cuentas ni se calcula automáticamente diferencia de cambio.
+7. El recorrido distingue **con saldo pendiente** y **sin saldo pendiente de cobro**. Una factura emitida queda congelada, también si otra persona intentaba editarla al mismo tiempo.
 
 **Certificación, factura y cobro (D-072)**
 
@@ -1161,7 +1168,7 @@ stateDiagram-v2
 
 ![Bloqer — Certificar y cobrar: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-certificar-cobrar-si-no.png)
 
-*Caminito: aprobar la certificación no cobra. Pública bloquea si supera 100%. La caja se mueve recién al confirmar la cobranza.*
+*Caminito: aprobar la certificación no cobra. Pública y privada bloquean si se supera 100%. La caja se mueve recién al confirmar la cobranza.*
 
 ![Bloqer — Certificar, facturar y cobrar](./guides/assets/laminas/mapa-certificar-cobrar.png)
 
