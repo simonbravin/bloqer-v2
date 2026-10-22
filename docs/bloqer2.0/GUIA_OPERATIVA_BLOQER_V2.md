@@ -1015,6 +1015,12 @@ Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño 
 
 **Cómo leer los precios de cotización:** el campo indica **Precio unitario neto (sin IVA)** o **Precio unitario con IVA**. Es el precio de una unidad: el resumen muestra cantidad × unitario, descuento, neto con descuento, IVA y total de línea. Cambiar **El precio unitario incluye IVA** cambia la interpretación del número ingresado, no convierte automáticamente ese número. Al editar, los precios guardados se muestran netos; solo activá IVA incluido si reingresás precios finales. El total de línea excluye IIBB y el **Total cotización con impuestos** lo incluye, con su importe informado aparte.
 
+**IVA y vigencia al consultar/editar:** cada ítem conserva su alícuota guardada, incluso si no coincide con las opciones del selector. Si hay alícuotas distintas o fuera de las opciones, el selector indica **Conservar IVA por ítem**. Elegir una **Alícuota IVA** la aplica a todos los ítems: revisá el desglose antes de guardar. **Vigencia** se muestra día/mes/año en escritorio y celular; sin fecha indica **No informada**.
+
+**Acceso y antecedentes:** cotizaciones y adjudicaciones respetan la empresa activa y el acceso a la obra. La modificación requiere una obra activa; una obra pausada o cerrada conserva la consulta autorizada. Si una cotización está vinculada a una OC activa, solicitá revisión: no anules una compra real para desbloquear su edición. La anulación corresponde cuando efectivamente debe cancelarse la compra y se cumplen sus controles.
+
+**Vigencia hasta** incluye el día indicado según el calendario de la plataforma (Argentina). La cotización vence al comenzar el día siguiente; no se altera su fecha guardada ni se prorroga una oferta vencida.
+
 En el detalle de la SC, las OC vinculadas muestran su **estado en español** y **Próximo paso**, con acceso a la ficha de cada orden, tanto en escritorio como en celular. **Enviada** indica envío a Compras, no una OC pendiente de aprobación. **Completada** no acredita facturación ni pago. En celular se ve también **Vigencia** y **Adjuntos por cotización**. Las ofertas y sus adjuntos continúan disponibles para consulta al completar la SC; esto no habilita edición ni nueva adjudicación.
 
 ### 9.1.1 Compra realizada o cotización vencida
@@ -1382,6 +1388,8 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 ---
 
 ## 14. Finanzas corporativas, gastos generales e inventario (nivel empresa)
+
+Las facturas y cuentas por pagar **sin proyecto** requieren permisos de finanzas de empresa y respetan la empresa activa, también al abrir un documento desde un vínculo directo. Tener acceso financiero a una obra no habilita los documentos corporativos. Al editar líneas de facturas/gastos corporativos se conservan los importes guardados si cantidad, precio neto, IVA y descuento no cambian, igual que en obra. Cotizaciones y OC siguen perteneciendo a sus proyectos: no hay que duplicarlas como gasto general.
 
 - **Finanzas corporativas** (`/finanzas`): tablero con **Indicadores** en grilla 4+4 (no copia los KPIs de Tesorería: saldo / ingresos-egresos del mes). **Fila 1 (empresa):** Egresos imputados a obras · Egresos corporativos · Facturas borrador (siempre visible, también en 0) · Pagos esperados (90d) (C×P corporativas abiertas con vencimiento ≤90d, incluye vencidas). **Fila 2 (CxP/CxC):** C×P corporativas · C×P vencidas · C×C abiertas · C×C vencidas. Luego **Tendencia mensual** (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses; pestaña Caja para tesorería), proyección de liquidez y actividad consolidada. Contabilidad se abre desde el menú **Contabilidad**, no desde una card del tablero.
 - **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación). El listado es el ledger de caja operativa (sin transferencias internas). Clic en la descripción = detalle del movimiento.

@@ -401,6 +401,39 @@ Revisión adicional del Word: el Owner autorizó completar ayudas que faciliten 
 - Módulos funcionales, guía §9.1/9.1.1/9.2, catálogo y conocimiento AI actualizados (490 chunks verificados). Sin cambios en tools AI, Prisma, migraciones, services ni datos del cliente.
 - Verificación local: 27 pruebas web/ayuda aprobadas; tipos en 13 paquetes aprobados; lint dirigido sin warnings ni errores; revisión de gates de solo consulta y de enlaces. El smoke operativo sigue limitado por el contexto de cuenta documentado en §17. Publicación verificable por SHA y alias de Vercel antes de entregar el PDF consolidado.
 
+## 19. Auditoría posterior a la entrega — correcciones locales (22/10/2026)
+
+Revisión de los cambios de este chat hasta `d605fa6b`: adjudicación parcial/clasificación, decimales, integridad AP, transacciones, permisos y ayudas de consulta. Los hallazgos siguientes son defectos de código o presentación; no prueban que hayan sido explotados ni que los datos de INDARI hayan sido alterados.
+
+- **Crítico — alcance de cotizaciones/adjudicaciones:** los servicios verificaban tenant y rol, pero omitían la empresa activa y el ACL de obra. Las server actions no suplían esos controles. Se aplica el alcance de la SC antes de leer cotizaciones o crear/editar/eliminar/adjudicar; también en la transacción de adjudicación. Se conserva el acceso tenant-wide de los roles autorizados y la consulta histórica.
+- **Medio — estado operativo de obra:** cargar/modificar cotizaciones y adjudicar podía eludir el bloqueo de una obra DRAFT/ON_HOLD/COMPLETED/CANCELLED. Se reutiliza el guard operativo existente, junto con el ACL de D-111; no se crean estados o permisos nuevos.
+- **Medio — IVA histórico al editar:** el formulario sustituía alícuotas fuera de los presets por el valor por defecto. Ahora conserva cada tasa y su precisión, conforme D-117. Si las tasas difieren o no son presets, el selector muestra **Conservar IVA por ítem**; elegir una tasa aplica el cambio explícito a todos los renglones.
+- **Medio — vencimiento adelantado:** `validUntil` es `@db.Date`, pero se comparaba contra un instante. Se usa `productCalendarDateUtc`, ya existente para compras, para conservar la vigencia durante el día indicado y vencer al iniciar el siguiente día del producto. No se extienden fechas guardadas.
+- **Leve — fecha de vigencia en escritorio:** formato ISO crudo/guion frente a fecha local/No informada en celular. Se unifica con `formatDbDate`.
+- **Leve — ayuda de cotizaciones congeladas:** se elimina la indicación incondicional de anular una OC para editar la oferta. Se aclara que la anulación corresponde a la cancelación real de la compra; los casos con operaciones reales requieren revisión.
+
+Pruebas de regresión nuevas: accesos de 8 entradas de servicio (otro tenant, otra empresa, sin membresía), bloqueo de mutaciones en los cuatro estados no operativos y lectura autorizada; conservación de IVA/precisión y selector mixto; vigencia durante el día y límite ART/UTC. Se ejecutan sin base de datos ni escrituras operativas. Guía, ayuda y knowledge AI acompañan las correcciones.
+
+**Validación final:** 58 pruebas nuevas; suite general de 1.267 pruebas aprobadas en 6 paquetes (1.026 services, 93 domain, 77 utils, 31 web/ayuda, 28 AI, 12 email). Typecheck aprobado en 13 paquetes; lint dirigido a los cinco archivos UI/ayuda sin warnings ni errores; `git diff --check` correcto. Índice AI: 492 chunks verificados, hash `3441d4c606de…`. Revisión estática del schema/migración D-118: campo nullable y sin backfill, sin modificaciones en esta auditoría. No se repitieron integración contra DB ni E2E operativo; no se presentan como aprobados en esta revisión.
+
+**Entrega:** cambios locales pendientes de commit/push por indicación del Owner. Sin migración Prisma, reparación de registros, cambio de políticas ni despliegue en esta auditoría. El smoke operativo de §17 permanece pendiente; no se ejecutan fixtures sobre producción.
+
+## 20. Comprobación de alcance empresa/proyecto (22/10/2026)
+
+El Owner pidió verificar si las correcciones de la intervención también aplican a empresa antes de cerrar el caso.
+
+- **Decimales y conservación D-117:** el alta/edición corporativa AP usa `SupplierInvoiceEditForm`, `InvoiceLinesEditor` y `create/updateSupplierInvoice`, compartidos con proyecto. Los IDs de líneas y originales llegan al kernel; no hay cálculo alternativo que requiera duplicar el fix. En AR, ambas páginas de edición envían IDs/originales al mismo formulario/servicio para las líneas editables (NC/ND).
+- **Compras:** SC, cotizaciones y OC pertenecen a una obra y empresa por schema. Clasificación, adjudicación, vigencia y justificativos se aplican en ese servicio común; no existe una segunda compra corporativa a corregir. Las políticas de cotizaciones se obtienen de la empresa de la SC. La nueva protección respeta `ctx.companyId = null` como contexto global autorizado.
+- **Facturación y CxP:** las pantallas corporativas consultadas filtran `projectId = null`; conservan sus gates D-056 y filtros de empresa. Los documentos de obra se consultan en su espacio correspondiente. No se mezcla el gasto general con costos de Casa Hogar.
+- **Hallazgo adicional medio — consultas compartidas AP/AR:** las rutas corporativas tenían su guard, pero las consultas genéricas de factura AP y CxP (por ID o por factura) no exigían por sí mismas empresa activa/permisos corporativos; la consulta genérica AR ya controlaba empresa, pero faltaba el gate corporativo. Se completan antes de serializar o reconciliar la CxP. La lectura de obra mantiene ACL y roles operativos; los usuarios autorizados siguen accediendo a corporativos sin membresía de obra. Reproducción: 7 de 32 escenarios fallaban antes del fix, todos pasan después.
+- **Tesorería:** permanece tenant-wide según el estándar vigente; no se agregan filtros de empresa que oculten cuentas compartidas ni se cambian saldos, pagos o asientos.
+
+La misma revisión completó el guard de empresa activa en `updateSalesInvoice`, que ya existía en AP y en emisión/anulación AR. La acción corporativa estaba protegida, pero el servicio compartido también debe garantizarlo. Se agregó una regresión negativa de otra empresa y otra que conserva el acceso al control de borrador de la propia empresa. Total del bloque: 34 escenarios nuevos.
+
+**Verificación:** 1.301 pruebas aprobadas en total (1.060 services y 241 en los demás paquetes). Typecheck general aprobado en 13 paquetes y nueva comprobación del paquete services tras el último ajuste AR; lint de la ayuda corporativa sin errores/warnings. Índice AI sincronizado: 493 chunks, hash `82f4750d8793…`; diff sin errores. La revisión de código del alcance empresa/proyecto queda aprobada con los límites de validación y publicación que siguen.
+
+Sin migraciones ni cambios de datos. El cierre de la revisión de código no equivale al cierre operativo: quedan commit/push/publicación de las correcciones locales, smoke operativo de §17 y definiciones/regularizaciones históricas Q-061/062/063 ya separadas del alcance implementado.
+
 ## Referencias canónicas
 
 - [Solicitudes y cotizaciones](../02-modules/PURCHASE_REQUESTS.md), [OC y recepciones](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [Gastos y pagos](../02-modules/EXPENSES_AND_PAYMENTS.md).

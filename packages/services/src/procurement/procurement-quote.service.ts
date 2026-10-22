@@ -12,6 +12,7 @@ import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-li
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { assertQuoteNotFrozenByActivePo } from "./purchase-request-to-po.service";
+import { assertPurchaseRequestScope } from "./purchase-request-scope";
 
 type QuoteWithRequest = Prisma.ProcurementQuoteGetPayload<{
   include: { purchaseRequest: true; lines: true };
@@ -31,6 +32,7 @@ async function loadMutableQuote(
   if (!quote || quote.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Cotización no encontrada");
   }
+  await assertPurchaseRequestScope(quote.purchaseRequest, ctx, "mutate");
   if (quote.status !== "RECEIVED") {
     throw new ServiceError(
       "CONFLICT",
@@ -175,6 +177,7 @@ export async function createProcurementQuote(
     include: { lines: true },
   });
   if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  await assertPurchaseRequestScope(pr, ctx, "mutate");
   if (pr.status !== "SUBMITTED") {
     throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
   }
@@ -190,6 +193,7 @@ export async function createProcurementQuote(
   const quote = await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
     const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id } });
+    await assertPurchaseRequestScope(current, ctx, "mutate");
     if (current.status !== "SUBMITTED") {
       throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
     }
@@ -437,6 +441,9 @@ export async function listProcurementQuotesForRequest(
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
+  const request = await prisma.purchaseRequest.findUnique({ where: { id: purchaseRequestId } });
+  if (!request) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  await assertPurchaseRequestScope(request, ctx, "read");
   const quotes = await prisma.procurementQuote.findMany({
     where: { purchaseRequestId, tenantId: ctx.tenantId },
     include: {
@@ -491,6 +498,9 @@ export async function listProcurementQuotesDetailedForRequest(
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
+  const request = await prisma.purchaseRequest.findUnique({ where: { id: purchaseRequestId } });
+  if (!request) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  await assertPurchaseRequestScope(request, ctx, "read");
   const quotes = await prisma.procurementQuote.findMany({
     where: { purchaseRequestId, tenantId: ctx.tenantId },
     include: {

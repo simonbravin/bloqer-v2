@@ -72,6 +72,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 - Cotización debe representar **todas** las líneas de la SC, indicando Cotizado / No cotizado / Bonificado ([D-118]); un proveedor activo por cotización activa. Cotizado tiene total positivo; No cotizado lleva precio/descuento/importes cero; Bonificado tiene total cero. El total de la cotización completa debe ser positivo.
 - Adjudicación: línea SC entera a un solo proveedor/OC; N OC por SC sin solapar líneas ([BR-PUR-024]).
 - No adjudicar cotización vencida ni por debajo del mínimo por ítem: cuentan renglones cotizados/bonificados de ofertas `RECEIVED`/`SELECTED`; no cuentan No cotizado ni cero histórico sin clasificar. La vigencia se valida en la oferta seleccionada.
+- `validUntil` es fecha calendario (`@db.Date`): se compara con el día de la plataforma (Argentina), no con la hora actual. La fecha indicada todavía es válida; vence al comenzar el día siguiente. Usa el mismo criterio de fechas que las alertas de compras.
 - Cotización usada por OC activa: no editar ni eliminar (freeze).
 - Históricos conservan `offerKind = null` y sus importes; no hay backfill. Si el total de línea es positivo sigue disponible; un cero pendiente exige revisión antes de adjudicar. Las OC ya procesadas no se invalidan ni recalculan. Si la oferta está congelada, no se habilita edición excepcional.
 

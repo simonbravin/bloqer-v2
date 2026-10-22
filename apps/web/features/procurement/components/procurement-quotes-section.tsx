@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatDbDate } from "@/lib/format";
 import type { QuoteLineOfferKind } from "@bloqer/domain";
 import { canQuickAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
 import {
@@ -160,7 +161,7 @@ export function ProcurementQuotesSection({
                     {q.leadTimeDays ?? "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {q.validUntil ?? "—"}
+                    {q.validUntil ? formatDbDate(q.validUntil) : "No informada"}
                   </TableCell>
                   <TableCell className="text-right">
                     {(q.status === "RECEIVED" || q.status === "SELECTED") && canQuote ? (

@@ -9,6 +9,8 @@ import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders } from "./procurement-access";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
+import { assertPurchaseRequestScope } from "./purchase-request-scope";
+import { isProcurementQuoteExpired } from "./quote-validity";
 
 // Multi-supplier awards include locks, line writes and audit in one atomic transaction.
 // Bound their duration explicitly; the Prisma 5s default expired on the isolated Neon regression.
@@ -213,10 +215,11 @@ async function createOnePoFromQuoteLinesInTx(
   if (!quote || quote.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Cotización no encontrada");
   }
+  const pr = quote.purchaseRequest;
+  await assertPurchaseRequestScope(pr, ctx, "mutate");
   if (quote.status !== "RECEIVED" && quote.status !== "SELECTED") {
     throw new ServiceError("CONFLICT", "Solo se pueden adjudicar cotizaciones recibidas");
   }
-  const pr = quote.purchaseRequest;
   if (options.expectedPurchaseRequestId && pr.id !== options.expectedPurchaseRequestId) {
     throw new ServiceError("CONFLICT", "La cotización no pertenece a esta solicitud");
   }
@@ -224,7 +227,7 @@ async function createOnePoFromQuoteLinesInTx(
     throw new ServiceError("CONFLICT", "Estado de solicitud incompatible");
   }
 
-  if (quote.validUntil && quote.validUntil < new Date()) {
+  if (isProcurementQuoteExpired(quote.validUntil)) {
     throw new ServiceError("CONFLICT", "La cotización está vencida");
   }
 
@@ -494,6 +497,7 @@ export async function createPurchaseOrdersFromAwards(
     if (!pr || pr.tenantId !== ctx.tenantId) {
       throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
     }
+    await assertPurchaseRequestScope(pr, ctx, "mutate");
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
 
     const maxNum = await tx.purchaseOrder.aggregate({
@@ -558,6 +562,7 @@ export async function selectProcurementQuoteAndCreatePo(
     throw new ServiceError("NOT_FOUND", "Cotización no encontrada");
   }
 
+  await assertPurchaseRequestScope(quote.purchaseRequest, ctx, "mutate");
   const freeLineIds = quote.purchaseRequest.lines
     .filter((l) => !l.awardedPurchaseOrderId)
     .map((l) => l.id)

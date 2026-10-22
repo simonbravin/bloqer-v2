@@ -79,6 +79,12 @@ export async function getPayableById(
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(p.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a la empresa activa");
+  }
+  if (p.projectId === null && !canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar a nivel empresa");
+  }
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
@@ -109,6 +115,12 @@ export async function getPayableBySupplierInvoiceId(
   });
   if (!p) return null;
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(p.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a la empresa activa");
+  }
+  if (p.projectId === null && !canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar a nivel empresa");
+  }
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }

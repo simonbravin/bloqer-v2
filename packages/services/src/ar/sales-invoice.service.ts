@@ -106,6 +106,9 @@ export async function getSalesInvoiceById(
   if (isCrossCompany(inv.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
+  if (inv.projectId === null && !canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas a nivel empresa");
+  }
   if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
@@ -594,6 +597,9 @@ export async function updateSalesInvoice(
   const inv = await prisma.salesInvoice.findUnique({ where: { id } });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
   if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }

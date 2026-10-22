@@ -400,6 +400,12 @@ export async function getSupplierInvoiceById(
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  if (inv.projectId === null && !canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor a nivel empresa");
+  }
   if (projectScopeId !== undefined && inv.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }

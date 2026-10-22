@@ -10,7 +10,6 @@ import {
   DEFAULT_IIBB_PERCEPTION_RATE_PCT,
   IVA_RATE_LABEL_ES,
   IVA_RATE_PRESETS,
-  normalizeIvaRatePreset,
   QUOTE_LINE_OFFER_KINDS,
   QUOTE_LINE_OFFER_LABELS,
   type QuoteLineOfferKind,
@@ -32,6 +31,7 @@ import type { SupplierOption } from "./purchase-order-form";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, formatUnitPriceFromString } from "@/lib/format-money";
 import { PricesIncludeTaxCheckbox } from "@/features/finance/components/invoice-letter-fields";
+import { initialQuoteLineMoney, quoteGlobalTaxRate } from "../lib/quote-line-edit-values";
 import {
   DocumentTaxTotalsFooter,
   IibbPerceptionFields,
@@ -136,8 +136,7 @@ export function ProcurementQuoteForm({
     return map;
   }, [editValues?.lines]);
 
-  const defaultTaxRate =
-    normalizeIvaRatePreset(editValues?.lines[0]?.taxRate) ?? DEFAULT_QUOTE_TAX_RATE;
+  const defaultTaxRate = isEdit ? quoteGlobalTaxRate(editValues.lines) : DEFAULT_QUOTE_TAX_RATE;
 
   const [supplierId, setSupplierId] = useState("");
   const [pricesIncludeTax, setPricesIncludeTax] = useState(false);
@@ -155,11 +154,7 @@ export function ProcurementQuoteForm({
         const initial = lineInitialByPrId.get(l.id);
         return [
           l.id,
-          {
-            unitPrice: initial?.unitPrice ?? "0",
-            discountPct: initial?.discountPct ?? "0",
-            taxRate: normalizeIvaRatePreset(initial?.taxRate) ?? defaultTaxRate,
-          },
+          initialQuoteLineMoney(initial, defaultTaxRate || DEFAULT_QUOTE_TAX_RATE),
         ];
       }),
     ),
@@ -425,7 +420,7 @@ export function ProcurementQuoteForm({
           <Label htmlFor={isEdit ? "editQuoteTaxRate" : "quoteTaxRate"}>Alícuota IVA</Label>
           <Select value={taxRate} onValueChange={applyGlobalTaxRate}>
             <SelectTrigger id={isEdit ? "editQuoteTaxRate" : "quoteTaxRate"}>
-              <SelectValue />
+              <SelectValue placeholder="Conservar IVA por ítem" />
             </SelectTrigger>
             <SelectContent>
               {IVA_RATE_PRESETS.map((rate) => (
@@ -454,6 +449,13 @@ export function ProcurementQuoteForm({
           editModeHint={isEdit}
         />
       </div>
+
+      {isEdit ? (
+        <p className="text-xs text-muted-foreground">
+          Cada ítem conserva su IVA guardado, aunque difiera de las opciones del selector.
+          Elegir una alícuota IVA en el selector la aplica a todos los ítems.
+        </p>
+      ) : null}
 
       <p className="text-xs text-muted-foreground" aria-live="polite">
         {pricesIncludeTax

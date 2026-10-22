@@ -420,6 +420,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     modules: ["finanzas"],
     level: "company",
     typicalRoles: ["Administración", "Finanzas"],
+    permissionHint: "Requiere permisos de finanzas de empresa. El acceso financiero a una obra no habilita gastos corporativos; los documentos respetan la empresa activa.",
     where: { menu: "Finanzas → Facturas y gastos / Transacciones" },
     hrefs: [
       { kind: "company", path: "/finanzas/facturas-proveedor", label: "Facturas y gastos" },
@@ -432,6 +433,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "¿El payee es Proveedor o Empleado activo? Si no → no sale en el listado: asigná el rol. Cliente y Subcontratista no sirven acá.",
       "Crear / Emitir = Devengado + CxP. ¿Pagar ahora? Si sí y hay fondos → Pagado. Si no hay fondos → Bloqer bloquea. Si no pagás ahora → CxP.",
       "En el detalle de Facturas y gastos ves la pista de proceso Borrador → Emitir → Pagar (igual que en obra).",
+      "Al editar, si no cambian cantidad, precio neto, IVA ni descuento, se conservan los importes originales, igual que en las facturas de obra.",
     ],
     figure: {
       src: "/help/mapa-flujo-gasto-empresa-si-no.png",
