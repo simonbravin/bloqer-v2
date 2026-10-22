@@ -26,7 +26,7 @@ import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { assertDirectPoAllowed } from "./procurement-policy.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { parseDiscountPct } from "../finance/invoice-line-money";
+import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -809,6 +809,7 @@ export async function updatePurchaseOrder(
 
     if (input.lines) {
       const previousLines = await tx.purchaseOrderLine.findMany({ where: { purchaseOrderId: id } });
+      const previousById = indexStoredDocumentLines(input.lines, previousLines);
       await tx.purchaseOrderLine.deleteMany({ where: { purchaseOrderId: id } });
       for (let i = 0; i < input.lines.length; i++) {
         const line = input.lines[i]!;
@@ -824,12 +825,11 @@ export async function updatePurchaseOrder(
         const qty   = new Prisma.Decimal(line.quantity);
         const price = new Prisma.Decimal(line.unitPrice);
         const rate  = new Prisma.Decimal(line.taxRate ?? "0");
-        const { lineSubtotal, lineTax, lineTotal } = calcLine(
-          qty,
-          price,
-          rate,
-          parseDiscountPct(line.discountPct),
-        );
+        const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+          quantity: qty, unitPrice: price, taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
+          previous: line.id ? previousById.get(line.id) : undefined,
+        });
         const baseline = await budgetBaselineForPurchaseLine(
           line.wbsNodeId,
           {
@@ -1002,7 +1002,7 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
     );
 
     return cancelled;
-  });
+  }, existing.purchaseRequestId ? { maxWait: 10_000, timeout: 30_000 } : undefined);
 
   return toPurchaseOrderView(po);
 }

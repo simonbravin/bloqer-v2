@@ -5,6 +5,8 @@
 
 ## Decisión
 
+**D-118 — renglones de cotización:** `procurement_quote_lines.offerKind` es nullable, enum `QuoteLineOfferKind` (`QUOTED`, `NOT_QUOTED`, `BONIFIED`), sin default/backfill. Conserva PK/FK y la unicidad cotización/ítem; no agrega una entidad operativa. Históricos quedan null. Aplicar la migración aditiva antes del cliente nuevo; un rollback de código conserva columna/enum. Revisar ceros pendientes en el servicio, sin revalidar adjudicaciones existentes.
+
 Representar el dominio como **modelo relacional multitenant** con **UUIDs**, **decimales para dinero**, **polimorfismos** como `(entity_type, entity_id)`, y **ledger** (`account_movement`) como núcleo de tesorería. El ERD técnico **respeta** modular monolith, service layer y aislamiento por `tenant_id` ([`ARCHITECTURE_OVERVIEW.md`](./ARCHITECTURE_OVERVIEW.md), [`MULTITENANCY_ARCHITECTURE.md`](./MULTITENANCY_ARCHITECTURE.md)).
 
 ## Diagrama ERD técnico (alto nivel)

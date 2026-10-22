@@ -23,6 +23,17 @@ export type DocumentLineAmounts = ExclusiveLineAmounts & {
   unitPriceNet: string;
 };
 
+/** Snapshot loaded from the document, never an authoritative client-provided total. */
+export type StoredDocumentLineMoney = {
+  quantity: string;
+  unitPrice: string;
+  taxRate: string;
+  discountPct: string;
+  lineSubtotal: string;
+  lineTax: string;
+  lineTotal: string;
+};
+
 /**
  * Canonical discount % ([D-093]): 0–100 inclusive, 4 dp. Empty → 0.
  * Throws `DISCOUNT_PCT_OUT_OF_RANGE` / `INVALID_AMOUNT` so callers never persist a negative net.
@@ -69,10 +80,34 @@ export function resolveDocumentLineAmounts(params: {
   taxRatePercent: string | number;
   discountPct?: string | number;
   pricesIncludeTax?: boolean;
+  previous?: StoredDocumentLineMoney;
 }): DocumentLineAmounts {
   const qty = normalizeDecimalString(params.quantity);
   const rate = normalizeDecimalString(params.taxRatePercent || "0");
   const pct = normalizeDiscountPct(params.discountPct);
+
+  const previous = params.previous;
+  if (
+    previous &&
+    !params.pricesIncludeTax &&
+    compareDecimal(qty, previous.quantity) === 0 &&
+    compareDecimal(params.unitPrice, previous.unitPrice) === 0 &&
+    compareDecimal(rate, previous.taxRate) === 0 &&
+    compareDecimal(pct, previous.discountPct) === 0
+  ) {
+    return {
+      unitPriceNet: previous.unitPrice,
+      discountAmount: roundMoney(
+        divideDecimal(
+          multiplyDecimal(roundMoney(multiplyDecimal(qty, previous.unitPrice)), pct),
+          "100",
+        ),
+      ),
+      lineSubtotal: previous.lineSubtotal,
+      lineTax: previous.lineTax,
+      lineTotal: previous.lineTotal,
+    };
+  }
 
   if (params.pricesIncludeTax) {
     const list = calcLineAmountsFromGrossInclusive({
@@ -80,6 +115,9 @@ export function resolveDocumentLineAmounts(params: {
       unitPriceGross: params.unitPrice,
       taxRatePercent: rate,
     });
+    // D-086: without discount, the entered gross total is authoritative.
+    // Rebuilding it from the rounded net can lose cents even for qty=1.
+    if (compareDecimal(pct, "0") === 0) return { ...list, discountAmount: "0.00" };
     const discounted = calcExclusiveLineAmounts({
       quantity: qty,
       unitPriceNet: list.unitPriceNet,

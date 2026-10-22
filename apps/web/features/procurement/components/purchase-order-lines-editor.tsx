@@ -1,5 +1,7 @@
 "use client";
 
+import type { StoredDocumentLineMoney } from "@bloqer/utils";
+
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { addDecimal, divideDecimal, roundMoney, roundQty, QTY_DECIMALS, resolveDocumentLineAmounts, effectiveUnitPriceNet, normalizeDiscountPct } from "@bloqer/utils";
@@ -38,6 +40,8 @@ import { DocumentTaxTotalsFooter } from "@/features/finance/components/iibb-perc
 import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
 
 export type PurchaseOrderLine = {
+  id?: string;
+  originalMoney?: StoredDocumentLineMoney;
   wbsNodeId: string | null;
   productId: string | null;
   costAnalysisLineId: string | null;
@@ -88,6 +92,7 @@ export type ProductOption = { id: string; sku: string; name: string; unit: strin
 function linePreview(l: PurchaseOrderLine) {
   try {
     const r = resolveDocumentLineAmounts({
+      previous: l.originalMoney,
       quantity: l.quantity.trim() || "0",
       unitPrice: l.unitPrice.trim() || "0",
       taxRatePercent: l.taxRate.trim() || "0",
@@ -349,6 +354,7 @@ export function PurchaseOrderLinesEditor({
           Descuento general %
         </Label>
         <DecimalInput
+          precision={4}
           id="po-header-discount"
           value={headerDiscount}
           onValueChange={setHeaderDiscount}
@@ -578,6 +584,7 @@ export function PurchaseOrderLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Cantidad</Label>
                   <DecimalInput
+                    precision={4}
                     required
                     value={line.quantity}
                     onValueChange={(v) => update(i, "quantity", v)}
@@ -588,6 +595,7 @@ export function PurchaseOrderLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Precio unitario</Label>
                   <DecimalInput
+                    precision={4}
                     required
                     value={line.unitPrice}
                     onValueChange={(v) => update(i, "unitPrice", v)}
@@ -665,6 +673,7 @@ export function PurchaseOrderLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Desc. %</Label>
                   <DecimalInput
+                    precision={4}
                     value={line.discountPct ?? "0"}
                     onValueChange={(v) => update(i, "discountPct", v)}
                     placeholder="0"
@@ -709,7 +718,7 @@ export function PurchaseOrderLinesEditor({
                     onChange={(e) => update(i, "varianceJustification", e.target.value)}
                     placeholder={
                       justificationRequired
-                        ? "Completá por qué se desvía esta línea…"
+                        ? "Explicá el motivo de la compra para esta línea…"
                         : "Si el precio supera el referencial…"
                     }
                     aria-invalid={justificationRequired || undefined}

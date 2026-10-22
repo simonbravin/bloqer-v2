@@ -45,9 +45,9 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 1. Crear / editar SC en borrador (todas las líneas con WBS).
 2. **Enviar** → snapshot de costo unitario presupuestario + cantidad; notifica a Compras ([BR-PUR-015]).
 3. **Devolver a borrador** desde `SUBMITTED` con motivo ([BR-PUR-025]): solo si no hay cotizaciones ni OC activas; limpia snapshots y permite editar de nuevo.
-4. Cargar ≥ `minQuotesRequired` cotizaciones (precio por línea + **plazo de entrega** + `validUntil`).
+4. Cargar ofertas suficientes para alcanzar `minQuotesRequired` por ítem (clasificación/precio por línea + **plazo de entrega** + `validUntil`, D-118).
 5. **Comparar** cotizaciones (total, desglose, plazo, ref. presupuesto / saldo de partida).
-6. Adjudicar por ítem (o atajo “toda la cotización” sobre líneas libres) → una o más OC `DRAFT` ([BR-PUR-024]); cobertura parcial deja la SC en `SUBMITTED`.
+6. Adjudicar por ítem (o atajo **Adjudicar cotizados → OC** sobre líneas libres de importe positivo) → una o más OC `DRAFT` ([BR-PUR-024]); los bonificados se seleccionan explícitamente en la matriz. Cobertura parcial deja la SC en `SUBMITTED`.
 7. Seguir workflow de cada OC (enviar → aprobar o devolver → confirmar).
 
 ## 9. Pantallas y vistas necesarias
@@ -68,10 +68,11 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 
 ## 11. Validaciones
 - Cada línea: `wbs_node_id` de ítem del presupuesto APPROVED/CLOSED del proyecto.
-- Cotización debe cubrir **todas** las líneas de la SC (comparables); un proveedor activo por cotización activa.
+- Cotización debe representar **todas** las líneas de la SC, indicando Cotizado / No cotizado / Bonificado ([D-118]); un proveedor activo por cotización activa. Cotizado tiene total positivo; No cotizado lleva precio/descuento/importes cero; Bonificado tiene total cero. El total de la cotización completa debe ser positivo.
 - Adjudicación: línea SC entera a un solo proveedor/OC; N OC por SC sin solapar líneas ([BR-PUR-024]).
-- No adjudicar cotización vencida ni por debajo del mínimo de cotizaciones recibidas.
+- No adjudicar cotización vencida ni por debajo del mínimo por ítem: cuentan renglones cotizados/bonificados de ofertas `RECEIVED`/`SELECTED`; no cuentan No cotizado ni cero histórico sin clasificar. La vigencia se valida en la oferta seleccionada.
 - Cotización usada por OC activa: no editar ni eliminar (freeze).
+- Históricos conservan `offerKind = null` y sus importes; no hay backfill. Si el total de línea es positivo sigue disponible; un cero pendiente exige revisión antes de adjudicar. Las OC ya procesadas no se invalidan ni recalculan. Si la oferta está congelada, no se habilita edición excepcional.
 
 ## 12. Fórmulas relacionadas
 - Baseline material / unitario: APU del `CostItem` del WBS; ver [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md).

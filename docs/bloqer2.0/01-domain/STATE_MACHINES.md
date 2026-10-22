@@ -16,6 +16,8 @@
 
 ## 1. Convenciones
 
+**Clasificación de oferta (D-118):** `ProcurementQuoteLine.offerKind` usa `QUOTED` (Cotizado), `NOT_QUOTED` (No cotizado) y `BONIFIED` (Bonificado); null = histórico sin clasificar. Es un atributo del renglón, no un estado de workflow. No modifica las máquinas de SC, cotización u OC ni reabre documentos procesados.
+
 - **Estado inicial** se marca con `( )`.
 - **Estado terminal** se marca con `[X]`.
 - Las flechas indican **transiciones permitidas**. Cualquier transición no listada es **prohibida**.

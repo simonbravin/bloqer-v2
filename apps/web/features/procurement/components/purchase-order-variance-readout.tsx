@@ -11,9 +11,9 @@ function extraHint(
   tier: string | null | undefined,
   refKind?: string | null,
 ): string | null {
-  if (tier === "UNIT_MISMATCH") return "Unidad distinta";
-  if (tier === "NO_BUDGET_BASELINE") return "Sin referencial";
-  if (tier === "NONE" && refKind === "GLOBAL_PARTIDA") return "Sin $/u comparable";
+  if (tier === "UNIT_MISMATCH") return "Unidad distinta al presupuesto; revisá unidad e insumo APU";
+  if (tier === "NO_BUDGET_BASELINE") return "Sin referencia presupuestaria; no se puede calcular el desvío";
+  if (tier === "NONE" && refKind === "GLOBAL_PARTIDA") return "Partida global: su total no es un precio unitario";
   return null;
 }
 

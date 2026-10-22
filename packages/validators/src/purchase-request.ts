@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
+import { DEFAULT_IIBB_PERCEPTION_RATE_PCT, QUOTE_LINE_OFFER_KINDS } from "@bloqer/domain";
 import { positiveQtyString, discountPctString, unitPriceString, ratePctString } from "./money";
 import { costCategorySchema } from "./budget";
 
@@ -44,6 +44,7 @@ export const returnPurchaseRequestSchema = z.object({
 
 const quoteLineSchema = z.object({
   purchaseRequestLineId: z.string().uuid(),
+  offerKind: z.enum(QUOTE_LINE_OFFER_KINDS).optional().nullable(),
   unitPrice: unitPriceString,
   taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
   discountPct: discountPctString.optional().default("0.0000"),

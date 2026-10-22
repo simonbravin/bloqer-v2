@@ -12,6 +12,7 @@ import {
 } from "./money";
 
 const purchaseOrderLineSchema = z.object({
+  id: z.string().uuid().optional(),
   wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
   productId: z.string().uuid().optional().nullable(),
   /** Optional APU hint ([D-068]); does not change EDT imputation. */

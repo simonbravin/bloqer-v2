@@ -6,17 +6,18 @@ import {
   DISPLAY_DECIMALS,
   formatDecimalEditBuffer,
   formatGroupedDecimal,
-  roundToDecimals,
-  tryParseUserDecimal,
 } from "@bloqer/utils";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { DecimalInputDraft } from "./decimal-input-draft";
 
 type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onChange" | "type"> & {
   value: string;
   onValueChange: (canonical: string) => void;
-  /** Fractional digits on blur / emit. Default 2 (D-053 display). Do not use type="number" for money/qty/%. */
+  /** Fractional digits for display. Default 2 (D-053). */
   scale?: number;
+  /** Editable/persisted precision, independent of display (unit prices/qty/%: 4). */
+  precision?: number;
 };
 
 /** Canonical DecimalInput string → number for RHF `valueAsNumber` fields. */
@@ -60,6 +61,7 @@ export function DecimalInput({
   value,
   onValueChange,
   scale = DISPLAY_DECIMALS,
+  precision = scale,
   name,
   className,
   onBlur,
@@ -73,13 +75,17 @@ export function DecimalInput({
   const visibleRef = useRef<HTMLInputElement>(null);
   const draftRef = useRef(draft);
   draftRef.current = draft;
-  const scaleRef = useRef(scale);
-  scaleRef.current = scale;
+  const precisionRef = useRef(precision);
+  precisionRef.current = precision;
+  const editRef = useRef(new DecimalInputDraft());
   const onValueChangeRef = useRef(onValueChange);
   onValueChangeRef.current = onValueChange;
 
   useEffect(() => {
-    if (!focused) setDraft(displayFromCanonical(value, scale));
+    if (!focused) {
+      setDraft(displayFromCanonical(value, scale));
+      editRef.current.reset();
+    }
   }, [value, scale, focused]);
 
   function emitCanonical(canonical: string) {
@@ -88,17 +94,12 @@ export function DecimalInput({
   }
 
   function commit(raw: string) {
-    const parsed = tryParseUserDecimal(raw, "commit");
-    if (parsed == null) return;
-    if (parsed === "") {
-      emitCanonical("");
-      setDraft("");
-      return;
-    }
+    // Formatting must never rewrite an untouched stored value on blur or submit.
     try {
-      const rounded = roundToDecimals(parsed, scaleRef.current);
+      const rounded = editRef.current.commit(raw, precisionRef.current);
+      if (rounded == null) return;
       emitCanonical(rounded);
-      setDraft(formatGroupedDecimal(rounded, scaleRef.current));
+      setDraft(rounded ? formatDecimalEditBuffer(rounded, precisionRef.current) : "");
     } catch {
       /* keep draft */
     }
@@ -135,20 +136,15 @@ export function DecimalInput({
         onFocus={(e) => {
           setFocused(true);
           const t = value.trim();
-          setDraft(t ? formatDecimalEditBuffer(t, scale) : "");
+          setDraft(t ? formatDecimalEditBuffer(t, precision) : "");
           onFocus?.(e);
         }}
         onChange={(e) => {
           const next = e.target.value;
           setDraft(next);
-          const parsed = tryParseUserDecimal(next, "live");
-          if (parsed == null) return;
-          if (parsed === "") {
-            emitCanonical("");
-            return;
-          }
           try {
-            emitCanonical(roundToDecimals(parsed, scaleRef.current));
+            const canonical = editRef.current.change(next, precisionRef.current);
+            if (canonical != null) emitCanonical(canonical);
           } catch {
             /* incomplete token */
           }

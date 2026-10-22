@@ -531,6 +531,47 @@
 
 ---
 
+### Q-061 — Regularización de compras históricas y unidades con documentos posteriores
+
+- **Categoría:** Compras / operación histórica
+- **Estado:** ABIERTA — relevamiento INDARI, 21/10/2026; no modifica BR-PUR-024/025.
+- **Contexto:** hay compras ya realizadas/pagadas con cotización vencida y SC con unidad incorrecta que ya tienen cotizaciones. Los controles actuales no equivalen a un circuito de regularización histórica.
+- **Pregunta:** ¿qué casos deben resolverse con los flujos vigentes y cuáles requieren un procedimiento excepcional, con qué permisos, fechas, evidencias y efectos en compromiso, recepción, costos y deuda?
+- **Recomendación para evaluar:** documentar primero el procedimiento soportado; diseñar una excepción trazable solo donde resulte insuficiente. No renovar vigencias ficticias, habilitar edición libre ni asumir conversión barras/kg.
+- **Bloquea:** ampliación B05, no mejoras acotadas de UI. Ver [plan INDARI, fase 3](../08-architecture/INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md#7-fase-3--decisiones-de-producto-antes-de-ampliar-el-modelo).
+
+### Q-062 — Factura de proveedor que cubre varias órdenes de compra
+
+- **Categoría:** AP / Compras / Costos
+- **Estado:** ABIERTA — relevamiento INDARI, 21/10/2026.
+- **Contexto:** Prisma y los servicios actuales enlazan una OC opcional por factura y validan sus líneas. El cliente puede recibir un documento fiscal que consolida varias compras.
+- **Pregunta:** ¿se habilita multi-OC y con qué alcance de empresa/proyecto/proveedor/moneda, asignación de renglones y percepciones, correcciones y cobertura de recepciones?
+- **Recomendación para evaluar:** asignación por líneas de alcance acotado, conservando una factura, una CxP y sus pagos parciales. La representación persistida requiere diseño/ADR; no está aprobada por esta pregunta.
+- **Bloquea:** B06 y su migración; no justifica duplicar facturas ni quitar la validación de cabecera/líneas.
+- **Referencia:** [plan INDARI](../08-architecture/INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md).
+
+### Q-063 — Prioridad y reglas de aplicación del anticipo a proveedor sin factura
+
+- **Categoría:** AP / Tesorería / Contabilidad
+- **Estado:** ABIERTA — detalle y priorización de implementación; ADR-013 continúa vigente.
+- **Contexto:** ADR-013 acepta una cuenta puente diferida. El validador existe y `registerSupplierAdvance` todavía rechaza la operación con `CONFLICT`. Anticipo con factura real y pago parcial es un supuesto distinto.
+- **Pregunta:** ¿se prioriza ahora la cuenta puente y cómo se aplican, devuelven, cancelan y concilian sus importes, con qué moneda, alcance y tratamiento de períodos cerrados?
+- **Recomendación para evaluar:** reutilizar ADR-013 y completar los casos financieros antes del modelo y la migración. No crear `Payment` sin `Payable` ni simular una recepción.
+- **Bloquea:** B07 sin factura, no el circuito vigente de factura real/pago parcial cuando corresponda.
+- **Referencia:** [plan INDARI](../08-architecture/INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md), [ADR-013](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md#adr-013--anticipos-a-proveedor-cuenta-puente-fase-2).
+
+### Q-064 — Renglón no cotizado frente a renglón bonificado
+
+- **Categoría:** Compras / Cotizaciones
+- **Estado:** RESUELTA → D-118 (Owner, 21/10/2026). Clasificación explícita aprobada; históricos preservados, ceros pendientes requieren revisión. Implementación/publicación se siguen en el plan INDARI.
+- **Contexto:** una oferta puede tener una línea con precio cero si otra está valorizada. El cero por sí solo no permite distinguir ausencia de oferta de bonificación legítima.
+- **Pregunta:** ¿cómo se expresa esa diferencia y cómo afecta comparación, selección y mínimo de cotizaciones válidas?
+- **Recomendación para evaluar:** representación explícita y comprensible; no transformar los ceros históricos sin evidencia ni prohibir toda bonificación. Acordar primero la regla y después decidir si requiere persistencia nueva.
+- **Bloquea:** B08 y cualquier nuevo bloqueo por precio cero; no bloquea corregir la adjudicación parcial de líneas ya cotizadas.
+- **Referencia:** [plan INDARI](../08-architecture/INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md).
+
+---
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

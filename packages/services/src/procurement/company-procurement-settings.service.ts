@@ -142,14 +142,15 @@ function parsePctOrDefault(
 export async function getCompanyProcurementSettings(
   companyId: string,
   ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<CompanyProcurementSettingsView> {
-  const company = await prisma.company.findFirst({
+  const company = await db.company.findFirst({
     where: { id: companyId, tenantId: ctx.tenantId },
     select: { id: true },
   });
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
 
-  const row = await prisma.companyProcurementSettings.findUnique({ where: { companyId } });
+  const row = await db.companyProcurementSettings.findUnique({ where: { companyId } });
   if (!row) {
     return {
       companyId,

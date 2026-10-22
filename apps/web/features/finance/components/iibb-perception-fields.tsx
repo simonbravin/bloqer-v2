@@ -47,6 +47,7 @@ export function IibbPerceptionFields({
     <div className={cn("space-y-2", className)}>
       <Label htmlFor={id}>{label}</Label>
       <DecimalInput
+        precision={4}
         id={id}
         value={rate}
         onValueChange={(v) => onRateChange(v.trim() === "" ? "0" : v)}

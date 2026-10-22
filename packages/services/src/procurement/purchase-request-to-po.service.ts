@@ -1,4 +1,5 @@
 import { effectiveUnitPriceNet } from "@bloqer/utils";
+import { isQuoteLineAwardable } from "@bloqer/domain";
 import { loadWbsDominantCostTypes, coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
 import { parseDiscountPct } from "../finance/invoice-line-money";
 import { Prisma, prisma, PurchaseOrderStatus } from "@bloqer/database";
@@ -7,7 +8,11 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders } from "./procurement-access";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
-import { recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
+import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
+
+// Multi-supplier awards include locks, line writes and audit in one atomic transaction.
+// Bound their duration explicitly; the Prisma 5s default expired on the isolated Neon regression.
+const AWARD_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
 
 const CONFIRMED_PLUS: PurchaseOrderStatus[] = [
   "CONFIRMED",
@@ -191,12 +196,13 @@ async function createOnePoFromQuoteLinesInTx(
   procurementQuoteId: string,
   purchaseRequestLineIds: string[],
   options: {
-    skipMinQuotesCheck?: boolean;
-    skipPrLock?: boolean;
+    positiveQuotedOnly?: boolean;
+    expectedPurchaseRequestId?: string;
     /** Pre-allocated OC number (batch awards in one TX). */
     documentNumber?: number;
   } = {},
 ): Promise<string> {
+  // Both callers hold the SC lock before loading the quote and its classification.
   const quote = await tx.procurementQuote.findUnique({
     where: { id: procurementQuoteId },
     include: {
@@ -211,32 +217,15 @@ async function createOnePoFromQuoteLinesInTx(
     throw new ServiceError("CONFLICT", "Solo se pueden adjudicar cotizaciones recibidas");
   }
   const pr = quote.purchaseRequest;
+  if (options.expectedPurchaseRequestId && pr.id !== options.expectedPurchaseRequestId) {
+    throw new ServiceError("CONFLICT", "La cotización no pertenece a esta solicitud");
+  }
   if (!["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)) {
     throw new ServiceError("CONFLICT", "Estado de solicitud incompatible");
   }
 
-  if (!options.skipMinQuotesCheck) {
-    const settings = await getCompanyProcurementSettings(pr.companyId, ctx);
-    const receivedCount = await tx.procurementQuote.count({
-      where: {
-        purchaseRequestId: pr.id,
-        status: { in: ["RECEIVED", "SELECTED"] },
-      },
-    });
-    if (receivedCount < settings.minQuotesRequired) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Se requieren al menos ${settings.minQuotesRequired} cotizaciones recibidas antes de adjudicar`,
-      );
-    }
-  }
-
   if (quote.validUntil && quote.validUntil < new Date()) {
     throw new ServiceError("CONFLICT", "La cotización está vencida");
-  }
-
-  if (!options.skipPrLock) {
-    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
   }
 
   const uniqueLineIds = [...new Set(purchaseRequestLineIds)];
@@ -255,6 +244,19 @@ async function createOnePoFromQuoteLinesInTx(
     throw new ServiceError("CONFLICT", "Hay ítems que no pertenecen a esta solicitud");
   }
 
+  const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
+  const competingLines = await tx.procurementQuoteLine.findMany({
+    where: {
+      purchaseRequestLineId: { in: uniqueLineIds },
+      procurementQuote: {
+        tenantId: ctx.tenantId,
+        purchaseRequestId: pr.id,
+        status: { in: ["RECEIVED", "SELECTED"] },
+      },
+    },
+    select: { purchaseRequestLineId: true, offerKind: true, lineTotal: true },
+  });
+
   for (const prl of prLines) {
     if (prl.awardedPurchaseOrderId) {
       throw new ServiceError(
@@ -267,6 +269,24 @@ async function createOnePoFromQuoteLinesInTx(
         "CONFLICT",
         `La cotización no incluye el ítem "${prl.description}"`,
       );
+    }
+    const selected = quoteLineByPrLine.get(prl.id)!;
+    if (options.positiveQuotedOnly &&
+      (selected.offerKind === "BONIFIED" || !selected.lineTotal.greaterThan(0))) {
+      throw new ServiceError("CONFLICT", "La oferta cambió. Los bonificados se seleccionan expresamente en Adjudicar por ítem.");
+    }
+    if (!isQuoteLineAwardable(selected.offerKind, selected.lineTotal.greaterThan(0))) {
+      throw new ServiceError("CONFLICT", selected.offerKind === "NOT_QUOTED"
+        ? `El ítem "${prl.description}" no fue cotizado por este proveedor`
+        : `El ítem "${prl.description}" tiene importe cero sin clasificar. Revisá la cotización antes de adjudicar.`);
+    }
+    const receivedCount = competingLines.filter((line) =>
+      line.purchaseRequestLineId === prl.id &&
+      isQuoteLineAwardable(line.offerKind, line.lineTotal.greaterThan(0)),
+    ).length;
+    if (receivedCount < settings.minQuotesRequired) {
+      throw new ServiceError("CONFLICT",
+        `Se requieren al menos ${settings.minQuotesRequired} ofertas para el ítem "${prl.description}"; hay ${receivedCount}. Los no cotizados y ceros sin clasificar no cuentan.`);
     }
   }
 
@@ -287,7 +307,7 @@ async function createOnePoFromQuoteLinesInTx(
   const wbsIdsForDominant = Array.from(
     new Set(prLines.map((l) => l.wbsNodeId).filter((id): id is string => Boolean(id))),
   );
-  const wbsDominant = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
+  const wbsDominant = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId, tx);
 
   let number = options.documentNumber;
   if (number == null) {
@@ -298,6 +318,12 @@ async function createOnePoFromQuoteLinesInTx(
     number = (maxNum._max.number ?? 0) + 1;
   }
 
+  const selectedQuoteLines = prLines.map((line) => quoteLineByPrLine.get(line.id)!);
+  const totals = headerTotalsWithIibbPerception({
+    lineSubtotals: selectedQuoteLines.map((line) => line.lineSubtotal),
+    lineTaxes: selectedQuoteLines.map((line) => line.lineTax),
+    iibbPerceptionRate: quote.iibbPerceptionRate,
+  });
   const po = await tx.purchaseOrder.create({
     data: {
       tenantId: ctx.tenantId,
@@ -312,13 +338,14 @@ async function createOnePoFromQuoteLinesInTx(
       currency: quote.currency,
       fxRate: quote.fxRate,
       iibbPerceptionRate: quote.iibbPerceptionRate,
+      ...totals,
       status: PurchaseOrderStatus.DRAFT,
       createdBy: ctx.actorUserId,
       updatedBy: ctx.actorUserId,
     },
   });
 
-  for (const prl of prLines) {
+  const poLines = prLines.map((prl) => {
     const ql = quoteLineByPrLine.get(prl.id)!;
     const costType = coerceFreeTextGoodsCostType(
       prl.lineType,
@@ -329,36 +356,33 @@ async function createOnePoFromQuoteLinesInTx(
         wbsDominantCostType: prl.wbsNodeId ? wbsDominant.get(prl.wbsNodeId) ?? null : null,
       }),
     );
-    await tx.purchaseOrderLine.create({
-      data: {
-        purchaseOrderId: po.id,
-        purchaseRequestLineId: prl.id,
-        procurementQuoteLineId: ql.id,
-        isActiveAward: true,
-        wbsNodeId: prl.wbsNodeId,
-        costAnalysisLineId: prl.costAnalysisLineId,
-        productId: prl.productId,
-        costType,
-        description: prl.description,
-        unit: prl.unit,
-        quantity: prl.quantity,
-        unitPrice: ql.unitPrice,
-        taxRate: ql.taxRate,
-        discountPct: ql.discountPct,
-        lineSubtotal: ql.lineSubtotal,
-        lineTax: ql.lineTax,
-        lineTotal: ql.lineTotal,
-        budgetUnitCostSnapshot: prl.budgetUnitCostSnapshot,
-        sortOrder: prl.sortOrder,
-      },
-    });
-    await tx.purchaseRequestLine.update({
-      where: { id: prl.id },
-      data: { awardedPurchaseOrderId: po.id },
-    });
-  }
-
-  await recalcPurchaseOrderTotals(tx, po.id);
+    return {
+      purchaseOrderId: po.id,
+      purchaseRequestLineId: prl.id,
+      procurementQuoteLineId: ql.id,
+      isActiveAward: true,
+      wbsNodeId: prl.wbsNodeId,
+      costAnalysisLineId: prl.costAnalysisLineId,
+      productId: prl.productId,
+      costType,
+      description: prl.description,
+      unit: prl.unit,
+      quantity: prl.quantity,
+      unitPrice: ql.unitPrice,
+      taxRate: ql.taxRate,
+      discountPct: ql.discountPct,
+      lineSubtotal: ql.lineSubtotal,
+      lineTax: ql.lineTax,
+      lineTotal: ql.lineTotal,
+      budgetUnitCostSnapshot: prl.budgetUnitCostSnapshot,
+      sortOrder: prl.sortOrder,
+    };
+  });
+  await tx.purchaseOrderLine.createMany({ data: poLines });
+  await tx.purchaseRequestLine.updateMany({
+    where: { purchaseRequestId: pr.id, id: { in: uniqueLineIds } },
+    data: { awardedPurchaseOrderId: po.id },
+  });
 
   await auditProcurement(
     ctx,
@@ -395,6 +419,7 @@ export async function createPurchaseOrderFromQuoteLines(
   procurementQuoteId: string,
   purchaseRequestLineIds: string[],
   ctx: ServiceContext,
+  options: { positiveQuotedOnly?: boolean } = {},
 ): Promise<{ purchaseOrderId: string }> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseOrders(ctx.roles)) {
@@ -416,7 +441,7 @@ export async function createPurchaseOrderFromQuoteLines(
       ctx,
       procurementQuoteId,
       purchaseRequestLineIds,
-      { skipPrLock: true },
+      { positiveQuotedOnly: options.positiveQuotedOnly },
     );
     const coverage = await syncPurchaseRequestStatusAfterCoverage(
       quote.purchaseRequestId,
@@ -438,7 +463,7 @@ export async function createPurchaseOrderFromQuoteLines(
       );
     }
     return poId;
-  });
+  }, AWARD_TRANSACTION_OPTIONS);
 
   return { purchaseOrderId };
 }
@@ -471,20 +496,6 @@ export async function createPurchaseOrdersFromAwards(
     }
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
 
-    const settings = await getCompanyProcurementSettings(pr.companyId, ctx);
-    const receivedCount = await tx.procurementQuote.count({
-      where: {
-        purchaseRequestId,
-        status: { in: ["RECEIVED", "SELECTED"] },
-      },
-    });
-    if (receivedCount < settings.minQuotesRequired) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Se requieren al menos ${settings.minQuotesRequired} cotizaciones recibidas antes de adjudicar`,
-      );
-    }
-
     const maxNum = await tx.purchaseOrder.aggregate({
       where: { tenantId: ctx.tenantId, companyId: pr.companyId },
       _max: { number: true },
@@ -493,22 +504,14 @@ export async function createPurchaseOrdersFromAwards(
 
     const ids: string[] = [];
     for (const group of groups) {
-      const quote = await tx.procurementQuote.findUnique({
-        where: { id: group.procurementQuoteId },
-        select: { purchaseRequestId: true },
-      });
-      if (!quote || quote.purchaseRequestId !== purchaseRequestId) {
-        throw new ServiceError("CONFLICT", "La cotización no pertenece a esta solicitud");
-      }
       const poId = await createOnePoFromQuoteLinesInTx(
         tx,
         ctx,
         group.procurementQuoteId,
         group.purchaseRequestLineIds,
         {
-          skipMinQuotesCheck: true,
-          skipPrLock: true,
           documentNumber: nextNumber,
+          expectedPurchaseRequestId: purchaseRequestId,
         },
       );
       nextNumber += 1;
@@ -527,13 +530,13 @@ export async function createPurchaseOrdersFromAwards(
       );
     }
     return ids;
-  });
+  }, AWARD_TRANSACTION_OPTIONS);
 
   return { purchaseOrderIds };
 }
 
 /**
- * Legacy: award all still-free lines from the quote onto one DRAFT PO.
+ * Shortcut: award positive quoted free lines. Gifts require explicit matrix selection.
  */
 export async function selectProcurementQuoteAndCreatePo(
   procurementQuoteId: string,
@@ -558,16 +561,17 @@ export async function selectProcurementQuoteAndCreatePo(
   const freeLineIds = quote.purchaseRequest.lines
     .filter((l) => !l.awardedPurchaseOrderId)
     .map((l) => l.id)
-    .filter((id) => quote.lines.some((ql) => ql.purchaseRequestLineId === id));
+    .filter((id) => quote.lines.some((ql) => ql.purchaseRequestLineId === id &&
+      ql.offerKind !== "NOT_QUOTED" && ql.offerKind !== "BONIFIED" && ql.lineTotal.greaterThan(0)));
 
   if (freeLineIds.length === 0) {
     throw new ServiceError(
       "CONFLICT",
-      "No quedan ítems libres para adjudicar de esta cotización",
+      "No quedan ítems cotizados con importe positivo para este atajo. Los bonificados se seleccionan en Adjudicar por ítem.",
     );
   }
 
-  return createPurchaseOrderFromQuoteLines(procurementQuoteId, freeLineIds, ctx);
+  return createPurchaseOrderFromQuoteLines(procurementQuoteId, freeLineIds, ctx, { positiveQuotedOnly: true });
 }
 
 export async function onPurchaseOrderConfirmed(

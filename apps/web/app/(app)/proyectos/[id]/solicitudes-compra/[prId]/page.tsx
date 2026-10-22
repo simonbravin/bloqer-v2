@@ -255,6 +255,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
           totalAmount: q.totalAmount,
           currency: q.currency,
           leadTimeDays: q.leadTimeDays,
+          iibbPerceptionAmount: q.iibbPerceptionAmount,
           lines: q.lines,
         }))}
         documents={

@@ -4,7 +4,7 @@ export const PURCHASE_VARIANCE_TIER_LABELS: Record<string, string> = {
   NOTE_REQUIRED: "Nota requerida",
   EXTRA_APPROVAL: "Aprobación extra",
   UNIT_MISMATCH: "Unidad distinta",
-  NO_BUDGET_BASELINE: "Sin baseline",
+  NO_BUDGET_BASELINE: "Sin referencia presupuestaria",
 };
 
 export function purchaseVarianceTierLabel(tier: string): string {

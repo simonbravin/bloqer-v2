@@ -120,3 +120,67 @@ describe("effectiveUnitPriceNet", () => {
     );
   });
 });
+
+describe("gross totals and unchanged edits [D-086]/[D-117]", () => {
+  for (const [quantity, total] of [
+    ["1", "10.00"],
+    ["333", "3330.00"],
+    ["1000", "10000.00"],
+  ] as const) {
+    it(`keeps gross total ${total} for quantity ${quantity}, including on an unchanged save`, () => {
+      const created = resolveDocumentLineAmounts({
+        quantity,
+        unitPrice: "10",
+        taxRatePercent: "21",
+        pricesIncludeTax: true,
+      });
+      assert.equal(created.lineTotal, total);
+      const previous = {
+        quantity,
+        unitPrice: created.unitPriceNet,
+        taxRate: "21",
+        discountPct: "0",
+        ...created,
+      };
+      const saved = resolveDocumentLineAmounts({
+        quantity,
+        unitPrice: created.unitPriceNet,
+        taxRatePercent: "21.0000",
+        previous,
+      });
+      assert.equal(saved.lineSubtotal, created.lineSubtotal);
+      assert.equal(saved.lineTax, created.lineTax);
+      assert.equal(saved.lineTotal, total);
+    });
+  }
+
+  it("recalculates for each monetary input change and for explicit gross interpretation", () => {
+    const original = resolveDocumentLineAmounts({
+      quantity: "1",
+      unitPrice: "10",
+      taxRatePercent: "21",
+      pricesIncludeTax: true,
+    });
+    const previous = {
+      quantity: "1",
+      unitPrice: original.unitPriceNet,
+      taxRate: "21",
+      discountPct: "0",
+      ...original,
+    };
+    const input = { quantity: "1", unitPrice: original.unitPriceNet, taxRatePercent: "21" };
+    for (const patch of [
+      { quantity: "2" },
+      { unitPrice: "8.27" },
+      { taxRatePercent: "0" },
+      { discountPct: "10" },
+      { pricesIncludeTax: true },
+    ]) {
+      const changed = { ...input, ...patch };
+      assert.deepEqual(
+        resolveDocumentLineAmounts({ ...changed, previous }),
+        resolveDocumentLineAmounts(changed),
+      );
+    }
+  });
+});

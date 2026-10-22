@@ -368,6 +368,7 @@ flowchart LR
 | PurchaseRequestLine | PurchaseOrder | N:1 | `awardedPurchaseOrderId` (cobertura activa) |
 | PurchaseRequestLine | PurchaseOrderLine | 1:1 activa | `purchaseRequestLineId` + `isActiveAward` |
 | ProcurementQuoteLine | PurchaseOrderLine | 1:N hist. | procedencia de precio; award activo 1:1 práctico |
+| ProcurementQuote | ProcurementQuoteLine | 1:N | un renglón por ítem SC; `offerKind` opcional QUOTED/NOT_QUOTED/BONIFIED; null histórico, sin backfill ([D-118]) |
 | PurchaseOrder | Receipt | 1:N | recepciones parciales |
 | PurchaseOrder | PurchaseInvoice | 1:N | múltiples facturas posibles |
 | PurchaseInvoice | PurchaseInvoiceLine | 1:N | imputaciones |

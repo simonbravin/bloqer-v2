@@ -402,6 +402,12 @@ enum PurchaseRequestStatus {
   CANCELLED
 }
 
+enum QuoteLineOfferKind {
+  QUOTED
+  NOT_QUOTED
+  BONIFIED
+}
+
 enum ProcurementQuoteStatus {
   DRAFT
   RECEIVED
@@ -2450,6 +2456,8 @@ model ProcurementQuoteLine {
   id                    String  @id @default(uuid())
   procurementQuoteId    String
   purchaseRequestLineId String
+  /// D-118: null preserves historical lines without interpreting zero prices.
+  offerKind             QuoteLineOfferKind?
   unitPrice             Decimal @db.Decimal(18, 4)
   taxRate               Decimal @default(0) @db.Decimal(8, 4)
   /// Commercial % off list net, before IVA ([D-093]).

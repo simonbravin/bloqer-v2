@@ -196,7 +196,7 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-010 — Cotizaciones mínimas antes de seleccionar
-- **Regla:** no se puede generar OC desde cotización hasta tener al menos `minQuotesRequired` cotizaciones en estado `RECEIVED` para la solicitud, y la cotización elegida no debe estar vencida (`validUntil`). Cada cotización debe incluir **precio por línea** y **plazo de entrega** comparable ([D-050]).
+- **Regla:** no se puede generar OC desde cotización hasta tener al menos `minQuotesRequired` ofertas por cada ítem seleccionado, en cotizaciones `RECEIVED`/`SELECTED`. No cuentan líneas `NOT_QUOTED` ni históricos sin clasificar de total cero; sí bonificados explícitos y históricos de total positivo ([D-118]). La cotización elegida no debe estar vencida (`validUntil`); no cambia el filtro de vigencia del resto del conteo. Cada cotización incluye clasificación/precio por línea y plazo comparable ([D-050]).
 - **Origen:** [D-044](../00-product/DECISION_LOG.md), [D-050](../00-product/DECISION_LOG.md).
 
 ### BR-PUR-011 — Costo referencial y saldo de partida visibles
@@ -258,7 +258,7 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Origen:** [D-097](../00-product/DECISION_LOG.md), enmienda multi-OC [D-044].
 
 ### BR-PUR-024 — Adjudicación multi-OC por línea completa
-- **Regla:** una `PurchaseRequest` puede generar **N** `PurchaseOrder` activas. Cada `PurchaseRequestLine` se adjudica **entera** a una sola OC (no se parte cantidad entre proveedores). Las cotizaciones siguen cotizando todas las líneas; la adjudicación elige subset por cotización/proveedor. Cobertura 100 % → SC `QUOTE_SELECTED`; todas las OC de cobertura en `CONFIRMED+` → `COMPLETED`. Cotización referenciada por OC activa no se edita ni elimina (freeze). Set de líneas PR en OC proveniente de SC es inmutable (no add/remove de líneas ligadas).
+- **Regla:** una `PurchaseRequest` puede generar **N** `PurchaseOrder` activas. Cada `PurchaseRequestLine` se adjudica **entera** a una sola OC (no se parte cantidad entre proveedores). Las cotizaciones representan todas las líneas, incluyendo las no cotizadas; la adjudicación elige subset ofertado por cotización/proveedor ([D-118]). Cobertura 100 % → SC `QUOTE_SELECTED`; todas las OC de cobertura en `CONFIRMED+` → `COMPLETED`. Cotización referenciada por OC activa no se edita ni elimina (freeze). Set de líneas PR en OC proveniente de SC es inmutable (no add/remove de líneas ligadas).
 - **Origen:** [D-044](../00-product/DECISION_LOG.md) (enmienda 2026-09-04).
 
 

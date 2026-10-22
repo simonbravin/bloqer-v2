@@ -56,6 +56,10 @@ Si además hay **descuento %** ([D-093]): extraer el list net como arriba y **de
 |---:|---:|---:|---:|---:|---:|
 | 1 | 121,00 | 21% | 100,00 | 21,00 | 121,00 |
 
+## Regrabado sin cambios ([D-117])
+
+Los componentes guardados son la referencia cuando cantidad, unitario neto, IVA y descuento no cambian. Ejemplo: una unidad a $10,00 con IVA incluido al 21% conserva neto $8,26 + IVA $1,74 = $10,00; no se reconstruye como $8,26 + $1,73. Para 333 unidades a $10,00: neto $2.752,07, IVA $577,93, total $3.330,00. El unitario neto a 4 dp no basta para reconstruir el total original en todos los casos. Al modificar datos monetarios se recalcula; con descuento continúa D-093.
+
 ## Descuento comercial % ([D-093])
 
 \[

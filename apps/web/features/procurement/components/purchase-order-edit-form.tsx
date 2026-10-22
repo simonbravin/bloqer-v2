@@ -54,6 +54,8 @@ export function PurchaseOrderEditForm({
   const [lines, setLines] = useState<PurchaseOrderLine[]>(
     order.lines.length > 0
       ? order.lines.map((l) => ({
+          id: l.id,
+          originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct ?? "0", lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },
           wbsNodeId:   l.wbsNodeId,
           productId:   l.productId ?? null,
           costAnalysisLineId: l.costAnalysisLineId ?? null,

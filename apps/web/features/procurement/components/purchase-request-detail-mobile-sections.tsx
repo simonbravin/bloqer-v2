@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { QuoteLineOfferKind } from "@bloqer/domain";
+import { canQuickAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
 import { formatDate, formatDbDate } from "@/lib/format";
 import {
   formatMoneyAmount,
@@ -20,11 +22,17 @@ type QuoteCard = {
   totalAmount: string;
   currency: string;
   leadTimeDays: number | null;
+  iibbPerceptionAmount: string;
   lines?: Array<{
+    offerKind: QuoteLineOfferKind | null;
     purchaseRequestLineId?: string;
     description: string;
     unitPrice: string;
     discountPct: string;
+    taxRate: string;
+    quantity: string;
+    unit: string;
+    lineTotal: string;
   }>;
 };
 
@@ -58,7 +66,7 @@ export function PurchaseRequestDetailMobileSections({
     quotes.some(
       (q) =>
         (q.status === "RECEIVED" || q.status === "SELECTED") &&
-        (q.lines?.some((l) => l.purchaseRequestLineId && freeLineIds.has(l.purchaseRequestLineId)) ??
+        (q.lines?.some((l) => l.purchaseRequestLineId && freeLineIds.has(l.purchaseRequestLineId) && canQuickAwardQuoteLine(l)) ??
           false),
     );
 
@@ -136,8 +144,9 @@ export function PurchaseRequestDetailMobileSections({
           <h2 className="font-semibold">Cotizaciones</h2>
           {showAwardShortcut ? (
             <p className="text-xs text-muted-foreground">
-              En el celular podés adjudicar todos los ítems libres de una cotización. Para repartir por
-              ítem entre proveedores, usá la vista de escritorio.
+              Usá Adjudicar por ítem más abajo para elegir solo algunos ítems o repartirlos entre
+              proveedores. Adjudicar cotizados → OC toma los ítems libres con importe positivo.
+              Los bonificados se eligen explícitamente en la matriz.
             </p>
           ) : null}
           {quotes.map((q) => {
@@ -146,7 +155,7 @@ export function PurchaseRequestDetailMobileSections({
               (q.status === "RECEIVED" || q.status === "SELECTED") &&
               freeLineCount > 0 &&
               (q.lines?.some(
-                (l) => l.purchaseRequestLineId && freeLineIds.has(l.purchaseRequestLineId),
+                (l) => l.purchaseRequestLineId && freeLineIds.has(l.purchaseRequestLineId) && canQuickAwardQuoteLine(l),
               ) ??
                 false);
             return (
@@ -156,16 +165,22 @@ export function PurchaseRequestDetailMobileSections({
                   <ProcurementQuoteStatusBadge status={q.status} />
                 </div>
                 <p className="text-sm tabular-nums">
-                  {formatMoneyAmount(q.totalAmount, q.currency)}
+                  Total cotización con impuestos: {formatMoneyAmount(q.totalAmount, q.currency)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Incluye IIBB: {formatMoneyAmount(q.iibbPerceptionAmount, q.currency)}
                 </p>
                 {q.lines && q.lines.length > 0 ? (
                   <ul className="text-xs text-muted-foreground space-y-0.5">
                     {q.lines.map((l, i) => (
                       <li key={`${q.id}-${i}`}>
-                        {l.description}: {formatUnitPriceFromString(l.unitPrice)} neto
+                        <strong>{quoteLineOfferLabel(l, Boolean(l.purchaseRequestLineId && freeLineIds.has(l.purchaseRequestLineId)))}</strong>{" · "}
+                        {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} neto
                         {!isZeroRatePct(l.discountPct)
                           ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
                           : ""}
+                        {" · "}IVA {formatRatePctFromString(l.taxRate)}%
+                        {" · "}Total línea con IVA: {formatMoneyAmount(l.lineTotal, q.currency)} (sin IIBB)
                       </li>
                     ))}
                   </ul>

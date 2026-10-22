@@ -3,6 +3,8 @@ import { can } from "@bloqer/domain";
 import { toIsoDateInTimeZone, addCalendarDays, calendarPartsInTimeZone, formatCalendarDate } from "@bloqer/utils";
 import type { CreateSupplierInvoiceFromPurchaseOrderInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
+import { isCrossCompany } from "../company-scope";
+import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -16,7 +18,6 @@ import { canViewProcurementProjectArea } from "../procurement/procurement-access
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 import {
   createSupplierInvoice,
-  getSupplierInvoiceById,
   serializeSupplierInvoice,
   type ProjectSupplierInvoiceListRow,
   type SupplierInvoiceView,
@@ -60,6 +61,8 @@ export type PurchaseOrderBillingSummary = {
   pendingToInvoice: string;
   hasReceivedQuantity: boolean;
   draftInvoiceCount: number;
+  /** Header-linked invoices whose quantities cannot be fully matched to PO lines. */
+  unlinkedInvoiceCount: number;
   /** Oldest open DRAFT on this OC (for Completar factura CTA). */
   openDraftInvoiceId: string | null;
   /** Per-line 3-way qty status ([D-067]). */
@@ -79,8 +82,8 @@ function defaultDueDate(): string {
   return formatCalendarDate(addCalendarDays(calendarPartsInTimeZone(), 30));
 }
 
-async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext) {
-  const po = await prisma.purchaseOrder.findUnique({
+async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext, db: Prisma.TransactionClient = prisma) {
+  const po = await db.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
     include: {
       lines: { orderBy: { sortOrder: "asc" } },
@@ -88,6 +91,10 @@ async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext) {
   });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(po.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La orden de compra no pertenece a la empresa activa");
+  }
+  await requireProjectAccess(po.projectId, ctx);
   return po;
 }
 
@@ -158,10 +165,12 @@ export async function getPurchaseOrderBillingSummary(
   let draftReservedAmount = new Prisma.Decimal(0);
   let paidAmount = new Prisma.Decimal(0);
   let draftInvoiceCount = 0;
+  let unlinkedInvoiceCount = 0;
   let openDraftInvoiceId: string | null = null;
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
+    if (inv.lines.some((line) => !line.purchaseOrderLineId)) unlinkedInvoiceCount += 1;
     // Coverage vs recibido uses neto+IVA only — IIBB is crédito fiscal, not goods coverage ([D-112]).
     const goodsTaxAmount = inv.subtotal.plus(inv.taxAmount);
     if (inv.status === "DRAFT") {
@@ -214,6 +223,7 @@ export async function getPurchaseOrderBillingSummary(
     pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
     hasReceivedQuantity,
     draftInvoiceCount,
+    unlinkedInvoiceCount,
     openDraftInvoiceId,
     lineMatches,
     matchWarningCount,
@@ -337,6 +347,7 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
     where: { id: supplierInvoiceId },
     select: {
       tenantId: true,
+      companyId: true,
       projectId: true,
       purchaseOrderId: true,
       subtotal: true,
@@ -350,15 +361,18 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(inv.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
+  }
+  await requireProjectAccessIfPresent(inv.projectId, ctx);
   if (!inv.purchaseOrderId || inv.status === "CANCELLED") return [];
 
-  const po = await prisma.purchaseOrder.findUnique({
-    where: { id: inv.purchaseOrderId },
-    include: { lines: true },
-  });
-  if (!po) return [];
+  const po = await loadPoForBilling(inv.purchaseOrderId, ctx);
 
   const warnings: string[] = [];
+  if (inv.lines.some((line) => !line.purchaseOrderLineId)) {
+    warnings.push("Hay líneas sin vínculo con un ítem de la OC. El importe figura en la facturación, pero esas cantidades no se concilian por línea. Revisá los comprobantes antes de generar otra factura.");
+  }
   const receivedAmount = sumPoLinesReceivedAmount(po.lines.map(toPoLineDraft));
 
   const settings = inv.projectId
@@ -438,9 +452,10 @@ export async function getPurchaseOrderCodeForApLink(
   }
   const po = await prisma.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
-    select: { tenantId: true, number: true },
+    select: { tenantId: true, companyId: true, projectId: true, number: true },
   });
-  if (!po || po.tenantId !== ctx.tenantId) return null;
+  if (!po || po.tenantId !== ctx.tenantId || isCrossCompany(po.companyId, ctx)) return null;
+  await requireProjectAccess(po.projectId, ctx);
   return `OC-${String(po.number).padStart(3, "0")}`;
 }
 
@@ -462,146 +477,145 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
 
   await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
-  const po = await loadPoForBilling(input.purchaseOrderId, ctx);
-  if (po.projectId !== input.projectId) {
-    throw new ServiceError("CONFLICT", "La orden de compra no pertenece a este proyecto");
-  }
-  if (!PO_INVOICE_LINKABLE_STATUSES.includes(po.status as (typeof PO_INVOICE_LINKABLE_STATUSES)[number])) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Solo se puede facturar desde órdenes de compra emitidas o con recepción",
-    );
-  }
+  return prisma.$transaction(async (tx) => {
+    // Panel and receipt triggers serialize before reading coverage, then write in the same TX.
+    await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${input.purchaseOrderId} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const po = await loadPoForBilling(input.purchaseOrderId, ctx, tx);
+    if (po.projectId !== input.projectId) {
+      throw new ServiceError("CONFLICT", "La orden de compra no pertenece a este proyecto");
+    }
+    if (!PO_INVOICE_LINKABLE_STATUSES.includes(po.status as (typeof PO_INVOICE_LINKABLE_STATUSES)[number])) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Solo se puede facturar desde órdenes de compra emitidas o con recepción",
+      );
+    }
 
-  const internalNotes = buildAutoFromPoInternalNotes(input.purchaseOrderId, input.purchaseReceiptId);
-  const autoFromPoPrefix = `bloqer:auto-from-po:${input.purchaseOrderId}`;
-  // Idempotent across PO-panel key vs receipt-scoped key ([D-108] duplicate draft).
-  const existingDraft = await prisma.supplierInvoice.findFirst({
-    where: {
-      tenantId: ctx.tenantId,
-      purchaseOrderId: input.purchaseOrderId,
-      status: "DRAFT",
-      OR: [
-        { internalNotes },
-        { internalNotes: { startsWith: autoFromPoPrefix } },
-      ],
-    },
-    include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-    },
-  });
-
-  let receiptQuantities: Map<string, string> | undefined;
-  if (input.purchaseReceiptId) {
-    const receipt = await prisma.purchaseReceipt.findUnique({
-      where: { id: input.purchaseReceiptId },
-      include: { lines: true },
+    const internalNotes = buildAutoFromPoInternalNotes(input.purchaseOrderId, input.purchaseReceiptId);
+    const autoFromPoPrefix = `bloqer:auto-from-po:${input.purchaseOrderId}`;
+    // Idempotent across PO-panel key vs receipt-scoped key ([D-108] duplicate draft).
+    const existingDraft = await tx.supplierInvoice.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        purchaseOrderId: input.purchaseOrderId,
+        status: "DRAFT",
+        OR: [
+          { internalNotes },
+          { internalNotes: { startsWith: autoFromPoPrefix } },
+        ],
+      },
+      include: {
+        lines: { orderBy: { sortOrder: "asc" } },
+        supplierContact: { select: { legalName: true, fantasyName: true } },
+      },
     });
-    if (!receipt) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
-    if (receipt.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (receipt.purchaseOrderId !== input.purchaseOrderId) {
-      throw new ServiceError("CONFLICT", "La recepción no pertenece a esta orden de compra");
-    }
-    if (receipt.status !== "CONFIRMED") {
-      throw new ServiceError("CONFLICT", "Solo se puede facturar desde recepciones confirmadas");
-    }
-    receiptQuantities = new Map(
-      receipt.lines.map((l) => [l.purchaseOrderLineId, serializeQtyDecimal(l.quantityReceived)]),
-    );
-  }
 
-  const poLines = po.lines.map(toPoLineDraft);
-  // Exclude the open auto-draft so a later receipt can refresh its lines ([D-108]).
-  const coveredQtyByPoLine = await loadCoveredQtyByPoLine(
-    input.purchaseOrderId,
-    ctx.tenantId,
-    existingDraft?.id ?? null,
-  );
-
-  if (receiptQuantities) {
-    receiptQuantities = clampReceiptQuantitiesToPendingInvoice(
-      receiptQuantities,
-      poLines,
-      coveredQtyByPoLine,
-    );
-  }
-
-  const receivedAmount = receiptQuantities
-    ? poLines.reduce((acc, line) => {
-        const qty = receiptQuantities!.get(line.id);
-        if (!qty) return acc;
-        const orderQty = new Prisma.Decimal(line.orderQuantity);
-        const lineTotal = new Prisma.Decimal(line.lineTotal);
-        if (orderQty.lessThanOrEqualTo(0)) return acc;
-        return acc.add(lineTotal.mul(new Prisma.Decimal(qty)).div(orderQty));
-      }, new Prisma.Decimal(0))
-    : sumPoLinesReceivedAmount(poLines);
-
-  if (receivedAmount.lessThanOrEqualTo(0)) {
-    if (existingDraft) {
-      return options?.asSystemFromReceiptPolicy
-        ? serializeSupplierInvoice({ ...existingDraft, subcontractCertification: null })
-        : getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
-    }
-    throw new ServiceError(
-      "CONFLICT",
-      input.purchaseReceiptId
-        ? "La recepción no tiene cantidades pendientes de facturar (ya facturadas o sin recibir)"
-        : "La orden de compra no tiene cantidades recibidas para facturar",
-    );
-  }
-
-  const coveredMoney = poLines.reduce((acc, line) => {
-    const coveredQty = coveredQtyByPoLine.get(line.id);
-    if (!coveredQty || coveredQty.lessThanOrEqualTo(0)) return acc;
-    const orderQty = new Prisma.Decimal(line.orderQuantity);
-    const lineTotal = new Prisma.Decimal(line.lineTotal);
-    if (orderQty.lessThanOrEqualTo(0)) return acc;
-    return acc.add(lineTotal.mul(coveredQty).div(orderQty));
-  }, new Prisma.Decimal(0));
-
-  // Receipt path (new draft): quantities already clamped to pending.
-  // Refresh of an open auto-draft: rebuild full per-line remaining vs other docs.
-  const draftLines = existingDraft
-    ? buildInvoiceDraftLinesFromPo(poLines, {
-        basis: "remaining",
-        receivedAmount: sumPoLinesReceivedAmount(poLines),
-        invoicedAmount: coveredMoney,
-        invoicedQtyByPoLine: coveredQtyByPoLine,
-      })
-    : buildInvoiceDraftLinesFromPo(poLines, {
-        basis: input.purchaseReceiptId
-          ? "received"
-          : coveredMoney.greaterThan(0)
-            ? "remaining"
-            : (input.basis ?? "received"),
-        receiptQuantities,
-        receivedAmount: sumPoLinesReceivedAmount(poLines),
-        invoicedAmount: coveredMoney,
-        invoicedQtyByPoLine: coveredQtyByPoLine,
+    let receiptQuantities: Map<string, string> | undefined;
+    if (input.purchaseReceiptId) {
+      const receipt = await tx.purchaseReceipt.findUnique({
+        where: { id: input.purchaseReceiptId },
+        include: { lines: true },
       });
-
-  if (draftLines.length === 0) {
-    if (existingDraft) {
-      return options?.asSystemFromReceiptPolicy
-        ? serializeSupplierInvoice({ ...existingDraft, subcontractCertification: null })
-        : getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
+      if (!receipt) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
+      if (receipt.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+      if (receipt.purchaseOrderId !== input.purchaseOrderId) {
+        throw new ServiceError("CONFLICT", "La recepción no pertenece a esta orden de compra");
+      }
+      if (receipt.status !== "CONFIRMED") {
+        throw new ServiceError("CONFLICT", "Solo se puede facturar desde recepciones confirmadas");
+      }
+      receiptQuantities = new Map(
+        receipt.lines.map((l) => [l.purchaseOrderLineId, serializeQtyDecimal(l.quantityReceived)]),
+      );
     }
-    throw new ServiceError("CONFLICT", "No hay líneas pendientes de facturación para esta OC");
-  }
 
-  if (existingDraft) {
-    await syncAutoFromPoDraftLines({
-      draftId: existingDraft.id,
-      existingLines: existingDraft.lines,
-      draftLines,
-      invoiceLetter: existingDraft.invoiceLetter,
-      actorUserId: ctx.actorUserId,
-      internalNotes,
-    });
-    if (options?.asSystemFromReceiptPolicy) {
-      const refreshed = await prisma.supplierInvoice.findUniqueOrThrow({
+    const poLines = po.lines.map(toPoLineDraft);
+    // Exclude the open auto-draft so a later receipt can refresh its lines ([D-108]).
+    const coveredQtyByPoLine = await loadCoveredQtyByPoLine(
+      input.purchaseOrderId,
+      ctx.tenantId,
+      existingDraft?.id ?? null,
+      tx,
+    );
+
+    if (receiptQuantities) {
+      receiptQuantities = clampReceiptQuantitiesToPendingInvoice(
+        receiptQuantities,
+        poLines,
+        coveredQtyByPoLine,
+      );
+    }
+
+    const receivedAmount = receiptQuantities
+      ? poLines.reduce((acc, line) => {
+          const qty = receiptQuantities!.get(line.id);
+          if (!qty) return acc;
+          const orderQty = new Prisma.Decimal(line.orderQuantity);
+          const lineTotal = new Prisma.Decimal(line.lineTotal);
+          if (orderQty.lessThanOrEqualTo(0)) return acc;
+          return acc.add(lineTotal.mul(new Prisma.Decimal(qty)).div(orderQty));
+        }, new Prisma.Decimal(0))
+      : sumPoLinesReceivedAmount(poLines);
+
+    if (receivedAmount.lessThanOrEqualTo(0)) {
+      if (existingDraft) {
+        return serializeSupplierInvoice({ ...existingDraft, subcontractCertification: null });
+      }
+      throw new ServiceError(
+        "CONFLICT",
+        input.purchaseReceiptId
+          ? "La recepción no tiene cantidades pendientes de facturar (ya facturadas o sin recibir)"
+          : "La orden de compra no tiene cantidades recibidas para facturar",
+      );
+    }
+
+    const coveredMoney = poLines.reduce((acc, line) => {
+      const coveredQty = coveredQtyByPoLine.get(line.id);
+      if (!coveredQty || coveredQty.lessThanOrEqualTo(0)) return acc;
+      const orderQty = new Prisma.Decimal(line.orderQuantity);
+      const lineTotal = new Prisma.Decimal(line.lineTotal);
+      if (orderQty.lessThanOrEqualTo(0)) return acc;
+      return acc.add(lineTotal.mul(coveredQty).div(orderQty));
+    }, new Prisma.Decimal(0));
+
+    // Receipt path (new draft): quantities already clamped to pending.
+    // Refresh of an open auto-draft: rebuild full per-line remaining vs other docs.
+    const draftLines = existingDraft
+      ? buildInvoiceDraftLinesFromPo(poLines, {
+          basis: "remaining",
+          receivedAmount: sumPoLinesReceivedAmount(poLines),
+          invoicedAmount: coveredMoney,
+          invoicedQtyByPoLine: coveredQtyByPoLine,
+        })
+      : buildInvoiceDraftLinesFromPo(poLines, {
+          basis: input.purchaseReceiptId
+            ? "received"
+            : coveredMoney.greaterThan(0)
+              ? "remaining"
+              : (input.basis ?? "received"),
+          receiptQuantities,
+          receivedAmount: sumPoLinesReceivedAmount(poLines),
+          invoicedAmount: coveredMoney,
+          invoicedQtyByPoLine: coveredQtyByPoLine,
+        });
+
+    if (draftLines.length === 0) {
+      if (existingDraft) {
+        return serializeSupplierInvoice({ ...existingDraft, subcontractCertification: null });
+      }
+      throw new ServiceError("CONFLICT", "No hay líneas pendientes de facturación para esta OC");
+    }
+
+    if (existingDraft) {
+      await syncAutoFromPoDraftLines(tx, {
+        draftId: existingDraft.id,
+        existingLines: existingDraft.lines,
+        draftLines,
+        invoiceLetter: existingDraft.invoiceLetter,
+        actorUserId: ctx.actorUserId,
+        internalNotes,
+      });
+      const refreshed = await tx.supplierInvoice.findUniqueOrThrow({
         where: { id: existingDraft.id },
         include: {
           lines: { orderBy: { sortOrder: "asc" } },
@@ -613,44 +627,43 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
         subcontractCertification: null,
       });
     }
-    return getSupplierInvoiceById(existingDraft.id, ctx, input.projectId);
-  }
 
-  const suggestedLetter = await resolveSuggestedApInvoiceLetter({
-    companyId: po.companyId,
-    supplierContactId: po.supplierContactId,
-    tenantId: ctx.tenantId,
-  });
-  const zeroTax = suggestedLetter === "C" || suggestedLetter === "E";
-
-  return createSupplierInvoice(
-    {
-      projectId: input.projectId,
+    const suggestedLetter = await resolveSuggestedApInvoiceLetter({
+      companyId: po.companyId,
       supplierContactId: po.supplierContactId,
-      issueDate: toIsoDateInTimeZone(),
-      dueDate: defaultDueDate(),
-      currency: po.currency,
-      fxRate: po.fxRate != null ? serializeFxRateDecimal(po.fxRate) : undefined,
-      invoiceLetter: suggestedLetter,
-      iibbPerceptionRate: serializeRatePctDecimal(po.iibbPerceptionRate),
-      purchaseOrderId: input.purchaseOrderId,
-      internalNotes,
-      notes: input.purchaseReceiptId
-        ? `Generada desde recepción vinculada a ${po.number}`
-        : `Generada desde OC-${String(po.number).padStart(3, "0")}`,
-      lines: draftLines.map((l, i) => ({
-        ...l,
-        discountPct: l.discountPct,
-        // Monotributo/Exento → Factura C: OC often has 21%; force 0 so DRAFT/issue stay consistent ([D-084]).
-        taxRate: zeroTax ? "0" : l.taxRate,
-        sortOrder: i,
-      })),
-    },
-    ctx,
-    options?.asSystemFromReceiptPolicy
-      ? { bypassApMutateGate: true, trustedSystemPath: "receipt-auto-draft" }
-      : undefined,
-  );
+      tenantId: ctx.tenantId,
+    });
+    const zeroTax = suggestedLetter === "C" || suggestedLetter === "E";
+
+    return createSupplierInvoice(
+      {
+        projectId: input.projectId,
+        supplierContactId: po.supplierContactId,
+        issueDate: toIsoDateInTimeZone(),
+        dueDate: defaultDueDate(),
+        currency: po.currency,
+        fxRate: po.fxRate != null ? serializeFxRateDecimal(po.fxRate) : undefined,
+        invoiceLetter: suggestedLetter,
+        iibbPerceptionRate: serializeRatePctDecimal(po.iibbPerceptionRate),
+        purchaseOrderId: input.purchaseOrderId,
+        internalNotes,
+        notes: input.purchaseReceiptId
+          ? `Generada desde recepción vinculada a ${po.number}`
+          : `Generada desde OC-${String(po.number).padStart(3, "0")}`,
+        lines: draftLines.map((l, i) => ({
+          ...l,
+          discountPct: l.discountPct,
+          // Monotributo/Exento → Factura C: OC often has 21%; force 0 so DRAFT/issue stay consistent ([D-084]).
+          taxRate: zeroTax ? "0" : l.taxRate,
+          sortOrder: i,
+        })),
+      },
+      ctx,
+      options?.asSystemFromReceiptPolicy
+        ? { tx, bypassApMutateGate: true, trustedSystemPath: "receipt-auto-draft" }
+        : { tx },
+    );
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 /** Qty already on ISSUED + other DRAFTs (optionally excluding one auto-draft being refreshed). */
@@ -658,8 +671,9 @@ async function loadCoveredQtyByPoLine(
   purchaseOrderId: string,
   tenantId: string,
   excludeDraftId: string | null,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<Map<string, Prisma.Decimal>> {
-  const invoices = await prisma.supplierInvoice.findMany({
+  const invoices = await db.supplierInvoice.findMany({
     where: {
       tenantId,
       purchaseOrderId,
@@ -700,7 +714,7 @@ function autoDraftLinesAlreadyCover(
  * Refresh an open auto-from-PO DRAFT so later receipts / Registrar factura do not
  * leave under-covered lines ([D-108] idempotent hit).
  */
-async function syncAutoFromPoDraftLines(params: {
+async function syncAutoFromPoDraftLines(tx: Prisma.TransactionClient, params: {
   draftId: string;
   existingLines: Array<{ purchaseOrderLineId: string | null; quantity: Prisma.Decimal }>;
   draftLines: InvoiceDraftLineInput[];
@@ -714,50 +728,49 @@ async function syncAutoFromPoDraftLines(params: {
 
   const forceZeroTax = params.invoiceLetter === "C" || params.invoiceLetter === "E";
 
-  await prisma.$transaction(async (tx) => {
-    const claim = await tx.supplierInvoice.updateMany({
-      where: { id: params.draftId, status: "DRAFT" },
-      data: {
-        internalNotes: params.internalNotes,
-        updatedBy: params.actorUserId,
-      },
-    });
-    if (claim.count !== 1) {
-      throw new ServiceError("CONFLICT", "La factura ya no está en borrador");
-    }
+  const claim = await tx.supplierInvoice.updateMany({
+    where: { id: params.draftId, status: "DRAFT" },
+    data: {
+      internalNotes: params.internalNotes,
+      updatedBy: params.actorUserId,
+    },
+  });
+  if (claim.count !== 1) {
+    throw new ServiceError("CONFLICT", "La factura ya no está en borrador");
+  }
 
-    await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: params.draftId } });
-    for (let i = 0; i < params.draftLines.length; i++) {
-      const line = params.draftLines[i]!;
-      const qty = new Prisma.Decimal(line.quantity);
-      const price = new Prisma.Decimal(line.unitPrice);
-      const rate = new Prisma.Decimal(forceZeroTax ? "0" : line.taxRate);
-      const money = resolveInvoiceLineMoney({
+  await tx.supplierInvoiceLine.deleteMany({ where: { invoiceId: params.draftId } });
+  for (let i = 0; i < params.draftLines.length; i++) {
+    const line = params.draftLines[i]!;
+    const qty = new Prisma.Decimal(line.quantity);
+    const price = new Prisma.Decimal(line.unitPrice);
+    const rate = new Prisma.Decimal(forceZeroTax ? "0" : line.taxRate);
+    const money = resolveInvoiceLineMoney({
+      quantity: qty,
+      unitPrice: price,
+      taxRate: rate,
+      discountPct: parseDiscountPct(line.discountPct),
+      pricesIncludeTax: false,
+    });
+    await tx.supplierInvoiceLine.create({
+      data: {
+        invoiceId: params.draftId,
+        description: line.description,
         quantity: qty,
-        unitPrice: price,
+        unitPrice: money.unitPriceNet,
         taxRate: rate,
         discountPct: parseDiscountPct(line.discountPct),
-        pricesIncludeTax: false,
-      });
-      await tx.supplierInvoiceLine.create({
-        data: {
-          invoiceId: params.draftId,
-          description: line.description,
-          quantity: qty,
-          unitPrice: money.unitPriceNet,
-          taxRate: rate,
-          discountPct: parseDiscountPct(line.discountPct),
-          lineSubtotal: money.lineSubtotal,
-          lineTax: money.lineTax,
-          lineTotal: money.lineTotal,
-          wbsNodeId: line.wbsNodeId ?? null,
-          purchaseOrderLineId: line.purchaseOrderLineId ?? null,
-          costAnalysisLineId: line.costAnalysisLineId ?? null,
-          costType: (line.costType as "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER") ?? "MATERIAL",
-          sortOrder: i,
-        },
-      });
-    }
-    await recalcSupplierInvoiceTotals(tx, params.draftId);
-  });
+        lineSubtotal: money.lineSubtotal,
+        lineTax: money.lineTax,
+        lineTotal: money.lineTotal,
+        wbsNodeId: line.wbsNodeId ?? null,
+        purchaseOrderLineId: line.purchaseOrderLineId ?? null,
+        costAnalysisLineId: line.costAnalysisLineId ?? null,
+        costType: (line.costType as "MATERIAL" | "LABOR" | "EQUIPMENT" | "SUBCONTRACT" | "OTHER") ?? "MATERIAL",
+        sortOrder: i,
+      },
+    });
+  }
+  await recalcSupplierInvoiceTotals(tx, params.draftId);
+
 }

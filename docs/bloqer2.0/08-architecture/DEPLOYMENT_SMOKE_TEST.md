@@ -6,6 +6,18 @@ Run after first production (or staging) deploy, **before** announcing availabili
 
 **Related:** for role-based training / UAT after UI freeze, use [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) (J-02). This file stays focused on post-deploy technical checks.
 
+## Regresión INDARI — fase 1 (pendiente de ejecutar)
+
+No anunciar B02 como disponible hasta resolver P-IND-04 y acreditar el alias del portal (P-IND-03). Preparar los casos mutantes con fixtures sintéticos en un entorno de prueba autorizado; no usar los registros de Casa Hogar. Antes del deploy, verificar integración de adjudicación, concurrencia y anulación. Después del deploy autorizado, comprobar la versión publicada y el recorrido con datos de prueba acordados.
+
+1. Escritorio y celular: SC enviada con dos líneas completas y cotizaciones vigentes. Seleccionar una; contador 1 de 2; **Generar órdenes seleccionadas** incluye solo esa línea y la otra queda libre. **Dejar pendiente** desmarca; con ninguna selección el botón queda deshabilitado. En celular comprobar selector y textos sin desborde a 360 px; en escritorio, matriz y teclado.
+2. Seleccionar dos proveedores para dos líneas; verificar una OC por grupo. Doble envío no duplica adjudicación. Anular una OC deja libre solo su línea; la otra sigue vinculada. La cobertura de SC respeta BR-PUR-024. Con D-118, el atajo **Adjudicar cotizados → OC** toma solo ítems libres cotizados con importe positivo; los bonificados requieren selección expresa en la matriz.
+3. Cotización: cantidad 2, unitario final 121 con IVA 21 %, descuento 10 % e IIBB 3 %. Neto 180,00; IVA 37,80; IIBB 5,40; total 223,20. Guardar y reabrir en modo neto conserva el resultado; no marcar de nuevo IVA incluido sin reingresar valores finales. La línea muestra 217,80 sin IIBB y la cotización 223,20 con IIBB. Verificar también IVA 0 legítimo con una cotización de prueba.
+4. OC borrador: probar referencia ausente, unidad distinta, partida global y precio sobre referencia. Verificar mensajes por causa y acceso a **Editar → Justificación desvío**, conservando umbrales y permisos. Partida global no se compara como precio unitario. Revisar código/proveedor y **Ver solicitud de origen**; una OC directa no muestra un origen ficticio.
+5. Consultar ayuda por «adjudicar algunos ítems», «precio con IVA» y «sin referencia presupuestaria»; verificar que guía, ayuda y respuestas documentales AI describan el mismo flujo. No usar estos checks para declarar resueltos OC-051 ni los datos históricos.
+
+## Comprobaciones generales
+
 | # | Check | Pass criteria |
 |---|--------|----------------|
 | 1 | App boots | Home/login loads without 500; no crash loop. |
@@ -39,3 +51,38 @@ Record who ran the checklist, date, and environment.
 | Date | Env | Operator | Notes |
 |---|---|---|---|
 | 2026-08-08 | local + portal.bloqer.app | Cursor agent | Technical pass recorded in [`PHASE_5_ASVS_LITE.md`](./PHASE_5_ASVS_LITE.md). Cron auth OK locally after excluding `/api/cron/*` from session middleware; production deploy of that fix still required for Vercel cron. |
+
+
+## Regresión INDARI — decimales y concurrencia (smoke UI pendiente)
+
+Tras verificar el deployment y alias, en datos de prueba autorizados: abrir y guardar sin tocar un unitario de 4 dp; entrar/salir del campo sin cambios; editarlo a 4 dp; confirmar dinero a 2 dp y FX a 6. Cargar 1 × $10,00 con IVA incluido al 21% y sin descuento: total de línea $10,00 (IIBB se informa aparte). Reabrir con precio neto y cambiar solo notas: mantener total; cambiar cantidad o precio: recalcular. Probar en escritorio y celular.
+
+Para concurrencia y datos sintéticos, usar `procurement-regression.live.test.ts` exclusivamente con el opt-in y las dos URLs a la DB aislada documentada en fase 0. Incluye panel OC/recepción simultáneos, cobertura parcial y resguardo de importes al editar. No ejecutar fixtures contra `neondb` ni `production`; el guard los rechaza.
+
+
+## Regresión INDARI — fase 2 (smoke UI pendiente)
+
+En entorno y datos de prueba autorizados, después del deploy:
+
+1. Crear factura desde una OC parcialmente recibida, editar descripción y emitir. Conservar OC e ítems de origen, total y una única CxP. Repetir emitir no crea otra deuda.
+2. Verificar una factura manual enlazada a cabecera sin ítems OC: panel y detalle explican que los importes están incluidos pero sus cantidades no se concilian por línea. No tratar el aviso como prueba de duplicación. La carga manual sigue permitida.
+3. Borrador automático histórico de prueba con vínculo de línea ausente: emitir debe pedir revisión, sin crear CxP. No restaurar por descripción/importe ni usar datos reales como caso de prueba.
+4. Usuario sin acceso a obra y contexto de otra empresa: no acceder al resumen, preview, listado ni avisos. Edición/anulación respetan el alcance existente.
+5. NC parcial de factura pagada parcialmente: crédito reduce saldo sin nuevo pago ni movimiento. ND crea su CxP; no cambia cantidades recibidas. Reporte de devengado toma signos D-115.
+
+Integración reproducible: `packages/services/src/ap/supplier-invoice-integrity.live.test.ts`, con el mismo opt-in y guard de DB aislada de fase 0. Tests de costos, saldos y cancelación forman parte de `pnpm test`. Sin fixtures mutables contra producción.
+
+## Regresión INDARI — fase 3 / ofertas por ítem (D-118)
+
+Pendiente de smoke UI en versión publicada. Pruebas automatizadas: `packages/services/src/procurement/quote-line-offer.live.test.ts` en DB aislada, con el guard de fixtures existente. No ejecutar sobre la DB normal de dev ni producción.
+
+1. Antes de desplegar, confirmar entorno/URLs de Vercel y punto de recuperación Neon. El build aplica migraciones automáticamente; un push con esta migración no debe usarse para averiguar a qué DB apunta el preview. Aplicar `20261021180000_quote_line_offer_kind` en el destino correcto antes del código nuevo; para portal es Neon `production`.
+2. Verificar columna `offerKind` nullable, sin default, y enum `QuoteLineOfferKind`. La migración no contiene UPDATE/backfill ni toca importes/FK. Comparar totales, cantidades y relaciones de una muestra histórica antes/después. No inferir bonificaciones de precios cero.
+3. En datos de ensayo, cargar una oferta con Cotizado y No cotizado: este último aparece identificado, no permite selección escritorio/celular y no aporta al mínimo del ítem. Una petición directa debe fallar igual. Una cotización completamente gratuita o sin oferta se rechaza por total no positivo.
+4. Cambiar un ítem a Bonificado con comprobante de respaldo y mantener otro cotizado positivo. El bonificado puede seleccionarse en la matriz; el atajo Adjudicar cotizados → OC lo deja pendiente. Precio, descuento, IVA e IIBB deben conciliar con lo guardado.
+5. Histórico positivo sin clasificación: se puede adjudicar sin reescribir la cotización. Cero histórico pendiente: muestra Cero sin clasificar · revisar; clasificar solo mediante edición permitida. Histórico con OC activa: no cambia importes/vínculos ni habilita edición excepcional; la OC existente conserva su flujo. Anular y readjudicar sí aplica D-118.
+6. Mínimo dos: dos ofertas para A y solo una para B. A se puede adjudicar, B no; lote A+B inválido revierte ambas operaciones. Reintentar edición/adjudicación simultáneas debe producir una respuesta funcional y no una OC sobre una línea no cotizada.
+7. Ayuda y guía §9.1 deben coincidir con las etiquetas; verificar búsqueda «no cotizado», «bonificado» y «cero sin clasificar». No informar disponibilidad a INDARI hasta verificar versión del portal y este recorrido.
+8. Enviar simultáneamente dos cotizaciones del mismo proveedor para una SC: solo una se guarda. Con un único cupo restante, enviar ofertas de dos proveedores distintos: solo una se guarda y la otra informa el máximo permitido. Verificar que el mínimo de ofertas no se infle por cargas duplicadas. Los dos casos están cubiertos por la suite aislada.
+
+**Recuperación:** no eliminar columna/enum ni migraciones aplicadas. El código anterior puede leer el esquema ampliado, pero desconoce la clasificación y permitiría adjudicar ceros. Si ya se cargaron ofertas nuevas, no reabrir adjudicaciones con esa versión: priorizar corrección hacia adelante o mantener ese flujo detenido hasta restaurar D-118. Revertir código no revierte documentos ni caja.

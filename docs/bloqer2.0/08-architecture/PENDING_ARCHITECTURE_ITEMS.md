@@ -3,6 +3,51 @@
 > Lista viva de **decisiones técnicas pendientes** y mejoras sugeridas. Completar antes o durante Phase 0 / implementación.  
 > **No** sustituye [`../00-product/OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) (producto); aquí predomina **cómo** modelar o implementar.
 
+## INDARI / Casa Hogar — auditoría del 21/10/2026
+
+Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md). Los siguientes pendientes no autorizan cambios de datos ni nuevos modelos.
+
+### P-IND-01 — Reconciliar procedencia de tres migraciones aplicadas
+
+- **Estado:** VERIFICACIÓN ESTRUCTURAL COMPLETADA 21/10/2026; procedencia histórica exacta no recuperada. Ver [resultados de fase 0](./INDARI_CASA_HOGAR_PHASE_0.md).
+- **Hallazgo aclarado:** los checksums de `20260807220000_d074_treasury_settlement_method`, `20260807230000_d075_bank_reconciliation` y `20260808140000_d078_period_close` son etiquetas literales, no hashes SHA-256. Se repiten en producción y dev. Los registros no permiten identificar el SQL original ni quién los registró.
+- **Distinción:** la diferencia de `20260914120000_d115_fiscal_credit_debit_notes` sí se explica por CRLF local; producción coincide con Git/LF.
+- **Evidencia:** 69 migraciones reproducidas en DB vacía aislada. Producción y reconstrucción coinciden en 1.206 columnas, 346 restricciones, 355 índices y 387 valores de enum. No se compararon exhaustivamente funciones, triggers, roles ni datos.
+- **Medida:** conservar la salvedad de trazabilidad; no editar checksums, reescribir migraciones aplicadas ni usar reset/resolve para ocultar las etiquetas. No hay divergencia estructural detectada que justifique una reparación de producción.
+- **Dependencia:** habilita desarrollar PR sin schema. Las futuras migraciones requieren ensayo específico, revisión de objetos afectados fuera de esta comparación y controles ordinarios de despliegue; la coincidencia no certifica todos los objetos de la DB.
+
+### P-IND-02 — Cobertura de factura y concurrencia OC/recepción
+
+- **Estado:** CORREGIDO Y VERIFICADO EN DB AISLADA 21/10/2026. Carrera reproducida: Dos disparadores simultáneos (panel OC/recepción) provocaron P2002 por numeración de factura duplicada. No demuestra causa de duplicados históricos.
+- **Corrección implementada:** bloqueo de la OC y lectura de cobertura/creación/refresco del borrador en una única transacción. `createSupplierInvoice` admite cliente transaccional interno; sin transacción anidada ni nueva restricción «una factura por OC».
+- **Contexto:** cobertura por cabecera/línea vinculadas no cuenta de igual modo registros legacy sin vínculos. Buscar un borrador existente antes de crear no demuestra exclusión de dos disparadores simultáneos.
+- **Verificación:** panel OC y recepción simultáneos devuelven el mismo ID; una segunda recepción amplía ese borrador; anularlo permite uno nuevo sin contar el anulado. Cobertura final recibida 847, facturada 242, reservada 605, pendiente 0 y pagada 121 (datos sintéticos). Vínculos de líneas conservados. No cambia la numeración general de documentos de otras OC concurrentes (P-ERD-04).
+- **Cierre:** reproducción y fix de causa con regresión, o evidencia de que el control actual cubre el escenario. Regularización legacy separada y respaldada por comprobantes; no asociar por texto/importe silenciosamente.
+
+**Continuación fase 2 (21/10/2026):** controles D-066 de vínculos de líneas automáticas al crear/editar/emitir; aislamiento de lectura y edición por empresa y membresía de obra; avisos de cobertura por cantidad incompleta en facturas con vínculo solo de cabecera. Alta manual conserva ese caso válido. Suite AP aislada: 6 escenarios aprobados, incluyendo emisión única, NC/ND, crédito/deuda, caja y devengado. Sin migraciones ni regularización histórica. Ver §13 del plan.
+
+### P-IND-03 — Acreditar versión de portal y entorno de regresión
+
+**Seguimiento 21/10/2026:** reabierto por pedido del usuario antes de fase 2. Se identificó el proyecto Vercel `bloqer-v2-web` y se ofreció su integración; aún falta conexión autenticada para acreditar el alias. El push a una rama de revisión no acredita producción.
+
+- **Estado:** PARCIAL 21/10/2026. Último deployment GitHub Production `6764344935` exitoso con SHA `527c824c9ad9009b0d9cf2d729a184dc5f2e31f9`, base de la intervención. La vista previa de `399128cf` pasó Vercel y CI; no acredita el alias de producción. Falta acreditar la asignación actual del alias de portal desde Vercel autenticado.
+- **Entorno listo:** DB `bloqer_indari_phase0_20261021` en compute dev, con 69 migraciones y fixtures sintéticos protegidos. Integración ampliada: 13 casos distintos aprobados (12 juntos y el caso adicional de recepción posterior en una ejecución dirigida de 2 casos); ver P-IND-02/04. No equivale a E2E UI aprobado.
+- **Acción pendiente:** verificar alias/deployment antes de publicar y completar regresión de cada PR. `prisma validate` y pruebas unitarias no sustituyen esa comprobación.
+- **Fase 3 / D-118:** migración aditiva de clasificación aplicada en DB aislada (70 migraciones). Confirmar también las URLs efectivas del preview antes de push: `vercel-migrate-if-needed.mjs` aplica automáticamente las migraciones pendientes al entorno del build. La autorización del campo no acredita el destino. Producción aún no migrada; guía de recuperación y smoke en `DEPLOYMENT_SMOKE_TEST.md`.
+- **Fase 4:** Vercel autenticado confirmó el alias `portal.bloqer.app` en Production, deployment `G2wxsALbkwt2mWCeriW6SB9HjmGS`, SHA `527c824c`. El preview de `b3d178cb` figura exitoso, pero heredaba las conexiones compartidas Production/Preview. Con autorización explícita se guardaron `DATABASE_URL` y `DIRECT_URL` exclusivas de Preview para `codex/indari-pendientes-decimales`, apuntando a la DB aislada; se aplican al próximo deployment. No se cambiaron las variables de Production. Otras ramas siguen pendientes de aislamiento global y no deben usarse para probar migraciones. Consulta de solo lectura confirma que D-118 todavía no está aplicada en producción. Recuperación Neon y smoke publicados pendientes; revisión/controles en §16 del plan.
+- **Entrega de revisión:** PR #1 / `08b13fdf`, CI aprobado (E2E omitido) y Vercel exitoso. El build acreditó DB aislada/70 migraciones. Smoke detenido porque el acceso del preview redirige a producción: separar `AUTH_URL`, `APP_URL`, `NEXT_PUBLIC_APP_URL` y `AUTH_SECRET` por rama antes de continuarlo. Owner consultado; ningún cambio de esas variables aplicado todavía. No promover este preview como si estuviera validado funcionalmente.
+- **Cierre:** versión y destino de pruebas documentados por entrega. No usar datos reales de Casa Hogar como fixtures mutables.
+
+### P-IND-04 — Timeout de adjudicación en integración aislada
+
+**Seguimiento 21/10/2026:** reabierto por pedido del usuario. Corrección implementada y regresión aislada de adjudicación aprobada (parcial, concurrencia, rollback, anulación/readjudicación y lote de dos proveedores).
+
+- **Estado:** CORREGIDO Y VERIFICADO EN DB AISLADA 21/10/2026; publicación y smoke UI pendientes (P-IND-03).
+- **Evidencia:** `procurement-regression.live.test.ts` falla al adjudicar una de dos líneas con Prisma `P2028`: 5.160 ms y 5.560 ms frente al límite de 5.000 ms, en dos ejecuciones. La DB confirma ambas SC sin líneas adjudicadas ni líneas de OC persistidas tras los fallos.
+- **Alcance:** falla desde esta conexión al compute de desarrollo; no prueba que portal tenga la misma latencia ni que explique OC-051. Los otros tres casos de integración pasan.
+- **Corrección:** creación de líneas y vínculo a SC por lote; totales de cabecera con el mismo helper canónico sobre las líneas seleccionadas, sin releerlas; quitada la lectura redundante de cotización; settings y clasificación EDT usan el cliente transaccional. Se conserva la relectura de líneas después del bloqueo. Timeout explícito de 30 s solo en adjudicación y anulación vinculada a SC, con espera de conexión de 10 s, sin cambio global. La anulación también reprodujo P2028 con 5 s antes del ajuste.
+- **Cierre técnico:** regresión aprobada con configuración efectiva del servicio, sin override del test. La publicación sigue condicionada a P-IND-03 y smoke UI.
+
 ## ERD / modelo físico (ver [`TECHNICAL_ERD.md`](./TECHNICAL_ERD.md))
 
 | ID | Tema | Acción sugerida |
