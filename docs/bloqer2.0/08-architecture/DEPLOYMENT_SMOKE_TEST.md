@@ -55,6 +55,8 @@ Record who ran the checklist, date, and environment.
 
 ## Regresión INDARI — decimales y concurrencia (smoke UI pendiente)
 
+**Ejecución 22/10/2026:** publicación Production confirmada (`1d07699a`, Vercel `9SKYgHtUNWHcZs6z7trTLGXaWwqU`, alias portal). Migración D-118 y conservación completa de 191 líneas verificadas. Login Google, sesión, dashboard y consola operativos. La cuenta de plataforma no tiene tenant operativo y no permite abrir OC-051: formularios, matriz y AP siguen pendientes de smoke con una cuenta habilitada. No se modificaron permisos ni documentos para completar el ensayo. Preview pospuesto por Owner; los escenarios mutables siguientes continúan reservados a datos de prueba autorizados. Ver §17 del plan INDARI.
+
 Tras verificar el deployment y alias, en datos de prueba autorizados: abrir y guardar sin tocar un unitario de 4 dp; entrar/salir del campo sin cambios; editarlo a 4 dp; confirmar dinero a 2 dp y FX a 6. Cargar 1 × $10,00 con IVA incluido al 21% y sin descuento: total de línea $10,00 (IIBB se informa aparte). Reabrir con precio neto y cambiar solo notas: mantener total; cambiar cantidad o precio: recalcular. Probar en escritorio y celular.
 
 Para concurrencia y datos sintéticos, usar `procurement-regression.live.test.ts` exclusivamente con el opt-in y las dos URLs a la DB aislada documentada en fase 0. Incluye panel OC/recepción simultáneos, cobertura parcial y resguardo de importes al editar. No ejecutar fixtures contra `neondb` ni `production`; el guard los rechaza.

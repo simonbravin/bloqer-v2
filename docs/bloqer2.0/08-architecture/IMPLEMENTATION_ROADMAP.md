@@ -40,6 +40,8 @@ Fase 1 INDARI preparada en código el 21/10/2026: selección parcial escritorio/
 
 **Fase 3 INDARI:** Q-064 resuelta por Owner en D-118: clasificación Cotizado/No cotizado/Bonificado, campo opcional sin backfill y conservación de procesados. Implementación y validación en §15 del plan. Q-061/062/063 siguen pendientes de definición; no se amplía facturación multi-OC ni cuenta puente por esta decisión.
 
+**Entrega INDARI 22/10/2026:** fases 1/2 y B08 de fase 3 publicadas en producción mediante PR #1, SHA `1d07699a`; revisión de fase 4 incluida. Migración D-118 aplicada y preservación de las 191 líneas existentes comprobada. Login y consola verificados; smoke de compras/AP pendiente de cuenta operativa. Preview diferido por Owner. Estado vigente y límites en §17 del plan; las referencias previas a falta de publicación son históricas.
+
 **2026-05-14:** corte documentado — [D-036](../00-product/DECISION_LOG.md) (membresía única), [D-037](../00-product/DECISION_LOG.md) (ingreso corporativo sin obra vía GL+tesorería), [ADR-Phase1-06](./ARCHITECTURE_DECISION_RECORDS.md), [ADR-Phase1-07](./ARCHITECTURE_DECISION_RECORDS.md).
 
 Orden sugerido **antes** de invertir fuerte en UX de cronograma/WBS ([Q-003](../00-product/OPEN_QUESTIONS.md), [Q-004](../00-product/OPEN_QUESTIONS.md)):

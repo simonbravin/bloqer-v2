@@ -378,6 +378,18 @@ Alcance: cambios INDARI de fases 1/2 y B08 de fase 3, junto con la migración ad
 - **Smoke UI no aprobado:** el primer acceso redirige a producción por la configuración anterior. Se detuvo antes de introducir credenciales. La base de pruebas tiene usuario sintético preparado con el seed existente; no usar cuentas/documentos de INDARI para completar este recorrido.
 - Pendientes de entrega: separar URL y clave de sesión del preview y repetir smoke; acreditar recuperación Neon (consola pendiente de inicio de sesión), migración/publicación de producción y smoke posterior. El informe final a INDARI se emite después de confirmar qué correcciones están disponibles; no confundir código/preview aprobados con publicación en portal.
 
+## 17. Publicación en producción y cierre de entrega (22/10/2026)
+
+El Owner indicó continuar directamente en producción y posponer la configuración de acceso de Preview. Esta decisión sustituye los bloqueos de entrega de §16; las secciones anteriores conservan el historial de cada etapa. No autoriza regularizar documentos del cliente ni usar producción como destino de fixtures.
+
+- **Publicación confirmada:** PR #1 integrado en `main`, SHA `1d07699af55256478fc73009a36a15b4cbe4e00e`. Vercel `9SKYgHtUNWHcZs6z7trTLGXaWwqU`, Production, Ready el 22/10 a las 00:01 ART, con alias `portal.bloqer.app`. El despliegue se construyó desde main con configuración Production; no se promovió el preview aislado.
+- **Migración aplicada:** `20261021180000_quote_line_offer_kind` mediante Prisma migrate deploy en Neon production (`ep-cold-mouse-appkpn84`, `neondb`). 70 migraciones y ninguna fallida. Enum QUOTED/NOT_QUOTED/BONIFIED; columna nullable, sin default.
+- **Preservación comprobada:** comparación completa antes/después de los 191 renglones de cotización: todos los campos previos idénticos y las 191 clasificaciones nuevas null. No hubo backfill, cambio de importes ni de vínculos. No se corrigieron compras, facturas, pagos ni justificativos históricos.
+- **Recuperación:** consola Neon autenticada confirmó ventana de recuperación de 6 horas. Punto previo registrado: 22/10/2026 02:53:27.694 UTC (21/10 23:53 ART). Evidencia privada de esquema, filas antes/después y salida de migración; no contiene credenciales.
+- **Smoke publicado parcial:** login Google con la cuenta existente correcto; sesión, dashboard y consola de organizaciones funcionan. La cuenta de plataforma no tiene contexto operativo de tenant: el acceso a OC-051 redirige al dashboard. No se agregaron membresías ni se suplantaron usuarios. Queda pendiente recorrer formularios/matriz/AP en escritorio y celular con una cuenta operativa autorizada. No se declara E2E completo; CI omite E2E por secretos ausentes. Las pruebas automatizadas e integración aislada de §12–16 permanecen aprobadas.
+- **Informe al cliente:** preparado y revisado visualmente en dos páginas; separa mejoras publicadas, acciones de INDARI y alcance aún no implementado. No enviado por correo. Incluye conciliación prioritaria de posibles duplicados y validación de comprobantes, sin afirmar doble pago bancario.
+- **Pendientes explícitos:** Q-061/062/063, regularización histórica con evidencia, smoke operativo y separación completa de Preview. Los overrides de DB aprobados para esta rama se conservan; no se cambiaron las URLs ni AUTH_SECRET. No usar otras ramas Preview para ensayar migraciones mientras hereden la DB general.
+
 ## Referencias canónicas
 
 - [Solicitudes y cotizaciones](../02-modules/PURCHASE_REQUESTS.md), [OC y recepciones](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [Gastos y pagos](../02-modules/EXPENSES_AND_PAYMENTS.md).

@@ -28,6 +28,8 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 
 ### P-IND-03 — Acreditar versión de portal y entorno de regresión
 
+**Estado vigente 22/10/2026:** publicación y migración de producción acreditadas; queda smoke operativo UI. PR #1 integrado, SHA `1d07699a`, deployment Vercel `9SKYgHtUNWHcZs6z7trTLGXaWwqU` Ready con alias `portal.bloqer.app`. D-118 aplicada: 70 migraciones, 191 líneas anteriores preservadas y clasificación null. Recuperación Neon de 6 horas verificada antes de migrar. Login/sesión/consola correctos; la cuenta de plataforma carece de contexto operativo para revisar Casa Hogar. No ampliar permisos para el smoke. Preview diferido explícitamente por Owner; se mantienen overrides de DB, sin cambios de URL/clave. Ver §17 del plan INDARI. El seguimiento siguiente es histórico, no el estado de publicación vigente.
+
 **Seguimiento 21/10/2026:** reabierto por pedido del usuario antes de fase 2. Se identificó el proyecto Vercel `bloqer-v2-web` y se ofreció su integración; aún falta conexión autenticada para acreditar el alias. El push a una rama de revisión no acredita producción.
 
 - **Estado:** PARCIAL 21/10/2026. Último deployment GitHub Production `6764344935` exitoso con SHA `527c824c9ad9009b0d9cf2d729a184dc5f2e31f9`, base de la intervención. La vista previa de `399128cf` pasó Vercel y CI; no acredita el alias de producción. Falta acreditar la asignación actual del alias de portal desde Vercel autenticado.
