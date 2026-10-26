@@ -416,6 +416,7 @@ export async function cancelCollection(
   if (projectScopeId !== undefined && collectionPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(collectionPreview.projectId, ctx);
 
   const glParams = {
     companyId: collectionPreview.companyId,

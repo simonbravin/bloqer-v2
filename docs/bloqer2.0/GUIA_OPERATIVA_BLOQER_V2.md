@@ -376,6 +376,8 @@ Bloqer separa herramientas de **empresa** y de **proyecto** (estilo Procore):
 
 **Permisos ≠ acceso a obras.** Los roles definen *qué* puede hacer el usuario. El acceso a obras define *en qué proyectos* puede hacerlo.
 
+Esto también aplica a consultar pagos de una CxP y a cancelar pagos o cobranzas: tener un rol financiero no reemplaza el acceso a la obra. Los pagos corporativos requieren permisos de finanzas de empresa; no quedan habilitados por `PROJECT_FINANCE`.
+
 | Modo (Políticas) | Nombre en UI | Comportamiento |
 |------------------|--------------|----------------|
 | `TENANT_WIDE` | **Todos los proyectos** | Quien tenga permisos de proyectos ve todas las obras de la empresa. |
@@ -1320,6 +1322,8 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 **Consultar el pago confirmado:** el detalle de obra (`/proyectos/[id]/pagos/[paymentId]`) muestra monto, fecha, cuenta y accesos a la CxP y la factura. **Cancelar pago** pide confirmación y solo aparece con permiso de pago mientras esté confirmado. Si la pantalla falla al cargar después de registrar, revisá primero la **CxP** y **Transacciones**: el pago puede haberse guardado correctamente. Si ya figura confirmado, volvé a abrir su detalle; no registres otro pago por el error de visualización.
 
+**Borrador contable pendiente:** si falla la generación automática del asiento, el pago confirmado y su movimiento de tesorería se conservan. Revisá Contabilidad; la ausencia del borrador no significa que falte registrar el pago. No lo repitas para intentar generar el asiento.
+
 > **Notas de navegación y límites:**
 > - Consulta consolidada de pagos: `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso.
 > - **Retenciones** manuales (sin módulo dedicado).
@@ -1455,6 +1459,7 @@ flowchart LR
 ```
 
 1. Operar finanzas con normalidad (facturas, cobros, pagos, transferencias). Cada hecho relevante **crea un asiento DRAFT** en segundo plano (soft: no bloquea la operación si falla la contabilidad).
+   Si el borrador no se generó, revisá las reglas contables y el asiento vinculado al origen. La operación confirmada conserva su validez; corregí o reintentá la generación contable desde las opciones del documento, sin repetir el pago, cobro o transferencia.
 2. Abrir `/contabilidad` y revisar card **Borradores pendientes**, o ir a **Asientos** filtrando borradores.
 3. Abrir el asiento:
    - Si tiene **origen operativo** (sourced): montos/moneda/estructura **bloqueados** (D-063); sí se pueden ajustar **cuentas** y textos.

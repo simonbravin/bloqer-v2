@@ -238,7 +238,10 @@ async function createDraftFromInput(
     return { status: "skipped", reason: "create_failed" };
   }
 }
-/** Best-effort: never throws to caller. Call only after operational commit. */
+/**
+ * Best-effort: never throws to caller. Call only after operational commit.
+ * Await delegated promises inside each try so asynchronous rejections reach its catch.
+ */
 export async function ensureDraftJournalFromCollection(
   collectionId: string,
   ctx: ServiceContext,
@@ -253,7 +256,7 @@ export async function ensureDraftJournalFromCollection(
     }
     const treasuryGlCode = suggestTreasuryGlAccountCode(col.account);
     const debitOverride = await resolveActiveGlAccountId(ctx.tenantId, col.companyId, treasuryGlCode);
-    return ensureFromRule({
+    return await ensureFromRule({
       ctx,
       companyId: col.companyId,
       projectId: col.projectId,
@@ -288,7 +291,7 @@ export async function ensureDraftJournalFromPayment(
     }
     const treasuryGlCode = suggestTreasuryGlAccountCode(pay.account);
     const creditOverride = await resolveActiveGlAccountId(ctx.tenantId, pay.companyId, treasuryGlCode);
-    return ensureFromRule({
+    return await ensureFromRule({
       ctx,
       companyId: pay.companyId,
       projectId: pay.projectId,
@@ -336,7 +339,7 @@ export async function ensureDraftJournalFromTreasuryMovement(
         mov.transferId
         ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
       if (!transferId) return { status: "skipped", reason: "missing_transfer_id" };
-      return ensureDraftJournalFromInternalTransfer(transferId, ctx);
+      return await ensureDraftJournalFromInternalTransfer(transferId, ctx);
     }
 
     let eventType: AccountingMappingEventType;
@@ -361,7 +364,7 @@ export async function ensureDraftJournalFromTreasuryMovement(
     const creditOverride =
       mov.type === "OUTFLOW" ? treasuryGlId : undefined;
 
-    return ensureFromRule({
+    return await ensureFromRule({
       ctx,
       companyId,
       projectId: null,
@@ -430,7 +433,7 @@ export async function ensureDraftJournalFromInternalTransfer(
       suggestTreasuryGlAccountCode({ type: outLeg.account.type, currency: outLeg.account.currency }),
     );
 
-    return ensureFromRule({
+    return await ensureFromRule({
       ctx,
       companyId,
       projectId: null,
@@ -537,7 +540,7 @@ export async function ensureDraftJournalFromSalesInvoice(
       iibbPerceptionDebitAccountId,
       sourceId: inv.id,
     });
-    return createDraftFromInput(ctx, inv.companyId, "SALES_INVOICE", inv.id, input);
+    return await createDraftFromInput(ctx, inv.companyId, "SALES_INVOICE", inv.id, input);
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
   }
@@ -628,7 +631,7 @@ export async function ensureDraftJournalFromSupplierInvoice(
       iibbPerceptionCreditAccountId,
       sourceId: inv.id,
     });
-    return createDraftFromInput(ctx, inv.companyId, "SUPPLIER_INVOICE", inv.id, input);
+    return await createDraftFromInput(ctx, inv.companyId, "SUPPLIER_INVOICE", inv.id, input);
   } catch {
     return { status: "skipped", reason: "unexpected_error" };
   }

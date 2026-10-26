@@ -562,9 +562,11 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Confirmá. Bloquea si fondos insuficientes o período cerrado.",
       "En el detalle del pago podés consultar monto, fecha y cuenta, y volver a la CxP o a la factura. En obra, Cancelar pago pide confirmación y requiere permiso.",
     ],
-    effects: ["Pagado (o parcial) + movimiento OUTFLOW + asiento DRAFT."],
+    effects: ["Pagado (o parcial) + movimiento OUTFLOW. Se intenta generar el asiento DRAFT según la configuración contable."],
     pitfalls: [
       "Si falla la carga del detalle después de confirmar, revisá la CxP y Transacciones antes de registrar otro pago: el pago puede haber quedado confirmado. Si ya figura, volvé a abrirlo; no lo dupliques.",
+      "Si falta el borrador contable, revisá Contabilidad: una falla al generarlo no invalida el pago confirmado. No repitas el pago para generar el asiento.",
+      "Consultar pagos de una CxP o cancelar pagos/cobranzas de obra exige acceso a esa obra además del permiso de la operación. PROJECT_FINANCE no habilita pagos corporativos.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
@@ -580,6 +582,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       "saldar",
       "pago confirmado",
       "error al abrir pago",
+      "pago sin asiento",
+      "acceso a obra",
     ],
     guideRef: "§12.2",
   },

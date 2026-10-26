@@ -108,3 +108,15 @@ Sin cambios de schema/ERD estructural ni migraciones. No hay backfill ni correcc
 - Factura en moneda extranjera debe pedir FX manual; la cobranza vuelve a pedir el suyo, exige cuenta compatible y conserva projectId/companyId. No mezclar ingreso de obra con ingreso corporativo en reportes.
 - Auditoría: la suite rechaza vínculos a certificados inyectados en ventas manuales (encabezado y líneas), intercala edición/emisión para comprobar inmutabilidad y conciliación con CxC, y verifica acceso por membresía a las consultas auxiliares. Con AR deshabilitado la planilla sigue disponible y las consultas financieras no devuelven datos.
 - En lectura de emitidos, **Físico período** debe conservar el porcentaje guardado aunque difiera del **Avance real**; con cobro total el recorrido indica **sin saldo pendiente de cobro**.
+
+## Auditoría de pagos y cobranzas — regresión 2026-10-26
+
+Sin migraciones ni corrección de saldos históricos. Pruebas automatizadas sin DB: `packages/services/src/finance/payment-collection-access.test.ts` y `packages/services/src/accounting/accounting-auto-draft-failure.test.ts`. Cubren acceso D-111 antes de cualquier control financiero o sincronización contable, separación empresa/obra y rechazos asíncronos durante el auto-DRAFT posterior al commit (D-061).
+
+Smoke pendiente de publicación, solo con datos de ensayo autorizados:
+
+1. En modo **Solo proyectos asignados**, un usuario de Finanzas sin asignación no puede cancelar pagos ni cobranzas de otra obra, incluso mediante una petición directa o un reintento de un documento ya cancelado. Verificar que no cambien el documento, saldo, movimiento ni asiento.
+2. Con asignación válida, conservar los controles de período cerrado, movimiento conciliado y asiento contabilizado. OWNER/ADMIN mantienen su acceso global; los documentos corporativos no requieren asignación a obra.
+3. El listado de pagos de una CxP y el detalle respetan tenant, empresa activa, proyecto de la ruta y rol corporativo. PROJECT_FINANCE no accede a pagos corporativos; sí a pagos de su obra asignada.
+4. Simular indisponibilidad de la generación contable con los tests de regresión. El resultado del auto-DRAFT debe ser omitido, sin propagar el error a una operación ya confirmada. Incluye pagos, cobranzas, movimientos, transferencias y facturas de venta/proveedor, aun si también falla la consulta de recuperación.
+5. En la UI, confirmar un pago de ensayo y abrir su detalle sin error de servidor; verificar una única operación y un único movimiento. La prueba React Flight `apps/web/features/ap/lib/payment-detail-rsc.test.mjs` cubre la preparación de acciones al renderizar el detalle.

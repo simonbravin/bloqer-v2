@@ -58,6 +58,9 @@ export async function getPaymentById(
   if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
+  if (p.projectId === null && !canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos a nivel empresa");
+  }
   await requireProjectAccessIfPresent(p.projectId, ctx);
   return serialize(p);
 }
@@ -122,11 +125,29 @@ export async function listPaymentsByProject(
 export async function listPaymentsByPayable(
   payableId: string,
   ctx: ServiceContext,
+  projectScopeId?: string,
 ): Promise<PaymentView[]> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos");
   }
+  const payable = await prisma.payable.findUnique({
+    where: { id: payableId },
+    select: { tenantId: true, companyId: true, projectId: true },
+  });
+  if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
+  assertResourceTenant(payable.tenantId, ctx.tenantId);
+  if (isCrossCompany(payable.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a la empresa activa");
+  }
+  if (projectScopeId !== undefined && payable.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+  }
+  if (payable.projectId === null && !canViewCompanyAp(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos a nivel empresa");
+  }
+  await requireProjectAccessIfPresent(payable.projectId, ctx);
+
   const rows = await prisma.payment.findMany({
     where: { payableId, tenantId: ctx.tenantId },
     include: { account: { select: { name: true } } },
@@ -377,6 +398,7 @@ export async function cancelPayment(
   if (projectScopeId !== undefined && paymentPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
   }
+  await requireProjectAccessIfPresent(paymentPreview.projectId, ctx);
 
   const glParams = {
     companyId: paymentPreview.companyId,

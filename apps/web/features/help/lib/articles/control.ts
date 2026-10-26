@@ -91,7 +91,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
   {
     slug: "contabilizar-asientos",
     title: "Contabilizar asientos (DRAFT ≠ POSTED)",
-    summary: "Los asientos nacen en borrador solos; hay que Contabilizarlos para los libros.",
+    summary: "La generación automática propone borradores según las reglas; hay que Contabilizarlos para los libros.",
     intents: ["contabilizar", "revertir-asiento"],
     modules: ["contabilidad"],
     level: "company",
@@ -114,6 +114,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "Creer que «apareció el borrador» = ya está contabilizado.",
+      "Si falla la generación automática, la operación confirmada sigue registrada. Revisá las reglas y el asiento desde el documento; no repitas pagos, cobros ni transferencias para obtener el borrador.",
       "Si hay POSTED sin reverso, anular el documento origen se bloquea.",
     ],
     relatedSlugs: [
@@ -130,6 +131,8 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "revertir",
       "revertir asiento",
       "anular borrador",
+      "operación sin asiento",
+      "falló borrador automático",
     ],
     guideRef: "§15.2 · §16 · §17",
   },

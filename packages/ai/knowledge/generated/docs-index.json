@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-10-26T13:03:45.034Z",
-  "sourceHash": "6225ffc8e2e8a1ecaaed9575e925c5abf3038a971ebbf50484efa9fd40e8ae2b",
+  "generatedAt": "2026-10-26T13:33:25.302Z",
+  "sourceHash": "340304e417d0d0c0bdf5cacd20fdbdb3045aab977418c9c7c39fefa5483c383b",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "77059c353606676ca379277543d7f2774a9d212c69677372f7cec630e95ff7dc",
-      "bytes": 160781
+      "sha256": "985e3f3c13b00babac0f78a3fa5f74881e48fac495d061a010113b87916a6143",
+      "bytes": 161582
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -394,7 +394,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "2. Usuarios, roles y permisos (nivel empresa)",
-      "text": "111\n\n**Permisos ≠ acceso a obras.** Los roles definen *qué* puede hacer el usuario. El acceso a obras define *en qué proyectos* puede hacerlo.\n\n| Modo (Políticas) | Nombre en UI | Comportamiento |\n|------------------|--------------|----------------|"
+      "text": "111\n\n**Permisos ≠ acceso a obras.** Los roles definen *qué* puede hacer el usuario. El acceso a obras define *en qué proyectos* puede hacerlo.\n\nEsto también aplica a consultar pagos de una CxP y a cancelar pagos o cobranzas: tener un rol financiero no reemplaza el acceso a la obra. Los pagos corporativos requieren permisos de finanzas de empresa; no quedan habilitados por `PROJECT_FINANCE`."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#39",
@@ -402,7 +402,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "2. Usuarios, roles y permisos (nivel empresa)",
-      "text": "| `TENANT_WIDE` | **Todos los proyectos** | Quien tenga permisos de proyectos ve todas las obras de la empresa. |\n| `MEMBERSHIP_SCOPED` | **Solo proyectos asignados** | Solo ve las obras con `ProjectMembership`, salvo usuarios con acceso global (OWNER/ADMIN vía RBAC). |\n\n**Dónde se gestiona**\n\n1. **Asignaciones por usuario:** Configuración → **Equipo** → miembro → sección **Acceso a obras** (`/configuracion/equipo/[membershipId]`).\n2. **Modo de la empresa:** Configuración → **Políticas** → **Acceso a proyectos** (`/configuracion/politicas#acceso-obras`).\n\n**Preparación bajo «Todos los proyectos»**\n\n- Podés marcar obras y **Guardar acceso a obras** sin cambiar el acceso real.\n- Mensaje: las asignaciones entran en vigencia cuando la empresa active el acceso por obra.\n- Sirve para preparar el cambio a «Solo proyectos asignados» sin lockouts.\n\n**Activar «Solo proyectos asignados»**\n\n1. Prepará memberships en Equipo.\n2. Políticas → **Solo proyectos asignados** → el sistema muestra un **preview** (usuarios activos, con obras, acceso global, posibles lockouts).\n3. Si hay usuarios con permisos de proyecto sin ninguna obra: aviso + lista + enlace **Revisar asignaciones**; hay que confirmar "
+      "text": "| Modo (Políticas) | Nombre en UI | Comportamiento |\n|------------------|--------------|----------------|\n| `TENANT_WIDE` | **Todos los proyectos** | Quien tenga permisos de proyectos ve todas las obras de la empresa. |\n| `MEMBERSHIP_SCOPED` | **Solo proyectos asignados** | Solo ve las obras con `ProjectMembership`, salvo usuarios con acceso global (OWNER/ADMIN vía RBAC). |\n\n**Dónde se gestiona**\n\n1. **Asignaciones por usuario:** Configuración → **Equipo** → miembro → sección **Acceso a obras** (`/configuracion/equipo/[membershipId]`).\n2. **Modo de la empresa:** Configuración → **Políticas** → **Acceso a proyectos** (`/configuracion/politicas#acceso-obras`).\n\n**Preparación bajo «Todos los proyectos»**\n\n- Podés marcar obras y **Guardar acceso a obras** sin cambiar el acceso real.\n- Mensaje: las asignaciones entran en vigencia cuando la empresa active el acceso por obra.\n- Sirve para preparar el cambio a «Solo proyectos asignados» sin lockouts.\n\n**Activar «Solo proyectos asignados»**\n\n1. Prepará memberships en Equipo.\n2. Políticas → **Solo proyectos asignados** → el sistema muestra un **preview** (usuarios activos, con obras, acceso global, posibles lockouts).\n3. Si hay usuarios con "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#40",
@@ -410,7 +410,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "2. Usuarios, roles y permisos (nivel empresa)",
-      "text": "«revisé las asignaciones».\n4. CTA: **Activar acceso por obras**. El backend **recalcula** el preview al confirmar (no confía en datos viejos del browser).\n5. Solo un usuario con **acceso global** a obras puede activar el modo restringido (evita auto-lockout del admin)."
+      "text": "permisos de proyecto sin ninguna obra: aviso + lista + enlace **Revisar asignaciones**; hay que confirmar «revisé las asignaciones».\n4. CTA: **Activar acceso por obras**. El backend **recalcula** el preview al confirmar (no confía en datos viejos del browser)."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#41",
@@ -418,7 +418,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "2. Usuarios, roles y permisos (nivel empresa)",
-      "text": "**Volver a «Todos los proyectos»**\n\n- También pide confirmación (amplía acceso).\n- **No borra** las memberships: quedan preparadas si más adelante se vuelve a restringir.\n\n**Acceso global**\n\n- Usuarios con autoridad tenant-wide (helper RBAC, no hardcode de string) ven el mensaje **Acceso global a todas las obras** y no necesitan memberships.\n\n**No confundir con Equipo de obra**\n\n- **Equipo de obra** (en la obra → Configuración) = roster de **avisos** del libro de obra.\n- **Acceso a obras** (en Equipo de la empresa) = **ACL** de quién entra a cada proyecto.\n\n---"
+      "text": "5. Solo un usuario con **acceso global** a obras puede activar el modo restringido (evita auto-lockout del admin).\n\n**Volver a «Todos los proyectos»**\n\n- También pide confirmación (amplía acceso).\n- **No borra** las memberships: quedan preparadas si más adelante se vuelve a restringir.\n\n**Acceso global**\n\n- Usuarios con autoridad tenant-wide (helper RBAC, no hardcode de string) ven el mensaje **Acceso global a todas las obras** y no necesitan memberships.\n\n**No confundir con Equipo de obra**\n\n- **Equipo de obra** (en la obra → Configuración) = roster de **avisos** del libro de obra.\n- **Acceso a obras** (en Equipo de la empresa) = **ACL** de quién entra a cada proyecto.\n\n---"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#42",
@@ -1322,7 +1322,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "**Consultar el pago confirmado:** el detalle de obra (`/proyectos/[id]/pagos/[paymentId]`) muestra monto, fecha, cuenta y accesos a la CxP y la factura. **Cancelar pago** pide confirmación y solo aparece con permiso de pago mientras esté confirmado. Si la pantalla falla al cargar después de registrar, revisá primero la **CxP** y **Transacciones**: el pago puede haberse guardado correctamente. Si ya figura confirmado, volvé a abrir su detalle; no registres otro pago por el error de visualización.\n\n> **Notas de navegación y límites:**\n> - Consulta consolidada de pagos: `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso.\n> - **Retenciones** manuales (sin módulo dedicado).\n> - Cobros y pagos: **una sola moneda** por operación.\n> - Export **CSV/PDF** desde CxP y Facturas y gastos corporativos.\n> - Desde OC / recepción con cantidades recibidas: panel Facturación → **Registrar factura**.\n> - Una factura originada por **certificación de subcontrato** no permite cambiar a quién se le paga.\n\n<!-- capture:33 emitir-y-pagar-ahora-obra -->\n![Bloqer — Emitir y pagar ahora (obra)](./guides/assets/screenshots/33-emitir-y-pagar-ahora-obra.png)\n\n*Emitir y pagar ahora (obra).*\n\n<!-- captur"
+      "text": "**Consultar el pago confirmado:** el detalle de obra (`/proyectos/[id]/pagos/[paymentId]`) muestra monto, fecha, cuenta y accesos a la CxP y la factura. **Cancelar pago** pide confirmación y solo aparece con permiso de pago mientras esté confirmado. Si la pantalla falla al cargar después de registrar, revisá primero la **CxP** y **Transacciones**: el pago puede haberse guardado correctamente. Si ya figura confirmado, volvé a abrir su detalle; no registres otro pago por el error de visualización.\n\n**Borrador contable pendiente:** si falla la generación automática del asiento, el pago confirmado y su movimiento de tesorería se conservan. Revisá Contabilidad; la ausencia del borrador no significa que falte registrar el pago. No lo repitas para intentar generar el asiento.\n\n> **Notas de navegación y límites:**\n> - Consulta consolidada de pagos: `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso.\n> - **Retenciones** manuales (sin módulo dedicado).\n> - Cobros y pagos: **una sola moneda** por operación.\n> - Export **CSV/PDF** desde CxP y Facturas y gastos corporativos.\n> - Desde OC / recepción con cantidades recibidas: panel Facturación → **Registrar factura**.\n> - Una factura "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#155",
@@ -1330,7 +1330,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "e:34 cxp-corporativo-con-export -->\n![Bloqer — CxP corporativo con export](./guides/assets/screenshots/34-cxp-corporativo-con-export.png)\n\n*CxP corporativo con export.*\n\n<!-- capture:35 transacciones-pagos-proveedor -->"
+      "text": "originada por **certificación de subcontrato** no permite cambiar a quién se le paga.\n\n<!-- capture:33 emitir-y-pagar-ahora-obra -->\n![Bloqer — Emitir y pagar ahora (obra)](./guides/assets/screenshots/33-emitir-y-pagar-ahora-obra.png)"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#156",
@@ -1338,7 +1338,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "![Bloqer — Transacciones / pagos proveedor](./guides/assets/screenshots/35-transacciones-pagos-proveedor.png)\n\n*Transacciones / pagos proveedor.*\n\n---"
+      "text": "*Emitir y pagar ahora (obra).*\n\n<!-- capture:34 cxp-corporativo-con-export -->\n![Bloqer — CxP corporativo con export](./guides/assets/screenshots/34-cxp-corporativo-con-export.png)\n\n*CxP corporativo con export.*\n\n<!-- capture:35 transacciones-pagos-proveedor -->\n![Bloqer — Transacciones / pagos proveedor](./guides/assets/screenshots/35-transacciones-pagos-proveedor.png)\n\n*Transacciones / pagos proveedor.*\n\n---"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#157",
@@ -1490,7 +1490,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": "| Sumas y saldos | `/contabilidad/sumas-y-saldos` | Trial balance por período |\n| Situación | `/contabilidad/situacion-patrimonial` | ESP al corte (`asOfDate`) |\n| Resultados | `/contabilidad/estado-resultados` | EERR del período |\n\nExports CSV/PDF (y XLSX en sumas, diario, ESP y EERR) desde `/api/reports/contabilidad/*`.\n\n### 15.2 Procedimiento — Día a día (auto-DRAFT + posteo)\n\n```mermaid\nflowchart LR\n  OP[\"Operación (factura / cobro / pago / transferencia)\"] --> DRAFT[\"Asiento DRAFT automático\"]\n  DRAFT --> REV[\"Contador revisa\"]\n  REV --> POST[\"Contabilizar → POSTED\"]\n  POST --> REP[\"Libros y estados gerenciales\"]\n  POST --> REV2[\"Revertir asiento (si hace falta)\"]\n```\n\n1. Operar finanzas con normalidad (facturas, cobros, pagos, transferencias). Cada hecho relevante **crea un asiento DRAFT** en segundo plano (soft: no bloquea la operación si falla la contabilidad).\n2. Abrir `/contabilidad` y revisar card **Borradores pendientes**, o ir a **Asientos** filtrando borradores.\n3. Abrir el asiento:\n   - Si tiene **origen operativo** (sourced): montos/moneda/estructura **bloqueados** (D-063); sí se pueden ajustar **cuentas** y textos.\n   - Si es **manual**: editable al 100%.\n4. Pulsar"
+      "text": "| Sumas y saldos | `/contabilidad/sumas-y-saldos` | Trial balance por período |\n| Situación | `/contabilidad/situacion-patrimonial` | ESP al corte (`asOfDate`) |\n| Resultados | `/contabilidad/estado-resultados` | EERR del período |\n\nExports CSV/PDF (y XLSX en sumas, diario, ESP y EERR) desde `/api/reports/contabilidad/*`.\n\n### 15.2 Procedimiento — Día a día (auto-DRAFT + posteo)\n\n```mermaid\nflowchart LR\n  OP[\"Operación (factura / cobro / pago / transferencia)\"] --> DRAFT[\"Asiento DRAFT automático\"]\n  DRAFT --> REV[\"Contador revisa\"]\n  REV --> POST[\"Contabilizar → POSTED\"]\n  POST --> REP[\"Libros y estados gerenciales\"]\n  POST --> REV2[\"Revertir asiento (si hace falta)\"]\n```\n\n1. Operar finanzas con normalidad (facturas, cobros, pagos, transferencias). Cada hecho relevante **crea un asiento DRAFT** en segundo plano (soft: no bloquea la operación si falla la contabilidad).\n   Si el borrador no se generó, revisá las reglas contables y el asiento vinculado al origen. La operación confirmada conserva su validez; corregí o reintentá la generación contable desde las opciones del documento, sin repetir el pago, cobro o transferencia.\n2. Abrir `/contabilidad` y revisar card **Borradores pendi"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#176",
@@ -1498,7 +1498,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": " **Contabilizar** → `POSTED`. **Nunca** se auto-posta.\n5. Quienes editan contabilidad reciben aviso in-app (máx. uno cada 24 h por empresa) cuando hay borradores nuevos.\n6. Corrección: **Revertir** un `POSTED` (crea asiento de reversa). Anular un borrador: **Anular borrador**."
+      "text": "entes**, o ir a **Asientos** filtrando borradores.\n3. Abrir el asiento:\n   - Si tiene **origen operativo** (sourced): montos/moneda/estructura **bloqueados** (D-063); sí se pueden ajustar **cuentas** y textos."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#177",
@@ -1506,7 +1506,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": "7. Al **anular el documento origen**, se cancela el DRAFT vinculado. Si hay `POSTED` sin reverso, la anulación del origen **se bloquea**.\n8. Correr reportes del período (Libro diario / Sumas y saldos / Situación / Resultados) — solo incluyen `POSTED`.\n\n**Qué genera auto-DRAFT hoy**\n\n| Origen | Asiento DRAFT |\n|--------|----------------|\n| Factura de venta emitida | Sí (devengo AR) |\n| Factura de proveedor emitida | Sí (devengo AP) |\n| Cobranza | Sí |\n| Pago a proveedor | Sí |\n| Transferencia interna | Sí |\n| Ingreso corporativo solo caja (`TREASURY_INFLOW`) | Sí |\n| Movimiento de tesorería cuyo origen ya es cobro/pago/apertura | **No** (anti doble conteo) |\n| Consumo de stock / recepción | **No** aún (costeo diferido) |\n\n> **Limitaciones:** sin cierre de **ejercicio** GL ni numeración correlativa de asientos; sí hay **cierre mensual operativo** (§15.3). Reportes gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.\n\n<!-- capture:38 contabilidad-hub-plantilla -->\n![Bloqer — Contabilidad hub + plantilla](./guides/assets/screenshots/38-contabilidad-hub-plantilla.png)\n\n*Contabilidad hub + plantilla.*\n\n<!-- capture:"
+      "text": "- Si es **manual**: editable al 100%.\n4. Pulsar **Contabilizar** → `POSTED`. **Nunca** se auto-posta.\n5. Quienes editan contabilidad reciben aviso in-app (máx. uno cada 24 h por empresa) cuando hay borradores nuevos.\n6. Corrección: **Revertir** un `POSTED` (crea asiento de reversa). Anular un borrador: **Anular borrador**.\n7. Al **anular el documento origen**, se cancela el DRAFT vinculado. Si hay `POSTED` sin reverso, la anulación del origen **se bloquea**.\n8. Correr reportes del período (Libro diario / Sumas y saldos / Situación / Resultados) — solo incluyen `POSTED`.\n\n**Qué genera auto-DRAFT hoy**\n\n| Origen | Asiento DRAFT |\n|--------|----------------|\n| Factura de venta emitida | Sí (devengo AR) |\n| Factura de proveedor emitida | Sí (devengo AP) |\n| Cobranza | Sí |\n| Pago a proveedor | Sí |\n| Transferencia interna | Sí |\n| Ingreso corporativo solo caja (`TREASURY_INFLOW`) | Sí |\n| Movimiento de tesorería cuyo origen ya es cobro/pago/apertura | **No** (anti doble conteo) |\n| Consumo de stock / recepción | **No** aún (costeo diferido) |\n\n> **Limitaciones:** sin cierre de **ejercicio** GL ni numeración correlativa de asientos; sí hay **cierre mensual operativo** (§15.3). Reportes "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#178",
@@ -1514,7 +1514,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": "39 aplicar-plantilla-ar -->\n![Bloqer — Aplicar plantilla AR](./guides/assets/screenshots/39-aplicar-plantilla-ar.png)\n\n*Aplicar plantilla AR.*\n\n### 15.3 Procedimiento — Cierre de períodos (bloqueo mensual) — [D-014] · [D-078]"
+      "text": "gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.\n\n<!-- capture:38 contabilidad-hub-plantilla -->\n![Bloqer — Contabilidad hub + plantilla](./guides/assets/screenshots/38-contabilidad-hub-plantilla.png)"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#179",
@@ -1522,7 +1522,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": "Congela **movimientos de tesorería** y **asientos contables** cuya fecha cae en un mes cerrado. No es el cierre de gastos generales (GG / overhead), que es otro flujo en `/finanzas/gastos-generales`.\n\n**Quién opera:** solo **OWNER** / **ADMIN** (permiso `PERIOD_CLOSE`). El módulo debe estar habilitado para el tenant.\n\n#### Pasos — Cerrar\n\n1. Ir a **Contabilidad → Cierres** (`/contabilidad/cierres`).\n2. Verificar la empresa (si hay varias y el usuario no está anclado a una sola).\n3. En la tabla **Períodos mensuales**, ubicar el mes (`YYYY-MM`) en estado **Abierto**.\n4. Pulsar **Cerrar** → confirmar en el diálogo **Cerrar período**.\n5. El período pasa a **Cerrado**. A partir de ahí, crear/editar/anular/postear/revertir con fecha en ese mes → error `PERIOD_CLOSED` (mensaje en español en pantalla).\n\n#### Pasos — Reabrir\n\n1. En el mismo listado, período **Cerrado** → **Reabrir**.\n2. Ingresar **motivo obligatorio** (queda en auditoría).\n3. El período vuelve a **Abierto**.\n\n> **Orden recomendado del mes:** (1) terminar cobros/pagos, (2) **contabilizar** borradores del mes, (3) **conciliar** banco (§4.2), (4) **cerrar** el período. Cerrar antes de conciliar complica las correcciones.\n\n> **"
+      "text": "*Contabilidad hub + plantilla.*\n\n<!-- capture:39 aplicar-plantilla-ar -->\n![Bloqer — Aplicar plantilla AR](./guides/assets/screenshots/39-aplicar-plantilla-ar.png)\n\n*Aplicar plantilla AR.*\n\n### 15.3 Procedimiento — Cierre de períodos (bloqueo mensual) — [D-014] · [D-078]\n\nCongela **movimientos de tesorería** y **asientos contables** cuya fecha cae en un mes cerrado. No es el cierre de gastos generales (GG / overhead), que es otro flujo en `/finanzas/gastos-generales`.\n\n**Quién opera:** solo **OWNER** / **ADMIN** (permiso `PERIOD_CLOSE`). El módulo debe estar habilitado para el tenant.\n\n#### Pasos — Cerrar\n\n1. Ir a **Contabilidad → Cierres** (`/contabilidad/cierres`).\n2. Verificar la empresa (si hay varias y el usuario no está anclado a una sola).\n3. En la tabla **Períodos mensuales**, ubicar el mes (`YYYY-MM`) en estado **Abierto**.\n4. Pulsar **Cerrar** → confirmar en el diálogo **Cerrar período**.\n5. El período pasa a **Cerrado**. A partir de ahí, crear/editar/anular/postear/revertir con fecha en ese mes → error `PERIOD_CLOSED` (mensaje en español en pantalla).\n\n#### Pasos — Reabrir\n\n1. En el mismo listado, período **Cerrado** → **Reabrir**.\n2. Ingresar **motivo obligatorio** (que"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#180",
@@ -1530,7 +1530,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": "No confundir**\n> - **Cierre de período** (`/contabilidad/cierres`) = bloquea caja + GL del mes.\n> - **Cierre de GG / overhead** (`/finanzas/gastos-generales`) = congela el prorrateo automático de gastos generales; **no** bloquea tesorería ni asientos."
+      "text": "da en auditoría).\n3. El período vuelve a **Abierto**.\n\n> **Orden recomendado del mes:** (1) terminar cobros/pagos, (2) **contabilizar** borradores del mes, (3) **conciliar** banco (§4.2), (4) **cerrar** el período. Cerrar antes de conciliar complica las correcciones."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#181",
@@ -1538,7 +1538,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063",
-      "text": "<!-- capture:40 cierres-de-periodo-listado -->\n![Bloqer — Cierres de período (listado)](./guides/assets/screenshots/40-cierres-de-periodo-listado.png)\n\n*Cierres de período (listado).*\n\n<!-- capture:41 dialogo-cerrar-periodo -->\n![Bloqer — Diálogo Cerrar período](./guides/assets/screenshots/41-dialogo-cerrar-periodo.png)\n\n*Diálogo Cerrar período.*\n\n<!-- capture:42 dialogo-reabrir-con-motivo -->\n![Bloqer — Diálogo Reabrir con motivo](./guides/assets/screenshots/42-dialogo-reabrir-con-motivo.png)\n\n*Diálogo Reabrir con motivo.*\n\n---"
+      "text": "> **No confundir**\n> - **Cierre de período** (`/contabilidad/cierres`) = bloquea caja + GL del mes.\n> - **Cierre de GG / overhead** (`/finanzas/gastos-generales`) = congela el prorrateo automático de gastos generales; **no** bloquea tesorería ni asientos.\n\n<!-- capture:40 cierres-de-periodo-listado -->\n![Bloqer — Cierres de período (listado)](./guides/assets/screenshots/40-cierres-de-periodo-listado.png)\n\n*Cierres de período (listado).*\n\n<!-- capture:41 dialogo-cerrar-periodo -->\n![Bloqer — Diálogo Cerrar período](./guides/assets/screenshots/41-dialogo-cerrar-periodo.png)\n\n*Diálogo Cerrar período.*\n\n<!-- capture:42 dialogo-reabrir-con-motivo -->\n![Bloqer — Diálogo Reabrir con motivo](./guides/assets/screenshots/42-dialogo-reabrir-con-motivo.png)\n\n*Diálogo Reabrir con motivo.*\n\n---"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#182",

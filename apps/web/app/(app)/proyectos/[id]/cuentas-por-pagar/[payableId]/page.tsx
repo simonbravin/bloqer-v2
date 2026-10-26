@@ -50,7 +50,7 @@ export default async function PayableDetailPage({ params, searchParams }: PagePr
   try {
     [payable, payments] = await Promise.all([
       getPayableById(payableId, ctx, id),
-      listPaymentsByPayable(payableId, ctx),
+      listPaymentsByPayable(payableId, ctx, id),
     ]);
     if (loadField) {
       projectName = (await getProjectShellInfo(id, ctx)).name;
