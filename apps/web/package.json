@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "node --import ../../packages/services/node_modules/tsx/dist/loader.mjs --test components/ui/decimal-input-draft.test.ts features/certifications/lib/measurement-tree.test.ts features/procurement/lib/purchase-request-award-selection.test.ts features/procurement/lib/quote-line-edit-values.test.ts features/help/lib/catalog.test.ts features/help/lib/catalog-integrity.test.ts",
+    "test": "node --import ../../packages/services/node_modules/tsx/dist/loader.mjs --test components/ui/decimal-input-draft.test.ts features/certifications/lib/measurement-tree.test.ts features/procurement/lib/purchase-request-award-selection.test.ts features/procurement/lib/quote-line-edit-values.test.ts features/help/lib/catalog.test.ts features/help/lib/catalog-integrity.test.ts && node --conditions react-server --test features/ap/lib/payment-detail-rsc.test.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

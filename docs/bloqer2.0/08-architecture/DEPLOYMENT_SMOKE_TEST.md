@@ -46,6 +46,15 @@ No anunciar B02 como disponible hasta resolver P-IND-04 y acreditar el alias del
 
 Record who ran the checklist, date, and environment.
 
+## Detalle de pago confirmado (regresión 26/10/2026)
+
+1. Con un usuario habilitado para pagos, abrir un pago **ya confirmado** desde la CxP de una obra o desde Transacciones. Verificar monto, fecha, cuenta y enlaces a factura/CxP, sin excepción del servidor.
+2. Abrir **Cancelar pago** y cerrar el diálogo sin confirmar. El pago y el egreso deben seguir confirmados y el saldo no debe cambiar. No cancelar pagos reales para esta prueba.
+3. Con un usuario de solo lectura, comprobar que el detalle abre sin ofrecer cancelación. Un pago cancelado tampoco ofrece volver a cancelarlo.
+4. En un entorno de pruebas autorizado, registrar un pago y comprobar que la navegación posterior abre el detalle y que existe un solo egreso. Si el detalle falla, revisar CxP/Transacciones antes de reintentar el registro.
+
+Cobertura automática sin DB: `apps/web/features/ap/lib/payment-detail-rsc.test.mjs`, ejecutada por `pnpm --filter @bloqer/web test`. Renderiza la página real con React Flight y datos simulados; detecta funciones no serializables, verifica que abrir el detalle no ejecuta mutaciones y que la acción de cancelación conserva pago y proyecto.
+
 ## Run log
 
 | Date | Env | Operator | Notes |
