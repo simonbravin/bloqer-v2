@@ -291,17 +291,23 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
 
   return (
     <>
+      <div aria-hidden="true" className="h-16 shrink-0" />
       <button
         type="button"
         onClick={() => setOpen(true)}
         className={cn(
-          "fixed bottom-20 right-4 z-40 flex h-12 items-center gap-2 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground shadow-lg",
+          "group fixed bottom-20 right-4 z-40 flex h-11 items-center overflow-hidden rounded-full bg-primary px-3 text-sm font-medium text-primary-foreground shadow-lg",
           "hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:bottom-6",
         )}
         aria-label="Preguntale a Bloqer"
       >
-        <Sparkles className="h-4 w-4" />
-        <span className="hidden sm:inline">Preguntale a Bloqer</span>
+        <Sparkles aria-hidden="true" className="h-5 w-5 shrink-0" />
+        <span
+          aria-hidden="true"
+          className="max-w-0 overflow-hidden whitespace-nowrap opacity-0 transition-[max-width,padding,opacity] duration-200 motion-reduce:transition-none group-focus-visible:max-w-48 group-focus-visible:pl-2 group-focus-visible:opacity-100 [@media(hover:hover)]:group-hover:max-w-48 [@media(hover:hover)]:group-hover:pl-2 [@media(hover:hover)]:group-hover:opacity-100"
+        >
+          Preguntale a Bloqer
+        </span>
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>

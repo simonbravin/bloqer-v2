@@ -560,6 +560,7 @@ Si hay un solo `currentProjectId` válido y la pregunta es relativa (“¿qué f
 ## 6. UI MVP
 
 - Entry: **“Preguntale a Bloqer”** — FAB + Sheet derecha (patrón Sheet existente).
+- FAB circular de 44 px en reposo; etiqueta expandible con hover de mouse o foco visible de teclado. En touch abre con un toque. Respeta movimiento reducido y reserva espacio al final del contenido para desplazar los últimos resultados por encima del botón.
 - Desktop-first; mobile Sheet full-height simple.
 - Historial en memoria de sesión (client state); sin persistir conversaciones en Prisma en MVP.
 - Estados: loading, “Consultando …”, error legible (`ServiceError.message` / `AiProviderError` mapeado).

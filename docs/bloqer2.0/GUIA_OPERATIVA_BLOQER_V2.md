@@ -88,6 +88,8 @@ La línea no guarda un presupuesto aparte: guarda la **partida**, y la partida p
 
 Botón flotante **Preguntale a Bloqer** (esquina inferior derecha en el layout autenticado), cuando el entorno tiene Bloqer AI habilitado.
 
+El botón es circular y compacto: muestra el ícono de destellos y despliega el texto al pasar el mouse o enfocarlo con el teclado. En pantallas táctiles, tocá el ícono para abrir el chat. Al retirar el mouse, vuelve a su tamaño compacto. Hay espacio libre al final de la página para desplazar los últimos resultados por encima del botón.
+
 **Qué puede hacer (esta versión):**
 
 - Explicar cómo usar Bloqer (Centro de Ayuda / Guía operativa).

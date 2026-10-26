@@ -55,6 +55,15 @@ Record who ran the checklist, date, and environment.
 
 Cobertura automática sin DB: `apps/web/features/ap/lib/payment-detail-rsc.test.mjs`, ejecutada por `pnpm --filter @bloqer/web test`. Renderiza la página real con React Flight y datos simulados; detecta funciones no serializables, verifica que abrir el detalle no ejecuta mutaciones y que la acción de cancelación conserva pago y proyecto.
 
+## Botón de Bloqer AI — regresión 26/10/2026
+
+Con Bloqer AI habilitado, verificar en escritorio y celular:
+
+1. En reposo, el botón de destellos es circular (44 × 44 px). En escritorio, al pasar el mouse muestra «Preguntale a Bloqer» y al retirarlo se contrae.
+2. Con Tab, el botón muestra el texto y el indicador de foco; Enter abre el chat. En celular, un toque abre el chat sin necesitar hover. Cerrar y volver a abrir conserva el comportamiento existente.
+3. Desplazar un listado hasta el final y comprobar que la última fila y sus acciones pueden quedar por encima del botón. Revisar también la navegación inferior del celular.
+4. Con preferencia de movimiento reducido, la etiqueta aparece sin animación. Con Bloqer AI deshabilitado, no aparece el botón ni se reserva espacio adicional.
+
 ## Run log
 
 | Date | Env | Operator | Notes |

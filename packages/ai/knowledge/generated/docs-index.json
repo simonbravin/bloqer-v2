@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-10-26T13:33:25.302Z",
-  "sourceHash": "340304e417d0d0c0bdf5cacd20fdbdb3045aab977418c9c7c39fefa5483c383b",
+  "generatedAt": "2026-10-26T13:37:19.682Z",
+  "sourceHash": "13808bb4906f449efd5affff590c24536bd6c59eb49b7f80d0eda0fd9d1cd9b8",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "985e3f3c13b00babac0f78a3fa5f74881e48fac495d061a010113b87916a6143",
-      "bytes": 161582
+      "sha256": "e7592aa22f4860e2e76530acb7c194da3b43c70a7870b14fe8b392374a28dd57",
+      "bytes": 161929
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -154,7 +154,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "| Confirmar OC | **Comprometido** en EDT y costos |\n| Emitir factura proveedor (con o sin OC) | **Devengado** (+ CxP; auto-DRAFT contable) |\n| Pagar CxP | **Pagado** (+ caja; auto-DRAFT) |\n| Aprobar libro de obra | **Avance real** del cronograma (+ consumo stock si aplica) |\n| Emitir/aprobar certificación cliente | **Avance certificado** (+ base para factura) |\n| Consumo de stock | Stock + (si hay partida EDT) imputación a partida |\n\nLa pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectaciones por partida.\n\nLa línea no guarda un presupuesto aparte: guarda la **partida**, y la partida pertenece a un presupuesto. En OC, solicitudes, subcontratos, facturas de proveedor y consumos, el selector muestra `código — nombre (presupuesto vN)` para no mezclar la misma partida del principal con la de una adenda.\n\n### 0.3 Preguntale a Bloqer (asistente)\n\nBotón flotante **Preguntale a Bloqer** (esquina inferior derecha en el layout autenticado), cuando el entorno tiene Bloqer AI habilitado.\n\n**Qué puede hacer (esta versión):**\n\n- Explicar cómo usar Bloqer (Centro de Ayuda / Guía operativa).\n- Consultar y resumir **datos autorizados** (OC, materiales, CxP/CxC, cronograma, et"
+      "text": "| Confirmar OC | **Comprometido** en EDT y costos |\n| Emitir factura proveedor (con o sin OC) | **Devengado** (+ CxP; auto-DRAFT contable) |\n| Pagar CxP | **Pagado** (+ caja; auto-DRAFT) |\n| Aprobar libro de obra | **Avance real** del cronograma (+ consumo stock si aplica) |\n| Emitir/aprobar certificación cliente | **Avance certificado** (+ base para factura) |\n| Consumo de stock | Stock + (si hay partida EDT) imputación a partida |\n\nLa pantalla **EDT y costos** (`/control-costos`) es el tablero de esas afectaciones por partida.\n\nLa línea no guarda un presupuesto aparte: guarda la **partida**, y la partida pertenece a un presupuesto. En OC, solicitudes, subcontratos, facturas de proveedor y consumos, el selector muestra `código — nombre (presupuesto vN)` para no mezclar la misma partida del principal con la de una adenda.\n\n### 0.3 Preguntale a Bloqer (asistente)\n\nBotón flotante **Preguntale a Bloqer** (esquina inferior derecha en el layout autenticado), cuando el entorno tiene Bloqer AI habilitado.\n\nEl botón es circular y compacto: muestra el ícono de destellos y despliega el texto al pasar el mouse o enfocarlo con el teclado. En pantallas táctiles, tocá el ícono para abrir el chat"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#9",
@@ -162,7 +162,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "c.) según tus roles, permisos y módulos habilitados.\n- Ofrecer **links internos** a pantallas (chips debajo de la respuesta); los href vienen de las tools del backend, no de URLs inventadas por el modelo."
+      "text": ". Al retirar el mouse, vuelve a su tamaño compacto. Hay espacio libre al final de la página para desplazar los últimos resultados por encima del botón.\n\n**Qué puede hacer (esta versión):**\n\n- Explicar cómo usar Bloqer (Centro de Ayuda / Guía operativa)."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#10",
@@ -170,7 +170,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "- En preguntas abiertas («¿cómo viene esta obra?», «qué debería preocuparme?») prioriza **pocos insights** con explicación, acciones sugeridas y links — no un inventario de todos los KPIs.\n\n**Qué no hace aún:**\n\n- **No modifica** información (no crea, aprueba, paga ni anula).\n- **No guarda historial** en servidor: la conversación vive solo en la sesión del navegador.\n- No reemplaza el Centro de Ayuda (`/ayuda`); lo complementa.\n- **No amplía permisos:** solo ve lo que tu usuario podría consultar en Bloqer. Tesorería / finanzas de empresa quedan ocultas si tu rol no las tiene (p. ej. Jefe de obra).\n\n**Ejemplos de preguntas:** «¿Qué OC están pendientes?», «¿Qué materiales faltan en esta obra?», «¿Cómo creo una solicitud de compra?», «¿Qué debería preocuparme hoy?»\n\nFicha in-app: `/ayuda/preguntale-a-bloqer`.\n\n### 0.4 Índice de capturas (dónde pegar pantallazos)\n\nEn el Markdown y en el DOCX, cada bloque con este formato es un **hueco para imagen real**:\n\n```text\n> **📷 Captura sugerida — <título>**\n> Ruta: /ruta · Mostrar … · Tip: …\n```\n\n**Cómo completarlas**\n\n1. Entrar al producto con datos demo (sin CUIT/emails reales de clientes).\n2. Abrir la **ruta** indicada, dejar la UI en el es"
+      "text": "- Consultar y resumir **datos autorizados** (OC, materiales, CxP/CxC, cronograma, etc.) según tus roles, permisos y módulos habilitados.\n- Ofrecer **links internos** a pantallas (chips debajo de la respuesta); los href vienen de las tools del backend, no de URLs inventadas por el modelo.\n- En preguntas abiertas («¿cómo viene esta obra?», «qué debería preocuparme?») prioriza **pocos insights** con explicación, acciones sugeridas y links — no un inventario de todos los KPIs.\n\n**Qué no hace aún:**\n\n- **No modifica** información (no crea, aprueba, paga ni anula).\n- **No guarda historial** en servidor: la conversación vive solo en la sesión del navegador.\n- No reemplaza el Centro de Ayuda (`/ayuda`); lo complementa.\n- **No amplía permisos:** solo ve lo que tu usuario podría consultar en Bloqer. Tesorería / finanzas de empresa quedan ocultas si tu rol no las tiene (p. ej. Jefe de obra).\n\n**Ejemplos de preguntas:** «¿Qué OC están pendientes?», «¿Qué materiales faltan en esta obra?», «¿Cómo creo una solicitud de compra?», «¿Qué debería preocuparme hoy?»\n\nFicha in-app: `/ayuda/preguntale-a-bloqer`.\n\n### 0.4 Índice de capturas (dónde pegar pantallazos)\n\nEn el Markdown y en el DOCX, cada bloq"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#11",
@@ -178,7 +178,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "tado que pide el tip.\n3. Capturar desktop (salvo que el tip diga lo contrario); recortar chrome innecesario.\n4. En el DOCX regenerado, **reemplazar la caja gris** “📷 CAPTURA SUGERIDA …” por la imagen (el generador no inserta archivos de foto solos: la caja marca el lugar)."
+      "text": "ue con este formato es un **hueco para imagen real**:\n\n```text\n> **📷 Captura sugerida — <título>**\n> Ruta: /ruta · Mostrar … · Tip: …\n```\n\n**Cómo completarlas**\n\n1. Entrar al producto con datos demo (sin CUIT/emails reales de clientes)."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#12",
@@ -186,7 +186,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "**Prioridad alta (módulos nuevos / agosto 2026) — completar primero**\n\n| # | Título del bloque | Sección | Ruta |\n|---|-------------------|---------|------|\n| P1 | Listado de conciliaciones | §4.2 | `/tesoreria/conciliacion` |\n| P2 | Nueva conciliación (alta) | §4.2 | `/tesoreria/conciliacion/nueva` |\n| P3 | Workspace de empareje (dos columnas) | §4.2 | `/tesoreria/conciliacion/[id]` |\n| P4 | Importar CSV / OFX | §4.2 | detalle de sesión |\n| P5 | Cerrar conciliación | §4.2 | diálogo en detalle |\n| P6 | Detalle de cuenta + CTA Ajuste manual | §4.3 | `/tesoreria/cuentas/[id]` |\n| P7 | Ajuste manual de cuenta | §4.3 | `/tesoreria/cuentas/[id]/ajuste` |\n| P8 | Ledger con columna Estado | §4.0 | `/tesoreria/cuentas/[id]` (extracto) |\n| P9 | Tesorería subnav (incl. Conciliación) | §4.0 | `/tesoreria` |\n| P10 | Cierres de período (listado) | §15.3 | `/contabilidad/cierres` |\n| P11 | Diálogo Cerrar período | §15.3 | `/contabilidad/cierres` |\n| P12 | Diálogo Reabrir con motivo | §15.3 | `/contabilidad/cierres` |\n| P13 | Contabilidad hub (subnav con Cierres) | §15 | `/contabilidad` |\n| P14 | Invitar usuario | §2.1 | `/configuracion/equipo/invitar` |\n| P15 | Aceptar invitación (sin token en U"
+      "text": "2. Abrir la **ruta** indicada, dejar la UI en el estado que pide el tip.\n3. Capturar desktop (salvo que el tip diga lo contrario); recortar chrome innecesario.\n4. En el DOCX regenerado, **reemplazar la caja gris** “📷 CAPTURA SUGERIDA …” por la imagen (el generador no inserta archivos de foto solos: la caja marca el lugar).\n\n**Prioridad alta (módulos nuevos / agosto 2026) — completar primero**\n\n| # | Título del bloque | Sección | Ruta |\n|---|-------------------|---------|------|\n| P1 | Listado de conciliaciones | §4.2 | `/tesoreria/conciliacion` |\n| P2 | Nueva conciliación (alta) | §4.2 | `/tesoreria/conciliacion/nueva` |\n| P3 | Workspace de empareje (dos columnas) | §4.2 | `/tesoreria/conciliacion/[id]` |\n| P4 | Importar CSV / OFX | §4.2 | detalle de sesión |\n| P5 | Cerrar conciliación | §4.2 | diálogo en detalle |\n| P6 | Detalle de cuenta + CTA Ajuste manual | §4.3 | `/tesoreria/cuentas/[id]` |\n| P7 | Ajuste manual de cuenta | §4.3 | `/tesoreria/cuentas/[id]/ajuste` |\n| P8 | Ledger con columna Estado | §4.0 | `/tesoreria/cuentas/[id]` (extracto) |\n| P9 | Tesorería subnav (incl. Conciliación) | §4.0 | `/tesoreria` |\n| P10 | Cierres de período (listado) | §15.3 | `/contabilidad/cie"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#13",
@@ -194,7 +194,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "RL) | §2.1 | `/invitaciones/aceptar` |\n\nEl resto de bloques `📷` del documento (login, presupuesto, OC, certificaciones, etc.) siguen vigentes; completarlos cuando armes el entregable completo al cliente."
+      "text": "rres` |\n| P11 | Diálogo Cerrar período | §15.3 | `/contabilidad/cierres` |\n| P12 | Diálogo Reabrir con motivo | §15.3 | `/contabilidad/cierres` |\n| P13 | Contabilidad hub (subnav con Cierres) | §15 | `/contabilidad` |"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#14",
@@ -202,7 +202,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "### 0.4 Mapas de proceso (guía visual)\n\nDos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primero caminitos, después láminas). Clic en el mapa para verlo a pantalla completa (X o Escape para cerrar); el título de la card abre el procedimiento.\n\n| Carpeta | Qué es |\n|---------|--------|\n| [`guides/assets/flujos/`](./guides/assets/flujos/) | Caminitos si/si no (cómo se mueve el documento) |\n| [`guides/assets/laminas/`](./guides/assets/laminas/) | Láminas con roles y detalle (las primeras que armamos) |\n| [`guides/assets/screenshots/`](./guides/assets/screenshots/) | Capturas de pantalla de la guía |\n\n**Caminitos** (`flujos/`)\n\n| Mapa | Archivo | Guía |\n|------|---------|------|\n| Pagar un sueldo | [`flujos/mapa-flujo-sueldo-si-no.png`](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png) | §12.2.1 |\n| Costo de empresa | [`flujos/mapa-flujo-gasto-empresa-si-no.png`](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png) | §12.2 · §14 |\n| Compra | [`flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png) | §9 |\n| Mano de obra y equipos | [`flujos/mapa-flujo-mano-obra-equipos-si-no.png`](./guides/assets/flujos/mapa-flujo-mano-o"
+      "text": "| P14 | Invitar usuario | §2.1 | `/configuracion/equipo/invitar` |\n| P15 | Aceptar invitación (sin token en URL) | §2.1 | `/invitaciones/aceptar` |\n\nEl resto de bloques `📷` del documento (login, presupuesto, OC, certificaciones, etc.) siguen vigentes; completarlos cuando armes el entregable completo al cliente.\n\n### 0.4 Mapas de proceso (guía visual)\n\nDos familias, misma marca. En la app: **Ayuda** → **Mapas de proceso** (primero caminitos, después láminas). Clic en el mapa para verlo a pantalla completa (X o Escape para cerrar); el título de la card abre el procedimiento.\n\n| Carpeta | Qué es |\n|---------|--------|\n| [`guides/assets/flujos/`](./guides/assets/flujos/) | Caminitos si/si no (cómo se mueve el documento) |\n| [`guides/assets/laminas/`](./guides/assets/laminas/) | Láminas con roles y detalle (las primeras que armamos) |\n| [`guides/assets/screenshots/`](./guides/assets/screenshots/) | Capturas de pantalla de la guía |\n\n**Caminitos** (`flujos/`)\n\n| Mapa | Archivo | Guía |\n|------|---------|------|\n| Pagar un sueldo | [`flujos/mapa-flujo-sueldo-si-no.png`](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png) | §12.2.1 |\n| Costo de empresa | [`flujos/mapa-flujo-gasto-empresa-"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#15",
@@ -210,7 +210,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "bra-equipos-si-no.png) | §9.0.1 · §9.0.2 |\n| Egresos de obra (comparación) | [`flujos/mapa-flujo-egresos-obra-comparacion.png`](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png) | §9.0 · §10 · §12.2 |"
+      "text": "si-no.png`](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png) | §12.2 · §14 |\n| Compra | [`flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png) | §9 |\n| Mano de obra y equipos | [`flujos/mapa-flujo-mano-obra-equipos-si-no.png`](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png) | §9.0.1 · §9.0.2 |"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#16",
@@ -218,7 +218,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "| Desvío de OC | [`flujos/mapa-flujo-desvio-oc-si-no.png`](./guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png) | §9.2 |\n| Costo de obra | [`flujos/mapa-flujo-costo-obra-si-no.png`](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png) | §12.2 |\n| Subcontrato | [`flujos/mapa-flujo-subcontrato-si-no.png`](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png) | §10 |\n| Certificar y cobrar | [`flujos/mapa-flujo-certificar-cobrar-si-no.png`](./guides/assets/flujos/mapa-flujo-certificar-cobrar-si-no.png) | §11 · §12.1 |\n\n**Láminas** (`laminas/`)\n\n| Mapa | Archivo | Guía |\n|------|---------|------|\n| Puesta en marcha | [`laminas/mapa-puesta-en-marcha.png`](./guides/assets/laminas/mapa-puesta-en-marcha.png) | §0.1 · §5 |\n| Pagar desde la empresa | [`laminas/mapa-pago-corporativo.png`](./guides/assets/laminas/mapa-pago-corporativo.png) | §12.2 |\n| Tesorería y conciliación | [`laminas/mapa-tesoreria-conciliacion.png`](./guides/assets/laminas/mapa-tesoreria-conciliacion.png) | §4.2 |\n| Cerrar el mes | [`laminas/mapa-cerrar-el-mes.png`](./guides/assets/laminas/mapa-cerrar-el-mes.png) | §15.3 |\n| Presupuesto y EDT | [`laminas/mapa-presupuesto-edt.png`](./guides/assets/laminas/mapa-presu"
+      "text": "| Egresos de obra (comparación) | [`flujos/mapa-flujo-egresos-obra-comparacion.png`](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png) | §9.0 · §10 · §12.2 |\n| Desvío de OC | [`flujos/mapa-flujo-desvio-oc-si-no.png`](./guides/assets/flujos/mapa-flujo-desvio-oc-si-no.png) | §9.2 |\n| Costo de obra | [`flujos/mapa-flujo-costo-obra-si-no.png`](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png) | §12.2 |\n| Subcontrato | [`flujos/mapa-flujo-subcontrato-si-no.png`](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png) | §10 |\n| Certificar y cobrar | [`flujos/mapa-flujo-certificar-cobrar-si-no.png`](./guides/assets/flujos/mapa-flujo-certificar-cobrar-si-no.png) | §11 · §12.1 |\n\n**Láminas** (`laminas/`)\n\n| Mapa | Archivo | Guía |\n|------|---------|------|\n| Puesta en marcha | [`laminas/mapa-puesta-en-marcha.png`](./guides/assets/laminas/mapa-puesta-en-marcha.png) | §0.1 · §5 |\n| Pagar desde la empresa | [`laminas/mapa-pago-corporativo.png`](./guides/assets/laminas/mapa-pago-corporativo.png) | §12.2 |\n| Tesorería y conciliación | [`laminas/mapa-tesoreria-conciliacion.png`](./guides/assets/laminas/mapa-tesoreria-conciliacion.png) | §4.2 |\n| Cerrar el mes | [`laminas/mapa"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#17",
@@ -226,7 +226,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "puesto-edt.png) | §6 |\n| Circuito de compra | [`laminas/mapa-circuito-compra-sc-oc.png`](./guides/assets/laminas/mapa-circuito-compra-sc-oc.png) | §9 |\n| Subcontrato hasta el pago | [`laminas/mapa-subcontrato.png`](./guides/assets/laminas/mapa-subcontrato.png) | §10 |"
+      "text": "-cerrar-el-mes.png`](./guides/assets/laminas/mapa-cerrar-el-mes.png) | §15.3 |\n| Presupuesto y EDT | [`laminas/mapa-presupuesto-edt.png`](./guides/assets/laminas/mapa-presupuesto-edt.png) | §6 |\n| Circuito de compra | [`laminas/mapa-circuito-compra-sc-oc.png`](./guides/assets/laminas/mapa-circuito-compra-sc-oc.png) | §9 |"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#18",
@@ -234,7 +234,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "0. Cómo leer esta guía",
-      "text": "| Certificar, facturar y cobrar | [`laminas/mapa-certificar-cobrar.png`](./guides/assets/laminas/mapa-certificar-cobrar.png) | §11 · §12.1 |\n| Cargar EDT y APU | [`laminas/mapa-cargar-edt-apu.png`](./guides/assets/laminas/mapa-cargar-edt-apu.png) | §6.1 |\n| Armar el cronograma | [`laminas/mapa-armar-cronograma.png`](./guides/assets/laminas/mapa-armar-cronograma.png) | §7 |\n\nLas láminas de empresa y de presupuesto:\n\n![Bloqer — Puesta en marcha](./guides/assets/laminas/mapa-puesta-en-marcha.png)\n\n*Puesta en marcha (empresa + primera obra).*\n\n![Bloqer — Pagar desde la empresa](./guides/assets/laminas/mapa-pago-corporativo.png)\n\n*Pagar desde la empresa.*\n\n![Bloqer — Tesorería y conciliación](./guides/assets/laminas/mapa-tesoreria-conciliacion.png)\n\n*Tesorería y conciliación.*\n\n![Bloqer — Cerrar el mes](./guides/assets/laminas/mapa-cerrar-el-mes.png)\n\n*Cerrar el mes.*\n\n![Bloqer — Presupuesto y EDT](./guides/assets/laminas/mapa-presupuesto-edt.png)\n\n*Presupuesto y EDT.*\n\nCaminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma están en su sección.\n\n---"
+      "text": "| Subcontrato hasta el pago | [`laminas/mapa-subcontrato.png`](./guides/assets/laminas/mapa-subcontrato.png) | §10 |\n| Certificar, facturar y cobrar | [`laminas/mapa-certificar-cobrar.png`](./guides/assets/laminas/mapa-certificar-cobrar.png) | §11 · §12.1 |\n| Cargar EDT y APU | [`laminas/mapa-cargar-edt-apu.png`](./guides/assets/laminas/mapa-cargar-edt-apu.png) | §6.1 |\n| Armar el cronograma | [`laminas/mapa-armar-cronograma.png`](./guides/assets/laminas/mapa-armar-cronograma.png) | §7 |\n\nLas láminas de empresa y de presupuesto:\n\n![Bloqer — Puesta en marcha](./guides/assets/laminas/mapa-puesta-en-marcha.png)\n\n*Puesta en marcha (empresa + primera obra).*\n\n![Bloqer — Pagar desde la empresa](./guides/assets/laminas/mapa-pago-corporativo.png)\n\n*Pagar desde la empresa.*\n\n![Bloqer — Tesorería y conciliación](./guides/assets/laminas/mapa-tesoreria-conciliacion.png)\n\n*Tesorería y conciliación.*\n\n![Bloqer — Cerrar el mes](./guides/assets/laminas/mapa-cerrar-el-mes.png)\n\n*Cerrar el mes.*\n\n![Bloqer — Presupuesto y EDT](./guides/assets/laminas/mapa-presupuesto-edt.png)\n\n*Presupuesto y EDT.*\n\nCaminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma están en su sección.\n\n---"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#19",

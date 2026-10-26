@@ -816,10 +816,11 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     level: "both",
     typicalRoles: ["OWNER", "PM", "Compras", "Finanzas", "Administración"],
     permissionHint: "Disponible si Bloqer AI está habilitado para el entorno. Las respuestas respetan tus permisos y módulos.",
-    where: { menu: "Botón flotante «Preguntale a Bloqer» (esquina inferior derecha)" },
+    where: { menu: "Botón circular con destellos «Preguntale a Bloqer» (esquina inferior derecha)" },
     hrefs: [{ kind: "company", path: "/ayuda/preguntale-a-bloqer", label: "Esta ficha" }],
     steps: [
-      "Abrí el chat con el botón flotante «Preguntale a Bloqer».",
+      "Abrí el chat con el botón circular de destellos. El texto «Preguntale a Bloqer» aparece al pasar el mouse o enfocarlo con el teclado; en el celular, tocá el ícono.",
+      "Retirá el mouse para que el botón vuelva a su tamaño compacto. Si tapa un resultado al final de la página, desplazate hacia abajo para verlo por encima del botón.",
       "Preguntá en lenguaje natural (ej. «¿Qué OC están pendientes?» o «¿Cómo creo una SC?»).",
       "Si estás dentro de una obra, el asistente usa ese contexto; si no, puede pedirte aclarar el proyecto.",
       "Usá los chips de acción debajo de la respuesta (links internos seguros) para ir a la pantalla correspondiente.",
@@ -846,6 +847,9 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     keywords: [
       "preguntale a bloqer",
+      "boton circular",
+      "boton tapa resultados",
+      "destellos",
       "bloqer ai",
       "asistente",
       "chat",
