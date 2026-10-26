@@ -147,7 +147,7 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
           confirmLabel="Cancelar pago"
           size="default"
           successMessage="Pago cancelado"
-          action={async () => cancelPaymentAction(paymentId, id)}
+          action={cancelPaymentAction.bind(null, paymentId, id)}
         />
       )}
     </PageShell>

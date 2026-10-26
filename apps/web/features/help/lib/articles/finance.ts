@@ -560,8 +560,12 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Cuenta, fecha, monto (click en el saldo para autocompletar; no reescribas «a ojo»).",
       "Método de liquidación y referencia opcionales.",
       "Confirmá. Bloquea si fondos insuficientes o período cerrado.",
+      "En el detalle del pago podés consultar monto, fecha y cuenta, y volver a la CxP o a la factura. En obra, Cancelar pago pide confirmación y requiere permiso.",
     ],
     effects: ["Pagado (o parcial) + movimiento OUTFLOW + asiento DRAFT."],
+    pitfalls: [
+      "Si falla la carga del detalle después de confirmar, revisá la CxP y Transacciones antes de registrar otro pago: el pago puede haber quedado confirmado. Si ya figura, volvé a abrirlo; no lo dupliques.",
+    ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
       "por-que-un-pago-se-bloquea",
@@ -574,6 +578,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       "pago proveedor",
       "cuenta corriente",
       "saldar",
+      "pago confirmado",
+      "error al abrir pago",
     ],
     guideRef: "§12.2",
   },

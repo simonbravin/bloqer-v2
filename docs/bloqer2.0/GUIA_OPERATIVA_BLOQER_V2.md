@@ -1318,6 +1318,8 @@ Si el “empleado” es monotributista y te pasa factura C: cargalo como **Prove
 
 **Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, **método de liquidación** + referencia opcional, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible. Si el movimiento de caja ya está **Conciliado**, hay que desemparejar antes de cancelar el pago.
 
+**Consultar el pago confirmado:** el detalle de obra (`/proyectos/[id]/pagos/[paymentId]`) muestra monto, fecha, cuenta y accesos a la CxP y la factura. **Cancelar pago** pide confirmación y solo aparece con permiso de pago mientras esté confirmado. Si la pantalla falla al cargar después de registrar, revisá primero la **CxP** y **Transacciones**: el pago puede haberse guardado correctamente. Si ya figura confirmado, volvé a abrir su detalle; no registres otro pago por el error de visualización.
+
 > **Notas de navegación y límites:**
 > - Consulta consolidada de pagos: `/finanzas/transacciones` filtrando origen `PAYMENT` y egreso.
 > - **Retenciones** manuales (sin módulo dedicado).
