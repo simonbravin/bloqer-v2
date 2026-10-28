@@ -27,6 +27,7 @@ export const HELP_FEATURED_SLUGS: readonly string[] = [
   "orden-de-compra-y-afectar-edt",
   "pagar-un-sueldo",
   "hub-reportes-de-obra",
+  "reporte-avances-del-proyecto",
   "presupuesto-vs-real",
   "ver-rentabilidad-de-obra",
   "exportar-reportes-csv-pdf",

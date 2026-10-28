@@ -128,6 +128,12 @@ export const SCHEDULED_REPORT_KEY_META: Record<ScheduledReportKey, ScheduledRepo
     group: "operational",
     requiredModules: ["CERTIFICATIONS"],
   },
+  PROJECT_PROGRESS: {
+    scope: "PROJECT",
+    labelEs: "Avance del proyecto",
+    group: "operational",
+    requiredModules: ["PROJECTS", "BUDGETS"],
+  },
   PROJECT_PROCUREMENT: {
     scope: "PROJECT",
     labelEs: "Análisis de compras",

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowUpRight, TrendingUp } from "lucide-react";
 import { formatDate } from "@/lib/format";
 import type { ProjectStatus } from "@bloqer/database";
 import type { ProjectOverviewDashboard } from "@bloqer/services";
@@ -97,7 +98,9 @@ export function ProjectOverviewView({
           </div>
           {p.code ? <p className="font-mono text-sm text-muted-foreground">{p.code}</p> : null}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">{lifecycleActions}</div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          {lifecycleActions}
+        </div>
       </div>
 
       {missingPm ? (
@@ -214,8 +217,29 @@ export function ProjectOverviewView({
         </KpiStatGrid>
       ) : null}
 
+      {dashboard.kpis.costControl?.available ? (
+        <Link
+          href={`/proyectos/${projectId}/reportes/avances`}
+          className="flex items-center justify-between gap-4 rounded-xl border border-primary/20 bg-primary/5 p-5 transition-colors hover:bg-primary/10"
+        >
+          <div className="flex min-w-0 items-start gap-3">
+            <TrendingUp className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden />
+            <div>
+              <p className="text-sm font-semibold">Reporte de avances</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                Plan, ejecución aprobada, certificación y costos. Detectá qué queda por ejecutar o
+                certificar.
+              </p>
+            </div>
+          </div>
+          <ArrowUpRight className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+        </Link>
+      ) : null}
+
       <section className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Evolución</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Evolución
+        </h2>
         <ProjectOverviewCharts
           projectId={projectId}
           billingVsCollections={dashboard.billingVsCollections}

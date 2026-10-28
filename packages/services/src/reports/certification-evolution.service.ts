@@ -8,6 +8,7 @@ import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget"
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
+import { certificationWeightedPhysicalPct } from "./certification-physical-pct";
 
 export type CertificationReportFilters = {
   budgetId?: string;
@@ -124,10 +125,7 @@ async function resolveBudget(
   projectId: string,
   budgetId: string | undefined,
   ctx: ServiceContext,
-): Promise<
-  | { id: string; name: string; status: string; totalSalePrice: Prisma.Decimal }
-  | null
-> {
+): Promise<{ id: string; name: string; status: string; totalSalePrice: Prisma.Decimal } | null> {
   const budgets = await prisma.budget.findMany({
     where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
     select: {
@@ -238,33 +236,34 @@ export async function getCertificationEvolutionReport(
       })
     : [];
 
-  const invoices =
-    arEnabled
-      ? await prisma.salesInvoice.findMany({
-          where: {
-            projectId,
-            tenantId: ctx.tenantId,
-            status: "ISSUED",
-            certification: { budgetId: budget.id },
-          },
-          select: { issueDate: true, totalAmount: true },
-        })
-      : [];
+  const invoices = arEnabled
+    ? await prisma.salesInvoice.findMany({
+        where: {
+          projectId,
+          tenantId: ctx.tenantId,
+          status: "ISSUED",
+          certification: { budgetId: budget.id },
+        },
+        select: { issueDate: true, totalAmount: true },
+      })
+    : [];
 
-  const collections =
-    arEnabled
-      ? await prisma.collection.findMany({
-          where: {
-            projectId,
-            tenantId: ctx.tenantId,
-            status: "CONFIRMED",
-            salesInvoice: { certification: { budgetId: budget.id } },
-          },
-          select: { collectionDate: true, amount: true },
-        })
-      : [];
+  const collections = arEnabled
+    ? await prisma.collection.findMany({
+        where: {
+          projectId,
+          tenantId: ctx.tenantId,
+          status: "CONFIRMED",
+          salesInvoice: { certification: { budgetId: budget.id } },
+        },
+        select: { collectionDate: true, amount: true },
+      })
+    : [];
 
-  const monthlyMap = new Map<string, { certified: Prisma.Decimal; invoiced: Prisma.Decimal; collected: Prisma.Decimal }>();
+  const monthlyMap = new Map<
+    string,
+    { certified: Prisma.Decimal; invoiced: Prisma.Decimal; collected: Prisma.Decimal }
+  >();
 
   function ensureMonth(key: string) {
     if (!monthlyMap.has(key)) {
@@ -316,7 +315,9 @@ export async function getCertificationEvolutionReport(
     cumCollected = cumCollected.add(p.collectedAmount);
 
     const certsInMonth = certifications.filter(
-      (c) => monthKey(c.periodEnd) === p.periodKey && inDateRange(c.periodEnd, filters.dateFrom, filters.dateTo),
+      (c) =>
+        monthKey(c.periodEnd) === p.periodKey &&
+        inDateRange(c.periodEnd, filters.dateFrom, filters.dateTo),
     );
     for (const cert of certsInMonth) {
       for (const line of cert.lines) {
@@ -333,9 +334,10 @@ export async function getCertificationEvolutionReport(
     const financialPct = budgetTotalSale.isZero()
       ? "0.00"
       : cumCollected.div(budgetTotalSale).times(100).toFixed(2);
-    const physicalPct = physicalWeight.isZero()
-      ? "0.00"
-      : physicalWeighted.div(physicalWeight).times(100).toFixed(2);
+    const physicalPct = certificationWeightedPhysicalPct(
+      physicalWeighted.toString(),
+      physicalWeight.toString(),
+    );
 
     return {
       periodKey: p.periodKey,
@@ -359,11 +361,7 @@ export async function getCertificationEvolutionReport(
         collected = collected.add(c.amount);
       }
       const balance = ar.originalAmount.minus(ar.paidAmount);
-      if (
-        ar.status !== "PAID" &&
-        balance.greaterThan(0) &&
-        ar.dueDate < new Date()
-      ) {
+      if (ar.status !== "PAID" && balance.greaterThan(0) && ar.dueDate < new Date()) {
         overdue = true;
       }
     }
@@ -378,7 +376,12 @@ export async function getCertificationEvolutionReport(
       totalAmount: serializeMoneyDecimal(cert.totalAmount),
       invoicedAmount: invoiced.toFixed(2),
       collectedAmount: collected.toFixed(2),
-      paymentStatus: derivePaymentStatus(invoiced, collected, cert.salesInvoices.length > 0, overdue),
+      paymentStatus: derivePaymentStatus(
+        invoiced,
+        collected,
+        cert.salesInvoices.length > 0,
+        overdue,
+      ),
     };
   });
 

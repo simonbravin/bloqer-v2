@@ -54,6 +54,7 @@ _No directas_; cruza con avance físico en [`../04-formulas/PROGRESS_FORMULAS.md
 
 ## 14. Reportes relacionados
 - Libro de obra PDF, línea de tiempo obra.
+- **Avances del proyecto** R-002 (D-120): acumula partes actualmente APPROVED por fecha de ejecución hasta el corte, con físico ponderado por costo y cobertura; porcentajes legacy anteriores a junio de 2026 se advierten como ambiguos, sin reescribirlos.
 
 ## 15. Relación con otros módulos
 - **Proyectos**, **Cronograma**, **Certificaciones**, **Inventario** (recepciones).

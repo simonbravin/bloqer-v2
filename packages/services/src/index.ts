@@ -239,6 +239,7 @@ export {
 export { formatNotificationTitle } from "./notifications/notification-copy";
 export * from "./report-exports/report-export.types";
 export * from "./report-exports/report-export.service";
+export * from "./report-exports/project-progress-export.service";
 export {
   DEFAULT_CASH_DATE_RANGE_DAYS,
   DEFAULT_PAGE_SIZE,

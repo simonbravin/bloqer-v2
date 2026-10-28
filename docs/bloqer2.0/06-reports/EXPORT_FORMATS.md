@@ -19,5 +19,13 @@
 ## PDF vs datos sensibles
 Ocultar columnas según rol antes de renderizar.
 
+## R-002 — Avances del proyecto (D-120)
+
+- Descarga **CSV / Excel (XLSX) / PDF** desde `/proyectos/[id]/reportes/avances`; email manual y programación de obra (`PROJECT_PROGRESS`) en **CSV/PDF**.
+- Misma lectura del servidor y permisos en vista, archivo y adjunto: presupuesto(s), moneda original coherente, movimientos desde, corte no futuro y estado documental actual. Desde no reinicia acumulados.
+- Conservar cobertura, avisos de fuentes ambiguas/faltantes y bases de cada indicador. Porcentajes observados no se convierten en globales validados al exportar. Un dato restringido o no calculable permanece vacío/identificado; no se convierte en cero.
+- PDF ejecutivo con indicadores, gráficos y pendientes; detalle por partida para análisis en Excel/CSV. Identificar cualquier truncado de detalle en PDF y remitir al archivo de datos completo.
+- Sin sumar monedas distintas, sin duplicar padres/hojas o comprometido/devengado; bases fiscales distintas conservan su explicación.
+
 ## Referencias
 - [`EXPORT_REPORTS.md`](../05-workflows/EXPORT_REPORTS.md)

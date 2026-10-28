@@ -4,6 +4,7 @@ import {
   LineChart,
   Package,
   Percent,
+  TrendingUp,
   Truck,
   Users,
   Wallet,
@@ -40,7 +41,8 @@ export function ReportsHub({
   const financial: ReportHubCard[] = [
     {
       title: "Aging Cuentas por cobrar",
-      description: "Deuda abierta por cliente con buckets de vencimiento y foco en riesgo de cobro.",
+      description:
+        "Deuda abierta por cliente con buckets de vencimiento y foco en riesgo de cobro.",
       href: `/proyectos/${projectId}/cuentas-por-cobrar`,
       icon: <Wallet className="h-5 w-5" />,
       available: canAr,
@@ -48,7 +50,8 @@ export function ReportsHub({
     },
     {
       title: "Aging Cuentas por pagar",
-      description: "Obligaciones abiertas por proveedor con buckets de vencimiento y riesgo de pago.",
+      description:
+        "Obligaciones abiertas por proveedor con buckets de vencimiento y riesgo de pago.",
       href: `/proyectos/${projectId}/cuentas-por-pagar`,
       icon: <Wallet className="h-5 w-5" />,
       available: canAp,
@@ -97,6 +100,15 @@ export function ReportsHub({
 
   const operational: ReportHubCard[] = [
     {
+      title: "Avances del proyecto",
+      description:
+        "Plan, ejecución del libro aprobado, certificación, costos y cobranzas, con cobertura y pendientes por partida.",
+      href: `${base}/avances`,
+      icon: <TrendingUp className="h-5 w-5" />,
+      available: canCostReports,
+      badge: "Visión integral de avance",
+    },
+    {
       title: "EDT y costos",
       description:
         "Tablero de $ por partida: capas, filtro por tipo, composición APU y barras Presup/Devengado/Exposición.",
@@ -107,15 +119,15 @@ export function ReportsHub({
     },
     {
       title: "Certificaciones",
-      description: "Evolución certificado / facturado / cobrado, curvas de avance y estado por partida.",
+      description:
+        "Evolución certificado / facturado / cobrado, cartera de certificaciones y estado por partida.",
       href: `${base}/certificaciones`,
       icon: <FileCheck2 className="h-5 w-5" />,
       available: canCertReports,
     },
     {
       title: "Proveedores",
-      description:
-        "Tabla, líderes por pedidos y por monto, concentración y saldo CxP (R-AP-03).",
+      description: "Tabla, líderes por pedidos y por monto, concentración y saldo CxP (R-AP-03).",
       href: `${base}/proveedores`,
       icon: <Truck className="h-5 w-5" />,
       available: canProcurementReports,

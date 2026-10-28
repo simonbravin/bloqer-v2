@@ -83,14 +83,15 @@
 ### Q-005b — Libro de obra: semántica legacy de `physicalPct`
 
 - **Categoría:** Libro de Obra
-- **Estado:** ABIERTA
+- **Estado:** RESUELTA para R-002 → D-120 (2026-10-28). No autoriza normalizar el histórico ni altera D-045.
 - **Impacto:** partes `APPROVED` previos a jun-2026 pueden haber cargado % acumulado en lugar de % incremental del día; la suma histórica puede superar 100 o no coincidir con cantidades.
 - **Opciones:**
   1. Dejar datos legacy sin migrar; UI/validación aplica solo a partes nuevos.
   2. Script de normalización one-off (fuera de producto) tras auditoría manual.
   3. Flag por tenant «modo acumulado legacy» hasta migración completa.
 - **Recomendación:** opción 1 + advertencia en UI si suma histórica > 100.
-- **Bloquea:** reportes de avance físico por WBS basados en `physicalPct`.
+- **Resolución para R-002:** conservar datos, advertir los porcentajes de partes anteriores a junio de 2026 como ambiguos y no presentar un físico global validado cuando su fuente incluya esa ambigüedad. Un acumulado menor a 100 tampoco demuestra semántica incremental. No aplicar correcciones masivas ni un tope visual que oculte el exceso. Cantidades y porcentajes conservan su evidencia y fecha; el tratamiento de cobertura está en `PROGRESS_FORMULAS.md`.
+- **Bloquea:** ya no bloquea R-002 bajo D-120; cualquier futura regularización de datos requiere una decisión específica.
 
 ### Q-006 — RFIs con SLA
 
@@ -578,6 +579,22 @@
 - **Estado:** RESUELTA → D-119.
 - **Resolución:** el pedido explícito del Owner de no superar nunca el 100% entre todos los certificados reemplaza la excepción privada de D-004.
 - **Sugerencias:** Owner confirmó avance físico inicial y compras/recepciones como alternativas editables.
+
+### Q-066 — Reporte de avance del proyecto: ponderación física y base histórica
+
+- **Fecha:** 2026-10-28.
+- **Categoría:** Proyectos / Reportes / Libro de obra.
+- **Estado:** RESUELTA → D-120 (2026-10-28), por aprobación explícita del Owner de las bases propuestas y su implementación completa.
+- **Contexto:** R-002 está integrado en Certificaciones y se propone convertirlo en un reporte propio de proyecto, con indicadores, gráficos, pendientes y exportaciones. El Real del cronograma ya puede provenir del libro aprobado (D-045): no son dos ejecuciones sumables. El KPI temporal pondera hojas por duración; no constituye una ponderación física global de partidas heterogéneas.
+- **Preguntas a resolver:**
+  1. ¿Cómo se pondera el físico global de partidas con distintas unidades? Opciones: costo directo presupuestado, venta presupuestada o pesos explícitos. **Recomendación para evaluar:** costo directo presupuestado de las partidas hoja del alcance seleccionado, con cobertura visible y sin excluir silenciosamente partidas sin medición. La fórmula y los casos de base nula/costo cero requieren aprobación y documentación antes del código; pesos explícitos implicarían modelo nuevo.
+  2. ¿Se adopta para R-002 el tratamiento recomendado en Q-005b: conservar históricos, advertir la semántica legacy y no presentar como validado un físico ambiguo? Una suma menor a 100 tampoco prueba que el histórico sea incremental. No normalizar datos ni ocultar excesos mediante un tope visual.
+  3. ¿Se acepta como primera versión una consulta de ejecución al corte contra **alcance vigente seleccionado**, incluyendo principal y adendas APPROVED/CLOSED (D-116), con el plan actual identificado como referencia? No equivale a reconstruir el alcance o el cronograma originalmente aprobados en cada fecha. La reconstrucción histórica de aprobaciones/anulaciones y un plan versionado requieren definición adicional.
+- **Recomendación de presentación:** separar avance de cronograma, físico por libro, certificado sobre venta, consumo del presupuesto de costo y cobrado sobre facturado. La comparación plan/físico exige igual alcance y ponderación; no restar directamente el KPI temporal ponderado por duración del físico ponderado por costo.
+- **Pendientes:** reutilizar documentos/estados existentes para cantidades por ejecutar, ejecución pendiente de certificar, aprobación, facturación y cobranza. Exposición de costo no es EAC; el costo necesario para terminar sigue diferido por Q-059.
+- **Resolución:** físico global ponderado por costo directo presupuestado de las partidas hoja del alcance vigente; costo cero sin peso pero con advertencia y cobertura visible; base cero no calculable. Partidas sin medición conservan el denominador y generan un porcentaje observado, sin afirmar que son 0% validadas. Global validado solo con cobertura completa y sin fuentes ambiguas. Se adopta el tratamiento conservador de Q-005b y el plan vigente recalculado con iguales pesos/alcance. Corte por fecha de ejecución y estado actual, sin reconstrucción histórica de aprobaciones o anulaciones. Fórmulas canónicas en `PROGRESS_FORMULAS.md`.
+- **Bloquea:** cerrado para el alcance aprobado; EAC y regularización legacy no forman parte de esta resolución.
+- **Especificación:** [Reportes operativos — R-002](../06-reports/OPERATIONAL_REPORTS.md#r-002--avance-del-proyecto-d-120).
 
 ## Cómo se resuelve una pregunta
 

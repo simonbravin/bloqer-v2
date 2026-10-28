@@ -3,10 +3,12 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import type { ScheduleItemStatus } from "@bloqer/database";
+import { can } from "@bloqer/domain";
 import {
   getProjectScheduleFieldWorkspace,
   getProjectScheduleWorkspace,
   getProjectShellInfo,
+  getTenantModuleGate,
   parseScheduleFieldFilter,
   ServiceError,
 } from "@bloqer/services";
@@ -17,7 +19,11 @@ import { ScheduleFieldExperience } from "@/features/schedule/components/schedule
 import { budgetFilterOptionLabel } from "@/features/budgets/components/budget-status-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { isScheduleFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
+import {
+  isScheduleFieldViewport,
+  parseViewportHint,
+  VIEWPORT_COOKIE,
+} from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -47,11 +53,22 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
   try {
     await getProjectShellInfo(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
   const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
+  const gate = await getTenantModuleGate(ctx);
+  const progressReportHref = `/proyectos/${projectId}/reportes/avances${sp.budgetId ? `?budgetId=${encodeURIComponent(sp.budgetId)}` : ""}`;
+  const progressReportAction =
+    gate.isEnabled("PROJECTS") &&
+    gate.isEnabled("BUDGETS") &&
+    (can(ctx.roles, "VIEW", "PROJECTS") || can(ctx.roles, "VIEW", "BUDGETS")) ? (
+      <Button variant="outline" size="sm" asChild>
+        <Link href={progressReportHref}>Reporte de avances</Link>
+      </Button>
+    ) : undefined;
   const loadField = isScheduleFieldViewport(hint);
 
   if (loadField) {
@@ -66,7 +83,11 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     const queryMs = Date.now() - started;
     return (
       <PageShell variant="default" className="space-y-6">
-        <ProjectPageHeader title="Cronograma" subtitle="Tareas de la obra" />
+        <ProjectPageHeader
+          title="Cronograma"
+          subtitle="Tareas de la obra"
+          actions={progressReportAction}
+        />
         <ScheduleFieldExperience projectId={projectId} workspace={field} queryMs={queryMs} />
       </PageShell>
     );
@@ -75,18 +96,11 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
   let result;
   const started = Date.now();
   try {
-    const statusValues = [
-      "PLANNED",
-      "IN_PROGRESS",
-      "BLOCKED",
-      "COMPLETED",
-      "CANCELLED",
-    ] as const;
+    const statusValues = ["PLANNED", "IN_PROGRESS", "BLOCKED", "COMPLETED", "CANCELLED"] as const;
     const status = statusValues.includes(sp.status as ScheduleItemStatus)
       ? (sp.status as ScheduleItemStatus)
       : undefined;
-    const itemType =
-      sp.type === "TASK" || sp.type === "MILESTONE" ? sp.type : undefined;
+    const itemType = sp.type === "TASK" || sp.type === "MILESTONE" ? sp.type : undefined;
     const fieldFilter = parseScheduleFieldFilter(sp.field);
 
     result = await getProjectScheduleWorkspace(
@@ -109,6 +123,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Cronograma"
+        actions={progressReportAction}
         subtitle={
           result.type === "WORKSPACE"
             ? `Presupuesto base: ${result.budgetName}`

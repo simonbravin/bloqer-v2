@@ -29,12 +29,14 @@ _No aplica._
 
 ## 9. Pantallas y vistas necesarias
 - Biblioteca de reportes por categoría.
+- **Avances del proyecto** (`/proyectos/[id]/reportes/avances`, R-002 / D-120): indicadores, plan y ejecución registrada, certificado, consumo del presupuesto de costo, cobranza, cobertura y pendientes con evidencia. Exportar CSV/Excel/PDF, enviar por email y programar mediante el registro existente.
 - **Proveedores de la obra** (`/proyectos/[id]/reportes/proveedores`, R-AP-03): líderes y tabla.
 - Query builder ([`QUERY_BUILDER.md`](../06-reports/QUERY_BUILDER.md)).
 
 ## 10. Reglas de negocio
 - Toggle **Comprometido / Pagado** en presupuesto vs real ([D-021]).
 - Datos sensibles filtrados por rol ([D-013]).
+- R-002: físico por libro ponderado por costo directo presupuestado de partidas hoja del alcance vigente (principal y adendas APPROVED/CLOSED); avance observado y cobertura explícitos. Fuentes ambiguas o faltantes no equivalen a cero validado; plan comparable con igual alcance/pesos. Corte de ejecución y estado actual identificados. Ver D-120 y `PROGRESS_FORMULAS.md`.
 
 ## 11. Validaciones
 - Rango fechas obligatorio salvo reportes “snapshot actual”.

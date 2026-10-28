@@ -32,6 +32,27 @@
     "expectTools": ["search_bloqer_knowledge"]
   },
   {
+    "id": "help-project-progress-report",
+    "category": "help",
+    "question": "¿Dónde veo el reporte de avances del proyecto y qué significa su cobertura?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["cobertura", "medición", "medicion"]
+  },
+  {
+    "id": "help-project-progress-missing-measurement",
+    "category": "help",
+    "question": "Una partida no tiene medición en Avances del proyecto. ¿Eso confirma que tiene cero avance?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["sin medición", "sin medicion", "no significa", "cobertura"]
+  },
+  {
+    "id": "help-project-progress-cost-remaining",
+    "category": "help",
+    "question": "¿El presupuesto disponible en Avances del proyecto es el costo necesario para terminar la obra?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["exposición", "exposicion", "no es", "EAC"]
+  },
+  {
     "id": "help-po-diff-1",
     "category": "help",
     "question": "¿Qué diferencia hay entre SC y OC?",

@@ -1,4 +1,7 @@
-import { sendReportByEmailInputSchema, type SendReportByEmailInputValidated } from "@bloqer/validators";
+import {
+  sendReportByEmailInputSchema,
+  type SendReportByEmailInputValidated,
+} from "@bloqer/validators";
 import { isEmailConfigured } from "@bloqer/config";
 import {
   sendEmail,
@@ -12,6 +15,8 @@ import {
   exportPayableAgingCsv,
   exportProjectCashFlowCsv,
   exportProjectCostControlCsv,
+  exportProjectProgressCsv,
+  parseProjectProgressFilters,
   exportReceivableAgingCsv,
   exportStockBalanceCsv,
   exportStockMovementsCsv,
@@ -35,6 +40,7 @@ import {
 import {
   exportPayableAgingPdf,
   exportProjectCostControlPdf,
+  exportProjectProgressPdf,
   exportReceivableAgingPdf,
 } from "./report-pdf-export.service";
 
@@ -42,6 +48,7 @@ const REPORT_LABEL: Record<SendReportByEmailInputValidated["reportType"], string
   AR_AGING: "Cuentas por cobrar",
   AP_AGING: "Cuentas por pagar",
   PROJECT_COST_CONTROL: "Control de costos (proyecto)",
+  PROJECT_PROGRESS: "Avance del proyecto",
   TREASURY_CASH_POSITION: "Tesorería — Posición de caja",
   TREASURY_MOVEMENTS: "Tesorería — Movimientos",
   TREASURY_CASH_FLOW: "Tesorería — Flujo de caja",
@@ -78,7 +85,11 @@ async function buildReportAttachment(
         return { filename, content: buffer, contentType: "application/pdf" };
       }
       const { content, filename } = await exportReceivableAgingCsv(f, ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "AP_AGING": {
       const f = parseAgingFilters(sp);
@@ -87,7 +98,24 @@ async function buildReportAttachment(
         return { filename, content: buffer, contentType: "application/pdf" };
       }
       const { content, filename } = await exportPayableAgingCsv(f, ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
+    }
+    case "PROJECT_PROGRESS": {
+      const filters = parseProjectProgressFilters(sp);
+      if (input.format === "pdf") {
+        const { buffer, filename } = await exportProjectProgressPdf(input.projectId!, filters, ctx);
+        return { filename, content: buffer, contentType: "application/pdf" };
+      }
+      const { content, filename } = await exportProjectProgressCsv(input.projectId!, filters, ctx);
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "PROJECT_COST_CONTROL": {
       const pid = input.projectId!;
@@ -97,32 +125,70 @@ async function buildReportAttachment(
         return { filename, content: buffer, contentType: "application/pdf" };
       }
       const { content, filename } = await exportProjectCostControlCsv(pid, f, ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "TREASURY_CASH_POSITION": {
       const { content, filename } = await exportCashPositionCsv(parseCashPositionFilters(sp), ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "TREASURY_MOVEMENTS": {
-      const { content, filename } = await exportTreasuryMovementsCsv(parseMovementReportFilters(sp), ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      const { content, filename } = await exportTreasuryMovementsCsv(
+        parseMovementReportFilters(sp),
+        ctx,
+      );
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "TREASURY_CASH_FLOW": {
       const { content, filename } = await exportTreasuryCashFlowCsv(parseCashFlowFilters(sp), ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "INVENTORY_STOCK": {
       const { content, filename } = await exportStockBalanceCsv(parseStockBalanceFilters(sp), ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "INVENTORY_MOVEMENTS": {
-      const { content, filename } = await exportStockMovementsCsv(parseStockMovementFilters(sp), ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      const { content, filename } = await exportStockMovementsCsv(
+        parseStockMovementFilters(sp),
+        ctx,
+      );
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     case "PROJECT_CASH_FLOW": {
       const pid = input.projectId!;
-      const { content, filename } = await exportProjectCashFlowCsv(pid, parseProjectCashFlowFilters(sp), ctx);
-      return { filename, content: Buffer.from(content, "utf-8"), contentType: "text/csv; charset=utf-8" };
+      const { content, filename } = await exportProjectCashFlowCsv(
+        pid,
+        parseProjectCashFlowFilters(sp),
+        ctx,
+      );
+      return {
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
     }
     default: {
       const _exhaustive: never = input.reportType;

@@ -1893,6 +1893,24 @@
 
 ---
 
+### D-120 — Reporte propio de avance del proyecto y físico ponderado por costo
+
+- **Fecha:** 2026-10-28
+- **Estado:** ACTIVA
+- **Decidido por:** Owner, aprobación explícita de las bases propuestas para planificar e implementar el reporte completo, con foco en dirección.
+- **Decisión:** R-002 dispone de una pantalla propia **Avances del proyecto**, `/proyectos/[id]/reportes/avances`, con indicadores, gráficos, pendientes accionables y descargas Excel/CSV/PDF; reutiliza envío por email y reportes programados existentes en CSV/PDF. No agrega tablas, campos persistidos, estados ni dependencias.
+- **Físico global:** ponderar partidas hoja del alcance vigente seleccionado por su costo directo presupuestado. El alcance predeterminado incluye principal y adendas `APPROVED`/`CLOSED` (D-116); el filtro de presupuesto permite recortarlo explícitamente. Las fuentes son partes actualmente `APPROVED` cuya fecha de ejecución no supera el corte; porcentaje incremental y fallback a cantidad según D-045. El Real del cronograma y el libro no se suman.
+- **Cobertura y base:** una partida sin medición no equivale a 0% validado y conserva su peso en el denominador. Mostrar avance **observado**, cobertura ponderada y partidas con/sin medición; solo presentar un global validado con cobertura completa y fuentes válidas. Sin ninguna medición válida, el observado es no calculable; cero explícito sí cuenta como medición. Costo cero no aporta peso y debe advertirse en cobertura; por sí solo no invalida el global, pero una fuente legacy/anómala de cualquier partida sí lo invalida aunque su peso sea cero. Denominador cero implica no calculable. Fórmulas, precisión y bordes en `PROGRESS_FORMULAS.md`.
+- **Histórico (cierre Q-005b para R-002):** conservar datos anteriores a junio de 2026; un porcentaje de un parte de ese período puede ser acumulado o incremental y se considera ambiguo. Advertirlo y no presentar un global validado afectado por esa fuente, aunque su suma no supere 100%. No migrar, normalizar ni ocultar excesos mediante un tope visual. No modifica la sincronización vigente del cronograma de D-045.
+- **Plan comparable y corte:** recalcular el plan vigente con el mismo alcance y pesos del físico; no restar el KPI temporal ponderado por duración de un físico ponderado por costo. Informar la cobertura del vínculo y fechas del cronograma. Los acumulados usan ejecución hasta el corte y el estado documental actual; no reconstruyen estados de aprobación/anulación ni una línea base histórica congelada. El filtro Desde recorta movimientos del período, no reinicia acumulados. El corte no puede superar hoy en Buenos Aires y Desde debe ser anterior o igual al corte: R-002 no es forecast.
+- **Dimensiones:** separar cronograma, físico por libro, certificado sobre venta, consumo del presupuesto de costo y cobrado sobre facturado; cada lectura conserva su denominador y moneda. El físico y el económico de certificados siguen independientes (D-003/D-119). Las capas de costo respetan D-021/D-065; exposición no es costo necesario para terminar. EAC y pronóstico de finalización siguen fuera de alcance (Q-059).
+- **Moneda y vínculo contractual:** la primera implementación trabaja con presupuestos y fuentes de la misma moneda original seleccionada (ARS cuando corresponde), sin convertir bases que no tengan FX trazable. Fuentes de moneda discrepante se advierten y la sección afectada queda no calculable/incompleta. Ventas directas sin vínculo al presupuesto se excluyen del ratio contractual y se explican con aviso/acceso a su operación; no se reparten arbitrariamente entre partidas.
+- **Base desconocida y límite técnico:** si falta una base de costo comparable de alguna partida, no se usa el subtotal conocido como denominador: físico global, observado y cobertura ponderada quedan no calculables; los conteos siguen disponibles. El costo cero conocido conserva su tratamiento sin peso. La ventana visible de evolución admite hasta 120 meses calendario para acotar la generación de series, sin limitar el acumulado anterior ni modificar reglas financieras.
+- **Acceso y distribución:** aplicar permisos y module gates por sección antes de construir resultados o archivos; misma base de datos, filtros y reglas en pantalla, CSV, Excel, PDF y adjuntos. No exponer costos o cobranzas restringidos por ubicarlos dentro de un reporte operativo.
+- **Documentos afectados:** Q-066/Q-005b, `PROGRESS_FORMULAS`, `REPORTING`, `REPORT_CATALOG`, `OPERATIONAL_REPORTS`, guía §13, centro de ayuda, knowledge y validación de Bloqer AI.
+
+---
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

@@ -7,6 +7,7 @@ import {
   parseCashFlowFilters,
   parseCashPositionFilters,
   parseCertificationReportFilters,
+  parseProjectProgressFilters,
   parseCompanyPayableExportFilters,
   parseCompanySupplierInvoiceExportFilters,
   parseCostControlFilters,
@@ -27,6 +28,7 @@ import {
 import {
   exportBudgetVariancePdf,
   exportCertificationEvolutionPdf,
+  exportProjectProgressPdf,
   exportCompanyPayablesPdf,
   exportCompanySupplierInvoicesPdf,
   exportMaterialVariancePdf,
@@ -56,7 +58,9 @@ export type ScheduledReportPdfAttachment = {
   contentType: "application/pdf";
 };
 
-function asFilterRecord(params: Record<string, string> | null | undefined): Record<string, string | undefined> {
+function asFilterRecord(
+  params: Record<string, string> | null | undefined,
+): Record<string, string | undefined> {
   return params ?? {};
 }
 
@@ -148,7 +152,10 @@ async function buildJobsiteDailyLogPdfAttachments(
     throw new PartialScheduledAttachmentsError(
       out.map((pdf) => ({
         reportKey: "TENANT_JOBSITE_DAILY_LOGS" as const,
-        filename: prefixScheduledReportAttachmentFilename("TENANT_JOBSITE_DAILY_LOGS", pdf.filename),
+        filename: prefixScheduledReportAttachmentFilename(
+          "TENANT_JOBSITE_DAILY_LOGS",
+          pdf.filename,
+        ),
         content: pdf.content,
         contentType: pdf.contentType,
       })),
@@ -175,11 +182,17 @@ export async function buildScheduledReportPdfAttachment(
       return toPdfAttachment(filename, buffer);
     }
     case "TENANT_TREASURY_CASH_POSITION": {
-      const { buffer, filename } = await exportTreasuryCashPositionPdf(parseCashPositionFilters(sp), ctx);
+      const { buffer, filename } = await exportTreasuryCashPositionPdf(
+        parseCashPositionFilters(sp),
+        ctx,
+      );
       return toPdfAttachment(filename, buffer);
     }
     case "TENANT_TREASURY_MOVEMENTS": {
-      const { buffer, filename } = await exportTreasuryMovementsPdf(parseMovementReportFilters(sp), ctx);
+      const { buffer, filename } = await exportTreasuryMovementsPdf(
+        parseMovementReportFilters(sp),
+        ctx,
+      );
       return toPdfAttachment(filename, buffer);
     }
     case "TENANT_TREASURY_CASH_FLOW": {
@@ -191,11 +204,17 @@ export async function buildScheduledReportPdfAttachment(
       return toPdfAttachment(filename, buffer);
     }
     case "TENANT_INVENTORY_MOVEMENTS": {
-      const { buffer, filename } = await exportStockMovementsPdf(parseStockMovementFilters(sp), ctx);
+      const { buffer, filename } = await exportStockMovementsPdf(
+        parseStockMovementFilters(sp),
+        ctx,
+      );
       return toPdfAttachment(filename, buffer);
     }
     case "TENANT_CORPORATE_PAYABLES": {
-      const { buffer, filename } = await exportCompanyPayablesPdf(parseCompanyPayableExportFilters(sp), ctx);
+      const { buffer, filename } = await exportCompanyPayablesPdf(
+        parseCompanyPayableExportFilters(sp),
+        ctx,
+      );
       return toPdfAttachment(filename, buffer);
     }
     case "TENANT_CORPORATE_SUPPLIER_INVOICES": {
@@ -232,6 +251,15 @@ export async function buildScheduledReportPdfAttachment(
       );
       return toPdfAttachment(filename, buffer);
     }
+    case "PROJECT_PROGRESS": {
+      if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
+      const { buffer, filename } = await exportProjectProgressPdf(
+        projectId,
+        parseProjectProgressFilters(sp),
+        ctx,
+      );
+      return toPdfAttachment(filename, buffer);
+    }
     case "PROJECT_CERTIFICATIONS": {
       if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
       const { buffer, filename } = await exportCertificationEvolutionPdf(
@@ -261,7 +289,11 @@ export async function buildScheduledReportPdfAttachment(
     }
     case "PROJECT_MATERIALS": {
       if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
-      const { buffer, filename } = await exportMaterialVariancePdf(projectId, parseProjectReportDateFilters(sp), ctx);
+      const { buffer, filename } = await exportMaterialVariancePdf(
+        projectId,
+        parseProjectReportDateFilters(sp),
+        ctx,
+      );
       return toPdfAttachment(filename, buffer);
     }
     case "PROJECT_INCOME_EXPENSE": {

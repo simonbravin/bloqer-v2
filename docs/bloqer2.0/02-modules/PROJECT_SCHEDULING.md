@@ -59,6 +59,7 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 
 ## 14. Reportes relacionados
 - Avance de obra (plan vs real), dashboard ejecutivo.
+- **Reporte de avances** → R-002 `/proyectos/[id]/reportes/avances` (D-120): compara plan vigente y físico con el mismo alcance y pesos por costo. El Real del cronograma permanece como lectura separada; no se suma al libro ni se presenta como baseline histórica.
 
 ## 15. Relación con otros módulos
 - **Proyectos**, **WBS**, **Certificaciones**, **Libro de obra**.

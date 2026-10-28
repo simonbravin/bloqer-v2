@@ -50,3 +50,14 @@ test("accent-insensitive search", () => {
   const hits = searchHelpArticles(HELP_ARTICLES, { query: "recepcion" });
   assert.ok(hits.some((a) => a.slug === "recibir-una-oc"));
 });
+
+test("project progress report is discoverable by its name and decision-making terms", () => {
+  for (const query of ["reporte de avances", "avances del proyecto", "avance observado"]) {
+    const hits = searchHelpArticles(HELP_ARTICLES, { query });
+    assert.equal(hits[0]?.slug, "reporte-avances-del-proyecto", query);
+  }
+  const article = getHelpArticle("reporte-avances-del-proyecto");
+  assert.ok(
+    article?.hrefs.some((href) => href.kind === "project" && href.suffix === "/reportes/avances"),
+  );
+});

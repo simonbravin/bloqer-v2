@@ -5,6 +5,7 @@ export const manualReportTypeSchema = z.enum([
   "AR_AGING",
   "AP_AGING",
   "PROJECT_COST_CONTROL",
+  "PROJECT_PROGRESS",
   "TREASURY_CASH_POSITION",
   "TREASURY_MOVEMENTS",
   "TREASURY_CASH_FLOW",
@@ -19,10 +20,12 @@ const REPORT_TYPES_WITH_PDF = new Set<ManualReportType>([
   "AR_AGING",
   "AP_AGING",
   "PROJECT_COST_CONTROL",
+  "PROJECT_PROGRESS",
 ]);
 
 const REPORT_TYPES_NEED_PROJECT_ID = new Set<ManualReportType>([
   "PROJECT_COST_CONTROL",
+  "PROJECT_PROGRESS",
   "PROJECT_CASH_FLOW",
 ]);
 

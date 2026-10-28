@@ -15,6 +15,8 @@ import {
   getPayableAgingReport,
   getProcurementDeviationReport,
   getProjectSupplierReport,
+  getProjectProgressReport,
+  type ProjectProgressFilters,
   getProjectCashFlowReport,
   getProjectCostControl,
   sliceCostControlReportByCostType,
@@ -76,6 +78,7 @@ import { AgingReportPdfDocument } from "./pdf/aging-pdf";
 import { CostControlReportPdfDocument } from "./pdf/cost-control-pdf";
 import { JobsiteLogPdfDocument } from "./pdf/jobsite-log-pdf";
 import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
+import { ProjectProgressPdfDocument } from "./pdf/project-progress-pdf";
 import { SchedulePdfDocument } from "./pdf/schedule-pdf";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
 import { MAX_AUDIT_LOG_PDF_ROWS } from "./pdf/pdf-export.types";
@@ -100,9 +103,14 @@ export async function exportReceivableAgingPdf(
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
   const report = await getReceivableAgingReport(filters, ctx);
-  return exportPdfDocument(ctx, { projectId: filters.projectId }, `aging_cxc_${report.asOfDate}`, (branding) => (
-    <AgingReportPdfDocument variant="AR" report={report} filters={filters} branding={branding} />
-  ));
+  return exportPdfDocument(
+    ctx,
+    { projectId: filters.projectId },
+    `aging_cxc_${report.asOfDate}`,
+    (branding) => (
+      <AgingReportPdfDocument variant="AR" report={report} filters={filters} branding={branding} />
+    ),
+  );
 }
 
 export async function exportPayableAgingPdf(
@@ -110,9 +118,14 @@ export async function exportPayableAgingPdf(
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
   const report = await getPayableAgingReport(filters, ctx);
-  return exportPdfDocument(ctx, { projectId: filters.projectId }, `aging_cxp_${report.asOfDate}`, (branding) => (
-    <AgingReportPdfDocument variant="AP" report={report} filters={filters} branding={branding} />
-  ));
+  return exportPdfDocument(
+    ctx,
+    { projectId: filters.projectId },
+    `aging_cxp_${report.asOfDate}`,
+    (branding) => (
+      <AgingReportPdfDocument variant="AP" report={report} filters={filters} branding={branding} />
+    ),
+  );
 }
 
 export async function exportProjectCostControlPdf(
@@ -122,18 +135,23 @@ export async function exportProjectCostControlPdf(
 ): Promise<ReportPdfPayload> {
   const raw = await getProjectCostControl(projectId, filters, ctx);
   if (raw.type === "NO_APPROVED_BUDGETS") {
-    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado o cerrado para exportar el control de costos");
+    throw new ServiceError(
+      "CONFLICT",
+      "No hay presupuesto aprobado o cerrado para exportar el control de costos",
+    );
   }
   if (raw.type === "BUDGET_SELECTION_REQUIRED") {
-    throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar el control de costos");
+    throw new ServiceError(
+      "CONFLICT",
+      "Seleccioná un presupuesto para exportar el control de costos",
+    );
   }
-  const result = filters.costType
-    ? sliceCostControlReportByCostType(raw, filters.costType)
-    : raw;
+  const result = filters.costType ? sliceCostControlReportByCostType(raw, filters.costType) : raw;
   const typeSuffix = filters.costType ? `_${filters.costType.toLowerCase()}` : "";
-  const slug = `${result.budgetName}_${filters.dateFrom ?? "all"}_${filters.dateTo ?? "all"}${typeSuffix}`
-    .replace(/[^a-zA-Z0-9._-]+/g, "_")
-    .slice(0, 80);
+  const slug =
+    `${result.budgetName}_${filters.dateFrom ?? "all"}_${filters.dateTo ?? "all"}${typeSuffix}`
+      .replace(/[^a-zA-Z0-9._-]+/g, "_")
+      .slice(0, 80);
   return exportPdfDocument(ctx, { projectId }, `control_costos_${slug}`, (branding) => (
     <CostControlReportPdfDocument report={result} filters={filters} branding={branding} />
   ));
@@ -149,30 +167,38 @@ export async function exportBudgetVariancePdf(
     throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar");
   }
   const report = raw;
-  return exportPdfDocument(ctx, { projectId }, `presupuesto_vs_real_${report.budgetName}`, (branding) => (
-    <ProjectSimpleTablePdfDocument
-      branding={branding}
-      title="Presupuesto vs real"
-      subtitle={`${report.budgetName}`}
-      filterLine={buildPdfFilterLine({ budgetId: filters.budgetId, costLayer: filters.costLayer })}
-      totalsLine={`Venta presup.: ${report.totals.budgetTotalSale} · Costo real (${report.costLayer}): ${report.totals.actualCost}`}
-      warnings={report.warnings}
-      columns={[
-        { key: "code", label: "Partida", flex: 0.8 },
-        { key: "name", label: "Ítem", flex: 1.4 },
-        { key: "budget", label: "Presup.", flex: 0.9 },
-        { key: "actual", label: "Real", flex: 0.9 },
-        { key: "variance", label: "Var.", flex: 0.8 },
-      ]}
-      rows={report.rows.map((r) => ({
-        code: r.wbsCode,
-        name: r.wbsName,
-        budget: r.budgetTotalCost,
-        actual: r.actualCost,
-        variance: r.costVariance,
-      }))}
-    />
-  ));
+  return exportPdfDocument(
+    ctx,
+    { projectId },
+    `presupuesto_vs_real_${report.budgetName}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title="Presupuesto vs real"
+        subtitle={`${report.budgetName}`}
+        filterLine={buildPdfFilterLine({
+          budgetId: filters.budgetId,
+          costLayer: filters.costLayer,
+        })}
+        totalsLine={`Venta presup.: ${report.totals.budgetTotalSale} · Costo real (${report.costLayer}): ${report.totals.actualCost}`}
+        warnings={report.warnings}
+        columns={[
+          { key: "code", label: "Partida", flex: 0.8 },
+          { key: "name", label: "Ítem", flex: 1.4 },
+          { key: "budget", label: "Presup.", flex: 0.9 },
+          { key: "actual", label: "Real", flex: 0.9 },
+          { key: "variance", label: "Var.", flex: 0.8 },
+        ]}
+        rows={report.rows.map((r) => ({
+          code: r.wbsCode,
+          name: r.wbsName,
+          budget: r.budgetTotalCost,
+          actual: r.actualCost,
+          variance: r.costVariance,
+        }))}
+      />
+    ),
+  );
 }
 
 export async function exportBudgetWbsPdf(
@@ -208,26 +234,48 @@ export async function exportCertificationEvolutionPdf(
   if (report.type === "NO_APPROVED_BUDGETS") {
     throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar");
   }
-  return exportPdfDocument(ctx, { projectId }, `certificaciones_${report.budgetName}`, (branding) => (
-    <ProjectSimpleTablePdfDocument
-      branding={branding}
-      title="Certificaciones — evolución y estado"
-      subtitle={report.budgetName}
-      filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
-      columns={[
-        { key: "period", label: "Período", flex: 1 },
-        { key: "cert", label: "Certificado", flex: 1 },
-        { key: "inv", label: "Facturado", flex: 1 },
-        { key: "col", label: "Cobrado", flex: 1 },
-      ]}
-      rows={report.monthlySeries.map((p) => ({
-        period: p.periodLabel,
-        cert: p.certifiedAmount,
-        inv: p.invoicedAmount,
-        col: p.collectedAmount,
-      }))}
-      warnings={report.warnings}
-    />
+  return exportPdfDocument(
+    ctx,
+    { projectId },
+    `certificaciones_${report.budgetName}`,
+    (branding) => (
+      <ProjectSimpleTablePdfDocument
+        branding={branding}
+        title="Certificaciones — evolución y estado"
+        subtitle={report.budgetName}
+        filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
+        columns={[
+          { key: "period", label: "Período", flex: 1 },
+          { key: "cert", label: "Certificado", flex: 1 },
+          { key: "inv", label: "Facturado", flex: 1 },
+          { key: "col", label: "Cobrado", flex: 1 },
+        ]}
+        rows={report.monthlySeries.map((p) => ({
+          period: p.periodLabel,
+          cert: p.certifiedAmount,
+          inv: p.invoicedAmount,
+          col: p.collectedAmount,
+        }))}
+        warnings={report.warnings}
+      />
+    ),
+  );
+}
+
+export async function exportProjectProgressPdf(
+  projectId: string,
+  filters: ProjectProgressFilters,
+  ctx: ServiceContext,
+): Promise<ReportPdfPayload> {
+  const report = await getProjectProgressReport(projectId, filters, ctx);
+  if (report.type !== "REPORT") {
+    throw new ServiceError(
+      "CONFLICT",
+      "No hay presupuesto aprobado o cerrado para exportar avances",
+    );
+  }
+  return exportPdfDocument(ctx, { projectId }, `avance_proyecto_${report.dateTo}`, (branding) => (
+    <ProjectProgressPdfDocument report={report} branding={branding} />
   ));
 }
 
@@ -512,7 +560,10 @@ export async function exportProjectCashFlowPdf(
       branding={branding}
       title="Flujo de caja — proyecto"
       subtitle={`${report.project.name} · ${report.dateFrom} → ${report.dateTo}`}
-      filterLine={buildPdfFilterLine({ period: filters.period, currency: filters.currency ?? cur.currency })}
+      filterLine={buildPdfFilterLine({
+        period: filters.period,
+        currency: filters.currency ?? cur.currency,
+      })}
       totalsLine={`Ingresos: ${cur.totalInflows} · Egresos: ${cur.totalOutflows} · Neto: ${cur.netCashFlow} ${cur.currency}`}
       columns={[
         { key: "period", label: "Período", flex: 1.1 },
@@ -980,8 +1031,12 @@ export async function exportAccountLedgerPdf(
         ]}
         rows={report.rows.map((r) => ({
           date: r.entryDate,
-          ref: r.isOpening ? "Saldo inicial" : (r.entryReference ?? (r.entryId ? r.entryId.slice(0, 8) : "—")),
-          desc: r.lineDescription ? `${r.entryDescription} — ${r.lineDescription}` : r.entryDescription,
+          ref: r.isOpening
+            ? "Saldo inicial"
+            : (r.entryReference ?? (r.entryId ? r.entryId.slice(0, 8) : "—")),
+          desc: r.lineDescription
+            ? `${r.entryDescription} — ${r.lineDescription}`
+            : r.entryDescription,
           debit: r.isOpening ? "—" : r.debit,
           credit: r.isOpening ? "—" : r.credit,
           balance: r.runningBalance,

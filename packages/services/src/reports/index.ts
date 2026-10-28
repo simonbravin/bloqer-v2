@@ -16,3 +16,4 @@ export * from "./project-gg-overview.service";
 export * from "./report-budget-resolve";
 export * from "./report-month";
 export * from "./report-currency-view";
+export * from "./project-progress.service";

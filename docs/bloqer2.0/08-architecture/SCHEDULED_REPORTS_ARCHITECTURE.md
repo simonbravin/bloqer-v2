@@ -56,7 +56,7 @@
 Agrupado en **Financieros** / **Operativos** (mismo criterio que los hubs). `PROJECT_BUDGET_VARIANCE` queda oculto del picker (legado [D-098]; EDT y costos lo reemplaza). CSV (Excel, `;` + BOM) y PDF para todas las keys listadas, incluidas las de empresa D-098 (portafolio, rentabilidad multi-obra, GG, compras multi-obra).
 
 - **Empresa:** Aging CxC/CxP, tesorería (posición, movimientos, flujo consolidado), CxP corporativo, facturas proveedor corporativas, rentabilidad multi-obra, GG por proyecto, portafolio, compras multi-obra, inventario (stock / movimientos), **Libro de obra — parte del día** (`TENANT_JOBSITE_DAILY_LOGS`, [D-100]: multi-obra ACTIVE, PDF only, N adjuntos).
-- **Proyecto:** Caja y proyección, ingresos vs gastos, rentabilidad, EDT y costos, certificaciones, análisis de compras, subcontratos, materiales.
+- **Proyecto:** Caja y proyección, ingresos vs gastos, rentabilidad, EDT y costos, **Avances del proyecto** (`PROJECT_PROGRESS`, D-120), certificaciones, análisis de compras, subcontratos, materiales. Avances comparte servicio/filtros/permisos con pantalla y descarga; programación conserva formatos CSV/PDF y no agrega una tabla de snapshots.
 
 **Parte diario ([D-100]):** params `jobsiteProjectIds`; día = timezone del envío; sin partes → `SKIPPED`; fotos embebidas en el mismo PDF que el export del detalle.
 

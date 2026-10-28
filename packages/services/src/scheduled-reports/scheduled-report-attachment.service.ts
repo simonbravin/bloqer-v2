@@ -42,6 +42,8 @@ import {
   parseSubcontractReportFilters,
 } from "../report-exports/report-export.service";
 import { ServiceContext, ServiceError } from "../types";
+import { exportProjectProgressCsv } from "../report-exports/project-progress-export.service";
+import { parseProjectProgressFilters } from "../reports/project-progress.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { SCHEDULED_REPORT_KEY_META } from "./scheduled-report-registry";
 
@@ -90,7 +92,9 @@ export function prefixScheduledReportAttachmentFilename(
   return `${slug}_${filename.slice(0, dot)}${filename.slice(dot)}`;
 }
 
-function asFilterRecord(params: Record<string, string> | null | undefined): Record<string, string | undefined> {
+function asFilterRecord(
+  params: Record<string, string> | null | undefined,
+): Record<string, string | undefined> {
   return params ?? {};
 }
 
@@ -131,7 +135,10 @@ async function buildScheduledReportCsvAttachment(
       };
     }
     case "TENANT_TREASURY_MOVEMENTS": {
-      const { content, filename } = await exportTreasuryMovementsCsv(parseMovementReportFilters(sp), ctx);
+      const { content, filename } = await exportTreasuryMovementsCsv(
+        parseMovementReportFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -158,7 +165,10 @@ async function buildScheduledReportCsvAttachment(
       };
     }
     case "TENANT_INVENTORY_MOVEMENTS": {
-      const { content, filename } = await exportStockMovementsCsv(parseStockMovementFilters(sp), ctx);
+      const { content, filename } = await exportStockMovementsCsv(
+        parseStockMovementFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -167,7 +177,10 @@ async function buildScheduledReportCsvAttachment(
       };
     }
     case "TENANT_CORPORATE_PAYABLES": {
-      const { content, filename } = await exportCompanyPayablesCsv(parseCompanyPayableExportFilters(sp), ctx);
+      const { content, filename } = await exportCompanyPayablesCsv(
+        parseCompanyPayableExportFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -189,7 +202,11 @@ async function buildScheduledReportCsvAttachment(
     }
     case "PROJECT_COST_CONTROL": {
       if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
-      const { content, filename } = await exportProjectCostControlCsv(projectId, parseCostControlFilters(sp), ctx);
+      const { content, filename } = await exportProjectCostControlCsv(
+        projectId,
+        parseCostControlFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -199,7 +216,11 @@ async function buildScheduledReportCsvAttachment(
     }
     case "PROJECT_CASH_FLOW": {
       if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
-      const { content, filename } = await exportProjectCashFlowCsv(projectId, parseProjectCashFlowFilters(sp), ctx);
+      const { content, filename } = await exportProjectCashFlowCsv(
+        projectId,
+        parseProjectCashFlowFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -209,7 +230,25 @@ async function buildScheduledReportCsvAttachment(
     }
     case "PROJECT_BUDGET_VARIANCE": {
       if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
-      const { content, filename } = await exportBudgetVarianceCsv(projectId, parseBudgetVarianceFilters(sp), ctx);
+      const { content, filename } = await exportBudgetVarianceCsv(
+        projectId,
+        parseBudgetVarianceFilters(sp),
+        ctx,
+      );
+      return {
+        reportKey,
+        filename,
+        content: Buffer.from(content, "utf-8"),
+        contentType: "text/csv; charset=utf-8",
+      };
+    }
+    case "PROJECT_PROGRESS": {
+      if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
+      const { content, filename } = await exportProjectProgressCsv(
+        projectId,
+        parseProjectProgressFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -261,7 +300,11 @@ async function buildScheduledReportCsvAttachment(
     }
     case "PROJECT_MATERIALS": {
       if (!projectId) throw new ServiceError("VALIDATION", "projectId requerido");
-      const { content, filename } = await exportMaterialVarianceCsv(projectId, parseProjectReportDateFilters(sp), ctx);
+      const { content, filename } = await exportMaterialVarianceCsv(
+        projectId,
+        parseProjectReportDateFilters(sp),
+        ctx,
+      );
       return {
         reportKey,
         filename,
@@ -334,10 +377,7 @@ async function buildScheduledReportCsvAttachment(
       };
     }
     case "TENANT_JOBSITE_DAILY_LOGS": {
-      throw new ServiceError(
-        "CONFLICT",
-        "Libro de obra — parte del día solo se envía en PDF",
-      );
+      throw new ServiceError("CONFLICT", "Libro de obra — parte del día solo se envía en PDF");
     }
     default: {
       const _exhaustive: never = reportKey;

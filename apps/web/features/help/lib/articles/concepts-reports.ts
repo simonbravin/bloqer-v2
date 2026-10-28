@@ -12,9 +12,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     level: "project",
     typicalRoles: ["PM", "Compras", "Finanzas", "OWNER"],
     where: { menu: "Planificación → EDT y costos (tablero de capas)" },
-    hrefs: [
-      { kind: "project", suffix: "/control-costos", label: "EDT y costos" },
-    ],
+    hrefs: [{ kind: "project", suffix: "/control-costos", label: "EDT y costos" }],
     steps: [
       "Confirmar OC (o activar subcontrato) → capa Comprometido.",
       "Emitir factura de proveedor → Devengado + CxP (y asiento DRAFT contable).",
@@ -77,6 +75,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Sin partida EDT vinculada a la tarea no hay sync Real ni métricas de costo/cert.",
     ],
     relatedSlugs: [
+      "reporte-avances-del-proyecto",
       "importar-cronograma",
       "agregar-hito-al-cronograma",
       "cargar-libro-de-obra",
@@ -105,9 +104,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     level: "project",
     typicalRoles: ["PM", "OWNER / ADMIN"],
     where: { menu: "Planificación → Presupuestos → detalle → Crear adenda / fase" },
-    hrefs: [
-      { kind: "project", suffix: "/presupuestos", label: "Presupuestos" },
-    ],
+    hrefs: [{ kind: "project", suffix: "/presupuestos", label: "Presupuestos" }],
     steps: [
       "Abrí el presupuesto APPROVED/CLOSED que será padre.",
       "Pulsá Crear adenda / fase (alta con parentBudgetId).",
@@ -207,7 +204,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     steps: [
       "Planificación → Reportes (título: Reportes del proyecto). Las cards están agrupadas en **Financieros** y **Operativos**.",
       "Financieros: aging CxC/CxP, Caja y proyección, Flujo de caja, Ingresos vs gastos, Rentabilidad, Gastos generales de obra.",
-      "Operativos: EDT y costos, Certificaciones, Proveedores, Análisis de compras, Materiales, Mano de obra, Equipos, Subcontratos.",
+      "Operativos: Avances del proyecto, EDT y costos, Certificaciones, Proveedores, Análisis de compras, Materiales, Mano de obra, Equipos, Subcontratos.",
       "Para comparar varias obras: menú empresa → Reportes (/reportes).",
       "Dentro de cada reporte usá Exportar → CSV o PDF (o Exportar PDF si solo hay PDF).",
       "Si tenés permiso: Envíos programados en Configuración → Reportes programados. El catálogo se agrupa en Financieros / Operativos (empresa y obra). Formato PDF o CSV (Excel).",
@@ -217,6 +214,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Aging CxC/CxP del hub abre las pantallas operativas de cuentas, no un PDF aparte.",
     ],
     relatedSlugs: [
+      "reporte-avances-del-proyecto",
       "presupuesto-vs-real",
       "reporte-proveedores-de-obra",
       "ver-rentabilidad-de-obra",
@@ -243,6 +241,71 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     guideRef: "§13.2 · [D-098]",
   },
   {
+    slug: "reporte-avances-del-proyecto",
+    title: "Leer los avances del proyecto y sus pendientes",
+    summary:
+      "Una vista para dirección: físico del libro con cobertura, plan comparable, certificado, consumo del presupuesto y cobranza, con evidencia y exportaciones.",
+    intents: ["reportes-obra", "dimensiones-avance", "exportar-reportes"],
+    modules: ["proyectos", "cronograma", "libro-obra", "certificaciones", "finanzas"],
+    level: "project",
+    typicalRoles: ["Dirección", "PM", "Finanzas", "OWNER / ADMIN"],
+    permissionHint:
+      "El reporte respeta los permisos y módulos de cada sección, también al exportar o enviar archivos.",
+    where: { menu: "Planificación → Reportes → Avances del proyecto" },
+    hrefs: [
+      { kind: "project", suffix: "/reportes/avances", label: "Avances del proyecto" },
+      { kind: "project", suffix: "/libro-obra", label: "Libro de obra" },
+      { kind: "project", suffix: "/reportes/programados", label: "Envíos programados" },
+    ],
+    steps: [
+      "Abrí Planificación → Reportes → Avances del proyecto. Desde Resumen o Cronograma también podés usar Reporte de avances.",
+      "Elegí Presupuesto y Moneda. Sin recorte, el alcance incluye principal y adendas Aprobados/Cerrados de la moneda elegida. No convierte automáticamente presupuestos de otras monedas.",
+      "Elegí Movimientos desde y Fecha de corte. La ventana visible admite hasta 120 meses calendario, sin reiniciar los acumulados ni perder el saldo anterior. El corte no puede ser futuro y usa ejecución con el estado documental actual.",
+      "Leé Ejecutado · libro aprobado junto con su cobertura: el físico pondera por costo directo presupuestado de partidas hoja. Sin medición no significa 0% validado; la parte sin medir conserva su peso y el indicador parcial dice Ejecutado observado. Sin ninguna medición válida no se calcula un porcentaje.",
+      "Compará Plan y ejecución registrada solo cuando haya base y cobertura. El plan usa las mismas partidas y pesos. Real · cronograma completo actual y Tareas actuales · proyecto completo muestran toda la obra hoy, sin recorte por presupuesto o corte pasado; no se suman al libro.",
+      "Revisá Certificado sobre venta, Costo devengado y exposición sobre presupuesto de costo, y Cobrado sobre facturado. Cada porcentaje tiene su propio denominador y última evidencia: Última medición, Último certificado, Último costo o Última cobranza. Sin evidencia al corte no confirma cero ni un atraso.",
+      "En Pendientes para avanzar elegí Tipo de pendiente y abrí la evidencia y su operación. Las tareas muestran su situación actual del proyecto completo; la sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte. En Detalle por partida buscá por código/nombre o usá Sólo con pendientes; conserva unidad, cantidad, físico y saldo, según tus permisos.",
+      "Exportar ofrece CSV, Excel y PDF con el mismo alcance y corte. La búsqueda local del detalle no recorta la descarga. Enviar por email y Envíos programados usan CSV/PDF.",
+    ],
+    effects: [
+      "Permite revisar ejecución, mediciones, costos y cobranzas sin sumar dimensiones distintas ni duplicar OC y factura.",
+      "Muestra cobertura, fuentes y avisos en pantalla y en archivos para interpretar un avance observado con datos incompletos.",
+    ],
+    pitfalls: [
+      "Una partida sin medición no es 0% confirmado. Un cero informado expresamente sí cuenta como medición.",
+      "Porcentajes de partes anteriores a junio de 2026 pueden ser ambiguos; se conserva la evidencia y no se presenta ese físico como validado.",
+      "Base cero es no calculable. Si falta la base de costo de alguna partida, global, observado y cobertura ponderada quedan sin calcular; los conteos siguen disponibles. Costo cero conocido no pesa y se advierte. Las unidades distintas no se suman.",
+      "Presupuesto menos exposición no es el costo necesario para terminar. El reporte no calcula EAC ni fecha estimada de finalización.",
+      "Una venta directa sin vínculo al presupuesto o una fuente en otra moneda no se distribuye automáticamente entre partidas.",
+      "Una nota de crédito aplicada reduce el saldo por cobrar; no cuenta como una cobranza real de caja.",
+    ],
+    relatedSlugs: [
+      "hub-reportes-de-obra",
+      "cuatro-dimensiones-de-avance",
+      "cargar-libro-de-obra",
+      "emitir-y-aprobar-certificacion",
+      "leer-edt-y-costos",
+      "programar-envios-de-reportes",
+      "exportar-reportes-csv-pdf",
+    ],
+    keywords: [
+      "reporte de avances",
+      "avances del proyecto",
+      "avance de obra",
+      "avance fisico",
+      "ejecutado",
+      "avance observado",
+      "cobertura",
+      "pendiente de ejecutar",
+      "pendiente de certificar",
+      "informe directivos",
+      "plan y ejecucion",
+      "certificado",
+      "cobrado sobre facturado",
+    ],
+    guideRef: "§13.3 · [D-120]",
+  },
+  {
     slug: "reporte-proveedores-de-obra",
     title: "Ver el reporte de proveedores de la obra",
     summary:
@@ -265,9 +328,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Opcional: filtrá Desde/Hasta (recorta OC, facturas y recepciones; el saldo CxP sigue siendo el de hoy).",
       "Exportar → CSV o PDF.",
     ],
-    effects: [
-      "Ves concentración de compra y exposición sin mezclar subcontratos certificados.",
-    ],
+    effects: ["Ves concentración de compra y exposición sin mezclar subcontratos certificados."],
     pitfalls: [
       "No sumes comprometido + devengado: la exposición ya evita el doble conteo.",
       "El saldo CxP no respeta el filtro de fechas (es el abierto de hoy).",
@@ -302,18 +363,14 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     level: "project",
     typicalRoles: ["PM", "Finanzas", "OWNER"],
     where: { menu: "Planificación → EDT y costos" },
-    hrefs: [
-      { kind: "project", suffix: "/control-costos", label: "EDT y costos" },
-    ],
+    hrefs: [{ kind: "project", suffix: "/control-costos", label: "EDT y costos" }],
     steps: [
       "Planificación → EDT y costos (la ruta antigua /reportes/presupuesto-vs-real redirige acá).",
       "Arriba: indicadores de resumen + gráfico de composición APU.",
       "Elegí Vista de columnas (Financiero / Compacto / Cantidades / % Avance) según el análisis.",
       "Exportá con Exportar → CSV o PDF.",
     ],
-    pitfalls: [
-      "Ya no hay una pantalla aparte de Presupuesto vs real: todo está en EDT y costos.",
-    ],
+    pitfalls: ["Ya no hay una pantalla aparte de Presupuesto vs real: todo está en EDT y costos."],
     relatedSlugs: [
       "hub-reportes-de-obra",
       "leer-edt-y-costos",
@@ -335,8 +392,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
   {
     slug: "ver-rentabilidad-de-obra",
     title: "Ver la rentabilidad de la obra",
-    summary:
-      "Margen bruto por capas de costo; margen neto (GG imputados) visible a OWNER/ADMIN.",
+    summary: "Margen bruto por capas de costo; margen neto (GG imputados) visible a OWNER/ADMIN.",
     intents: ["rentabilidad", "exportar-reportes"],
     modules: ["presupuesto", "finanzas"],
     level: "project",
@@ -544,8 +600,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
   {
     slug: "ver-registro-de-actividad",
     title: "Ver el registro de actividad",
-    summary:
-      "Auditoría de quién hizo qué: Configuración → Registro. Fechas en zona de la empresa.",
+    summary: "Auditoría de quién hizo qué: Configuración → Registro. Fechas en zona de la empresa.",
     intents: ["registro-actividad"],
     modules: ["configuracion"],
     level: "company",
@@ -815,8 +870,11 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     modules: ["general"],
     level: "both",
     typicalRoles: ["OWNER", "PM", "Compras", "Finanzas", "Administración"],
-    permissionHint: "Disponible si Bloqer AI está habilitado para el entorno. Las respuestas respetan tus permisos y módulos.",
-    where: { menu: "Botón circular con destellos «Preguntale a Bloqer» (esquina inferior derecha)" },
+    permissionHint:
+      "Disponible si Bloqer AI está habilitado para el entorno. Las respuestas respetan tus permisos y módulos.",
+    where: {
+      menu: "Botón circular con destellos «Preguntale a Bloqer» (esquina inferior derecha)",
+    },
     hrefs: [{ kind: "company", path: "/ayuda/preguntale-a-bloqer", label: "Esta ficha" }],
     steps: [
       "Abrí el chat con el botón circular de destellos. El texto «Preguntale a Bloqer» aparece al pasar el mouse o enfocarlo con el teclado; en el celular, tocá el ícono.",

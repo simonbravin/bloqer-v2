@@ -64,6 +64,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 
 ## 14. Reportes relacionados
 - Rentabilidad por proyecto, presupuesto vs real, avance vs costo, materiales por proyecto ([`../06-reports/OPERATIONAL_REPORTS.md`](../06-reports/OPERATIONAL_REPORTS.md)).
+- **Avances del proyecto** (R-002 / D-120), `/proyectos/[id]/reportes/avances`: lectura ejecutiva de físico por libro con cobertura, plan comparable, certificado, consumo de presupuesto y cobranza; pendientes y exportaciones. Acceso **Reporte de avances** desde Resumen y Cronograma.
 
 ## 15. Relación con otros módulos
 - **Presupuestos**, **Cronograma**, **Contratos**, **Certificaciones**, **Compras**, **Inventario**, **Tesorería** (imputación).

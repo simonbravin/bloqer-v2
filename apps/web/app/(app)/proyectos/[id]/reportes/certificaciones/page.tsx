@@ -10,7 +10,6 @@ import {
 import {
   CertificationEvolutionChart,
   CertificationPortfolioTable,
-  CertificationProgressChart,
   CertificationVsBudgetTable,
   ReportDateFilters,
   ReportSubnav,
@@ -44,12 +43,16 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
   try {
     await getProjectShellInfo(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
   const filters = { budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo };
+  const progressQuery = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) if (value) progressQuery.set(key, value);
+  const progressHref = `/proyectos/${projectId}/reportes/avances${progressQuery.size ? `?${progressQuery.toString()}` : ""}`;
 
   let report;
   let budgetProbe;
@@ -93,6 +96,9 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/certificaciones`}>Ir a certificaciones</Link>
         </Button>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href={progressHref}>Avances del proyecto</Link>
+        </Button>
       </ReportSubnav>
 
       <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
@@ -116,10 +122,18 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            <CertificationEvolutionChart series={report.monthlySeries} />
-            <CertificationProgressChart series={report.progressSeries} />
+          <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
+            Para comparar planificación, ejecución del libro aprobado, certificación y costos,
+            consultá el{" "}
+            <Link
+              href={progressHref}
+              className="font-medium text-primary underline underline-offset-2"
+            >
+              reporte de avances del proyecto
+            </Link>
+            .
           </div>
+          <CertificationEvolutionChart series={report.monthlySeries} />
 
           <Card>
             <CardHeader className="pb-2">

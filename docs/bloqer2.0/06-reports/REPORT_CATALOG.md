@@ -7,7 +7,7 @@
 | ID | Nombre | Área | Descripción breve | Fase |
 |---|---|---|---|---|
 | R-001 | Presupuesto vs real (ítem) | OP | Integrado en **EDT y costos** ([D-098] · [D-099]): capas + composición APU + gasto por tipo (barras) + filtro por CostCategory + vistas de columnas. Ruta legacy `/reportes/presupuesto-vs-real` → redirect | 1 |
-| R-002 | Avance físico/económico/financiero | PRJ | Tres curvas por proyecto | 1 |
+| R-002 | Avances del proyecto | PRJ | Reporte propio `/reportes/avances` (D-120): físico del libro ponderado por costo con cobertura, plan comparable, certificado, consumo del presupuesto, cobranza, pendientes y CSV/Excel/PDF/email | 1 |
 | R-003 | Rentabilidad bruta por proyecto | FIN | MB y MB% (costo según vista etiquetada: devengado / pagado / exposición esperada, [BR-COS-001]) | 1 |
 | R-004 | Rentabilidad neta por proyecto | FIN | MN y MN% (misma convención de capa de costo que R-003) | 1 |
 | R-005 | Cashflow real | FIN | Ingresos−egresos por período (**solo caja**; no costo comprometido/devengado) | 1 |
@@ -35,6 +35,7 @@
 | ID | Nombre | Área | Descripción breve | Fase | Impl. |
 |---|---|---|---|---|---|
 | R-CERT-01 | Estado cartera certificaciones | PRJ | Certificaciones con `payment_status` derivado (AR/cobranzas) | 1 | Sí |
+| R-002 | Avances del proyecto | PRJ | Lectura ejecutiva con bases explícitas, alcance vigente principal/adendas y corte; detalle por partida y evidencia. Ruta `/reportes/avances` (D-120) | 1 | Disponible en código; sin publicación |
 | R-CERT-02 | Certificado vs venta presupuestada | OP | Por partida WBS: venta presup. vs acum. certificado | 1 | Sí |
 | R-CERT-03 | Pendiente de certificar | OP | Partidas con venta presup. y saldo pendiente | 1 | Sí |
 | R-AP-01 | Desvío compras por partida | OP | APU **MATERIAL** vs comprometido/devengado por `wbsNodeId` | 1 | Sí |
@@ -96,6 +97,7 @@ Solo asientos `POSTED`; saldos naturales; multi-moneda por bloque; gerencial (no
 | Reporte | Ruta |
 |---------|------|
 | R-001 (EDT) | `/api/reports/proyectos/[projectId]/control-costos.csv` (legacy `presupuesto-vs-real.csv` puede seguir existiendo) |
+| R-002 (Avances) | `/api/reports/proyectos/[projectId]/avances.csv` (CSV / JSON / XLSX / PDF según formato) |
 | R-012, R-CERT-* | `/api/reports/proyectos/[projectId]/certificaciones.csv` |
 | R-AP-01…02 + resumen legado | `/api/reports/proyectos/[projectId]/compras-proveedores.csv` |
 | R-AP-03 | `/api/reports/proyectos/[projectId]/proveedores.csv` |

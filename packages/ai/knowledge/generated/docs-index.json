@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-10-26T13:37:19.682Z",
-  "sourceHash": "13808bb4906f449efd5affff590c24536bd6c59eb49b7f80d0eda0fd9d1cd9b8",
+  "generatedAt": "2026-10-28T18:01:48.985Z",
+  "sourceHash": "1afa5dfef0218d80cc2c2b9ddd3293b223c697fbb89b45df5355fff9873fc163",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "e7592aa22f4860e2e76530acb7c194da3b43c70a7870b14fe8b392374a28dd57",
-      "bytes": 161929
+      "sha256": "5cc3e6f67b839adc90e4c14b40f6d4e7de554e47546344f002aea68f7961d7f8",
+      "bytes": 167285
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -45,13 +45,13 @@
     },
     {
       "path": "docs/bloqer2.0/02-modules/PROJECT_SCHEDULING.md",
-      "sha256": "b3532a950e7ce8b5d106700b81a83912b90982660be1501d6cdf8e3dd768915a",
-      "bytes": 4263
+      "sha256": "d3a74ddc7e429f9e404afe69e0705b8b42ec026fe89e82c89703e02e58ff2073",
+      "bytes": 4530
     },
     {
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
-      "sha256": "dc0822f03bc898e32d72a370608888fc5de039e89ac02a49bd0ae63ca4698254",
-      "bytes": 2913
+      "sha256": "9844bfa3ec9c0944aa998037c0f63792f0591154573101d07e2f80113796ac71",
+      "bytes": 3169
     },
     {
       "path": "docs/bloqer2.0/02-modules/CERTIFICATIONS.md",
@@ -1410,7 +1410,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "5. Registrar **pago** de la CxP.\n6. Volvé a abrir la partida en el diálogo: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto; **Por tipo de costo** separa MAT vs LAB/EQP si tipaste distinto.\n\n<!-- capture:36 edt-y-costos -->\n![Bloqer — EDT y costos](./guides/assets/screenshots/36-edt-y-costos.png)\n\n*EDT y costos.*\n\n### 13.2 Rentabilidad y reportes\n\n- **Tablero de finanzas de obra** (`/proyectos/[id]/finanzas`): después de la visión rápida del mes (mes calendario actual), **Tendencia mensual** a todo el ancho (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses).\n- **Hub de obra:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**). Las cards se agrupan en **Financieros** y **Operativos**.\n- **Financieros:** aging CxC/CxP, **Caja y proyección**, **Flujo de caja (detalle)**, **Ingresos vs gastos**, **Rentabilidad**.\n- **Operativos:** **EDT y costos** (control $ por partida + composición APU + gasto por tipo + filtro por tipo de costo, [D-099]), **Certificaciones**, **Proveedores** (`/reportes/proveedores`: tabla, líderes por pedidos/monto/saldo CxP, concentración), **Análisis de compras** (varian"
+      "text": "5. Registrar **pago** de la CxP.\n6. Volvé a abrir la partida en el diálogo: deben aparecer links a OC, factura y pago; la exposición = devengado + comprometido abierto; **Por tipo de costo** separa MAT vs LAB/EQP si tipaste distinto.\n\n<!-- capture:36 edt-y-costos -->\n![Bloqer — EDT y costos](./guides/assets/screenshots/36-edt-y-costos.png)\n\n*EDT y costos.*\n\n### 13.2 Rentabilidad y reportes\n\n- **Tablero de finanzas de obra** (`/proyectos/[id]/finanzas`): después de la visión rápida del mes (mes calendario actual), **Tendencia mensual** a todo el ancho (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses).\n- **Hub de obra:** Planificación → **Reportes** → `/proyectos/[id]/reportes` (título: **Reportes del proyecto**). Las cards se agrupan en **Financieros** y **Operativos**.\n- **Financieros:** aging CxC/CxP, **Caja y proyección**, **Flujo de caja (detalle)**, **Ingresos vs gastos**, **Rentabilidad**.\n- **Operativos:** **Avances del proyecto** (§13.3, D-120), **EDT y costos** (control $ por partida + composición APU + gasto por tipo + filtro por tipo de costo, [D-099]), **Certificaciones**, **Proveedores** (`/reportes/proveedores`: tabla, líderes por pedidos/monto/saldo CxP, concen"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#166",
@@ -1418,7 +1418,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "za OC vs APU, [D-044]; **no** solapa con EDT), **Materiales**, **Subcontratos**.\n- **Proveedores de la obra:** `/proyectos/[id]/reportes/proveedores`. Resumen (cantidad, comprometido, exposición, pagado, saldo CxP, concentración top 3), líderes por **monto**, **pedidos** y **saldo a pagar**, y tabla por proveedor. El filtro Desde/Hasta recorta OC, facturas y recepciones; el **saldo CxP** es el abierto de hoy. Las certificaciones de subcontrato no entran (van a **Subcontratos**). Exportar CSV / PDF."
+      "text": "tración), **Análisis de compras** (varianza OC vs APU, [D-044]; **no** solapa con EDT), **Materiales**, **Subcontratos**.\n- **Proveedores de la obra:** `/proyectos/[id]/reportes/proveedores`. Resumen (cantidad, comprometido, exposición, pagado, saldo CxP, concentración top 3), líderes por **monto**, **pedidos** y **saldo a pagar**, y tabla por proveedor. El filtro Desde/Hasta recorta OC, facturas y recepciones; el **saldo CxP** es el abierto de hoy. Las certificaciones de subcontrato no entran (van a **Subcontratos**). Exportar CSV / PDF."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#167",
@@ -1441,11 +1441,59 @@
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
+      "text": "### 13.3 Avances del proyecto — lectura para dirección\n\n**Ruta:** Planificación → **Reportes** → **Avances del proyecto** (`/proyectos/[id]/reportes/avances`). En **Resumen** y **Cronograma**, el acceso **Reporte de avances** lleva a la misma pantalla.\n\n1. Elegí **Presupuesto** y **Moneda**. Sin recortar presupuesto, se incluyen principal y adendas **Aprobados/Cerrados** de la moneda elegida. Una adenda suma alcance: no reemplaza al principal. No se convierten automáticamente presupuestos de otra moneda ni se mezclan sus importes.\n2. Elegí **Movimientos desde** y **Fecha de corte**. El corte no puede ser futuro. La ventana visible admite hasta **120 meses calendario**; si la superás, acercá Desde al corte. Ese límite solo acota la evolución visible: los acumulados siguen contando desde el inicio hasta el corte y conservan el saldo anterior. Se considera la fecha de ejecución del parte y el estado aprobado que tiene hoy; no es una reconstrucción de cómo estaban aprobados los documentos en aquella fecha.\n3. Leé **Ejecutado · libro aprobado** junto con su **cobertura** de la base ponderada y el conteo de partidas. **Última medición** indica la fecha de evidencia del libro al corte. El"
+    },
+    {
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#170",
+      "sourceType": "bloqer_docs",
+      "title": "Guía operativa — Bloqer v2",
+      "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
+      "text": " físico global pondera por costo directo presupuestado de las partidas hoja. Una partida sin medición conserva su peso: no significa 0% confirmado. Con cobertura incompleta el indicador dice **Ejecutado observado**, sin afirmar un global validado; sin ninguna medición válida, se muestra sin calcular. Un cero informado expresamente sí es una medición. Las partidas de costo **cero conocido** siguen visibles pero no tienen peso; un dato legacy/anómalo tampoco se valida por pertenecer a una de ellas. Si falta la base de costo de alguna partida, no se conoce el denominador completo: global, observado y cobertura ponderada quedan sin calcular, manteniendo los conteos y el detalle disponibles."
+    },
+    {
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#171",
+      "sourceType": "bloqer_docs",
+      "title": "Guía operativa — Bloqer v2",
+      "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
+      "text": "4. Compará **Plan y ejecución registrada**. El plan es la referencia del cronograma vigente recalculada para las mismas partidas y pesos. Si faltan vínculos o fechas, la cobertura lo indica. No equivale al plan original congelado ni a un pronóstico de fecha de terminación. **Real · cronograma completo actual** y **Tareas actuales · proyecto completo** muestran toda la obra hoy, aunque filtres una adenda o un corte pasado. Pueden incluir ajustes manuales o hitos completados por recepción y no se suman al libro.\n5. Mirá las otras bases por separado: **Certificado** sobre venta presupuestada; **Costo devengado** y exposición sobre presupuesto de costo; **Cobrado sobre facturado**. Cada indicador muestra su última evidencia disponible: **Último certificado**, **Último costo** o **Última cobranza**. **Sin evidencia al corte** no significa un cero confirmado ni define un atraso por antigüedad. Cobrar un porcentaje de lo facturado no significa haber ejecutado ese porcentaje de la obra. Una nota de crédito aplicada reduce el saldo pendiente y no es una cobranza de caja. Exposición = devengado + comprometido abierto; no sumes OC + factura en bruto. Presupuesto menos exposición es disponibil"
+    },
+    {
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#172",
+      "sourceType": "bloqer_docs",
+      "title": "Guía operativa — Bloqer v2",
+      "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
+      "text": "idad presupuestaria, no el costo necesario para terminar.\n6. En **Pendientes para avanzar**, elegí **Tipo de pendiente** y abrí la evidencia de partes enviados, certificados pendientes, mediciones por certificar, documentos por facturar o saldos por cobrar según tus permisos. Las tareas muestran su situación actual en el proyecto completo. La sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte, para evitar proponer una medición ya emitida. En **Detalle por partida**, buscá por código/nombre y usá **Sólo con pendientes** para concentrar la revisión; las tablas se paginan de a 20. Revisá unidad, cantidad, físico, cobertura y saldo. No sumes cantidades de unidades diferentes ni tomes una sugerencia de certificación como derecho automático de cobro. La búsqueda y los filtros de lectura del detalle no cambian el alcance de la descarga."
+    },
+    {
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#173",
+      "sourceType": "bloqer_docs",
+      "title": "Guía operativa — Bloqer v2",
+      "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
+      "text": "7. Usá **Exportar** → **CSV / Excel / PDF** para conservar el mismo alcance, corte y cobertura. **Enviar por email** ofrece CSV/PDF. **Envíos programados** permite incluir el reporte en una programación de obra con los formatos existentes. Revisá los avisos también en el archivo: los permisos se aplican antes de generar cada sección.\n\n**Advertencias de datos:** porcentajes de partes anteriores a junio de 2026 pueden haberse cargado como acumulados en vez de incrementos. El reporte conserva la evidencia y muestra la ambigüedad; no normaliza datos ni presenta ese físico como validado aunque su suma no supere 100%. Un exceso físico tampoco se oculta recortando visualmente al 100%. Las fuentes en otra moneda y las ventas directas sin vínculo al presupuesto se explican por separado; no se distribuyen automáticamente entre partidas.\n\n**Cómo decidir:** una brecha entre físico y certificado orienta a revisar mediciones; un saldo vencido orienta a revisar cobranzas; una exposición superior al presupuesto orienta a revisar costos. Cada pendiente conserva la operación que lo originó. La falta de base, permiso o medición se muestra como tal y nunca confirma que la obra no avanzó. R-002 no calc"
+    },
+    {
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#174",
+      "sourceType": "bloqer_docs",
+      "title": "Guía operativa — Bloqer v2",
+      "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
+      "text": "ula EAC ni una fecha futura de finalización.\n\n---"
+    },
+    {
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#175",
+      "sourceType": "bloqer_docs",
+      "title": "Guía operativa — Bloqer v2",
+      "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "14. Finanzas corporativas, gastos generales e inventario (nivel empresa)",
       "text": "## 14. Finanzas corporativas, gastos generales e inventario (nivel empresa)\n\nLas facturas y cuentas por pagar **sin proyecto** requieren permisos de finanzas de empresa y respetan la empresa activa, también al abrir un documento desde un vínculo directo. Tener acceso financiero a una obra no habilita los documentos corporativos. Al editar líneas de facturas/gastos corporativos se conservan los importes guardados si cantidad, precio neto, IVA y descuento no cambian, igual que en obra. Cotizaciones y OC siguen perteneciendo a sus proyectos: no hay que duplicarlas como gasto general.\n\n- **Finanzas corporativas** (`/finanzas`): tablero con **Indicadores** en grilla 4+4 (no copia los KPIs de Tesorería: saldo / ingresos-egresos del mes). **Fila 1 (empresa):** Egresos imputados a obras · Egresos corporativos · Facturas borrador (siempre visible, también en 0) · Pagos esperados (90d) (C×P corporativas abiertas con vencimiento ≤90d, incluye vencidas). **Fila 2 (CxP/CxC):** C×P corporativas · C×P vencidas · C×C abiertas · C×C vencidas. Luego **Tendencia mensual** (ingresos vs gastos; rangos Este mes / 3 / 6 / 12 meses; pestaña Caja para tesorería), proyección de liquidez y actividad consolid"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#170",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#176",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1453,7 +1501,7 @@
       "text": "ada. Contabilidad se abre desde el menú **Contabilidad**, no desde una card del tablero.\n- **Transacciones** (`/finanzas/transacciones`): alta rápida de **gasto corporativo (AP)** a proveedor o **empleado** ([D-089], §12.2), **factura/CxC corporativa (AR, D-051)** y **ingreso solo caja** (`TREASURY_INFLOW`, sin obligación). El listado es el ledger de caja operativa (sin transferencias internas). Clic en la descripción = detalle del movimiento."
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#171",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#177",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1461,7 +1509,7 @@
       "text": "- **Cuentas por cobrar empresa** (`/finanzas/cuentas-por-cobrar`): consolida obra + filas **Empresa**; detalle y cobranza corporativa en `/finanzas/cuentas-por-cobrar/[id]`. La factura vinculada abre `/finanzas/facturas/[id]` (NC/ND [D-115]).\n- **Gastos generales / overhead** (`/finanzas/gastos-generales`): se **imputan a las obras** de forma **manual** o por **prorrateo automático** según el peso del costo directo, con **cierre de período**. *(Es un módulo complejo; conviene validar los cálculos en producción.)*\n- **Inventario corporativo** (`/inventario`): hub con **Productos**, **Depósitos**, **Movimientos**, **Transferencias** y **Reportes** (misma subnav en todas las pantallas). Productos (`/inventario/productos`), depósitos (`/inventario/depositos`), movimientos (`/inventario/movimientos`, ledger append‑only; el saldo se calcula sumando movimientos), transferencias (`/inventario/transferencias`) y reportes (`/inventario/reportes`: **Stock actual** y **Movimientos** confirmados).\n\n<!-- capture:37 inventario-con-subnav -->\n![Bloqer — Inventario con subnav](./guides/assets/screenshots/37-inventario-con-subnav.png)\n\n*Inventario con subnav.*\n\n> **Limitación:** no hay **valuación d"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#172",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#178",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1469,7 +1517,7 @@
       "text": "e inventario FIFO/promedio** configurable; el costo se toma de la compra.\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#173",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#179",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1477,7 +1525,7 @@
       "text": "## 15. Contabilidad (nivel empresa) — D-061 · D-062 · D-063\n\nContabilidad **gerencial interna** (libro mayor). No sustituye estados oficiales, AFIP ni ajuste por inflación. Visible solo para roles de company finance (§2.5).\n\n### 15.0 Procedimiento — Puesta en marcha (una vez por empresa)\n\n1. Confirmar módulo Contabilidad habilitado y usuario con permiso de editar/contabilizar.\n2. Ir a **Contabilidad → Cuentas** (`/contabilidad/cuentas`).\n3. Si el plan está vacío: **Aplicar plantilla AR** (~40 cuentas típicas AR + reglas de mapeo). Es **idempotente por código** (reaplicar no duplica).\n4. Revisar **Reglas** (`/contabilidad/reglas`): mapeo evento → cuentas Debe/Haber; ajustar si la empresa usa códigos propios.\n5. Opcional: alta manual de cuentas (**Nueva cuenta**) si faltan rubros.\n\n### 15.1 Pantallas (subnav)\n\n| Etiqueta | Ruta | Para qué |\n|----------|------|----------|\n| Resumen | `/contabilidad` | KPIs: **Borradores**, **Contabilizados del mes**, **Resultado del mes**, **Activo a hoy** + card **Borradores pendientes** |\n| Cuentas | `/contabilidad/cuentas` | Plan de cuentas; CTA **Aplicar plantilla AR** |\n| Asientos | `/contabilidad/asientos` | Listado `DRAFT` / `POSTED` / `CANCELL"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#174",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#180",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1485,7 +1533,7 @@
       "text": "ED` |\n| **Cierres** | `/contabilidad/cierres` | Cierre / reapertura mensual de tesorería + asientos (§15.3) |\n| Reglas | `/contabilidad/reglas` | Mapeo evento → cuentas Debe/Haber |\n| Libro diario | `/contabilidad/libro-diario` | Solo asientos `POSTED` |"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#175",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#181",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1493,7 +1541,7 @@
       "text": "| Sumas y saldos | `/contabilidad/sumas-y-saldos` | Trial balance por período |\n| Situación | `/contabilidad/situacion-patrimonial` | ESP al corte (`asOfDate`) |\n| Resultados | `/contabilidad/estado-resultados` | EERR del período |\n\nExports CSV/PDF (y XLSX en sumas, diario, ESP y EERR) desde `/api/reports/contabilidad/*`.\n\n### 15.2 Procedimiento — Día a día (auto-DRAFT + posteo)\n\n```mermaid\nflowchart LR\n  OP[\"Operación (factura / cobro / pago / transferencia)\"] --> DRAFT[\"Asiento DRAFT automático\"]\n  DRAFT --> REV[\"Contador revisa\"]\n  REV --> POST[\"Contabilizar → POSTED\"]\n  POST --> REP[\"Libros y estados gerenciales\"]\n  POST --> REV2[\"Revertir asiento (si hace falta)\"]\n```\n\n1. Operar finanzas con normalidad (facturas, cobros, pagos, transferencias). Cada hecho relevante **crea un asiento DRAFT** en segundo plano (soft: no bloquea la operación si falla la contabilidad).\n   Si el borrador no se generó, revisá las reglas contables y el asiento vinculado al origen. La operación confirmada conserva su validez; corregí o reintentá la generación contable desde las opciones del documento, sin repetir el pago, cobro o transferencia.\n2. Abrir `/contabilidad` y revisar card **Borradores pendi"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#176",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#182",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1501,7 +1549,7 @@
       "text": "entes**, o ir a **Asientos** filtrando borradores.\n3. Abrir el asiento:\n   - Si tiene **origen operativo** (sourced): montos/moneda/estructura **bloqueados** (D-063); sí se pueden ajustar **cuentas** y textos."
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#177",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#183",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1509,7 +1557,7 @@
       "text": "- Si es **manual**: editable al 100%.\n4. Pulsar **Contabilizar** → `POSTED`. **Nunca** se auto-posta.\n5. Quienes editan contabilidad reciben aviso in-app (máx. uno cada 24 h por empresa) cuando hay borradores nuevos.\n6. Corrección: **Revertir** un `POSTED` (crea asiento de reversa). Anular un borrador: **Anular borrador**.\n7. Al **anular el documento origen**, se cancela el DRAFT vinculado. Si hay `POSTED` sin reverso, la anulación del origen **se bloquea**.\n8. Correr reportes del período (Libro diario / Sumas y saldos / Situación / Resultados) — solo incluyen `POSTED`.\n\n**Qué genera auto-DRAFT hoy**\n\n| Origen | Asiento DRAFT |\n|--------|----------------|\n| Factura de venta emitida | Sí (devengo AR) |\n| Factura de proveedor emitida | Sí (devengo AP) |\n| Cobranza | Sí |\n| Pago a proveedor | Sí |\n| Transferencia interna | Sí |\n| Ingreso corporativo solo caja (`TREASURY_INFLOW`) | Sí |\n| Movimiento de tesorería cuyo origen ya es cobro/pago/apertura | **No** (anti doble conteo) |\n| Consumo de stock / recepción | **No** aún (costeo diferido) |\n\n> **Limitaciones:** sin cierre de **ejercicio** GL ni numeración correlativa de asientos; sí hay **cierre mensual operativo** (§15.3). Reportes "
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#178",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#184",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1517,7 +1565,7 @@
       "text": "gerenciales on-the-fly ≠ AFIP; multi-moneda por bloques sin consolidación FX; IVA/retenciones solo si hay cuentas en el plan.\n\n<!-- capture:38 contabilidad-hub-plantilla -->\n![Bloqer — Contabilidad hub + plantilla](./guides/assets/screenshots/38-contabilidad-hub-plantilla.png)"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#179",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#185",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1525,7 +1573,7 @@
       "text": "*Contabilidad hub + plantilla.*\n\n<!-- capture:39 aplicar-plantilla-ar -->\n![Bloqer — Aplicar plantilla AR](./guides/assets/screenshots/39-aplicar-plantilla-ar.png)\n\n*Aplicar plantilla AR.*\n\n### 15.3 Procedimiento — Cierre de períodos (bloqueo mensual) — [D-014] · [D-078]\n\nCongela **movimientos de tesorería** y **asientos contables** cuya fecha cae en un mes cerrado. No es el cierre de gastos generales (GG / overhead), que es otro flujo en `/finanzas/gastos-generales`.\n\n**Quién opera:** solo **OWNER** / **ADMIN** (permiso `PERIOD_CLOSE`). El módulo debe estar habilitado para el tenant.\n\n#### Pasos — Cerrar\n\n1. Ir a **Contabilidad → Cierres** (`/contabilidad/cierres`).\n2. Verificar la empresa (si hay varias y el usuario no está anclado a una sola).\n3. En la tabla **Períodos mensuales**, ubicar el mes (`YYYY-MM`) en estado **Abierto**.\n4. Pulsar **Cerrar** → confirmar en el diálogo **Cerrar período**.\n5. El período pasa a **Cerrado**. A partir de ahí, crear/editar/anular/postear/revertir con fecha en ese mes → error `PERIOD_CLOSED` (mensaje en español en pantalla).\n\n#### Pasos — Reabrir\n\n1. En el mismo listado, período **Cerrado** → **Reabrir**.\n2. Ingresar **motivo obligatorio** (que"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#180",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#186",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1533,7 +1581,7 @@
       "text": "da en auditoría).\n3. El período vuelve a **Abierto**.\n\n> **Orden recomendado del mes:** (1) terminar cobros/pagos, (2) **contabilizar** borradores del mes, (3) **conciliar** banco (§4.2), (4) **cerrar** el período. Cerrar antes de conciliar complica las correcciones."
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#181",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#187",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1541,7 +1589,7 @@
       "text": "> **No confundir**\n> - **Cierre de período** (`/contabilidad/cierres`) = bloquea caja + GL del mes.\n> - **Cierre de GG / overhead** (`/finanzas/gastos-generales`) = congela el prorrateo automático de gastos generales; **no** bloquea tesorería ni asientos.\n\n<!-- capture:40 cierres-de-periodo-listado -->\n![Bloqer — Cierres de período (listado)](./guides/assets/screenshots/40-cierres-de-periodo-listado.png)\n\n*Cierres de período (listado).*\n\n<!-- capture:41 dialogo-cerrar-periodo -->\n![Bloqer — Diálogo Cerrar período](./guides/assets/screenshots/41-dialogo-cerrar-periodo.png)\n\n*Diálogo Cerrar período.*\n\n<!-- capture:42 dialogo-reabrir-con-motivo -->\n![Bloqer — Diálogo Reabrir con motivo](./guides/assets/screenshots/42-dialogo-reabrir-con-motivo.png)\n\n*Diálogo Reabrir con motivo.*\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#182",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#188",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1549,7 +1597,7 @@
       "text": "## 16. Qué acciones producen impactos económicos o contables\n\n| Acción | Efecto económico | Efecto en tesorería | Efecto contable |\n|--------|------------------|---------------------|-----------------|\n| Aprobar presupuesto | Habilita baseline y certificaciones | — | — |\n| Enviar/Aprobar/Devolver OC | Sin impacto económico (control de flujo y aprobación) | — | — |\n| Confirmar OC | **Comprometido** | — | — |\n| Recepción de OC | Ingreso de stock | — | — (sin auto-DRAFT aún) |\n| Emitir factura de proveedor | **Devengado** + cuenta por pagar | — | **Auto-DRAFT** → Contabilizar a mano |\n| Emitir y pagar ahora (AP) | Devengado + pagado en un paso | Movimiento `OUTFLOW` | Auto-DRAFT factura + Auto-DRAFT pago (no TREASURY duplicado) |\n| Pago a proveedor | **Pagado** | Movimiento `OUTFLOW` (bloquea si fondos insuficientes) | **Auto-DRAFT** → Contabilizar |\n| Certificación aprobada | **Certificado** | — | — |\n| Emitir factura de venta | **Facturado** + cuenta por cobrar | — | **Auto-DRAFT** → Contabilizar |\n| Cobranza / Cobrar ahora (AR corporativo) | **Cobrado** | Movimiento `INFLOW` | **Auto-DRAFT** → Contabilizar |\n| Transferencia interna | — | TRANSFER_OUT + TRANSFER_IN | **Auto-DRAFT** "
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#183",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#189",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1557,7 +1605,7 @@
       "text": "→ Contabilizar |\n| Ajuste manual de cuenta | — | Movimiento `ADJUSTMENT` confirmado | Según reglas (si aplica) |\n| Emparejar en conciliación | — | Movimiento → estado **Conciliado** | — |\n| Cerrar conciliación | — | Sesión `CLOSED`; matches congelados | — |"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#184",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#190",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1565,7 +1613,7 @@
       "text": "| Cerrar período contable | Bloquea mutaciones del mes | No crea movimientos; **impide** crear/anular en fechas cerradas | Impide postear/anular/revertir asientos del mes |\n| Aprobar cert. de subcontrato | **Devengado** (factura proveedor DRAFT) | — | Al **emitir** la factura → Auto-DRAFT |\n| Imputar / cerrar GG (overhead) | Afecta rentabilidad neta | Según pago | Independiente del cierre de período GL |\n\n### Diferencias entre estados económicos\n\n```mermaid\nflowchart LR\n  PLAN[\"Planificado (presupuesto)\"] --> COMP[\"Comprometido (OC confirmada / subcontrato)\"]\n  COMP --> DEV[\"Devengado (factura recibida)\"]\n  DEV --> PAG[\"Pagado (egreso de caja)\"]\n  CERT[\"Certificado (avance al cliente)\"] --> FAC[\"Facturado (factura de venta)\"]\n  FAC --> COB[\"Cobrado (ingreso de caja)\"]\n```\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#185",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#191",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1573,7 +1621,7 @@
       "text": "## 17. Errores operativos a evitar\n\n| Error | Consecuencia | Orden correcto |\n|-------|--------------|----------------|\n| Certificar sin presupuesto aprobado | Bloqueo o datos inválidos | Aprobar el presupuesto primero |\n| Modelar insumos (hierros, etc.) como hijos EDT | Partidas certificables falsas / doble multiplicación | Insumos en el **APU** de la partida (D-057); ver filas APU expandibles (D-059) |\n| Crear línea de compra o factura de obra sin partida EDT | El sistema lo rechaza | Imputar cada línea a una **partida hoja**; gastos generales → partida de indirectos |\n| Aprobar tu propia OC cuando no corresponde | Sin segregación de funciones | Que apruebe otro; la autoaprobación depende de la política y del umbral |\n| Confundir avance de Gantt con certificado | Reportes incoherentes | Real = libro de obra; Certificado = certificaciones |\n| Sumar OC + factura como costo total | Doble conteo | Usar **exposición esperada** |\n| Editar fechas de un contenedor del cronograma | Se pisa con el rollup | Editar solo hojas |\n| Pagar sin factura/devengado | Caja sin respaldo | Factura → cuenta por pagar → pago (o Emitir y pagar ahora) |\n| Duplicar contactos por rol | Datos partidos | Un co"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#186",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#192",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1581,7 +1629,7 @@
       "text": "ntacto con múltiples roles |\n| Marcar al empleado como **Proveedor** solo para pagarle | Ensucia el listado de OC | Rol **Empleado**; gasto sin OC (§12.2.1) |\n| Pagar un subcontrato con OC o gasto genérico | Doble conteo / payee incorrecto | Certificar → emitir la factura del subcontrato (§10) |"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#187",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#193",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1589,7 +1637,7 @@
       "text": "| Creer que en obra todo pasa por OC | Subcontratos y reintegros mal cargados | OC = materiales; Subcontrato = paquete; gasto sin OC = reintegro/chico (§9) |\n| Usar **Solo caja** (ingreso) para reintegrar a un empleado | El movimiento entra en vez de salir | Tab **Gasto / factura** + **Pagar ahora (egreso de caja)** |\n| Creer que “apareció el borrador” = ya está contabilizado | Libros (diario/sumas/ESP) vacíos o desfasados | Revisar borradores y **Contabilizar**; los reportes solo usan `POSTED` |\n| Dar company finance a PM/Compras “para ver más” | Ven hub/caja/GL de empresa | Usar roles de proyecto / `PROJECT_FINANCE` (D-056) |\n| Cobrar/pagar esperando conversión de moneda | Descalce | Operar en la misma moneda de la cuenta |\n| Reescribir el monto “a ojo” al pagar el total | Residual o rechazo | Usar el saldo pendiente que muestra el sistema (2 decimales); click en el saldo para autocompletar |\n| Pagar con cuenta sin fondos | Operación bloqueada | Verificar saldo de tesorería antes |\n| Esperar “Cobrar ahora” al crear factura de obra | No existe (diferido) | Cobrar desde CxC del proyecto |\n| Buscar Recepciones bajo Operación | No aparece | Menú **Compras → Recepciones** |\n| Cancelar"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#188",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#194",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1597,7 +1645,7 @@
       "text": " pago/cobranza con movimiento **Conciliado** | Bloqueo | Desemparejar (o reabrir sesión) y recién entonces cancelar |\n| Operar caja en un mes **Cerrado** | Error `PERIOD_CLOSED` | Reabrir el período (OWNER/ADMIN + motivo) o usar fecha de mes abierto |"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#189",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#195",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1605,7 +1653,7 @@
       "text": "| Confundir cierre de período con cierre de GG | Expectativa incorrecta | Cierres GL = `/contabilidad/cierres`; GG = `/finanzas/gastos-generales` |\n| Cerrar el mes antes de conciliar / postear | Correcciones bloqueadas | Conciliar + Contabilizar → recién ahí Cerrar |\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#190",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#196",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1613,7 +1661,7 @@
       "text": "## 18. Checklists por rol\n\n> **Hábitos diarios / semanales** (esta sección). Para un **smoke verificable** con rutas y criterios PASS/FAIL por rol (capacitación / UAT), usar  \n> [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) (J-02).\n\n### Dueño / Director\n\n- [ ] Usuarios y roles asignados (mínimo un `OWNER`/`ADMIN`); company finance solo a quien corresponda (D-056)\n- [ ] Módulos habilitados confirmados con el proveedor del servicio (incl. Tesorería, Conciliación, Contabilidad, Cierre de períodos)\n- [ ] Cuentas de tesorería creadas con saldo de apertura\n- [ ] Contabilidad: **Aplicar plantilla AR** si el plan está vacío\n- [ ] Revisión periódica de finanzas corporativas (`/finanzas`) y rentabilidad neta\n- [ ] Campana / inbox y **Alertas operativas** revisadas (`/notificaciones/alertas`)\n- [ ] Reportes programados revisados\n- [ ] Comprender: los asientos **nacen en borrador** solos, pero hay que **Contabilizarlos**\n- [ ] Cierre de mes: cobros/pagos OK → borradores contabilizados → conciliaciones cerradas → **Cerrar período** (`/contabilidad/cierres`)\n- [ ] Si hay que corregir un mes cerrado: **Reabrir** con motivo aud"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#191",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#197",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1621,7 +1669,7 @@
       "text": "itado\n\n<!-- capture:43 alertas-ultima-actividad -->\n![Bloqer — Alertas · Última actividad](./guides/assets/screenshots/43-alertas-ultima-actividad.png)\n\n*Alertas · Última actividad.*\n\n<!-- capture:44 reportes-programados-omitido-fallido -->"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#192",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#198",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1629,7 +1677,7 @@
       "text": "![Bloqer — Reportes programados (Omitido ≠ Fallido)](./guides/assets/screenshots/44-reportes-programados-omitido-fallido.png)\n\n*Reportes programados (Omitido ≠ Fallido).*\n\n### Project Manager / Jefe de obra\n\n- [ ] Proyecto en `ACTIVE`\n- [ ] Presupuesto `APPROVED`/`CLOSED` (un solo APPROVED por obra)\n- [ ] Partidas medibles con APU; **insumos en APU**, no como hijos EDT (D-057)\n- [ ] Cronograma con fechas en hojas y dependencias FS\n- [ ] Partida EDT primaria en tareas críticas\n- [ ] Libro de obra al día y aprobado (materiales con partida EDT si hay varias partidas)\n- [ ] Tablero **Materiales** revisado (faltantes → Pedir)\n- [ ] Certificaciones periódicas (y CTA a factura cuando corresponda)\n- [ ] Recepciones (Compras) y consumos (Operación) al día\n- [ ] **EDT y costos** revisado semanalmente (tablero de $; Materiales = cantidades; Compras = documentos)\n- [ ] Smoke: partida → OC → factura → pago visible en el diálogo de la partida en EDT y costos\n\n### Capataz\n\n- [ ] Parte diario cargado (clima, cuadrilla, avance por partida EDT, fotos)\n- [ ] Parte enviado (`SUBMITTED`) para aprobación del PM\n- [ ] Materiales consumidos registrados (listado `/consumos`); partida EDT del material si el"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#193",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#199",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1637,7 +1685,7 @@
       "text": " parte toca varias partidas\n\n### Compras\n\n- [ ] Política de compras revisada en `/configuracion/politicas`\n- [ ] Tablero **Materiales** / **Tablero de compras** como punto de partida del faltante\n- [ ] Todas las líneas con **partida EDT** (indirectos → partida de gastos generales)"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#194",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#200",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1645,7 +1693,7 @@
       "text": "- [ ] Solicitudes cotizadas (mínimo según política), comparando **precio y plazo**\n- [ ] Desvíos de precio con **justificación** cuando corresponde\n- [ ] OC enviada → aprobada (o **devuelta con motivo**) → **confirmada** al proveedor\n- [ ] Recepciones registradas (menú **Compras → Recepciones** o desde la OC)\n- [ ] Facturas de proveedor con partida EDT (desde OC o alta manual)\n- [ ] Tras emitir factura/pago: verificar partida en **EDT y costos** (no solo en Materiales)\n\n### Administración / Finanzas / Tesorería\n\n- [ ] Facturas de venta emitidas desde certificaciones (o venta directa / anticipo)\n- [ ] Cobranzas de obra aplicadas desde CxC del proyecto (click en saldo para autocompletar); revisar avisos **Listo para cobrar** ([D-072]) tras emitir facturas\n- [ ] Ingresos corporativos con CxC desde Transacciones (Factura / cuenta por cobrar) cuando corresponde\n- [ ] Ingresos solo caja (sin CxC) solo cuando no hay obligación de cobro\n- [ ] CxC empresa revisadas en `/finanzas/cuentas-por-cobrar` (filas **Empresa**)\n- [ ] Facturas de proveedor de obra: borrador → emitir, o **Emitir y pagar ahora** si hay permiso de tesorería\n- [ ] Gastos corporativos desde Facturas y gastos / Transaccione"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#195",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#201",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1653,7 +1701,7 @@
       "text": "s (**A quién se le paga** = proveedor o empleado)\n- [ ] Sueldos y reintegros mapeados al contacto con rol **Empleado** (§12.2.1 / §12.2.2); no solo texto en la descripción\n- [ ] CxP revisadas; pagos con saldo a 2 decimales; fondos suficientes en la cuenta"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#196",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#202",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1661,7 +1709,7 @@
       "text": "- [ ] Exports CSV/PDF de CxP / facturas / transacciones corporativas cuando haga falta\n- [ ] **Conciliación bancaria** del mes: importar extracto → emparejar → **Cerrar conciliación** (§4.2)\n- [ ] Ajustes manuales de caja solo con motivo documentado (§4.3)\n- [ ] Reportes de flujo de caja y aging revisados\n- [ ] Si también tienen contabilidad: revisar **Borradores pendientes** del hub\n- [ ] Pedir a OWNER/ADMIN el **cierre de período** cuando el mes quedó cerrado (§15.3)\n\n### Contabilidad\n\n- [ ] **Aplicar plantilla AR** (o plan de cuentas propio) + reglas de mapeo\n- [ ] Revisar **Borradores pendientes** tras el día operativo\n- [ ] **Contabilizar** asientos DRAFT (y **Revertir** si hay corrección)\n- [ ] Correr Sumas y saldos / Libro diario / Situación / Resultados del período\n- [ ] Exportar libros cuando haga falta (CSV/PDF/XLSX)\n- [ ] Coordinar con tesorería: conciliación del mes antes del cierre\n- [ ] Pedir / ejecutar **Cerrar período** del mes (OWNER/ADMIN) en `/contabilidad/cierres` cuando corresponda\n- [ ] Recordar: gerencial ≠ AFIP; stock aún sin auto-asiento\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#197",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#203",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1669,7 +1717,7 @@
       "text": "## 19. Limitaciones actuales\n\n| Limitación | Detalle |\n|------------|---------|\n| **Contabilidad: sin auto-POST** | Los asientos **sí** se crean en `DRAFT` solos (D-061); hay que **Contabilizar** a mano. Stock/consumos aún **sin** auto-DRAFT. Hay **cierre mensual operativo** (§15.3); **no** hay cierre de ejercicio GL ni numeración correlativa. Reportes gerenciales ≠ AFIP. |\n| **Conciliación bancaria** | **Implementada** (manual + CSV/OFX, §4.2). **No** hay conexión API directa con el banco (integración futura). |\n| **Contratos, adendas y órdenes de cambio** | Entidades formales Contract/CO no implementadas (Q-057). Adenda operativa = presupuesto hijo con `parentBudgetId` (UI **Crear adenda / fase**). |\n| **RFIs** | No implementados. |\n| **Multi‑moneda en tesorería** | Cobros, pagos y transferencias exigen misma moneda. Contabilidad: bloques por moneda sin consolidación FX. |\n| **Valuación de inventario** | Sin política FIFO/promedio configurable; por eso el costeo de stock no auto-asienta aún. |\n| **Impuestos / retenciones** | IVA por línea + **Percepción IIBB** a nivel documento (alícuota editable, default 3% sobre neto [D-112]); otras retenciones manuales, sin módulo dedicado. |\n"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#198",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#204",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1677,7 +1725,7 @@
       "text": "| **Documentos** | Si R2 no está configurado: metadata + badge **PLACEHOLDER**; la descarga explica el límite. |\n| **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |\n| **Cobrar ahora en factura de obra** | Disponible en alta manual de factura de proyecto ([D-077] / Q-055); requiere `EDIT TREASURY`. Certificación sigue: emitir → cobrar aparte. Corporativo: cobro opcional en Transacciones. |"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#199",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#205",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1685,7 +1733,7 @@
       "text": "| **Ajustes de caja** | **Hay UI** de ajuste manual por cuenta (§4.3). Ajustes de **stock** siguen sin pantalla dedicada de ajuste genérico. |\n| **Notificaciones** | Preferencias email por categoría + digest OA ([D-114]); sin mute de campana / Web Push; polling 30 s (D-054). Libro de obra: in-app + email filtrado ([D-091]/[D-114]). |\n| **Permisos** | La matriz es de solo lectura; los roles son fijos. Roster `ProjectTeamMember` solo para avisos ([D-091]); techos “solo su proyecto” (R-USR-007) aún sin enforcement. |\n| **Nómina / RRHH** | Bloqer **no** liquida haberes ni aportes. El sueldo se registra como **gasto** ligado al empleado (§12.2.1). |\n| **Segundo factor (2FA)** | No disponible; acceso con Google o email/contraseña. |\n| **DOCX de guía** | Un solo entregable: `guides/Guía_Operativa_Bloqer_v2.docx`. Regenerar con `node build_guide.js` tras editar **esta** MD. |\n\n> Estas limitaciones **no impiden** el uso productivo del sistema, pero deben conocerse para no asumir capacidades que hoy son manuales o inexistentes.\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#200",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#206",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1693,7 +1741,7 @@
       "text": "## 20. Referencias\n\n- Panorama ejecutivo: [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md)\n- Relevamiento técnico y clasificación A–G: [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md)\n- Plan de mejoras corto plazo: [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md)\n- Smoke por rol (J-02): [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md)\n- Changelog UI Lotes 1–6 (autores): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)\n- Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/EDT/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email) · [D-072](./00-product/DECISION_LOG.md) (cobranza CxC) · [D-074](./00-product/DECISION_LOG.md) (método de liquidación) · [D-075](./00-produ"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#201",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#207",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1701,7 +1749,7 @@
       "text": "ct/DECISION_LOG.md)–[D-080](./00-product/DECISION_LOG.md) (conciliación / OFX / reapertura) · [D-078](./00-product/DECISION_LOG.md) (cierre de período) · [D-089](./00-product/DECISION_LOG.md) (payee AP: proveedor o empleado; tres caminos de egreso)"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#202",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#208",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1709,7 +1757,7 @@
       "text": "- Tesorería / conciliación: [`02-modules/TREASURY.md`](./02-modules/TREASURY.md), [`02-modules/BANK_RECONCILIATION.md`](./02-modules/BANK_RECONCILIATION.md), workflow [`05-workflows/RECONCILE_BANK.md`](./05-workflows/RECONCILE_BANK.md)\n- Cierre de período: [`03-finance/PERIOD_CLOSE_AND_LOCKS.md`](./03-finance/PERIOD_CLOSE_AND_LOCKS.md), workflow [`05-workflows/CLOSE_PERIOD.md`](./05-workflows/CLOSE_PERIOD.md)\n- Contabilidad: [`02-modules/ACCOUNTING.md`](./02-modules/ACCOUNTING.md), [`08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md`](./08-architecture/ACCOUNTING_LEDGER_ARCHITECTURE.md)\n- Notificaciones: [`02-modules/NOTIFICATIONS.md`](./02-modules/NOTIFICATIONS.md)\n- Estados canónicos: [`01-domain/STATE_MACHINES.md`](./01-domain/STATE_MACHINES.md)\n- Fórmulas de costo: [`04-formulas/COST_FORMULAS.md`](./04-formulas/COST_FORMULAS.md)\n- Módulos: [`02-modules/EXPENSES_AND_PAYMENTS.md`](./02-modules/EXPENSES_AND_PAYMENTS.md), [`02-modules/SALES_AND_COLLECTIONS.md`](./02-modules/SALES_AND_COLLECTIONS.md), [`02-modules/WBS_AND_COST_ITEMS.md`](./02-modules/WBS_AND_COST_ITEMS.md)\n\n---"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#203",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#209",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -1717,7 +1765,7 @@
       "text": "## 21. Mantenimiento de esta guía (obligatorio para el equipo)\n\n1. **Fuente viva (única):** este archivo (`GUIA_OPERATIVA_BLOQER_V2.md`). Se **sobrescribe** en el mismo path ante cada cambio de producto.\n2. **Entregable cliente:** únicamente `docs/bloqer2.0/guides/Guía_Operativa_Bloqer_v2.docx`.\n3. **Centro de ayuda in-app ([D-090](./00-product/DECISION_LOG.md)):** hermano de esta guía, no la reemplaza. Ruta `/ayuda`. Catálogo en `apps/web/features/help/`. Todo PR del punto 4 debe actualizar **también** las fichas afectadas (pasos, rutas, keywords, related). Ver [`08-architecture/HELP_CENTER.md`](./08-architecture/HELP_CENTER.md).\n4. **Cuándo actualizar:** todo PR que cambie rutas, menús, etiquetas, flujos de OC/CxP/CxC/tesorería/conciliación/cierres/contabilidad, presupuesto/EDT, notificaciones, permisos visibles o reglas de montos.\n5. **Cómo regenerar el DOCX:** `cd docs/bloqer2.0/guides && node build_guide.js`.\n6. **Capturas:** los bloques `📷 Captura sugerida` del DOCX aparecen como cajas grises con título y tip; **reemplazalos** con pantallazos reales del producto (no inventar UI). Priorizar las marcadas en §§4.2, 4.3 y 15.3 si el entregable incluye los módulos nuevos.\n7. **Sm"
     },
     {
-      "id": "GUIA_OPERATIVA_BLOQER_V2.md#204",
+      "id": "GUIA_OPERATIVA_BLOQER_V2.md#210",
       "sourceType": "bloqer_docs",
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -2948,7 +2996,7 @@
       "title": "Cronograma / Planificación temporal",
       "path": "docs/bloqer2.0/02-modules/PROJECT_SCHEDULING.md",
       "section": "14. Reportes relacionados",
-      "text": "## 14. Reportes relacionados\n- Avance de obra (plan vs real), dashboard ejecutivo."
+      "text": "## 14. Reportes relacionados\n- Avance de obra (plan vs real), dashboard ejecutivo.\n- **Reporte de avances** → R-002 `/proyectos/[id]/reportes/avances` (D-120): compara plan vigente y físico con el mismo alcance y pesos por costo. El Real del cronograma permanece como lectura separada; no se suma al libro ni se presenta como baseline histórica."
     },
     {
       "id": "02-modules/PROJECT_SCHEDULING.md#15",
@@ -3107,7 +3155,7 @@
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
       "section": "14. Reportes relacionados",
-      "text": "## 14. Reportes relacionados\n- Libro de obra PDF, línea de tiempo obra."
+      "text": "## 14. Reportes relacionados\n- Libro de obra PDF, línea de tiempo obra.\n- **Avances del proyecto** R-002 (D-120): acumula partes actualmente APPROVED por fecha de ejecución hasta el corte, con físico ponderado por costo y cobertura; porcentajes legacy anteriores a junio de 2026 se advierten como ambiguos, sin reescribirlos."
     },
     {
       "id": "02-modules/JOBSITE_LOG.md#16",

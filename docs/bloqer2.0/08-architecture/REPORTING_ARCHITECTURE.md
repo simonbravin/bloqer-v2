@@ -127,6 +127,7 @@ Filtros: **mismos query params** que las páginas de reporte (p. ej. `currency`,
 - `/api/reports/proyectos/[projectId]/control-costos.csv`
 - `/api/reports/proyectos/[projectId]/presupuesto-vs-real.csv` (R-001)
 - `/api/reports/proyectos/[projectId]/certificaciones.csv` (R-012, R-CERT-*)
+- `/api/reports/proyectos/[projectId]/avances.csv` (R-002 / D-120; CSV/JSON/XLSX/PDF). El reporte usa una lectura dedicada de avances, con cobertura, alcance vigente y bases de fecha/moneda explícitas; no toma el físico de la evolución de certificaciones.
 - `/api/reports/proyectos/[projectId]/compras-proveedores.csv` (R-AP-01…02)
 - `/api/reports/proyectos/[projectId]/proveedores.csv` (R-AP-03)
 - `/api/reports/proyectos/[projectId]/subcontratos.csv` (R-SCC-*, R-SUB-*)
