@@ -43,6 +43,19 @@ import type {
 export * from "./project-progress.types";
 
 const ZERO = new Prisma.Decimal(0);
+const PENDING_KIND_PRIORITY: Record<string, number> = {
+  COST_OVERRUN: 0,
+  RECEIVABLE_OVERDUE: 1,
+  SCHEDULE_BLOCKED: 2,
+  SCHEDULE_DELAYED: 3,
+  PHYSICAL_MISSING: 4,
+  JOBSITE_PENDING: 5,
+  CERTIFICATION_APPROVAL: 6,
+  INVOICE_PENDING: 7,
+  CERTIFICATION_PENDING: 8,
+  COST_UNALLOCATED: 9,
+  PHYSICAL_REMAINING: 10,
+};
 const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
@@ -133,15 +146,18 @@ export function projectProgressCostEvents(
 ) {
   const events: ProjectProgressCostEvent[] = [];
   let unallocatedCount = 0;
-  let foreignCount = 0;
-  let incompleteCount = 0;
+  const foreignDates: string[] = [];
+  const incompleteDates: string[] = [];
+  function markIncomplete(date: string) {
+    incompleteDates.push(date);
+  }
   function push(event: ProjectProgressCostEvent, sourceCurrency: string) {
     if (!ids.has(event.wbsNodeId)) {
       if (!event.wbsNodeId) unallocatedCount++;
       return;
     }
     if (sourceCurrency !== currency) {
-      foreignCount++;
+      foreignDates.push(event.date);
       return;
     }
     events.push(event);
@@ -183,7 +199,7 @@ export function projectProgressCostEvents(
   for (const invoice of data.supplierInvoices) {
     if (invoice.subcontractCertificationId) continue;
     if (
-      invoice.documentKind === "CREDIT_NOTE" &&
+      (invoice.documentKind === "CREDIT_NOTE" || invoice.documentKind === "DEBIT_NOTE") &&
       !invoice.purchaseOrderId &&
       !invoice.lines.some((line) => line.purchaseOrderLineId)
     ) {
@@ -193,6 +209,8 @@ export function projectProgressCostEvents(
       )
         continue;
       const parent = invoice.referencedSupplierInvoice;
+      const signed = (amount: Prisma.Decimal) =>
+        invoice.documentKind === "CREDIT_NOTE" ? amount.negated() : amount;
       const sameScope =
         parent &&
         parent.tenantId === invoice.tenantId &&
@@ -202,13 +220,13 @@ export function projectProgressCostEvents(
         parent.status === "ISSUED" &&
         parent.issueDate <= invoice.issueDate;
       if (!sameScope) {
-        incompleteCount++;
+        markIncomplete(dateKey(invoice.issueDate));
         for (const line of invoice.lines)
           push(
             {
               wbsNodeId: line.wbsNodeId ?? "",
               date: dateKey(invoice.issueDate),
-              accrued: line.lineSubtotal.negated(),
+              accrued: signed(line.lineSubtotal),
             },
             invoice.currency,
           );
@@ -244,12 +262,13 @@ export function projectProgressCostEvents(
       else for (const line of parent.lines) addParent(line.wbsNodeId, null);
       for (const line of invoice.lines) {
         const wbsNodeId = line.wbsNodeId ?? "";
+        if (wbsNodeId && !ids.has(wbsNodeId)) continue;
         const commitments = commitmentsByWbs.get(wbsNodeId);
         const attributable = parentWbs.has(wbsNodeId) && (!commitments || commitments.size <= 1);
-        if (!attributable) incompleteCount++;
+        if (!attributable) markIncomplete(dateKey(invoice.issueDate));
         const commitmentId =
           attributable && commitments?.size === 1 ? [...commitments][0] : undefined;
-        const amount = line.lineSubtotal.negated();
+        const amount = signed(line.lineSubtotal);
         push(
           {
             wbsNodeId,
@@ -261,7 +280,7 @@ export function projectProgressCostEvents(
         );
       }
       if (!invoice.lines.length) {
-        incompleteCount++;
+        markIncomplete(dateKey(invoice.issueDate));
         unallocatedCount++;
       }
       continue;
@@ -362,7 +381,14 @@ export function projectProgressCostEvents(
         payment.currency,
       );
   }
-  return { events, unallocatedCount, foreignCount, incompleteCount };
+  return {
+    events,
+    unallocatedCount,
+    foreignCount: foreignDates.length,
+    incompleteCount: incompleteDates.length,
+    foreignDates,
+    incompleteDates,
+  };
 }
 
 export async function getProjectProgressReport(
@@ -420,8 +446,14 @@ export async function getProjectProgressReport(
   const nodes = data.nodes.sort((a, b) => compareWbsCodes(a.code, b.code));
   const ids = new Set(nodes.map((node) => node.id));
   const costData = projectProgressCostEvents(data, ids, currency);
-  const costsAvailable = access.costs && costData.foreignCount === 0;
-  const exposureAvailable = costsAvailable && costData.incompleteCount === 0;
+  const costAvailabilityAt = (cut: string) => {
+    const costsAvailable = access.costs && !costData.foreignDates.some((date) => date <= cut);
+    return {
+      costsAvailable,
+      exposureAvailable: costsAvailable && !costData.incompleteDates.some((date) => date <= cut),
+    };
+  };
+  const { costsAvailable, exposureAvailable } = costAvailabilityAt(dateTo);
   const notes = [
     "Acumulados desde el inicio hasta el corte; el período seleccionado no reinicia los saldos.",
     "Las fechas de ejecución y documentos se leen con sus estados actuales; este reporte no reconstruye estados históricos.",
@@ -434,9 +466,21 @@ export async function getProjectProgressReport(
   const warnings: string[] = [];
   if (costData.incompleteCount)
     warnings.push(
-      "Hay notas de crédito sin un vínculo inequívoco al compromiso de la factura de origen. El devengado con EDT se conserva; la exposición no se calcula hasta revisar la trazabilidad.",
+      "Hay notas de crédito o débito sin un vínculo inequívoco al compromiso de la factura de origen. El devengado con EDT se conserva; la exposición afectada no se calcula hasta revisar la trazabilidad.",
     );
   const sectionsExcluded: string[] = [];
+  if (access.costs) {
+    for (const [enabled, label, source] of [
+      [access.procurement, "Compras", "órdenes de compra"],
+      [access.subcontracts, "Subcontratos", "contratos y certificaciones de subcontrato"],
+    ] as const) {
+      if (enabled) continue;
+      sectionsExcluded.push(`${label}: módulo deshabilitado; no se incluyen ${source}.`);
+      warnings.push(
+        `${label}: módulo deshabilitado; las capas de costo y exposición incluyen únicamente las fuentes habilitadas.`,
+      );
+    }
+  }
   if (candidates.length !== budgets.length)
     warnings.push(
       "El alcance se presenta por moneda original. Otros presupuestos en distinta moneda no se suman a esta vista.",
@@ -497,12 +541,19 @@ export async function getProjectProgressReport(
     (c) => c.status === "ISSUED" || c.status === "APPROVED",
   );
   const nativeInvoices = data.invoices.filter((i) => i.currency === currency);
-  const arAvailable =
+  const arAvailabilityAt = (cut: string) =>
     access.ar &&
-    nativeInvoices.length === data.invoices.length &&
-    data.invoices.every(
-      (i) => i.receivable?.collections.every((c) => c.currency === currency) ?? true,
-    );
+    data.invoices
+      .filter((invoice) => dateKey(invoice.issueDate) <= cut)
+      .every(
+        (invoice) =>
+          invoice.currency === currency &&
+          (invoice.receivable?.collections
+            .filter((collection) => dateKey(collection.collectionDate) <= cut)
+            .every((collection) => collection.currency === currency) ??
+            true),
+      );
+  const arAvailable = arAvailabilityAt(dateTo);
   if (access.ar && !arAvailable)
     warnings.push(
       "Hay facturas o cobranzas de otra moneda en el alcance. La sección AR está incompleta y no se calcula sin una conversión comparable.",
@@ -539,6 +590,8 @@ export async function getProjectProgressReport(
       })),
     );
   const financialAt = (cut: string): ProjectProgressFinancial => {
+    const { costsAvailable, exposureAvailable } = costAvailabilityAt(cut);
+    const arAvailable = arAvailabilityAt(cut);
     const certified = activeCerts
       .filter((c) => dateKey(c.issueDate ?? c.periodEnd) <= cut)
       .reduce((sum, c) => sum.plus(c.totalAmount), ZERO);
@@ -613,18 +666,32 @@ export async function getProjectProgressReport(
   const pending: ProjectProgressPending[] = [];
   const costs = projectProgressCostsAt(costData.events, dateTo);
   const budgetById = new Map(budgets.map((b) => [b.id, b]));
+  const certifiedByWbs = new Map<
+    string,
+    { qty: Prisma.Decimal; amount: Prisma.Decimal; currentQty: Prisma.Decimal }
+  >();
+  for (const cert of activeCerts) {
+    const includedAtCut = dateKey(cert.issueDate ?? cert.periodEnd) <= dateTo;
+    for (const line of cert.lines) {
+      const totals = certifiedByWbs.get(line.wbsNodeId) ?? {
+        qty: ZERO,
+        amount: ZERO,
+        currentQty: ZERO,
+      };
+      totals.currentQty = totals.currentQty.plus(line.currentQty);
+      if (includedAtCut) {
+        totals.qty = totals.qty.plus(line.currentQty);
+        totals.amount = totals.amount.plus(line.periodAmount);
+      }
+      certifiedByWbs.set(line.wbsNodeId, totals);
+    }
+  }
   const rows: ProjectProgressRow[] = physicalAt(dateTo).map(({ node, value }) => {
     const ci = node.costItem;
-    const certLines = activeCerts
-      .filter((c) => dateKey(c.issueDate ?? c.periodEnd) <= dateTo)
-      .flatMap((c) => c.lines)
-      .filter((l) => l.wbsNodeId === node.id);
-    const certQty = certLines.reduce((sum, line) => sum.plus(line.currentQty), ZERO);
-    const certAmount = certLines.reduce((sum, line) => sum.plus(line.periodAmount), ZERO);
-    const currentCertifiedQty = activeCerts
-      .flatMap((c) => c.lines)
-      .filter((l) => l.wbsNodeId === node.id)
-      .reduce((sum, l) => sum.plus(l.currentQty), ZERO);
+    const certTotals = certifiedByWbs.get(node.id);
+    const certQty = certTotals?.qty ?? ZERO;
+    const certAmount = certTotals?.amount ?? ZERO;
+    const currentCertifiedQty = certTotals?.currentQty ?? ZERO;
     const suggestion =
       value.pct != null && ci && access.certifications
         ? suggestCertificationFromProgress({
@@ -696,7 +763,7 @@ export async function getProjectProgressReport(
       budgetId: node.budgetId,
       budgetName: budgetById.get(node.budgetId)!.name,
       unit: ci?.unit ?? "",
-      budgetQty: serializeQtyDecimal(ci?.quantity ?? ZERO),
+      budgetQty: ci ? serializeQtyDecimal(ci.quantity) : null,
       budgetCost: budgetAmounts && ci ? money(ci.totalCostDirect) : null,
       budgetSale: budgetAmounts && ci ? money(ci.totalSalePrice) : null,
       physicalPct: value.pct == null ? null : rate(value.pct),
@@ -915,22 +982,9 @@ export async function getProjectProgressReport(
     },
     series,
     rows,
-    pending: pending.sort((a, b) => {
-      const priorities: Record<string, number> = {
-        COST_OVERRUN: 0,
-        RECEIVABLE_OVERDUE: 1,
-        SCHEDULE_BLOCKED: 2,
-        SCHEDULE_DELAYED: 3,
-        PHYSICAL_MISSING: 4,
-        JOBSITE_PENDING: 5,
-        CERTIFICATION_APPROVAL: 6,
-        INVOICE_PENDING: 7,
-        CERTIFICATION_PENDING: 8,
-        COST_UNALLOCATED: 9,
-        PHYSICAL_REMAINING: 10,
-      };
-      return (priorities[a.kind] ?? 20) - (priorities[b.kind] ?? 20);
-    }),
+    pending: pending.sort(
+      (a, b) => (PENDING_KIND_PRIORITY[a.kind] ?? 20) - (PENDING_KIND_PRIORITY[b.kind] ?? 20),
+    ),
     notes,
     sourceDates,
     warnings,

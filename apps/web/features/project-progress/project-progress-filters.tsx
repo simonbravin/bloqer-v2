@@ -42,7 +42,13 @@ export function ProjectProgressFilters(props: Props) {
           <SlidersHorizontal className="h-4 w-4 text-muted-foreground" aria-hidden />
           Alcance del reporte
         </div>
-        <DateRangePresets defaultPreset={null} />
+        <DateRangePresets
+          defaultPreset={null}
+          onRangeChange={(range) => {
+            setDateFrom(range.dateFrom);
+            setDateTo(range.dateTo);
+          }}
+        />
       </div>
       <form
         onSubmit={apply}

@@ -2,10 +2,7 @@
 
 import { useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  computeDateRangePreset,
-  type DateRangePresetId,
-} from "@bloqer/utils";
+import { computeDateRangePreset, type DateRangePresetId } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +41,8 @@ export type DateRangePresetsProps = {
    */
   defaultPreset?: DateRangePresetId | null;
   className?: string;
+  /** Synchronizes draft form inputs even when selecting the already-active URL range. */
+  onRangeChange?: (range: { dateFrom: string; dateTo: string }) => void;
 };
 
 export function DateRangePresets({
@@ -51,6 +50,7 @@ export function DateRangePresets({
   toKey = "dateTo",
   defaultPreset = "d90",
   className,
+  onRangeChange,
 }: DateRangePresetsProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,6 +70,7 @@ export function DateRangePresets({
 
   function selectPreset(id: DateRangePresetId) {
     const { dateFrom, dateTo } = computeDateRangePreset(id);
+    onRangeChange?.({ dateFrom, dateTo });
     const params = new URLSearchParams(sp.toString());
     params.set(fromKey, dateFrom);
     params.set(toKey, dateTo);

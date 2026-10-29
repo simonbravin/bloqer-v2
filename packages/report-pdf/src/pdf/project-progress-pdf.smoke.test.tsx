@@ -33,10 +33,33 @@ test("progress PDF renders missing/legacy measurements and restricted financial 
   report.series[1]!.physicalPct = null;
   for (const key of Object.keys(report.financial) as (keyof typeof report.financial)[])
     report.financial[key] = null;
+  for (const point of report.series) {
+    point.certified = point.invoiced = point.collected = null;
+    point.costAccrued = point.costExposure = point.costPaid = null;
+  }
   report.warnings.push("Porcentaje anterior a junio de 2026: requiere revisión.");
   const buffer = await renderReportPdfToBuffer(
     <ProjectProgressPdfDocument report={report} branding={branding} />,
   );
   assert.equal(buffer.subarray(0, 5).toString("ascii"), "%PDF-");
   assert.ok(buffer.length > 5000);
+});
+
+test("progress PDF renders signed cost bars and comparable history with an unavailable final cut", async () => {
+  const report = projectProgressExportFixture();
+  report.financial.costAccrued = "-2000000.00";
+  report.financial.costAccruedPct = "-20.0000";
+  report.financial.costExposure = "0.00";
+  report.financial.costExposurePct = "0.0000";
+  report.financial.invoiced = report.financial.collected = null;
+  report.financial.collectionPct = null;
+  report.series.at(-1)!.invoiced = report.series.at(-1)!.collected = null;
+  report.rows[0]!.budgetQty = null;
+  const buffer = await renderReportPdfToBuffer(
+    <ProjectProgressPdfDocument report={report} branding={branding} />,
+  );
+  assert.equal(buffer.subarray(0, 5).toString("ascii"), "%PDF-");
+  assert.ok(buffer.length > 5000);
+  if (process.env.BLOQER_PDF_AUDIT_OUTPUT)
+    await writeFile(process.env.BLOQER_PDF_AUDIT_OUTPUT, buffer);
 });

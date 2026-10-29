@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-10-28T18:01:48.985Z",
-  "sourceHash": "1afa5dfef0218d80cc2c2b9ddd3293b223c697fbb89b45df5355fff9873fc163",
+  "generatedAt": "2026-10-29T04:04:16.227Z",
+  "sourceHash": "44a835ba90f1907e9f9290a374092a520ab9745e82d106549f41584b6c09badc",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "5cc3e6f67b839adc90e4c14b40f6d4e7de554e47546344f002aea68f7961d7f8",
-      "bytes": 167285
+      "sha256": "ccdb75b34f1cf2510db4b3f78969ada23f851a1f4499002cabddaea6f295d8cf",
+      "bytes": 167896
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1442,7 +1442,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "### 13.3 Avances del proyecto — lectura para dirección\n\n**Ruta:** Planificación → **Reportes** → **Avances del proyecto** (`/proyectos/[id]/reportes/avances`). En **Resumen** y **Cronograma**, el acceso **Reporte de avances** lleva a la misma pantalla.\n\n1. Elegí **Presupuesto** y **Moneda**. Sin recortar presupuesto, se incluyen principal y adendas **Aprobados/Cerrados** de la moneda elegida. Una adenda suma alcance: no reemplaza al principal. No se convierten automáticamente presupuestos de otra moneda ni se mezclan sus importes.\n2. Elegí **Movimientos desde** y **Fecha de corte**. El corte no puede ser futuro. La ventana visible admite hasta **120 meses calendario**; si la superás, acercá Desde al corte. Ese límite solo acota la evolución visible: los acumulados siguen contando desde el inicio hasta el corte y conservan el saldo anterior. Se considera la fecha de ejecución del parte y el estado aprobado que tiene hoy; no es una reconstrucción de cómo estaban aprobados los documentos en aquella fecha.\n3. Leé **Ejecutado · libro aprobado** junto con su **cobertura** de la base ponderada y el conteo de partidas. **Última medición** indica la fecha de evidencia del libro al corte. El"
+      "text": "### 13.3 Avances del proyecto — lectura para dirección\n\n**Ruta:** Planificación → **Reportes** → **Avances del proyecto** (`/proyectos/[id]/reportes/avances`). En **Resumen** y **Cronograma**, el acceso **Reporte de avances** lleva a la misma pantalla.\n\n1. Elegí **Presupuesto** y **Moneda**. Sin recortar presupuesto, se incluyen principal y adendas **Aprobados/Cerrados** de la moneda elegida. Una adenda suma alcance: no reemplaza al principal. No se convierten automáticamente presupuestos de otra moneda ni se mezclan sus importes.\n2. Elegí **Movimientos desde** y **Fecha de corte**. Los accesos **Esta semana / Este mes / Últimos 90 días / Este año** completan las fechas, incluso si volvés a seleccionar el rango activo después de editar los campos. El corte no puede ser futuro. La ventana visible admite hasta **120 meses calendario**; si la superás, acercá Desde al corte. Ese límite solo acota la evolución visible: los acumulados siguen contando desde el inicio hasta el corte y conservan el saldo anterior. Se considera la fecha de ejecución del parte y el estado aprobado que tiene hoy; no es una reconstrucción de cómo estaban aprobados los documentos en aquella fecha.\n3. Leé **Ejecu"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#170",
@@ -1450,7 +1450,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": " físico global pondera por costo directo presupuestado de las partidas hoja. Una partida sin medición conserva su peso: no significa 0% confirmado. Con cobertura incompleta el indicador dice **Ejecutado observado**, sin afirmar un global validado; sin ninguna medición válida, se muestra sin calcular. Un cero informado expresamente sí es una medición. Las partidas de costo **cero conocido** siguen visibles pero no tienen peso; un dato legacy/anómalo tampoco se valida por pertenecer a una de ellas. Si falta la base de costo de alguna partida, no se conoce el denominador completo: global, observado y cobertura ponderada quedan sin calcular, manteniendo los conteos y el detalle disponibles."
+      "text": "tado · libro aprobado** junto con su **cobertura** de la base ponderada y el conteo de partidas. **Última medición** indica la fecha de evidencia del libro al corte. El físico global pondera por costo directo presupuestado de las partidas hoja. Una partida sin medición conserva su peso: no significa 0% confirmado. Con cobertura incompleta el indicador dice **Ejecutado observado**, sin afirmar un global validado; sin ninguna medición válida, se muestra sin calcular. Un cero informado expresamente sí es una medición. Las partidas de costo **cero conocido** siguen visibles pero no tienen peso; un dato legacy/anómalo tampoco se valida por pertenecer a una de ellas. Si falta la base de costo de alguna partida, no se conoce el denominador completo: global, observado y cobertura ponderada quedan sin calcular, manteniendo los conteos y el detalle disponibles."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#171",
@@ -1458,7 +1458,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "4. Compará **Plan y ejecución registrada**. El plan es la referencia del cronograma vigente recalculada para las mismas partidas y pesos. Si faltan vínculos o fechas, la cobertura lo indica. No equivale al plan original congelado ni a un pronóstico de fecha de terminación. **Real · cronograma completo actual** y **Tareas actuales · proyecto completo** muestran toda la obra hoy, aunque filtres una adenda o un corte pasado. Pueden incluir ajustes manuales o hitos completados por recepción y no se suman al libro.\n5. Mirá las otras bases por separado: **Certificado** sobre venta presupuestada; **Costo devengado** y exposición sobre presupuesto de costo; **Cobrado sobre facturado**. Cada indicador muestra su última evidencia disponible: **Último certificado**, **Último costo** o **Última cobranza**. **Sin evidencia al corte** no significa un cero confirmado ni define un atraso por antigüedad. Cobrar un porcentaje de lo facturado no significa haber ejecutado ese porcentaje de la obra. Una nota de crédito aplicada reduce el saldo pendiente y no es una cobranza de caja. Exposición = devengado + comprometido abierto; no sumes OC + factura en bruto. Presupuesto menos exposición es disponibil"
+      "text": "4. Compará **Plan y ejecución registrada**. El plan es la referencia del cronograma vigente recalculada para las mismas partidas y pesos. Si faltan vínculos o fechas, la cobertura lo indica. No equivale al plan original congelado ni a un pronóstico de fecha de terminación. **Real · cronograma completo actual** y **Tareas actuales · proyecto completo** muestran toda la obra hoy, aunque filtres una adenda o un corte pasado. Pueden incluir ajustes manuales o hitos completados por recepción y no se suman al libro.\n5. Mirá las otras bases por separado: **Certificado** sobre venta presupuestada; **Costo devengado** y exposición sobre presupuesto de costo; **Cobrado sobre facturado**. Cada indicador muestra su última evidencia disponible: **Último certificado**, **Último registro de costo** o **Última cobranza**. **Sin evidencia al corte** no significa un cero confirmado ni define un atraso por antigüedad. Cobrar un porcentaje de lo facturado no significa haber ejecutado ese porcentaje de la obra. Una nota de crédito aplicada reduce el saldo pendiente y no es una cobranza de caja. Exposición = devengado + comprometido abierto; no sumes OC + factura en bruto. Presupuesto menos exposición e"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#172",
@@ -1466,7 +1466,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "idad presupuestaria, no el costo necesario para terminar.\n6. En **Pendientes para avanzar**, elegí **Tipo de pendiente** y abrí la evidencia de partes enviados, certificados pendientes, mediciones por certificar, documentos por facturar o saldos por cobrar según tus permisos. Las tareas muestran su situación actual en el proyecto completo. La sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte, para evitar proponer una medición ya emitida. En **Detalle por partida**, buscá por código/nombre y usá **Sólo con pendientes** para concentrar la revisión; las tablas se paginan de a 20. Revisá unidad, cantidad, físico, cobertura y saldo. No sumes cantidades de unidades diferentes ni tomes una sugerencia de certificación como derecho automático de cobro. La búsqueda y los filtros de lectura del detalle no cambian el alcance de la descarga."
+      "text": "s disponibilidad presupuestaria, no el costo necesario para terminar.\n6. En **Pendientes para avanzar**, elegí **Tipo de pendiente** y abrí la evidencia de partes enviados, certificados pendientes, mediciones por certificar, documentos por facturar o saldos por cobrar según tus permisos. Las tareas muestran su situación actual en el proyecto completo. La sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte, para evitar proponer una medición ya emitida. En **Detalle por partida**, buscá por código/nombre y usá **Sólo con pendientes** para concentrar la revisión; las tablas se paginan de a 20. Revisá unidad, cantidad, físico, cobertura y saldo. No sumes cantidades de unidades diferentes ni tomes una sugerencia de certificación como derecho automático de cobro. La búsqueda y los filtros de lectura del detalle no cambian el alcance de la descarga."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#173",
@@ -1474,7 +1474,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "7. Usá **Exportar** → **CSV / Excel / PDF** para conservar el mismo alcance, corte y cobertura. **Enviar por email** ofrece CSV/PDF. **Envíos programados** permite incluir el reporte en una programación de obra con los formatos existentes. Revisá los avisos también en el archivo: los permisos se aplican antes de generar cada sección.\n\n**Advertencias de datos:** porcentajes de partes anteriores a junio de 2026 pueden haberse cargado como acumulados en vez de incrementos. El reporte conserva la evidencia y muestra la ambigüedad; no normaliza datos ni presenta ese físico como validado aunque su suma no supere 100%. Un exceso físico tampoco se oculta recortando visualmente al 100%. Las fuentes en otra moneda y las ventas directas sin vínculo al presupuesto se explican por separado; no se distribuyen automáticamente entre partidas.\n\n**Cómo decidir:** una brecha entre físico y certificado orienta a revisar mediciones; un saldo vencido orienta a revisar cobranzas; una exposición superior al presupuesto orienta a revisar costos. Cada pendiente conserva la operación que lo originó. La falta de base, permiso o medición se muestra como tal y nunca confirma que la obra no avanzó. R-002 no calc"
+      "text": "7. Usá **Exportar** → **CSV / Excel / PDF** para conservar el mismo alcance, corte y cobertura. **Enviar por email** ofrece CSV/PDF. **Envíos programados** permite incluir el reporte en una programación de obra con los formatos existentes. Revisá los avisos también en el archivo: los permisos se aplican antes de generar cada sección.\n\n**Advertencias de datos:** porcentajes de partes anteriores a junio de 2026 pueden haberse cargado como acumulados en vez de incrementos. El reporte conserva la evidencia y muestra la ambigüedad; no normaliza datos ni presenta ese físico como validado aunque su suma no supere 100%. Un exceso físico tampoco se oculta recortando visualmente al 100%. Las fuentes en otra moneda y las ventas directas sin vínculo al presupuesto se explican por separado; no se distribuyen automáticamente entre partidas.\n\nLa comparabilidad se comprueba en cada fecha de la evolución: una incidencia posterior no borra los meses anteriores que sí eran calculables, también en Excel y PDF. Una cantidad contractual ausente aparece sin dato, no como cero. Si Compras o Subcontratos están deshabilitados, los avisos identifican las fuentes excluidas de las capas de costo. En el PDF las"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#174",
@@ -1482,7 +1482,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "ula EAC ni una fecha futura de finalización.\n\n---"
+      "text": " barras negativas se dibujan a la izquierda del origen cero.\n\n**Cómo decidir:** una brecha entre físico y certificado orienta a revisar mediciones; un saldo vencido orienta a revisar cobranzas; una exposición superior al presupuesto orienta a revisar costos. Cada pendiente conserva la operación que lo originó. La falta de base, permiso o medición se muestra como tal y nunca confirma que la obra no avanzó. R-002 no calcula EAC ni una fecha futura de finalización."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#175",

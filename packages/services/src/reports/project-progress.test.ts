@@ -372,6 +372,142 @@ function supplierInvoiceFixture(
 }
 
 describe("project progress complete service cuts", () => {
+  it("does not invalidate a selected budget because of ambiguous note lines outside its scope", () => {
+    const data = emptyEvidence();
+    const poLines = [
+      { id: "po-a", wbsNodeId: "a", lineSubtotal: d(100), lineTotal: d(100) },
+      { id: "po-b1", wbsNodeId: "b", lineSubtotal: d(50), lineTotal: d(50) },
+      { id: "po-b2", wbsNodeId: "b", lineSubtotal: d(50), lineTotal: d(50) },
+    ];
+    const parent = supplierInvoiceFixture({
+      id: "parent",
+      purchaseOrderId: "po",
+      purchaseOrder: { lines: poLines },
+      lines: poLines.map((line) => ({
+        wbsNodeId: line.wbsNodeId,
+        lineSubtotal: line.lineSubtotal,
+        lineTotal: line.lineTotal,
+        purchaseOrderLineId: line.id,
+        purchaseOrderLine: { wbsNodeId: line.wbsNodeId },
+      })),
+    });
+    const note = supplierInvoiceFixture({
+      id: "note",
+      documentKind: "CREDIT_NOTE",
+      issueDate: new Date("2026-08-01"),
+      referencedSupplierInvoice: parent,
+      lines: ["a", "b"].map((wbsNodeId) => ({
+        wbsNodeId,
+        lineSubtotal: d(10),
+        lineTotal: d(10),
+        purchaseOrderLineId: null,
+        purchaseOrderLine: null,
+      })),
+    });
+    data.supplierInvoices.push(parent, note);
+    const costs = projectProgressCostEvents(data, new Set(["a"]), "ARS");
+    assert.equal(costs.incompleteCount, 0);
+    assert.ok(costs.events.every((event) => event.wbsNodeId === "a"));
+  });
+  it("attributes a supplier debit note to its parent's open commitment", async () => {
+    const fixture = installReportFixture();
+    fixture.orders.push({
+      id: "po",
+      currency: "ARS",
+      issueDate: new Date("2026-06-01"),
+      lines: [{ id: "po-line", wbsNodeId: "a", lineSubtotal: d(100) }],
+    });
+    const parent = supplierInvoiceFixture({
+      id: "parent",
+      purchaseOrderId: "po",
+      totalAmount: d(80),
+      purchaseOrder: {
+        lines: [{ id: "po-line", wbsNodeId: "a", lineSubtotal: d(100), lineTotal: d(100) }],
+      },
+      lines: [
+        {
+          wbsNodeId: "a",
+          lineSubtotal: d(80),
+          lineTotal: d(80),
+          purchaseOrderLineId: "po-line",
+          purchaseOrderLine: { wbsNodeId: "a" },
+        },
+      ],
+    });
+    fixture.supplierInvoices.push(
+      parent,
+      supplierInvoiceFixture({
+        id: "debit",
+        documentKind: "DEBIT_NOTE",
+        issueDate: new Date("2026-08-01"),
+        totalAmount: d(20),
+        referencedSupplierInvoice: parent,
+        lines: [
+          {
+            wbsNodeId: "a",
+            lineSubtotal: d(20),
+            lineTotal: d(20),
+            purchaseOrderLineId: null,
+            purchaseOrderLine: null,
+          },
+        ],
+      }),
+    );
+    const report = await getProjectProgressReport(
+      "project",
+      { dateFrom: "2026-07-01", dateTo: "2026-08-31" },
+      ctx,
+    );
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.financial.costAccrued, "100.00");
+    assert.equal(report.financial.costExposure, "100.00");
+  });
+
+  it("preserves comparable earlier cost cuts when a later document uses a foreign currency", async () => {
+    const fixture = installReportFixture();
+    fixture.orders.push(
+      {
+        id: "native",
+        currency: "ARS",
+        issueDate: new Date("2026-06-01"),
+        lines: [{ id: "native-line", wbsNodeId: "a", lineSubtotal: d(100) }],
+      },
+      {
+        id: "foreign",
+        currency: "USD",
+        issueDate: new Date("2026-08-10"),
+        lines: [{ id: "foreign-line", wbsNodeId: "a", lineSubtotal: d(20) }],
+      },
+    );
+    const report = await getProjectProgressReport(
+      "project",
+      { dateFrom: "2026-07-01", dateTo: "2026-08-31" },
+      ctx,
+    );
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.financial.costExposure, null);
+    assert.equal(report.series[0]!.costExposure, "100.00");
+    assert.equal(report.opening.costExposure, "100.00");
+  });
+
+  it("does not invalidate earlier AR cuts because of a later foreign-currency collection", async () => {
+    const fixture = installReportFixture();
+    fixture.invoices[0]!.receivable!.collections.push({
+      amount: d(1),
+      collectionDate: new Date("2026-08-20"),
+      currency: "USD",
+    });
+    const report = await getProjectProgressReport(
+      "project",
+      { dateFrom: "2026-07-01", dateTo: "2026-08-31" },
+      ctx,
+    );
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.financial.invoiced, null);
+    assert.equal(report.series[0]!.invoiced, "48400.00");
+    assert.equal(report.series[0]!.collected, "0.00");
+  });
+
   it("does not publish partial budget totals or global budget ratios when a CostItem is missing", async () => {
     const fixture = installReportFixture();
     fixture.nodes[1]!.costItem = null;
@@ -391,6 +527,7 @@ describe("project progress complete service cuts", () => {
     assert.equal(report.financial.certified, "40000.00");
     assert.equal(report.financial.collected, "10000.00");
     assert.equal(report.financial.costAccrued, "0.00");
+    assert.equal(report.rows[1]!.budgetQty, null);
     assert.equal(report.physical.observedPct, null);
     assert.match(report.warnings.join(" "), /Base presupuestaria incompleta/);
   });
@@ -580,10 +717,27 @@ describe("project progress complete service cuts", () => {
     assert.equal(report.financial.costAccrued, "80.00");
     assert.equal(report.financial.costExposure, null);
     assert.match(report.warnings.join(" "), /vínculo inequívoco/);
+    assert.equal(report.opening.costExposure, "100.00");
   });
 });
 
 describe("project progress access, filters and scoped reads", () => {
+  it("discloses excluded cost sources when procurement and subcontracts are disabled", async () => {
+    installReportFixture();
+    replaceMethod(prisma.tenantModuleSetting, "findMany", async () => [
+      { moduleKey: "PROCUREMENT", isEnabled: false },
+      { moduleKey: "SUBCONTRACTS", isEnabled: false },
+    ]);
+    const report = await getProjectProgressReport(
+      "project",
+      { dateFrom: "2026-08-01", dateTo: "2026-08-31" },
+      ctx,
+    );
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.ok(report.sectionsExcluded.some((section) => section.startsWith("Compras:")));
+    assert.ok(report.sectionsExcluded.some((section) => section.startsWith("Subcontratos:")));
+    assert.match(report.warnings.join(" "), /únicamente las fuentes habilitadas/);
+  });
   it("rejects users without project or budget access before any I/O", async () => {
     await assert.rejects(
       () => getProjectProgressReport("project", {}, { ...ctx, roles: [] }),

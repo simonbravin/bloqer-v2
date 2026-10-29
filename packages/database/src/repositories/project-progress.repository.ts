@@ -63,7 +63,7 @@ export type ProjectProgressSourceAccess = {
   subcontracts: boolean;
 };
 
-/** One bounded read per source; the service derives all monthly cuts in memory. */
+/** One batched query per authorized source; the service derives monthly cuts in memory. */
 export async function readProjectProgressEvidence(
   scope: ProjectProgressScope,
   budgetIds: string[],

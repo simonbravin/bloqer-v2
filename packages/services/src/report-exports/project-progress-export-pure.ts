@@ -112,6 +112,16 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
   }
   const showCost = report.financial.budgetCost !== null || report.financial.costAccrued !== null;
   const showCert = report.financial.certified !== null;
+  const showSeriesCert = showCert || report.series.some((point) => point.certified !== null);
+  const showSeriesAr =
+    report.financial.invoiced !== null ||
+    report.series.some((point) => point.invoiced !== null || point.collected !== null);
+  const showSeriesCost =
+    showCost ||
+    report.series.some(
+      (point) =>
+        point.costAccrued !== null || point.costExposure !== null || point.costPaid !== null,
+    );
   const rowHeaders = [
     "EDT",
     "Partida",
@@ -138,7 +148,7 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
       r.wbsName,
       r.budgetName,
       r.unit,
-      r.budgetQty,
+      r.budgetQty ?? "",
       r.physicalPct ?? "",
       r.physicalQty ?? "",
       r.physicalRemainingQty ?? "",
@@ -163,10 +173,9 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
     "Plan vigente comparable (%)",
     "Plan observado parcial (%)",
   ];
-  if (showCert) seriesHeaders.push("Certificado acumulado");
-  if (report.financial.invoiced !== null)
-    seriesHeaders.push("Facturado acumulado", "Cobrado acumulado");
-  if (showCost)
+  if (showSeriesCert) seriesHeaders.push("Certificado acumulado");
+  if (showSeriesAr) seriesHeaders.push("Facturado acumulado", "Cobrado acumulado");
+  if (showSeriesCost)
     seriesHeaders.push("Devengado acumulado", "Exposición acumulada", "Pagado acumulado");
   const seriesRows = report.series.map((p) => {
     const cells = [
@@ -177,9 +186,9 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
       p.planPct ?? "",
       p.planObservedPct ?? "",
     ];
-    if (showCert) cells.push(p.certified ?? "");
-    if (report.financial.invoiced !== null) cells.push(p.invoiced ?? "", p.collected ?? "");
-    if (showCost) cells.push(p.costAccrued ?? "", p.costExposure ?? "", p.costPaid ?? "");
+    if (showSeriesCert) cells.push(p.certified ?? "");
+    if (showSeriesAr) cells.push(p.invoiced ?? "", p.collected ?? "");
+    if (showSeriesCost) cells.push(p.costAccrued ?? "", p.costExposure ?? "", p.costPaid ?? "");
     return cells;
   });
   return [

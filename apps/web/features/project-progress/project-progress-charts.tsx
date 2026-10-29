@@ -17,6 +17,7 @@ import type { ProjectProgressReport } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartAxis, formatMoneyAmount, formatRatePctWithSymbol } from "@/lib/format-money";
+import { formatProjectProgressChartAmount } from "./lib/project-progress-chart-format";
 
 type Props = { report: ProjectProgressReport };
 
@@ -219,8 +220,12 @@ export function ProjectProgressCharts({ report }: Props) {
                       width={58}
                     />
                     <Tooltip
-                      formatter={(value: number) =>
-                        formatMoneyAmount(String(value), report.currency)
+                      formatter={(_value, _name, item) =>
+                        formatProjectProgressChartAmount(
+                          item.dataKey,
+                          item.payload,
+                          report.currency,
+                        )
                       }
                       contentStyle={{ borderRadius: 10, fontSize: 12 }}
                     />

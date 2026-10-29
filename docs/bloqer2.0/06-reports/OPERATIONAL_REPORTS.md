@@ -95,3 +95,31 @@ Vista, archivos y adjuntos deben compartir servicio, filtros, alcance, corte, mo
 
 ## Referencias
 - [`../04-formulas/COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md)
+
+## Auditoría de código del R-002 — 2026-10-28 / cierre 2026-10-29
+
+**Alcance:** implementación del reporte y sus integraciones de lectura, UI, exportación y distribución del commit `f0855713`. Revisión local de código, regresiones y aislamiento de consultas; no equivale a una auditoría de todo el ERP ni a validación con datos productivos. Las correcciones de esta auditoría quedan para revisión antes de un nuevo commit/push, según indicación del Owner.
+
+### Críticas
+
+No se confirmó un fallo crítico reproducible en el alcance revisado. Se conservaron los guards de tenant/empresa/proyecto, permisos por fuente y exclusión de fuentes no autorizadas. No se modificaron datos, máquinas de estado ni esquema.
+
+### Medias — corregidas
+
+1. **M-01 — Exposición duplicada con nota de débito de proveedor.** La ND no seguía la factura de origen para consumir el compromiso abierto. OC 100 + factura ligada 80 + ND 20 se mostraba como exposición 120. Ahora sigue el vínculo inequívoco del padre, al igual que la NC, conservando el signo de la ND: devengado 100 + abierto 0 = exposición 100. Un vínculo ambiguo no recibe un prorrateo inventado.
+2. **M-02 — Pérdida de historia comparable.** La disponibilidad financiera se decidía una sola vez usando todos los documentos hasta el corte final; una incidencia de agosto anulaba también los valores válidos de julio y la apertura. Ahora moneda y trazabilidad se evalúan en cada corte y solo para las partidas del alcance seleccionado: una línea ambigua de otra adenda no invalida el presupuesto consultado. Excel/CSV y las curvas de PDF también conservan puntos anteriores cuando el indicador final queda no calculable. Las fuentes sin permiso siguen completamente excluidas.
+3. **M-03 — Barras negativas de PDF con dirección incorrecta.** El uso de valor absoluto dibujaba importes negativos como positivos. Ahora las barras parten de un origen cero común: negativas hacia la izquierda y positivas hacia la derecha, con signo conservado en las etiquetas.
+
+### Leves — corregidas
+
+1. **L-01 — Cantidad contractual desconocida mostrada como cero.** Una partida sin `CostItem` publicaba `budgetQty = 0`. El DTO conserva ahora null y las vistas/archivos muestran ausencia de dato.
+2. **L-02 — Pérdida de centavos en tooltip de importes grandes.** El texto se reconstruía desde la coordenada numérica del gráfico. Ahora usa el string monetario exacto del servicio; hay regresión con `90071992547409.91`.
+3. **L-03 — Fechas editadas desincronizadas al volver a elegir el rango activo.** Si la URL no cambiaba, los borradores de los inputs conservaban las fechas anteriores. El control canónico notifica la selección de rango y sincroniza ambos campos, aunque el rango ya estuviera activo.
+4. **L-04 — Fuentes de costo deshabilitadas sin aviso específico.** Se agregan exclusiones y advertencias explícitas para Compras/Subcontratos; la guía y ayuda aclaran ese alcance y alinean la etiqueta **Último registro de costo**.
+
+### Limpieza y verificación
+
+- Se indexan una sola vez los acumulados de certificación por partida, evitando recorrer todas las líneas por cada fila. Se preserva la separación entre cantidades al corte y cantidades actuales para sugerencias D-119.
+- Se extraen las prioridades de pendientes fuera del comparador y los datos/coordenadas de gráficos PDF a helpers puros; no se cambian fórmulas ni se agrega infraestructura.
+- Regresiones reproducidas antes de corregir: ND 120 en lugar de 100, cortes históricos null por incidencia posterior y cantidad desconocida convertida a cero. Nuevas pruebas cubren además preservación en archivos, dirección de barras y precisión de tooltips.
+- Validación focal: **45 pruebas de servicios/exportación, 37 web y 9 de PDF aprobadas (91 en total)**; tipos y lint focal correctos. Compilación Next completa con salida 0 y 111 páginas generadas; mantiene avisos preexistentes fuera del alcance del R-002. Revisión visual del PDF con costos negativos y último corte incompleto correcta. La selección de rango se revisa en código y con tipos; no se afirma un recorrido autenticado de navegador ni validación contra una DB real. Sin nuevo commit ni push en esta auditoría.

@@ -260,10 +260,10 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí Planificación → Reportes → Avances del proyecto. Desde Resumen o Cronograma también podés usar Reporte de avances.",
       "Elegí Presupuesto y Moneda. Sin recorte, el alcance incluye principal y adendas Aprobados/Cerrados de la moneda elegida. No convierte automáticamente presupuestos de otras monedas.",
-      "Elegí Movimientos desde y Fecha de corte. La ventana visible admite hasta 120 meses calendario, sin reiniciar los acumulados ni perder el saldo anterior. El corte no puede ser futuro y usa ejecución con el estado documental actual.",
+      "Elegí Movimientos desde y Fecha de corte. Los accesos rápidos de período completan los campos de fecha, incluso al volver a elegir el rango activo. La ventana visible admite hasta 120 meses calendario, sin reiniciar los acumulados ni perder el saldo anterior. El corte no puede ser futuro y usa ejecución con el estado documental actual.",
       "Leé Ejecutado · libro aprobado junto con su cobertura: el físico pondera por costo directo presupuestado de partidas hoja. Sin medición no significa 0% validado; la parte sin medir conserva su peso y el indicador parcial dice Ejecutado observado. Sin ninguna medición válida no se calcula un porcentaje.",
       "Compará Plan y ejecución registrada solo cuando haya base y cobertura. El plan usa las mismas partidas y pesos. Real · cronograma completo actual y Tareas actuales · proyecto completo muestran toda la obra hoy, sin recorte por presupuesto o corte pasado; no se suman al libro.",
-      "Revisá Certificado sobre venta, Costo devengado y exposición sobre presupuesto de costo, y Cobrado sobre facturado. Cada porcentaje tiene su propio denominador y última evidencia: Última medición, Último certificado, Último costo o Última cobranza. Sin evidencia al corte no confirma cero ni un atraso.",
+      "Revisá Certificado sobre venta, Costo devengado y exposición sobre presupuesto de costo, y Cobrado sobre facturado. Cada porcentaje tiene su propio denominador y última evidencia: Última medición, Último certificado, Último registro de costo o Última cobranza. Sin evidencia al corte no confirma cero ni un atraso.",
       "En Pendientes para avanzar elegí Tipo de pendiente y abrí la evidencia y su operación. Las tareas muestran su situación actual del proyecto completo; la sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte. En Detalle por partida buscá por código/nombre o usá Sólo con pendientes; conserva unidad, cantidad, físico y saldo, según tus permisos.",
       "Exportar ofrece CSV, Excel y PDF con el mismo alcance y corte. La búsqueda local del detalle no recorta la descarga. Enviar por email y Envíos programados usan CSV/PDF.",
     ],
@@ -278,6 +278,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Presupuesto menos exposición no es el costo necesario para terminar. El reporte no calcula EAC ni fecha estimada de finalización.",
       "Una venta directa sin vínculo al presupuesto o una fuente en otra moneda no se distribuye automáticamente entre partidas.",
       "Una nota de crédito aplicada reduce el saldo por cobrar; no cuenta como una cobranza real de caja.",
+      "Una incidencia de moneda o trazabilidad posterior no borra los puntos anteriores comparables de la evolución, tampoco en Excel o PDF. Las cantidades sin base se muestran sin dato. Los avisos indican si Compras o Subcontratos están deshabilitados y sus fuentes no se incluyen en costos.",
     ],
     relatedSlugs: [
       "hub-reportes-de-obra",

@@ -31,6 +31,10 @@ test("unavailable sections omit confidential columns and absent measurements sta
   const report = projectProgressExportFixture();
   for (const key of Object.keys(report.financial) as (keyof typeof report.financial)[])
     report.financial[key] = null;
+  for (const point of report.series) {
+    point.certified = point.invoiced = point.collected = null;
+    point.costAccrued = point.costExposure = point.costPaid = null;
+  }
   report.physical.pct = null;
   report.physical.observedPct = null;
   report.rows[0]!.physicalPct = null;
@@ -39,9 +43,28 @@ test("unavailable sections omit confidential columns and absent measurements sta
   const sheets = buildProjectProgressExportSheets(report);
   assert.ok(!sheets[1]!.headers.includes("Devengado"));
   assert.ok(!sheets[1]!.headers.includes("Cantidad certificada"));
+  assert.ok(!sheets[2]!.headers.includes("Facturado acumulado"));
+  assert.ok(!sheets[2]!.headers.includes("Devengado acumulado"));
   assert.ok(!sheets[0]!.rows.some((r) => r[0] === "Venta presupuestada"));
   assert.equal(sheets[1]!.rows[0]![5], "");
   assert.ok(sheets[4]!.rows.some((r) => r[1] === "Costos: sin permisos"));
+});
+
+test("historical series remain exportable when the last cut is not comparable", () => {
+  const report = projectProgressExportFixture();
+  report.financial.invoiced = report.financial.collected = null;
+  report.financial.budgetCost =
+    report.financial.costAccrued =
+    report.financial.costExposure =
+    report.financial.costPaid =
+      null;
+  const last = report.series.at(-1)!;
+  last.invoiced = last.collected = last.costAccrued = last.costExposure = last.costPaid = null;
+  const sheets = buildProjectProgressExportSheets(report);
+  const series = sheets[2]!;
+  assert.equal(series.rows[0]![series.headers.indexOf("Facturado acumulado")], "2420000.00");
+  assert.equal(series.rows[0]![series.headers.indexOf("Exposición acumulada")], "4500000.00");
+  assert.equal(series.rows.at(-1)![series.headers.indexOf("Facturado acumulado")], "");
 });
 
 test("progress report is registered for scheduling and manual attachments require a project", () => {
@@ -67,6 +90,6 @@ test("known actual costs remain exportable when a budget base is incomplete", ()
   report.financial.costAccruedPct = null;
   const sheets = buildProjectProgressExportSheets(report);
   assert.ok(sheets[1]!.headers.includes("Devengado"));
-  assert.ok(sheets[0]!.rows.some(r => r[0] === "Costo devengado" && r[1] === "5500000.00"));
-  assert.ok(!sheets[0]!.rows.some(r => r[0] === "Costo presupuestado"));
+  assert.ok(sheets[0]!.rows.some((r) => r[0] === "Costo devengado" && r[1] === "5500000.00"));
+  assert.ok(!sheets[0]!.rows.some((r) => r[0] === "Costo presupuestado"));
 });

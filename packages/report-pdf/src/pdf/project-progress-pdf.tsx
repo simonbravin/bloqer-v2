@@ -8,6 +8,11 @@ import {
   reportPdfStyles,
   truncateText,
 } from "./report-pdf-shared";
+import {
+  buildProgressCommercialSeries,
+  projectProgressBarGeometry,
+  type ProgressPdfPlotSeries,
+} from "./project-progress-chart-data";
 
 const colors = {
   ink: "#172b3a",
@@ -27,7 +32,7 @@ const pageStyle = {
 const fmt = (value: string | null, dp = 2) =>
   value === null ? "Sin base comparable" : formatGroupedDecimal(value, dp);
 const pct = (value: string | null) => (value === null ? "Pendiente de validar" : `${fmt(value)}%`);
-type PlotSeries = { name: string; values: (string | null)[]; color: string; dashed?: boolean };
+type PlotSeries = ProgressPdfPlotSeries;
 
 /** Number conversion is only for SVG coordinates; money is never aggregated here. */
 function LinePlot({
@@ -165,22 +170,33 @@ function CostBars({ report }: { report: ProjectProgressReport }) {
   ];
   const valid = bars.filter((b): b is [string, string, string] => b[1] !== null);
   if (!valid.length) return null;
-  const scale = Math.max(1, ...valid.map((b) => Math.abs(Number(b[1]))));
+  const geometry = projectProgressBarGeometry(
+    valid.map((bar) => Number(bar[1])),
+    460,
+  );
   return (
     <View wrap={false} style={{ marginTop: 12 }}>
       <Text style={{ fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 5 }}>
         Presupuesto y costos · {report.currency}
       </Text>
-      {valid.map(([label, value, color]) => (
+      {valid.map(([label, value, color], index) => (
         <View key={label} style={{ flexDirection: "row", alignItems: "center", marginBottom: 5 }}>
           <Text style={{ width: 110, fontSize: 7 }}>{label}</Text>
           <Svg width={460} height={8}>
             <Rect
-              x={0}
+              x={geometry.segments[index]!.x}
               y={0}
-              width={(Math.abs(Number(value)) / scale) * 460}
+              width={geometry.segments[index]!.width}
               height={8}
               fill={color}
+            />
+            <Line
+              x1={geometry.zeroX}
+              x2={geometry.zeroX}
+              y1={0}
+              y2={8}
+              stroke={colors.ink}
+              strokeWidth={0.6}
             />
           </Svg>
           <Text style={{ width: 180, textAlign: "right", fontSize: 7 }}>
@@ -189,8 +205,9 @@ function CostBars({ report }: { report: ProjectProgressReport }) {
         </View>
       ))}
       <Text style={{ fontSize: 6.5, color: colors.muted }}>
-        Eje horizontal: importe en {report.currency}. Capas comparadas, no sumables. Pagado:{" "}
-        {fmt(report.financial.costPaid)}. Exposición = devengado + compromiso abierto.
+        Eje horizontal: importe en {report.currency}; línea vertical = cero. Capas comparadas, no
+        sumables. Pagado: {fmt(report.financial.costPaid)}. Exposición = devengado + compromiso
+        abierto.
       </Text>
     </View>
   );
@@ -231,7 +248,11 @@ function ExecutivePage({
       `Última cobranza: ${report.sourceDates.collections ?? "Sin evidencia al corte"}`,
     ],
   ];
-  const commercial: PlotSeries[] = [];
+  const commercial = buildProgressCommercialSeries(report.series, {
+    certified: colors.blue,
+    invoiced: colors.slate,
+    collected: colors.teal,
+  });
   const execution: PlotSeries[] = [
     {
       name: "Físico validado",
@@ -258,24 +279,6 @@ function ExecutivePage({
       values: report.series.map((p) => (p.planPct === null ? p.planObservedPct : null)),
       color: colors.amber,
       dashed: true,
-    });
-  if (report.financial.certified !== null)
-    commercial.push({
-      name: "Certificado",
-      values: report.series.map((p) => p.certified),
-      color: colors.blue,
-    });
-  if (report.financial.invoiced !== null)
-    commercial.push({
-      name: "Facturado",
-      values: report.series.map((p) => p.invoiced),
-      color: colors.slate,
-    });
-  if (report.financial.collected !== null)
-    commercial.push({
-      name: "Cobrado",
-      values: report.series.map((p) => p.collected),
-      color: colors.teal,
     });
   return (
     <Page size="A4" orientation="landscape" style={pageStyle}>

@@ -60,7 +60,7 @@ export type ProjectProgressRow = {
   budgetId: string;
   budgetName: string;
   unit: string;
-  budgetQty: string;
+  budgetQty: string | null;
   budgetCost: string | null;
   budgetSale: string | null;
   physicalPct: string | null;
