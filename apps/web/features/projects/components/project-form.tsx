@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,8 +48,10 @@ export function ProjectForm({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const formId = useId();
+  const submitting = useRef(false);
 
-  const form = useForm<ProjectFormInput>({
+  const form = useForm<ProjectFormInput, unknown, CreateProjectInput>({
     resolver: zodResolver(createProjectSchema),
     defaultValues: {
       type: "PRIVATE",
@@ -61,47 +63,55 @@ export function ProjectForm({
   const clientContactId = form.watch("clientContactId");
 
   const handleSubmit = form.handleSubmit((raw) => {
+    if (submitting.current) return;
     const parsed = createProjectSchema.safeParse(raw);
     if (!parsed.success) {
       setServerError(parsed.error.issues[0]?.message ?? "Datos inválidos");
       return;
     }
     setServerError(null);
+    submitting.current = true;
     startTransition(async () => {
-      const result = await onSubmit(parsed.data);
-      if ("error" in result) {
-        setServerError(result.error);
-      } else {
-        const id = "id" in result ? result.id : null;
-        const redirectPath = successRedirect ?? (id ? `/proyectos/${id}` : "/proyectos");
-        const updatedProjectId =
-          id ?? redirectPath.match(/^\/proyectos\/([^/]+)/)?.[1] ?? null;
-        if ("ok" in result && updatedProjectId) {
-          invalidateProjectShellCache(updatedProjectId);
+      try {
+        const result = await onSubmit(parsed.data);
+        if ("error" in result) {
+          setServerError(result.error);
+        } else {
+          const id = "id" in result ? result.id : null;
+          const redirectPath = successRedirect ?? (id ? `/proyectos/${id}` : "/proyectos");
+          const updatedProjectId =
+            id ?? redirectPath.match(/^\/proyectos\/([^/]+)/)?.[1] ?? null;
+          if ("ok" in result && updatedProjectId) {
+            invalidateProjectShellCache(updatedProjectId);
+          }
+          router.push(redirectPath);
         }
-        router.push(redirectPath);
+      } catch {
+        setServerError("No se pudo guardar el proyecto. Volvé a intentar.");
+      } finally {
+        submitting.current = false;
       }
     });
   });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Código *</Label>
-          <Input placeholder="PRY-2024-001" {...form.register("code")} />
+          <Label htmlFor={`${formId}-code`}>Código *</Label>
+          <Input id={`${formId}-code`} aria-required aria-invalid={Boolean(form.formState.errors.code)} aria-describedby={form.formState.errors.code ? `${formId}-code-error` : undefined} placeholder="PRY-2024-001" {...form.register("code")} />
           {form.formState.errors.code && (
-            <p className="text-xs text-destructive">{form.formState.errors.code.message}</p>
+            <p id={`${formId}-code-error`} role="alert" className="text-xs text-destructive">{form.formState.errors.code.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
-          <Label>Tipo *</Label>
+          <Label htmlFor={`${formId}-type`}>Tipo *</Label>
           <Select
             value={form.watch("type")}
             onValueChange={(v) => form.setValue("type", v as "PUBLIC" | "PRIVATE")}
             disabled={typeLocked}
           >
-            <SelectTrigger>
+            <SelectTrigger id={`${formId}-type`} aria-required aria-describedby={typeLocked ? `${formId}-type-help` : undefined}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -110,7 +120,7 @@ export function ProjectForm({
             </SelectContent>
           </Select>
           {typeLocked ? (
-            <p className="text-xs text-muted-foreground">
+            <p id={`${formId}-type-help`} className="text-xs text-muted-foreground">
               El tipo no se puede cambiar después de un presupuesto aprobado o cerrado.
             </p>
           ) : null}
@@ -118,15 +128,15 @@ export function ProjectForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label>Nombre *</Label>
-        <Input placeholder="Edificio Residencial Torre Norte" {...form.register("name")} />
+        <Label htmlFor={`${formId}-name`}>Nombre *</Label>
+        <Input id={`${formId}-name`} aria-required aria-invalid={Boolean(form.formState.errors.name)} aria-describedby={form.formState.errors.name ? `${formId}-name-error` : undefined} placeholder="Edificio Residencial Torre Norte" {...form.register("name")} />
         {form.formState.errors.name && (
-          <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+          <p id={`${formId}-name-error`} role="alert" className="text-xs text-destructive">{form.formState.errors.name.message}</p>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <Label>Cliente *</Label>
+        <Label htmlFor={clients.length ? `${formId}-client` : undefined}>Cliente *</Label>
         {clients.length === 0 ? (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground">
             No hay contactos con rol <strong>Cliente</strong> activo. Los proyectos solo pueden asociarse a ese tipo
@@ -142,6 +152,10 @@ export function ProjectForm({
           </p>
         ) : (
           <SearchableCombobox
+            id={`${formId}-client`}
+            aria-required
+            aria-invalid={Boolean(form.formState.errors.clientContactId)}
+            aria-describedby={form.formState.errors.clientContactId ? `${formId}-client-error` : undefined}
             popoverWidth="wide"
             options={contactsToSearchableOptions(clients)}
             value={clientContactId ?? ""}
@@ -152,48 +166,50 @@ export function ProjectForm({
           />
         )}
         {form.formState.errors.clientContactId && (
-          <p className="text-xs text-destructive">{form.formState.errors.clientContactId.message}</p>
+          <p id={`${formId}-client-error`} role="alert" className="text-xs text-destructive">{form.formState.errors.clientContactId.message}</p>
         )}
       </div>
 
       <div className="space-y-1.5">
-        <Label>Descripción</Label>
-        <Textarea rows={3} placeholder="Descripción del proyecto..." {...form.register("description")} />
+        <Label htmlFor={`${formId}-description`}>Descripción</Label>
+        <Textarea id={`${formId}-description`} rows={3} placeholder="Descripción del proyecto..." {...form.register("description")} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Fecha de inicio</Label>
-          <Input type="date" {...form.register("startDate")} />
+          <Label htmlFor={`${formId}-start`}>Fecha de inicio</Label>
+          <Input id={`${formId}-start`} type="date" aria-invalid={Boolean(form.formState.errors.startDate)} aria-describedby={form.formState.errors.startDate ? `${formId}-start-error` : undefined} {...form.register("startDate")} />
+          {form.formState.errors.startDate ? <p id={`${formId}-start-error`} role="alert" className="text-xs text-destructive">{form.formState.errors.startDate.message}</p> : null}
         </div>
         <div className="space-y-1.5">
-          <Label>Fecha estimada de fin</Label>
-          <Input type="date" {...form.register("expectedEndDate")} />
+          <Label htmlFor={`${formId}-end`}>Fecha estimada de fin</Label>
+          <Input id={`${formId}-end`} type="date" aria-invalid={Boolean(form.formState.errors.expectedEndDate)} aria-describedby={form.formState.errors.expectedEndDate ? `${formId}-end-error` : undefined} {...form.register("expectedEndDate")} />
+          {form.formState.errors.expectedEndDate ? <p id={`${formId}-end-error`} role="alert" className="text-xs text-destructive">{form.formState.errors.expectedEndDate.message}</p> : null}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Dirección</Label>
-          <Input placeholder="Av. Corrientes 1234" {...form.register("address")} />
+          <Label htmlFor={`${formId}-address`}>Dirección</Label>
+          <Input id={`${formId}-address`} placeholder="Av. Corrientes 1234" {...form.register("address")} />
         </div>
         <div className="space-y-1.5">
-          <Label>Ciudad</Label>
-          <Input placeholder="Buenos Aires" {...form.register("city")} />
+          <Label htmlFor={`${formId}-city`}>Ciudad</Label>
+          <Input id={`${formId}-city`} placeholder="Buenos Aires" {...form.register("city")} />
         </div>
         <div className="space-y-1.5">
-          <Label>Provincia</Label>
-          <Input placeholder="CABA" {...form.register("province")} />
+          <Label htmlFor={`${formId}-province`}>Provincia</Label>
+          <Input id={`${formId}-province`} placeholder="CABA" {...form.register("province")} />
         </div>
       </div>
 
       <div className="space-y-1.5">
-        <Label>Notas</Label>
-        <Textarea rows={2} placeholder="Observaciones..." {...form.register("notes")} />
+        <Label htmlFor={`${formId}-notes`}>Notas</Label>
+        <Textarea id={`${formId}-notes`} rows={2} placeholder="Observaciones..." {...form.register("notes")} />
       </div>
 
       {serverError && (
-        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+        <div role="alert" className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {serverError}
         </div>
       )}

@@ -8,6 +8,7 @@ import {
   canEditTeamMembership,
   canReadTenantConfigArea,
   getTenantMemberById,
+  getTenantModuleGate,
   getUserProjectAccessEditor,
   ServiceError,
 } from "@bloqer/services";
@@ -54,7 +55,8 @@ export default async function ConfiguracionEquipoDetallePage({ params }: PagePro
     throw e;
   }
 
-  const canEdit = canEditTeamMembership(current.tenantCtx.roles);
+  const gate = await getTenantModuleGate(ctx);
+  const canEdit = canEditTeamMembership(current.tenantCtx.roles) && gate.isEnabled("USERS_PERMISSIONS");
 
   let projectAccess: Awaited<ReturnType<typeof getUserProjectAccessEditor>> | null = null;
   let projectAccessError: string | null = null;

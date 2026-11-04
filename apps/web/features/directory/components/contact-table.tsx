@@ -38,7 +38,7 @@ export function ContactTable({ contacts }: ContactTableProps) {
 
   return (
     <TableScroll>
-      <Table>
+      <Table className="min-w-[56rem]">
         <TableHeader>
           <TableRow>
             <SortableTableHead label="Nombre" sortKey="name" activeKey={sortKey} sortDir={sortDir} onSort={toggleSort} />
@@ -55,9 +55,9 @@ export function ContactTable({ contacts }: ContactTableProps) {
           return (
             <TableRow key={contact.id}>
               <TableCell className={tableNameStackCellClass}>
-                <div className="truncate font-medium" title={contact.legalName}>
+                <Link href={`/directorio/${contact.id}`} aria-label={`Abrir ${contact.legalName}`} className="block truncate font-medium hover:underline" title={contact.legalName}>
                   {contact.legalName}
-                </div>
+                </Link>
                 {contact.fantasyName && (
                   <div className="truncate text-xs text-muted-foreground" title={contact.fantasyName}>
                     {contact.fantasyName}

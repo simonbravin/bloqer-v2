@@ -4,6 +4,8 @@ import { getSession } from "@/lib/auth";
 import { listPlatformTenantUsers, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
+import { formatMembershipStatusLabel, formatUserAccountStatusLabel } from "@/lib/tenant-status-label";
+import { formatUserRoleList } from "@/lib/user-role-label";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -32,7 +34,7 @@ export default async function PlatformTenantUsersPage({ params }: PageProps) {
   }
 
   const hasOwner = rows.some(
-    (r) => r.membershipStatus === "ACTIVE" && r.roles.includes("OWNER"),
+    (r) => r.membershipStatus === "ACTIVE" && r.userStatus === "ACTIVE" && r.roles.includes("OWNER"),
   );
 
   return (
@@ -44,7 +46,7 @@ export default async function PlatformTenantUsersPage({ params }: PageProps) {
         </div>
         <Button asChild size="sm">
           <Link href={`/platform/tenants/${tenantId}/invitations/new`}>
-            {hasOwner ? "Invitar usuario" : "Invitar OWNER"}
+            {hasOwner ? "Invitar usuario" : "Invitar propietario"}
           </Link>
         </Button>
       </div>
@@ -76,8 +78,13 @@ export default async function PlatformTenantUsersPage({ params }: PageProps) {
                 <TableRow key={r.membershipId}>
                   <TableCell>{r.email}</TableCell>
                   <TableCell>{r.name ?? "—"}</TableCell>
-                  <TableCell className="text-xs">{r.roles.join(", ")}</TableCell>
-                  <TableCell>{r.membershipStatus}</TableCell>
+                  <TableCell className="text-xs">{formatUserRoleList(r.roles)}</TableCell>
+                  <TableCell>
+                    {formatMembershipStatusLabel(r.membershipStatus)}
+                    {r.userStatus !== "ACTIVE" ? (
+                      <p className="mt-1 text-xs text-destructive">Cuenta: {formatUserAccountStatusLabel(r.userStatus)}</p>
+                    ) : null}
+                  </TableCell>
                 </TableRow>
               ))
             )}

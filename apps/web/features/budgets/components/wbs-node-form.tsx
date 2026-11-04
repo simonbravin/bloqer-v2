@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useTransition } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
@@ -16,6 +16,7 @@ import {
   type UpdateWbsNodeInput,
 } from "@bloqer/validators";
 import { UnitSelect } from "./unit-select";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 export type WbsCreatePreset = "childItem";
 
@@ -34,11 +35,11 @@ type EditMode = {
   onSubmit: (data: UpdateWbsNodeInput) => Promise<{ ok: true } | { error: string }>;
 };
 
-type WbsNodeFormProps = (CreateMode | EditMode) & { onDone: () => void };
+type WbsNodeFormProps = (CreateMode | EditMode) & { onDone: () => void; onPendingChange?: (pending: boolean) => void };
 
 export function WbsNodeForm(props: WbsNodeFormProps) {
-  const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { isPending, run: startTransition } = useBudgetAction(setServerError, props.onPendingChange);
 
   if (props.mode === "create") {
     return <CreateForm {...props} isPending={isPending} startTransition={startTransition} serverError={serverError} setServerError={setServerError} />;
@@ -48,7 +49,7 @@ export function WbsNodeForm(props: WbsNodeFormProps) {
 
 type Shared = {
   isPending: boolean;
-  startTransition: ReturnType<typeof useTransition>[1];
+  startTransition: ReturnType<typeof useBudgetAction>["run"];
   serverError: string | null;
   setServerError: (e: string | null) => void;
   onDone: () => void;
@@ -57,6 +58,7 @@ type Shared = {
 function CreateForm({
   parentId, preset, suggestedCode, subdivideApu, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
 }: CreateMode & Shared) {
+  const formId = useId();
   const nodeType = "ITEM" as const;
   const isItem = true;
 
@@ -95,6 +97,7 @@ function CreateForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <fieldset disabled={isPending} className="min-w-0 space-y-4">
       {suggestedCode ? (
         <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
           <span className="text-muted-foreground">Código asignado: </span>
@@ -103,8 +106,9 @@ function CreateForm({
       ) : null}
 
       <div className="space-y-1.5">
-        <Label>Nombre *</Label>
+        <Label htmlFor={`${formId}-name`}>Nombre *</Label>
         <Input
+          id={`${formId}-name`}
           placeholder={preset === "childItem" ? "Hormigón H-21" : "Estructura"}
           autoFocus
           {...form.register("name")}
@@ -117,12 +121,13 @@ function CreateForm({
       {isItem && (
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label>Unidad</Label>
-            <UnitSelect value={unit} onChange={(v) => form.setValue("unit", v)} />
+            <Label htmlFor={`${formId}-unit`}>Unidad</Label>
+            <UnitSelect id={`${formId}-unit`} value={unit} onChange={(v) => form.setValue("unit", v)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Cantidad</Label>
+            <Label htmlFor={`${formId}-quantity`}>Cantidad</Label>
             <DecimalInput
+              id={`${formId}-quantity`}
               {...bindRhfNumberDecimal(form.watch("quantity"), (n) =>
                 form.setValue("quantity", n, { shouldValidate: true, shouldDirty: true }),
               )}
@@ -132,11 +137,16 @@ function CreateForm({
       )}
 
       <div className="space-y-1.5">
-        <Label>Descripción</Label>
-        <Textarea rows={2} placeholder="Opcional..." {...form.register("description")} />
+        <Label htmlFor={`${formId}-description`}>Descripción</Label>
+        <Textarea id={`${formId}-description`} rows={2} placeholder="Opcional..." {...form.register("description")} />
       </div>
+      </fieldset>
 
-      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+      {Object.entries(form.formState.errors).filter(([field]) => field !== "name").map(([field, error]) => (
+        <p key={field} role="alert" className="text-sm text-destructive">{error?.message}</p>
+      ))}
+
+      {serverError && <p role="alert" className="text-sm text-destructive">{serverError}</p>}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={isPending}>
@@ -153,6 +163,7 @@ function CreateForm({
 function EditForm({
   defaults, onSubmit, isPending, startTransition, serverError, setServerError, onDone,
 }: EditMode & Shared) {
+  const formId = useId();
   const form = useForm<UpdateWbsNodeInput>({
     resolver: zodResolver(updateWbsNodeSchema),
     defaultValues: {
@@ -178,17 +189,18 @@ function EditForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <fieldset disabled={isPending} className="min-w-0 space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>Código *</Label>
-          <Input {...form.register("code")} />
+          <Label htmlFor={`${formId}-code`}>Código *</Label>
+          <Input id={`${formId}-code`} {...form.register("code")} />
           {form.formState.errors.code && (
             <p className="text-xs text-destructive">{form.formState.errors.code.message}</p>
           )}
         </div>
         <div className="space-y-1.5">
-          <Label>Nombre *</Label>
-          <Input {...form.register("name")} />
+          <Label htmlFor={`${formId}-name`}>Nombre *</Label>
+          <Input id={`${formId}-name`} {...form.register("name")} />
           {form.formState.errors.name && (
             <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
           )}
@@ -196,11 +208,14 @@ function EditForm({
       </div>
 
       <div className="space-y-1.5">
-        <Label>Descripción</Label>
-        <Textarea rows={2} {...form.register("description")} />
+        <Label htmlFor={`${formId}-description`}>Descripción</Label>
+        <Textarea id={`${formId}-description`} rows={2} {...form.register("description")} />
       </div>
+      </fieldset>
 
-      {serverError && <p className="text-sm text-destructive">{serverError}</p>}
+      {form.formState.errors.description && <p role="alert" className="text-sm text-destructive">{form.formState.errors.description.message}</p>}
+
+      {serverError && <p role="alert" className="text-sm text-destructive">{serverError}</p>}
 
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={isPending}>

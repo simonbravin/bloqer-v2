@@ -10,7 +10,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 
-import type { SubdivideApuChoice } from "@bloqer/validators";
 
 type Props = {
   open: boolean;

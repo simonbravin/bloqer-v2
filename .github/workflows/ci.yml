@@ -34,7 +34,7 @@ jobs:
       - name: Typecheck monorepo
         run: pnpm typecheck
 
-      - name: Unit tests (domain / utils / services)
+      - name: Unit tests (all workspace test suites)
         run: pnpm test
 
   # Job-level `if` cannot reference `secrets` (GitHub rejects the workflow).

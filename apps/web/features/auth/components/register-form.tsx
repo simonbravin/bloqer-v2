@@ -104,7 +104,7 @@ export function RegisterForm() {
             autoComplete="new-password"
             required
             disabled={pending}
-            hint="Mínimo 10 caracteres, con al menos una letra y un número."
+            hint="Mínimo 10 caracteres, una letra y un número. Hasta 72 caracteres; con acentos o emojis el límite es menor."
           />
           <PasswordField
             id="register-confirm-password"

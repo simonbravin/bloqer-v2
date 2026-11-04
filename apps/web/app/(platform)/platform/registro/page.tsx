@@ -5,6 +5,7 @@ import { listPlatformAuditLog, listPlatformTenants, ServiceError } from "@bloqer
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { formatDateTime } from "@/lib/format";
+import { parsePlatformAuditSearchParams } from "@/lib/platform-audit-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +22,7 @@ import {
 } from "@/features/platform/platform-audit-labels";
 
 interface PageProps {
-  searchParams: Promise<{ tenantId?: string; action?: string; limit?: string }>;
+  searchParams: Promise<{ tenantId?: string | string[]; action?: string | string[]; limit?: string | string[] }>;
 }
 
 function formatMetadata(metadata: unknown): string {
@@ -39,22 +40,16 @@ export default async function PlatformRegistroPage({ searchParams }: PageProps) 
   if (!session?.user?.id) redirect("/login");
   const ctx = await getPlatformServiceContext(session.user.id);
   const sp = await searchParams;
-  const tenantId = sp.tenantId?.trim() || undefined;
-  const action = sp.action?.trim() || undefined;
-  const limitRaw = sp.limit ? Number(sp.limit) : undefined;
+  const filters = parsePlatformAuditSearchParams(sp);
+  const tenantId = typeof sp.tenantId === "string" ? sp.tenantId.trim() : "";
+  const action = typeof sp.action === "string" ? sp.action.trim() : "";
+  const limitRaw = filters.success ? filters.data.limit : 80;
 
   let rows;
   let tenants;
   try {
     [rows, tenants] = await Promise.all([
-      listPlatformAuditLog(
-        {
-          targetTenantId: tenantId,
-          action,
-          limit: limitRaw && !Number.isNaN(limitRaw) ? limitRaw : 80,
-        },
-        ctx,
-      ),
+      filters.success ? listPlatformAuditLog(filters.data, ctx) : Promise.resolve([]),
       listPlatformTenants({ limit: 200 }, ctx),
     ]);
   } catch (e) {
@@ -120,6 +115,12 @@ export default async function PlatformRegistroPage({ searchParams }: PageProps) 
           Filtrar
         </Button>
       </form>
+
+      {!filters.success ? (
+        <p role="alert" className="rounded-md border border-destructive/40 p-3 text-sm text-destructive">
+          Revisá los filtros: elegí una organización válida y un límite entero entre 1 y 200.
+        </p>
+      ) : null}
 
       <div className="rounded-xl border bg-card shadow-sm">
         <Table>

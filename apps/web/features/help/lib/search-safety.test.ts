@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { HELP_ARTICLES, listHelpIntentChips } from "./catalog";
+import { HELP_ARTICLES, HELP_INTENT_LABELS, listHelpIntentChips } from "./catalog";
 import { searchHelpArticles } from "./search";
 
 function dump(q: string) {
@@ -27,6 +27,20 @@ test("plata alone stays bounded", () => {
   assert.ok(n <= 8, String(n));
 });
 
-test("intent chip count curated", () => {
-  assert.ok(listHelpIntentChips().length <= 28, String(listHelpIntentChips().length));
+test("intent chips have curated labels and select only articles for their objective", () => {
+  const chips = listHelpIntentChips();
+  assert.ok(chips.length > 0);
+  const intents = new Set<string>();
+  for (const { intent, label } of chips) {
+    assert.ok(!intents.has(intent), `duplicate intent chip: ${intent}`);
+    intents.add(intent);
+    assert.ok(label.trim().length > 0, `${intent}: empty label`);
+    assert.equal(label, HELP_INTENT_LABELS[intent], `${intent}: missing curated label`);
+    const hits = searchHelpArticles(HELP_ARTICLES, { intent, query: "" });
+    assert.ok(hits.length > 0, `${intent}: chip without matching articles`);
+    assert.ok(
+      hits.every((article) => article.intents.includes(intent)),
+      `${intent}: unrelated article`,
+    );
+  }
 });

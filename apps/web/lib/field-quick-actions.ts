@@ -48,7 +48,7 @@ export function listFieldQuickActions(
       case "consumption":
         return isEnabled("INVENTORY") && can(roles, "EDIT", "INVENTORY");
       case "document":
-        return can(roles, "EDIT", "PROJECTS");
+        return isEnabled("PROJECTS") && can(roles, "EDIT", "PROJECTS");
     }
   });
 }

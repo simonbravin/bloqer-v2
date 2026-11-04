@@ -50,6 +50,11 @@ describe("detectImportProfile", () => {
 });
 
 describe("validateManualNodeCode", () => {
+  for (const [code, parent] of [["2.1", "1"], ["1.1.1", "1"], ["1.2", null], ["garbage", null], ["1..2", "1"], ["EST.1", "ARQ"]] as const) {
+    it(`rejects invalid code or parent ${code}/${parent}`, () => {
+      assert.ok(validateManualNodeCode(code, "ITEM", parent));
+    });
+  }
   it("allows subcapítulo bajo rubro ARQ", () => {
     assert.equal(validateManualNodeCode("ARQ.1", "GROUP", "ARQ"), null);
   });

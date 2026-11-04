@@ -1,6 +1,5 @@
 import type { SubscriptionStatus, TenantStatus } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { ServiceError } from "../types";
 import { assertPlatformAccess, type PlatformServiceContext } from "./platform-auth.service";
 import type { PlatformTenantListItem } from "./platform-tenant.service";
 
@@ -38,7 +37,7 @@ function computeTrialEndingWithinDays(
   subscriptionStatus: SubscriptionStatus,
   now: Date,
 ): number | null {
-  if (!trialEndsAt || subscriptionStatus !== "TRIAL") return null;
+  if (!trialEndsAt || subscriptionStatus !== "TRIAL" || trialEndsAt < now) return null;
   const days = daysUntil(trialEndsAt, now);
   if (days < 0) return null;
   if (days <= 7) return 7;
@@ -65,7 +64,7 @@ async function loadMembershipFlagsByTenant(
   if (tenantIds.length === 0) return map;
 
   const memberships = await prisma.userMembership.findMany({
-    where: { tenantId: { in: tenantIds }, status: "ACTIVE" },
+    where: { tenantId: { in: tenantIds }, status: "ACTIVE", user: { status: "ACTIVE" } },
     select: { tenantId: true, roles: true },
   });
 
@@ -154,10 +153,19 @@ export async function listPlatformExpirationAttention(
 ): Promise<PlatformExpirationRow[]> {
   await assertPlatformAccess(ctx);
   const now = new Date();
+  const in30 = new Date(now.getTime() + 30 * MS_PER_DAY);
 
   const rows = await prisma.tenant.findMany({
+    where: {
+      OR: [
+        { subscriptionStatus: "TRIAL", trialEndsAt: { lte: in30 } },
+        { subscriptionStatus: "PAST_DUE" },
+        { status: "SUSPENDED" },
+        // No active users also implies no active OWNER.
+        { memberships: { none: { status: "ACTIVE", user: { status: "ACTIVE" }, roles: { has: "OWNER" } } } },
+      ],
+    },
     orderBy: [{ trialEndsAt: "asc" }, { name: "asc" }],
-    take: 300,
     select: {
       id: true,
       name: true,

@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { listPendingInvitationsForEmail } from "@bloqer/services";
+import { getMembershipByUserId, listPendingInvitationsForEmail } from "@bloqer/services";
 import { OnboardingForm } from "./onboarding-form";
 import { PendingOrganizationInvitations } from "./pending-organization-invitations";
+import { signOutOnboardingAction } from "./actions";
+import { Button } from "@/components/ui/button";
 
 export const metadata = {
   title: "Crear espacio de trabajo — Bloqer",
@@ -13,8 +15,27 @@ export default async function OnboardingPage() {
   if (!current) redirect("/login");
   if (current.tenantCtx) redirect("/dashboard");
 
+  const existingMembership = await getMembershipByUserId(current.session.user.id);
   const userEmail = current.session.user?.email?.trim() ?? "";
   const pendingInvitations = userEmail ? await listPendingInvitationsForEmail(userEmail) : [];
+  if (existingMembership) {
+    return (
+      <div className="w-full max-w-xl space-y-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Acceso al espacio no disponible</h1>
+        <p role="alert" className="text-sm text-muted-foreground">
+          Tu cuenta ya pertenece a una organización, pero el espacio, la empresa asignada o tus roles requieren una revisión.
+          Pedile a un administrador que revise tu acceso.
+        </p>
+        {pendingInvitations.length > 0 ? (
+          <PendingOrganizationInvitations invitations={pendingInvitations} userEmail={userEmail} />
+        ) : null}
+        <form action={signOutOnboardingAction}>
+          <Button type="submit" variant="outline">Cerrar sesión</Button>
+        </form>
+      </div>
+    );
+  }
+
   const hasPendingInvitations = pendingInvitations.length > 0;
   const missingEmail = !userEmail;
 

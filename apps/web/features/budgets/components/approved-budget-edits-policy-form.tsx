@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ApprovedBudgetEditsPolicyView } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,7 @@ import {
   updateTenantApprovedBudgetEditsPolicyAction,
   updateProjectApprovedBudgetEditsPolicyAction,
 } from "@/app/(app)/configuracion/politicas/actions";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 type Props = {
   policy: ApprovedBudgetEditsPolicyView;
@@ -26,8 +27,8 @@ const PROJECT_STATUS_LABEL: Record<string, string> = {
 
 export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { isPending: pending, isRunning, run: startTransition } = useBudgetAction(setError);
   const [success, setSuccess] = useState<string | null>(null);
   const [tenantAllow, setTenantAllow] = useState(policy.tenantAllow);
 
@@ -36,7 +37,7 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
   }, [policy.tenantAllow]);
 
   function runTenantToggle(next: boolean) {
-    if (!canEdit) return;
+    if (!canEdit || isRunning()) return;
     const msg = next
       ? "¿Habilitar la edición excepcional de presupuestos aprobados en toda la organización? Solo las obras que también tengan el flag activo podrán editarse. Cada cambio queda en el registro."
       : "¿Deshabilitar la edición de presupuestos aprobados para toda la organización? Ninguna obra podrá editar presupuestos APPROVED hasta que se vuelva a habilitar.";
@@ -57,7 +58,7 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
   }
 
   function runProjectToggle(projectId: string, code: string, next: boolean) {
-    if (!canEdit) return;
+    if (!canEdit || isRunning()) return;
     if (next && !tenantAllow) return;
     const msg = next
       ? `¿Permitir editar presupuestos aprobados en la obra ${code}? Quien tenga permiso de edición de presupuestos podrá agregar o cambiar partidas, APU, costos y venta. Cada cambio queda auditado.`
@@ -89,9 +90,9 @@ export function ApprovedBudgetEditsPolicyForm({ policy, canEdit }: Props) {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {success && (
-            <p className="text-sm text-green-600 dark:text-green-500">{success}</p>
+            <p role="status" className="text-sm text-green-600 dark:text-green-500">{success}</p>
           )}
           <div className="rounded-lg border bg-muted/20 p-4">
             <SwitchField

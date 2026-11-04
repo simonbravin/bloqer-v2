@@ -5,13 +5,20 @@ import { redirect } from "next/navigation";
 import type { ZodError } from "zod";
 import { completeTrialOnboarding, ServiceError } from "@bloqer/services";
 import { completeTrialOnboardingInputSchema } from "@bloqer/validators";
+import { signOut } from "@bloqer/auth";
 import { getSession } from "@/lib/auth";
 import { setActiveTenantCookie } from "@/lib/active-tenant";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
+import { clearActiveTenantCookieAction } from "@/lib/auth-session-actions";
 
 export type OnboardingFormState = {
   error: string | null;
 };
+
+export async function signOutOnboardingAction(): Promise<void> {
+  await clearActiveTenantCookieAction();
+  await signOut({ redirectTo: "/login" });
+}
 
 function firstValidationMessage(err: ZodError): string {
   return err.issues[0]?.message ?? "Revisá los datos ingresados.";

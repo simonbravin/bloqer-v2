@@ -46,6 +46,24 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-014 | PDF render boundary en `@bloqer/report-pdf` (monorepo + Next.js) | ACEPTADO |
 | ADR-016 | Company vs project finance tools (D-056) | ACEPTADO |
 | ADR-017 | Bloqer AI: tool layer + provider-agnostic (`AiProvider`) sobre `@bloqer/services` | ACEPTADO |
+| ADR-018 | Aislamiento explícito y catálogo cerrado de hijos con tenant heredado | ACEPTADO |
+
+---
+
+## ADR-018 — Aislamiento explícito y catálogo cerrado de hijos con tenant heredado
+
+- **Fecha:** 2026-11-03.
+- **Estado:** ACEPTADO por confirmación explícita del usuario durante la remediación de AG-00, sobre la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md).
+- **Contexto:** GA-AG-00-005/006 identificaron fuentes que describían filtro automático o columna de tenant en cada fila, mientras la implementación usa scopes/guards explícitos y 22 hijos/configuraciones heredan pertenencia por su padre. D-001 mantiene el aislamiento absoluto; faltaba reconciliar el mecanismo y su contrato físico sin inventar cambios de schema.
+- **Decisión:**
+  - El tenant se obtiene del contexto autenticado. Ningún dato del cliente habilita leer, devolver o modificar información de otro tenant. Empresa y proyecto conservan sus reglas específicas; `companyId` no sustituye al tenant.
+  - El mecanismo vigente es explícito en servicios/repositorios. Las lecturas masivas se acotan desde la consulta; una carga por ID comprueba pertenencia antes de usar o devolver el agregado o mutar. El cliente Prisma simple no inyecta filtros ni rechaza automáticamente consultas sin tenant.
+  - Las raíces operativas conservan `tenant_id` obligatorio. Solo los **22 hijos/configuraciones existentes** del [catálogo de pertenencia](./TENANT_ISOLATION_MODEL.md) conservan tenant derivado de su padre dueño obligatorio. El catálogo es cerrado: no habilita nuevos hijos sin columna por analogía.
+  - Toda consulta o mutación de esos hijos comprueba padre, tenant y coherencia de las referencias adicionales, incluso cuando las FK simples no garantizan esa coherencia. Un ID de hijo recibido del cliente se valida contra el padre autorizado.
+  - Identidad, raíz y administración de plataforma mantienen sus propósitos y guards propios, enumerados separadamente en el catálogo.
+  - Esta reconciliación no incorpora columnas, migraciones ni middleware global. Un control automático adicional requiere diseño y ADR propios con pruebas de compatibilidad.
+- **Consecuencias:** se alinean AGENTS, requisito de multitenancy, convenciones y documentos de aislamiento con el contrato confirmado. Se resuelven P-AG00-01/02 y GA-AG-00-005/006 en su alcance documental/arquitectónico; la aprobación no acredita SQL, datos efectivos ni autorización correcta de todos los recorridos. Las pruebas de políticas sin DB no reemplazan la integración aislada prevista para AG-01.
+- **Referencias:** D-001 en [`DECISION_LOG.md`](../00-product/DECISION_LOG.md), [`MULTITENANCY_ARCHITECTURE.md`](./MULTITENANCY_ARCHITECTURE.md), [`TENANT_ISOLATION_MODEL.md`](./TENANT_ISOLATION_MODEL.md), [`DATABASE_CONVENTIONS.md`](./DATABASE_CONVENTIONS.md), [`PRISMA_ERD_AUDIT.md`](./PRISMA_ERD_AUDIT.md).
 
 ---
 
@@ -105,7 +123,7 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
   - **Concurrencia optimista** en `createPayment` / `createCollection` y todas las cancelaciones/reversiones: `updateMany` + `assertOptimisticRowUpdate(count)` exige exactamente 1 fila afectada → `CONFLICT` si no.
   - **Fase 0 no propaga** `projectId` en `AccountMovement` generado por cobro/pago; filtro por obra en reportes vía join (`Collection.projectId`, `Payment.projectId`).
 - **Consecuencias:** guards extraídos y testeados en `packages/services/src/ar/sales-invoice-cancel-guards.ts`, `.../ap/supplier-invoice-cancel-guards.ts` y `.../treasury/account-movement-cancel-guards.ts`; locking optimista también en cancelación de facturas, obligaciones, cobros/pagos y reversión de saldos; P-TRZ-06 resuelto vía `resolveOpeningBase` en `balance.service.ts`.
-- **Referencias:** plan Finanzas/Transacciones v2; [`02-modules/TREASURY.md`](../02-modules/TREASURY.md), [`02-modules/ACCOUNTS_RECEIVABLE.md`](../02-modules/ACCOUNTS_RECEIVABLE.md).
+- **Referencias:** plan Finanzas/Transacciones v2; [`02-modules/TREASURY.md`](../02-modules/TREASURY.md), [`03-finance/ACCOUNTS_RECEIVABLE.md`](../03-finance/ACCOUNTS_RECEIVABLE.md).
 
 ---
 

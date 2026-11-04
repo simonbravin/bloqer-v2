@@ -15,6 +15,7 @@ export { WbsTree } from "./components/wbs-tree";
 export { CostItemPanel } from "./components/cost-item-panel";
 export { BudgetLifecycleDialog } from "./components/budget-lifecycle-dialog";
 export { BudgetMarginConfigSection } from "./components/budget-margin-config-section";
+export { BudgetMetadataSection } from "./components/budget-metadata-section";
 export { BudgetExportActions } from "./components/budget-export-actions";
 export { CostItemApuDialog } from "./components/cost-item-apu-dialog";
 export { WbsGroupDialog } from "./components/wbs-group-dialog";

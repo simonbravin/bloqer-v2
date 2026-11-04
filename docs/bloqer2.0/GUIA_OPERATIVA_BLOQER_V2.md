@@ -216,8 +216,22 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 ### 1.1 Ingreso y navegación
 
 - Acceso en `/login` con **email y contraseña** (registro en `/registro` + verificación de email; recuperación en `/recuperar-contrasena`) o **Google**. No hay segundo factor (2FA) al momento de este relevamiento.
+- Al registrar o restablecer una contraseña: mínimo **10 caracteres**, con una letra y un número. El máximo es **72 bytes UTF-8**: hasta 72 caracteres simples, menos si usás acentos o emojis. Restablecerla invalida las sesiones con la contraseña anterior; confirmar un email o entrar con Google no reactiva una cuenta suspendida.
+- Si aparece **Acceso al espacio no disponible**, tu organización, empresa asignada o roles requieren revisión por un administrador. No crees otro espacio para resolverlo. Las invitaciones válidas a otras organizaciones siguen disponibles; **Cerrar sesión** permite entrar con otra cuenta.
 - El **menú lateral de empresa** agrupa: **General · Finanzas · Tesorería · Contabilidad · Configuración**.
 - Al entrar a una obra, el menú lateral se reemplaza por el **menú del proyecto**.
+- Los accesos del menú y las barras de cada área respetan tus permisos y los módulos habilitados. **General**, **Políticas**, **Equipo** y **Permisos** de Configuración pueden no aparecer según tu acceso; **Mi perfil** y **Notificaciones** conservan sus propios accesos.
+- Con teclado, el primer enlace es **Ir al contenido principal**. En teléfono, **Mostrar menú lateral** abre el menú; **Escape**, **Cerrar** o elegir una sección lo cierran. Al cerrar con Escape, el foco vuelve al botón del menú.
+- En la barra inferior de campo: **Inicio · Obra · Registrar · Pendientes · Más**. Desde una pantalla general, **Obra** abre `/proyectos`; dentro de una obra, vuelve a su resumen. Si Proyectos no está habilitado, **Obra** queda deshabilitada. **Más** muestra enlaces de la obra actual solo si estás dentro de ella. La consola de administración SaaS conserva su propia navegación.
+- **Registrar** usa la obra de la pantalla actual o comprueba que la última elegida siga disponible para vos. Si hace falta, abre **Seleccionar obra**. Mientras consulta muestra **Cargando obras…**; si falla, **No pudimos cargar las obras. Volvé a intentar.** y **Reintentar**. **No hay obras disponibles.** indica una consulta terminada sin resultados. Al cerrar sesión o cambiar de empresa se borra la preferencia de obra.
+- Las migas del encabezado permiten volver a pantallas existentes; los nombres que solo agrupan páginas se muestran como texto.
+
+#### Carga y recuperación de pantallas
+
+- **Cargando contenido…** indica que se está abriendo la sección.
+- **No encontramos esta página**: revisá la dirección o elegí **Ir al inicio**. Si falta una sección, pedile a un administrador que revise tus permisos.
+- **No pudimos cargar esta página**: usá **Volver a cargar** para reintentar o **Ir al inicio** para continuar. En la consola SaaS, ese inicio es el de la consola. Si el problema continúa, comunicate con el administrador.
+- Los selectores con búsqueda permiten abrir con flechas, buscar y elegir con teclado; **Escape** cierra el selector. En los diálogos, **Cerrar** y **Cancelar** permiten volver sin confirmar. Durante una confirmación aparece **Procesando…** y se bloquea otro envío; si falla, podés corregir y reintentar. Si aparece **No se pudo completar la acción. Volvé a intentar.**, la acción quedó disponible para otro intento.
 
 <!-- capture:01 login-email-google -->
 ![Bloqer — Login (email + Google)](./guides/assets/screenshots/01-login-email-google.png)
@@ -257,6 +271,8 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 - **Zona horaria:** desplegable con ciudades + offset **GMT** (ej. `Buenos Aires (GMT-3)`). No hay que escribir el id IANA a mano. Argentina (Buenos Aires) es **GMT-3 todo el año** (sin horario de verano).
 - Esa zona se usa en el **Registro de actividad** (tabla, detalle y exports CSV/PDF). En **reportes programados**, cada envío tiene su propia zona: la **próxima / última ejecución** se muestra en la zona del envío (no en UTC del servidor).
 - Razón social / CUIT son de solo lectura acá (datos fiscales de la empresa principal).
+- Los datos de contacto corresponden a tu empresa asignada; una membresía global usa la empresa principal de la organización. Podés borrar **Sitio web** o dejar la **Condición frente al IVA** sin especificar y guardar: el valor se elimina. No se elige otra empresa si tu asignación dejó de estar activa.
+- La plataforma puede deshabilitar módulos para la organización. Los formularios de General y de Equipo respetan esa disponibilidad además de tus permisos; deshabilitar la administración del equipo no quita el acceso a tu perfil personal.
 - **Políticas:** `/configuracion/politicas` (Configuración → **Políticas**): bloque **Acceso a proyectos** (todas las obras vs solo asignadas, [D-111]); umbral de aprobación OC, SC requerida, min/max cotizaciones, OC directa, auto-aprobación, emergencia, % desvíos; bloque **Atajos operativos** (Un paso: autorizar y comprometer [D-105]/[D-106]; Al aprobar, confirmar [D-107]; Al recibir, crear borrador de factura [D-108]; apagados por defecto); bloque **Notificaciones** ([D-114]/[D-070]/[D-097]: alertas de vencimiento, canal CxP campana vs campana+email, CC email flujo diario a Propietario/Administrador, digest matutino); y política excepcional de presupuestos aprobados (partidas + economía; apagada por defecto; solo OWNER/ADMIN).
 
 <!-- capture:02 configuracion-zona-horaria -->
@@ -276,6 +292,8 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 Las notificaciones in-app se abren desde la **campana del encabezado** (no tienen ítem propio en el menú lateral de módulos).
 
 **Preferencias personales de email ([D-114]):** Configuración → **Notificaciones** → `/configuracion/notificaciones`. Cada usuario elige categorías de correo (compras flujo / escalamientos, CxP, CxC, libro de obra, etc.) según su rol. La **campana no se apaga**. Por defecto Propietario/Administrador **no** reciben el flujo diario SC/OC por email (sí ven la campana); Compras y Jefe de obra sí. Pueden prenderlo. Auth/invitación siempre se envían. Desde el inbox `/notificaciones` hay un enlace **Configurar emails**.
+
+Las preferencias de correo no apagan la campana. Si la plataforma deshabilita el módulo **Notificaciones** de toda la organización, campana e inbox no muestran avisos ni contadores y no admiten cambios de estado hasta habilitarlo. El historial se conserva. Al quitar el acceso a una obra, sus avisos anteriores también dejan de verse; recibir un aviso no concede acceso a esa obra.
 
 **Políticas de notificaciones (empresa):** Configuración → **Políticas** → sección **Notificaciones** (`/configuracion/politicas#notificaciones`): alertas de vencimiento y canal CxP (campana vs campana+email, [D-070]/[D-097]); más **Email a dirección** (solo Propietario/Administrador): CC del flujo diario y digest matutino on/off + hora local ([D-114]).
 
@@ -320,6 +338,8 @@ Las notificaciones in-app se abren desde la **campana del encabezado** (no tiene
 - Si el invitado **aún no tiene cuenta**, primero se registra / inicia sesión; al volver a aceptar, la cookie sigue vigente hasta que acepte o expire.
 - Tras aceptar, queda como miembro con uno o más roles, anclado a la empresa del tenant cuando hay una sola razón social (no hay que elegirla).
 - Gestión de cada miembro: `/configuracion/equipo/[membershipId]`.
+- No podés quitar el rol de Propietario ni desactivar al último propietario que pueda ingresar. Primero debe quedar otro propietario con cuenta y membresía activas. La protección también se aplica a cambios simultáneos.
+- Dos solicitudes de invitación simultáneas al mismo email dejan una sola invitación pendiente por organización. Una invitación vencida no se puede aceptar ni cancelar como pendiente; queda **Vencida**. Cancelarla mientras se acepta produce un solo resultado válido.
 - **Tenant suspendido:** no se puede aceptar una invitación a una empresa inactiva; el mensaje lo indica en pantalla.
 
 <!-- capture:05 invitar-usuario -->
@@ -411,7 +431,9 @@ Esto también aplica a consultar pagos de una CxP y a cancelar pagos o cobranzas
 
 **Acceso global**
 
-- Usuarios con autoridad tenant-wide (helper RBAC, no hardcode de string) ven el mensaje **Acceso global a todas las obras** y no necesitan memberships.
+- **Acceso global dentro de su empresa** evita la necesidad de asignaciones por obra; conserva el alcance de empresa. Las obras compartidas de la organización siguen visibles. El listado, las URLs directas, Field, Pendientes, la campana y Bloqer AI respetan ese mismo alcance.
+- El editor muestra la intersección de las obras administrables por vos y las que puede usar el miembro. **Guardar acceso a obras** conserva las asignaciones de otras empresas y de obras canceladas que no aparecen en la lista.
+- Deshabilitar **Proyectos** bloquea sus datos y operaciones directas. Un área habilitada de una obra, como CxP, puede seguir usando el encabezado del proyecto si tu rol y tu acceso a la obra lo permiten; el encabezado por sí solo no habilita los datos de otras áreas.
 
 **No confundir con Equipo de obra**
 
@@ -435,6 +457,14 @@ Esto también aplica a consultar pagos de una CxP y a cancelar pagos o cobranzas
 | **Otro** | Residuo / no operativo | No entra en OC ni en el desplegable de gasto |
 
 **Selectores de contacto.** En alta de obra, OC, cotizaciones, facturas de venta, subcontratos, transacciones y mano de obra del parte, el buscador lista **todos** los contactos activos del rol que corresponde (no recorta a 20). Cada opción muestra **razón social** y, si es distinta, el **nombre fantasía** entre paréntesis. Se filtra por cualquiera de los dos nombres (sin CUIT). El listado de `/directorio` sigue paginado y tiene su propia búsqueda.
+
+**Buscar y mantener contactos.** El listado abre con contactos **Activos**. Elegí **Todos los estados** para incluir los archivados, o **Archivados** para encontrarlos y **Reactivar** desde su ficha. **Exportar página CSV** descarga únicamente la página que ves, con los filtros actuales y los roles en español. El listado permite buscar por nombres o identificación fiscal; un CUIT/CUIL completo se encuentra con o sin guiones o espacios.
+
+**Datos fiscales y perfiles.** Si elegís CUIT o CUIL, ingresá sus 11 dígitos; se aceptan guiones y espacios y se guarda sin separadores. Un número repetido dentro de la organización se rechaza, incluso si el contacto histórico lo tenía formateado. Los identificadores extranjeros conservan su formato. Desde la ficha, **+ Asignar rol**, **Quitar rol** y **Editar perfil** administran los roles del contacto y sus datos; esos roles describen la relación comercial y no son permisos de usuarios. Al editar el perfil podés vaciar notas, CBU/CVU, especialidad o límite de crédito para quitar ese dato; el límite admite cero y valores positivos. **Guardando...** evita otro envío; ante un error, corregí lo indicado y volvé a guardar.
+
+**Acceso a Directorio.** La organización debe tener el módulo habilitado. Crear, editar, archivar, reactivar y administrar perfiles requiere permiso de edición de Directorio; con lectura podés consultar las fichas sin esas acciones. Archivar conserva las referencias históricas y lo retira de los selectores nuevos.
+
+Para cambiar roles o perfiles de un contacto archivado, primero usá **Reactivar**. No se puede quitar **Cliente** si una obra en borrador, activa o en pausa todavía lo usa: reasigná el cliente de esa obra antes. Si solo quedan obras completadas o canceladas, podés quitar el rol y sus referencias y perfil comercial se conservan como historial.
 
 **Convención Argentina**
 
@@ -602,7 +632,11 @@ Para diferencias de caja/banco que no vienen de un cobro/pago (cargos bancarios,
 
 En el listado **Proyectos** (`/proyectos`) la vista por defecto es **Tarjetas** (dos por fila en desktop). Toda la tarjeta abre el proyecto. El toggle **Tabla / Tarjetas** cambia la vista; en tabla, **Ver**, o clic en el **código** o el **nombre**.
 
+**Exportar página CSV** descarga solo los proyectos de la página actual, respetando los filtros. Para exportar otra página, abrila primero.
+
 ### 5.1 Procedimiento — Alta de proyecto
+
+**Nuevo proyecto** y **Crear proyecto** aparecen solo si tenés permiso de edición de proyectos, también cuando el listado está vacío. Sin ese permiso, la dirección de alta vuelve al listado; con el módulo deshabilitado, vuelve a Inicio.
 
 **Prerrequisitos**
 
@@ -620,18 +654,24 @@ En el listado **Proyectos** (`/proyectos`) la vista por defecto es **Tarjetas** 
    - **Nombre \***
    - **Cliente \*** (buscador de contactos Cliente: razón social o nombre fantasía)
    - Ubicación / país (default AR) y fechas contractuales si aplica (metadata; **no** reemplazan al cronograma)
+   - Si informás inicio y fin previsto, el fin debe ser igual o posterior al inicio. Una fecha inválida muestra un error en el campo.
 3. Pulsar **Crear proyecto**. El proyecto queda asociado a la empresa del tenant (si hay una sola razón social); no hay selector de empresa en el alta.
 4. El sistema abre el **Resumen** de la obra (`/proyectos/[id]`). El estado inicial es `DRAFT`.
-5. En el resumen / acciones de ciclo de vida, pulsar **Activar** (**Activar obra**) → estado `ACTIVE`. Sin activar, la operación diaria queda limitada.
+   Si la empresa usa **Solo proyectos asignados**, el creador recibe acceso únicamente a esa obra nueva cuando sus roles lo requieren. Conserva sus permisos actuales; la creación no le da acceso a otras obras ni cambia el equipo de avisos.
+5. En el resumen / acciones de ciclo de vida, pulsar **Activar**, revisar el diálogo **Activar obra** y pulsar **Confirmar** → estado `ACTIVE`. Sin activar, la operación diaria queda limitada.
 
 **Estados posteriores**
 
 | Acción UI | Estado |
 |-----------|--------|
 | Pausar | `ON_HOLD` |
-| Reactivar | `ACTIVE` |
+| Reanudar | `ACTIVE` desde una obra en pausa |
 | Completar | `COMPLETED` |
 | Cancelar | `CANCELLED` (no destructiva: conserva datos) |
+
+**Editar y corregir datos.** En **Administración → Configuración** podés vaciar fechas opcionales para quitarlas. Se valida el intervalo completo aunque cambies una sola fecha. Un código ya usado por otro proyecto de la organización se rechaza. Si el cliente histórico quedó inactivo, podés conservarlo al editar otros datos; para un alta o cambio de cliente necesitás uno activo. El tipo queda fijo cuando hay un presupuesto aprobado o cerrado. Una modificación simultánea pide recargar y reintentar para evitar pisar cambios.
+
+**Confirmaciones de estado.** **Confirmar** muestra **Procesando…** y bloquea otro envío. Si falla, el diálogo conserva el intento para corregir o reintentar. Al cancelar una obra activa o en pausa, se verifica que no tenga documentos operativos abiertos y se exige un motivo; si la consulta falla, usá **Reintentar**. Solo OWNER/ADMIN pueden cancelar una obra en curso o usar **Reactivar proyecto** sobre una cancelada. La reactivación muestra el estado destino y exige motivo: restaura el estado previo guardado; en históricos sin ese dato vuelve a pausa si hubo actividad o fecha de inicio, y a borrador si no la hubo. Completar registra el fin real y rechaza un inicio posterior a ese fin.
 
 <!-- capture:18 alta-de-proyecto -->
 ![Bloqer — Alta de proyecto](./guides/assets/screenshots/18-alta-de-proyecto.png)
@@ -667,6 +707,8 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 
 **Ruta base:** Planificación → **Presupuesto** → `/proyectos/[id]/presupuestos`
 
+Para crear o editar necesitás permiso de edición de presupuestos y acceso a la obra. La planificación se permite en obras **Borrador** o **Activo**; una obra pausada, finalizada o cancelada queda de consulta. Los usuarios de lectura pueden consultar historial y exportaciones; las acciones del ciclo de vida aparecen según sus permisos y el estado actual.
+
 ### 6.0 Procedimiento — Crear presupuesto
 
 1. En el listado, **Nuevo presupuesto** → `/presupuestos/nuevo`.
@@ -676,6 +718,8 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
    - **Parámetros económicos:** Gastos generales (%) · Costo financiero (%) · Utilidad (%) · Impuestos (%)
    - Opcional: precarga / **Importar EDT** en el mismo alta (sección de preload del formulario)
 3. Guardar. Queda en `DRAFT` y abre el detalle `/presupuestos/[budgetId]`.
+
+Si usás precarga, esperá a que termine de leerse el archivo antes de crear. **Quitar archivo** elimina esa precarga del formulario. Si el presupuesto se crea pero falla la importación, la pantalla informa que ya existe: **Reintentar importación EDT** usa ese mismo presupuesto y **Abrir presupuesto creado** permite continuar en su detalle. No vuelvas a darlo de alta para resolver ese error.
 
 ### 6.1 Estructura — capítulo vs partida vs insumo (D-057)
 
@@ -696,6 +740,8 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 2. Diálogo **Importar estructura EDT**: subir Excel/CSV (columna A = numeración, B = nombre; multi-rubro si el archivo trae prefijos).
 3. Confirmar **Importar**.
 
+La importación de estructura crea partidas sin cómputo económico: completá unidad, cantidad mayor a cero y APU antes de aprobar. Reemplazar una EDT se bloquea si sus nodos o insumos ya están vinculados a documentos operativos; el mensaje conserva la estructura existente. La numeración manual respeta la jerarquía y el código del padre; al cambiar el código de un capítulo, sus descendientes se renumeran juntos.
+
 **Opción B — Manual**
 
 1. Agregar capítulos (`GROUP`) e ítems hoja (`ITEM`) desde el árbol (acciones del nodo: p. ej. **Agregar ítem**).
@@ -710,12 +756,20 @@ Al entrar a la obra, el sidebar muestra (según permisos y módulos):
 
 1. En la tabla EDT, abrir la partida hoja (panel / click) → sección **Análisis de precio unitario (APU)** o modal **APU — Análisis de precio unitario**.
 2. El modal muestra **solo costo** (D-058): no edita PU ni total de venta (eso va en la tabla EDT, base **Venta**).
-3. Por categoría (Materiales / Mano de obra / Equipos / Subcontratos / Otros), agregar líneas con:
+3. Por categoría (Materiales / Mano de obra / Equipos / Subcontratos), agregar líneas con:
    - Descripción, unidad, cantidad/coeficiente, precio
    - Modo de carga: **Por unidad** o **Total partida** (default al agregar: Total partida — “necesito 500 un a $X”; Bloqer calcula el aporte unitario y guarda necesidad para Materiales)
    - **Importes sin compra:** unidad **Global** (`gl`) + cant. 1 (o N) + precio = monto; **no** genera necesidad en el tablero Materiales
 4. **Guardar cambios**.
 5. En la EDT, expandir la partida (chevron) para ver filas de detalle de solo lectura (`APU·MAT`, etc.) (D-059). Click en una fila detalle → reabre el APU de la **partida**. Esas filas **no** se certifican ni se compran: siempre contra la partida hoja.
+
+Antes de guardar, pulsá **Agregar** para incorporar el insumo que estás cargando. Si quedó una línea en edición, el aviso **Agregá la línea APU que estás cargando antes de guardar los cambios** conserva el formulario. Durante el envío se bloquean los campos y el cierre del diálogo; un rechazo permite corregir y reintentar. Para quitar un insumo ya usado por compras o facturas necesitás conservar ese vínculo histórico; el sistema bloquea su eliminación.
+
+Si existen **Líneas legacy (Otros), incluidas en el costo directo**, el modal conserva y muestra sus importes. No hay una pestaña nueva de alta de Otros ni una quinta columna en el desglose EDT.
+
+Podés abrir una partida o capítulo con el botón de su nombre usando el teclado. Abrir un APU histórico conserva sus aportes; si una edición cambia el cálculo que quedará al guardar, aparece **Vista previa al guardar: aportes del APU recalculados a 2 decimales.** La vista previa usa el mismo cálculo que el servidor y no modifica la base por abrir el diálogo.
+
+En **Configuración de márgenes**, el desglose de cálculo usa los mismos redondeos por unidad y partida que el servidor. **Guardar configuración** aplica esos parámetros y actualiza el precio de venta del presupuesto, el listado y las vistas de costos que lo consumen. La vista previa distingue **TOTAL DE VENTA (calc.)** de **Total venta en presupuesto** hasta guardar.
 
 ### 6.1c Vista EDT (toolbar) — D-058 · D-059 · D-060
 
@@ -764,6 +818,10 @@ stateDiagram-v2
 
 **Excepción (OWNER/ADMIN):** si hace falta corregir un `APPROVED` (agregar partidas, APU, costos o venta), Configuración → **Políticas** → Presupuestos: habilitar el interruptor de la organización **y** el de la obra. Quien tenga permiso de editar presupuestos puede cambiar todo el presupuesto. Al terminar: **Congelar** en la obra (o deshabilitar el interruptor de la organización). Un `CLOSED` no entra: ahí se usa adenda.
 
+**Cancelar presupuesto** está disponible con permiso de edición desde **Borrador**, **En revisión** o **Con observaciones** (D-121). Conserva el registro como cancelado; no elimina documentos. En **Aprobado** y **Cerrado** esa acción no está disponible.
+
+**Datos del presupuesto**, al final del detalle, muestra el nombre y las notas internas. **Guardar datos** permite corregirlos según permiso y estado. En **Cerrado** se conserva el nombre contractual y solo se guardan notas; las obras bloqueadas y los usuarios de lectura ven esos datos sin edición.
+
 <!-- capture:21 presupuesto-aprobado-edt -->
 ![Bloqer — Presupuesto aprobado / EDT](./guides/assets/screenshots/21-presupuesto-aprobado-edt.png)
 
@@ -789,6 +847,7 @@ stateDiagram-v2
 
 1. Abrir Cronograma. Vista por defecto: **Gantt** (`?view=gantt`). El eje de tiempo abre en **hoy** (no en el medio del rango); **Ir a hoy** vuelve a esa fecha. También: Calendario, Kanban, Tabla.
 2. (Recomendado) **Importar desde presupuesto** → diálogo **Importar EDT al cronograma** → elegir presupuesto aprobado → **Importar**. Así las tareas nacen alineadas a la EDT.
+   La base y las tareas se guardan juntas: si falla la importación, se conserva la planificación anterior. Repetir la misma importación incorpora solamente nodos que todavía no estén vinculados, sin duplicar tareas.
 3. Completar fechas en ítems **hoja** (no en contenedores: sus fechas se derivan; usar **Recalcular contenedores** en el Gantt si hace falta). En Gantt: arrastrar/redimensionar barras y **hitos**.
 4. Crear ítems adicionales con **+ Tarea / hito** (`TASK` o `MILESTONE`). En **Ubicación**: *Colocar bajo* (capítulo o raíz) e *Insertar después de* (hermano). Si vinculás una partida EDT que ya tiene una tarea hoja, el sistema propone poner el ítem **justo debajo** (hermano, no hijo). El vínculo EDT **no** mueve la fila.
 5. Reordenar: el botón **⋮** de cada fila en Gantt, Tabla o detalle (Subir / Bajar / Sangrar / Disminuir sangría). Si sangrás bajo una hoja con fechas, esa hoja pasa a contenedor (fechas derivadas); el sistema pide confirmación.
@@ -836,7 +895,7 @@ En el Gantt: relleno oscuro de la barra = **Real**; franja/borde ámbar = **Cert
 
 **Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`
 
-**Equipo de obra (avisos):** en **Administración → Configuración** (`/editar`), al final, card **Equipo de obra**. Ahí se asignan usuarios activos de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Pueden editar el roster quienes tienen permiso de **editar proyectos** (OWNER, ADMIN y PM de la organización; no el capataz). En el **Resumen**, si no hay PM con membresía activa, aparece un aviso con enlace a Configuración. Sin PM activo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster con membresía inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. `/pendientes` sigue mostrando partes de todas las obras para quien puede aprobar.
+**Equipo de obra (avisos):** en **Administración → Configuración** (`/editar`), al final, card **Equipo de obra**. Ahí se asignan usuarios con cuenta y membresía activas de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Pueden editar el roster quienes tienen permiso de **editar proyectos**, con el módulo habilitado y acceso a esa obra (OWNER, ADMIN y PM según el alcance vigente; no el capataz). En el **Resumen**, si no hay PM activo, aparece un aviso con enlace a Configuración. Sin PM activo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster cuya cuenta o membresía está inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. Si falla Agregar o Quitar, se muestra el error y podés reintentar. `/pendientes` muestra los partes que podés aprobar dentro de las obras accesibles por tu empresa y asignación (D-111).
 
 1. **Nuevo parte** (fecha no futura, clima, cuadrilla, tareas). En **Notas generales** podés usar **viñetas**, **numeración** y **negrita** para listar lo hecho o los problemas del día ([D-101]). En **mano de obra**, el contacto se busca por razón social o nombre fantasía.
 2. Cargar **avance por partida EDT**: cada fila necesita **partida** y **cantidad** (el % del día y la cantidad sugerida se precargan al elegir partida). Si después editás el **% del día** o la **cantidad**, el otro campo se recalcula con el presupuesto de la partida (así el % del libro y el **% avance libro** de EDT coinciden). Si falta partida o cantidad, el parte **no se guarda** y se muestra el error. El **% avance libro** en EDT y costos suma el **% del día** de partes **APPROVED** (un parte enviado todavía no mueve esa columna). Si la partida nunca registró % en un parte aprobado, se usa cantidad/presupuesto. La vista *Financiero* no muestra %: usá *Cantidades* o *% Avance*.

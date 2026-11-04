@@ -4,7 +4,6 @@ import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-en
 import { ServiceContext, ServiceError } from "../types";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
 import {
-  defaultAccountingMonthRange,
   entryDateGte,
   entryDateLte,
   parseAccountingAsOfDate,

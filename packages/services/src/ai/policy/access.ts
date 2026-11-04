@@ -1,4 +1,4 @@
-import { can, type UserRole } from "@bloqer/domain";
+import { can } from "@bloqer/domain";
 import type { PermissionModule } from "@bloqer/domain";
 import type { ServiceContext } from "../../types";
 import { canViewCompanyAp, canViewApProjectArea } from "../../ap/ap-access";

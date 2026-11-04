@@ -294,6 +294,7 @@
   1. Solo los roles predefinidos en `USER_ROLES.md`.
   2. Tenant puede crear "roles custom" combinando permisos.
 - **Recomendación:** opción 1 en Fase 1 (alineado con D-012 simpleza). Opción 2 en Fase 2.
+- **Aclaración del Owner (03/11/2026, AG-03):** evaluar 4 o 5 roles con límites de visibilidad o lectura por usuario, preservando lo que funciona. [Propuesta por etapas](../08-architecture/platform-audit/2026-11-03-role-simplification-proposal.md), pendiente de definición y aprobación; no reemplaza la matriz vigente ni autoriza nuevos campos.
 - **Bloquea:** [`02-modules/USERS_AND_PERMISSIONS.md`](../02-modules/USERS_AND_PERMISSIONS.md).
 
 ### Q-025 — Diferencias de cambio (multi-moneda)
@@ -595,6 +596,27 @@
 - **Resolución:** físico global ponderado por costo directo presupuestado de las partidas hoja del alcance vigente; costo cero sin peso pero con advertencia y cobertura visible; base cero no calculable. Partidas sin medición conservan el denominador y generan un porcentaje observado, sin afirmar que son 0% validadas. Global validado solo con cobertura completa y sin fuentes ambiguas. Se adopta el tratamiento conservador de Q-005b y el plan vigente recalculado con iguales pesos/alcance. Corte por fecha de ejecución y estado actual, sin reconstrucción histórica de aprobaciones o anulaciones. Fórmulas canónicas en `PROGRESS_FORMULAS.md`.
 - **Bloquea:** cerrado para el alcance aprobado; EAC y regularización legacy no forman parte de esta resolución.
 - **Especificación:** [Reportes operativos — R-002](../06-reports/OPERATIONAL_REPORTS.md#r-002--avance-del-proyecto-d-120).
+
+### Q-067 — Acceso del creador a una obra nueva en modo por asignación
+
+- **Fecha:** 2026-11-03.
+- **Categoría:** Proyectos / acceso / AG-03.
+- **Estado:** RESUELTA → enmienda de D-111 — Project membership ACL (Owner, 2026-11-03).
+- **Situación:** un PM con `EDIT PROJECTS` puede crear una obra en `MEMBERSHIP_SCOPED`, pero el alta solo incorpora el roster de avisos D-091; no crea el ACL D-111 y el propio creador no puede abrir la obra nueva.
+- **Pregunta:** ¿se asigna acceso al creador en la misma transacción, se reserva la creación a administradores con acceso global o se mantiene alta con asignación manual y retorno al listado?
+- **Propuesta preparada:** [acceso del creador — AG-03](../08-architecture/platform-audit/2026-11-03-ag-03-project-creator-proposal.md). Se recomienda asignación únicamente para el creador y la obra nueva, conservando los permisos y la separación con el roster.
+- **Resolución:** el Owner aprobó expresamente «Acceso del creador solo a la obra nueva». Se crea la asignación existente en la misma transacción que el alta, únicamente cuando el modo por asignación y los roles del creador la requieren. No se conceden otras obras ni roles, ni se migran históricos. Ver [D-111 — ACL](./DECISION_LOG.md#d-111--project-membership-acl-procurement--view-projects-treasury-sin-viewer).
+- **Límite:** la simplificación general a 4 o 5 roles con límites de visibilidad/lectura por usuario sigue como propuesta separada; esta aprobación no autoriza ese rediseño.
+- **Bloquea:** cerrado para el comportamiento aprobado; implementación y verificación se registran en AG-03.
+
+### Q-068 — Cancelar presupuesto durante la revisión
+
+- **Fecha:** 2026-11-03.
+- **Categoría:** Presupuestos / workflow.
+- **Estado:** RESUELTA → D-121 (2026-11-04), aprobación explícita del Owner: conservar los tres orígenes actuales.
+- **Contradicción:** `cancelBudget` admite `DRAFT`, `IN_REVIEW` y `RETURNED_FOR_CHANGES`; el diagrama solo incluye `DRAFT → CANCELLED` y el catálogo de eventos usa `* → CANCELLED`.
+- **Propuesta concreta:** [conservar los tres orígenes actuales y documentarlos](../08-architecture/platform-audit/2026-11-03-ag-04-budget-cancellation-proposal.md), preservando permisos y bloqueo en `APPROVED`/`CLOSED`. Alternativa: restringir el flujo a `DRAFT`.
+- **Límite:** no autoriza cancelar presupuestos aprobados/cerrados, eliminar datos ni rediseñar roles.
 
 ## Cómo se resuelve una pregunta
 

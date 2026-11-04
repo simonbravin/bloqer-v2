@@ -89,7 +89,7 @@ export async function getPlatformDashboardSummary(ctx: PlatformServiceContext): 
   for (const t of tenants) {
     byTenantStatus[t.status] += 1;
     bySubscriptionStatus[t.subscriptionStatus] += 1;
-    if (t.trialEndsAt && t.trialEndsAt >= now && t.trialEndsAt <= in7) {
+    if (t.subscriptionStatus === "TRIAL" && t.trialEndsAt && t.trialEndsAt >= now && t.trialEndsAt <= in7) {
       trialsEndingWithin7Days += 1;
     }
   }
@@ -170,19 +170,18 @@ export async function getPlatformTenantById(
 export async function updatePlatformTenantStatus(raw: unknown, ctx: PlatformServiceContext): Promise<void> {
   await assertPlatformAccess(ctx);
   const input = parseStatusUpdate(raw);
-  const existing = await prisma.tenant.findFirst({
-    where: { id: input.tenantId },
-    select: { id: true, status: true },
-  });
-  if (!existing) {
-    throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  }
   const data: { status: typeof input.status; suspendedReason?: string | null } = { status: input.status };
   if (input.suspendedReason !== undefined) {
     data.suspendedReason = input.suspendedReason;
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${input.tenantId} FOR UPDATE`;
+    const existing = await tx.tenant.findFirst({
+      where: { id: input.tenantId },
+      select: { id: true, status: true },
+    });
+    if (!existing) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
     await tx.tenant.update({
       where: { id: input.tenantId },
       data,
@@ -205,20 +204,6 @@ export async function updatePlatformTenantStatus(raw: unknown, ctx: PlatformServ
 export async function updatePlatformTenantPlanMetadata(raw: unknown, ctx: PlatformServiceContext): Promise<void> {
   await assertPlatformAccess(ctx);
   const input = parsePlanMetadata(raw);
-  const existing = await prisma.tenant.findFirst({
-    where: { id: input.tenantId },
-    select: {
-      id: true,
-      saasPlan: true,
-      subscriptionStatus: true,
-      trialEndsAt: true,
-      billingCustomerId: true,
-      platformInternalNotes: true,
-    },
-  });
-  if (!existing) {
-    throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  }
   const data: {
     saasPlan?: string;
     subscriptionStatus?: SubscriptionStatus;
@@ -237,6 +222,19 @@ export async function updatePlatformTenantPlanMetadata(raw: unknown, ctx: Platfo
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${input.tenantId} FOR UPDATE`;
+    const existing = await tx.tenant.findFirst({
+      where: { id: input.tenantId },
+      select: {
+        id: true,
+        saasPlan: true,
+        subscriptionStatus: true,
+        trialEndsAt: true,
+        billingCustomerId: true,
+        platformInternalNotes: true,
+      },
+    });
+    if (!existing) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
     await tx.tenant.update({
       where: { id: input.tenantId },
       data,
@@ -275,22 +273,22 @@ export async function updatePlatformTenantPlanMetadata(raw: unknown, ctx: Platfo
 export async function extendPlatformTenantTrial(raw: unknown, ctx: PlatformServiceContext): Promise<void> {
   await assertPlatformAccess(ctx);
   const input = parseExtendTrial(raw);
-  const existing = await prisma.tenant.findFirst({
-    where: { id: input.tenantId },
-    select: { id: true, trialEndsAt: true, subscriptionStatus: true },
-  });
-  if (!existing) {
-    throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  }
-
-  const now = new Date();
-  const base =
-    existing.trialEndsAt && existing.trialEndsAt.getTime() > now.getTime()
-      ? existing.trialEndsAt
-      : now;
-  const newTrialEndsAt = new Date(base.getTime() + input.additionalDays * 24 * 60 * 60 * 1000);
 
   await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${input.tenantId} FOR UPDATE`;
+    const existing = await tx.tenant.findFirst({
+      where: { id: input.tenantId },
+      select: { id: true, trialEndsAt: true, subscriptionStatus: true },
+    });
+    if (!existing) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+
+    const now = new Date();
+    const base =
+      existing.trialEndsAt && existing.trialEndsAt.getTime() > now.getTime()
+        ? existing.trialEndsAt
+        : now;
+    const newTrialEndsAt = new Date(base.getTime() + input.additionalDays * 24 * 60 * 60 * 1000);
+
     await tx.tenant.update({
       where: { id: input.tenantId },
       data: {

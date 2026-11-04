@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { moneyAmountString, optionalMoneyAmountString } from "./money";
+import { moneyAmountString } from "./money";
 
 export const contactRoleTypeSchema = z.enum([
   "CLIENT",
@@ -16,6 +16,12 @@ export const taxIdTypeSchema = z.enum([
   "FOREIGN",
   "FINAL_CONSUMER",
 ]);
+
+/** BR-VAL-001: format only; checking the fiscal registry/check digit is not mandatory. */
+export const argentineTaxIdSchema = z.string().trim()
+  .regex(/^[0-9\p{P}\s]+$/u, "El CUIT/CUIL debe contener 11 dígitos")
+  .transform((value) => value.replace(/[^0-9]/g, ""))
+  .pipe(z.string().length(11, "El CUIT/CUIL debe contener 11 dígitos"));
 
 /** Condición frente al IVA — [D-084]. */
 export const ivaConditionSchema = z.enum([
@@ -52,6 +58,12 @@ function blankToUndefined(v: unknown) {
   return v;
 }
 
+const profileCurrency = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Moneda inválida");
+const nonnegativeCreditLimit = moneyAmountString.refine(
+  (value) => !value.startsWith("-"),
+  "El límite de crédito no puede ser negativo",
+);
+
 export const createContactSchema = z.object({
   legalName: z.string().trim().min(1, "La razón social es obligatoria").max(255),
   fantasyName: optionalNullableText(255),
@@ -72,7 +84,7 @@ export const createContactSchema = z.object({
 });
 
 export const updateContactSchema = z.object({
-  legalName: z.string().trim().min(1).max(255).optional(),
+  legalName: z.string().trim().min(1, "La razón social es obligatoria").max(255).optional(),
   fantasyName: optionalNullableText(255),
   taxId: optionalNullableText(20),
   taxIdType: taxIdTypeSchema.optional(),
@@ -88,13 +100,13 @@ export const updateContactSchema = z.object({
 
 export const assignContactRoleSchema = z.object({
   role: contactRoleTypeSchema,
-  notes: z.string().max(500).optional(),
+  notes: optionalNullableText(500),
   // Profile-specific fields
   paymentTermsDays: z.number().int().min(0).optional(),
-  creditLimit: optionalMoneyAmountString,
-  defaultCurrency: z.string().length(3).optional(),
-  bankAccount: z.string().max(50).optional(),
-  specialty: z.string().max(255).optional(),
+  creditLimit: z.preprocess(blankToUndefined, nonnegativeCreditLimit.optional()),
+  defaultCurrency: profileCurrency.optional(),
+  bankAccount: optionalNullableText(50),
+  specialty: optionalNullableText(255),
 });
 
 export const listContactsSchema = z.object({
@@ -105,25 +117,29 @@ export const listContactsSchema = z.object({
   search: z.string().max(200).optional(),
   page: z.number().int().min(1).optional(),
   pageSize: z.number().int().min(1).max(200).optional(),
+}).superRefine((input, ctx) => {
+  if (!Number.isSafeInteger(((input.page ?? 1) - 1) * (input.pageSize ?? 20))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["page"], message: "Página inválida" });
+  }
 });
 
 export const updateClientProfileSchema = z.object({
-  creditLimit: z.union([moneyAmountString, z.null()]).optional(),
+  creditLimit: z.preprocess(blankToNull, nonnegativeCreditLimit.nullable().optional()),
   paymentTermsDays: z.number().int().min(0).optional(),
-  defaultCurrency: z.string().length(3).optional(),
-  notes: z.string().max(2000).optional(),
+  defaultCurrency: profileCurrency.optional(),
+  notes: optionalNullableText(2000),
 });
 
 export const updateSupplierProfileSchema = z.object({
   paymentTermsDays: z.number().int().min(0).optional(),
-  defaultCurrency: z.string().length(3).optional(),
-  bankAccount: z.string().max(50).optional(),
-  notes: z.string().max(2000).optional(),
+  defaultCurrency: profileCurrency.optional(),
+  bankAccount: optionalNullableText(50),
+  notes: optionalNullableText(2000),
 });
 
 export const updateSubcontractorProfileSchema = z.object({
-  specialty: z.string().max(255).optional(),
-  notes: z.string().max(2000).optional(),
+  specialty: optionalNullableText(255),
+  notes: optionalNullableText(2000),
 });
 
 export type CreateContactInput = z.infer<typeof createContactSchema>;

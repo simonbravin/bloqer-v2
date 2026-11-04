@@ -374,7 +374,7 @@ export function searchHelpArticles(
     : [];
   const tokenGroups = rawTokens.map(expandToken);
 
-  let list = articles.filter((a) => {
+  const list = articles.filter((a) => {
     if (moduleFilter && !a.modules.includes(moduleFilter)) return false;
     if (intentFilter && !a.intents.includes(intentFilter)) return false;
     return true;

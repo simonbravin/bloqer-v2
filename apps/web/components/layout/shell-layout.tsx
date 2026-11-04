@@ -7,6 +7,7 @@ import { ProjectShellProvider } from "@/lib/project-shell-context";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -15,6 +16,7 @@ import {
   SHELL_SIDEBAR_WIDTH_CLASS,
   SidebarRail,
   SidebarShellProvider,
+  focusShellSidebarToggle,
   useSidebarShell,
 } from "./sidebar-shell-context";
 import { FieldProjectProvider } from "@/lib/field-project-context";
@@ -31,6 +33,8 @@ interface ShellLayoutProps {
   pendingCount?: number;
   roles?: UserRole[];
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
+  /** The SaaS platform console does not use tenant Field navigation. */
+  showFieldNavigation?: boolean;
 }
 
 function ShellSidebarPanel({ children, forOverlay }: { children: ReactNode; forOverlay?: boolean }) {
@@ -54,10 +58,19 @@ function MobileNavSheet({ children }: { children: ReactNode }) {
     <Sheet open={overlayOpen} onOpenChange={setOverlayOpen}>
       <SheetContent
         side="left"
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          focusShellSidebarToggle();
+        }}
+        onClickCapture={(event) => {
+          if (event.button !== 0 || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+          if (event.target instanceof Element && event.target.closest("a[href]")) setOverlayOpen(false);
+        }}
         className="flex h-full w-64 max-w-[min(16rem,85vw)] flex-col gap-0 p-0 [&>button]:right-2 [&>button]:top-2 [&>button]:flex [&>button]:h-11 [&>button]:w-11 [&>button]:items-center [&>button]:justify-center"
       >
         <SheetHeader className="sr-only">
           <SheetTitle>Menú de navegación</SheetTitle>
+          <SheetDescription>Accesos a las secciones disponibles para tu usuario.</SheetDescription>
         </SheetHeader>
         <ShellSidebarPanel forOverlay>{children}</ShellSidebarPanel>
       </SheetContent>
@@ -72,6 +85,7 @@ export function ShellLayout({
   pendingCount = 0,
   roles = [],
   moduleGateSnapshot = {},
+  showFieldNavigation = true,
 }: ShellLayoutProps) {
   const [motionReady, setMotionReady] = useState(false);
   const pathname = usePathname();
@@ -104,6 +118,16 @@ export function ShellLayout({
           <FieldProjectProvider>
             <PendingInboxCountProvider tenantInitial={pendingCount}>
               <div className="flex h-dvh overflow-hidden bg-background">
+                <a
+                  href="#main-content"
+                  className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-background focus:px-4 focus:py-3 focus:text-foreground focus:ring-2 focus:ring-ring"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    document.getElementById("main-content")?.focus();
+                  }}
+                >
+                  Ir al contenido principal
+                </a>
                 <SidebarRail>
                   <ShellSidebarPanel>{sidebar}</ShellSidebarPanel>
                 </SidebarRail>
@@ -111,18 +135,19 @@ export function ShellLayout({
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-workspace">
                   {header}
                   <main
+                    id="main-content"
+                    tabIndex={-1}
                     className={cn(
-                      "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 sm:p-6 lg:p-8",
-                      !immersive &&
+                      "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 outline-none sm:p-6 lg:p-8",
+                      showFieldNavigation && !immersive &&
                         "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-6 lg:pb-8",
                     )}
                   >
                     {children}
                   </main>
-                  <FieldBottomNav
-                    roles={roles}
-                    moduleGateSnapshot={moduleGateSnapshot}
-                  />
+                  {showFieldNavigation ? (
+                    <FieldBottomNav roles={roles} moduleGateSnapshot={moduleGateSnapshot} />
+                  ) : null}
                 </div>
               </div>
             </PendingInboxCountProvider>

@@ -202,14 +202,6 @@ function buildMoneyCardFromAging(
   };
 }
 
-function overdueAmountForItem(item: AgingItem): Prisma.Decimal {
-  return item.daysOverdue > 0 ? new Prisma.Decimal(item.balanceDue) : ZERO;
-}
-
-function currentAmountForItem(item: AgingItem): Prisma.Decimal {
-  return item.daysOverdue <= 0 ? new Prisma.Decimal(item.balanceDue) : ZERO;
-}
-
 /**
  * Aggregates open lines from an aging report, optionally filtered per line.
  * Skips non-positive balances. Never sums across currencies.
@@ -398,7 +390,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   let treasuryCard: FinanceHubTreasuryCard | undefined;
   if (trMod) {
     let displayHeadline = "—";
-    let balancesByCurrency: Record<string, string> = {};
+    const balancesByCurrency: Record<string, string> = {};
     let multicurrency = false;
     let loadFailed = false;
     if (trPerm) {

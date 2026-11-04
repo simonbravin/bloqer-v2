@@ -26,6 +26,7 @@ function Segment<T extends string>({
           size="sm"
           variant="ghost"
           disabled={opt.disabled}
+          aria-pressed={value === opt.id}
           className={cn(
             "h-8 rounded-md px-2.5 text-xs font-medium",
             value === opt.id &&
@@ -127,6 +128,7 @@ export function WbsTreeToolbar({
       <div className="relative w-full sm:max-w-md">
         <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input
+          aria-label="Buscar en la EDT"
           className="pl-9"
           placeholder="Buscar por código, nombre, descripción o insumo APU..."
           value={search}

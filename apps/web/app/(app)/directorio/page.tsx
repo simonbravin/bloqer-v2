@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { can } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { Pagination } from "@/components/ui/pagination";
@@ -7,7 +8,7 @@ import { ContactListSection } from "@/features/directory/components/contact-list
 import { ContactListExportButton } from "@/features/directory/components/contact-list-export-button";
 import { ContactFilters } from "@/features/directory/components/contact-filters";
 import { getCurrentUser } from "@/lib/auth";
-import { listContacts } from "@bloqer/services";
+import { listContacts, ServiceError } from "@bloqer/services";
 import { redirect } from "next/navigation";
 import type { ContactRoleType } from "@bloqer/database";
 import { PageShell } from "@/components/layout/page-shell";
@@ -36,14 +37,27 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
   const role = VALID_ROLES.includes(sp.role as ContactRoleType) ? (sp.role as ContactRoleType) : undefined;
   const status = sp.status === "ARCHIVED" ? "ARCHIVED" as const : sp.status === "ALL" ? undefined : "ACTIVE" as const;
   const parsedPage = Number(sp.page);
-  const page = Number.isFinite(parsedPage) && parsedPage >= 1 ? Math.trunc(parsedPage) : 1;
+  const page = Number.isSafeInteger(parsedPage) && parsedPage >= 1 && Number.isSafeInteger((parsedPage - 1) * PAGE_SIZE) ? parsedPage : 1;
   const hasActiveFilters = Boolean(role || sp.search || sp.status === "ARCHIVED" || sp.status === "ALL");
 
-  const { data, total } = await listContacts({ role, status, search: sp.search, page, pageSize: PAGE_SIZE }, ctx);
+  const canCreate = can(ctx.roles, "EDIT", "DIRECTORY");
+  let result;
+  try {
+    result = await listContacts({ role, status, search: sp.search, page, pageSize: PAGE_SIZE }, ctx);
+  } catch (err) {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  }
+  const { data, total } = result;
 
   // Strip Prisma profiles (Decimal creditLimit) before Client Components — RSC serialization.
   const contacts = data.map(
-    ({ clientProfile: _c, supplierProfile: _s, subcontractorProfile: _sc, ...contact }) => contact,
+    ({ clientProfile, supplierProfile, subcontractorProfile, ...contact }) => {
+      void clientProfile;
+      void supplierProfile;
+      void subcontractorProfile;
+      return contact;
+    },
   );
 
   return (
@@ -54,9 +68,9 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
         actions={
           <>
             <ContactListExportButton contacts={contacts} />
-            <Button asChild>
+            {canCreate ? <Button asChild>
               <Link href="/directorio/nuevo">+ Nuevo contacto</Link>
-            </Button>
+            </Button> : null}
           </>
         }
       />
@@ -68,7 +82,7 @@ export default async function DirectorioPage({ searchParams }: PageProps) {
         </Suspense>
       </div>
       <Suspense fallback={<ListSectionSkeleton />}>
-        <ContactListSection contacts={contacts} hasActiveFilters={hasActiveFilters} />
+        <ContactListSection contacts={contacts} hasActiveFilters={hasActiveFilters} canCreate={canCreate} />
       </Suspense>
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
     </PageShell>

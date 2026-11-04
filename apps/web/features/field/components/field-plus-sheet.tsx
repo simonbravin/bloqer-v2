@@ -14,6 +14,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { tenantGateFromSnapshot } from "@/features/projects/tenant-gate-from-snapshot";
+import { useFieldProjectContext } from "@/lib/field-project-context";
 import {
   fieldQuickActionHref,
   listFieldQuickActions,
@@ -27,6 +28,7 @@ type Props = {
   roles: UserRole[];
   moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
   convenienceProjectId: string | null;
+  onCloseAutoFocus?: (event: Event) => void;
 };
 
 export function FieldPlusSheet({
@@ -35,34 +37,51 @@ export function FieldPlusSheet({
   roles,
   moduleGateSnapshot,
   convenienceProjectId,
+  onCloseAutoFocus,
 }: Props) {
   const router = useRouter();
+  const { pathProjectId } = useFieldProjectContext();
   const gate = tenantGateFromSnapshot(moduleGateSnapshot);
   const actions = listFieldQuickActions(roles, (m) => gate.isEnabled(m));
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingAction, setPendingAction] = useState<FieldQuickActionId | null>(null);
   const [projects, setProjects] = useState<FieldHomeProject[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState<string | null>(null);
+  const [retryVersion, setRetryVersion] = useState(0);
+  // A remembered UUID is a preference. Only reuse it after checking the current visible list.
+  const actionProjectId = pathProjectId ??
+    (projects.some((project) => project.id === convenienceProjectId) ? convenienceProjectId : null);
 
   useEffect(() => {
-    if (!pickerOpen) return;
+    if ((!open && !pickerOpen) || pathProjectId) return;
     let cancelled = false;
+    setProjects([]);
+    setProjectsLoading(true);
+    setProjectsError(null);
     void fetch("/api/field/projects", { credentials: "same-origin" })
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("projects"))))
       .then((data: { projects?: FieldHomeProject[] }) => {
         if (!cancelled) setProjects(data.projects ?? []);
       })
       .catch(() => {
-        if (!cancelled) setProjects([]);
+        if (!cancelled) {
+          setProjects([]);
+          setProjectsError("No pudimos cargar las obras. Volvé a intentar.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setProjectsLoading(false);
       });
     return () => {
       cancelled = true;
     };
-  }, [pickerOpen]);
+  }, [open, pickerOpen, pathProjectId, retryVersion]);
 
   function run(id: FieldQuickActionId) {
-    if (convenienceProjectId) {
+    if (actionProjectId) {
       onOpenChange(false);
-      router.push(fieldQuickActionHref(convenienceProjectId, id));
+      router.push(fieldQuickActionHref(actionProjectId, id));
       return;
     }
     setPendingAction(id);
@@ -78,13 +97,14 @@ export function FieldPlusSheet({
       <Sheet open={open} onOpenChange={onOpenChange}>
         <SheetContent
           side="bottom"
+          onCloseAutoFocus={pickerOpen ? (event) => event.preventDefault() : onCloseAutoFocus}
           className="rounded-t-xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
           data-testid="field-plus-sheet"
         >
           <SheetHeader>
             <SheetTitle>Registrar</SheetTitle>
             <SheetDescription>
-              {convenienceProjectId
+              {actionProjectId
                 ? "Elegí una acción. Se abre el flujo existente de la obra."
                 : "Primero tenés que elegir una obra."}
             </SheetDescription>
@@ -136,6 +156,11 @@ export function FieldPlusSheet({
           if (!next) setPendingAction(null);
         }}
         projects={projects}
+        loading={projectsLoading}
+        error={projectsError}
+        onRetry={() => setRetryVersion((version) => version + 1)}
+        showAllProjectsLink={gate.isEnabled("PROJECTS")}
+        onCloseAutoFocus={onCloseAutoFocus}
         afterSelectHref={
           pendingAction ? (projectId) => fieldQuickActionHref(projectId, pendingAction) : undefined
         }

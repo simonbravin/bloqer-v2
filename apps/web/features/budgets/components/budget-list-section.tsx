@@ -8,11 +8,13 @@ import { BudgetTable } from "./budget-table";
 export function BudgetListSection({
   budgets,
   projectId,
+  canCreate = false,
 }: {
   budgets: BudgetListItem[];
   projectId: string;
+  canCreate?: boolean;
 }) {
   const view = useListViewMode();
-  if (view === "cards") return <BudgetCards budgets={budgets} projectId={projectId} />;
-  return <BudgetTable budgets={budgets} projectId={projectId} />;
+  if (view === "cards") return <BudgetCards budgets={budgets} projectId={projectId} canCreate={canCreate} />;
+  return <BudgetTable budgets={budgets} projectId={projectId} canCreate={canCreate} />;
 }

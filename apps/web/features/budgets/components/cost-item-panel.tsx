@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -26,6 +26,7 @@ import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
 import { apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
 import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 interface CostItemPanelProps {
   costItem: CostItemView;
@@ -46,11 +47,15 @@ export function CostItemPanel({
   costItem, currency, editable,
   onUpdateCostItem, onAddLine, onUpdateLine, onRemoveLine,
 }: CostItemPanelProps) {
+  const formId = useId();
   const [dialogState, setDialogState] = useState<DialogState>({ type: "closed" });
   const [editingItem, setEditingItem] = useState(false);
   const [itemError, setItemError] = useState<string | null>(null);
-  const [itemPending, startItemTransition] = useTransition();
-  const [removePending, startRemoveTransition] = useTransition();
+  const { isPending: itemPending, run: startItemTransition } = useBudgetAction(setItemError);
+  const { isPending: removePending, isRunning: isRemoving, run: startRemoveTransition } = useBudgetAction(toast.error);
+  const linePendingRef = useRef(false);
+  const [linePending, setLinePending] = useState(false);
+  function handleLinePending(next: boolean) { linePendingRef.current = next; setLinePending(next); }
 
   // Local item form state
   const [unit, setUnit] = useState(costItem.unit);
@@ -58,12 +63,18 @@ export function CostItemPanel({
   const [notes, setNotes] = useState(costItem.notes ?? "");
 
   function saveItemFields() {
+    if (!editable) return;
     setItemError(null);
+    const nextQuantity = Number(quantity);
+    if (!unit.trim() || !Number.isFinite(nextQuantity) || nextQuantity <= 0) {
+      setItemError("Elegí una unidad y una cantidad mayor a 0");
+      return;
+    }
     startItemTransition(async () => {
       const result = await onUpdateCostItem({
-        unit: unit || undefined,
-        quantity: parseFloat(quantity) || undefined,
-        notes: notes || undefined,
+        unit: unit.trim(),
+        quantity: nextQuantity,
+        notes: notes || null,
       });
       if ("error" in result) {
         setItemError(result.error);
@@ -76,6 +87,7 @@ export function CostItemPanel({
   }
 
   function handleRemoveLine(lineId: string) {
+    if (!editable || isRemoving()) return;
     if (!confirm("¿Eliminar esta línea de análisis?")) return;
     startRemoveTransition(async () => {
       const result = await onRemoveLine(lineId);
@@ -101,15 +113,16 @@ export function CostItemPanel({
         </div>
 
         {editingItem ? (
-          <div className="space-y-3">
+          <fieldset disabled={itemPending} className="min-w-0 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Unidad</Label>
-                <UnitSelect value={unit} onChange={setUnit} className="h-8 text-sm" />
+                <Label htmlFor={`${formId}-unit`} className="text-xs">Unidad</Label>
+                <UnitSelect id={`${formId}-unit`} value={unit} onChange={setUnit} className="h-8 text-sm" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Cantidad</Label>
+                <Label htmlFor={`${formId}-quantity`} className="text-xs">Cantidad</Label>
                 <DecimalInput
+                  id={`${formId}-quantity`}
                   className="h-8 text-sm font-mono"
                   value={quantity}
                   onValueChange={setQuantity}
@@ -117,8 +130,9 @@ export function CostItemPanel({
               </div>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Notas</Label>
+              <Label htmlFor={`${formId}-notes`} className="text-xs">Notas</Label>
               <Textarea
+                id={`${formId}-notes`}
                 className="text-sm"
                 rows={2}
                 value={notes}
@@ -130,11 +144,11 @@ export function CostItemPanel({
               <Button size="sm" disabled={itemPending} onClick={saveItemFields}>
                 {itemPending ? "Guardando..." : "Guardar"}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => setEditingItem(false)}>
+              <Button size="sm" variant="outline" disabled={itemPending} onClick={() => setEditingItem(false)}>
                 Cancelar
               </Button>
             </div>
-          </div>
+          </fieldset>
         ) : (
           <dl className="grid grid-cols-3 gap-3 text-sm">
             <div>
@@ -252,9 +266,9 @@ export function CostItemPanel({
       {/* Dialogs */}
       <Dialog
         open={dialogState.type !== "closed"}
-        onOpenChange={(open) => { if (!open) setDialogState({ type: "closed" }); }}
+        onOpenChange={(open) => { if (!open && !linePendingRef.current) setDialogState({ type: "closed" }); }}
       >
-        <DialogContent>
+        <DialogContent closeButtonDisabled={linePending} aria-busy={linePending}>
           <DialogHeader>
             <DialogTitle>
               {dialogState.type === "add" ? "Agregar línea APU" : "Editar línea APU"}
@@ -263,6 +277,7 @@ export function CostItemPanel({
           {dialogState.type === "add" && (
             <CostAnalysisLineForm
               mode="create"
+              onPendingChange={handleLinePending}
               costItemId={costItem.id}
               nextSortOrder={costItem.analysisLines.length}
               itemQuantity={parseFloat(costItem.quantity) || 0}
@@ -274,6 +289,7 @@ export function CostItemPanel({
           {dialogState.type === "edit" && (
             <CostAnalysisLineForm
               mode="edit"
+              onPendingChange={handleLinePending}
               defaults={(() => {
                 const line = dialogState.line;
                 const itemQty = parseFloat(costItem.quantity) || 0;

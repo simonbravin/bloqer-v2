@@ -102,14 +102,19 @@ export function UserProjectAccessSection({ membershipId, initial, canEdit }: Pro
 
         {initial.targetHasTenantWideAccess ? (
           <div className="rounded-md border bg-muted/40 px-4 py-3 text-sm">
-            <p className="font-medium">Acceso global a todas las obras</p>
+            <p className="font-medium">Acceso global dentro de su empresa</p>
             <p className="text-muted-foreground mt-1">
               Este usuario tiene autorización de alcance global: no necesita asignaciones por
-              obra para ver proyectos. Podés preparar memberships de todas formas; no son
-              obligatorias.
+              obra para ver proyectos dentro de su alcance de empresa. Podés preparar asignaciones
+              de todas formas; no son obligatorias.
             </p>
           </div>
         ) : null}
+
+        <p className="text-xs text-muted-foreground">
+          Se muestran las obras que pueden administrar vos y este usuario. Guardar conserva las
+          asignaciones de otras empresas y de obras canceladas que no aparecen en esta lista.
+        </p>
 
         {initial.mode === "TENANT_WIDE" && !initial.targetHasTenantWideAccess ? (
           <p className="text-sm rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-amber-950 dark:text-amber-100">

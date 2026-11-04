@@ -1,11 +1,13 @@
 "use client";
 
+import { useRef } from "react";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import {
   createContactSchema,
   updateContactSchema,
+  argentineTaxIdSchema,
   type CreateContactInput,
 } from "@bloqer/validators";
 import { Button } from "@/components/ui/button";
@@ -70,6 +72,7 @@ export function ContactForm({
   successRedirect,
 }: ContactFormProps) {
   const router = useRouter();
+  const submitting = useRef(false);
   const isCreate = mode === "create";
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(isCreate ? createContactSchema : editContactFormSchema) as Resolver<ContactFormValues>,
@@ -80,6 +83,16 @@ export function ContactForm({
   });
 
   const handleSubmit = async (data: ContactFormValues) => {
+    if (submitting.current) return;
+    if (data.taxId && (data.taxIdType === "CUIT" || data.taxIdType === "CUIL")) {
+      const parsed = argentineTaxIdSchema.safeParse(data.taxId);
+      if (!parsed.success) {
+        form.setError("taxId", { message: parsed.error.issues[0]?.message ?? "Ingresá un CUIT o CUIL válido" });
+        return;
+      }
+      data = { ...data, taxId: parsed.data };
+    }
+    submitting.current = true;
     try {
       const result = await onSubmit(data as CreateContactInput);
       if (result.error) {
@@ -89,6 +102,8 @@ export function ContactForm({
       }
     } catch {
       form.setError("root", { message: "Error inesperado al guardar" });
+    } finally {
+      submitting.current = false;
     }
   };
 
@@ -96,7 +111,7 @@ export function ContactForm({
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
         {form.formState.errors.root && (
-          <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <div role="alert" className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {form.formState.errors.root.message}
           </div>
         )}
@@ -208,7 +223,9 @@ export function ContactForm({
             <FormItem>
               <FormControl>
                 <IvaConditionSelect
-                  id="ivaCondition"
+                  ref={field.ref}
+                  name={field.name}
+                  onBlur={field.onBlur}
                   value={(field.value as IvaConditionCode | null | undefined) ?? null}
                   onValueChange={(v) => field.onChange(v)}
                 />
@@ -335,7 +352,7 @@ export function ContactForm({
           <Button type="submit" disabled={form.formState.isSubmitting}>
             {form.formState.isSubmitting ? "Guardando..." : submitLabel}
           </Button>
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={form.formState.isSubmitting}>
             Cancelar
           </Button>
         </div>

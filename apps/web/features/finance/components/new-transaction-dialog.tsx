@@ -546,15 +546,12 @@ export function NewTransactionDialog({
   const incomeTabActive = kind === "AR_INCOME" || kind === "TREASURY_INFLOW";
   const showInvoiceAttachment = storageConfigured && (kind === "AP_EXPENSE" || kind === "AR_INCOME");
 
-  const derivedClass = useMemo(() => {
-    if (kind === "AP_EXPENSE") {
-      return classifySupplierInvoice({ projectId: null });
-    }
-    if (kind === "AR_INCOME") {
-      return classifySalesInvoice({ projectId: null });
-    }
-    return classifyAccountMovement({ type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT" });
-  }, [kind]);
+  const derivedClass =
+    kind === "AP_EXPENSE"
+      ? classifySupplierInvoice({ projectId: null })
+      : kind === "AR_INCOME"
+        ? classifySalesInvoice({ projectId: null })
+        : classifyAccountMovement({ type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT" });
 
   const classHint =
     kind === "AP_EXPENSE"

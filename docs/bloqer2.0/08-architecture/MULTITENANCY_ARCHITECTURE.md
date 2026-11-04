@@ -29,12 +29,15 @@ Implementar **aislamiento lógico estricto** por `tenant_id` en **todas** las en
 - **Default hasta selector ([D-092]):** si el tenant tiene exactamente una `Company` ACTIVE, sesión, invitaciones, membresías y proyectos nuevos se anclan a esa empresa. No se elige entre varias.
 - **Selector de empresa en el shell:** adecuado para cambiar el contexto **dentro** de esa semántica; no sustituye por sí solo membresías múltiples por usuario sin migración (ver Q-001).
 
-## Estrategia de defensa en profundidad (conceptual)
+## Estrategia de defensa en profundidad vigente (ADR-018)
 
 1. **Sesión** lleva identidad + tenant permitido.
 2. **Handlers** inyectan `tenant_id` al contexto del request.
-3. **Repositories / Prisma middleware** aplican filtro por defecto en modelos tenant-scoped.
-4. **Tests** de regresión para “no cross-tenant” en servicios críticos.
+3. **Servicios/repositorios** aplican filtros y guards explícitos. Las lecturas masivas se acotan desde la consulta; las cargas por ID comprueban pertenencia antes de usar/devolver datos o mutar. El cliente Prisma simple **no** inyecta filtros ni rechaza consultas sin tenant automáticamente.
+4. **Padre dueño de hijos existentes:** los 22 modelos del [catálogo cerrado](./TENANT_ISOLATION_MODEL.md) heredan tenant de un padre obligatorio. Se verifican el padre autorizado y las relaciones adicionales; no se admiten nuevas excepciones por analogía.
+5. **Tests** de regresión para “no cross-tenant” en servicios críticos. Las pruebas de políticas no sustituyen integración SQL; el estado de cada recorrido requiere evidencia propia.
+
+La reconciliación fue confirmada explícitamente por el usuario en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md), el 03/11/2026. No añade middleware, columnas ni migraciones. Un control automático adicional requiere diseño y ADR propios; no se considera ya implementado.
 
 ## Referencias funcionales
 

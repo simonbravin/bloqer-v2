@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useConfirmationAction } from "@/hooks/use-confirmation-action";
+import { invalidateProjectShellCache } from "@/lib/project-shell-context";
 import type { ProjectStatus } from "@bloqer/database";
 import type { ProjectCancellationImpact } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -98,7 +100,14 @@ export function ProjectLifecycleActions({
   const [impact, setImpact] = useState<ProjectCancellationImpact | null>(null);
   const [impactLoadFailed, setImpactLoadFailed] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const impactRequest = useRef(0);
+  const { busy: isPending, actionError, handleOpenChange, confirmAction } = useConfirmationAction({
+    open: pending !== null,
+    pending: false,
+    onOpenChange: (open) => { if (!open) closeDialog(); },
+  });
+
+  useEffect(() => () => { impactRequest.current++; }, [projectId]);
 
   const isTerminal = status === "COMPLETED" || status === "CANCELLED";
   const cancelRequiresReason = status === "ACTIVE" || status === "ON_HOLD";
@@ -107,20 +116,23 @@ export function ProjectLifecycleActions({
     (status === "DRAFT" ? canEditProject : canCancelActive);
 
   function closeDialog() {
+    impactRequest.current++;
     setPending(null);
     setComment("");
     setReason("");
     setImpact(null);
     setImpactLoadFailed(false);
+    setLoadingImpact(false);
   }
 
-  async function openCancelDialog() {
-    setPending({ kind: "cancel" });
-    if (cancelRequiresReason) {
-      setLoadingImpact(true);
-      setImpactLoadFailed(false);
+  async function loadImpact() {
+    const request = ++impactRequest.current;
+    setLoadingImpact(true);
+    setImpactLoadFailed(false);
+    setImpact(null);
+    try {
       const result = await getProjectCancellationImpactAction(projectId);
-      setLoadingImpact(false);
+      if (request !== impactRequest.current) return;
       if ("error" in result) {
         toast.error(result.error);
         setImpact(null);
@@ -128,27 +140,32 @@ export function ProjectLifecycleActions({
       } else {
         setImpact(result.impact);
       }
+    } catch {
+      if (request !== impactRequest.current) return;
+      setImpactLoadFailed(true);
+      toast.error("No se pudo verificar el impacto. Volvé a intentar.");
+    } finally {
+      if (request === impactRequest.current) setLoadingImpact(false);
     }
   }
 
-  async function openReactivateDialog() {
+  function openCancelDialog() {
+    closeDialog();
+    setPending({ kind: "cancel" });
+    if (cancelRequiresReason) void loadImpact();
+  }
+
+  function openReactivateDialog() {
+    closeDialog();
     setPending({ kind: "reactivate" });
-    setLoadingImpact(true);
-    setImpactLoadFailed(false);
-    const result = await getProjectCancellationImpactAction(projectId);
-    setLoadingImpact(false);
-    if ("error" in result) {
-      toast.error(result.error);
-      setImpactLoadFailed(true);
-    } else {
-      setImpact(result.impact);
-    }
+    void loadImpact();
   }
 
   function confirm() {
-    if (!pending) return;
+    if (!pending || loadingImpact || cancelBlocked ||
+      (pending.kind === "reactivate" && impactLoadFailed) || (requiresReason && !reason.trim())) return;
 
-    startTransition(async () => {
+    void confirmAction(async () => {
       let ok = false;
       const payload = {
         comment: comment.trim() || undefined,
@@ -199,6 +216,7 @@ export function ProjectLifecycleActions({
       }
 
       if (ok) {
+        invalidateProjectShellCache(projectId);
         closeDialog();
         router.refresh();
       }
@@ -234,7 +252,7 @@ export function ProjectLifecycleActions({
 
   return (
     <>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className="flex w-full min-w-0 max-w-full flex-wrap items-center justify-start gap-2 sm:justify-end">
         {!isTerminal && canEditProject && (
           <Button variant="outline" size="sm" asChild>
             <Link href={`/proyectos/${projectId}/editar`}>Editar</Link>
@@ -277,8 +295,8 @@ export function ProjectLifecycleActions({
         )}
       </div>
 
-      <Dialog open={pending !== null} onOpenChange={(open) => !open && closeDialog()}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={pending !== null} onOpenChange={handleOpenChange}>
+        <DialogContent className="sm:max-w-md" closeButtonDisabled={isPending} aria-busy={isPending}>
           <DialogHeader>
             <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>
@@ -298,21 +316,26 @@ export function ProjectLifecycleActions({
           </DialogHeader>
 
           {pending?.kind === "cancel" && cancelRequiresReason && impactLoadFailed && (
-            <p className="text-sm text-destructive">
+            <p role="alert" className="text-sm text-destructive">
               No se pudo verificar el impacto. Reintentá o contactá a soporte antes de cancelar.
             </p>
           )}
 
           {pending?.kind === "reactivate" && impactLoadFailed && (
-            <p className="text-sm text-destructive">
+            <p role="alert" className="text-sm text-destructive">
               No se pudo determinar el estado destino. Reintentá antes de reactivar.
             </p>
           )}
 
+          {impactLoadFailed && !loadingImpact ? (
+            <Button type="button" variant="outline" onClick={() => void loadImpact()}>Reintentar</Button>
+          ) : null}
+          {actionError ? <p role="alert" className="text-sm text-destructive">{actionError}</p> : null}
+
           {pending?.kind === "cancel" && cancelRequiresReason && (
             <div className="space-y-2">
               {loadingImpact ? (
-                <p className="text-sm text-muted-foreground">Verificando documentos abiertos…</p>
+                <p role="status" className="text-sm text-muted-foreground">Verificando documentos abiertos…</p>
               ) : (
                 <ImpactList impact={impact} />
               )}
@@ -362,7 +385,7 @@ export function ProjectLifecycleActions({
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={closeDialog} disabled={isPending}>
+            <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
               Volver
             </Button>
             <Button

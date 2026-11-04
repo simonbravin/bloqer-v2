@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
   addScheduleDependency,
-  blockScheduleItem,
   cancelScheduleItem,
   copyScheduleProgressFromPhysical,
   createScheduleItem,

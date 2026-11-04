@@ -1,5 +1,4 @@
 import { Prisma, prisma, type CostCategory } from "@bloqer/database";
-import { can } from "@bloqer/domain";
 import { roundToDecimals } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -88,7 +87,6 @@ import type {
   CostControlRowFlags,
   CostControlTotals,
   CostTypeBucket,
-  ProjectCostControlReport,
 } from "./cost-control-types";
 
 // ─── Internal accumulators ────────────────────────────────────────────────────

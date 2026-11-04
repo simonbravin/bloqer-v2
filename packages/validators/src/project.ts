@@ -3,22 +3,38 @@ import { z } from "zod";
 export const projectTypeSchema = z.enum(["PUBLIC", "PRIVATE"]);
 export const projectStatusSchema = z.enum(["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"]);
 
-/** Accepts YYYY-MM-DD strings or Date; empty string → undefined. */
+/** Empty form fields explicitly clear nullable dates; omitted fields stay unchanged. */
 const optionalDateField = z
-  .union([z.string(), z.date()])
+  .union([
+    z.string().date("Ingresá una fecha válida").transform((value) => new Date(value)),
+    z.date({ errorMap: () => ({ message: "Ingresá una fecha válida" }) }),
+    z.literal(""),
+    z.null(),
+  ], { errorMap: () => ({ message: "Ingresá una fecha válida" }) })
   .optional()
-  .transform((val) => {
-    if (val === undefined || val === null || val === "") return undefined;
-    if (val instanceof Date) return val;
-    const d = new Date(val);
-    return Number.isNaN(d.getTime()) ? undefined : d;
-  });
+  .transform((value) => value === "" ? null : value);
+
+function validateProjectDateRange(
+  input: { startDate?: Date | null; expectedEndDate?: Date | null },
+  ctx: z.RefinementCtx,
+) {
+  if (input.startDate && input.expectedEndDate && input.startDate > input.expectedEndDate) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["expectedEndDate"],
+      message: "La fecha estimada de fin no puede ser anterior a la fecha de inicio",
+    });
+  }
+}
 
 export const createProjectSchema = z.object({
   code: z.string().min(1, "El código es obligatorio").max(50),
   name: z.string().min(1, "El nombre es obligatorio").max(255),
   description: z.string().max(2000).optional(),
-  clientContactId: z.string().uuid("Seleccione un cliente válido"),
+  clientContactId: z.string({
+    required_error: "Seleccioná un cliente válido",
+    invalid_type_error: "Seleccioná un cliente válido",
+  }).uuid("Seleccioná un cliente válido"),
   type: projectTypeSchema,
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
@@ -27,7 +43,7 @@ export const createProjectSchema = z.object({
   startDate: optionalDateField,
   expectedEndDate: optionalDateField,
   notes: z.string().max(2000).optional(),
-});
+}).superRefine(validateProjectDateRange);
 
 export const updateProjectSchema = z.object({
   code: z.string().min(1).max(50).optional(),
@@ -42,14 +58,22 @@ export const updateProjectSchema = z.object({
   startDate: optionalDateField,
   expectedEndDate: optionalDateField,
   notes: z.string().max(2000).optional(),
-});
+}).superRefine(validateProjectDateRange);
 
 export const listProjectsSchema = z.object({
   status: projectStatusSchema.optional(),
   search: z.string().max(200).optional(),
   clientContactId: z.string().uuid().optional(),
-  page: z.number().int().min(1).optional(),
-  pageSize: z.number().int().min(1).max(100).optional(),
+  page: z.number().int().safe().min(1).optional(),
+  pageSize: z.number().int().safe().min(1).max(100).optional(),
+}).superRefine((input, ctx) => {
+  if (!Number.isSafeInteger(((input.page ?? 1) - 1) * (input.pageSize ?? 20))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["page"],
+      message: "La página solicitada no es válida",
+    });
+  }
 });
 
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;

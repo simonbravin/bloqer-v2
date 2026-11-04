@@ -76,7 +76,7 @@ function getServerSnapshot(): boolean {
   return true;
 }
 
-function focusShellSidebarToggle() {
+export function focusShellSidebarToggle() {
   document.getElementById(SHELL_SIDEBAR_TOGGLE_ID)?.focus();
 }
 

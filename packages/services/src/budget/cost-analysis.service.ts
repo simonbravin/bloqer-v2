@@ -1,13 +1,9 @@
 import { Prisma, prisma } from "@bloqer/database";
-import type { CostAnalysisLine } from "@bloqer/database";
+import type { Budget, CostAnalysisLine } from "@bloqer/database";
 import {
   APU_GLOBAL_UNIT,
   can,
   isGlobalUnit,
-  migrateLegacyLumpToGlobalResource,
-  normalizeStoredApuLineForItemQuantity,
-  recomputeLumpForItemQuantity,
-  recomputeResourceForItemQuantity,
 } from "@bloqer/domain";
 import type {
   CreateCostAnalysisLineInput,
@@ -17,13 +13,27 @@ import type {
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { assertBudgetEditable, approvedEditOverrideAuditMeta, lockBudgetForEconomicEdit } from "./budget.service";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
+import { isCrossCompany } from "../company-scope";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import { toMoneyDecimal } from "../finance/money-decimal";
+import { approvedEditOverrideAuditMeta, lockBudgetForEconomicEdit } from "./budget.service";
 import { assertCostItemQuantityNotBelowCertified } from "./cost-item-certified-qty";
 import { _recalcCostItemTotals, _recalcBudgetSummary } from "./budget-calc.service";
+import { assertBudgetDecimalFits } from "./budget-decimal";
+import { computeApuUnitContribution } from "./budget-apu-calc";
 
 /** Persist APU decimals at 4 dp half-up — avoid writing raw IEEE floats. */
-function apuDecimal(value: number | string): Prisma.Decimal {
-  return new Prisma.Decimal(value).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
+function apuDecimal(value: Prisma.Decimal | number | string): Prisma.Decimal {
+  const decimal = assertBudgetDecimalFits(value, "APU");
+  if (decimal.isNegative()) {
+    throw new ServiceError("VALIDATION", "Las cantidades y costos del APU deben ser números finitos no negativos");
+  }
+  return decimal.toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
+}
+
+function apuMoney(value: Prisma.Decimal): Prisma.Decimal {
+  return assertBudgetDecimalFits(toMoneyDecimal(value), "Costo del APU");
 }
 
 type TxClient = Omit<
@@ -32,27 +42,75 @@ type TxClient = Omit<
 >;
 
 async function _guardLine(costItemId: string, ctx: ServiceContext) {
+  await assertTenantModuleEnabled(ctx, "BUDGETS");
   const costItem = await prisma.costItem.findUnique({ where: { id: costItemId } });
   if (!costItem) throw new ServiceError("NOT_FOUND", "Ítem de costo no encontrado");
   const budget = await prisma.budget.findUniqueOrThrow({ where: { id: costItem.budgetId } });
   if (budget.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertBudgetEditable(budget);
+  if (isCrossCompany(budget.companyId, ctx)) throw new ServiceError("FORBIDDEN", "Presupuesto de otra empresa");
   await assertProjectAllowsBudgetPlanning(budget.projectId, ctx);
   return { costItem, budget };
 }
 
-function resolveLineTotalCost(
-  coefficient: Prisma.Decimal | number,
-  unitCost: Prisma.Decimal | number,
-  totalCost?: number,
-): Prisma.Decimal {
-  if (totalCost !== undefined && Number.isFinite(totalCost)) {
-    return new Prisma.Decimal(totalCost).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
+type ApuDecimalInput = Prisma.Decimal | number | string;
+
+/** D-047: resource quantities and unit prices retain 4 dp; contribution is money (D-053). */
+export function normalizeApuLineForPersistence(line: {
+  coefficient: ApuDecimalInput; unitCost: ApuDecimalInput; totalCost?: ApuDecimalInput;
+  partidaQuantity?: ApuDecimalInput | null; isLumpSum?: boolean;
+}, itemQuantity: ApuDecimalInput) {
+  const quantity = apuDecimal(itemQuantity);
+  let coefficient = apuDecimal(line.coefficient);
+  let unitCost = apuDecimal(line.unitCost);
+  let partidaQuantity = line.partidaQuantity == null ? null : apuDecimal(line.partidaQuantity);
+  if (line.isLumpSum) {
+    if (!quantity.gt(0)) throw new ServiceError("VALIDATION", "Definí una cantidad de ítem mayor a 0 antes de cargar un total de partida");
+    // Convert legacy money-only lines to the documented Global resource representation.
+    const unitContribution = line.totalCost === undefined
+      ? coefficient.times(unitCost) : apuDecimal(line.totalCost);
+    partidaQuantity = new Prisma.Decimal(1);
+    unitCost = apuDecimal(unitContribution.times(quantity));
   }
-  // Keep APU product on Decimal — avoid IEEE Number round-trip before persist.
-  return new Prisma.Decimal(coefficient)
-    .times(unitCost)
-    .toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP);
+  if (partidaQuantity !== null) {
+    if (!quantity.gt(0)) throw new ServiceError("VALIDATION", "Definí una cantidad de ítem mayor a 0 antes de cargar un total de partida");
+    coefficient = apuDecimal(partidaQuantity.div(quantity));
+  }
+  const totalCost = assertBudgetDecimalFits(computeApuUnitContribution({
+    coefficient: coefficient.toString(), unitCost: unitCost.toString(),
+    partidaQuantity: partidaQuantity?.toString() ?? null,
+  }, quantity.toString()), "Costo del APU");
+  return { coefficient, unitCost, totalCost, partidaQuantity, isLumpSum: false };
+}
+
+async function assertApuItem(tx: TxClient, costItemId: string, budgetId: string) {
+  const item = await tx.costItem.findUnique({ where: { id: costItemId } });
+  if (!item || item.budgetId !== budgetId) throw new ServiceError("NOT_FOUND", "Ítem de costo no encontrado");
+  const node = await tx.wbsNode.findFirst({ where: { id: item.wbsNodeId, budgetId, type: "ITEM" } });
+  if (!node || await tx.wbsNode.count({ where: { parentId: item.wbsNodeId } })) {
+    throw new ServiceError("CONFLICT", "Solo las partidas hoja pueden tener análisis de costo");
+  }
+  return item;
+}
+
+async function assertApuReferences(tx: TxClient, input: { productId?: string | null; supplierContactId?: string | null; }, budget: Pick<Budget, "companyId" | "projectId">, ctx: ServiceContext) {
+  if (input.productId) {
+    const project = await tx.project.findUnique({ where: { id: budget.projectId }, select: { companyId: true } });
+    const companyId = budget.companyId ?? project?.companyId ?? ctx.companyId;
+    const product = await tx.product.findUnique({ where: { id: input.productId }, select: { tenantId: true, companyId: true } });
+    if (!product || product.tenantId !== ctx.tenantId || isCrossCompany(product.companyId, { ...ctx, companyId: companyId ?? ctx.companyId })) {
+      throw new ServiceError("NOT_FOUND", "Producto no encontrado en la empresa del presupuesto");
+    }
+  }
+  if (input.supplierContactId) await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
+}
+
+/** Do not remove purchasing hints already used by an operational document. */
+async function assertApuLinesDeletable(tx: TxClient, ids: string[]) {
+  if (ids.length === 0) return;
+  await tx.$queryRaw`SELECT id FROM cost_analysis_lines WHERE id IN (${Prisma.join(ids)}) ORDER BY id FOR UPDATE`;
+  const where = { costAnalysisLineId: { in: ids } };
+  const counts = await Promise.all([tx.purchaseRequestLine.count({ where }), tx.purchaseOrderLine.count({ where }), tx.supplierInvoiceLine.count({ where })]);
+  if (counts.some((count) => count > 0)) throw new ServiceError("CONFLICT", "No se puede eliminar un insumo APU vinculado a solicitudes, órdenes de compra o facturas");
 }
 
 /** Recompute APU lines that were entered as Total partida when item qty changes. */
@@ -65,47 +123,32 @@ export async function _recomputePartidaLinesForQuantity(
   if (oldQuantity.equals(newQuantity) || newQuantity.lte(0)) return;
 
   const lines = await tx.costAnalysisLine.findMany({ where: { costItemId } });
-  const newQtyN = Number(newQuantity.toString());
-  const oldQtyN = Number(oldQuantity.toString());
-  // Scaling lump from qty ≤ 0 would do totalCost × 0 → wipe partida money.
-  const canScaleLump = oldQtyN > 0;
-
   for (const line of lines) {
-    if (line.partidaQuantity == null) continue;
+    if (line.partidaQuantity == null && !line.isLumpSum) continue;
 
     if (line.isLumpSum) {
-      if (!canScaleLump) continue;
-      const partidaMoney = Number(line.totalCost.toString()) * oldQtyN;
-      const next = recomputeLumpForItemQuantity(partidaMoney, newQtyN);
+      if (!oldQuantity.gt(0)) continue;
+      const nextTotal = apuMoney(line.totalCost.times(oldQuantity).div(newQuantity));
       await tx.costAnalysisLine.update({
         where: { id: line.id },
         data: {
-          coefficient: apuDecimal(next.coefficient),
-          unitCost: apuDecimal(next.unitCost),
-          totalCost: apuDecimal(next.totalCost),
-          partidaQuantity: next.partidaQuantity == null ? null : apuDecimal(next.partidaQuantity),
+          coefficient: 1,
+          unitCost: nextTotal,
+          totalCost: nextTotal,
+          partidaQuantity: 1,
           isLumpSum: true,
         },
       });
       continue;
     }
 
-    const next = recomputeResourceForItemQuantity(
-      {
-        coefficient: Number(line.coefficient.toString()),
-        unitCost: Number(line.unitCost.toString()),
-        totalCost: Number(line.totalCost.toString()),
-        partidaQuantity: Number(line.partidaQuantity.toString()),
-        isLumpSum: false,
-      },
-      newQtyN,
-    );
+    const next = normalizeApuLineForPersistence(line, newQuantity);
     await tx.costAnalysisLine.update({
       where: { id: line.id },
       data: {
         coefficient: apuDecimal(next.coefficient),
         unitCost: apuDecimal(next.unitCost),
-        totalCost: apuDecimal(next.totalCost),
+        totalCost: next.totalCost,
         partidaQuantity: next.partidaQuantity == null ? null : apuDecimal(next.partidaQuantity),
         isLumpSum: false,
       },
@@ -122,28 +165,13 @@ export async function addCostAnalysisLine(
   }
   const { costItem, budget } = await _guardLine(input.costItemId, ctx);
 
-  const wbsNode = await prisma.wbsNode.findUniqueOrThrow({ where: { id: costItem.wbsNodeId } });
-  if (wbsNode.type !== "ITEM") {
-    throw new ServiceError("CONFLICT", "Solo nodos ITEM pueden tener análisis de costo");
-  }
-
   const line = await prisma.$transaction(async (tx) => {
-    await lockBudgetForEconomicEdit(tx, budget.id, ctx.tenantId);
-    const itemQtyN = Number(costItem.quantity.toString());
-    const resolvedTotal = resolveLineTotalCost(input.coefficient, input.unitCost, input.totalCost);
-    let stored = normalizeStoredApuLineForItemQuantity(
-      {
-        coefficient: input.coefficient,
-        unitCost: input.unitCost,
-        totalCost: Number(resolvedTotal.toString()),
-        partidaQuantity: input.partidaQuantity ?? null,
-        isLumpSum: input.isLumpSum ?? false,
-      },
-      itemQtyN,
-    );
+    const currentBudget = await lockBudgetForEconomicEdit(tx, budget.id, ctx);
+    const currentItem = await assertApuItem(tx, costItem.id, budget.id);
+    await assertApuReferences(tx, input, currentBudget, ctx);
+    const stored = normalizeApuLineForPersistence(input, currentItem.quantity);
     let unit = input.unit;
-    if (stored.isLumpSum) {
-      stored = migrateLegacyLumpToGlobalResource(stored, itemQtyN);
+    if (input.isLumpSum) {
       unit = isGlobalUnit(unit) ? unit : APU_GLOBAL_UNIT;
     }
     const l = await tx.costAnalysisLine.create({
@@ -168,23 +196,23 @@ export async function addCostAnalysisLine(
     const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: costItem.budgetId } });
     await _recalcCostItemTotals(tx, input.costItemId, settings);
     await _recalcBudgetSummary(tx, costItem.budgetId);
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "cost_analysis_line.added",
+      entityType: "CostAnalysisLine",
+      entityId: l.id,
+      projectId: budget.projectId,
+      after: {
+        category: input.category,
+        description: input.description,
+        budgetId: budget.id,
+        ...approvedEditOverrideAuditMeta(currentBudget.status),
+      },
+      ipAddress: ctx.ipAddress,
+    }, tx);
     return l;
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "cost_analysis_line.added",
-    entityType: "CostAnalysisLine",
-    entityId: line.id,
-    after: {
-      category: input.category,
-      description: input.description,
-      budgetId: budget.id,
-      ...approvedEditOverrideAuditMeta(budget.status),
-    },
-    ipAddress: ctx.ipAddress,
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return line;
 }
@@ -202,44 +230,35 @@ export async function updateCostAnalysisLine(
   const { budget } = await _guardLine(existing.costItemId, ctx);
 
   const updated = await prisma.$transaction(async (tx) => {
-    await lockBudgetForEconomicEdit(tx, existing.budgetId, ctx.tenantId);
-    const costItemRow = await tx.costItem.findUniqueOrThrow({
-      where: { id: existing.costItemId },
-      select: { quantity: true },
-    });
-    const itemQtyN = Number(costItemRow.quantity.toString());
+    const currentBudget = await lockBudgetForEconomicEdit(tx, budget.id, ctx);
+    const current = await tx.costAnalysisLine.findFirst({ where: { id, costItemId: existing.costItemId, budgetId: budget.id } });
+    if (!current) throw new ServiceError("NOT_FOUND", "Línea de análisis no encontrada");
+    const costItemRow = await assertApuItem(tx, current.costItemId, budget.id);
+    await assertApuReferences(tx, input, currentBudget, ctx);
     const newCoefficient =
-      input.coefficient !== undefined ? Number(input.coefficient) : Number(existing.coefficient.toString());
+      input.coefficient !== undefined ? input.coefficient : current.coefficient;
     const newUnitCost =
-      input.unitCost !== undefined ? Number(input.unitCost) : Number(existing.unitCost.toString());
-    const resolvedTotal = resolveLineTotalCost(
-      newCoefficient,
-      newUnitCost,
-      input.totalCost !== undefined
-        ? input.totalCost
-        : Number(existing.totalCost.toString()),
-    );
+      input.unitCost !== undefined ? input.unitCost : current.unitCost;
     const partidaQuantity =
       input.partidaQuantity !== undefined
         ? input.partidaQuantity
-        : existing.partidaQuantity != null
-          ? Number(existing.partidaQuantity.toString())
+        : current.partidaQuantity != null
+          ? current.partidaQuantity
           : null;
     const isLumpSum =
-      input.isLumpSum !== undefined ? input.isLumpSum : existing.isLumpSum;
-    let stored = normalizeStoredApuLineForItemQuantity(
+      input.isLumpSum !== undefined ? input.isLumpSum : current.isLumpSum;
+    const stored = normalizeApuLineForPersistence(
       {
         coefficient: newCoefficient,
         unitCost: newUnitCost,
-        totalCost: Number(resolvedTotal.toString()),
+        totalCost: input.totalCost ?? current.totalCost,
         partidaQuantity,
         isLumpSum,
       },
-      itemQtyN,
+      costItemRow.quantity,
     );
-    let unit = input.unit !== undefined ? input.unit : existing.unit;
-    if (stored.isLumpSum) {
-      stored = migrateLegacyLumpToGlobalResource(stored, itemQtyN);
+    let unit = input.unit !== undefined ? input.unit : current.unit;
+    if (isLumpSum) {
       unit = isGlobalUnit(unit) ? unit : APU_GLOBAL_UNIT;
     }
 
@@ -264,21 +283,21 @@ export async function updateCostAnalysisLine(
     const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: existing.budgetId } });
     await _recalcCostItemTotals(tx, existing.costItemId, settings);
     await _recalcBudgetSummary(tx, existing.budgetId);
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "cost_analysis_line.updated",
+      entityType: "CostAnalysisLine",
+      entityId: id,
+      projectId: budget.projectId,
+      after: {
+        ...input,
+        ...approvedEditOverrideAuditMeta(currentBudget.status),
+      },
+      ipAddress: ctx.ipAddress,
+    }, tx);
     return l;
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "cost_analysis_line.updated",
-    entityType: "CostAnalysisLine",
-    entityId: id,
-    after: {
-      ...input,
-      ...approvedEditOverrideAuditMeta(budget.status),
-    },
-    ipAddress: ctx.ipAddress,
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return updated;
 }
@@ -292,25 +311,29 @@ export async function removeCostAnalysisLine(id: string, ctx: ServiceContext): P
   const { budget } = await _guardLine(existing.costItemId, ctx);
 
   await prisma.$transaction(async (tx) => {
-    await lockBudgetForEconomicEdit(tx, existing.budgetId, ctx.tenantId);
+    const currentBudget = await lockBudgetForEconomicEdit(tx, budget.id, ctx);
+    const current = await tx.costAnalysisLine.findFirst({ where: { id, costItemId: existing.costItemId, budgetId: budget.id } });
+    if (!current) throw new ServiceError("NOT_FOUND", "Línea de análisis no encontrada");
+    await assertApuItem(tx, current.costItemId, budget.id);
+    await assertApuLinesDeletable(tx, [id]);
     await tx.costAnalysisLine.delete({ where: { id } });
-    const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: existing.budgetId } });
+    const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: budget.id } });
     await _recalcCostItemTotals(tx, existing.costItemId, settings);
-    await _recalcBudgetSummary(tx, existing.budgetId);
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "cost_analysis_line.removed",
-    entityType: "CostAnalysisLine",
-    entityId: id,
-    after: {
-      budgetId: existing.budgetId,
-      ...approvedEditOverrideAuditMeta(budget.status),
-    },
-    ipAddress: ctx.ipAddress,
-  });
+    await _recalcBudgetSummary(tx, budget.id);
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "cost_analysis_line.removed",
+      entityType: "CostAnalysisLine",
+      entityId: id,
+      projectId: budget.projectId,
+      after: {
+        budgetId: budget.id,
+        ...approvedEditOverrideAuditMeta(currentBudget.status),
+      },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 /**
@@ -320,27 +343,22 @@ export async function removeCostAnalysisLine(id: string, ctx: ServiceContext): P
 export async function saveCostItemApu(
   input: SaveCostItemApuInput,
   ctx: ServiceContext,
-): Promise<{ ok: true }> {
+): Promise<{ ok: true; }> {
   if (!can(ctx.roles, "EDIT", "BUDGETS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
   }
   const { costItem, budget } = await _guardLine(input.costItemId, ctx);
 
-  const wbsNode = await prisma.wbsNode.findUniqueOrThrow({ where: { id: costItem.wbsNodeId } });
-  if (wbsNode.type !== "ITEM") {
-    throw new ServiceError("CONFLICT", "Solo nodos ITEM pueden tener análisis de costo");
-  }
-
-  if (input.quantity !== undefined && !(input.quantity > 0)) {
+  if (input.quantity !== undefined && (!Number.isFinite(input.quantity) || !(input.quantity > 0))) {
     throw new ServiceError("VALIDATION", "La cantidad del ítem debe ser mayor a 0");
   }
 
   await prisma.$transaction(async (tx) => {
-    await lockBudgetForEconomicEdit(tx, budget.id, ctx.tenantId);
+    const currentBudget = await lockBudgetForEconomicEdit(tx, budget.id, ctx);
+    const currentItem = await assertApuItem(tx, costItem.id, budget.id);
     const newQty =
-      input.quantity !== undefined ? new Prisma.Decimal(input.quantity) : costItem.quantity;
-    const itemQtyN = Number(newQty.toString());
-    if (!(itemQtyN > 0)) {
+      input.quantity !== undefined ? apuDecimal(input.quantity) : currentItem.quantity;
+    if (!newQty.gt(0)) {
       throw new ServiceError(
         "VALIDATION",
         "Definí una cantidad de ítem mayor a 0 antes de guardar el APU",
@@ -349,17 +367,18 @@ export async function saveCostItemApu(
 
     if (input.quantity !== undefined) {
       await assertCostItemQuantityNotBelowCertified(tx, {
-        wbsNodeId: costItem.wbsNodeId,
+        wbsNodeId: currentItem.wbsNodeId,
         tenantId: ctx.tenantId,
         quantity: newQty,
       });
     }
+    if (!(input.unit ?? currentItem.unit).trim()) throw new ServiceError("VALIDATION", "La unidad del ítem es obligatoria");
 
     await tx.costItem.update({
       where: { id: input.costItemId },
       data: {
-        unit: input.unit ?? undefined,
-        quantity: input.quantity !== undefined ? input.quantity : undefined,
+        unit: input.unit?.trim(),
+        quantity: input.quantity !== undefined ? newQty : undefined,
         notes: input.notes === undefined ? undefined : input.notes,
       },
     });
@@ -373,10 +392,16 @@ export async function saveCostItemApu(
         select: { id: true },
       })).map((l) => l.id),
     );
+    const payloadIds = input.lines.filter((line) => line.id).map((line) => line.id!);
+    if (new Set(payloadIds).size !== payloadIds.length || payloadIds.some((id) => !existingIds.has(id))) {
+      throw new ServiceError("CONFLICT", "Las líneas APU deben pertenecer al ítem y aparecer una sola vez. Recargá y volvé a intentar.");
+    }
+    const keptIds = new Set(input.lines.filter((line) => line.id && !line._delete).map((line) => line.id));
+    await assertApuLinesDeletable(tx, [...existingIds].filter((id) => !keptIds.has(id)));
 
     for (const line of input.lines) {
-      if (line._delete && line.id) {
-        if (existingIds.has(line.id)) {
+      if (line._delete) {
+        if (line.id && existingIds.has(line.id)) {
           await tx.costAnalysisLine.delete({ where: { id: line.id } });
           existingIds.delete(line.id);
         }
@@ -385,20 +410,19 @@ export async function saveCostItemApu(
 
       const partidaQuantity = line.partidaQuantity === undefined ? null : line.partidaQuantity;
       const isLumpSum = line.isLumpSum ?? false;
-      const resolvedTotal = resolveLineTotalCost(line.coefficient, line.unitCost, line.totalCost);
-      let normalized = normalizeStoredApuLineForItemQuantity(
+      await assertApuReferences(tx, line, currentBudget, ctx);
+      const normalized = normalizeApuLineForPersistence(
         {
           coefficient: line.coefficient,
           unitCost: line.unitCost,
-          totalCost: Number(resolvedTotal.toString()),
+          totalCost: line.totalCost,
           partidaQuantity,
           isLumpSum,
         },
-        itemQtyN,
+        newQty,
       );
       let unit = line.unit;
-      if (normalized.isLumpSum) {
-        normalized = migrateLegacyLumpToGlobalResource(normalized, itemQtyN);
+      if (isLumpSum) {
         unit = isGlobalUnit(unit) ? unit : APU_GLOBAL_UNIT;
       }
 
@@ -463,22 +487,21 @@ export async function saveCostItemApu(
     const settings = await tx.budgetSettings.findUniqueOrThrow({ where: { budgetId: costItem.budgetId } });
     await _recalcCostItemTotals(tx, input.costItemId, settings);
     await _recalcBudgetSummary(tx, costItem.budgetId);
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "cost_item.apu_saved",
-    entityType: "CostItem",
-    entityId: input.costItemId,
-    projectId: budget.projectId,
-    after: {
-      budgetId: budget.id,
-      lineCount: input.lines.length,
-      ...approvedEditOverrideAuditMeta(budget.status),
-    },
-    ipAddress: ctx.ipAddress,
-  });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "cost_item.apu_saved",
+      entityType: "CostItem",
+      entityId: input.costItemId,
+      projectId: budget.projectId,
+      after: {
+        budgetId: budget.id,
+        lineCount: input.lines.length,
+        ...approvedEditOverrideAuditMeta(currentBudget.status),
+      },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return { ok: true };
 }

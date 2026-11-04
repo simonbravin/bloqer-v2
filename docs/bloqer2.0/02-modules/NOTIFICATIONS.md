@@ -70,6 +70,8 @@ _No usuario final_; métricas internas uso email (`EmailDeliveryLog`).
 ## 16. Permisos
 Bandeja personal: cualquier usuario autenticado con tenant. Alertas operativas y log de emails: OWNER/ADMIN. No exige `VIEW NOTIFICATIONS` para el inbox.
 
+**AG-01 (03/11/2026):** la lectura y los cambios de estado revalidan tenant, destinatario, empresa y acceso actual a la obra. Revocar una asignación oculta también los avisos recibidos anteriormente sobre esa obra. El fan-out respeta empresa/membresía activa y el fallback [D-092]; ser OWNER no omite el alcance de empresa. Si el flag tenant `NOTIFICATIONS` está deshabilitado, campana/inbox devuelven listas y contadores vacíos y las mutaciones directas quedan bloqueadas; la emisión interna operativa y el historial se conservan. Las preferencias personales de correo no son ese flag ni requieren permisos de administración del equipo.
+
 ## 17. Eventos disparados / consumidos
 - Consume eventos; puede emitir `notification.sent`.
 
@@ -77,4 +79,4 @@ Bandeja personal: cualquier usuario autenticado con tenant. Alertas operativas y
 In-app + campana con polling ([D-054]); email según [Q-009] / [D-050].
 
 ## 19. Preguntas abiertas
-- Mute de campana in-app, Web Push, RBAC “solo su proyecto” (R-USR-007 sobre `ProjectTeamMember`), SLA de partes SUBMITTED, nuevos tipos (cobros, transferencias): diferidos — ver limitaciones en arquitectura. Preferencias email + digest: [D-114].
+- Mute personal de campana in-app, Web Push, SLA de partes SUBMITTED, nuevos tipos (cobros, transferencias): diferidos — ver limitaciones en arquitectura. El acceso por obra ya usa `ProjectMembership` [D-111], no el roster `ProjectTeamMember`. Preferencias email + digest: [D-114].

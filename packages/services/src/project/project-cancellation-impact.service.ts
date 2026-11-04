@@ -1,7 +1,9 @@
 import { prisma } from "@bloqer/database";
-import type { ProjectStatus } from "@bloqer/database";
+import type { Prisma, ProjectStatus } from "@bloqer/database";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
+import { requireProjectAccess } from "../security/access";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { canViewProjectCancellationImpact } from "./project-lifecycle-access";
 
 export type ProjectCancellationImpactBlocker = {
@@ -26,6 +28,7 @@ const OPEN_OBLIGATION_STATUSES = ["OPEN", "PARTIAL", "OVERDUE"] as const;
 export async function countOpenOperationalDocuments(
   projectId: string,
   tenantId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<ProjectCancellationImpactBlocker[]> {
   const [
     openPurchaseOrders,
@@ -39,34 +42,34 @@ export async function countOpenOperationalDocuments(
     openPayables,
     activeSubcontracts,
   ] = await Promise.all([
-    prisma.purchaseOrder.count({
+    db.purchaseOrder.count({
       where: { projectId, tenantId, status: { in: [...OPEN_PO_STATUSES] } },
     }),
-    prisma.purchaseRequest.count({
+    db.purchaseRequest.count({
       where: { projectId, tenantId, status: { in: ["DRAFT", "SUBMITTED", "QUOTE_SELECTED"] } },
     }),
-    prisma.certification.count({
+    db.certification.count({
       where: { projectId, tenantId, status: { in: [...OPEN_CERT_STATUSES] } },
     }),
-    prisma.supplierInvoice.count({
+    db.supplierInvoice.count({
       where: { projectId, tenantId, status: "ISSUED" },
     }),
-    prisma.salesInvoice.count({
+    db.salesInvoice.count({
       where: { projectId, tenantId, status: "ISSUED" },
     }),
-    prisma.collection.count({
+    db.collection.count({
       where: { projectId, tenantId, status: "CONFIRMED" },
     }),
-    prisma.payment.count({
+    db.payment.count({
       where: { projectId, tenantId, status: "CONFIRMED" },
     }),
-    prisma.receivable.count({
+    db.receivable.count({
       where: { projectId, tenantId, status: { in: [...OPEN_OBLIGATION_STATUSES] } },
     }),
-    prisma.payable.count({
+    db.payable.count({
       where: { projectId, tenantId, status: { in: [...OPEN_OBLIGATION_STATUSES] } },
     }),
-    prisma.subcontract.count({
+    db.subcontract.count({
       where: { projectId, tenantId, status: "ACTIVE" },
     }),
   ]);
@@ -128,17 +131,39 @@ export async function resolveReactivationTargetStatus(
     ? sanitizeReactivationTargetStatus(project.statusBeforeCancellation)
     : null;
   if (stored) return stored;
+  if (project.startDate != null) return "ON_HOLD";
 
-  const blockers = await countOpenOperationalDocuments(project.id, project.tenantId);
-  const hasApprovedBudget = await prisma.budget.count({
-    where: {
-      projectId: project.id,
-      tenantId: project.tenantId,
-      status: { in: ["APPROVED", "CLOSED"] },
+  // BR-PROJ-006 asks whether the project ever had activity, including closed or
+  // cancelled documents. Current cancellation blockers do not answer that.
+  const historical = await prisma.project.findFirst({
+    where: { id: project.id, tenantId: project.tenantId },
+    select: {
+      _count: {
+        select: {
+          budgets: { where: { tenantId: project.tenantId, status: { in: ["APPROVED", "CLOSED"] } } },
+          purchaseOrders: { where: { tenantId: project.tenantId } },
+          purchaseRequests: { where: { tenantId: project.tenantId } },
+          purchaseReceipts: { where: { tenantId: project.tenantId } },
+          certifications: { where: { tenantId: project.tenantId } },
+          supplierInvoices: { where: { tenantId: project.tenantId } },
+          salesInvoices: { where: { tenantId: project.tenantId } },
+          collections: { where: { tenantId: project.tenantId } },
+          payments: { where: { tenantId: project.tenantId } },
+          receivables: { where: { tenantId: project.tenantId } },
+          payables: { where: { tenantId: project.tenantId } },
+          subcontracts: { where: { tenantId: project.tenantId } },
+          subcontractCertifications: { where: { tenantId: project.tenantId } },
+          stockMovements: { where: { tenantId: project.tenantId } },
+          warehouseTransfers: { where: { tenantId: project.tenantId } },
+          jobsiteLogs: { where: { tenantId: project.tenantId } },
+          accountMovements: { where: { tenantId: project.tenantId } },
+          journalEntries: { where: { tenantId: project.tenantId } },
+        },
+      },
     },
   });
-
-  const hadActivity = blockers.length > 0 || hasApprovedBudget > 0 || project.startDate != null;
+  if (!historical) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  const hadActivity = Object.values(historical._count).some((count) => count > 0);
   return hadActivity ? "ON_HOLD" : "DRAFT";
 }
 
@@ -149,6 +174,8 @@ export async function getProjectCancellationImpact(
   if (!canViewProjectCancellationImpact(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el impacto de cancelación");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  await requireProjectAccess(projectId, ctx);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -185,8 +212,9 @@ export async function getProjectCancellationImpact(
 export async function assertNoOpenOperationalDocuments(
   projectId: string,
   tenantId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<void> {
-  const blockers = await countOpenOperationalDocuments(projectId, tenantId);
+  const blockers = await countOpenOperationalDocuments(projectId, tenantId, db);
   if (blockers.length > 0) {
     const summary = blockers.map((b) => `${b.count} ${b.label.toLowerCase()}`).join("; ");
     throw new ServiceError(

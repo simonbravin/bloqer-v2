@@ -9,6 +9,8 @@ import { prisma, type ProjectAccessMode } from "@bloqer/database";
 import { can, type UserRole } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import { companyScopeFilter, isCrossCompany } from "../company-scope";
+import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
 import { requireProjectInTenant, type ProjectTenantScope } from "../project/require-project-in-tenant";
 import { hasCompanyFinanceRole } from "@bloqer/domain";
 
@@ -137,8 +139,9 @@ export function canViewTreasury(roles: ServiceContext["roles"]): boolean {
 
 /**
  * Resolves which projects the actor may access for list/aggregate queries.
- * TENANT_WIDE → ALL (still requires VIEW PROJECTS at call site for lists).
- * MEMBERSHIP_SCOPED → ALL if tenant-wide access, else membership ids.
+ * TENANT_WIDE / bypass → ALL only for a global company context; otherwise
+ * return the company's own + shared project ids. Membership never widens company scope.
+ * MEMBERSHIP_SCOPED → membership ids intersected with tenant/company scope.
  * Memoized per ServiceContext for the request.
  */
 export async function resolveAccessibleProjectScope(
@@ -148,11 +151,21 @@ export async function resolveAccessibleProjectScope(
   if (!bag.scope) {
     bag.scope = (async () => {
       const mode = await getTenantProjectAccessModeForCtx(ctx);
-      if (mode === "TENANT_WIDE") return "ALL" as const;
-      if (hasTenantWideProjectAccess(ctx.roles)) return "ALL" as const;
+      if (mode === "TENANT_WIDE" || hasTenantWideProjectAccess(ctx.roles)) {
+        if (!ctx.companyId) return "ALL" as const;
+        const projects = await prisma.project.findMany({
+          where: { tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
+          select: { id: true },
+        });
+        return { projectIds: projects.map((project) => project.id) };
+      }
 
       const rows = await prisma.projectMembership.findMany({
-        where: { tenantId: ctx.tenantId, userId: ctx.actorUserId },
+        where: {
+          tenantId: ctx.tenantId,
+          userId: ctx.actorUserId,
+          project: { tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
+        },
         select: { projectId: true },
       });
       return { projectIds: rows.map((r) => r.projectId) };
@@ -203,25 +216,11 @@ export async function canAccessProject(
   ctx: ServiceContext,
 ): Promise<boolean> {
   try {
-    await requireProjectInTenant(projectId, ctx.tenantId);
+    await requireProjectAccess(projectId, ctx);
+    return true;
   } catch {
     return false;
   }
-  const mode = await getTenantProjectAccessModeForCtx(ctx);
-  if (mode === "TENANT_WIDE") return true;
-  if (hasTenantWideProjectAccess(ctx.roles)) return true;
-
-  const row = await prisma.projectMembership.findUnique({
-    where: {
-      tenantId_projectId_userId: {
-        tenantId: ctx.tenantId,
-        projectId,
-        userId: ctx.actorUserId,
-      },
-    },
-    select: { id: true },
-  });
-  return Boolean(row);
 }
 
 /**
@@ -233,6 +232,9 @@ export async function requireProjectAccess(
   ctx: ServiceContext,
 ): Promise<ProjectTenantScope> {
   const project = await requireProjectInTenant(projectId, ctx.tenantId);
+  if (isCrossCompany(project.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "Proyecto de otra empresa");
+  }
   const mode = await getTenantProjectAccessModeForCtx(ctx);
   if (mode === "TENANT_WIDE") return project;
   if (hasTenantWideProjectAccess(ctx.roles)) return project;
@@ -269,8 +271,8 @@ export async function requireProjectAccessIfPresent(
 /**
  * Filter notification / fan-out recipients by D-111 project ACL.
  * - No projectId (company-level) → unchanged (company permission already gated audience).
- * - TENANT_WIDE → unchanged.
- * - MEMBERSHIP_SCOPED → keep tenant-wide roles (OWNER/ADMIN/…) or explicit ProjectMembership.
+ * - Project recipients must have an active tenant membership in the project's company scope.
+ * - MEMBERSHIP_SCOPED → additionally require tenant-wide roles or explicit ProjectMembership.
  */
 export async function filterUserIdsByProjectAccess(
   tenantId: string,
@@ -278,26 +280,43 @@ export async function filterUserIdsByProjectAccess(
   userIds: string[],
 ): Promise<string[]> {
   if (!projectId || userIds.length === 0) return userIds;
+  const project = await requireProjectInTenant(projectId, tenantId);
   const mode = await getTenantProjectAccessMode(tenantId);
-  if (mode === "TENANT_WIDE") return userIds;
 
   const unique = [...new Set(userIds)];
   const [memberships, projectMembers] = await Promise.all([
     prisma.userMembership.findMany({
-      where: { tenantId, status: "ACTIVE", userId: { in: unique } },
-      select: { userId: true, roles: true },
+      where: {
+        tenantId,
+        status: "ACTIVE",
+        userId: { in: unique },
+        user: { status: "ACTIVE" },
+        OR: [{ companyId: null }, { company: { tenantId, status: "ACTIVE" } }],
+      },
+      select: { userId: true, roles: true, companyId: true },
     }),
-    prisma.projectMembership.findMany({
-      where: { tenantId, projectId, userId: { in: unique } },
-      select: { userId: true },
-    }),
+    mode === "MEMBERSHIP_SCOPED"
+      ? prisma.projectMembership.findMany({
+          where: { tenantId, projectId, userId: { in: unique } },
+          select: { userId: true },
+        })
+      : Promise.resolve([]),
   ]);
-  const rolesByUser = new Map(memberships.map((m) => [m.userId, m.roles]));
+  const membershipByUser = new Map(memberships.map((m) => [m.userId, m]));
   const memberSet = new Set(projectMembers.map((m) => m.userId));
+  const soleCompanyId = memberships.some((membership) => membership.companyId === null)
+    ? await getSoleActiveCompanyIdForTenant(tenantId) : null;
 
   return unique.filter((userId) => {
-    const roles = rolesByUser.get(userId) ?? [];
-    if (hasTenantWideProjectAccess(roles)) return true;
+    const membership = membershipByUser.get(userId);
+    if (!membership) return false;
+    if (isCrossCompany(project.companyId, {
+      tenantId,
+      actorUserId: userId,
+      companyId: membership.companyId ?? soleCompanyId,
+      roles: membership.roles,
+    })) return false;
+    if (mode === "TENANT_WIDE" || hasTenantWideProjectAccess(membership.roles)) return true;
     return memberSet.has(userId);
   });
 }

@@ -111,7 +111,7 @@ export type GanttContextProps = {
 
 const getsDaysIn = (range: Range) => {
   // For when range is daily
-  let fn = (_date: Date) => 1;
+  let fn: typeof getDaysInMonth = () => 1;
 
   if (range === "monthly" || range === "quarterly") {
     fn = getDaysInMonth;
@@ -1343,8 +1343,8 @@ export const GanttProvider: FC<GanttProviderProps> = ({
     };
   }, []);
 
-  const handleScroll = useCallback(
-    throttle(() => {
+  const handleScroll = useMemo(
+    () => throttle(() => {
       const scrollElement = scrollRef.current;
       if (!scrollElement) {
         return;
@@ -1550,11 +1550,11 @@ export const GanttGoToTodayButton: FC<GanttGoToTodayButtonProps> = ({
   className,
   label = "Ir a hoy",
 }) => {
-  const gantt = useContext(GanttContext);
+  const { scrollToDate } = useContext(GanttContext);
 
   const handleClick = useCallback(() => {
-    gantt.scrollToDate?.(new Date());
-  }, [gantt.scrollToDate]);
+    scrollToDate?.(new Date());
+  }, [scrollToDate]);
 
   return (
     <div

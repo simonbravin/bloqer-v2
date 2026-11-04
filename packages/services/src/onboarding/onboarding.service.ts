@@ -39,8 +39,11 @@ export async function completeTrialOnboarding(
 
     const actorUser = await tx.user.findFirst({
       where: { id: actorUserId },
-      select: { email: true },
+      select: { email: true, status: true },
     });
+    if (!actorUser || actorUser.status !== "ACTIVE") {
+      throw new ServiceError("FORBIDDEN", "Tu cuenta no está activa para crear un espacio de trabajo.");
+    }
     const actorEmail = actorUser?.email?.trim();
     if (!actorEmail) {
       throw new ServiceError(
@@ -125,5 +128,5 @@ export async function completeTrialOnboarding(
     );
 
     return { status: "created", tenantId: tenant.id };
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 }

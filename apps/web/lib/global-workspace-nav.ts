@@ -1,7 +1,7 @@
 import { can, hasCompanyFinanceRole, type UserRole } from "@bloqer/domain";
 import type { PermissionModule } from "@bloqer/domain";
 import { satisfiesNavRequirement, type NavRequirement } from "./nav-config";
-import { canAccessScheduledReportsNav } from "./configuracion-subnav";
+import { canAccessScheduledReportsNav, canReadConfigNav } from "./configuracion-subnav";
 
 function canViewTenantAuditLog(roles: UserRole[]): boolean {
   return can(roles, "VIEW", "AUDIT");
@@ -34,12 +34,6 @@ const FINANCE_AREA: NavRequirement = {
 };
 
 const COMPANY_FINANCE_SECTION_TITLES = new Set(["Finanzas", "Tesorería", "Contabilidad"]);
-
-function canReadConfigNav(roles: UserRole[]): boolean {
-  // Equipo + Permisos share this OR today: only OWNER/ADMIN have either leaf (PERM-005).
-  // If a future role gains TENANT_SETTINGS without USERS_PERMISSIONS, split the nav leaves.
-  return can(roles, "VIEW", "TENANT_SETTINGS") || can(roles, "VIEW", "USERS_PERMISSIONS");
-}
 
 const GLOBAL_NAV_SECTION_DEFS: GlobalNavSectionDef[] = [
   {
@@ -151,6 +145,9 @@ export function buildGlobalNavSections(
     if (COMPANY_FINANCE_SECTION_TITLES.has(def.title) && !companyFinance) {
       continue;
     }
+    // Child modules cannot make a disabled operational parent reachable.
+    if (def.title === "Tesorería" && !isTenantModuleEnabled("TREASURY")) continue;
+    if (def.title === "Contabilidad" && !isTenantModuleEnabled("ACCOUNTING")) continue;
 
     const items: GlobalNavSection["items"] = [];
 
@@ -172,7 +169,7 @@ export function buildGlobalNavSections(
           }
           continue;
         }
-        if (!canReadConfigNav(roles)) continue;
+        if (!canReadConfigNav(roles, isTenantModuleEnabled)) continue;
         items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
         continue;
       }

@@ -1,0 +1,1103 @@
+{
+  "date": "2026-11-03",
+  "head": "3b5ae7a038465ad6b3d60cde19c278a31019e165",
+  "branch": "codex/pruebas",
+  "scope": "remediacion local AG-00; no AG-01 ni produccion",
+  "originalBaseline": "2026-11-03-ag-00-baseline.md",
+  "campaignMode": "diagnosticar,corregir,verificar cada fase; esperar instruccion usuario antes de la siguiente",
+  "architectureApproval": {
+    "explicitUserApproval": true,
+    "date": "2026-11-03",
+    "answer": "Aprobar la propuesta actual (Recomendado)",
+    "adr": "ADR-018",
+    "proposal": "2026-11-03-ag-00-isolation-proposal.md",
+    "scope": "contrato de aislamiento vigente, sin schema/migraciones/middleware nuevos"
+  },
+  "resolutions": [
+    {
+      "id": "GA-AG-00-001",
+      "status": "corregido y verificado",
+      "change": "pnpm test incluye ocho suites del workspace y descubre 226/226 archivos, sin filtros que omitan paquetes",
+      "evidence": "output/platform-audit/ag-00-remediation-2026-11-03/test-discovery-after.json"
+    },
+    {
+      "id": "GA-AG-00-002",
+      "status": "corregido y verificado",
+      "change": "Pruebas puras deterministas de NOT_FOUND/FORBIDDEN; sin retorno silencioso ni conexion DB implicita",
+      "evidence": "packages/services/src/ai/context-isolation.test.ts"
+    },
+    {
+      "id": "GA-AG-00-003",
+      "status": "corregido y verificado",
+      "change": "Lint packages conectado,48incidencias corregidas; web completo incl features/hooks con cero warnings y hooks corregidos",
+      "evidence": "output/platform-audit/ag-00-remediation-2026-11-03/verified-lint.log"
+    },
+    {
+      "id": "GA-AG-00-004",
+      "status": "corregido y verificado",
+      "change": "Limites de cantidad arbitrarios sustituidos por integridad/curacion/descubrimiento y filtros verificables, sin reducir catalogo",
+      "evidence": "output/platform-audit/ag-00-remediation-2026-11-03/verified-test.log"
+    },
+    {
+      "id": "GA-AG-00-005",
+      "status": "resuelto en contrato documental/arquitectonico aprobado",
+      "change": "ADR018 documenta enforcement explicito en servicios/repositorios; no se atribuye automatismo inexistente",
+      "evidence": "docs/bloqer2.0/08-architecture/ARCHITECTURE_DECISION_RECORDS.md"
+    },
+    {
+      "id": "GA-AG-00-006",
+      "status": "resuelto en contrato documental/arquitectonico aprobado",
+      "change": "ADR018 y catalogo cerrado22hijos con padre obligatorio y coherencia de referencias adicionales; fuentes reconciliadas",
+      "evidence": "docs/bloqer2.0/08-architecture/TENANT_ISOLATION_MODEL.md"
+    }
+  ],
+  "checks": [
+    {
+      "id": "verified-lint",
+      "command": "node C:/Users/bravi/AppData/Local/node/corepack/v1/pnpm/9.15.0/bin/pnpm.cjs run lint",
+      "cwd": "C:\\Dev\\bloqer-v2",
+      "exitCode": 0,
+      "signal": null,
+      "timeout": false,
+      "durationMs": 28154,
+      "log": "output/platform-audit/ag-00-remediation-2026-11-03/verified-lint.log"
+    },
+    {
+      "id": "verified-test",
+      "command": "node C:/Users/bravi/AppData/Local/node/corepack/v1/pnpm/9.15.0/bin/pnpm.cjs run test --force --concurrency=2",
+      "cwd": "C:\\Dev\\bloqer-v2",
+      "exitCode": 0,
+      "signal": null,
+      "timeout": false,
+      "durationMs": 39232,
+      "log": "output/platform-audit/ag-00-remediation-2026-11-03/verified-test.log"
+    },
+    {
+      "id": "verified-ai-knowledge-index",
+      "command": "node C:/Users/bravi/AppData/Local/node/corepack/v1/pnpm/9.15.0/bin/pnpm.cjs --filter @bloqer/ai check-docs-index",
+      "cwd": "C:\\Dev\\bloqer-v2",
+      "exitCode": 0,
+      "signal": null,
+      "timeout": false,
+      "durationMs": 1051,
+      "log": "output/platform-audit/ag-00-remediation-2026-11-03/verified-ai-knowledge-index.log"
+    },
+    {
+      "id": "verified-typecheck",
+      "command": "node C:/Users/bravi/AppData/Local/node/corepack/v1/pnpm/9.15.0/bin/pnpm.cjs run typecheck --force --concurrency=2",
+      "cwd": "C:\\Dev\\bloqer-v2",
+      "exitCode": 0,
+      "signal": null,
+      "timeout": false,
+      "durationMs": 76944,
+      "log": "output/platform-audit/ag-00-remediation-2026-11-03/verified-typecheck.log"
+    }
+  ],
+  "tests": {
+    "packages": {
+      "@bloqer/validators": {
+        "tests": 14,
+        "suites": 4,
+        "pass": 14,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/web": {
+        "tests": 145,
+        "suites": 7,
+        "pass": 145,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/utils": {
+        "tests": 85,
+        "suites": 28,
+        "pass": 85,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/ai": {
+        "tests": 28,
+        "suites": 11,
+        "pass": 28,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/domain": {
+        "tests": 111,
+        "suites": 27,
+        "pass": 111,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/email": {
+        "tests": 12,
+        "suites": 4,
+        "pass": 12,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/report-pdf": {
+        "tests": 9,
+        "suites": 0,
+        "pass": 9,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "@bloqer/services": {
+        "tests": 1175,
+        "suites": 260,
+        "pass": 1175,
+        "fail": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    "totals": {
+      "tests": 1579,
+      "suites": 341,
+      "pass": 1579,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "omittedIntegrationSuites": [
+      "@bloqer/services:test: ok 14 - D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV) # SKIP",
+      "@bloqer/services:test: ok 15 - Bloqer AI live isolation (Neon DEV) # SKIP",
+      "@bloqer/services:test: ok 59 - AP integrity (isolated database) # SKIP",
+      "@bloqer/services:test: ok 138 - certification → invoice → receivable → collection (isolated DB) # SKIP",
+      "@bloqer/services:test: ok 349 - procurement regression baseline (isolated database) # SKIP",
+      "@bloqer/services:test: ok 389 - D-118 quote coverage and historical preservation (isolated database) # SKIP",
+      "@bloqer/services:test: ok 410 - D-111 Phase C membership admin (Neon DEV) # SKIP"
+    ]
+  },
+  "discovery": {
+    "total": 226,
+    "selected": 226,
+    "missing": [],
+    "packages": [
+      {
+        "package": "@bloqer/web",
+        "path": "apps/web",
+        "script": "node --import ../../packages/services/node_modules/tsx/dist/loader.mjs --test \"components/**/*.test.ts\" \"features/**/*.test.ts\" \"hooks/**/*.test.ts\" \"lib/**/*.test.ts\" && node --conditions react-server --test \"features/**/*.test.mjs\"",
+        "patterns": [
+          "components/**/*.test.ts",
+          "features/**/*.test.ts",
+          "hooks/**/*.test.ts",
+          "lib/**/*.test.ts",
+          "features/**/*.test.mjs"
+        ],
+        "existingFiles": [
+          "apps/web/components/ui/decimal-input-draft.test.ts",
+          "apps/web/features/ap/lib/ap-payee-options.test.ts",
+          "apps/web/features/ap/lib/payment-detail-rsc.test.mjs",
+          "apps/web/features/bloqer-ai/lib/safe-ai-content.test.ts",
+          "apps/web/features/certifications/lib/measurement-tree.test.ts",
+          "apps/web/features/documents/lib/document-file-utils.test.ts",
+          "apps/web/features/documents/lib/document-revalidate-paths.test.ts",
+          "apps/web/features/documents/lib/linked-entity-label.test.ts",
+          "apps/web/features/documents/lib/upload-pending-entity-evidence.test.ts",
+          "apps/web/features/help/lib/catalog-integrity.test.ts",
+          "apps/web/features/help/lib/catalog.test.ts",
+          "apps/web/features/help/lib/search-audit.test.ts",
+          "apps/web/features/help/lib/search-probe.test.ts",
+          "apps/web/features/help/lib/search-safety.test.ts",
+          "apps/web/features/jobsite-log/lib/jobsite-log-form-lines.test.ts",
+          "apps/web/features/jobsite-log/lib/upload-jobsite-log-evidence.test.ts",
+          "apps/web/features/procurement/lib/matches-list-status-filter.test.ts",
+          "apps/web/features/procurement/lib/purchase-delivery-overdue.test.ts",
+          "apps/web/features/procurement/lib/purchase-request-award-selection.test.ts",
+          "apps/web/features/procurement/lib/purchase-request-form-lines.test.ts",
+          "apps/web/features/procurement/lib/quote-line-edit-values.test.ts",
+          "apps/web/features/project-progress/lib/project-progress-chart-format.test.ts",
+          "apps/web/hooks/client-table-sort.test.ts",
+          "apps/web/lib/ai-rate-limit.test.ts",
+          "apps/web/lib/field-nav.test.ts",
+          "apps/web/lib/field-pending-empty-cta.test.ts",
+          "apps/web/lib/format-relative.test.ts",
+          "apps/web/lib/list-view-mode.test.ts",
+          "apps/web/lib/pending-count-badge.test.ts",
+          "apps/web/lib/searchable-options.test.ts",
+          "apps/web/lib/viewport-hint-cookie.test.ts"
+        ],
+        "selectedFiles": [
+          "apps/web/components/ui/decimal-input-draft.test.ts",
+          "apps/web/features/ap/lib/ap-payee-options.test.ts",
+          "apps/web/features/ap/lib/payment-detail-rsc.test.mjs",
+          "apps/web/features/bloqer-ai/lib/safe-ai-content.test.ts",
+          "apps/web/features/certifications/lib/measurement-tree.test.ts",
+          "apps/web/features/documents/lib/document-file-utils.test.ts",
+          "apps/web/features/documents/lib/document-revalidate-paths.test.ts",
+          "apps/web/features/documents/lib/linked-entity-label.test.ts",
+          "apps/web/features/documents/lib/upload-pending-entity-evidence.test.ts",
+          "apps/web/features/help/lib/catalog-integrity.test.ts",
+          "apps/web/features/help/lib/catalog.test.ts",
+          "apps/web/features/help/lib/search-audit.test.ts",
+          "apps/web/features/help/lib/search-probe.test.ts",
+          "apps/web/features/help/lib/search-safety.test.ts",
+          "apps/web/features/jobsite-log/lib/jobsite-log-form-lines.test.ts",
+          "apps/web/features/jobsite-log/lib/upload-jobsite-log-evidence.test.ts",
+          "apps/web/features/procurement/lib/matches-list-status-filter.test.ts",
+          "apps/web/features/procurement/lib/purchase-delivery-overdue.test.ts",
+          "apps/web/features/procurement/lib/purchase-request-award-selection.test.ts",
+          "apps/web/features/procurement/lib/purchase-request-form-lines.test.ts",
+          "apps/web/features/procurement/lib/quote-line-edit-values.test.ts",
+          "apps/web/features/project-progress/lib/project-progress-chart-format.test.ts",
+          "apps/web/hooks/client-table-sort.test.ts",
+          "apps/web/lib/ai-rate-limit.test.ts",
+          "apps/web/lib/field-nav.test.ts",
+          "apps/web/lib/field-pending-empty-cta.test.ts",
+          "apps/web/lib/format-relative.test.ts",
+          "apps/web/lib/list-view-mode.test.ts",
+          "apps/web/lib/pending-count-badge.test.ts",
+          "apps/web/lib/searchable-options.test.ts",
+          "apps/web/lib/viewport-hint-cookie.test.ts"
+        ],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/ai",
+        "path": "packages/ai",
+        "script": "node --import tsx --test \"src/**/*.test.ts\"",
+        "patterns": ["src/**/*.test.ts"],
+        "existingFiles": [
+          "packages/ai/src/env.test.ts",
+          "packages/ai/src/knowledge/bm25.test.ts",
+          "packages/ai/src/orchestration/run-agent.test.ts",
+          "packages/ai/src/policy/system-prompt.test.ts",
+          "packages/ai/src/presentation/presentation.test.ts",
+          "packages/ai/src/providers/openai/openai-provider.test.ts"
+        ],
+        "selectedFiles": [
+          "packages/ai/src/env.test.ts",
+          "packages/ai/src/knowledge/bm25.test.ts",
+          "packages/ai/src/orchestration/run-agent.test.ts",
+          "packages/ai/src/policy/system-prompt.test.ts",
+          "packages/ai/src/presentation/presentation.test.ts",
+          "packages/ai/src/providers/openai/openai-provider.test.ts"
+        ],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/domain",
+        "path": "packages/domain",
+        "script": "node --import tsx --test \"src/**/*.test.ts\"",
+        "patterns": ["src/**/*.test.ts"],
+        "existingFiles": [
+          "packages/domain/src/budget/wbs-incidence.test.ts",
+          "packages/domain/src/budget/wbs-table-columns.test.ts",
+          "packages/domain/src/documents/folder-rules.test.ts",
+          "packages/domain/src/finance/document-classification.test.ts",
+          "packages/domain/src/finance/iva-rates.test.ts",
+          "packages/domain/src/finance/suggest-invoice-letter.test.ts",
+          "packages/domain/src/notifications/email-categories.test.ts",
+          "packages/domain/src/permissions/matrix-d056.test.ts",
+          "packages/domain/src/permissions/matrix-overview.test.ts",
+          "packages/domain/src/procurement/process-steps.test.ts"
+        ],
+        "selectedFiles": [
+          "packages/domain/src/budget/wbs-incidence.test.ts",
+          "packages/domain/src/budget/wbs-table-columns.test.ts",
+          "packages/domain/src/documents/folder-rules.test.ts",
+          "packages/domain/src/finance/document-classification.test.ts",
+          "packages/domain/src/finance/iva-rates.test.ts",
+          "packages/domain/src/finance/suggest-invoice-letter.test.ts",
+          "packages/domain/src/notifications/email-categories.test.ts",
+          "packages/domain/src/permissions/matrix-d056.test.ts",
+          "packages/domain/src/permissions/matrix-overview.test.ts",
+          "packages/domain/src/procurement/process-steps.test.ts"
+        ],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/email",
+        "path": "packages/email",
+        "script": "node --import tsx --test \"src/**/*.test.ts\"",
+        "patterns": ["src/**/*.test.ts"],
+        "existingFiles": ["packages/email/src/templates/notification-email.test.ts"],
+        "selectedFiles": ["packages/email/src/templates/notification-email.test.ts"],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/report-pdf",
+        "path": "packages/report-pdf",
+        "script": "node --import tsx --test \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+        "patterns": ["src/**/*.test.ts", "src/**/*.test.tsx"],
+        "existingFiles": [
+          "packages/report-pdf/src/pdf-render.smoke.test.tsx",
+          "packages/report-pdf/src/pdf/pdf-filter-line.test.ts",
+          "packages/report-pdf/src/pdf/project-progress-chart-data.test.ts",
+          "packages/report-pdf/src/pdf/project-progress-pdf.smoke.test.tsx",
+          "packages/report-pdf/src/pdf/schedule-pdf.smoke.test.tsx"
+        ],
+        "selectedFiles": [
+          "packages/report-pdf/src/pdf-render.smoke.test.tsx",
+          "packages/report-pdf/src/pdf/pdf-filter-line.test.ts",
+          "packages/report-pdf/src/pdf/project-progress-chart-data.test.ts",
+          "packages/report-pdf/src/pdf/project-progress-pdf.smoke.test.tsx",
+          "packages/report-pdf/src/pdf/schedule-pdf.smoke.test.tsx"
+        ],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/services",
+        "path": "packages/services",
+        "script": "node --import tsx --test \"src/**/*.test.ts\"",
+        "patterns": ["src/**/*.test.ts"],
+        "existingFiles": [
+          "packages/services/src/accounting/accounting-auto-draft-failure.test.ts",
+          "packages/services/src/accounting/accounting-cancel-sync.test.ts",
+          "packages/services/src/accounting/accounting-coa-template.test.ts",
+          "packages/services/src/accounting/accounting-date.test.ts",
+          "packages/services/src/accounting/accounting-invoice-journal-lines.test.ts",
+          "packages/services/src/accounting/accounting-natural-balance.test.ts",
+          "packages/services/src/accounting/accounting-sourced-lock.test.ts",
+          "packages/services/src/accounting/accounting-suggestion-gl-override.test.ts",
+          "packages/services/src/accounting/treasury-gl-account-hint.test.ts",
+          "packages/services/src/ai/context-isolation.test.ts",
+          "packages/services/src/ai/d111-scoped-live.test.ts",
+          "packages/services/src/ai/live-isolation.test.ts",
+          "packages/services/src/ai/prompt-injection.test.ts",
+          "packages/services/src/ai/read-only.test.ts",
+          "packages/services/src/ai/registry.test.ts",
+          "packages/services/src/ai/zero-trust-access.test.ts",
+          "packages/services/src/ap/company-document-access.test.ts",
+          "packages/services/src/ap/payable-cancel-guards.test.ts",
+          "packages/services/src/ap/payables-field.test.ts",
+          "packages/services/src/ap/register-supplier-advance.test.ts",
+          "packages/services/src/ap/supplier-invoice-cancel-guards.test.ts",
+          "packages/services/src/ap/supplier-invoice-from-po-pure.test.ts",
+          "packages/services/src/ap/supplier-invoice-integrity.live.test.ts",
+          "packages/services/src/ap/supplier-invoice-list-status.test.ts",
+          "packages/services/src/ap/supplier-invoice-po-reconciliation.test.ts",
+          "packages/services/src/ar/ar-notifications.test.ts",
+          "packages/services/src/ar/manual-invoice-guards.test.ts",
+          "packages/services/src/ar/receivable-cancel-guards.test.ts",
+          "packages/services/src/ar/receivables-field.test.ts",
+          "packages/services/src/ar/register-ar-income.test.ts",
+          "packages/services/src/ar/sales-invoice-cancel-guards.test.ts",
+          "packages/services/src/audit/audit.test.ts",
+          "packages/services/src/auth/credentials-auth.pure.test.ts",
+          "packages/services/src/budget/approved-budget-edits.test.ts",
+          "packages/services/src/budget/apu-display.test.ts",
+          "packages/services/src/budget/apu-entry.test.ts",
+          "packages/services/src/budget/budget-approve-unique.test.ts",
+          "packages/services/src/budget/budget-calc.financial.test.ts",
+          "packages/services/src/budget/budget-import-pure.test.ts",
+          "packages/services/src/budget/budget-summary-kpis.test.ts",
+          "packages/services/src/budget/budget-wbs-export.test.ts",
+          "packages/services/src/budget/cost-item-certified-qty.test.ts",
+          "packages/services/src/budget/pick-principal-budget.test.ts",
+          "packages/services/src/budget/sum-contractual-budgets.test.ts",
+          "packages/services/src/budget/wbs-code-rules.test.ts",
+          "packages/services/src/budget/wbs-import-code-fix.test.ts",
+          "packages/services/src/budget/wbs-spreadsheet-parser.test.ts",
+          "packages/services/src/certification/certification-flow.live.test.ts",
+          "packages/services/src/certification/certification-guards.test.ts",
+          "packages/services/src/certification/certification-measurement-pure.test.ts",
+          "packages/services/src/company-scope.test.ts",
+          "packages/services/src/company/company-resolve.test.ts",
+          "packages/services/src/contact/assert-contact-role.test.ts",
+          "packages/services/src/contact/create-contact-schema.test.ts",
+          "packages/services/src/cost-control/cost-control-pct.test.ts",
+          "packages/services/src/cost-control/cost-exposure.test.ts",
+          "packages/services/src/cost-control/cost-type-slice.test.ts",
+          "packages/services/src/cost-control/cost-type.test.ts",
+          "packages/services/src/cost-control/project-accrued-aggregation.test.ts",
+          "packages/services/src/cost-control/wbs-progress-summary.test.ts",
+          "packages/services/src/documents/content-disposition.test.ts",
+          "packages/services/src/documents/document-delete-policy.test.ts",
+          "packages/services/src/documents/document-folder-isolation.test.ts",
+          "packages/services/src/documents/sniff-upload-content.test.ts",
+          "packages/services/src/documents/storage-key.test.ts",
+          "packages/services/src/field/field-pending-access.test.ts",
+          "packages/services/src/finance/calc-line-money.test.ts",
+          "packages/services/src/finance/discount-pct-string.test.ts",
+          "packages/services/src/finance/finance-access.d056.test.ts",
+          "packages/services/src/finance/finance-corporate-kpis.test.ts",
+          "packages/services/src/finance/financial-trace.service.test.ts",
+          "packages/services/src/finance/invoice-line-money.test.ts",
+          "packages/services/src/finance/money-decimal.test.ts",
+          "packages/services/src/finance/money-nonneg-validators.test.ts",
+          "packages/services/src/finance/obligation-balance.test.ts",
+          "packages/services/src/finance/obligation-date.test.ts",
+          "packages/services/src/finance/obligation-stored-status.test.ts",
+          "packages/services/src/finance/optimistic-lock.test.ts",
+          "packages/services/src/finance/overhead-period-freeze.test.ts",
+          "packages/services/src/finance/payable-list-filters.test.ts",
+          "packages/services/src/finance/payment-collection-access.test.ts",
+          "packages/services/src/finance/period-lock-assert.test.ts",
+          "packages/services/src/finance/period-lock.test.ts",
+          "packages/services/src/finance/project-overhead-period.test.ts",
+          "packages/services/src/finance/register-transaction-scope.test.ts",
+          "packages/services/src/idempotency/idempotency.test.ts",
+          "packages/services/src/inventory/consumption-warehouse-scope.test.ts",
+          "packages/services/src/inventory/jobsite-log-material-wbs.test.ts",
+          "packages/services/src/jobsite-log/jobsite-log-guards.test.ts",
+          "packages/services/src/jobsite-log/jobsite-log-notifications.test.ts",
+          "packages/services/src/jobsite-log/jobsite-log-progress-schema.test.ts",
+          "packages/services/src/materials/material-commitment-pure.test.ts",
+          "packages/services/src/materials/materials-field.test.ts",
+          "packages/services/src/materials/project-materials-board.service.test.ts",
+          "packages/services/src/notifications/notification-copy.test.ts",
+          "packages/services/src/notifications/notification-email-context.test.ts",
+          "packages/services/src/procurement/assert-company-project-scope.test.ts",
+          "packages/services/src/procurement/authorize-and-commit-po.test.ts",
+          "packages/services/src/procurement/create-purchase-request-schema.test.ts",
+          "packages/services/src/procurement/procurement-access.test.ts",
+          "packages/services/src/procurement/procurement-budget-baseline.test.ts",
+          "packages/services/src/procurement/procurement-fixture-guard.test.ts",
+          "packages/services/src/procurement/procurement-overdue-alerts.test.ts",
+          "packages/services/src/procurement/procurement-policy.test.ts",
+          "packages/services/src/procurement/procurement-regression.live.test.ts",
+          "packages/services/src/procurement/purchase-order-calc.service.test.ts",
+          "packages/services/src/procurement/purchase-receipt-availability.test.ts",
+          "packages/services/src/procurement/purchase-receipt-guards.test.ts",
+          "packages/services/src/procurement/purchase-request-list-enrichment.test.ts",
+          "packages/services/src/procurement/purchase-request-return-guards.test.ts",
+          "packages/services/src/procurement/purchase-variance.test.ts",
+          "packages/services/src/procurement/quote-line-offer.live.test.ts",
+          "packages/services/src/procurement/quote-request-access.test.ts",
+          "packages/services/src/procurement/quote-validity.test.ts",
+          "packages/services/src/procurement/three-way-match-pure.test.ts",
+          "packages/services/src/project-cash-flow/project-cash-position-projection-pure.test.ts",
+          "packages/services/src/project-finance/project-finance-layers.test.ts",
+          "packages/services/src/project/project-lifecycle.test.ts",
+          "packages/services/src/project/project-membership.d111.test.ts",
+          "packages/services/src/project/project-membership.phase-c.live.test.ts",
+          "packages/services/src/project/project-team.test.ts",
+          "packages/services/src/project/project-workspace-nav.test.ts",
+          "packages/services/src/report-exports/csv-export.test.ts",
+          "packages/services/src/report-exports/project-progress-export.test.ts",
+          "packages/services/src/report-exports/report-export-filters.test.ts",
+          "packages/services/src/reports/budget-variance.test.ts",
+          "packages/services/src/reports/certification-physical-pct.test.ts",
+          "packages/services/src/reports/gg-wbs-detect.test.ts",
+          "packages/services/src/reports/project-progress.test.ts",
+          "packages/services/src/reports/project-supplier-report-pure.test.ts",
+          "packages/services/src/reports/report-month-projection.test.ts",
+          "packages/services/src/resources/resource-board-pure.test.ts",
+          "packages/services/src/schedule/schedule-access.test.ts",
+          "packages/services/src/schedule/schedule-bar-color.test.ts",
+          "packages/services/src/schedule/schedule-export-pure.test.ts",
+          "packages/services/src/schedule/schedule-field-workspace.service.test.ts",
+          "packages/services/src/schedule/schedule-field.test.ts",
+          "packages/services/src/schedule/schedule-helpers.test.ts",
+          "packages/services/src/schedule/schedule-milestone-from-receipt.test.ts",
+          "packages/services/src/schedule/schedule-placement.test.ts",
+          "packages/services/src/schedule/schedule-progress-sync-pure.test.ts",
+          "packages/services/src/schedule/schedule-xlsx-styled.test.ts",
+          "packages/services/src/scheduled-reports/scheduled-report-run-status.test.ts",
+          "packages/services/src/security/access.aggregate.d111.test.ts",
+          "packages/services/src/security/access.d111.test.ts",
+          "packages/services/src/security/finance-tenant-isolation.test.ts",
+          "packages/services/src/subcontracts/subcontract-cert-approve-guards.test.ts",
+          "packages/services/src/subcontracts/subcontract-cert-succession-unique.test.ts",
+          "packages/services/src/subcontracts/subcontract-cert-succession.test.ts",
+          "packages/services/src/tenant-modules/tenant-module-gate.test.ts",
+          "packages/services/src/tenant-settings/tenant-logo-isolation.test.ts",
+          "packages/services/src/treasury-reports/movement-document-ref.test.ts",
+          "packages/services/src/treasury/account-movement-cancel-guards.test.ts",
+          "packages/services/src/treasury/balance.service.test.ts",
+          "packages/services/src/treasury/bank-reconciliation-open-unique.test.ts",
+          "packages/services/src/treasury/bank-statement-csv-parser.test.ts",
+          "packages/services/src/treasury/bank-statement-ofx-parser.test.ts",
+          "packages/services/src/treasury/internal-transfer-legs.test.ts",
+          "packages/services/src/treasury/treasury-account-opening-company.test.ts",
+          "packages/services/src/treasury/treasury-currency-guards.test.ts",
+          "packages/services/src/user/resolve-user-display-names.test.ts"
+        ],
+        "selectedFiles": [
+          "packages/services/src/accounting/accounting-auto-draft-failure.test.ts",
+          "packages/services/src/accounting/accounting-cancel-sync.test.ts",
+          "packages/services/src/accounting/accounting-coa-template.test.ts",
+          "packages/services/src/accounting/accounting-date.test.ts",
+          "packages/services/src/accounting/accounting-invoice-journal-lines.test.ts",
+          "packages/services/src/accounting/accounting-natural-balance.test.ts",
+          "packages/services/src/accounting/accounting-sourced-lock.test.ts",
+          "packages/services/src/accounting/accounting-suggestion-gl-override.test.ts",
+          "packages/services/src/accounting/treasury-gl-account-hint.test.ts",
+          "packages/services/src/ai/context-isolation.test.ts",
+          "packages/services/src/ai/d111-scoped-live.test.ts",
+          "packages/services/src/ai/live-isolation.test.ts",
+          "packages/services/src/ai/prompt-injection.test.ts",
+          "packages/services/src/ai/read-only.test.ts",
+          "packages/services/src/ai/registry.test.ts",
+          "packages/services/src/ai/zero-trust-access.test.ts",
+          "packages/services/src/ap/company-document-access.test.ts",
+          "packages/services/src/ap/payable-cancel-guards.test.ts",
+          "packages/services/src/ap/payables-field.test.ts",
+          "packages/services/src/ap/register-supplier-advance.test.ts",
+          "packages/services/src/ap/supplier-invoice-cancel-guards.test.ts",
+          "packages/services/src/ap/supplier-invoice-from-po-pure.test.ts",
+          "packages/services/src/ap/supplier-invoice-integrity.live.test.ts",
+          "packages/services/src/ap/supplier-invoice-list-status.test.ts",
+          "packages/services/src/ap/supplier-invoice-po-reconciliation.test.ts",
+          "packages/services/src/ar/ar-notifications.test.ts",
+          "packages/services/src/ar/manual-invoice-guards.test.ts",
+          "packages/services/src/ar/receivable-cancel-guards.test.ts",
+          "packages/services/src/ar/receivables-field.test.ts",
+          "packages/services/src/ar/register-ar-income.test.ts",
+          "packages/services/src/ar/sales-invoice-cancel-guards.test.ts",
+          "packages/services/src/audit/audit.test.ts",
+          "packages/services/src/auth/credentials-auth.pure.test.ts",
+          "packages/services/src/budget/approved-budget-edits.test.ts",
+          "packages/services/src/budget/apu-display.test.ts",
+          "packages/services/src/budget/apu-entry.test.ts",
+          "packages/services/src/budget/budget-approve-unique.test.ts",
+          "packages/services/src/budget/budget-calc.financial.test.ts",
+          "packages/services/src/budget/budget-import-pure.test.ts",
+          "packages/services/src/budget/budget-summary-kpis.test.ts",
+          "packages/services/src/budget/budget-wbs-export.test.ts",
+          "packages/services/src/budget/cost-item-certified-qty.test.ts",
+          "packages/services/src/budget/pick-principal-budget.test.ts",
+          "packages/services/src/budget/sum-contractual-budgets.test.ts",
+          "packages/services/src/budget/wbs-code-rules.test.ts",
+          "packages/services/src/budget/wbs-import-code-fix.test.ts",
+          "packages/services/src/budget/wbs-spreadsheet-parser.test.ts",
+          "packages/services/src/certification/certification-flow.live.test.ts",
+          "packages/services/src/certification/certification-guards.test.ts",
+          "packages/services/src/certification/certification-measurement-pure.test.ts",
+          "packages/services/src/company-scope.test.ts",
+          "packages/services/src/company/company-resolve.test.ts",
+          "packages/services/src/contact/assert-contact-role.test.ts",
+          "packages/services/src/contact/create-contact-schema.test.ts",
+          "packages/services/src/cost-control/cost-control-pct.test.ts",
+          "packages/services/src/cost-control/cost-exposure.test.ts",
+          "packages/services/src/cost-control/cost-type-slice.test.ts",
+          "packages/services/src/cost-control/cost-type.test.ts",
+          "packages/services/src/cost-control/project-accrued-aggregation.test.ts",
+          "packages/services/src/cost-control/wbs-progress-summary.test.ts",
+          "packages/services/src/documents/content-disposition.test.ts",
+          "packages/services/src/documents/document-delete-policy.test.ts",
+          "packages/services/src/documents/document-folder-isolation.test.ts",
+          "packages/services/src/documents/sniff-upload-content.test.ts",
+          "packages/services/src/documents/storage-key.test.ts",
+          "packages/services/src/field/field-pending-access.test.ts",
+          "packages/services/src/finance/calc-line-money.test.ts",
+          "packages/services/src/finance/discount-pct-string.test.ts",
+          "packages/services/src/finance/finance-access.d056.test.ts",
+          "packages/services/src/finance/finance-corporate-kpis.test.ts",
+          "packages/services/src/finance/financial-trace.service.test.ts",
+          "packages/services/src/finance/invoice-line-money.test.ts",
+          "packages/services/src/finance/money-decimal.test.ts",
+          "packages/services/src/finance/money-nonneg-validators.test.ts",
+          "packages/services/src/finance/obligation-balance.test.ts",
+          "packages/services/src/finance/obligation-date.test.ts",
+          "packages/services/src/finance/obligation-stored-status.test.ts",
+          "packages/services/src/finance/optimistic-lock.test.ts",
+          "packages/services/src/finance/overhead-period-freeze.test.ts",
+          "packages/services/src/finance/payable-list-filters.test.ts",
+          "packages/services/src/finance/payment-collection-access.test.ts",
+          "packages/services/src/finance/period-lock-assert.test.ts",
+          "packages/services/src/finance/period-lock.test.ts",
+          "packages/services/src/finance/project-overhead-period.test.ts",
+          "packages/services/src/finance/register-transaction-scope.test.ts",
+          "packages/services/src/idempotency/idempotency.test.ts",
+          "packages/services/src/inventory/consumption-warehouse-scope.test.ts",
+          "packages/services/src/inventory/jobsite-log-material-wbs.test.ts",
+          "packages/services/src/jobsite-log/jobsite-log-guards.test.ts",
+          "packages/services/src/jobsite-log/jobsite-log-notifications.test.ts",
+          "packages/services/src/jobsite-log/jobsite-log-progress-schema.test.ts",
+          "packages/services/src/materials/material-commitment-pure.test.ts",
+          "packages/services/src/materials/materials-field.test.ts",
+          "packages/services/src/materials/project-materials-board.service.test.ts",
+          "packages/services/src/notifications/notification-copy.test.ts",
+          "packages/services/src/notifications/notification-email-context.test.ts",
+          "packages/services/src/procurement/assert-company-project-scope.test.ts",
+          "packages/services/src/procurement/authorize-and-commit-po.test.ts",
+          "packages/services/src/procurement/create-purchase-request-schema.test.ts",
+          "packages/services/src/procurement/procurement-access.test.ts",
+          "packages/services/src/procurement/procurement-budget-baseline.test.ts",
+          "packages/services/src/procurement/procurement-fixture-guard.test.ts",
+          "packages/services/src/procurement/procurement-overdue-alerts.test.ts",
+          "packages/services/src/procurement/procurement-policy.test.ts",
+          "packages/services/src/procurement/procurement-regression.live.test.ts",
+          "packages/services/src/procurement/purchase-order-calc.service.test.ts",
+          "packages/services/src/procurement/purchase-receipt-availability.test.ts",
+          "packages/services/src/procurement/purchase-receipt-guards.test.ts",
+          "packages/services/src/procurement/purchase-request-list-enrichment.test.ts",
+          "packages/services/src/procurement/purchase-request-return-guards.test.ts",
+          "packages/services/src/procurement/purchase-variance.test.ts",
+          "packages/services/src/procurement/quote-line-offer.live.test.ts",
+          "packages/services/src/procurement/quote-request-access.test.ts",
+          "packages/services/src/procurement/quote-validity.test.ts",
+          "packages/services/src/procurement/three-way-match-pure.test.ts",
+          "packages/services/src/project-cash-flow/project-cash-position-projection-pure.test.ts",
+          "packages/services/src/project-finance/project-finance-layers.test.ts",
+          "packages/services/src/project/project-lifecycle.test.ts",
+          "packages/services/src/project/project-membership.d111.test.ts",
+          "packages/services/src/project/project-membership.phase-c.live.test.ts",
+          "packages/services/src/project/project-team.test.ts",
+          "packages/services/src/project/project-workspace-nav.test.ts",
+          "packages/services/src/report-exports/csv-export.test.ts",
+          "packages/services/src/report-exports/project-progress-export.test.ts",
+          "packages/services/src/report-exports/report-export-filters.test.ts",
+          "packages/services/src/reports/budget-variance.test.ts",
+          "packages/services/src/reports/certification-physical-pct.test.ts",
+          "packages/services/src/reports/gg-wbs-detect.test.ts",
+          "packages/services/src/reports/project-progress.test.ts",
+          "packages/services/src/reports/project-supplier-report-pure.test.ts",
+          "packages/services/src/reports/report-month-projection.test.ts",
+          "packages/services/src/resources/resource-board-pure.test.ts",
+          "packages/services/src/schedule/schedule-access.test.ts",
+          "packages/services/src/schedule/schedule-bar-color.test.ts",
+          "packages/services/src/schedule/schedule-export-pure.test.ts",
+          "packages/services/src/schedule/schedule-field-workspace.service.test.ts",
+          "packages/services/src/schedule/schedule-field.test.ts",
+          "packages/services/src/schedule/schedule-helpers.test.ts",
+          "packages/services/src/schedule/schedule-milestone-from-receipt.test.ts",
+          "packages/services/src/schedule/schedule-placement.test.ts",
+          "packages/services/src/schedule/schedule-progress-sync-pure.test.ts",
+          "packages/services/src/schedule/schedule-xlsx-styled.test.ts",
+          "packages/services/src/scheduled-reports/scheduled-report-run-status.test.ts",
+          "packages/services/src/security/access.aggregate.d111.test.ts",
+          "packages/services/src/security/access.d111.test.ts",
+          "packages/services/src/security/finance-tenant-isolation.test.ts",
+          "packages/services/src/subcontracts/subcontract-cert-approve-guards.test.ts",
+          "packages/services/src/subcontracts/subcontract-cert-succession-unique.test.ts",
+          "packages/services/src/subcontracts/subcontract-cert-succession.test.ts",
+          "packages/services/src/tenant-modules/tenant-module-gate.test.ts",
+          "packages/services/src/tenant-settings/tenant-logo-isolation.test.ts",
+          "packages/services/src/treasury-reports/movement-document-ref.test.ts",
+          "packages/services/src/treasury/account-movement-cancel-guards.test.ts",
+          "packages/services/src/treasury/balance.service.test.ts",
+          "packages/services/src/treasury/bank-reconciliation-open-unique.test.ts",
+          "packages/services/src/treasury/bank-statement-csv-parser.test.ts",
+          "packages/services/src/treasury/bank-statement-ofx-parser.test.ts",
+          "packages/services/src/treasury/internal-transfer-legs.test.ts",
+          "packages/services/src/treasury/treasury-account-opening-company.test.ts",
+          "packages/services/src/treasury/treasury-currency-guards.test.ts",
+          "packages/services/src/user/resolve-user-display-names.test.ts"
+        ],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/utils",
+        "path": "packages/utils",
+        "script": "node --import tsx --test \"src/**/*.test.ts\"",
+        "patterns": ["src/**/*.test.ts"],
+        "existingFiles": [
+          "packages/utils/src/calendar-date.test.ts",
+          "packages/utils/src/date-format.test.ts",
+          "packages/utils/src/document-tax-totals.test.ts",
+          "packages/utils/src/line-amounts.test.ts",
+          "packages/utils/src/money.test.ts",
+          "packages/utils/src/rich-note.test.ts",
+          "packages/utils/src/sort-tree-order.test.ts",
+          "packages/utils/src/tax-inclusive.test.ts",
+          "packages/utils/src/timezones.test.ts"
+        ],
+        "selectedFiles": [
+          "packages/utils/src/calendar-date.test.ts",
+          "packages/utils/src/date-format.test.ts",
+          "packages/utils/src/document-tax-totals.test.ts",
+          "packages/utils/src/line-amounts.test.ts",
+          "packages/utils/src/money.test.ts",
+          "packages/utils/src/rich-note.test.ts",
+          "packages/utils/src/sort-tree-order.test.ts",
+          "packages/utils/src/tax-inclusive.test.ts",
+          "packages/utils/src/timezones.test.ts"
+        ],
+        "missing": []
+      },
+      {
+        "package": "@bloqer/validators",
+        "path": "packages/validators",
+        "script": "node --import ../services/node_modules/tsx/dist/loader.mjs --test \"src/**/*.test.ts\"",
+        "patterns": ["src/**/*.test.ts"],
+        "existingFiles": [
+          "packages/validators/src/documents-cad.test.ts",
+          "packages/validators/src/money-unit-price.test.ts",
+          "packages/validators/src/purchase-request-award.test.ts"
+        ],
+        "selectedFiles": [
+          "packages/validators/src/documents-cad.test.ts",
+          "packages/validators/src/money-unit-price.test.ts",
+          "packages/validators/src/purchase-request-award.test.ts"
+        ],
+        "missing": []
+      }
+    ]
+  },
+  "modifiedTrackedSourceFiles": [
+    {
+      "file": ".github/workflows/ci.yml",
+      "sha256": "6c20879d500a339886e679f1fe105544036109c5627795aff5860038d1e8459d"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/configuracion-actions.ts",
+      "sha256": "43898c6250eaef75b4f89863808b43e47a42c1c5b253c31f57fff1c381ba10da"
+    },
+    {
+      "file": "apps/web/app/(app)/contabilidad/asientos/[journalEntryId]/editar/page.tsx",
+      "sha256": "5c56da418193be1891024abd8092044c43e95e52a8d0114e355bf35a5bb708c4"
+    },
+    {
+      "file": "apps/web/app/(app)/contabilidad/reglas/[ruleId]/editar/page.tsx",
+      "sha256": "bfb6c9926365f11f7f68da434ec45f7e4fb58ade3bd841788f7b820dd217b799"
+    },
+    {
+      "file": "apps/web/app/(app)/contabilidad/reglas/nueva/page.tsx",
+      "sha256": "aeb88d231c112cd151a4c341513514926d35f3c89c0f6f33c940538388b6986f"
+    },
+    {
+      "file": "apps/web/app/(app)/directorio/page.tsx",
+      "sha256": "cc8726eeccc426ba919fb9b3f9df08d9bdad16662c7286f6ba5d047148278f06"
+    },
+    {
+      "file": "apps/web/app/(app)/inventario/transferencias/[transferId]/page.tsx",
+      "sha256": "9f336f48a5251093bcbaa17a4dca68862f0c97cf6a7575bf0ede5115983db4de"
+    },
+    {
+      "file": "apps/web/app/(app)/proyectos/[id]/subcontratos/[subcontractId]/certificaciones/[certId]/page.tsx",
+      "sha256": "26b3c5cc0972f307286324a5c0378968b1897b590e7abf582a874082c474345c"
+    },
+    {
+      "file": "apps/web/app/invitaciones/aceptar/actions.ts",
+      "sha256": "cfc27c1226d91f5537a5841d898812bc7206fbfd67324a2426c03e8da7d15179"
+    },
+    {
+      "file": "apps/web/components/kibo-ui/gantt/index.tsx",
+      "sha256": "9d0f3049f943c416e208061bec93b7d0afaca909db05c78ed446a7dc3a9936d6"
+    },
+    {
+      "file": "apps/web/components/ui/currency-select.tsx",
+      "sha256": "e766cc9266e470cff3ddd5570e8970e8eee084564a829a6acc0f5b74ad3ddbb1"
+    },
+    {
+      "file": "apps/web/eslint.config.mjs",
+      "sha256": "8af4c787ab3f077ad52488393423df4d59325ec4b665156c2d9ffb9037ec70e4"
+    },
+    {
+      "file": "apps/web/features/accounting/components/accounting-account-form.tsx",
+      "sha256": "1aee3cb61a13243a89d7f0cba95e16e1f35c5953f09fc0e12b46a2cffe7987bd"
+    },
+    {
+      "file": "apps/web/features/accounting/components/journal-entry-lines-editor.tsx",
+      "sha256": "f43e19d99587f0e6ad79cf0096805d32b963e270925beae1fdc79fe8e37e082f"
+    },
+    {
+      "file": "apps/web/features/budgets/components/budget-wbs-preload-section.tsx",
+      "sha256": "865d6c7b6c3dc86d01d37311d34ca45ce48312ceece81395f039ceb8277ede42"
+    },
+    {
+      "file": "apps/web/features/budgets/components/cost-item-apu-dialog.tsx",
+      "sha256": "a124e601d59bc13b810aa1ed94bba7a195490039ffc395fbe9f6055f0eedee90"
+    },
+    {
+      "file": "apps/web/features/budgets/components/wbs-import-dialog.tsx",
+      "sha256": "8027fb9a71e2f62c8b0b010dcf6887ae40fae31469c2a4d322b4cd5038b994a9"
+    },
+    {
+      "file": "apps/web/features/budgets/components/wbs-subdivide-apu-dialog.tsx",
+      "sha256": "9f2ec140de5a99a66826e866946f646608c3d2046e2e6026e18133d7e49541e6"
+    },
+    {
+      "file": "apps/web/features/budgets/components/wbs-tree.tsx",
+      "sha256": "97096e37a8970492a17157f224531d165a3132d51cc5ec5cdfa876aadcc47169"
+    },
+    {
+      "file": "apps/web/features/dashboard/dashboard-cash-flow-chart.tsx",
+      "sha256": "57a12c516c7303b691b9e1aa00b449c2f4644806953d7d0c50100fc3056295e4"
+    },
+    {
+      "file": "apps/web/features/finance/components/new-transaction-dialog.tsx",
+      "sha256": "9d8510f32083d96306e0f7f98d5e37bdf77babea67ceec7565494bef6c44d8fa"
+    },
+    {
+      "file": "apps/web/features/help/lib/catalog-integrity.test.ts",
+      "sha256": "8776836b43a2a64525a1e3b8c2676485af0de31fefc207adf86149e463e5eec4"
+    },
+    {
+      "file": "apps/web/features/help/lib/search-probe.test.ts",
+      "sha256": "f2d63cff41c861d675c8293f8bda19aab72b9cb903134e371584ed54cdaa9e60"
+    },
+    {
+      "file": "apps/web/features/help/lib/search-safety.test.ts",
+      "sha256": "9f980ae7e4186f3effce37369e12f5a2b98523fd85e0a2b9b4389fb5716a886e"
+    },
+    {
+      "file": "apps/web/features/help/lib/search.ts",
+      "sha256": "23d462702776a09ee9c274eb3403b81861898b17579b1353ff60e105fc63e9f6"
+    },
+    {
+      "file": "apps/web/features/jobsite-log/components/jobsite-log-form.tsx",
+      "sha256": "72a28451c81b1f300f7306c8a014fa62f91d74968f5e58aabb0020830b632c67"
+    },
+    {
+      "file": "apps/web/features/schedule/actions/schedule-actions.ts",
+      "sha256": "0080cf1e6ddfbd0551d3a4094f1818e818c5cde546a5ceafd8b4e290a44e3877"
+    },
+    {
+      "file": "apps/web/features/schedule/components/schedule-item-dialog.tsx",
+      "sha256": "6adac0047cc20a1be834de5b1c0db0ebc05987b5797aa64fac75d0cca49d9cb3"
+    },
+    {
+      "file": "apps/web/features/subcontracts/components/subcontract-form.tsx",
+      "sha256": "8f2a3d92aff4aee870f77cbf0c333320030cdd14dde398d485c5a55bfcdec0df"
+    },
+    {
+      "file": "apps/web/features/treasury/components/treasury-account-form.tsx",
+      "sha256": "9968e1937ff3806f11188e80ef46bd357728509adaef381ce55c20f97eb98434"
+    },
+    {
+      "file": "apps/web/lib/breadcrumb-override-context.tsx",
+      "sha256": "869516c74ad6fa709cd1f18c1439a9518a08fab92cf858b82b67fcf0b940ce79"
+    },
+    {
+      "file": "apps/web/lib/invitation-auth.ts",
+      "sha256": "530c914cfc265bcfdbdd1ce71937a2b12c6854f52896eed938f265663c7f8a5b"
+    },
+    {
+      "file": "apps/web/package.json",
+      "sha256": "3f19b41e129656eb96ce2c039059af7d396dcd000319b65fe7f6ac0c9809b52e"
+    },
+    {
+      "file": "package.json",
+      "sha256": "811a1e861c54a3b3b298eac1627a21b75f4cf2be1041707b285044f5ee461169"
+    },
+    {
+      "file": "packages/domain/package.json",
+      "sha256": "c72f0163e9c94477ea974a2d369d4a69846441c343d6a757049237b327b55211"
+    },
+    {
+      "file": "packages/email/package.json",
+      "sha256": "cffc4ff599ce8ab4ccf2ae1fee22d414fd2e5ce4cab16e39a39ef43ea1db1d3f"
+    },
+    {
+      "file": "packages/report-pdf/package.json",
+      "sha256": "e4403f23d6436534d12720d65981e4c2bb374a6b31696f73eaafeff4e87f51bd"
+    },
+    {
+      "file": "packages/services/src/accounting/accounting-reports.service.ts",
+      "sha256": "62cee580ac83a87e6a8579212a41e0d52180fea1cb0fa6b551470fc2c3288bd5"
+    },
+    {
+      "file": "packages/services/src/accounting/accounting-suggestions.service.ts",
+      "sha256": "8e54237155e2107c9d2a70725bec373f5781946673aa9dcee6b4e17f7e3db5f9"
+    },
+    {
+      "file": "packages/services/src/ai/context-isolation.test.ts",
+      "sha256": "49a1a48d37c576d9a26f9fc4355c8eec5ab72d63423b7f53f564b6fdfb06a9d9"
+    },
+    {
+      "file": "packages/services/src/ai/d111-scoped-live.test.ts",
+      "sha256": "fe4529a9c9bdd189510df7c71b3fcc391f039f9e38d6f453ef1484661689fdf9"
+    },
+    {
+      "file": "packages/services/src/ai/policy/access.ts",
+      "sha256": "781d5c651badaa10d1fd53a238488f4f9eccfe4e40bf0d7df1c03926d5859a74"
+    },
+    {
+      "file": "packages/services/src/ai/registry.ts",
+      "sha256": "c7b61a97af84fc2ee9c432e8303caae7db6cc630f5f4046f67507363682e8653"
+    },
+    {
+      "file": "packages/services/src/ap/register-supplier-advance.service.ts",
+      "sha256": "12943db9bcc6fab40a0c00d615d799529f4635cf66834f06b0fad1e9f83ee742"
+    },
+    {
+      "file": "packages/services/src/ar/receivable.service.ts",
+      "sha256": "f10a6e7571f1425430d2b8aca130945ab278b3ce43b9bde0dc9a0fe133e7a790"
+    },
+    {
+      "file": "packages/services/src/budget/budget-import-pure.ts",
+      "sha256": "c60e9fe285612441f30aa662e4931b1fc3e2c814d932114a2d2b74ae0323128b"
+    },
+    {
+      "file": "packages/services/src/budget/wbs-codes.ts",
+      "sha256": "06ed0a5bedc0254c201959e1865ebe087c9422fa9f47695cc33902a468911a18"
+    },
+    {
+      "file": "packages/services/src/budget/wbs-spreadsheet-parser.ts",
+      "sha256": "a1e94a4c427e364725d4c87589d74fb064f68e288e7e16fc1d850f14c8be05c6"
+    },
+    {
+      "file": "packages/services/src/budget/wbs.service.ts",
+      "sha256": "96f999a5645e4d808cc605d19619e9425a5eb79e511c3a98c086848d99a844a7"
+    },
+    {
+      "file": "packages/services/src/cost-control/cost-control.service.ts",
+      "sha256": "65b0af38987af731e02cccba984c460e6d91148546d6c46075682b6af2d0a9ef"
+    },
+    {
+      "file": "packages/services/src/finance/company-finance-operations-summary.service.ts",
+      "sha256": "2fd32a3299b2a5ce276079a053e23f4a38f07419da498f396dd79cf96e229c1a"
+    },
+    {
+      "file": "packages/services/src/finance/finance-hub-overview.service.ts",
+      "sha256": "67d2507e1dc46932737fbb79b1e22bd23db17939853b38c053121f66b638fb4d"
+    },
+    {
+      "file": "packages/services/src/finance/register-transaction.service.ts",
+      "sha256": "3f7c8600cadaa0f26c82d7fb7a719af51db0f2d53a62a6b4b21f9f773025de55"
+    },
+    {
+      "file": "packages/services/src/inventory/product.service.ts",
+      "sha256": "9c55901140a51c35bf2899e5c31f6ecd87aa9677ecdb64dd4ddaa48b8faed5ab"
+    },
+    {
+      "file": "packages/services/src/platform/platform-operations.service.ts",
+      "sha256": "6804da8d23685680045b60a504cc0c760aa31932edccf9b2fac6e443d5770e7a"
+    },
+    {
+      "file": "packages/services/src/procurement/purchase-order.service.ts",
+      "sha256": "16405eb7a51dac224d565181fefdc77f8545d5e7f19cbb576a9116449ccb8c9d"
+    },
+    {
+      "file": "packages/services/src/project-cash-flow/project-cash-flow.service.ts",
+      "sha256": "e5b5d1ee5f31802500a3a150bd1ae80b553629e32278a422e72cb6b7445d27c7"
+    },
+    {
+      "file": "packages/services/src/project-finance/project-finance-overview.service.ts",
+      "sha256": "82f9685cb09f2f73abd656352178d6a290ad6c2319b4d598c8cc46226faca37d"
+    },
+    {
+      "file": "packages/services/src/project/project-overview-dashboard.service.ts",
+      "sha256": "e9770cd78289a5a52a6696cb74e01e081ce3aa68d9b517e620947140f39eeaad"
+    },
+    {
+      "file": "packages/services/src/project/project.service.ts",
+      "sha256": "658f0bfd4d66037a2ade9ab056576cc057e9b22e2792a3fe5332cc4c1b3502a5"
+    },
+    {
+      "file": "packages/services/src/report-exports/report-export.service.ts",
+      "sha256": "662783b744f8b2be861212477e6c4d4745418059226628f54e033099bc32823a"
+    },
+    {
+      "file": "packages/services/src/reports/project-profitability.service.ts",
+      "sha256": "0be9b447fcfa84bd207e47587384ca87ad69b5b4d9c6bb0cb4947842ea08d94d"
+    },
+    {
+      "file": "packages/services/src/reports/report-month-projection.test.ts",
+      "sha256": "afedbeb79d21d14c907ef46e8b79735441dbae945fee6c6533525dc374168be4"
+    },
+    {
+      "file": "packages/services/src/schedule/schedule-workspace.service.ts",
+      "sha256": "333aec640d5ae977fcb2e0b689ed650d0ac51ac8c4f0522db8386babdbdff954"
+    },
+    {
+      "file": "packages/services/src/scheduled-reports/scheduled-report.service.ts",
+      "sha256": "44202f3a8dd34b519788f55a7ab82a558cad6ca100632419581cf0d172ce5a6e"
+    },
+    {
+      "file": "packages/services/src/scheduled-reports/scheduling.ts",
+      "sha256": "bc817399b53c55255da198c3f83808561e4c1d79150cd37e73f5ef470f095a67"
+    },
+    {
+      "file": "packages/services/src/treasury-reports/treasury-reports.service.ts",
+      "sha256": "32fd8e4f41cef5f4484ac96350703ed388dc49953bc4ae3c10e681711b638c6e"
+    },
+    {
+      "file": "packages/services/src/treasury/account-movement.service.ts",
+      "sha256": "77856d88f4ae93d0bf5a3a115c1024f48b6817043d416a60620ed388c669edff"
+    },
+    {
+      "file": "packages/services/src/treasury/bank-reconciliation.service.ts",
+      "sha256": "2d36b277eee77bb1008ff028da739bd536128c67e91657e3df6afad03fb41e8a"
+    },
+    {
+      "file": "packages/services/src/treasury/treasury-account.service.ts",
+      "sha256": "22af6f7804358145cce3f001948ede13cdfaf0ed8bce98893eac81bcb65a1e1a"
+    },
+    {
+      "file": "packages/utils/package.json",
+      "sha256": "32566179fae0ef30a8c1e6eabb71422d5922c6e415992463d29c7e5867a4500a"
+    },
+    {
+      "file": "packages/utils/src/money.ts",
+      "sha256": "699601c11597d5071c3fbad4f582a136d1d46708cc30960ca61f3b60b497dfe3"
+    },
+    {
+      "file": "packages/validators/package.json",
+      "sha256": "02494b29dcad7ff3c271d0081f067b8f16056451d871ae41896980b411b20209"
+    },
+    {
+      "file": "packages/validators/src/sales-invoice.ts",
+      "sha256": "4d27dfb9dfef6fee19ba1aaa06c27ca82591e664f05e49af103887ba451bee7a"
+    }
+  ],
+  "reconciledSources": [
+    {
+      "file": "AGENTS.md",
+      "sha256": "016830659934960b9fb1da373555e0f93712b570d8d0c121effeee79685f8b18"
+    },
+    {
+      "file": "docs/bloqer2.0/AGENTS.md",
+      "sha256": "eab67b081cfdc239d4501aa2a94122950a36bb41e9230794d93a2d75c5bf84d1"
+    },
+    {
+      "file": "docs/bloqer2.0/07-non-functional/MULTITENANCY.md",
+      "sha256": "7e52442cc6a59efe5219ae8ad3a349d1a202fea6e0253614484c509f4e5216e0"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/ARCHITECTURE_DECISION_RECORDS.md",
+      "sha256": "612a1ffb1fa64fc09b1779b0c2464a379c3b72370451b517ce308e7f9e27ffe0"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/TENANT_ISOLATION_MODEL.md",
+      "sha256": "74592fc3880bc95362c842ca4a72f2ba5e1202b574f807828cadb643c0756e1d"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/MULTITENANCY_ARCHITECTURE.md",
+      "sha256": "5093e11f48a5627bc074283c0f53a9bc948ea87756d37543e770cf86b4d0a885"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/DATABASE_CONVENTIONS.md",
+      "sha256": "c8897d6df7e7d0e017953966a190e1753aacdfa0710b10edafc943832969cff3"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/PRISMA_ERD_AUDIT.md",
+      "sha256": "d8f4bb0062ebe8151443f2e3a56ffebe98661313752c3945ac1c35e1bdac03d3"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/PENDING_ARCHITECTURE_ITEMS.md",
+      "sha256": "2905d63580cadde49aa0b916b6d03e00d017ad7d887664b47bd341960e214c13"
+    },
+    {
+      "file": "docs/bloqer2.0/01-domain/CORE_ENTITIES.md",
+      "sha256": "b8a7cdab37612784fe8cf2587fd73f1aa3ab3a6c9332bb61186997737ef3595b"
+    },
+    {
+      "file": "docs/bloqer2.0/01-domain/ENTITY_RELATIONSHIPS.md",
+      "sha256": "15a33a9d12ffad48616709b964f6aae5d6599daa493cf59da18b2fea597e8af0"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/TECHNICAL_ERD.md",
+      "sha256": "daa42ed108fe19aa1fab6f83005375fc5a626f650133110d92e8cd2bce9f2e50"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/DATA_MODEL_OVERVIEW.md",
+      "sha256": "91cbd31e8f44acde0fed2dc36f32645a3ffca06dcc659bfb6d65739ba0ac83e3"
+    }
+  ],
+  "preservedPreexistingWork": [
+    "docs/bloqer2.0/08-architecture/INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md",
+    "packages/services/src/ap/supplier-invoice-po-reconciliation.service.ts",
+    "packages/services/src/ap/supplier-invoice-po-reconciliation.test.ts"
+  ],
+  "notExecuted": [
+    "DB live/SQL efectivo",
+    "E2E/browser/visual",
+    "proveedores externos live",
+    "build/migrate/deploy"
+  ],
+  "limitations": "Pruebas puras y control estatico no acreditan SQL ni seguridad de todos los recorridos. Siete suites live omitidas, no fallidas."
+}

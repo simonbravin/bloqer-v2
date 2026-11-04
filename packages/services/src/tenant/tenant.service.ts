@@ -17,18 +17,20 @@ export async function createTenant(input: CreateTenantInput, actorUserId: string
   const existing = await prisma.tenant.findUnique({ where: { slug: input.slug } });
   if (existing) throw new ServiceError("CONFLICT", `Slug '${input.slug}' is already taken`);
 
-  const tenant = await prisma.tenant.create({ data: input });
+  return prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.create({ data: input });
 
-  await log({
-    tenantId: tenant.id,
-    actorUserId,
-    action: "TENANT_CREATED",
-    entityType: "Tenant",
-    entityId: tenant.id,
-    after: { name: tenant.name, slug: tenant.slug },
+    await log({
+      tenantId: tenant.id,
+      actorUserId,
+      action: "TENANT_CREATED",
+      entityType: "Tenant",
+      entityId: tenant.id,
+      after: { name: tenant.name, slug: tenant.slug },
+    }, tx);
+
+    return tenant;
   });
-
-  return tenant;
 }
 
 export async function getTenantById(id: string, ctx: ServiceContext): Promise<Tenant> {
@@ -52,17 +54,19 @@ export async function updateTenantStatus(
   }
   if (tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
-  const tenant = await prisma.tenant.update({ where: { id: tenantId }, data: { status } });
+  return prisma.$transaction(async (tx) => {
+    const tenant = await tx.tenant.update({ where: { id: tenantId }, data: { status } });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "TENANT_STATUS_UPDATED",
-    entityType: "Tenant",
-    entityId: tenantId,
-    after: { status },
-    ipAddress: ctx.ipAddress,
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "TENANT_STATUS_UPDATED",
+      entityType: "Tenant",
+      entityId: tenantId,
+      after: { status },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+
+    return tenant;
   });
-
-  return tenant;
 }

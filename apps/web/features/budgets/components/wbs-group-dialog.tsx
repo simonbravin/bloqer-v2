@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -33,14 +34,16 @@ export function WbsGroupDialog({
   onUpdateNode,
 }: WbsGroupDialogProps) {
   const router = useRouter();
+  const pendingRef = useRef(false);
+  const [pending, setPending] = useState(false);
 
   if (!node || isWbsStructuralLeaf(node)) return null;
 
   const metrics = computeWbsRowMetrics(node);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+    <Dialog open={open} onOpenChange={(next) => { if (next || !pendingRef.current) onOpenChange(next); }}>
+      <DialogContent className="max-w-lg" closeButtonDisabled={pending} aria-busy={pending}>
         <DialogHeader>
           <DialogTitle>
             <span className="font-mono text-muted-foreground">{node.code}</span>
@@ -80,6 +83,7 @@ export function WbsGroupDialog({
         {editable ? (
           <WbsNodeForm
             mode="edit"
+            onPendingChange={(next) => { pendingRef.current = next; setPending(next); }}
             defaults={{
               code: node.code,
               name: node.name,

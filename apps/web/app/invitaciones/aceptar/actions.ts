@@ -13,6 +13,7 @@ import { rethrowNextNavigationError } from "@/lib/next-errors";
 import { setActiveTenantCookie } from "@/lib/active-tenant";
 
 export async function acceptTenantInvitationAction(_formData: FormData) {
+  void _formData;
   const token = (await readInviteAcceptToken())?.trim() || "";
   const session = await getSession();
 

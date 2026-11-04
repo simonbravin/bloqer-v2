@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { can } from "@bloqer/domain";
+import { projectStatusSchema } from "@bloqer/validators";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ProjectListSection, ProjectFilters, ProjectListExportButton } from "@/features/projects";
@@ -22,8 +24,10 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
-  const status = sp.status as Parameters<typeof listProjects>[0]["status"];
+  const parsedPage = Number(sp.page);
+  const page = Number.isSafeInteger(parsedPage) && parsedPage >= 1 && Number.isSafeInteger((parsedPage - 1) * PAGE_SIZE) ? parsedPage : 1;
+  const parsedStatus = projectStatusSchema.safeParse(sp.status);
+  const status = parsedStatus.success ? parsedStatus.data : undefined;
   const search = sp.search;
 
   const ctx = {
@@ -32,6 +36,7 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+  const canCreate = can(ctx.roles, "EDIT", "PROJECTS");
 
   let result = { data: [] as Awaited<ReturnType<typeof listProjects>>["data"], total: 0 };
   try {
@@ -49,9 +54,9 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
         actions={
           <>
             <ProjectListExportButton projects={result.data} />
-            <Button asChild>
+            {canCreate ? <Button asChild>
               <Link href="/proyectos/nuevo">+ Nuevo proyecto</Link>
-            </Button>
+            </Button> : null}
           </>
         }
       />
@@ -64,7 +69,7 @@ export default async function ProyectosPage({ searchParams }: PageProps) {
       </div>
 
       <Suspense fallback={<ListSectionSkeleton variant="cards" className="md:grid-cols-2 xl:grid-cols-2" />}>
-        <ProjectListSection projects={result.data} />
+        <ProjectListSection projects={result.data} canCreate={canCreate} />
       </Suspense>
 
       <Pagination page={page} pageSize={PAGE_SIZE} total={result.total} />

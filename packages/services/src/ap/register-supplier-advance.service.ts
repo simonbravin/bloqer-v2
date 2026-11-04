@@ -10,6 +10,9 @@ export async function registerSupplierAdvance(
   _input: RegisterSupplierAdvanceInput,
   _ctx: ServiceContext,
 ): Promise<never> {
+  // Preserve the deferred service's input contract without consuming the payload.
+  void _input;
+  void _ctx;
   throw new ServiceError(
     "CONFLICT",
     "Los anticipos a proveedor (cuenta puente) están planificados para Fase 2. Ver ADR-013. " +

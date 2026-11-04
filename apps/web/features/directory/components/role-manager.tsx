@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +8,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -76,6 +77,7 @@ export type RoleManagerSubcontractorProfile = {
 
 interface RoleManagerProps {
   contactId: string;
+  canEdit: boolean;
   roles: RoleManagerRole[];
   clientProfile: RoleManagerClientProfile | null;
   supplierProfile: RoleManagerSupplierProfile | null;
@@ -84,6 +86,7 @@ interface RoleManagerProps {
 
 export function RoleManager({
   contactId,
+  canEdit,
   roles,
   clientProfile,
   supplierProfile,
@@ -94,6 +97,16 @@ export function RoleManager({
   const [assignOpen, setAssignOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inFlight = useRef(false);
+  const formId = useId();
+
+  function runMutation(action: () => Promise<void>) {
+    if (!canEdit || inFlight.current) return;
+    inFlight.current = true;
+    startTransition(async () => {
+      try { await action(); } finally { inFlight.current = false; }
+    });
+  }
 
   // Assign role form — no default: a CLIENT default caused suppliers to pick up an extra client role.
   const [selectedRole, setSelectedRole] = useState<ContactRoleType | "">("");
@@ -161,7 +174,7 @@ export function RoleManager({
       setError("El plazo de pago debe ser un número entero mayor o igual a 0");
       return;
     }
-    startTransition(async () => {
+    runMutation(async () => {
       try {
         const result = await assignContactRoleAction(contactId, {
           role: selectedRole,
@@ -185,7 +198,7 @@ export function RoleManager({
 
   const handleRemove = (role: ContactRoleType) => {
     setError(null);
-    startTransition(async () => {
+    runMutation(async () => {
       try {
         const result = await removeContactRoleAction(contactId, role);
         if ("error" in result) setError(result.error);
@@ -204,7 +217,7 @@ export function RoleManager({
       setError("El plazo de pago debe ser un número entero mayor o igual a 0");
       return;
     }
-    startTransition(async () => {
+    runMutation(async () => {
       try {
         let result: { ok: true } | { error: string };
         if (editTarget === "CLIENT") {
@@ -212,19 +225,19 @@ export function RoleManager({
             paymentTermsDays: days.ok ? days.value : undefined,
             creditLimit: editCreditLimit.trim() ? editCreditLimit.trim() : null,
             defaultCurrency: editDefaultCurrency.trim() || undefined,
-            notes: editNotes || undefined,
+            notes: editNotes,
           });
         } else if (editTarget === "SUPPLIER") {
           result = await updateSupplierProfileAction(contactId, {
             paymentTermsDays: days.ok ? days.value : undefined,
             defaultCurrency: editDefaultCurrency.trim() || undefined,
-            bankAccount: editBankAccount || undefined,
-            notes: editNotes || undefined,
+            bankAccount: editBankAccount,
+            notes: editNotes,
           });
         } else {
           result = await updateSubcontractorProfileAction(contactId, {
-            specialty: editSpecialty || undefined,
-            notes: editNotes || undefined,
+            specialty: editSpecialty,
+            notes: editNotes,
           });
         }
         if ("error" in result) {
@@ -247,8 +260,8 @@ export function RoleManager({
 
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+      {error && !assignOpen && !editTarget && (
+        <div role="alert" className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
@@ -266,7 +279,7 @@ export function RoleManager({
               return (
                 <div key={r.id} className="flex items-center gap-2">
                   <RoleBadge role={role} />
-                  {hasProfileFields && (
+                  {canEdit && hasProfileFields && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -277,15 +290,16 @@ export function RoleManager({
                       Editar perfil
                     </Button>
                   )}
-                  <Button
+                  {canEdit ? <Button
                     variant="ghost"
                     size="sm"
                     className="h-6 px-1 text-muted-foreground hover:text-destructive"
                     disabled={isPending}
                     onClick={() => handleRemove(role)}
+                    aria-label={`Quitar rol ${ROLE_LABELS[role]}`}
                   >
                     ×
-                  </Button>
+                  </Button> : null}
                 </div>
               );
             })}
@@ -300,13 +314,13 @@ export function RoleManager({
             {inactiveRoles.map((r) => (
               <div key={r.id} className="flex items-center gap-1 opacity-50">
                 <RoleBadge role={r.role} />
-                <Button
+                {canEdit ? <Button
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs text-muted-foreground"
                   disabled={isPending}
                   onClick={() =>
-                    startTransition(async () => {
+                    runMutation(async () => {
                       try {
                         const result = await assignContactRoleAction(contactId, {
                           role: r.role as ContactRoleType,
@@ -320,34 +334,35 @@ export function RoleManager({
                   }
                 >
                   Reactivar
-                </Button>
+                </Button> : null}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <Button
+      {canEdit ? <Button
         variant="outline"
         size="sm"
         onClick={() => { resetAssignForm(); setAssignOpen(true); }}
         disabled={isPending || assignableRoles.length === 0}
       >
         + Asignar rol
-      </Button>
+      </Button> : null}
 
       {/* Assign role dialog */}
-      <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={assignOpen} onOpenChange={(open) => { if (!inFlight.current) setAssignOpen(open); }}>
+        <DialogContent className="max-w-sm" closeButtonDisabled={isPending}>
           <DialogHeader>
             <DialogTitle>Asignar rol</DialogTitle>
+            <DialogDescription>Elegí el rol y completá sus datos opcionales.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Rol</Label>
+              <Label htmlFor={`${formId}-role`}>Rol</Label>
               <Select value={selectedRole || undefined} onValueChange={(v) => setSelectedRole(v as ContactRoleType)}>
-                <SelectTrigger>
+                <SelectTrigger id={`${formId}-role`} disabled={isPending}>
                   <SelectValue placeholder="Seleccionar rol" />
                 </SelectTrigger>
                 <SelectContent>
@@ -360,8 +375,10 @@ export function RoleManager({
 
             {(selectedRole === "CLIENT" || selectedRole === "SUPPLIER") && (
               <div className="space-y-1.5">
-                <Label>Plazo de pago (días)</Label>
+                <Label htmlFor={`${formId}-assign-days`}>Plazo de pago (días)</Label>
                 <Input
+                  id={`${formId}-assign-days`}
+                  disabled={isPending}
                   type="number"
                   min={0}
                   value={paymentTermsDays}
@@ -373,8 +390,10 @@ export function RoleManager({
 
             {selectedRole === "CLIENT" && (
               <div className="space-y-1.5">
-                <Label>Límite de crédito (opcional)</Label>
+                <Label htmlFor={`${formId}-assign-credit`}>Límite de crédito (opcional)</Label>
                 <DecimalInput
+                  id={`${formId}-assign-credit`}
+                  disabled={isPending}
                   value={creditLimit}
                   onValueChange={setCreditLimit}
                   placeholder="Sin límite"
@@ -384,8 +403,10 @@ export function RoleManager({
 
             {selectedRole === "SUPPLIER" && (
               <div className="space-y-1.5">
-                <Label>CBU / CVU (opcional)</Label>
+                <Label htmlFor={`${formId}-assign-bank`}>CBU / CVU (opcional)</Label>
                 <Input
+                  id={`${formId}-assign-bank`}
+                  disabled={isPending}
                   value={bankAccount}
                   onChange={(e) => setBankAccount(e.target.value)}
                   placeholder="0000000000000000000000"
@@ -395,8 +416,10 @@ export function RoleManager({
 
             {selectedRole === "SUBCONTRACTOR" && (
               <div className="space-y-1.5">
-                <Label>Especialidad (opcional)</Label>
+                <Label htmlFor={`${formId}-assign-specialty`}>Especialidad (opcional)</Label>
                 <Input
+                  id={`${formId}-assign-specialty`}
+                  disabled={isPending}
                   value={specialty}
                   onChange={(e) => setSpecialty(e.target.value)}
                   placeholder="Ej: Electricidad, Albañilería..."
@@ -404,7 +427,7 @@ export function RoleManager({
               </div>
             )}
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           </div>
 
           <DialogFooter>
@@ -419,18 +442,21 @@ export function RoleManager({
       </Dialog>
 
       {/* Edit profile dialog */}
-      <Dialog open={editTarget !== null} onOpenChange={(open) => { if (!open) setEditTarget(null); }}>
-        <DialogContent className="max-w-sm">
+      <Dialog open={editTarget !== null} onOpenChange={(open) => { if (!open && !inFlight.current) setEditTarget(null); }}>
+        <DialogContent className="max-w-sm" closeButtonDisabled={isPending}>
           <DialogHeader>
             <DialogTitle>{editTarget ? profileEditTitle[editTarget] : ""}</DialogTitle>
+            <DialogDescription>Actualizá los datos del perfil. Podés vaciar los datos opcionales para quitarlos.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             {(editTarget === "CLIENT" || editTarget === "SUPPLIER") && (
               <>
                 <div className="space-y-1.5">
-                  <Label>Plazo de pago (días)</Label>
+                  <Label htmlFor={`${formId}-edit-days`}>Plazo de pago (días)</Label>
                   <Input
+                    id={`${formId}-edit-days`}
+                    disabled={isPending}
                     type="number"
                     min={0}
                     value={editPaymentTermsDays}
@@ -439,8 +465,10 @@ export function RoleManager({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Moneda</Label>
+                  <Label htmlFor={`${formId}-edit-currency`}>Moneda</Label>
                   <Input
+                    id={`${formId}-edit-currency`}
+                    disabled={isPending}
                     value={editDefaultCurrency}
                     onChange={(e) => setEditDefaultCurrency(e.target.value.toUpperCase())}
                     maxLength={3}
@@ -452,8 +480,10 @@ export function RoleManager({
 
             {editTarget === "CLIENT" && (
               <div className="space-y-1.5">
-                <Label>Límite de crédito (vacío = sin límite)</Label>
+                <Label htmlFor={`${formId}-edit-credit`}>Límite de crédito (vacío = sin límite)</Label>
                 <DecimalInput
+                  id={`${formId}-edit-credit`}
+                  disabled={isPending}
                   value={editCreditLimit}
                   onValueChange={setEditCreditLimit}
                   placeholder="Sin límite"
@@ -463,8 +493,10 @@ export function RoleManager({
 
             {editTarget === "SUPPLIER" && (
               <div className="space-y-1.5">
-                <Label>CBU / CVU</Label>
+                <Label htmlFor={`${formId}-edit-bank`}>CBU / CVU</Label>
                 <Input
+                  id={`${formId}-edit-bank`}
+                  disabled={isPending}
                   value={editBankAccount}
                   onChange={(e) => setEditBankAccount(e.target.value)}
                   placeholder="0000000000000000000000"
@@ -474,8 +506,10 @@ export function RoleManager({
 
             {editTarget === "SUBCONTRACTOR" && (
               <div className="space-y-1.5">
-                <Label>Especialidad</Label>
+                <Label htmlFor={`${formId}-edit-specialty`}>Especialidad</Label>
                 <Input
+                  id={`${formId}-edit-specialty`}
+                  disabled={isPending}
                   value={editSpecialty}
                   onChange={(e) => setEditSpecialty(e.target.value)}
                   placeholder="Ej: Electricidad, Albañilería..."
@@ -484,15 +518,17 @@ export function RoleManager({
             )}
 
             <div className="space-y-1.5">
-              <Label>Notas</Label>
+              <Label htmlFor={`${formId}-edit-notes`}>Notas</Label>
               <Input
+                id={`${formId}-edit-notes`}
+                disabled={isPending}
                 value={editNotes}
                 onChange={(e) => setEditNotes(e.target.value)}
                 placeholder="Observaciones..."
               />
             </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           </div>
 
           <DialogFooter>

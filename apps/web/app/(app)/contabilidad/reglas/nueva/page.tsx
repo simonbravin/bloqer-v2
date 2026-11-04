@@ -22,8 +22,6 @@ export default async function NuevaReglaContablePage({
   const { data: accounts } = await listAccountingAccounts(ctx, cf);
   const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
-  const empresa = cf.companyId;
-  const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
   const defaultCompanyId = current.tenantCtx.companyId ?? cf.companyId ?? null;
 
   return (

@@ -29,7 +29,7 @@ import {
 import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { assertManualInvoiceHasNoCertificationLinks } from "./manual-invoice-guards";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import {
   ensureDraftJournalFromCollection,
   ensureDraftJournalFromSalesInvoice,
@@ -344,6 +344,7 @@ export async function registerArSale(
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
+        await lockProjectForOperationalMutation(tx, projectId, ctx);
         const maxNum = await tx.salesInvoice.aggregate({
           where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
           _max: { number: true },

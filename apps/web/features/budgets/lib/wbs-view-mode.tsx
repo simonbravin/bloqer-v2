@@ -76,16 +76,27 @@ function normalizeMode(mode: WbsViewMode): WbsViewMode {
 
 function readStoredViewMode(budgetId: string, storageKey: string): WbsViewMode {
   if (typeof window === "undefined") return DEFAULT_VIEW;
-  const legacyKey = wbsViewModeLegacyStorageKey(budgetId);
-  const current = sessionStorage.getItem(storageKey);
-  const legacy = sessionStorage.getItem(legacyKey);
-  // Prefer v3 when both exist (avoids discarding richer prefs behind a stale DEFAULT v4).
-  const mode = normalizeMode(parseStored(legacy ?? current));
-  if (legacy != null) {
-    sessionStorage.setItem(storageKey, JSON.stringify(mode));
-    sessionStorage.removeItem(legacyKey);
+  try {
+    const legacyKey = wbsViewModeLegacyStorageKey(budgetId);
+    const current = sessionStorage.getItem(storageKey);
+    const legacy = sessionStorage.getItem(legacyKey);
+    const mode = normalizeMode(parseStored(legacy ?? current));
+    if (legacy != null) {
+      sessionStorage.setItem(storageKey, JSON.stringify(mode));
+      sessionStorage.removeItem(legacyKey);
+    }
+    return mode;
+  } catch {
+    return DEFAULT_VIEW;
   }
-  return mode;
+}
+
+function storeViewMode(storageKey: string, mode: WbsViewMode) {
+  try {
+    sessionStorage.setItem(storageKey, JSON.stringify(mode));
+  } catch {
+    // A blocked/full preference store must not prevent editing or exporting the budget.
+  }
 }
 
 type BudgetWbsViewContextValue = {
@@ -116,7 +127,7 @@ export function BudgetWbsViewProvider({
       const next = normalizeMode(mode);
       setViewModeState(next);
       if (typeof window !== "undefined") {
-        sessionStorage.setItem(storageKey, JSON.stringify(next));
+        storeViewMode(storageKey, next);
       }
     },
     [storageKey],
@@ -127,7 +138,7 @@ export function BudgetWbsViewProvider({
       setViewModeState((prev) => {
         const next = normalizeMode({ ...prev, ...patch });
         if (typeof window !== "undefined") {
-          sessionStorage.setItem(storageKey, JSON.stringify(next));
+          storeViewMode(storageKey, next);
         }
         return next;
       });

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ClipboardList, HardHat, Home, Menu, Plus } from "lucide-react";
-import type { PermissionModule, UserRole } from "@bloqer/domain";
+import { can, type PermissionModule, type UserRole } from "@bloqer/domain";
 import { cn } from "@/lib/utils";
 import { isFieldImmersivePath } from "@/lib/field-immersive-routes";
 import { isPendingInboxPath } from "@/lib/field-pending-path";
@@ -22,17 +22,24 @@ type Props = {
 
 export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
   const pathname = usePathname();
-  const { convenienceProjectId } = useFieldProjectContext();
+  const { convenienceProjectId, pathProjectId } = useFieldProjectContext();
   const { tenantCount } = usePendingInboxCount();
   const [plusOpen, setPlusOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const plusButtonRef = useRef<HTMLButtonElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
 
   if (isFieldImmersivePath(pathname)) return null;
 
-  const obraHref = convenienceProjectId ? `/proyectos/${convenienceProjectId}` : "/proyectos";
+  const obraHref = pathProjectId ? `/proyectos/${pathProjectId}` : "/proyectos";
+  const canViewProjects = moduleGateSnapshot.PROJECTS !== false && can(roles, "VIEW", "PROJECTS");
   const homeActive = pathname === "/dashboard";
   const pendingActive = isPendingInboxPath(pathname);
-  const obraActive = pathname.startsWith("/proyectos/") && !pendingActive;
+  const obraActive = (pathname === "/proyectos" || pathname.startsWith("/proyectos/")) && !pendingActive;
+  const obraClassName = cn(
+    "flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[11px]",
+    obraActive ? "font-semibold text-foreground" : "text-muted-foreground",
+  );
 
   return (
     <>
@@ -57,23 +64,30 @@ export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
             </Link>
           </li>
           <li>
-            <Link
-              href={obraHref}
-              aria-current={obraActive ? "page" : undefined}
-              aria-label="Obra"
-              className={cn(
-                "flex min-h-11 flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[11px]",
-                obraActive ? "font-semibold text-foreground" : "text-muted-foreground",
-              )}
-            >
-              <HardHat className="h-5 w-5" aria-hidden />
-              Obra
-            </Link>
+            {canViewProjects ? (
+              <Link
+                href={obraHref}
+                aria-current={obraActive ? "page" : undefined}
+                aria-label="Obra"
+                className={obraClassName}
+              >
+                <HardHat className="h-5 w-5" aria-hidden />
+                Obra
+              </Link>
+            ) : (
+              <span aria-disabled="true" title="Proyectos no habilitados" className={cn(obraClassName, "opacity-50")}>
+                <HardHat className="h-5 w-5" aria-hidden />
+                Obra
+              </span>
+            )}
           </li>
           <li className="flex justify-center">
             <button
               type="button"
+              ref={plusButtonRef}
               aria-label="Registrar"
+              aria-haspopup="dialog"
+              aria-expanded={plusOpen}
               data-testid="field-plus-button"
               className="-mt-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
               onClick={() => setPlusOpen(true)}
@@ -101,7 +115,10 @@ export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
           <li>
             <button
               type="button"
+              ref={moreButtonRef}
               aria-label="Más"
+              aria-haspopup="dialog"
+              aria-expanded={moreOpen}
               data-testid="field-more-button"
               className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[11px] text-muted-foreground"
               onClick={() => setMoreOpen(true)}
@@ -118,13 +135,23 @@ export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
         roles={roles}
         moduleGateSnapshot={moduleGateSnapshot}
         convenienceProjectId={convenienceProjectId}
+        onCloseAutoFocus={(event) => {
+          if (!plusButtonRef.current) return;
+          event.preventDefault();
+          plusButtonRef.current.focus();
+        }}
       />
       <FieldMoreSheet
         open={moreOpen}
         onOpenChange={setMoreOpen}
         roles={roles}
         moduleGateSnapshot={moduleGateSnapshot}
-        projectId={convenienceProjectId}
+        projectId={pathProjectId}
+        onCloseAutoFocus={(event) => {
+          if (!moreButtonRef.current) return;
+          event.preventDefault();
+          moreButtonRef.current.focus();
+        }}
       />
     </>
   );

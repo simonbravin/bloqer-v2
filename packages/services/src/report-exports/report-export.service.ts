@@ -52,7 +52,7 @@ import { getProjectProfitabilityReport } from "../reports/project-profitability.
 import type { ProjectGgOverviewFilters } from "../reports/project-gg-overview.service";
 import { getProjectGgOverviewReport } from "../reports/project-gg-overview.service";
 import { parseCurrencyView } from "../reports/report-currency-view";
-import { MAX_EXPORT_ROWS, defaultDateRangeDays, DEFAULT_CASH_DATE_RANGE_DAYS } from "../finance/pagination";
+import { MAX_EXPORT_ROWS } from "../finance/pagination";
 import { listCompanyPayables, type CompanyPayableListFilters } from "../ap/payable.service";
 import {
   listCompanySupplierInvoices,

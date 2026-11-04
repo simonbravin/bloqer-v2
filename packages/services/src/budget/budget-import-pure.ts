@@ -6,6 +6,8 @@ import { parseNumberedSpreadsheetRows } from "./wbs-spreadsheet-parser";
 import {
   detectProfileFromImportRows,
   reconcileImportRowTypes,
+  validateCanonicalCode,
+  parentCodeFrom,
   type WbsImportProfile,
 } from "./wbs-code-rules";
 
@@ -39,7 +41,7 @@ export type ImportWarning = {
 export type ImportMode = "structure_only" | "full";
 
 export type ParseResult = {
-  validRows: (BudgetImportRow & { _row: number })[];
+  validRows: (BudgetImportRow & { _row: number; })[];
   errors: ImportError[];
   profile: WbsImportProfile;
 };
@@ -47,13 +49,13 @@ export type ParseResult = {
 export type PreviewResult = {
   valid: boolean;
   profile: WbsImportProfile;
-  rows: (BudgetImportRow & { _row: number; _parentResolved: boolean })[];
+  rows: (BudgetImportRow & { _row: number; _parentResolved: boolean; })[];
   errors: ImportError[];
   warnings: ImportWarning[];
 };
 
 export function parseImportRows(rawRows: unknown[]): ParseResult {
-  const validRows: (BudgetImportRow & { _row: number })[] = [];
+  const validRows: (BudgetImportRow & { _row: number; })[] = [];
   const errors: ImportError[] = [];
 
   rawRows.forEach((raw, idx) => {
@@ -98,13 +100,17 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
 
   if (rows.length > 0) {
     const { validRows, errors: parseErrors } = parseImportRows(
-      rows.map(({ _sourceRow: _, _profile: __, ...row }) => row),
+      rows.map(({ _sourceRow, _profile, ...row }) => {
+        // Spreadsheet metadata is deliberately excluded from the input schema.
+        void _sourceRow;
+        void _profile;
+        return row;
+      }),
     );
-    const rowByCode = new Map(rows.map((r) => [r.code, r._sourceRow]));
     return {
       profile,
-      validRows: validRows.map((r) => ({ ...r, _row: rowByCode.get(r.code) ?? 0 })),
-      errors: [...sheetErrorsMapped, ...parseErrors],
+      validRows: validRows.map((r) => ({ ...r, _row: rows[r._row - 1]?._sourceRow ?? r._row })),
+      errors: [...sheetErrorsMapped, ...parseErrors.map((error) => ({ ...error, row: rows[error.row - 1]?._sourceRow ?? error.row }))],
       warnings: sheetWarningsMapped,
       skippedRows,
     };
@@ -113,7 +119,7 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
   const objectRows = rawRows.filter((r) => r && typeof r === "object" && !Array.isArray(r));
   if (objectRows.length > 0) {
     const { validRows, errors } = parseImportRows(objectRows);
-    return { profile: "simple", validRows, errors, warnings: [], skippedRows: 0 };
+    return { profile: detectProfileFromImportRows(validRows), validRows, errors, warnings: [], skippedRows: 0 };
   }
 
   return {
@@ -126,18 +132,24 @@ export function parseSpreadsheetForImport(rawRows: unknown[][]): ParseResult & {
 }
 
 export function validateImportRows(
-  rows: (BudgetImportRow & { _row: number })[],
+  rows: (BudgetImportRow & { _row: number; })[],
   existingCodes: string[],
   mode: ImportMode = "structure_only",
-): { errors: ImportError[]; warnings: ImportWarning[] } {
+): { errors: ImportError[]; warnings: ImportWarning[]; } {
   const errors: ImportError[] = [];
   const warnings: ImportWarning[] = [];
   const seenCodes = new Set<string>();
   const existingSet = new Set(existingCodes);
   const profile = detectProfileFromImportRows(rows);
   const normalizedRows = reconcileImportRowTypes(rows, profile);
+  if (rows.length === 0) errors.push({ row: 0, field: "general", message: "No se encontraron filas EDT válidas en el archivo" });
 
   for (const row of normalizedRows) {
+    const codeError = validateCanonicalCode(row.code, row.type, profile);
+    if (codeError) errors.push({ row: row._row, field: "code", message: codeError });
+    if ((row.parent_code || undefined) !== parentCodeFrom(row.code)) {
+      errors.push({ row: row._row, field: "parent_code", message: `El código "${row.code}" debe estar bajo su padre directo` });
+    }
     if (seenCodes.has(row.code)) {
       errors.push({ row: row._row, field: "code", message: `Código duplicado en la importación: "${row.code}"` });
     }
@@ -157,6 +169,9 @@ export function validateImportRows(
       }
       if (row.quantity === undefined || row.quantity === null) {
         errors.push({ row: row._row, field: "quantity", message: "Los ítems requieren cantidad" });
+      }
+      else if (!/^(?:0*[1-9]\d*(?:\.\d+)?|0*\.\d*[1-9]\d*)$/.test(row.quantity)) {
+        errors.push({ row: row._row, field: "quantity", message: "La cantidad del ítem debe ser mayor a 0" });
       }
     }
 

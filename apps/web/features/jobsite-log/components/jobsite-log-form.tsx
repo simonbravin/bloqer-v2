@@ -286,8 +286,9 @@ export function JobsiteLogForm({
   );
 
   useEffect(() => {
+    const timers = stockTimers.current;
     return () => {
-      for (const t of Object.values(stockTimers.current)) clearTimeout(t);
+      for (const timer of Object.values(timers)) clearTimeout(timer);
     };
   }, []);
 

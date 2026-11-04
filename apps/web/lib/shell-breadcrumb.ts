@@ -89,6 +89,16 @@ function labelForSegment(segment: string): string {
   return PATH_SEGMENT_LABELS[segment] ?? humanizeSegment(segment);
 }
 
+/** These URL containers have detail/create pages, but their lists live in the parent page. */
+function isNonPageContainer(path: string): boolean {
+  return (
+    path === "/finanzas/facturas" ||
+    path === "/finanzas/pagos-proveedor" ||
+    /^\/proyectos\/[^/]+\/subcontratos\/[^/]+\/certificaciones$/.test(path) ||
+    /^\/proyectos\/[^/]+\/ordenes-compra\/[^/]+\/recepciones$/.test(path)
+  );
+}
+
 /** Last entity UUID in path (excludes project id under /proyectos). Used for tailLabel on edit routes. */
 function indexOfTailEntityUuid(segments: string[]): number {
   for (let i = segments.length - 1; i >= 0; i--) {
@@ -153,7 +163,7 @@ export function resolveAppShellBreadcrumbs(
 
     items.push({
       label: labelForSegment(seg),
-      href: isLast ? undefined : acc,
+      href: isLast || isNonPageContainer(acc) ? undefined : acc,
     });
   }
 

@@ -1,6 +1,7 @@
 import type { NotificationEmailCategory as PrismaEmailCategory, NotificationType } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import {
+  can,
   notificationTypeToEmailCategory,
   resolveNotificationEmailPreference,
   visibleEmailCategoriesForRoles,
@@ -11,7 +12,7 @@ import {
   type UserRole,
 } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
-import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 
 export type TenantNotificationEmailPolicyView = {
   tenantId: string;
@@ -116,7 +117,7 @@ export async function getOrCreateTenantNotificationEmailPolicy(
 export async function getTenantNotificationEmailPolicy(
   ctx: ServiceContext,
 ): Promise<TenantNotificationEmailPolicyView> {
-  if (!canRunOperationalAlerts(ctx)) {
+  if (!can(ctx.roles, "EDIT", "TENANT_SETTINGS")) {
     throw new ServiceError("FORBIDDEN", "Solo Propietario o Administrador pueden ver esta política");
   }
   return getOrCreateTenantNotificationEmailPolicy(ctx.tenantId);
@@ -130,9 +131,10 @@ export async function updateTenantNotificationEmailPolicy(
   },
   ctx: ServiceContext,
 ): Promise<TenantNotificationEmailPolicyView> {
-  if (!canRunOperationalAlerts(ctx)) {
+  if (!can(ctx.roles, "EDIT", "TENANT_SETTINGS")) {
     throw new ServiceError("FORBIDDEN", "Solo Propietario o Administrador pueden editar esta política");
   }
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
   if (input.digestHourLocal !== undefined) {
     const h = input.digestHourLocal;
     if (!Number.isInteger(h) || h < 0 || h > 23) {

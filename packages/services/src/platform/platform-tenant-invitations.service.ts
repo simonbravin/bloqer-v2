@@ -1,4 +1,4 @@
-import { prisma } from "@bloqer/database";
+import { prisma, type Prisma } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
 import {
   cancelTenantInvitationSchema,
@@ -20,8 +20,11 @@ import { ServiceError } from "../types";
 import { assertPlatformAccess, type PlatformServiceContext } from "./platform-auth.service";
 import { createPlatformAuditLog } from "./platform-audit.service";
 
-async function assertTenantExists(tenantId: string): Promise<{ id: string; name: string }> {
-  const tenant = await prisma.tenant.findFirst({
+async function assertTenantExists(
+  tenantId: string,
+  db: Prisma.TransactionClient = prisma,
+): Promise<{ id: string; name: string }> {
+  const tenant = await db.tenant.findFirst({
     where: { id: tenantId },
     select: { id: true, name: true },
   });
@@ -119,7 +122,7 @@ export async function listPlatformTenantCompanies(
   await assertPlatformAccess(ctx);
   await assertTenantExists(tenantId);
   const rows = await prisma.company.findMany({
-    where: { tenantId },
+    where: { tenantId, status: "ACTIVE" },
     orderBy: { name: "asc" },
     select: { id: true, name: true },
   });
@@ -140,55 +143,58 @@ export async function createPlatformTenantInvitation(
   const { tenantId } = parsed.data;
   const emailNorm = normalizeInvitationEmail(parsed.data.email);
   const uniqueRoles = dedupeInvitationRoles(parsed.data.roles as UserRole[]);
-  const companyId = await resolveDefaultCompanyIdForTenant(tenantId, parsed.data.companyId);
+  const { inserted, tenantName } = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${tenantId} FOR UPDATE`;
+    const tenant = await assertTenantExists(tenantId, tx);
+    const companyId = await resolveDefaultCompanyIdForTenant(tenantId, parsed.data.companyId, tx);
 
-  await markExpiredPendingInvitationsForTenant(tenantId);
+    await markExpiredPendingInvitationsForTenant(tenantId, tx);
 
-  const userWithEmail = await prisma.user.findFirst({
-    where: { email: { equals: emailNorm, mode: "insensitive" } },
-    select: { id: true },
-  });
-  if (userWithEmail) {
-    const active = await prisma.userMembership.findFirst({
-      where: { tenantId, userId: userWithEmail.id, status: "ACTIVE" },
+    const userWithEmail = await tx.user.findFirst({
+      where: { email: { equals: emailNorm, mode: "insensitive" } },
       select: { id: true },
     });
-    if (active) {
-      throw new ServiceError("CONFLICT", "Ya existe un miembro activo con ese email en el tenant");
+    if (userWithEmail) {
+      const active = await tx.userMembership.findFirst({
+        where: { tenantId, userId: userWithEmail.id, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (active) {
+        throw new ServiceError("CONFLICT", "Ya existe un miembro activo con ese email en el tenant");
+      }
     }
-  }
 
-  const pendingDup = await prisma.tenantInvitation.findFirst({
-    where: { tenantId, email: emailNorm, status: "PENDING" },
-    select: { id: true },
-  });
-  if (pendingDup) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Ya hay una invitación pendiente para ese email. Cancelala o esperá a que venza.",
-    );
-  }
+    const pendingDup = await tx.tenantInvitation.findFirst({
+      where: { tenantId, email: emailNorm, status: "PENDING" },
+      select: { id: true },
+    });
+    if (pendingDup) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Ya hay una invitación pendiente para ese email. Cancelala o esperá a que venza.",
+      );
+    }
 
-  const tenant = await assertTenantExists(tenantId);
-
-  const inserted = await insertTenantInvitation(prisma, {
-    tenantId,
-    invitedByUserId: ctx.actorUserId,
-    emailNorm,
-    roles: uniqueRoles,
-    companyId,
-    expiresInDays: parsed.data.expiresInDays,
-  });
-
-  await createPlatformAuditLog({
-    actorUserId: ctx.actorUserId,
-    action: "platform.tenant.invitation_created",
-    targetTenantId: tenantId,
-    metadata: {
-      invitationId: inserted.invitationId,
-      email: emailNorm,
+    const inserted = await insertTenantInvitation(tx, {
+      tenantId,
+      invitedByUserId: ctx.actorUserId,
+      emailNorm,
       roles: uniqueRoles,
-    },
+      companyId,
+      expiresInDays: parsed.data.expiresInDays,
+    });
+
+    await createPlatformAuditLog({
+      actorUserId: ctx.actorUserId,
+      action: "platform.tenant.invitation_created",
+      targetTenantId: tenantId,
+      metadata: {
+        invitationId: inserted.invitationId,
+        email: emailNorm,
+        roles: uniqueRoles,
+      },
+    }, tx);
+    return { inserted, tenantName: tenant.name };
   });
 
   let emailDispatched = false;
@@ -196,7 +202,7 @@ export async function createPlatformTenantInvitation(
   const emailDispatch = await sendTenantInvitationEmailMessage(
     emailNorm,
     inserted.invitationLink,
-    tenant.name,
+    tenantName,
     { invitedByUserId: ctx.actorUserId, roles: uniqueRoles },
   );
   emailDispatched = emailDispatch.dispatched;
@@ -224,31 +230,34 @@ export async function cancelPlatformTenantInvitation(
     throw new ServiceError("VALIDATION", "Parámetros inválidos");
   }
 
-  await markExpiredPendingInvitationsForTenant(tenantId);
+  const cancelled = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${tenantId} FOR UPDATE`;
+    await markExpiredPendingInvitationsForTenant(tenantId, tx);
 
-  const inv = await prisma.tenantInvitation.findFirst({
-    where: { id: invitationId, tenantId },
-    select: { id: true, status: true },
-  });
-  if (!inv) throw new ServiceError("NOT_FOUND", "Invitación no encontrada");
-  if (inv.status !== "PENDING") {
-    throw new ServiceError("CONFLICT", "Solo se pueden cancelar invitaciones pendientes");
-  }
+    const inv = await tx.tenantInvitation.findFirst({
+      where: { id: invitationId, tenantId },
+      select: { id: true, status: true },
+    });
+    if (!inv) throw new ServiceError("NOT_FOUND", "Invitación no encontrada");
+    if (inv.status !== "PENDING") return false;
 
-  const now = new Date();
-  const cancelled = await prisma.tenantInvitation.updateMany({
-    where: { id: inv.id, tenantId, status: "PENDING" },
-    data:  { status: "CANCELLED", cancelledAt: now },
-  });
-  assertOptimisticRowUpdate(
-    cancelled.count,
-    "La invitación ya no está pendiente. Recargá e intentá de nuevo.",
-  );
+    const now = new Date();
+    const cancelled = await tx.tenantInvitation.updateMany({
+      where: { id: inv.id, tenantId, status: "PENDING" },
+      data:  { status: "CANCELLED", cancelledAt: now },
+    });
+    assertOptimisticRowUpdate(
+      cancelled.count,
+      "La invitación ya no está pendiente. Recargá e intentá de nuevo.",
+    );
 
-  await createPlatformAuditLog({
-    actorUserId: ctx.actorUserId,
-    action: "platform.tenant.invitation_cancelled",
-    targetTenantId: tenantId,
-    metadata: { invitationId: inv.id },
+    await createPlatformAuditLog({
+      actorUserId: ctx.actorUserId,
+      action: "platform.tenant.invitation_cancelled",
+      targetTenantId: tenantId,
+      metadata: { invitationId: inv.id },
+    }, tx);
+    return true;
   });
+  if (!cancelled) throw new ServiceError("CONFLICT", "Solo se pueden cancelar invitaciones pendientes");
 }

@@ -5,6 +5,7 @@ import { listPlatformExpirationAttention, ServiceError } from "@bloqer/services"
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { formatDate } from "@/lib/format";
+import { formatSubscriptionStatusLabel, formatTenantStatusLabel } from "@/lib/tenant-status-label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,7 +39,7 @@ export default async function PlatformVencimientosPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Vencimientos y alertas</h1>
         <p className="text-sm text-muted-foreground">
-          Trials por vencer o vencidos, mora, suspensiones y organizaciones sin OWNER o sin usuarios activos.
+          Pruebas por vencer o vencidas, mora, suspensiones y organizaciones sin propietario o sin usuarios activos.
         </p>
       </div>
 
@@ -49,7 +50,7 @@ export default async function PlatformVencimientosPage() {
               <TableHead>Organización</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Suscripción</TableHead>
-              <TableHead>Trial hasta</TableHead>
+              <TableHead>Prueba hasta</TableHead>
               <TableHead>Alertas</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -70,8 +71,8 @@ export default async function PlatformVencimientosPage() {
                     </Link>
                     <div className="font-mono text-xs text-muted-foreground">{t.slug}</div>
                   </TableCell>
-                  <TableCell>{t.status}</TableCell>
-                  <TableCell>{t.subscriptionStatus}</TableCell>
+                  <TableCell>{formatTenantStatusLabel(t.status)}</TableCell>
+                  <TableCell>{formatSubscriptionStatusLabel(t.subscriptionStatus)}</TableCell>
                   <TableCell>{t.trialEndsAt ? formatDate(t.trialEndsAt) : "—"}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
@@ -89,7 +90,7 @@ export default async function PlatformVencimientosPage() {
                         <input type="hidden" name="additionalDays" value="7" />
                         <input type="hidden" name="returnTo" value="/platform/vencimientos" />
                         <Button type="submit" variant="outline" size="sm">
-                          +7d trial
+                          +7 días de prueba
                         </Button>
                       </form>
                       {t.status !== "ACTIVE" ? (

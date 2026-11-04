@@ -2,6 +2,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { BudgetSettings } from "@bloqer/database";
 import { toMoneyDecimal } from "../finance/money-decimal";
+import { computeBudgetItemUnitSaleBreakdown } from "./budget-sale-calc";
+import { assertBudgetDecimalFits } from "./budget-decimal";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
 
@@ -35,22 +37,21 @@ export async function _recalcCostItemTotals(
     tx.costItem.findUniqueOrThrow({ where: { id: costItemId } }),
   ]);
 
-  const unitCostDirect = toMoneyDecimal(
+  const unitCostDirect = assertBudgetDecimalFits(toMoneyDecimal(
     lines.reduce((sum, l) => sum.plus(l.totalCost), new D(0)),
-  );
+  ), "Costo directo unitario");
 
-  const overhead = toMoneyDecimal(unitCostDirect.times(settings.overheadPct).dividedBy(HUNDRED));
-  const subtotal1 = toMoneyDecimal(unitCostDirect.plus(overhead));
-  const finFactor = financialCostFactor(settings.financialCostPct, settings.financialDaysAvg);
-  const finCost = toMoneyDecimal(subtotal1.times(finFactor));
+  const sale = computeBudgetItemUnitSaleBreakdown(unitCostDirect.toString(), {
+    overheadPct: settings.overheadPct.toString(),
+    financialCostPct: settings.financialCostPct.toString(),
+    financialDaysAvg: settings.financialDaysAvg,
+    profitPct: settings.profitPct.toString(),
+    taxPct: settings.taxPct.toString(),
+  });
+  const unitSalePrice = assertBudgetDecimalFits(sale.totalSale, "Precio de venta unitario");
 
-  const subtotal = toMoneyDecimal(subtotal1.plus(finCost));
-  const profit = toMoneyDecimal(subtotal.times(settings.profitPct).dividedBy(HUNDRED));
-  const tax = toMoneyDecimal(subtotal.plus(profit).times(settings.taxPct).dividedBy(HUNDRED));
-  const unitSalePrice = toMoneyDecimal(subtotal.plus(profit).plus(tax));
-
-  const totalCostDirect = toMoneyDecimal(unitCostDirect.times(costItem.quantity));
-  const totalSalePrice = toMoneyDecimal(unitSalePrice.times(costItem.quantity));
+  const totalCostDirect = assertBudgetDecimalFits(toMoneyDecimal(unitCostDirect.times(costItem.quantity)), "Costo directo de la partida");
+  const totalSalePrice = assertBudgetDecimalFits(toMoneyDecimal(unitSalePrice.times(costItem.quantity)), "Venta de la partida");
 
   await tx.costItem.update({
     where: { id: costItemId },
@@ -63,12 +64,12 @@ export async function _recalcBudgetSummary(
   budgetId: string,
 ): Promise<void> {
   const items = await tx.costItem.findMany({ where: { budgetId } });
-  const totalCost = toMoneyDecimal(
+  const totalCost = assertBudgetDecimalFits(toMoneyDecimal(
     items.reduce((s, i) => s.plus(i.totalCostDirect), new D(0)),
-  );
-  const totalSalePrice = toMoneyDecimal(
+  ), "Costo total del presupuesto");
+  const totalSalePrice = assertBudgetDecimalFits(toMoneyDecimal(
     items.reduce((s, i) => s.plus(i.totalSalePrice), new D(0)),
-  );
+  ), "Venta total del presupuesto");
   await tx.budget.update({ where: { id: budgetId }, data: { totalCost, totalSalePrice } });
 }
 

@@ -1,0 +1,466 @@
+{
+  "phase": "AG-04",
+  "status": "corrected_and_verified_locally",
+  "startedAt": "2026-11-03T22:51:27.183Z",
+  "completedAt": "2026-11-04T03:32:44.788Z",
+  "branch": "codex/pruebas",
+  "head": "3b5ae7a038465ad6b3d60cde19c278a31019e165",
+  "baseline": "output/platform-audit/ag-04-2026-11-03/initial-snapshot.json",
+  "attribution": "output/platform-audit/ag-04-2026-11-03/final-manifest.json",
+  "scope": [
+    "Budgets",
+    "BudgetSettings",
+    "WBS",
+    "CostItem",
+    "CostAnalysisLine",
+    "Operational addenda",
+    "Import/export",
+    "Budget-to-schedule boundary"
+  ],
+  "report": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-03-ag-04-budgets-wbs-apu.md",
+  "findings": [
+    {
+      "id": "GA-AG-04-001",
+      "priority": "P1",
+      "title": "Lecturas y servicios omitían alcance/gates",
+      "details": "Budget bajo obra compartida podía cruzar empresa; árbol/ensure/preview omitían ACL, permisos o módulo. Guards reales antes de exponer o mutar; propias y compartidas conservan su semántica.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget.service.ts",
+        "packages/services/src/budget/wbs.service.ts",
+        "packages/services/src/budget/budget-import.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-002",
+      "priority": "P1",
+      "title": "Datos precargados permitían editar tras un cambio concurrente",
+      "details": "Relectura bajo los locks coordinados de tenant, obra y presupuesto; incluye baseline y revocación de D-088 en ambos órdenes.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget.service.ts",
+        "packages/services/src/budget/approved-budget-edits.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-003",
+      "priority": "P1",
+      "title": "Auditoría posterior al commit",
+      "details": "Parámetros, flags y mutaciones EDT/APU ahora se guardan junto a su evento; falla inducida de AuditLog comprueba rollback real.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget-settings.service.ts",
+        "packages/services/src/budget/approved-budget-edits.service.ts",
+        "packages/services/src/budget/wbs.service.ts",
+        "packages/services/src/budget/cost-analysis.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-004",
+      "priority": "P2",
+      "title": "Creación/adenda usaba padre, moneda o parámetros anteriores al lock",
+      "details": "Relectura e herencia correctas; versiones simultáneas únicas y principal/adenda conforme D-116.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-005",
+      "priority": "P2",
+      "title": "Aprobación admitía partidas importadas incompletas",
+      "details": "Se bloquean cantidad cero/unidad vacía; no se impide crear el placeholder de borrador documentado.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-006",
+      "priority": "P2",
+      "title": "Árbol y códigos podían quedar inconsistentes",
+      "details": "Formato, padre, profundidad, perfil, renombre de descendientes, numeración con huecos y reordenamiento completo atómicos.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/wbs.service.ts",
+        "packages/services/src/budget/wbs-code-rules.ts",
+        "packages/services/src/budget/wbs-codes.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-007",
+      "priority": "P1",
+      "title": "Protección incompleta de historia al borrar/reemplazar",
+      "details": "Nueve vínculos WBS y hints APU protegidos, incluidos consumos del libro; rechazo sin desvincular documentos.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/wbs.service.ts",
+        "packages/services/src/budget/budget-import.service.ts",
+        "packages/services/src/budget/cost-analysis.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-008",
+      "priority": "P1",
+      "title": "Referencias de producto/proveedor APU sin pertenencia",
+      "details": "Catálogo propio/compartido según empresa y comprobación de proveedor válido; IDs de otros tenants/contextos rechazados.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/cost-analysis.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-009",
+      "priority": "P2",
+      "title": "Listas APU aceptaban IDs duplicados/ajenos o eliminaciones ignoradas",
+      "details": "Validación completa y rollback del conjunto; un `_delete` no elude pertenencia ni referencia histórica.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/cost-analysis.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-010",
+      "priority": "P2",
+      "title": "Cantidad de partida podía recalcular con datos viejos o perder dinero legacy",
+      "details": "Cantidad fresca, piso certificado y conservación del recurso; lump histórico con `partidaQuantity = null` también se recalcula.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/cost-analysis.service.ts",
+        "packages/services/src/budget/cost-item.service.ts",
+        "packages/services/src/budget/cost-item-certified-qty.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-011",
+      "priority": "P2",
+      "title": "APU mostrado y próximo guardado discrepaban",
+      "details": "Helper puro común, sin doble redondeo; contempla legacy, cantidad inicial cero e insumo todavía sin Agregar. La diferencia de dos recursos `0,52 / 5` fue detectada durante esta remediación al alinear el servidor a dos decimales y se corrigió antes del cierre.",
+      "status": "resolved_locally",
+      "origin": "baseline_and_remediation_regressions_resolved",
+      "codePaths": [
+        "packages/services/src/budget/budget-apu-calc.ts",
+        "packages/services/src/budget/cost-analysis.service.ts",
+        "apps/web/features/budgets/lib/apu-money.ts",
+        "apps/web/features/budgets/components/cost-item-apu-dialog.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-012",
+      "priority": "P2",
+      "title": "Márgenes duplicaban una fórmula float global",
+      "details": "Cascada común por unitario/partida y suma posterior; preview y resultado persistido coinciden.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget-sale-calc.ts",
+        "packages/services/src/budget/budget-calc.service.ts",
+        "apps/web/features/budgets/components/budget-margin-config-section.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-013",
+      "priority": "P2",
+      "title": "Valores finitos podían exceder Decimal(18,4)",
+      "details": "Se comprueba la capacidad física después del redondeo, en entrada y derivados, con VALIDATION y rollback; sin clamp ni regla financiera nueva.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget-decimal.ts",
+        "packages/services/src/budget/budget-calc.service.ts",
+        "packages/validators/src/budget.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-014",
+      "priority": "P2",
+      "title": "Rollups/exportación perdían centavos",
+      "details": "Agregación exacta, cantidades preservadas y porcentaje half-up sin redondeo intermedio; DTO monetario display conservado.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/wbs-metrics.ts",
+        "packages/services/src/budget/budget-summary-kpis.ts",
+        "packages/services/src/budget/budget-wbs-export.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-015",
+      "priority": "P2",
+      "title": "Importación estructural aceptaba economía o árbol inválido",
+      "details": "El servidor verifica forma, unicidad, padres, perfiles y vacío; estructura solo produce placeholders.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget-import-pure.ts",
+        "packages/services/src/budget/budget-import.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-016",
+      "priority": "P2",
+      "title": "CSV alteraba nombres y filas",
+      "details": "Parser de registros citados/escapados y delimitador correcto; XLSX conserva el código formateado.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/features/budgets/lib/read-spreadsheet.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-017",
+      "priority": "P2",
+      "title": "Importación hacía viajes por nodo y pequeñas ediciones agotaban cinco segundos",
+      "details": "Batches y plazos explícitos. El primer smoke APU reprodujo expiración a 6.025 ms; la operación revirtió y pasó después del arreglo.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget-import.service.ts",
+        "packages/services/src/budget/cost-analysis.service.ts",
+        "packages/services/src/budget/wbs.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-018",
+      "priority": "P2",
+      "title": "Preview impedía reemplazar el mismo archivo",
+      "details": "Validación del archivo sin colisionar con la estructura que será sustituida; confirmación de reemplazo obligatoria y ejecución protegida.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/budget/budget-import.service.ts",
+        "apps/web/features/budgets/components/wbs-import-dialog.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-019",
+      "priority": "P2",
+      "title": "UI ofrecía acciones que el servidor rechazaba",
+      "details": "Permisos EDIT/APPROVE, estados y condición de la obra; URL de creación restringida, capítulos con bloqueo de estructura y lectura sin ensure mutante.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/features/budgets/components/budget-lifecycle-dialog.tsx",
+        "apps/web/features/budgets/lib/budget-page-contracts.test.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-020",
+      "priority": "P2",
+      "title": "Doble envío, rechazo y cierre en vuelo",
+      "details": "Ref inmediata y estado pendiente compartido por el área; edición/cierre bloqueados, error recuperable y contenido conservado.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/features/budgets/lib/use-budget-action.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-021",
+      "priority": "P2",
+      "title": "Alta parcial/importación podía duplicar presupuestos",
+      "details": "ID creado conservado, reintento de importación independiente; archivos nuevos invalidan precarga vieja y bloquean Crear mientras se leen.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/features/budgets/components/budget-form.tsx",
+        "apps/web/features/budgets/components/budget-wbs-preload-section.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-022",
+      "priority": "P2",
+      "title": "Insumo sin Agregar podía perderse al guardar APU",
+      "details": "Aviso explícito y conservación de la edición; futuras cifras usan el mismo aporte que se enviará.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/features/budgets/components/cost-item-apu-dialog.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-023",
+      "priority": "P2",
+      "title": "Lecturas derivadas quedaban obsoletas",
+      "details": "Invalidación de lista, detalle y consumidores de costos/finanzas; la creación usa el projectId vinculado por la página.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/app/(app)/proyectos/[id]/presupuestos/actions.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-024",
+      "priority": "P2",
+      "title": "Notas guardadas no tenían lectura/edición visible",
+      "details": "Datos del presupuesto expone nombre/notas y Action existente. CLOSED envía solo notas y conserva incluso nombres legados no válidos para altas nuevas; esta última regresión del schema nuevo fue detectada y corregida en la fase.",
+      "status": "resolved_locally",
+      "origin": "baseline_and_remediation_regressions_resolved",
+      "codePaths": [
+        "apps/web/features/budgets/components/budget-metadata-section.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-025",
+      "priority": "P2",
+      "title": "Controles sin nombre o acceso por teclado",
+      "details": "Labels, ids, estados de toggles, botones de icono y apertura nativa de capítulo/APU; formularios de parámetros se acomodan en móvil con componentes existentes. El smoke detectó además que el fieldset del refactor desplazaba el título/acciones del APU móvil: se separó el div de scroll del fieldset y se recapturó correctamente en 390×844.",
+      "status": "resolved_locally",
+      "origin": "baseline_and_remediation_regressions_resolved",
+      "codePaths": [
+        "apps/web/features/budgets/components/unit-select.tsx",
+        "apps/web/features/budgets/components/cost-item-apu-dialog.tsx",
+        "apps/web/features/budgets/components/wbs-tree.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-04-026",
+      "priority": "P2",
+      "title": "JSON de export autenticado sin política de caché equivalente",
+      "details": "`private, no-store`, como las otras representaciones.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "apps/web/app/api/reports/proyectos/[projectId]/presupuestos/[budgetId]/export/route.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-027",
+      "priority": "P1",
+      "title": "Importación a cronograma dejaba baseline parcial, duplicaba o copiaba alcance ajeno",
+      "details": "Guarda conjunto y evento atómicamente, scopes/gates, estado fresco, idempotencia y dos batches; audita también cambios de base sin tareas nuevas.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "packages/services/src/schedule/schedule.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-04-028",
+      "priority": "P2",
+      "title": "Contradicciones de documentación y cancelación",
+      "details": "D-121 conserva los tres orígenes aprobados por el Owner y bloquea aprobados/cerrados. Fórmulas/WBS/workflow se reconciliaron con D-030/D-042/D-088; Q-057 queda distinguida como capacidad futura.",
+      "status": "resolved_locally",
+      "origin": "baseline_or_documented_contradiction",
+      "codePaths": [
+        "docs/bloqer2.0/01-domain/STATE_MACHINES.md",
+        "docs/bloqer2.0/04-formulas/BUDGET_FORMULAS.md",
+        "docs/bloqer2.0/05-workflows/CREATE_BUDGET.md"
+      ]
+    }
+  ],
+  "verification": {
+    "unit": {
+      "passed": 2129,
+      "failed": 0,
+      "tasks": 9,
+      "liveSuitesOmitted": 20,
+      "log": "verification-test.log"
+    },
+    "types": {
+      "successfulTasks": 13,
+      "log": "verification-typecheck.log"
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0,
+      "log": "verification-lint.log"
+    },
+    "isolatedSql": {
+      "distinctPassed": 34,
+      "failed": 0,
+      "budget": 17,
+      "wbsApuImportExport": 8,
+      "scheduleImport": 9,
+      "logs": [
+        "budget-live.log",
+        "budget-acl-live.log",
+        "budget-final-policy-live.log",
+        "wbs-live.log",
+        "export-live.log",
+        "schedule-live-final.log"
+      ]
+    },
+    "knowledge": {
+      "chunks": 521,
+      "sourceHashPrefix": "028ef3aa1ef8",
+      "fresh": true,
+      "log": "knowledge-index.log"
+    },
+    "visual": "output/platform-audit/ag-04-2026-11-03/visual-smoke.json",
+    "incremental": [
+      "services-post-export-typecheck.log",
+      "frontend-apu-mobile-interactions.log",
+      "frontend-apu-mobile-typecheck.log",
+      "frontend-apu-mobile-lint.log",
+      "knowledge-help-final-tests.log (AI28 passed; web loader invocation corrected separately)",
+      "help-final-tests.log (23 passed)"
+    ]
+  },
+  "decision": {
+    "question": "Q-068",
+    "record": "D-121",
+    "approved": "Keep cancellation from DRAFT, IN_REVIEW and RETURNED_FOR_CHANGES; no APPROVED/CLOSED cancellation"
+  },
+  "environment": {
+    "phase": "AG-04",
+    "database": "bloqer_audit_ag01_20261103",
+    "compute": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+    "verifiedAt": "2026-11-03T23:05:29.463Z",
+    "production": false
+  },
+  "independentReview": {
+    "agents": [
+      "ag04_budget",
+      "ag04_wbs",
+      "ag04_frontend"
+    ],
+    "rootReproduced": [
+      "SQL",
+      "Browser",
+      "Unit/type/lint"
+    ],
+    "unresolvedConfirmedFindings": 0
+  },
+  "limitations": [
+    "Not deployed; portal not verified",
+    "No migrations, new persisted fields or dependencies",
+    "Legal Contract/Addendum/ChangeOrder remain deferred Q-057",
+    "Roles preserved; simplification remains proposal",
+    "Browser download automation interrupted; persisted CSV/XLSX verified via maintained real service test",
+    "17 unrelated live suites not repeated",
+    "No production benchmark, full WCAG certification or external providers"
+  ],
+  "nextPhase": "AG-05",
+  "nextPhaseRequiresUserInstruction": true,
+  "cleanup": {
+    "phase": "AG-04",
+    "pid": 66368,
+    "startedAt": "2026-11-03T23:05:29.477Z",
+    "origin": "http://localhost:3100",
+    "database": "bloqer_audit_ag01_20261103",
+    "compute": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+    "externalServicesDisabled": true,
+    "syntheticOnly": true,
+    "stoppedAt": "2026-11-04T03:24:11.3987463Z",
+    "stoppedOwnedPids": [
+      67792,
+      58724,
+      66368
+    ],
+    "port3100Listening": false,
+    "signedOut": true,
+    "ownedTabsClosed": true,
+    "viewportReset": true
+  }
+}

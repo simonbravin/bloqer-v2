@@ -232,7 +232,7 @@ export function AccountingAccountForm({
                   Cuentas ya registradas que coinciden
                 </li>
                 {nameMatches.map((a) => (
-                  <li key={a.id} role="option">
+                  <li key={a.id} role="option" aria-selected={false}>
                     <Link
                       href={accountHref(a.id, a.companyId)}
                       className="flex items-center justify-between gap-3 rounded-sm px-2 py-1.5 hover:bg-accent"

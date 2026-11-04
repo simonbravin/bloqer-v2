@@ -429,7 +429,7 @@ ERD funcional con relaciones explícitas en [`ENTITY_RELATIONSHIPS.md`](./ENTITY
 
 ## 15. Reglas globales sobre entidades
 
-- **Tenant-id obligatorio**: toda entidad operativa lleva `tenant_id`.
+- **Pertenencia al tenant obligatoria**: toda entidad operativa pertenece a un tenant. Las raíces conservan `tenant_id` propio; solo los hijos del catálogo físico cerrado de [ADR-018](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) lo heredan por su padre dueño obligatorio, con guards y relaciones coherentes según [TENANT_ISOLATION_MODEL](../08-architecture/TENANT_ISOLATION_MODEL.md). Este catálogo conceptual no impone una columna redundante fuera del contrato físico aprobado ni habilita excepciones nuevas.
 - **Soft-delete preferente**: comprobantes legales no se borran; se anulan.
 - **Inmutabilidad**: comprobantes con valor legal en estado terminal son inmutables (ver [D-025]).
 - **Trazabilidad**: cada entidad guarda `created_at`, `updated_at`, `created_by`, `updated_by`.

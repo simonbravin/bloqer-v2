@@ -14,7 +14,7 @@ export function PlatformShell({
 }) {
   return (
     <PlatformNavProvider>
-      <ShellLayout sidebar={<PlatformSidebar />} header={<PlatformHeader user={user} />}>
+      <ShellLayout sidebar={<PlatformSidebar />} header={<PlatformHeader user={user} />} showFieldNavigation={false}>
         <SearchParamsToast />
         {children}
       </ShellLayout>

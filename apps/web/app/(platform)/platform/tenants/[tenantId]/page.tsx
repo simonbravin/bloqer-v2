@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatDate, formatDateTime } from "@/lib/format";
+import { formatSubscriptionStatusLabel, formatTenantStatusLabel } from "@/lib/tenant-status-label";
 import { platformAuditActionLabel } from "@/features/platform/platform-audit-labels";
 import { notFound, redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
@@ -37,7 +38,7 @@ export default async function PlatformTenantDetailPage({ params }: PageProps) {
   }
 
   const hasOwner = users.some(
-    (u) => u.membershipStatus === "ACTIVE" && u.roles.includes("OWNER"),
+    (u) => u.membershipStatus === "ACTIVE" && u.userStatus === "ACTIVE" && u.roles.includes("OWNER"),
   );
 
   return (
@@ -50,7 +51,7 @@ export default async function PlatformTenantDetailPage({ params }: PageProps) {
         <div className="flex flex-wrap gap-2">
           {!hasOwner ? (
             <Button asChild size="sm">
-              <Link href={`/platform/tenants/${tenant.id}/invitations/new`}>Invitar OWNER</Link>
+              <Link href={`/platform/tenants/${tenant.id}/invitations/new`}>Invitar propietario</Link>
             </Button>
           ) : null}
           <Button asChild variant="outline" size="sm">
@@ -62,18 +63,18 @@ export default async function PlatformTenantDetailPage({ params }: PageProps) {
       <dl className="grid gap-3 text-sm sm:grid-cols-2">
         <div>
           <dt className="text-muted-foreground">Estado operativo</dt>
-          <dd className="font-medium">{tenant.status}</dd>
+          <dd className="font-medium">{formatTenantStatusLabel(tenant.status)}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Suscripción (interno)</dt>
-          <dd className="font-medium">{tenant.subscriptionStatus}</dd>
+          <dd className="font-medium">{formatSubscriptionStatusLabel(tenant.subscriptionStatus)}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Plan</dt>
           <dd className="font-medium">{tenant.saasPlan}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">Trial hasta</dt>
+          <dt className="text-muted-foreground">Prueba hasta</dt>
           <dd className="font-medium">{tenant.trialEndsAt ? formatDate(tenant.trialEndsAt) : "—"}</dd>
         </div>
         {tenant.suspendedReason ? (

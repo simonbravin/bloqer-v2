@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auditoría integral de Bloqer"
+  short_description: "Auditoría por etapas, módulos y cambios de Bloqer"
+  default_prompt: "Usá $bloqer-platform-audit para auditar el área indicada y sus conexiones, con evidencia y correcciones si fueron solicitadas."

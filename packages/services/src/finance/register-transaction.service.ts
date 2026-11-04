@@ -16,19 +16,23 @@ export async function registerTransaction(
   switch (input.kind) {
     case "AP_EXPENSE": {
       const { kind: _k, ...payload } = input;
+      void _k; // The discriminant is not part of the delegated service payload.
       // Corporate entry point always creates company-level AP ([D-048]); project uses its own action.
       return registerApExpense({ ...payload, projectId: null, purchaseOrderId: null }, ctx);
     }
     case "TREASURY_INFLOW": {
       const { kind: _k, ...payload } = input;
+      void _k;
       return registerCorporateTreasuryInflow(payload, ctx);
     }
     case "AR_INCOME": {
       const { kind: _k, ...payload } = input;
+      void _k;
       return registerArIncome(payload, ctx);
     }
     case "PAYMENT": {
       const { kind: _k, ...paymentInput } = input;
+      void _k;
       const payable = await prisma.payable.findUnique({ where: { id: paymentInput.payableId } });
       if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
       if (payable.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

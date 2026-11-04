@@ -42,9 +42,9 @@ export function isStructuralLeafByCode(code: string, childCount: number): boolea
 }
 
 export type ParsedCellA =
-  | { kind: "empty" }
-  | { kind: "banner"; discipline: string; name: string }
-  | { kind: "numbered"; discipline: string | null; numeric: string; canonical: string };
+  | { kind: "empty"; }
+  | { kind: "banner"; discipline: string; name: string; }
+  | { kind: "numbered"; discipline: string | null; numeric: string; canonical: string; };
 
 export function parseCellA(colA: unknown, colB: unknown): ParsedCellA {
   if (colA == null || String(colA).trim() === "") return { kind: "empty" };
@@ -85,7 +85,7 @@ export function parseCellA(colA: unknown, colB: unknown): ParsedCellA {
 
 /** Detecta si el archivo usa varios rubros con numeración repetida (ARQ 1, EST 1, …). */
 export function detectImportProfile(
-  numbered: { discipline: string | null; numeric: string }[],
+  numbered: { discipline: string | null; numeric: string; }[],
 ): WbsImportProfile {
   const prefixes = new Set<string>();
   const numericToPrefixes = new Map<string, Set<string>>();
@@ -130,6 +130,15 @@ export function validateCanonicalCode(
   type: WbsNodeType,
   profile: WbsImportProfile,
 ): string | null {
+  const canonicalPattern = profile === "multi_discipline"
+    ? /^[A-Z]{2,8}(?:\.\d+)*$/
+    : NUMERIC_CODE;
+  if (!canonicalPattern.test(canonicalCode)) {
+    return `El código "${canonicalCode}" no tiene un formato EDT válido`;
+  }
+  if (isDisciplineRootCode(canonicalCode) && type !== "GROUP") {
+    return "El rubro raíz debe agrupar capítulos";
+  }
   const segments = countCodeSegments(canonicalCode);
   const max = maxCodeSegmentsForProfile(profile);
 
@@ -156,6 +165,14 @@ export function validateManualNodeCode(
   type: WbsNodeType,
   parentCode: string | null,
 ): string | null {
+  const profile = isMultiStyleCode(code) ? "multi_discipline" : "simple";
+  const formatError = validateCanonicalCode(code, type, profile);
+  if (formatError) return formatError;
+  if ((parentCodeFrom(code) ?? null) !== parentCode) {
+    return parentCode
+      ? `El código debe ser un hijo directo de "${parentCode}"`
+      : "Un nodo raíz debe tener un código de un solo nivel";
+  }
   const max = parentCode ? maxCodeSegmentsForCode(parentCode) : maxCodeSegmentsForCode(code);
   const segments = countCodeSegments(code);
 
@@ -211,7 +228,7 @@ export function compareWbsCodes(a: string, b: string): number {
  * Do not use `sortTreeOrder` on ITEM-only lists: missing GROUP parents make
  * `sortOrder` group every first child before every second child.
  */
-export function sortByWbsCode<T extends { code: string }>(
+export function sortByWbsCode<T extends { code: string; }>(
   items: T[],
   tieBreak: (a: T, b: T) => number = () => 0,
 ): T[] {
@@ -219,7 +236,7 @@ export function sortByWbsCode<T extends { code: string }>(
 }
 
 export function detectProfileFromImportRows(
-  rows: ReadonlyArray<{ code: string }>,
+  rows: ReadonlyArray<{ code: string; }>,
 ): WbsImportProfile {
   if (rows.some((r) => isDisciplineRootCode(r.code) || isMultiStyleCode(r.code))) {
     return "multi_discipline";
@@ -228,7 +245,7 @@ export function detectProfileFromImportRows(
 }
 
 /** Recalcula GROUP/ITEM según hijos en el lote (importación / execute). */
-export function reconcileImportRowTypes<T extends { code: string; type: WbsNodeType }>(
+export function reconcileImportRowTypes<T extends { code: string; type: WbsNodeType; }>(
   rows: T[],
   profile?: WbsImportProfile,
 ): T[] {

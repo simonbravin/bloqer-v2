@@ -3,7 +3,7 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { createBudgetSchema, type CreateBudgetInput, type BudgetImportRow } from "@bloqer/validators";
 import { BudgetWbsPreloadSection } from "./budget-wbs-preload-section";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 const PARENT_NONE = "__none__";
 
@@ -73,9 +74,13 @@ export function BudgetForm({
   onImportWbs,
 }: BudgetFormProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const formId = useId();
   const [serverError, setServerError] = useState<string | null>(null);
   const [pendingWbsRows, setPendingWbsRows] = useState<BudgetImportRow[] | null>(null);
+  const [preloading, setPreloading] = useState(false);
+  const [createdBudgetId, setCreatedBudgetId] = useState<string | null>(null);
+  const createdBudgetRef = useRef<string | null>(null);
+  const { isPending, run: startTransition } = useBudgetAction(setServerError);
 
   const validInitialParent =
     initialParentBudgetId && parentOptions.some((p) => p.id === initialParentBudgetId)
@@ -116,36 +121,43 @@ export function BudgetForm({
   }
 
   const handleSubmit = form.handleSubmit((data) => {
+    if (preloading) return;
     setServerError(null);
     startTransition(async () => {
-      const result = await onSubmit({
-        ...data,
-        projectId,
-        parentBudgetId: data.parentBudgetId || null,
-      });
-      if ("error" in result) {
-        setServerError(result.error);
-        return;
+      let budgetId = createdBudgetRef.current;
+      if (!budgetId) {
+        const result = await onSubmit({
+          ...data,
+          projectId,
+          parentBudgetId: data.parentBudgetId || null,
+        });
+        if ("error" in result) {
+          setServerError(result.error);
+          return;
+        }
+        budgetId = result.id;
+        createdBudgetRef.current = budgetId;
+        setCreatedBudgetId(budgetId);
       }
       if (pendingWbsRows?.length && onImportWbs) {
-        const importResult = await onImportWbs(result.id, pendingWbsRows);
+        const importResult = await onImportWbs(budgetId, pendingWbsRows);
         if ("error" in importResult) {
           setServerError(
-            `Presupuesto creado, pero falló la importación EDT: ${importResult.error}`,
+            `El presupuesto ya está creado. No se pudo importar la EDT: ${importResult.error}. Podés reintentar la importación o abrir el presupuesto.`,
           );
-          router.push(`/proyectos/${projectId}/presupuestos/${result.id}`);
           return;
         }
       }
-      router.push(`/proyectos/${projectId}/presupuestos/${result.id}`);
+      router.push(`/proyectos/${projectId}/presupuestos/${budgetId}`);
     });
   });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      <fieldset disabled={isPending || createdBudgetId !== null} className="min-w-0 space-y-6">
       <div className="space-y-1.5">
-        <Label>Nombre del presupuesto *</Label>
-        <Input placeholder="Presupuesto inicial" {...form.register("name")} />
+        <Label htmlFor={`${formId}-name`}>Nombre del presupuesto *</Label>
+        <Input id={`${formId}-name`} placeholder="Presupuesto inicial" {...form.register("name")} />
         {form.formState.errors.name && (
           <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
         )}
@@ -153,13 +165,13 @@ export function BudgetForm({
 
       {parentOptions.length > 0 && (
         <div className="space-y-1.5">
-          <Label>Presupuesto padre (adenda / fase)</Label>
+          <Label htmlFor={`${formId}-parent`}>Presupuesto padre (adenda / fase)</Label>
           <Select
             value={parentBudgetId ?? PARENT_NONE}
             onValueChange={(v) => applyParentChoice(v === PARENT_NONE ? null : v)}
             disabled={isPending}
           >
-            <SelectTrigger className="w-full max-w-lg">
+            <SelectTrigger id={`${formId}-parent`} className="w-full max-w-lg">
               <SelectValue placeholder="Sin padre (presupuesto independiente)" />
             </SelectTrigger>
             <SelectContent>
@@ -180,8 +192,9 @@ export function BudgetForm({
       )}
 
       <div className="space-y-1.5">
-        <Label>Moneda</Label>
+        <Label htmlFor={`${formId}-currency`}>Moneda</Label>
         <CurrencySelect
+          id={`${formId}-currency`}
           value={form.watch("currency") ?? "ARS"}
           onValueChange={(v) => form.setValue("currency", v)}
           triggerClassName="w-full max-w-xs"
@@ -197,26 +210,29 @@ export function BudgetForm({
             </p>
           ) : null}
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Gastos generales (%)</Label>
+            <Label htmlFor={`${formId}-overhead`}>Gastos generales (%)</Label>
             <DecimalInput
+              id={`${formId}-overhead`}
               {...bindRhfNumberDecimal(form.watch("overheadPct"), (n) =>
                 form.setValue("overheadPct", n, { shouldValidate: true, shouldDirty: true }),
               )}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Costo financiero — tasa anual (%)</Label>
+            <Label htmlFor={`${formId}-financial`}>Costo financiero — tasa anual (%)</Label>
             <DecimalInput
+              id={`${formId}-financial`}
               {...bindRhfNumberDecimal(form.watch("financialCostPct"), (n) =>
                 form.setValue("financialCostPct", n, { shouldValidate: true, shouldDirty: true }),
               )}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>Días promedio financiamiento</Label>
+            <Label htmlFor={`${formId}-days`}>Días promedio financiamiento</Label>
             <Input
+              id={`${formId}-days`}
               type="number"
               step="1"
               min="0"
@@ -227,16 +243,18 @@ export function BudgetForm({
             </p>
           </div>
           <div className="space-y-1.5">
-            <Label>Utilidad (%)</Label>
+            <Label htmlFor={`${formId}-profit`}>Utilidad (%)</Label>
             <DecimalInput
+              id={`${formId}-profit`}
               {...bindRhfNumberDecimal(form.watch("profitPct"), (n) =>
                 form.setValue("profitPct", n, { shouldValidate: true, shouldDirty: true }),
               )}
             />
           </div>
           <div className="space-y-1.5">
-            <Label>IVA / Impuesto (%)</Label>
+            <Label htmlFor={`${formId}-tax`}>IVA / Impuesto (%)</Label>
             <DecimalInput
+              id={`${formId}-tax`}
               {...bindRhfNumberDecimal(form.watch("taxPct"), (n) =>
                 form.setValue("taxPct", n, { shouldValidate: true, shouldDirty: true }),
               )}
@@ -249,34 +267,50 @@ export function BudgetForm({
         <BudgetWbsPreloadSection
           disabled={isPending}
           onPendingRowsChange={setPendingWbsRows}
+          onPendingChange={setPreloading}
         />
       )}
 
       <div className="space-y-1.5">
-        <Label>Notas internas</Label>
+        <Label htmlFor={`${formId}-notes`}>Notas internas</Label>
         <Textarea
+          id={`${formId}-notes`}
           rows={3}
           placeholder="Observaciones internas del presupuesto..."
           {...form.register("internalNotes")}
         />
       </div>
+      </fieldset>
+
+      {Object.entries(form.formState.errors).filter(([field]) => field !== "name").map(([field, error]) => (
+        <p key={field} role="alert" className="text-sm text-destructive">{error?.message}</p>
+      ))}
 
       {serverError && (
-        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+        <div role="alert" className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {serverError}
         </div>
       )}
+      {createdBudgetId && (
+        <p role="status" className="text-sm text-muted-foreground">
+          El presupuesto ya está creado. Reintentar solo vuelve a importar la estructura EDT.
+        </p>
+      )}
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={isPending}>
+        <Button type="submit" disabled={isPending || preloading}>
           {isPending
-            ? "Creando..."
-            : parentBudgetId
+            ? createdBudgetId ? "Importando EDT..." : "Creando..."
+            : createdBudgetId
+              ? "Reintentar importación EDT"
+              : preloading
+                ? "Leyendo archivo..."
+                : parentBudgetId
               ? "Crear adenda / fase"
               : "Crear presupuesto"}
         </Button>
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={isPending}>
-          Cancelar
+        <Button type="button" variant="outline" onClick={() => createdBudgetId ? router.push(`/proyectos/${projectId}/presupuestos/${createdBudgetId}`) : router.back()} disabled={isPending}>
+          {createdBudgetId ? "Abrir presupuesto creado" : "Cancelar"}
         </Button>
       </div>
     </form>

@@ -210,7 +210,7 @@ export async function listBankReconciliations(
 ): Promise<{ data: BankReconciliationListItem[]; total: number }> {
   await assertBankReconciliationModules(ctx);
   assertCanViewBankReconciliation(ctx.roles);
-  const { skip, take, pageSize } = resolvePagination(filters);
+  const { skip, pageSize } = resolvePagination(filters);
 
   const where: Prisma.BankReconciliationWhereInput = {
     tenantId: ctx.tenantId,

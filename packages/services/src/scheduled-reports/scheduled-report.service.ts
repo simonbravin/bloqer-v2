@@ -13,7 +13,6 @@ import {
   updateScheduledReportSchema,
   type CreateScheduledReportInput,
   type ScheduledReportKey,
-  type UpdateScheduledReportInput,
 } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";

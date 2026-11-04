@@ -13,7 +13,7 @@ import {
   canViewProcurementProjectArea,
 } from "./procurement-access";
 import { PO_INVOICE_LINKABLE_STATUSES } from "./procurement-constants";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import {
@@ -619,6 +619,7 @@ export async function createPurchaseOrder(
   });
 
   const po = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, input.projectId, ctx);
     const maxNum = await tx.purchaseOrder.aggregate({
       where: { tenantId: ctx.tenantId, companyId },
       _max: { number: true },
@@ -747,7 +748,7 @@ export async function updatePurchaseOrder(
     }
   }
 
-  let apuCategoryByIdx = new Map<number, CostCategory>();
+  const apuCategoryByIdx = new Map<number, CostCategory>();
   let wbsDominantByUpdate = new Map<string, CostCategory | null>();
   if (input.lines) {
     assertWbsRequiredOnLines(input.lines);
@@ -781,6 +782,7 @@ export async function updatePurchaseOrder(
   }
 
   const po = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     // Claim DRAFT so concurrent submit cannot leave a submitted PO with rewritten lines.
     const headerClaim = await tx.purchaseOrder.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "DRAFT" },

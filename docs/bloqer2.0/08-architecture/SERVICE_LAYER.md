@@ -31,6 +31,18 @@ Toda **mutación de negocio** y toda **operación que combine** validación de e
 - **Persistir** en transacción; emitir **eventos de aplicación** / encolar jobs ([`BACKGROUND_JOBS_ARCHITECTURE.md`](./BACKGROUND_JOBS_ARCHITECTURE.md)).
 - **Registrar** auditoría cuando corresponda.
 
+## Revalidación transaccional de Proyectos y Directorio (AG-03)
+
+Un guard previo al comienzo de una transacción da una respuesta temprana, pero no protege por sí solo frente a otro escritor. Los caminos corregidos en AG-03 conservan rol/ACL/gate y vuelven a comprobar la condición mutable dentro de la transacción:
+
+- `lockProjectForMutation` toma la fila de la obra por `id` + `tenantId` con `FOR NO KEY UPDATE`. Los wrappers operativos y de planificación reutilizan las políticas de estado existentes. Este bloqueo precede a PR/PO, presupuesto, certificación, factura o empresa cuando se componen esos caminos.
+- Cancelar consulta sus bloqueantes mediante el mismo `tx` después del bloqueo de la obra. Crear un documento o cambiarlo a un estado bloqueante usa ese mismo bloqueo antes de escribir. No se cambian las reglas existentes de reversión que permiten cerrar obligaciones.
+- Editar `Project.code`, incluso si el formulario reenvía el mismo valor, toma antes `Tenant FOR KEY SHARE`: actualizar una columna del índice único puede elevar el lock de la obra. El orden evita invertir la comprobación FK de auditoría frente a la administración de ACL, que ya coordina por tenant.
+- El alta de obra con posible asignación del creador lee el modo fresco bajo `Tenant FOR NO KEY UPDATE`, y confirma obra, asignación y auditoría en una única transacción. Se aplica la enmienda aprobada Q-067; no se crean permisos generales.
+- La validación CLIENT al crear o cambiar cliente y la baja del rol se coordinan por la fila `Contact` con `FOR NO KEY UPDATE`. La comprobación del rol y de proyectos vinculados se repite por `tx`; el mismo orden protege la edición de perfiles frente a bajas concurrentes.
+
+Son correcciones de integridad dentro del service layer y de las transacciones existentes, sin nuevos modelos ni estados. El alcance y las pruebas de los consumidores adaptados se registran en el informe AG-03; no equivale a haber auditado íntegramente los módulos financieros, de compras o planificación.
+
 ## Referencias funcionales
 
 - Reglas: [`../01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md)

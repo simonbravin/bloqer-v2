@@ -45,6 +45,7 @@ export function ApuEntryModeToggle({
               type="button"
               size="sm"
               variant={value === "unit" ? "default" : "ghost"}
+              aria-pressed={value === "unit"}
               className="h-7 px-2.5 text-xs"
               onClick={() => onChange("unit")}
             >
@@ -68,6 +69,7 @@ export function ApuEntryModeToggle({
                 type="button"
                 size="sm"
                 variant={value === "total" ? "default" : "ghost"}
+                aria-pressed={value === "total"}
                 className="h-7 px-2.5 text-xs"
                 disabled={totalDisabled}
                 onClick={() => onChange("total")}

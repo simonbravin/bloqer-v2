@@ -427,7 +427,7 @@ export async function getAccountMovementReport(
   }
 
   const paginated = filters.page !== undefined || filters.pageSize !== undefined;
-  const { page, pageSize, skip, take } = resolvePagination(
+  const { skip, take } = resolvePagination(
     paginated ? { page: filters.page, pageSize: filters.pageSize } : undefined,
   );
 
@@ -662,7 +662,6 @@ export async function getCashFlowReport(
 
   for (const currency of currencies) {
     const currAccounts = allAccounts.filter((a) => a.currency === currency);
-    const accountIds   = currAccounts.map((a) => a.id);
 
     // Balance as of startDate (pre-period, P-TRZ-06 safe per account)
     let openingBalance = new Prisma.Decimal(0);

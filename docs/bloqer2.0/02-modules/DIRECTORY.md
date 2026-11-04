@@ -73,7 +73,7 @@ _No aplica directamente._ Reportes agregan datos de contacto vía joins.
 Convención Argentina: un contacto puede ser **Empleado** (sueldo/reintegro) y a la vez **Proveedor** si emite factura (monotributo). No hace falta el segundo rol solo para reintegrar.
 
 ## 16. Permisos
-Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) fila Directorio.
+Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md), especialmente §9.1 y §9.5: la implementación actual usa el gate agregado `DIRECTORY`. Lectura y mutaciones requieren el módulo habilitado; los cambios de maestro, roles del contacto y perfiles requieren `EDIT DIRECTORY`. No se introduce granularidad por tipo de contacto en AG-03.
 
 ## 17. Eventos disparados / consumidos
 - `contact.created`, `contact.updated`, `contact.archived`, `contact.role_assigned`.
@@ -83,3 +83,16 @@ Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md) fila Director
 
 ## 19. Preguntas abiertas
 - Merge automático de duplicados: reglas y UI ([`OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md)).
+
+## 20. Implementación revalidada en AG-03 (03/11/2026)
+
+- CUIT/CUIL: formato de 11 dígitos y normalización de separadores en escrituras nuevas. La unicidad por tenant incluye formas históricas equivalentes sin reescribirlas; una colisión concurrente se devuelve como conflicto. La búsqueda exacta completa admite ambas formas. No se agregó validación obligatoria de checksum ni consulta al padrón.
+- Los identificadores extranjeros explícitos conservan su formato. Los identificadores históricos sin tipo solo se tratan como CUIT/CUIL cuando su contenido numérico y separadores lo hacen inequívoco.
+- Creación, edición, archivado, reactivación, asignación/baja de roles y perfiles confirman su auditoría dentro de la misma transacción. Cambios concurrentes no pisan silenciosamente versiones previas.
+- Los perfiles requieren contacto y rol activos; los datos opcionales se pueden vaciar, y el crédito usa el kernel monetario de 2 decimales. Reactivar un rol conserva su perfil histórico. Para editar roles/perfiles de un contacto archivado primero se reactiva el contacto.
+- El listado está paginado y `Exportar página CSV` incluye solo la página actual. `Todos los estados` conserva los archivados y la búsqueda no pierde filtros al cambiar controles rápidamente.
+- Los selectores operativos cargan todos los contactos activos del rol solicitado, sin el anterior corte silencioso de 10.000; esto no convierte al listado ni al CSV en una exportación completa.
+
+## Hallazgo — Permisos agregados y perfiles (AG-03)
+
+Las descripciones funcionales de Clientes, Proveedores y Subcontratistas conservan granularidad objetivo por rol. §9.1 de la matriz identifica que la implementación vigente agrupa estas pantallas en Directorio. AG-03 corrige los guards y las acciones de la UI bajo ese contrato actual; no incorpora permisos por campo o tipo de contacto. La simplificación de perfiles de usuario se evalúa por separado en [Q-024](../00-product/OPEN_QUESTIONS.md#q-024--roles-personalizables-vs-solo-predefinidos).

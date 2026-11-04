@@ -36,6 +36,7 @@ npm-debug.log*
 pnpm-debug.log*
 
 # Test artifacts
+output/
 test-results/
 **/test-results/
 playwright-report/

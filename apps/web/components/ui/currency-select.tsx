@@ -58,7 +58,6 @@ type CurrencyFilterSelectProps = {
 export function CurrencyFilterSelect({
   value,
   onValueChange,
-  className,
   triggerClassName,
 }: CurrencyFilterSelectProps) {
   return (

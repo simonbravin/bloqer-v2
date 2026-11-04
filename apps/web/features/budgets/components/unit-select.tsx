@@ -10,6 +10,7 @@ import {
 import { BUDGET_UNIT_OPTIONS, isKnownBudgetUnit } from "@/lib/budget-units";
 
 interface UnitSelectProps {
+  id?: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
@@ -18,6 +19,7 @@ interface UnitSelectProps {
 }
 
 export function UnitSelect({
+  id,
   value,
   onChange,
   disabled,
@@ -38,7 +40,7 @@ export function UnitSelect({
       }}
       disabled={disabled}
     >
-      <SelectTrigger className={className}>
+      <SelectTrigger id={id} className={className}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

@@ -187,7 +187,7 @@ Organizar el persistido en **PostgreSQL** en dominios alineados al monolito modu
 
 - No crear tablas “por cada pantalla”.  
 - No persistir **labels en español** en columnas de negocio.  
-- No omitir `tenant_id` en entidades operativas.
+- No omitir la pertenencia al tenant en entidades operativas: columna propia en raíces o padre dueño obligatorio solo para los hijos del catálogo cerrado de [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md) / [TENANT_ISOLATION_MODEL](./TENANT_ISOLATION_MODEL.md). No autorizar excepciones nuevas por analogía ni omitir los guards y la coherencia de relaciones.
 
 ## Referencias cruzadas
 

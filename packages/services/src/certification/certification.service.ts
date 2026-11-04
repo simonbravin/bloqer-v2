@@ -7,7 +7,7 @@ import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, se
 import { createSystemNotification } from "../notifications/notification.service";
 import { resolveNotificationAudience } from "../notifications/notification-audience.service";
 import { formatCertificationCode, formatNotificationTitle } from "../notifications/notification-copy";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent, filterUserIdsByProjectAccess } from "../security/access";
 
 import { resolveActiveCompanyId } from "../company/company.service";
@@ -128,12 +128,13 @@ export async function createCertification(
   let cert;
   try {
     cert = await prisma.$transaction(async (tx) => {
+      await lockProjectForOperationalMutation(tx, input.projectId, ctx);
       const maxNum = await tx.certification.aggregate({
         where: { projectId: input.projectId, tenantId: ctx.tenantId },
         _max: { number: true },
       });
       const number = (maxNum._max.number ?? 0) + 1;
-      return tx.certification.create({
+      const created = await tx.certification.create({
         data: {
           tenantId: ctx.tenantId,
           companyId,
@@ -152,6 +153,17 @@ export async function createCertification(
           lines: { include: { wbsNode: { include: { costItem: true } } } },
         },
       });
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        projectId: input.projectId,
+        action: "certification.created",
+        entityType: "Certification",
+        entityId: created.id,
+        after: { number: created.number, projectId: input.projectId, budgetId: input.budgetId },
+        ipAddress: ctx.ipAddress,
+      }, tx);
+      return created;
     });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
@@ -162,16 +174,6 @@ export async function createCertification(
     }
     throw e;
   }
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "certification.created",
-    entityType: "Certification",
-    entityId: cert.id,
-    after: { number: cert.number, projectId: input.projectId, budgetId: input.budgetId },
-    ipAddress: ctx.ipAddress,
-  });
 
   return serializeCertification(cert);
 }
@@ -191,37 +193,34 @@ export async function updateCertification(
   assertCertificationEditable(cert);
 
   const updated = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, cert.projectId, ctx);
     const current = await _lockEditableCertification(tx, id, ctx.tenantId);
     const nextStart = input.periodStart ?? current.periodStart.toISOString().slice(0, 10);
     const nextEnd = input.periodEnd ?? current.periodEnd.toISOString().slice(0, 10);
     if (nextEnd < nextStart) {
       throw new ServiceError("VALIDATION", "La fecha de fin del período no puede ser anterior al inicio");
     }
-    return tx.certification.update({
-    where: { id },
-    data: {
-      periodStart: input.periodStart ? new Date(input.periodStart) : undefined,
-      periodEnd:   input.periodEnd   ? new Date(input.periodEnd)   : undefined,
-      notes:         input.notes         ?? undefined,
-      internalNotes: input.internalNotes ?? undefined,
-      updatedBy: ctx.actorUserId,
-    },
-    include: {
-      budget: { select: { currency: true } },
-      lines: { include: { wbsNode: { include: { costItem: true } } }, orderBy: { sortOrder: "asc" } },
-    },
+    const result = await tx.certification.update({
+      where: { id },
+      data: {
+        periodStart: input.periodStart ? new Date(input.periodStart) : undefined,
+        periodEnd: input.periodEnd ? new Date(input.periodEnd) : undefined,
+        notes: input.notes ?? undefined,
+        internalNotes: input.internalNotes ?? undefined,
+        updatedBy: ctx.actorUserId,
+      },
+      include: {
+        budget: { select: { currency: true } },
+        lines: { include: { wbsNode: { include: { costItem: true } } }, orderBy: { sortOrder: "asc" } },
+      },
     });
+    await log({
+      tenantId: ctx.tenantId, actorUserId: ctx.actorUserId, projectId: cert.projectId,
+      action: "certification.updated", entityType: "Certification", entityId: id,
+      after: input, ipAddress: ctx.ipAddress,
+    }, tx);
+    return result;
   }, { timeout: 30_000, maxWait: 10_000 });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "certification.updated",
-    entityType: "Certification",
-    entityId: id,
-    after: input,
-    ipAddress: ctx.ipAddress,
-  });
 
   return serializeCertification(updated);
 }
@@ -246,6 +245,7 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
   // lines (P-CERT-01 / BR-CERT-002). Conditional DRAFT→ISSUED update prevents TOCTOU.
   const updated = await prisma.$transaction(
     async (tx) => {
+      await lockProjectForOperationalMutation(tx, certPreview.projectId, ctx);
       await _lockCertificationProject(tx, certPreview.projectId);
 
       const cert = await tx.certification.findUnique({
@@ -327,21 +327,16 @@ export async function issueCertification(id: string, ctx: ServiceContext): Promi
           "La certificación ya no está en borrador. Recargá e intentá de nuevo.",
         );
       }
-      return tx.certification.findUniqueOrThrow({ where: { id } });
+      const result = await tx.certification.findUniqueOrThrow({ where: { id } });
+      await log({
+        tenantId: ctx.tenantId, actorUserId: ctx.actorUserId, projectId: certPreview.projectId,
+        action: "certification.issued", entityType: "Certification", entityId: id,
+        before: { status: "DRAFT" }, after: { status: "ISSUED" }, ipAddress: ctx.ipAddress,
+      }, tx);
+      return result;
     },
     { timeout: 30_000, maxWait: 10_000 },
   );
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "certification.issued",
-    entityType: "Certification",
-    entityId: id,
-    before: { status: "DRAFT" },
-    after: { status: "ISSUED" },
-    ipAddress: ctx.ipAddress,
-  });
 
   return updated;
 }
@@ -436,7 +431,8 @@ async function _transition(
   const cert = await prisma.certification.findUnique({ where: { id } });
   if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
   if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  const { beforeStatus, updated } = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, cert.projectId, ctx);
     // Same lock as measurement, issue and billing: no invoice can be created during cancellation.
     await _lockCertificationProject(tx, cert.projectId);
     const current = await tx.certification.findFirstOrThrow({ where: { id, tenantId: ctx.tenantId } });
@@ -452,23 +448,16 @@ async function _transition(
         throw new ServiceError("CONFLICT", "No se puede cancelar la certificación porque tiene una factura activa. Anule la factura primero.");
       }
     }
-    return { beforeStatus: current.status, updated: await tx.certification.update({
+    const updated = await tx.certification.update({
       where: { id }, data: { status: to, updatedBy: ctx.actorUserId },
-    }) };
+    });
+    await log({
+      tenantId: ctx.tenantId, actorUserId: ctx.actorUserId, projectId: cert.projectId,
+      action, entityType: "Certification", entityId: id,
+      before: { status: current.status }, after: { status: to }, ipAddress: ctx.ipAddress,
+    }, tx);
+    return updated;
   }, { timeout: 30_000, maxWait: 10_000 });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action,
-    entityType: "Certification",
-    entityId: id,
-    before: { status: beforeStatus },
-    after: { status: to },
-    ipAddress: ctx.ipAddress,
-  });
-
-  return updated;
 }
 
 // ─── Serialization ────────────────────────────────────────────────────────────

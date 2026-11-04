@@ -1,7 +1,7 @@
 "use client";
 
 import { ExportCsvButton } from "@/components/ui/export-csv-button";
-import { activeContactRoles, type ContactWithRoles } from "@/features/directory/types";
+import { activeContactRoles, contactRoleLabel, type ContactWithRoles } from "@/features/directory/types";
 
 export function ContactListExportButton({ contacts }: { contacts: ContactWithRoles[] }) {
   const rows = contacts.map((c) => [
@@ -10,13 +10,14 @@ export function ContactListExportButton({ contacts }: { contacts: ContactWithRol
     c.taxId ?? "",
     c.email ?? "",
     activeContactRoles(c.roles)
-      .map((r) => r.role)
+      .map((r) => contactRoleLabel(r.role))
       .join("; "),
     c.status === "ACTIVE" ? "Activo" : "Archivado",
   ]);
 
   return (
     <ExportCsvButton
+      label="Exportar página CSV"
       filename="directorio.csv"
       headers={["Razón social", "Nombre fantasía", "CUIT", "Email", "Roles", "Estado"]}
       rows={rows}

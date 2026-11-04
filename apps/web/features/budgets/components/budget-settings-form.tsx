@@ -3,12 +3,13 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateBudgetSettingsSchema, type UpdateBudgetSettingsInput } from "@bloqer/validators";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 export type SettingsDefaults = {
   overheadPct: number;
@@ -26,8 +27,9 @@ interface BudgetSettingsFormProps {
 
 export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const formId = useId();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { isPending, run: startTransition } = useBudgetAction(setServerError);
   const [saved, setSaved] = useState(false);
 
   const form = useForm<UpdateBudgetSettingsInput>({
@@ -57,26 +59,29 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+      <fieldset disabled={isPending} className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <Label>Gastos generales (%)</Label>
+          <Label htmlFor={`${formId}-overhead`}>Gastos generales (%)</Label>
           <DecimalInput
+            id={`${formId}-overhead`}
             {...bindRhfNumberDecimal(form.watch("overheadPct"), (n) =>
               form.setValue("overheadPct", n, { shouldValidate: true, shouldDirty: true }),
             )}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Costo financiero — tasa anual (%)</Label>
+          <Label htmlFor={`${formId}-financial`}>Costo financiero — tasa anual (%)</Label>
           <DecimalInput
+            id={`${formId}-financial`}
             {...bindRhfNumberDecimal(form.watch("financialCostPct"), (n) =>
               form.setValue("financialCostPct", n, { shouldValidate: true, shouldDirty: true }),
             )}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Días promedio de financiamiento</Label>
+          <Label htmlFor={`${formId}-days`}>Días promedio de financiamiento</Label>
           <Input
+            id={`${formId}-days`}
             type="number"
             step="1"
             min="0"
@@ -88,30 +93,36 @@ export function BudgetSettingsForm({ defaults, onSubmit }: BudgetSettingsFormPro
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label>Utilidad (%)</Label>
+          <Label htmlFor={`${formId}-profit`}>Utilidad (%)</Label>
           <DecimalInput
+            id={`${formId}-profit`}
             {...bindRhfNumberDecimal(form.watch("profitPct"), (n) =>
               form.setValue("profitPct", n, { shouldValidate: true, shouldDirty: true }),
             )}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>IVA / Impuesto (%)</Label>
+          <Label htmlFor={`${formId}-tax`}>IVA / Impuesto (%)</Label>
           <DecimalInput
+            id={`${formId}-tax`}
             {...bindRhfNumberDecimal(form.watch("taxPct"), (n) =>
               form.setValue("taxPct", n, { shouldValidate: true, shouldDirty: true }),
             )}
           />
         </div>
-      </div>
+      </fieldset>
+
+      {Object.values(form.formState.errors).map((error, index) => (
+        <p key={index} role="alert" className="text-sm text-destructive">{error?.message}</p>
+      ))}
 
       {serverError && (
-        <div className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
+        <div role="alert" className="rounded-md bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {serverError}
         </div>
       )}
       {saved && (
-        <div className="rounded-md bg-green-50 px-4 py-2 text-sm text-green-700">
+        <div role="status" className="rounded-md bg-green-50 px-4 py-2 text-sm text-green-700 dark:bg-green-950/30 dark:text-green-300">
           Configuración guardada.
         </div>
       )}

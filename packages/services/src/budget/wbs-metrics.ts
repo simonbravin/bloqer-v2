@@ -1,4 +1,5 @@
 import type { WbsViewNode } from "./wbs.service";
+import { addDecimal, multiplyDecimal, roundMoney } from "@bloqer/utils";
 
 /** Pure WBS row metrics (safe for client bundles — no Prisma). */
 /** Visible cost categories in WBS EDT (excludes OTHER). */
@@ -21,88 +22,68 @@ export type WbsRowMetrics = {
   totalSalePrice: number;
 };
 
-const ZERO: CategoryAmounts = {
-  MATERIAL: 0,
-  LABOR: 0,
-  EQUIPMENT: 0,
-  SUBCONTRACT: 0,
+export type ExactCategoryAmounts = Record<VisibleCostCategory, string>;
+export type ExactWbsRowMetrics = Omit<WbsRowMetrics, "quantity" | "byCategory" | "totalCostDirect" | "totalSalePrice"> & {
+  quantity: string | null;
+  byCategory: ExactCategoryAmounts;
+  totalCostDirect: string;
+  totalSalePrice: string;
 };
+export type CategoryAmountsExact = ExactCategoryAmounts;
+export type WbsRowMetricsExact = ExactWbsRowMetrics;
 
-function unitCategoryCosts(node: WbsViewNode): CategoryAmounts {
-  if (node.children.length > 0 || !node.costItem) return { ...ZERO };
-  const amounts = { ...ZERO };
+function emptyExact(): ExactWbsRowMetrics {
+  return { unit: "", quantity: null, byCategory: { MATERIAL: "0.00", LABOR: "0.00", EQUIPMENT: "0.00", SUBCONTRACT: "0.00" }, totalCostDirect: "0.00", totalSalePrice: "0.00" };
+}
+
+/** Decimal strings remain exact through every tree level; convert only at display boundaries. */
+export function computeUnitCategoryCostsExact(node: WbsViewNode): ExactCategoryAmounts {
+  const amounts = emptyExact().byCategory;
+  if (node.children.length > 0 || !node.costItem) return amounts;
   for (const line of node.costItem.analysisLines) {
-    if (line.category === "OTHER") continue;
-    if (line.category in amounts) {
-      amounts[line.category as VisibleCostCategory] += parseFloat(line.totalCost) || 0;
+    if (VISIBLE_WBS_COST_CATEGORIES.includes(line.category as VisibleCostCategory)) {
+      const category = line.category as VisibleCostCategory;
+      amounts[category] = addDecimal(amounts[category], line.totalCost);
     }
   }
-  const qty = parseFloat(node.costItem.quantity) || 0;
-  return {
-    MATERIAL: amounts.MATERIAL * qty,
-    LABOR: amounts.LABOR * qty,
-    EQUIPMENT: amounts.EQUIPMENT * qty,
-    SUBCONTRACT: amounts.SUBCONTRACT * qty,
-  };
+  return amounts;
+}
+
+function sumExact(rows: ExactWbsRowMetrics[]): ExactWbsRowMetrics {
+  const result = emptyExact();
+  for (const row of rows) {
+    for (const category of VISIBLE_WBS_COST_CATEGORIES) result.byCategory[category] = roundMoney(addDecimal(result.byCategory[category], row.byCategory[category]));
+    result.totalCostDirect = roundMoney(addDecimal(result.totalCostDirect, row.totalCostDirect));
+    result.totalSalePrice = roundMoney(addDecimal(result.totalSalePrice, row.totalSalePrice));
+  }
+  return result;
+}
+
+export function computeWbsRowMetricsExact(node: WbsViewNode): ExactWbsRowMetrics {
+  if (node.children.length > 0 || !node.costItem) return sumExact(node.children.map(computeWbsRowMetricsExact));
+  const byCategory = computeUnitCategoryCostsExact(node);
+  for (const category of VISIBLE_WBS_COST_CATEGORIES) byCategory[category] = roundMoney(multiplyDecimal(byCategory[category], node.costItem.quantity));
+  return { unit: node.costItem.unit, quantity: node.costItem.quantity, byCategory, totalCostDirect: roundMoney(node.totalCostDirect), totalSalePrice: roundMoney(node.totalSalePrice) };
+}
+
+export function computeTreeGrandTotalsExact(nodes: WbsViewNode[]): ExactWbsRowMetrics {
+  return sumExact(nodes.map(computeWbsRowMetricsExact));
+}
+
+function forDisplay(row: ExactWbsRowMetrics): WbsRowMetrics {
+  return { unit: row.unit, quantity: row.quantity === null ? null : Number(row.quantity), byCategory: Object.fromEntries(VISIBLE_WBS_COST_CATEGORIES.map((category) => [category, Number(row.byCategory[category])])) as CategoryAmounts, totalCostDirect: Number(row.totalCostDirect), totalSalePrice: Number(row.totalSalePrice) };
 }
 
 export function computeWbsRowMetrics(node: WbsViewNode): WbsRowMetrics {
-  if (node.children.length === 0 && node.costItem) {
-    const byCategory = unitCategoryCosts(node);
-    return {
-      unit: node.costItem.unit,
-      quantity: parseFloat(node.costItem.quantity) || 0,
-      byCategory,
-      totalCostDirect: parseFloat(node.totalCostDirect) || 0,
-      totalSalePrice: parseFloat(node.totalSalePrice) || 0,
-    };
-  }
-
-  const byCategory = { ...ZERO };
-  let totalCostDirect = 0;
-  let totalSalePrice = 0;
-  for (const child of node.children) {
-    const childMetrics = computeWbsRowMetrics(child);
-    for (const cat of Object.keys(byCategory) as VisibleCostCategory[]) {
-      byCategory[cat] += childMetrics.byCategory[cat];
-    }
-    totalCostDirect += childMetrics.totalCostDirect;
-    totalSalePrice += childMetrics.totalSalePrice;
-  }
-
-  return {
-    unit: "",
-    quantity: null,
-    byCategory,
-    totalCostDirect,
-    totalSalePrice,
-  };
+  return forDisplay(computeWbsRowMetricsExact(node));
 }
 
 export function computeTreeGrandTotals(nodes: WbsViewNode[]): WbsRowMetrics {
-  const byCategory = { ...ZERO };
-  let totalCostDirect = 0;
-  let totalSalePrice = 0;
-  for (const node of nodes) {
-    const m = computeWbsRowMetrics(node);
-    for (const cat of Object.keys(byCategory) as VisibleCostCategory[]) {
-      byCategory[cat] += m.byCategory[cat];
-    }
-    totalCostDirect += m.totalCostDirect;
-    totalSalePrice += m.totalSalePrice;
-  }
-  return { unit: "", quantity: null, byCategory, totalCostDirect, totalSalePrice };
+  return forDisplay(computeTreeGrandTotalsExact(nodes));
 }
 
 /** Unit costs by category (without multiplying quantity). */
 export function computeUnitCategoryCosts(node: WbsViewNode): CategoryAmounts {
-  if (node.children.length > 0 || !node.costItem) return { ...ZERO };
-  const amounts = { ...ZERO };
-  for (const line of node.costItem.analysisLines) {
-    if (line.category === "OTHER") continue;
-    if (line.category in amounts) {
-      amounts[line.category as VisibleCostCategory] += parseFloat(line.totalCost) || 0;
-    }
-  }
-  return amounts;
+  const exact = computeUnitCategoryCostsExact(node);
+  return Object.fromEntries(VISIBLE_WBS_COST_CATEGORIES.map((category) => [category, Number(exact[category])])) as CategoryAmounts;
 }

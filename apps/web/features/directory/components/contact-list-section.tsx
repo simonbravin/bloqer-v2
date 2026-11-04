@@ -9,14 +9,16 @@ import { ContactListEmpty } from "./contact-list-empty";
 export function ContactListSection({
   contacts,
   hasActiveFilters = false,
+  canCreate,
 }: {
   contacts: ContactWithRoles[];
   hasActiveFilters?: boolean;
+  canCreate: boolean;
 }) {
   const view = useListViewMode();
 
   if (contacts.length === 0) {
-    return <ContactListEmpty hasActiveFilters={hasActiveFilters} />;
+    return <ContactListEmpty hasActiveFilters={hasActiveFilters} canCreate={canCreate} />;
   }
 
   if (view === "cards") return <ContactCards contacts={contacts} />;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useConfirmationAction } from "@/hooks/use-confirmation-action";
 
 type ConfirmProps = {
   open: boolean;
@@ -23,7 +24,7 @@ type ConfirmProps = {
   cancelLabel?: string;
   variant?: "default" | "destructive";
   pending?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<unknown>;
 };
 
 /** Confirmación destructiva con AlertDialog (reemplazo de window.confirm). */
@@ -38,22 +39,15 @@ export function ConfirmAlertDialog({
   pending = false,
   onConfirm,
 }: ConfirmProps) {
-  const [submitting, setSubmitting] = useState(false);
-  const busy = pending || submitting;
-
-  useEffect(() => {
-    if (!open) setSubmitting(false);
-  }, [open]);
-
-  function handleConfirm() {
-    if (busy) return;
-    setSubmitting(true);
-    onConfirm();
-  }
+  const { busy, actionError, handleOpenChange, confirmAction } = useConfirmationAction({
+    open,
+    pending,
+    onOpenChange,
+  });
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+      <AlertDialogContent aria-busy={busy}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription asChild>
@@ -62,13 +56,14 @@ export function ConfirmAlertDialog({
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {actionError ? <p className="text-sm text-destructive" role="alert">{actionError}</p> : null}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel type="button" disabled={busy}>{cancelLabel}</AlertDialogCancel>
           <Button
             type="button"
             variant={variant === "destructive" ? "destructive" : "default"}
             disabled={busy}
-            onClick={handleConfirm}
+            onClick={() => void confirmAction(onConfirm)}
           >
             {busy ? "Procesando…" : confirmLabel}
           </Button>
@@ -90,7 +85,7 @@ type ReasonProps = {
   variant?: "default" | "destructive";
   pending?: boolean;
   minChars?: number;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => void | Promise<unknown>;
 };
 
 /** Motivo obligatorio (mín. 3 caracteres) — reemplazo de window.prompt. */
@@ -110,31 +105,35 @@ export function ReasonAlertDialog({
 }: ReasonProps) {
   const [reason, setReason] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const busy = pending || submitting;
+  const reasonId = useId();
+  const reasonErrorId = `${reasonId}-error`;
+  const { busy, actionError, isBusy, handleOpenChange, confirmAction } = useConfirmationAction({
+    open,
+    pending,
+    onOpenChange,
+  });
 
   useEffect(() => {
     if (open) {
       setReason("");
       setLocalError(null);
-      setSubmitting(false);
     }
   }, [open]);
 
   function handleConfirm() {
-    if (busy) return;
+    if (isBusy()) return;
     const trimmed = reason.trim();
     if (trimmed.length < minChars) {
       setLocalError(`Indicá un motivo (mín. ${minChars} caracteres)`);
       return;
     }
-    setSubmitting(true);
-    onConfirm(trimmed);
+    setLocalError(null);
+    void confirmAction(() => onConfirm(trimmed));
   }
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+      <AlertDialogContent aria-busy={busy}>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription asChild>
@@ -144,23 +143,29 @@ export function ReasonAlertDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="space-y-2">
-          <Label htmlFor="reason-alert-dialog">{reasonLabel}</Label>
+          <Label htmlFor={reasonId}>{reasonLabel}</Label>
           <Textarea
-            id="reason-alert-dialog"
+            id={reasonId}
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={(e) => {
+              setReason(e.target.value);
+              if (localError) setLocalError(null);
+            }}
             placeholder={reasonPlaceholder}
             rows={3}
             disabled={busy}
+            aria-invalid={Boolean(localError)}
+            aria-describedby={localError ? reasonErrorId : undefined}
           />
           {localError ? (
-            <p className="text-sm text-destructive" role="alert">
+            <p id={reasonErrorId} className="text-sm text-destructive" role="alert">
               {localError}
             </p>
           ) : null}
         </div>
+        {actionError ? <p className="text-sm text-destructive" role="alert">{actionError}</p> : null}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={busy}>{cancelLabel}</AlertDialogCancel>
+          <AlertDialogCancel type="button" disabled={busy}>{cancelLabel}</AlertDialogCancel>
           <Button
             type="button"
             variant={variant === "destructive" ? "destructive" : "default"}

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -16,10 +17,25 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   projects: FieldHomeProject[];
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
+  showAllProjectsLink?: boolean;
+  onCloseAutoFocus?: (event: Event) => void;
   afterSelectHref?: (projectId: string) => string;
 };
 
-export function FieldProjectPickerSheet({ open, onOpenChange, projects, afterSelectHref }: Props) {
+export function FieldProjectPickerSheet({
+  open,
+  onOpenChange,
+  projects,
+  loading = false,
+  error = null,
+  onRetry,
+  showAllProjectsLink = true,
+  onCloseAutoFocus,
+  afterSelectHref,
+}: Props) {
   const router = useRouter();
 
   function select(id: string) {
@@ -32,13 +48,22 @@ export function FieldProjectPickerSheet({ open, onOpenChange, projects, afterSel
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
+        onCloseAutoFocus={onCloseAutoFocus}
         className="max-h-[80vh] rounded-t-xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
         data-testid="field-project-picker-sheet"
       >
         <SheetHeader>
           <SheetTitle>Seleccionar obra</SheetTitle>
+          <SheetDescription>Elegí la obra en la que querés continuar.</SheetDescription>
         </SheetHeader>
-        {projects.length === 0 ? (
+        {loading ? (
+          <p className="mt-4 text-sm text-muted-foreground" role="status">Cargando obras…</p>
+        ) : error ? (
+          <div className="mt-4 space-y-3" role="alert">
+            <p className="text-sm text-destructive">{error}</p>
+            {onRetry ? <Button type="button" variant="outline" onClick={onRetry}>Reintentar</Button> : null}
+          </div>
+        ) : projects.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">No hay obras disponibles.</p>
         ) : (
           <ul className="mt-4 space-y-2" data-testid="field-project-picker">
@@ -60,11 +85,13 @@ export function FieldProjectPickerSheet({ open, onOpenChange, projects, afterSel
             ))}
           </ul>
         )}
-        <Button asChild variant="ghost" className="mt-4 min-h-11 w-full">
-          <Link href="/proyectos" onClick={() => onOpenChange(false)}>
-            Ver todas las obras
-          </Link>
-        </Button>
+        {showAllProjectsLink ? (
+          <Button asChild variant="ghost" className="mt-4 min-h-11 w-full">
+            <Link href="/proyectos" onClick={() => onOpenChange(false)}>
+              Ver todas las obras
+            </Link>
+          </Button>
+        ) : null}
       </SheetContent>
     </Sheet>
   );

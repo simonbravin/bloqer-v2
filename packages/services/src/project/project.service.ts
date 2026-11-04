@@ -1,6 +1,7 @@
-import { prisma } from "@bloqer/database";
-import type { Project, ProjectStatus, Prisma, Contact } from "@bloqer/database";
-import { can } from "@bloqer/domain";
+import { prisma, Prisma } from "@bloqer/database";
+import type { Project, ProjectStatus, Contact } from "@bloqer/database";
+import { can, type PermissionModule } from "@bloqer/domain";
+import { listProjectsSchema } from "@bloqer/validators";
 import type { CreateProjectInput, UpdateProjectInput, ListProjectsInput, ProjectLifecycleInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { canViewArProjectArea } from "../ar/ar-access";
@@ -10,7 +11,6 @@ import { canViewProcurementProjectArea } from "../procurement/procurement-access
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import {
   assertNoOpenOperationalDocuments,
-  getProjectCancellationImpact,
   resolveReactivationTargetStatus,
 } from "./project-cancellation-impact.service";
 import {
@@ -19,9 +19,12 @@ import {
   canReactivateProject,
 } from "./project-lifecycle-access";
 import { maybeAutoAddCreatorToProjectTeam } from "./project-team.service";
+import { lockProjectForMutation } from "./project-write-lock";
+import { clearProjectAccessModeCache, hasTenantWideProjectAccess } from "../security/access";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { assertTenantModuleEnabled, getTenantModuleGate, type TenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 
 export {
@@ -75,26 +78,32 @@ export type ProjectShellInfo = {
  * True if the actor may load `/proyectos/[id]` layout (any project-scoped area they can reach).
  * Narrower than “VIEW PROJECTS everywhere”: AR/AP/procurement specialists can open their routes.
  */
-export function canAccessProjectLayout(roles: ServiceContext["roles"]): boolean {
+export function canAccessProjectLayout(
+  roles: ServiceContext["roles"],
+  gate?: Pick<TenantModuleGate, "isEnabled">,
+): boolean {
+  const enabled = (module: PermissionModule) => gate?.isEnabled(module) ?? true;
   return (
-    can(roles, "VIEW", "PROJECTS") ||
-    canViewArProjectArea(roles) ||
-    canViewApProjectArea(roles) ||
-    canViewProjectCashFlowReport(roles) ||
-    canViewProjectCostControlReport(roles) ||
-    canViewProcurementProjectArea(roles) ||
-    can(roles, "VIEW", "SUBCONTRACTS") ||
-    can(roles, "VIEW", "INVENTORY") ||
-    can(roles, "VIEW", "JOBSITE_LOG") ||
-    can(roles, "VIEW", "BUDGETS") ||
-    can(roles, "VIEW", "CERTIFICATIONS")
+    (enabled("PROJECTS") && can(roles, "VIEW", "PROJECTS")) ||
+    (enabled("AR") && canViewArProjectArea(roles)) ||
+    (enabled("AP") && canViewApProjectArea(roles)) ||
+    (enabled("PROJECTS") && canViewProjectCashFlowReport(roles)) ||
+    (enabled("PROJECTS") && enabled("BUDGETS") && canViewProjectCostControlReport(roles)) ||
+    (enabled("PROCUREMENT") && canViewProcurementProjectArea(roles)) ||
+    (enabled("SUBCONTRACTS") && can(roles, "VIEW", "SUBCONTRACTS")) ||
+    (enabled("INVENTORY") && can(roles, "VIEW", "INVENTORY")) ||
+    (enabled("JOBSITE_LOG") && can(roles, "VIEW", "JOBSITE_LOG")) ||
+    (enabled("BUDGETS") && can(roles, "VIEW", "BUDGETS")) ||
+    (enabled("CERTIFICATIONS") && can(roles, "VIEW", "CERTIFICATIONS"))
   );
 }
 
 export async function getProjectShellInfo(id: string, ctx: ServiceContext): Promise<ProjectShellInfo> {
-  if (!canAccessProjectLayout(ctx.roles)) {
+  if (!canAccessProjectLayout(ctx.roles, await getTenantModuleGate(ctx))) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver este proyecto");
   }
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(id, ctx);
   const row = await prisma.project.findUnique({
     where: { id },
     select: { id: true, name: true, code: true, status: true, tenantId: true, companyId: true },
@@ -109,9 +118,11 @@ export async function getProjectClientContactId(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<string> {
-  if (!canAccessProjectLayout(ctx.roles)) {
+  if (!canAccessProjectLayout(ctx.roles, await getTenantModuleGate(ctx))) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para acceder a este proyecto");
   }
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(projectId, ctx);
   const row = await prisma.project.findUnique({
     where: { id: projectId },
     select: { tenantId: true, clientContactId: true },
@@ -127,6 +138,9 @@ export async function getProjectById(id: string, ctx: ServiceContext): Promise<P
   if (!can(ctx.roles, "VIEW", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view projects");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(id, ctx);
   const project = await prisma.project.findUnique({
     where: { id },
     select: {
@@ -159,8 +173,6 @@ export async function getProjectById(id: string, ctx: ServiceContext): Promise<P
   });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  const { requireProjectAccess } = await import("../security/access");
-  await requireProjectAccess(project.id, ctx);
   return project;
 }
 
@@ -171,6 +183,13 @@ export async function listProjects(
   if (!can(ctx.roles, "VIEW", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to view projects");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+
+  const parsed = listProjectsSchema.safeParse(filters);
+  if (!parsed.success) {
+    throw new ServiceError("VALIDATION", "Los filtros o la página solicitada no son válidos");
+  }
+  filters = parsed.data;
 
   const { resolveAccessibleProjectScope } = await import("../security/access");
   const scope = await resolveAccessibleProjectScope(ctx);
@@ -224,6 +243,9 @@ export async function createProject(
   if (!can(ctx.roles, "EDIT", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to create projects");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+
+  assertProjectDateRange(input.startDate, input.expectedEndDate);
 
   // BR-PROJ-001: client must have active CLIENT role
   await _guardClientRole(input.clientContactId, ctx.tenantId);
@@ -235,25 +257,49 @@ export async function createProject(
 
   const companyId = (await resolveActiveCompanyId(ctx)) ?? undefined;
 
-  const project = await prisma.project.create({
-    data: {
-      ...input,
-      tenantId: ctx.tenantId,
-      companyId,
-      createdBy: ctx.actorUserId,
-      updatedBy: ctx.actorUserId,
-    },
-  });
+  const project = await withProjectCodeConflict(input.code, () => prisma.$transaction(async (tx) => {
+    let assignCreator = false;
+    if (!hasTenantWideProjectAccess(ctx.roles)) {
+      // Same tenant lock as membership/mode administration; do not use a cached mode.
+      await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR NO KEY UPDATE`;
+      const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { projectAccessMode: true } });
+      if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+      assignCreator = tenant.projectAccessMode === "MEMBERSHIP_SCOPED";
+    }
+    await _guardClientRole(input.clientContactId, ctx.tenantId, tx);
+    const created = await tx.project.create({
+      data: {
+        ...input,
+        tenantId: ctx.tenantId,
+        companyId,
+        createdBy: ctx.actorUserId,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    const creatorMembership = assignCreator
+      ? await tx.projectMembership.create({
+          data: { tenantId: ctx.tenantId, projectId: created.id, userId: ctx.actorUserId, createdBy: ctx.actorUserId },
+          select: { id: true, userId: true },
+        })
+      : null;
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "project.created",
-    entityType: "Project",
-    entityId: project.id,
-    after: { code: project.code, name: project.name, status: project.status, companyId: project.companyId },
-    ipAddress: ctx.ipAddress,
-  });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      projectId: created.id,
+      action: "project.created",
+      entityType: "Project",
+      entityId: created.id,
+      after: {
+        ...projectConfigurationAuditSnapshot(created), status: created.status, companyId: created.companyId,
+        ...(creatorMembership ? { creatorMembership } : {}),
+      },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+    return created;
+  }, { maxWait: 10_000, timeout: 30_000 }));
+  // Both company-scoped lists and scoped memberships changed; refresh request bags too.
+  clearProjectAccessModeCache();
 
   await maybeAutoAddCreatorToProjectTeam({
     projectId: project.id,
@@ -273,6 +319,9 @@ export async function isProjectTypeLocked(
   if (!can(ctx.roles, "VIEW", "PROJECTS") && !can(ctx.roles, "EDIT", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(projectId, ctx);
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { tenantId: true },
@@ -299,6 +348,9 @@ export async function updateProject(
   if (!can(ctx.roles, "EDIT", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions to update projects");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(id, ctx);
 
   const existing = await prisma.project.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
@@ -309,7 +361,12 @@ export async function updateProject(
     throw new ServiceError("CONFLICT", "Los proyectos completados o cancelados no pueden modificarse");
   }
 
-  // BR-PROJ-002: type drives over-cert rules; immutable after first APPROVED/CLOSED budget.
+  assertProjectDateRange(
+    input.startDate === undefined ? existing.startDate : input.startDate,
+    input.expectedEndDate === undefined ? existing.expectedEndDate : input.expectedEndDate,
+  );
+
+  // BR-PROJ-002: preserve project classification after first APPROVED/CLOSED budget.
   if (input.type !== undefined && input.type !== existing.type) {
     const lockedBudget = await prisma.budget.findFirst({
       where: {
@@ -340,28 +397,49 @@ export async function updateProject(
 
   const { startDate, expectedEndDate, ...rest } = input;
 
-  const updated = await prisma.project.update({
-    where: { id },
-    data: {
-      ...rest,
-      ...(startDate !== undefined ? { startDate } : {}),
-      ...(expectedEndDate !== undefined ? { expectedEndDate } : {}),
-      updatedBy: ctx.actorUserId,
-    },
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "project.updated",
-    entityType: "Project",
-    entityId: id,
-    before: { name: existing.name, code: existing.code },
-    after: { name: updated.name, code: updated.code },
-    ipAddress: ctx.ipAddress,
-  });
-
-  return updated;
+  return withProjectCodeConflict(input.code, () => prisma.$transaction(async (tx) => {
+    if (input.code !== undefined) {
+      // Writing a unique key may upgrade the project lock. Keep Tenant → Project
+      // order so membership administration cannot invert the audit FK check.
+      await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR KEY SHARE`;
+    }
+    await lockProjectForMutation(tx, id, ctx.tenantId);
+    if (input.type !== undefined && input.type !== existing.type) {
+      const lockedBudget = await tx.budget.findFirst({
+        where: { projectId: id, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
+        select: { id: true },
+      });
+      if (lockedBudget) {
+        throw new ServiceError("CONFLICT", "No se puede cambiar el tipo de obra después de un presupuesto aprobado o cerrado (BR-PROJ-002)");
+      }
+    }
+    if (input.clientContactId && input.clientContactId !== existing.clientContactId) {
+      await _guardClientRole(input.clientContactId, ctx.tenantId, tx);
+    }
+    const changed = await tx.project.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: existing.status, updatedAt: existing.updatedAt },
+      data: {
+        ...rest,
+        ...(startDate !== undefined ? { startDate } : {}),
+        ...(expectedEndDate !== undefined ? { expectedEndDate } : {}),
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(changed.count, "El proyecto cambió mientras lo editabas. Recargá e intentá de nuevo.");
+    const updated = await tx.project.findUniqueOrThrow({ where: { id } });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      projectId: id,
+      action: "project.updated",
+      entityType: "Project",
+      entityId: id,
+      before: projectConfigurationAuditSnapshot(existing),
+      after: projectConfigurationAuditSnapshot(updated),
+      ipAddress: ctx.ipAddress,
+    }, tx);
+    return updated;
+  }, { maxWait: 10_000, timeout: 30_000 }));
 }
 
 // ─── Status transitions ───────────────────────────────────────────────────────
@@ -401,7 +479,11 @@ export async function completeProject(
     ["ACTIVE"],
     "COMPLETED",
     "project.completed",
-    () => ({ actualEndDate: new Date() }),
+    (project) => {
+      const actualEndDate = new Date();
+      assertProjectDateRange(project.startDate, actualEndDate);
+      return { actualEndDate };
+    },
     input,
   );
 }
@@ -411,6 +493,9 @@ export async function cancelProject(
   ctx: ServiceContext,
   input?: ProjectLifecycleInput,
 ): Promise<Project> {
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(id, ctx);
   const project = await prisma.project.findUnique({ where: { id } });
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -427,7 +512,6 @@ export async function cancelProject(
     if (!reason) {
       throw new ServiceError("CONFLICT", "El motivo de cancelación es obligatorio");
     }
-    await assertNoOpenOperationalDocuments(id, ctx.tenantId);
   } else {
     throw new ServiceError("CONFLICT", `No se puede cancelar desde el estado ${project.status}`);
   }
@@ -459,6 +543,9 @@ export async function reactivateProject(
   if (!canReactivateProject(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Solo OWNER o ADMIN pueden reactivar una obra cancelada");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(id, ctx);
 
   const reason = input.reason?.trim();
   if (!reason) {
@@ -477,42 +564,78 @@ export async function reactivateProject(
     throw new ServiceError("CONFLICT", "No se pudo determinar el estado de reactivación");
   }
 
-  const flipped = await prisma.project.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "CANCELLED" },
-    data: {
-      status: targetStatus,
-      statusBeforeCancellation: null,
-      cancellationReason: null,
-      cancelledAt: null,
-      updatedBy: ctx.actorUserId,
-    },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El proyecto ya no está cancelado. Recargá e intentá de nuevo.",
-  );
-
-  const updated = await prisma.project.findUniqueOrThrow({ where: { id } });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "project.reactivated",
-    entityType: "Project",
-    entityId: id,
-    before: { status: "CANCELLED", previousStatus: project.statusBeforeCancellation },
-    after: { status: targetStatus, reason, restoredStatus: targetStatus },
-    ipAddress: ctx.ipAddress,
-  });
-
-  return updated;
+  return prisma.$transaction(async (tx) => {
+    await lockProjectForMutation(tx, id, ctx.tenantId);
+    const flipped = await tx.project.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "CANCELLED", updatedAt: project.updatedAt },
+      data: {
+        status: targetStatus,
+        statusBeforeCancellation: null,
+        cancellationReason: null,
+        cancelledAt: null,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El proyecto ya no está cancelado. Recargá e intentá de nuevo.",
+    );
+    const updated = await tx.project.findUniqueOrThrow({ where: { id } });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      projectId: id,
+      action: "project.reactivated",
+      entityType: "Project",
+      entityId: id,
+      before: { status: "CANCELLED", previousStatus: project.statusBeforeCancellation },
+      after: { status: targetStatus, reason, restoredStatus: targetStatus },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+    return updated;
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
-async function _guardClientRole(contactId: string, tenantId: string) {
+function assertProjectDateRange(start: Date | null | undefined, end: Date | null | undefined): void {
+  if ((start && !Number.isFinite(start.getTime())) || (end && !Number.isFinite(end.getTime()))) {
+    throw new ServiceError("VALIDATION", "Ingresá una fecha válida");
+  }
+  if (start && end && start > end) {
+    throw new ServiceError("VALIDATION", "La fecha de fin no puede ser anterior a la fecha de inicio");
+  }
+}
+
+function projectConfigurationAuditSnapshot(project: Project) {
+  return {
+    code: project.code,
+    name: project.name,
+    type: project.type,
+    clientContactId: project.clientContactId,
+    startDate: project.startDate,
+    expectedEndDate: project.expectedEndDate,
+  };
+}
+
+async function withProjectCodeConflict<T>(code: string | undefined, operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (code !== undefined && error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      const target = error.meta?.target;
+      if ((Array.isArray(target) && target.includes("code")) || (typeof target === "string" && target.includes("code"))) {
+        throw new ServiceError("CONFLICT", `Ya existe un proyecto con el código "${code}"`);
+      }
+    }
+    throw error;
+  }
+}
+
+async function _guardClientRole(contactId: string, tenantId: string, tx?: Prisma.TransactionClient) {
   await assertContactRoleInTenant(contactId, "CLIENT", tenantId, {
     contactNotFoundMessage: "Contacto cliente no encontrado",
+    ...(tx ? { tx } : {}),
   });
 }
 
@@ -530,6 +653,9 @@ async function _transition(
   if (!can(ctx.roles, "EDIT", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Insufficient permissions");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
+  const { requireProjectAccess } = await import("../security/access");
+  await requireProjectAccess(id, ctx);
   const project =
     existingProject ?? (await prisma.project.findUnique({ where: { id } }));
   if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
@@ -541,36 +667,41 @@ async function _transition(
   const comment = input?.comment?.trim() || null;
   const reason = input?.reason?.trim() || null;
 
-  const flipped = await prisma.project.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: { in: allowedFrom } },
-    data: {
-      status: to,
-      updatedBy: ctx.actorUserId,
-      ...(extraData?.(project) as Prisma.ProjectUpdateManyMutationInput | undefined),
-    },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    `No se puede cambiar el estado desde ${project.status}. Recargá e intentá de nuevo.`,
-  );
-
-  const updated = await prisma.project.findUniqueOrThrow({ where: { id } });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action,
-    entityType: "Project",
-    entityId: id,
-    before: { status: project.status },
-    after: {
-      status: to,
-      ...(comment ? { comment } : {}),
-      ...(reason ? { reason } : {}),
-      ...auditExtra,
-    },
-    ipAddress: ctx.ipAddress,
-  });
-
-  return updated;
+  const additionalData = extraData?.(project) as Prisma.ProjectUpdateManyMutationInput | undefined;
+  return prisma.$transaction(async (tx) => {
+    await lockProjectForMutation(tx, id, ctx.tenantId);
+    if (to === "CANCELLED" && (project.status === "ACTIVE" || project.status === "ON_HOLD")) {
+      await assertNoOpenOperationalDocuments(id, ctx.tenantId, tx);
+    }
+    const flipped = await tx.project.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: project.status, updatedAt: project.updatedAt },
+      data: {
+        status: to,
+        updatedBy: ctx.actorUserId,
+        ...additionalData,
+      },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      `No se puede cambiar el estado desde ${project.status}. Recargá e intentá de nuevo.`,
+    );
+    const updated = await tx.project.findUniqueOrThrow({ where: { id } });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      projectId: id,
+      action,
+      entityType: "Project",
+      entityId: id,
+      before: { status: project.status },
+      after: {
+        status: to,
+        ...(comment ? { comment } : {}),
+        ...(reason ? { reason } : {}),
+        ...auditExtra,
+      },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+    return updated;
+  }, { maxWait: 10_000, timeout: 30_000 });
 }

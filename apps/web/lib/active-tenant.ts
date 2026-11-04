@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { isUuid } from "@bloqer/utils";
+import { LAST_PROJECT_COOKIE } from "./last-project-cookie";
 
 /** HttpOnly preference for multi-tenant users; subscription/plan always follows this tenant id. */
 export const ACTIVE_TENANT_COOKIE = "bloqer_active_tenant_id";
@@ -16,6 +17,9 @@ export async function readActiveTenantIdFromCookies(): Promise<string | null> {
 export async function setActiveTenantCookie(tenantId: string): Promise<void> {
   if (!isUuid(tenantId)) return;
   const c = await cookies();
+  if (c.get(ACTIVE_TENANT_COOKIE)?.value?.trim() !== tenantId) {
+    c.delete({ name: LAST_PROJECT_COOKIE, path: "/" });
+  }
   c.set(ACTIVE_TENANT_COOKIE, tenantId, {
     httpOnly: true,
     sameSite: "lax",
@@ -28,4 +32,5 @@ export async function setActiveTenantCookie(tenantId: string): Promise<void> {
 export async function clearActiveTenantCookie(): Promise<void> {
   const c = await cookies();
   c.delete({ name: ACTIVE_TENANT_COOKIE, path: "/" });
+  c.delete({ name: LAST_PROJECT_COOKIE, path: "/" });
 }

@@ -20,7 +20,8 @@ import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./a
 import { notifyPayableReadyToPay } from "./ap-notifications.service";
 import { calcLine, recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
 import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -798,6 +799,7 @@ export async function createSupplierInvoice(
   const lineCostTypes = await resolveInvoiceLineCostTypes(input.lines, ctx.tenantId);
 
   const writeInvoice = async (tx: Prisma.TransactionClient) => {
+    if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
     const maxNum = await tx.supplierInvoice.aggregate({
       where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
       _max: { number: true },
@@ -1056,6 +1058,7 @@ export async function updateSupplierInvoice(
     : [];
 
   const inv = await prisma.$transaction(async (tx) => {
+    if (existing.projectId) await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     const nextPurchaseOrderId =
       input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined;
 
@@ -1279,6 +1282,7 @@ export async function issueSupplierInvoice(
       : null;
 
   const result = await prisma.$transaction(async (tx) => {
+    if (invPreview.projectId) await lockProjectForOperationalMutation(tx, invPreview.projectId, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -1475,6 +1479,7 @@ export async function cancelSupplierInvoice(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    if (invPreview.projectId) await lockProjectForMutation(tx, invPreview.projectId, ctx.tenantId);
     const inv = await tx.supplierInvoice.findUnique({ where: { id } });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

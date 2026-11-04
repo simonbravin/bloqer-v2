@@ -93,7 +93,7 @@ export function ProjectOverviewView({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="truncate text-2xl font-bold tracking-tight lg:text-3xl">{p.name}</h1>
+            <h1 className="break-words text-2xl font-bold tracking-tight lg:text-3xl">{p.name}</h1>
             <ProjectStatusBadge status={p.status as ProjectStatus} />
           </div>
           {p.code ? <p className="font-mono text-sm text-muted-foreground">{p.code}</p> : null}
@@ -129,7 +129,7 @@ export function ProjectOverviewView({
             <CardTitle className="text-base">Datos del proyecto</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <dl className="grid grid-cols-1 gap-3 xl:grid-cols-3">
               <MetaItem
                 label="Cliente"
                 iconKey="client"
@@ -147,7 +147,7 @@ export function ProjectOverviewView({
                   "—"
                 )}
               </MetaItem>
-              <div className="grid grid-cols-1 gap-3 sm:col-span-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 xl:col-span-2">
                 <MetaItem label="Tipo" iconKey="type">
                   {TYPE_LABELS[fullProject.type]}
                 </MetaItem>

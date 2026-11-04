@@ -87,12 +87,16 @@ function ShellBreadcrumbTrail({ items }: { items: ShellBreadcrumbItem[] }) {
             <Fragment key={item.href ?? `crumb-${index}`}>
               {index > 0 ? <BreadcrumbSeparator /> : null}
               <BreadcrumbItem>
-                {isLast || !item.href ? (
+                {isLast ? (
                   <BreadcrumbPage title={item.label}>{item.label}</BreadcrumbPage>
-                ) : (
+                ) : item.href ? (
                   <BreadcrumbLink href={item.href} title={item.label}>
                     {item.label}
                   </BreadcrumbLink>
+                ) : (
+                  <span className="max-w-[8rem] truncate font-medium sm:max-w-[10rem] md:max-w-[14rem]" title={item.label}>
+                    {item.label}
+                  </span>
                 )}
               </BreadcrumbItem>
             </Fragment>

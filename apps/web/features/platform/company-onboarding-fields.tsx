@@ -36,7 +36,7 @@ export function CompanyOnboardingFields({
     <>
       {showOwnerEmail ? (
         <div className="space-y-2">
-          <Label htmlFor="ownerEmail">Email del administrador (OWNER)</Label>
+          <Label htmlFor="ownerEmail">Email del propietario</Label>
           <Input
             id="ownerEmail"
             name="ownerEmail"
@@ -121,7 +121,7 @@ export function CompanyOnboardingFields({
             className="max-w-[120px]"
           />
           <p className="text-xs text-muted-foreground">
-            Duración del link del correo. El trial de la organización se define al crear el tenant.
+            Duración del enlace del correo. La prueba de la organización se define al crearla.
           </p>
         </div>
       ) : null}

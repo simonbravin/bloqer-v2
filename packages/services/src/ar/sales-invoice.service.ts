@@ -27,7 +27,8 @@ import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { ensureDraftJournalFromSalesInvoice } from "../accounting/accounting-auto-draft.service";
@@ -393,6 +394,7 @@ export async function createSalesInvoice(
   const number = (maxNum._max.number ?? 0) + 1;
 
   const inv = await prisma.$transaction(async (tx) => {
+    if (input.projectId) await lockProjectForOperationalMutation(tx, input.projectId, ctx);
     const created = await tx.salesInvoice.create({
       data: {
         tenantId: ctx.tenantId,
@@ -524,6 +526,7 @@ export async function createInvoiceFromCertification(
   try {
     inv = await prisma.$transaction(
       async (tx) => {
+        await lockProjectForOperationalMutation(tx, cert.projectId, ctx);
         await _lockCertificationProject(tx, cert.projectId);
         const currentCert = await tx.certification.findFirstOrThrow({
           where: { id: cert.id, tenantId: ctx.tenantId },
@@ -662,6 +665,7 @@ export async function updateSalesInvoice(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (inv.projectId) await lockProjectForOperationalMutation(tx, inv.projectId, ctx);
     await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     assertInvoiceEditable(await tx.salesInvoice.findUniqueOrThrow({ where: { id } }));
     const updatedInvoice = await tx.salesInvoice.update({
@@ -825,6 +829,7 @@ export async function issueSalesInvoice(
   await assertProjectGuardIfPresent(invPreview.projectId, ctx);
 
   const result = await prisma.$transaction(async (tx) => {
+    if (invPreview.projectId) await lockProjectForOperationalMutation(tx, invPreview.projectId, ctx);
     await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
@@ -990,6 +995,7 @@ export async function cancelSalesInvoice(
   }
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (invPreview.projectId) await lockProjectForMutation(tx, invPreview.projectId, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({ where: { id } });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

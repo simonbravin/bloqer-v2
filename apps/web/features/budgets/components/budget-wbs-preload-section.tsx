@@ -1,28 +1,33 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { previewSpreadsheetImport } from "@bloqer/services/budget-import-pure";
 import type { BudgetImportRow } from "@bloqer/validators";
 import { readSpreadsheetFile } from "../lib/read-spreadsheet";
 import type { WbsImportPreview } from "./wbs-import-dialog";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 type Props = {
   disabled?: boolean;
   onPendingRowsChange: (rows: BudgetImportRow[] | null) => void;
+  onPendingChange?: (pending: boolean) => void;
 };
 
-export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props) {
-  const [isPending, startTransition] = useTransition();
+export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange, onPendingChange }: Props) {
+  const { isPending, isRunning, run: startTransition } = useBudgetAction(toast.error, onPendingChange);
   const [expanded, setExpanded] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [preview, setPreview] = useState<WbsImportPreview | null>(null);
 
   const handleFile = (file: File | null) => {
-    if (!file) return;
+    if (!file || disabled || isRunning()) return;
     setFileName(file.name);
+    setPreview(null);
+    onPendingRowsChange(null);
 
     startTransition(async () => {
       try {
@@ -31,7 +36,11 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
         setPreview(result);
         if (result.valid) {
           onPendingRowsChange(
-            result.rows.map(({ _row: _, _parentResolved: __, ...row }) => row),
+            result.rows.map(({ _row, _parentResolved, ...row }) => {
+              void _row;
+              void _parentResolved;
+              return row;
+            }),
           );
         } else {
           onPendingRowsChange(null);
@@ -75,9 +84,21 @@ export function BudgetWbsPreloadSection({ disabled, onPendingRowsChange }: Props
               accept=".csv,.xlsx,.xls"
               className="sr-only"
               disabled={disabled || isPending}
-              onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                handleFile(e.target.files?.[0] ?? null);
+                e.target.value = "";
+              }}
             />
           </Label>
+          {fileName && (
+            <Button type="button" variant="ghost" size="sm" disabled={disabled || isPending} onClick={() => {
+              setFileName(null);
+              setPreview(null);
+              onPendingRowsChange(null);
+            }}>
+              Quitar archivo
+            </Button>
+          )}
 
           {preview && !preview.valid && (
             <p className="text-xs text-destructive">

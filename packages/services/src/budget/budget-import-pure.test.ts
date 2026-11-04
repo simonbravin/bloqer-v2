@@ -9,7 +9,7 @@ describe("previewSpreadsheetImport", () => {
     assert.ok(result.errors.some((e) => e.field === "general"));
   });
 
-  it("reconcilia padre con hijo a GROUP aunque venga como ITEM", () => {
+  it("rechaza estructuras de JSON que superan los niveles permitidos", () => {
     const { errors } = validateImportRows(
       [
         { code: "1.1.1", type: "ITEM", name: "Ítem hoja", _row: 1 },
@@ -17,7 +17,29 @@ describe("previewSpreadsheetImport", () => {
       ],
       [],
     );
-    assert.equal(errors.length, 0);
+    assert.ok(errors.some((error) => error.field === "code"));
+  });
+
+  it("reconcilia padre con hijo a GROUP dentro de la jerarquía permitida", () => {
+    const { errors } = validateImportRows([
+      { code: "1", type: "ITEM", name: "Capítulo", _row: 1 },
+      { code: "1.1", parent_code: "1", type: "GROUP", name: "Partida hoja", _row: 2 },
+    ], []);
+    assert.deepEqual(errors, []);
+  });
+
+  for (const [code, parent_code] of [["1.1", undefined], ["1.2", "2"], ["1", "1"], ["A!", undefined]] as const) {
+    it(`rechaza código/padre incompatible ${code}/${parent_code}`, () => {
+      const { errors } = validateImportRows([{ code, parent_code, type: "ITEM", name: "Partida", _row: 1 }], []);
+      assert.ok(errors.length > 0);
+    });
+  }
+
+  it("rechaza reemplazo vacío y cantidades cero en full; permite placeholders de estructura", () => {
+    assert.ok(validateImportRows([], []).errors.length > 0);
+    const row = { code: "1", type: "ITEM" as const, name: "Partida", quantity: "0.0000", unit: "m2", _row: 1 };
+    assert.ok(validateImportRows([row], [], "full").errors.some((error) => error.field === "quantity"));
+    assert.deepEqual(validateImportRows([row], [], "structure_only").errors, []);
   });
 
   it("imports leaf items without unit in structure_only", () => {

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import {
-  moneyAmountString,
   optionalMoneyAmountString,
   optionalFxRateString,
   qtyString,

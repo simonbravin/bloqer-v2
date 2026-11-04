@@ -21,8 +21,9 @@ export const AMERICAS_CURRENCY_CODES = [
 
 export const americasCurrencyCodeSchema = z.enum(AMERICAS_CURRENCY_CODES);
 
-const emptyToUndefined = (v: unknown) =>
-  v === "" || v === null || v === undefined ? undefined : v;
+/** null explicitly clears a nullable setting; undefined leaves it unchanged. */
+const emptyToNull = (v: unknown) =>
+  typeof v === "string" && v.trim() === "" ? null : v;
 
 const userRoleEnum = z.enum([
   "OWNER",
@@ -54,12 +55,12 @@ export const updateTenantDisplaySettingsInputSchema = z.object({
   country: z.string().trim().length(2, "País inválido").toUpperCase().optional(),
   phone: z.string().trim().min(1).max(40).optional(),
   website: z.preprocess(
-    emptyToUndefined,
+    emptyToNull,
     z.union([z.null(), z.string().trim().url("URL inválida").max(512)]).optional(),
   ),
   /** Condición frente al IVA de la empresa emisora ([D-084]). */
   ivaCondition: z.preprocess(
-    emptyToUndefined,
+    emptyToNull,
     ivaConditionSchema.nullable().optional(),
   ),
 });

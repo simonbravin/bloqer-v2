@@ -44,6 +44,12 @@ function handle(err: unknown): Err {
   return { error: "Error inesperado" };
 }
 
+function revalidateBudgetPaths(projectId: string, budgetId?: string) {
+  revalidatePath(`/proyectos/${projectId}/presupuestos`);
+  if (budgetId) revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+  revalidateProjectCostAndFinancePaths(projectId);
+}
+
 // ─── Budget ───────────────────────────────────────────────────────────────────
 
 export async function createBudgetAction(
@@ -51,11 +57,11 @@ export async function createBudgetAction(
   data: CreateBudgetInput,
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
-  const parsed = createBudgetSchema.safeParse(data);
+  const parsed = createBudgetSchema.safeParse({ ...data, projectId });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const budget = await createBudget(parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos`);
+    revalidateBudgetPaths(projectId, budget.id);
     return { id: budget.id };
   } catch (err) { return handle(err); }
 }
@@ -70,7 +76,7 @@ export async function updateBudgetAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateBudget(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -85,8 +91,7 @@ export async function updateBudgetSettingsAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateBudgetSettings(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos`);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -102,9 +107,7 @@ async function lifecycleAction(
   const ctx = await getCtx();
   try {
     await fn(budgetId, ctx, input);
-    revalidatePath(`/proyectos/${projectId}/presupuestos`);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -181,7 +184,7 @@ export async function ensureWbsLeafForApuAction(
   const ctx = await getCtx();
   try {
     const node = await ensureWbsLeafForApu(budgetId, nodeId, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { node };
   } catch (err) {
     return handle(err);
@@ -198,7 +201,7 @@ export async function addWbsNodeAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const result = await addWbsNode(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return result;
   } catch (err) { return handle(err); }
 }
@@ -214,7 +217,7 @@ export async function updateWbsNodeAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateWbsNode(nodeId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -227,7 +230,7 @@ export async function removeWbsNodeAction(
   const ctx = await getCtx();
   try {
     await removeWbsNode(nodeId, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -242,7 +245,7 @@ export async function reorderWbsNodesAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await reorderWbsNodes(budgetId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -277,17 +280,16 @@ export async function executeWbsImportAction(
   options: { replaceExisting: boolean },
 ): Promise<{ createdNodes: number; createdItems: number } | Err> {
   const ctx = await getCtx();
-  const parsed = rows.map((r) => budgetImportRowSchema.safeParse(r));
-  if (parsed.some((p) => !p.success)) {
+  const parsed = budgetImportRowSchema.array().safeParse(rows);
+  if (!parsed.success || !options || typeof options.replaceExisting !== "boolean") {
     return { error: "Hay filas inválidas en la importación" };
   }
-  const validRows = parsed.map((p) => p.data!);
   try {
-    const result = await executeImport(budgetId, validRows, ctx, {
+    const result = await executeImport(budgetId, parsed.data, ctx, {
       mode: "structure_only",
       replaceExisting: options.replaceExisting,
     });
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return result;
   } catch (err) {
     return handle(err);
@@ -307,7 +309,7 @@ export async function updateCostItemAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateCostItem(costItemId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -324,7 +326,7 @@ export async function addCostAnalysisLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const line = await addCostAnalysisLine(parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { id: line.id };
   } catch (err) { return handle(err); }
 }
@@ -340,7 +342,7 @@ export async function updateCostAnalysisLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateCostAnalysisLine(lineId, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -353,7 +355,7 @@ export async function removeCostAnalysisLineAction(
   const ctx = await getCtx();
   try {
     await removeCostAnalysisLine(lineId, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) { return handle(err); }
 }
@@ -368,7 +370,7 @@ export async function saveCostItemApuAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await saveCostItemApu(parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/presupuestos/${budgetId}`);
+    revalidateBudgetPaths(projectId, budgetId);
     return { ok: true };
   } catch (err) {
     return handle(err);

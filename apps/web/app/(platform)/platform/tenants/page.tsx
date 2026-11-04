@@ -5,6 +5,7 @@ import { listPlatformTenantsEnriched, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { formatDate } from "@/lib/format";
+import { formatSubscriptionStatusLabel, formatTenantStatusLabel } from "@/lib/tenant-status-label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -68,7 +69,7 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
               <TableHead>Nombre</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Suscripción</TableHead>
-              <TableHead>Trial hasta</TableHead>
+              <TableHead>Prueba hasta</TableHead>
               <TableHead>Alertas</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
@@ -89,8 +90,8 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
                     </Link>
                     <div className="font-mono text-xs text-muted-foreground">{t.slug}</div>
                   </TableCell>
-                  <TableCell>{t.status}</TableCell>
-                  <TableCell>{t.subscriptionStatus}</TableCell>
+                  <TableCell>{formatTenantStatusLabel(t.status)}</TableCell>
+                  <TableCell>{formatSubscriptionStatusLabel(t.subscriptionStatus)}</TableCell>
                   <TableCell>{t.trialEndsAt ? formatDate(t.trialEndsAt) : "—"}</TableCell>
                   <TableCell>
                     <PlatformTenantAlerts

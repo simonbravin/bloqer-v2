@@ -277,9 +277,11 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     ],
     effects: [
       "Marcar leída solo afecta tu copia; no cambia la de otro usuario.",
+      "Al perder acceso a una obra, también dejan de verse sus avisos anteriores.",
     ],
     pitfalls: [
       "Campana ≠ email: apagar una categoría de correo no silencia la campana.",
+      "Si plataforma deshabilita Notificaciones para la organización, campana e inbox quedan vacíos; el historial se conserva hasta habilitarlo.",
       "Pendientes (/pendientes) es la cola de acciones, no el historial de avisos.",
     ],
     relatedSlugs: [
@@ -314,7 +316,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     slug: "configurar-emails-de-notificacion",
     title: "Configurar emails de notificación",
     summary:
-      "Elegí por categoría qué avisos recibís por correo. La campana no se apaga. Dirección puede activar digest matutino.",
+      "Elegí por categoría qué avisos recibís por correo. Estas preferencias no apagan la campana. Dirección puede activar digest matutino.",
     intents: ["notificaciones", "configurar-empresa"],
     modules: ["general", "configuracion"],
     level: "company",
@@ -450,9 +452,11 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Nombre a mostrar, moneda base y zona horaria (desplegable con GMT).",
       "Logo opcional (PNG/JPEG/WebP horizontal): reemplaza Bloqer en el menú y aparece en PDF.",
       "La zona se usa en Registro de actividad y reportes programados.",
+      "Para eliminar Sitio web o Condición frente al IVA, dejá el campo vacío/sin especificar y guardá.",
     ],
+    pitfalls: ["Se edita la empresa asignada a tu membresía; una empresa inactiva no se reemplaza en silencio por otra.", "General y Equipo requieren que su módulo esté habilitado además del permiso del usuario."],
     relatedSlugs: ["invitar-un-usuario", "que-ve-cada-rol"],
-    keywords: ["logo", "zona horaria", "moneda", "configuracion", "marca"],
+    keywords: ["logo", "zona horaria", "moneda", "configuracion", "marca", "borrar sitio web", "condición IVA", "empresa asignada"],
     guideRef: "§1.3",
   },
   {

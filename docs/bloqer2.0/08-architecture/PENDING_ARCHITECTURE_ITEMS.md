@@ -61,7 +61,7 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 | P-ERD-05 | Modelo fino de **`tax_line`** y polimorfismos | Normalización vs pragmatismo Fase 1 |
 | P-ERD-06 | Entidad **línea de extracto** en conciliación bancaria | **HECHO 2026-08-08** — tabla `BankStatementLine` ([D-081]) |
 | P-ERD-07 | **UUID v4 vs v7** | **HECHO 2026-05-07** — UUID v4 elegido. Ver ADR-Phase1-01. |
-| P-ERD-08 | **Equipo de obra / R-USR-007** | **Parcial 2026-08-26 ([D-091]):** tabla `ProjectTeamMember` = roster de notificaciones. RBAC “solo su proyecto” / filtrar `/pendientes` **pendiente**. |
+| P-ERD-08 | **Equipo de obra / R-USR-007** | **Antecedente superado por ACL [D-111], revalidado AG-01 (03/11/2026):** `ProjectTeamMember` conserva función de roster; `ProjectMembership` + `ProjectAccessMode` controlan acceso. Pendientes, shell, empresa y avisos se corrigieron y verificaron con suites SQL aisladas; ver [AG-01](./platform-audit/2026-11-03-ag-01-identity-access.md). La revisión operativa/visual completa de Field sigue en AG-11. |
 | P-PUR-01 | **Oleada B compras** (atajo alto nivel, auto-confirm on approve, auto-draft AP) | **Hecho 2026-08-30** — [D-106]/[D-107]/[D-108]. Commitment unificado / Workflows → Oleada C ([Q-060]). |
 
 ## Gastos generales → obra (D-040)
@@ -124,3 +124,23 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 
 - Al resolver un ítem: marcar **HECHO** con fecha y enlace a PR/ADR, o **MOVIDO** a `OPEN_QUESTIONS` si era ambigüedad de producto.  
 - Los agentes IA: **no** borrar filas sin confirmación; agregar fila si surge nueva duda técnica.
+
+## AG-00 — Aislamiento: reconciliación documental resuelta
+
+Diagnóstico inicial del 03/11/2026: [subanálisis de arquitectura](./platform-audit/2026-11-03-ag-00-architecture.md). El usuario confirmó explícitamente la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), formalizada en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md). El cierre siguiente es documental/arquitectónico; no equivale a comprobar SQL ni autorización de todos los recorridos y no introduce schema, migraciones o middleware.
+
+### P-AG00-01 — Reconciliar el filtro de tenant por defecto descrito con el cliente disponible
+
+- **Estado:** HECHO 03/11/2026 — reconciliación del contrato en ADR-018 por confirmación explícita del usuario. Hallazgo GA-AG-00-005 resuelto en su alcance documental/arquitectónico; no se demostró fuga de datos ni se certifica ausencia de fugas.
+- **Antecedente:** `MULTITENANCY_ARCHITECTURE.md` §defensa en profundidad y `TENANT_ISOLATION_MODEL.md` §enforcement describían filtro/inyección por defecto mediante repositorio o middleware.
+- **Evidencia estática:** `packages/database/src/client.ts` exporta un `PrismaClient` simple y `index.ts` lo expone. Numerosos servicios construyen sus filtros y guards explícitamente; el control predeterminado descrito no está implementado globalmente en ese cliente.
+- **Resolución:** las fuentes describen ahora el mecanismo explícito en servicios/repositorios: filtros masivos en consulta y guards de pertenencia antes de usar/devolver cargas por ID o mutar. No atribuyen automatismo inexistente a Prisma ni deciden implementarlo.
+- **Verificación pendiente por recorrido:** AG-01 comprobará contexto, entradas directas y consultas con dos tenants en infraestructura apropiada. Este cierre documental no sustituye esa integración ni se justifica solo por schema o typecheck.
+
+### P-AG00-02 — Aclarar columna de tenant en hijos frente a pertenencia heredada
+
+- **Estado:** HECHO 03/11/2026 — contrato físico confirmado y fuentes reconciliadas por ADR-018. Hallazgo GA-AG-00-006 resuelto en su alcance documental/arquitectónico; no se demostró defecto de aislamiento.
+- **Antecedente:** AGENTS y el modelo de aislamiento exigían columna en toda fila operativa, mientras `PRISMA_ERD_AUDIT.md` §1 aceptaba hijos sin tenant redundante por FK al padre.
+- **Evidencia estática:** 22 modelos hijos/configuraciones del schema actual carecen de columna propia; ejemplos `BudgetSettings`, `WbsNode`, líneas de documentos y `CompanyProcurementSettings`. La pertenencia debe comprobarse a través del padre en los recorridos actuales.
+- **Resolución:** raíces operativas con tenant obligatorio; catálogo cerrado de los 22 hijos existentes con padre dueño obligatorio, comprobación del padre autorizado y coherencia de referencias adicionales. Se distingue pertenencia lógica de columna redundante; no se permiten nuevos hijos sin columna por analogía.
+- **Límites:** no se agregaron campos ni migraciones. Las anotaciones `## Hallazgo` conservan el diagnóstico inicial y registran la resolución por ADR-018. La comprobación SQL y de autorización de los recorridos afectados sigue pendiente para AG-01; la confirmación documental no la acredita.

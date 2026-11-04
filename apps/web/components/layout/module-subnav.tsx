@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { isNavLinkActive } from "@/lib/nav-link-active";
 
 /** Serializable icon keys — do not pass Lucide components from server layouts. */
 export type ModuleSubnavIconName =
@@ -40,11 +41,6 @@ export type ModuleSubnavLink = {
   match?: "exact" | "prefix";
 };
 
-function linkIsActive(pathname: string, link: ModuleSubnavLink): boolean {
-  if (link.match === "exact") return pathname === link.href;
-  return pathname === link.href || pathname.startsWith(`${link.href}/`);
-}
-
 export function ModuleSubnav({
   links,
   ariaLabel,
@@ -67,7 +63,7 @@ export function ModuleSubnav({
       ) : null}
       <div className="flex w-full min-w-0 flex-wrap gap-1.5 rounded-xl border border-border/80 bg-card/80 p-1.5 shadow-sm ring-1 ring-border/40 backdrop-blur-sm dark:bg-card/50 sm:flex-nowrap">
         {links.map((l) => {
-          const on = linkIsActive(pathname, l);
+          const on = isNavLinkActive(pathname, null, l.href, { matchExact: l.match === "exact" });
           const Icon = l.icon ? SUBNAV_ICONS[l.icon] : undefined;
           return (
             <Link

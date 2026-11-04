@@ -29,6 +29,8 @@ Permitir que un usuario **ya autenticado** (Auth.js / Google) que **no tiene** `
   - **Clave:** `classid = 824014001` (constante de producto para no colisionar con otros advisory locks que usen el mismo segundo entero); `key = hashtext(user id)` cabe en `int4` como exige la firma de dos enteros.
   - **Efecto:** el segundo submit concurrente **espera** hasta que termine el primero; luego el re-chequeo de membresía ve la fila creada y devuelve `already_member` sin crear otro tenant.
 
+**Revalidación AG-01 (03/11/2026):** la asignación de slug en `createTrialTenantBundle` también adquiere advisory transaction lock `824014003` por base de slug, compartido por onboarding y alta desde plataforma. Evita que dos actores con el mismo nombre elijan el mismo slug entre comprobación e inserción. Ambas transacciones usan `maxWait: 10000`, `timeout: 30000` ms para admitir la espera serializada y la creación/auditoría completa; la prueba SQL detectó que el límite implícito de 5 segundos vencía tras esperar el lock. El actor debe seguir ACTIVE antes de crear. Si su membresía existe pero no permite formar un contexto válido, la página informa **Acceso al espacio no disponible**, mantiene las invitaciones a otros espacios y ofrece **Cerrar sesión**; no muestra otro formulario de alta.
+
 ## Límites y amenazas mitigadas
 
 - **No confiar en el cliente** para `tenantId`, `companyId`, ni rol: el actor es `session.user.id`; roles fijados a **OWNER** en servidor.

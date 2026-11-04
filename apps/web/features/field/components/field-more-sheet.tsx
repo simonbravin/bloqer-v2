@@ -15,6 +15,7 @@ import { PendingCountBadge } from "@/components/ui/pending-count-badge";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
@@ -46,9 +47,10 @@ type Props = {
   roles: UserRole[];
   moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
   projectId: string | null;
+  onCloseAutoFocus?: (event: Event) => void;
 };
 
-export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, projectId }: Props) {
+export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, projectId, onCloseAutoFocus }: Props) {
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot), [moduleGateSnapshot]);
   const projectSections = useMemo(
     () => (projectId ? buildProjectWorkspaceNavSections(projectId, gate, roles) : []),
@@ -85,12 +87,14 @@ export function FieldMoreSheet({ open, onOpenChange, roles, moduleGateSnapshot, 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
+        onCloseAutoFocus={onCloseAutoFocus}
         side="bottom"
         className="max-h-[80vh] overflow-y-auto rounded-t-xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
         data-testid="field-more-sheet"
       >
         <SheetHeader>
           <SheetTitle>Más</SheetTitle>
+          <SheetDescription>Accesos a las secciones disponibles para tu usuario.</SheetDescription>
         </SheetHeader>
         <div className="mt-4 space-y-5">
           {projectLinks.length > 0 ? (

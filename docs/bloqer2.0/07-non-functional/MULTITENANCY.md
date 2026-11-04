@@ -4,9 +4,10 @@
 Aislamiento **estricto** de datos por `tenant_id` ([D-001]).
 
 ## Estrategia funcional (agnóstica de implementación)
-- Cada fila operativa incluye `tenant_id`.
+- Toda entidad operativa pertenece a un tenant. Las raíces operativas incluyen `tenant_id` obligatorio; los 22 hijos/configuraciones existentes del [catálogo cerrado](../08-architecture/TENANT_ISOLATION_MODEL.md) lo heredan de un padre obligatorio con pertenencia inequívoca ([ADR-018](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md)). No se amplía ese catálogo por analogía.
 - Autenticación produce `tenant_id` efectivo del usuario.
 - Ninguna API retorna datos de otro tenant ([BR-MT-001]).
+- El aislamiento se aplica explícitamente en servicios/repositorios: lecturas masivas acotadas en consulta, comprobación de pertenencia antes de usar/devolver cargas por ID o mutar y validación del padre y referencias adicionales de hijos. No se atribuye al cliente Prisma simple una inyección o un rechazo automático de consultas sin tenant.
 
 ## Hard rules
 - Tests automatizados deben incluir caso “cross-tenant forbidden”.

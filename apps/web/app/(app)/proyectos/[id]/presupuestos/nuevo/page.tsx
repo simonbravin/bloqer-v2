@@ -6,6 +6,8 @@ import { getProjectShellInfo, listBudgetsByProject, ServiceError } from "@bloqer
 import { createBudgetAction, executeWbsImportOnCreateAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { can } from "@bloqer/domain";
+import { budgetProjectReadOnlyReason } from "@/features/budgets/lib/budget-project-read-only";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -17,6 +19,9 @@ export default async function NuevoPresupuestoPage({ params, searchParams }: Pag
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "BUDGETS")) {
+    redirect(`/proyectos/${projectId}/presupuestos`);
+  }
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -25,15 +30,17 @@ export default async function NuevoPresupuestoPage({ params, searchParams }: Pag
     roles: current.tenantCtx.roles,
   };
 
+  let budgets: Awaited<ReturnType<typeof listBudgetsByProject>> = [];
   try {
-    await getProjectShellInfo(projectId, ctx);
+    const project = await getProjectShellInfo(projectId, ctx);
+    if (budgetProjectReadOnlyReason(project.status)) redirect(`/proyectos/${projectId}/presupuestos`);
+    budgets = await listBudgetsByProject(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
-  const budgets = await listBudgetsByProject(projectId, ctx);
   const parentOptions: BudgetParentOption[] = budgets
     .filter((b) => b.status === "APPROVED" || b.status === "CLOSED")
     .map((b) => ({

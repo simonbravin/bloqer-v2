@@ -63,10 +63,10 @@ async function fetchProjectShell(projectId: string): Promise<ProjectShellInfo> {
           typeof data === "object" && data && "error" in data ? String(data.error) : "Error al cargar",
         );
       }
-      cache.set(projectId, data as ProjectShellInfo);
+      if (inflight.get(projectId) === pending) cache.set(projectId, data as ProjectShellInfo);
       return data as ProjectShellInfo;
     })().finally(() => {
-      inflight.delete(projectId);
+      if (inflight.get(projectId) === pending) inflight.delete(projectId);
     });
     inflight.set(projectId, pending);
   }
@@ -98,21 +98,23 @@ export function ProjectShellProvider({ children }: { children: ReactNode }) {
     }
 
     const id = ++requestId.current;
+    let cancelled = false;
     setState({ status: "loading", projectId });
 
     void fetchProjectShell(projectId)
       .then((shell) => {
-        if (requestId.current !== id) return;
+        if (cancelled || requestId.current !== id) return;
         setState({ status: "ok", projectId, shell });
       })
       .catch((err: unknown) => {
-        if (requestId.current !== id) return;
+        if (cancelled || requestId.current !== id) return;
         setState({
           status: "error",
           projectId,
           message: err instanceof Error ? err.message : "Error de red",
         });
       });
+    return () => { cancelled = true; };
   }, [projectId, cacheVersion]);
 
   const value = useMemo(() => ({ state }), [state]);

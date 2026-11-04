@@ -247,6 +247,49 @@ describe("buildBudgetWbsExportTable", () => {
     assert.equal(rows[1]![0], "1.1");
     assert.equal(rows[2]![0], "1.2");
   });
+
+  it("preserves cents when rolling up monetary strings near the DB capacity", () => {
+    const tree = [groupNode("1", "Capítulo", [
+      leafNode("1.1", "A", { totalCost: "99999999999999.99", totalSale: "99999999999999.99" }),
+      leafNode("1.2", "B", { totalCost: "0.02", totalSale: "0.02" }),
+    ])];
+    const { rows } = buildBudgetWbsExportTable(tree, "totals");
+    assert.equal(rows[0]![4], "100000000000000.01");
+    assert.equal(rows.at(-1)![4], "100000000000000.01");
+  });
+
+  it("uses half-up for unit prices and keeps quantity precision", () => {
+    const node = leafNode("1", "Precisión", { qty: "1.2345", totalCost: "1.01" });
+    node.costItem!.unitCostDirect = "1.005";
+    const { rows } = buildBudgetWbsExportTable([node], { base: "cost", scale: "unit", detail: "compact", showIncidence: false });
+    assert.equal(rows[0]![3], "1.2345");
+    assert.equal(rows[0]![4], "1.01");
+  });
+
+  it("rounds incidence half-up at a decimal tie", () => {
+    const a = leafNode("1", "A", { totalCost: "1.01" });
+    const b = leafNode("2", "B", { totalCost: "199.99" });
+    const { rows } = buildBudgetWbsExportTable([a, b], { base: "cost", scale: "total", detail: "compact", showIncidence: true });
+    // 1.01 / 201 × 100 is below the tie: do not round an intermediate quotient.
+    assert.equal(rows[0]!.at(-1), "0.50%");
+    b.totalCostDirect = "198.99";
+    b.costItem!.totalCostDirect = "198.99";
+    const tied = buildBudgetWbsExportTable([a, b], { base: "cost", scale: "total", detail: "compact", showIncidence: true });
+    assert.equal(tied.rows[0]!.at(-1), "0.51%");
+  });
+
+  it("does not export APU lines as additional WBS rows or sum them twice", () => {
+    const { rows } = buildBudgetWbsExportTable([leafNode("1", "Partida", { totalCost: "300.00" })], "totals");
+    assert.equal(rows.length, 2);
+    assert.equal(rows[1]![4], "300.00");
+    assert.ok(rows.every((row) => row[1] !== "Mat" && row[1] !== "MO"));
+  });
+
+  it("exports no incidence percentage for an empty budget", () => {
+    const { rows } = buildBudgetWbsExportTable([], { base: "sale", scale: "total", detail: "compact", showIncidence: true });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0]!.at(-1), "");
+  });
 });
 
 describe("budgetWbsExportPdfRowsFromTable", () => {

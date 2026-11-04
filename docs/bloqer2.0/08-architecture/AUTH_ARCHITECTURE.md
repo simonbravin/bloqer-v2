@@ -18,8 +18,11 @@ Usar **Auth.js / NextAuth** como **primera opción** para autenticación en Next
 - **Idle `maxAge`:** **7 días** (`SESSION_IDLE_MAX_AGE_SEC`). Mientras el usuario navega, el middleware re-emite la cookie y extiende el `exp`; sin uso durante 7 días, expira. No es un tope duro desde el login.
 - **Tope absoluto:** **30 días** desde `authTime` en el JWT (`SESSION_ABSOLUTE_MAX_AGE_SEC`), aunque el idle se renueve. El callback `jwt` devuelve `null` al vencer.
 - Invalidación post-reset / suspend: claim `pwdAt` vs `User.passwordUpdatedAt` y status en Node (`getSession` → usado por `getCurrentUser`); el middleware Edge no valida contra DB (ADR-Auth-Credentials-01). Si `signOut` no puede borrar cookies en RSC, la request igual se niega (`null`).
+- Credentials conserva en el JWT el `passwordUpdatedAt` de la contraseña que autenticó: no lo reemplaza con una lectura posterior que pudiera corresponder a un reset concurrente. Google exige `email_verified === true` antes de activar/vincular una cuenta. Verificación, reset y takeover actualizan mediante condiciones de estado; no sobrescriben una suspensión concurrente.
 - No hay “remember me” aparte: UX larga = idle + absoluto arriba (o, a futuro, MFA / logout remoto).
 - `updateAge` de Auth.js **no aplica** a estrategia JWT; no usarlo como control de lifetime.
+
+Emisión y consumo de tokens de ambos propósitos se serializan por email normalizado con advisory transaction lock `824014002`. El cooldown se comprueba dentro de la transacción, los enlaces son de un solo uso y su vencimiento se vuelve a comprobar después de esperar el lock. Los hashes nunca se devuelven en DTO de perfil. El límite de nuevas contraseñas de bcrypt se valida sobre los bytes UTF-8 reales (72), preservando compatibilidad del login existente. Regresiones unitarias y SQL aisladas: [AG-01](./platform-audit/2026-11-03-ag-01-identity-access.md); no sustituyen una prueba del proveedor OAuth o del email real.
 
 ## Justificación para Bloqer 2.0
 

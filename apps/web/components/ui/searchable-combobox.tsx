@@ -24,7 +24,10 @@ import { foldSearchText, type SearchableComboboxOption } from "@/lib/searchable-
 
 export type { SearchableComboboxOption };
 
-type SearchableComboboxProps = {
+type SearchableComboboxProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "value" | "onChange" | "children" | "defaultValue"
+> & {
   options: SearchableComboboxOption[];
   value: string;
   onValueChange: (value: string) => void;
@@ -41,7 +44,7 @@ type SearchableComboboxProps = {
   contentClassName?: string;
 };
 
-export function SearchableCombobox({
+export const SearchableCombobox = React.forwardRef<HTMLButtonElement, SearchableComboboxProps>(function SearchableCombobox({
   options,
   value,
   onValueChange,
@@ -54,7 +57,9 @@ export function SearchableCombobox({
   allowClear = false,
   popoverWidth = "trigger",
   contentClassName,
-}: SearchableComboboxProps) {
+  onKeyDown,
+  ...triggerProps
+}, ref) {
   const [open, setOpen] = React.useState(false);
   const selected = options.find((o) => o.value === value);
 
@@ -62,13 +67,23 @@ export function SearchableCombobox({
     <Popover open={open} onOpenChange={setOpen} modal>
       <PopoverTrigger asChild>
         <Button
+          {...triggerProps}
+          ref={ref}
           id={id}
           type="button"
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          aria-label={triggerProps["aria-label"] ?? (id || triggerProps["aria-labelledby"] ? undefined : placeholder)}
           disabled={disabled}
           title={selected?.label}
+          onKeyDown={(event) => {
+            onKeyDown?.(event);
+            if (!event.defaultPrevented && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+              event.preventDefault();
+              setOpen(true);
+            }
+          }}
           className={cn(
             "h-10 w-full justify-between px-3 font-normal",
             !selected && "text-muted-foreground",
@@ -82,13 +97,16 @@ export function SearchableCombobox({
       <PopoverContent
         className={cn(
           popoverWidth === "wide"
-            ? "min-w-[max(var(--radix-popover-trigger-width),28rem)] max-w-[min(36rem,90vw)] p-0"
-            : "w-[var(--radix-popover-trigger-width)] p-0",
+            ? "w-[max(var(--radix-popover-trigger-width),28rem)] max-w-[min(36rem,calc(100vw-1.5rem))] p-0"
+            : "w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-1.5rem)] p-0",
           contentClassName,
         )}
         align="start"
+        collisionPadding={12}
+        aria-label={placeholder}
       >
         <Command
+          label={searchPlaceholder}
           filter={(_itemValue, search, keywords) => {
             const query = foldSearchText(search);
             if (!query) return 1;
@@ -96,8 +114,8 @@ export function SearchableCombobox({
             return haystack.includes(query) ? 1 : 0;
           }}
         >
-          <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandInput aria-label={searchPlaceholder} placeholder={searchPlaceholder} />
+          <CommandList label="Opciones" className="max-h-[min(300px,max(0px,calc(var(--radix-popover-content-available-height)-3rem)))]">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
@@ -129,4 +147,4 @@ export function SearchableCombobox({
       </PopoverContent>
     </Popover>
   );
-}
+});

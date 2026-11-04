@@ -1,4 +1,4 @@
-import { Prisma, prisma, Receivable, ReceivableStatus } from "@bloqer/database";
+import { Prisma, prisma, Receivable } from "@bloqer/database";
 import {
   canEditCompanyAr,
   canMutateArForScope,

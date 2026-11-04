@@ -1,4 +1,4 @@
-import { formatWbsIncidencePercentExport, wbsIncidencePercent } from "@bloqer/domain";
+import { compareDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import { buildCsv } from "../report-exports/csv-export.service";
 import { safeReportFilename } from "../report-exports/filename.service";
 import type { ReportCsvPayload, ReportXlsxPayload } from "../report-exports/report-export.types";
@@ -6,11 +6,11 @@ import { buildXlsxSheet } from "../report-exports/xlsx-export.service";
 import { getBudgetById } from "./budget.service";
 import { getWbsTree, type WbsViewNode } from "./wbs.service";
 import {
-  computeTreeGrandTotals,
-  computeUnitCategoryCosts,
-  computeWbsRowMetrics,
+  computeTreeGrandTotalsExact,
+  computeUnitCategoryCostsExact,
+  computeWbsRowMetricsExact,
   VISIBLE_WBS_COST_CATEGORIES,
-  type WbsRowMetrics,
+  type ExactWbsRowMetrics,
 } from "./wbs-metrics";
 import { ServiceContext, ServiceError } from "../types";
 
@@ -88,15 +88,12 @@ export function parseBudgetWbsExportFilters(
   return { ...mode, view: modeToLegacyView(mode) };
 }
 
-function formatDecimal(value: number): string {
-  if (!Number.isFinite(value)) return "0.00";
-  return value.toFixed(2);
+function formatDecimal(value: string): string {
+  return serializeMoney(value);
 }
 
-function formatQuantity(qty: number | null): string {
-  if (qty == null) return "";
-  if (!Number.isFinite(qty)) return "";
-  return String(qty);
+function formatQuantity(qty: string | null): string {
+  return qty ?? "";
 }
 
 function flattenWbsTree(nodes: WbsViewNode[]): WbsViewNode[] {
@@ -139,13 +136,13 @@ function buildHeaders(mode: BudgetWbsExportMode): string[] {
 
 function moneyCellsForNode(
   node: WbsViewNode,
-  metrics: WbsRowMetrics,
+  metrics: ExactWbsRowMetrics,
   mode: BudgetWbsExportMode,
 ): string[] {
   const isLeaf = node.children.length === 0 && !!node.costItem;
-  const unitCats = isLeaf ? computeUnitCategoryCosts(node) : null;
-  const unitCd = isLeaf ? parseFloat(node.costItem!.unitCostDirect) || 0 : null;
-  const unitSale = isLeaf ? parseFloat(node.costItem!.unitSalePrice) || 0 : null;
+  const unitCats = isLeaf ? computeUnitCategoryCostsExact(node) : null;
+  const unitCd = isLeaf ? node.costItem!.unitCostDirect : null;
+  const unitSale = isLeaf ? node.costItem!.unitSalePrice : null;
   const withUnit = mode.scale === "unit";
   const cells: string[] = [];
 
@@ -185,7 +182,7 @@ function moneyCellsForNode(
 }
 
 function moneyCellsForGrand(
-  grand: ReturnType<typeof computeTreeGrandTotals>,
+  grand: ReturnType<typeof computeTreeGrandTotalsExact>,
   mode: BudgetWbsExportMode,
 ): string[] {
   const withUnit = mode.scale === "unit";
@@ -213,14 +210,15 @@ function moneyCellsForGrand(
 }
 
 function incidenceForMetrics(
-  metrics: Pick<WbsRowMetrics, "totalCostDirect" | "totalSalePrice">,
-  grand: ReturnType<typeof computeTreeGrandTotals>,
+  metrics: Pick<ExactWbsRowMetrics, "totalCostDirect" | "totalSalePrice">,
+  grand: ReturnType<typeof computeTreeGrandTotalsExact>,
   mode: BudgetWbsExportMode,
 ): string {
   if (!mode.showIncidence) return "";
   const part = mode.base === "sale" ? metrics.totalSalePrice : metrics.totalCostDirect;
   const whole = mode.base === "sale" ? grand.totalSalePrice : grand.totalCostDirect;
-  return formatWbsIncidencePercentExport(wbsIncidencePercent(part, whole));
+  if (compareDecimal(whole, "0") <= 0) return "";
+  return `${divideDecimal(multiplyDecimal(part, "100"), whole, 2)}%`;
 }
 
 export type BudgetWbsExportPayload = {
@@ -243,7 +241,7 @@ export type BudgetWbsExportPayload = {
 export function buildBudgetWbsExportTable(
   tree: WbsViewNode[],
   modeOrView: BudgetWbsExportMode | BudgetWbsExportView,
-): { headers: string[]; rows: string[][]; grand: ReturnType<typeof computeTreeGrandTotals> } {
+): { headers: string[]; rows: string[][]; grand: ReturnType<typeof computeTreeGrandTotalsExact> } {
   const mode: BudgetWbsExportMode =
     typeof modeOrView === "string"
       ? normalizeExportMode({
@@ -256,11 +254,11 @@ export function buildBudgetWbsExportTable(
 
   const headers = buildHeaders(mode);
   const flat = flattenWbsTree(tree);
-  const grand = computeTreeGrandTotals(tree);
+  const grand = computeTreeGrandTotalsExact(tree);
   const rows: string[][] = [];
 
   for (const node of flat) {
-    const metrics = computeWbsRowMetrics(node);
+    const metrics = computeWbsRowMetricsExact(node);
     const row = [
       node.code,
       node.name,

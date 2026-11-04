@@ -10,6 +10,7 @@ import { getMyFieldPendingItems } from "./field-pending.service";
 import type { FieldPendingCounts } from "./field-pending.service";
 import {
   projectRowIdWhereForScope,
+  requireProjectAccess,
   resolveAccessibleProjectScope,
 } from "../security/access";
 
@@ -58,6 +59,7 @@ export type FieldHomeView = {
 /** Operational obras for Field pickers. Excludes CANCELLED; capped at `FIELD_PROJECT_LIST_LIMIT`. */
 export async function listFieldProjects(ctx: ServiceContext): Promise<FieldHomeProject[]> {
   if (!can(ctx.roles, "VIEW", "PROJECTS")) return [];
+  if (!(await getTenantModuleGate(ctx)).isEnabled("PROJECTS")) return [];
   const scope = await resolveAccessibleProjectScope(ctx);
   return prisma.project.findMany({
     where: {
@@ -77,7 +79,7 @@ export async function getFieldHome(
 ): Promise<FieldHomeView> {
   const started = Date.now();
   const gate = await getTenantModuleGate(ctx);
-  const canListProjects = can(ctx.roles, "VIEW", "PROJECTS");
+  const canListProjects = gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS");
 
   const projects = canListProjects ? await listFieldProjects(ctx) : [];
 
@@ -92,6 +94,7 @@ export async function getFieldHome(
             id: preferred,
             tenantId: ctx.tenantId,
             status: { not: "CANCELLED" },
+            AND: [projectRowIdWhereForScope(await resolveAccessibleProjectScope(ctx))],
           },
           select: { id: true, code: true, name: true, status: true },
         })
@@ -108,7 +111,7 @@ export async function getFieldHome(
       gate.isEnabled("PROCUREMENT") &&
       (can(ctx.roles, "EDIT", "PURCHASE_REQUESTS") || can(ctx.roles, "EDIT", "PROCUREMENT")),
     consumption: gate.isEnabled("INVENTORY") && can(ctx.roles, "EDIT", "INVENTORY"),
-    document: can(ctx.roles, "EDIT", "PROJECTS"),
+    document: gate.isEnabled("PROJECTS") && can(ctx.roles, "EDIT", "PROJECTS"),
   };
 
   const todayScopeIds = featuredProject ? [featuredProject.id] : projects.map((p) => p.id);
@@ -194,12 +197,11 @@ export async function assertPreferredProjectAccess(
   ctx: ServiceContext,
 ): Promise<void> {
   if (!isUuid(projectId)) throw new ServiceError("VALIDATION", "Proyecto inválido");
-  const row = await prisma.project.findFirst({
-    where: { id: projectId, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
-    select: { id: true },
-  });
-  if (!row) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (!canAccessProjectLayout(ctx.roles)) {
+  if (!canAccessProjectLayout(ctx.roles, await getTenantModuleGate(ctx))) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver este proyecto");
+  }
+  const project = await requireProjectAccess(projectId, ctx);
+  if (project.status === "CANCELLED") {
+    throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   }
 }

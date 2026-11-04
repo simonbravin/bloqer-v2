@@ -100,7 +100,7 @@ export async function provisionPlatformTenant(
       invitationId: inserted.invitationId,
       invitationLink: inserted.invitationLink,
     };
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   const emailDispatch = await sendTenantInvitationEmailMessage(
     emailNorm,

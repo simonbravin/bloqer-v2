@@ -9,9 +9,9 @@
   "scripts": {
     "build": "pnpm ci:prisma && turbo build",
     "dev": "turbo dev --parallel",
-    "lint": "turbo lint",
+    "lint": "eslint packages && turbo lint",
     "typecheck": "turbo typecheck",
-    "test": "turbo test --filter=@bloqer/domain --filter=@bloqer/utils --filter=@bloqer/services --filter=@bloqer/email --filter=@bloqer/ai --filter=@bloqer/web",
+    "test": "turbo test",
     "ai:index-docs": "pnpm --filter @bloqer/ai index-docs",
     "ai:check-docs-index": "pnpm --filter @bloqer/ai check-docs-index",
     "ai:eval": "pnpm --filter @bloqer/ai eval",
