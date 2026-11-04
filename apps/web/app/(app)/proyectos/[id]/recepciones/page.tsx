@@ -46,6 +46,8 @@ export default async function RecepcionesPage({ params }: PageProps) {
 
   const items: PurchaseReceiptListItem[] = receipts.map((r) => ({
     id: r.id,
+    number: r.number,
+    code: r.code,
     purchaseOrderCode: r.purchaseOrderCode,
     purchaseOrderId: r.purchaseOrderId,
     supplierName: r.supplierName,

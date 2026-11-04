@@ -63,7 +63,10 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
 
   let receipt;
   let stockMovements: Awaited<ReturnType<typeof listStockMovements>> = [];
-  let billing;
+  let billing: Awaited<ReturnType<typeof getPurchaseOrderBillingSummary>> | null = null;
+  let billingAvailable = true;
+  let billingWarning = "La información de facturación y pagos no está disponible para tu acceso o configuración. No se puede comprobar el saldo de esta OC.";
+  let inventoryAvailable = true;
   try {
     receipt = await getPurchaseReceiptById(receiptId, ctx);
   } catch (err) {
@@ -73,35 +76,28 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
     throw err;
   }
 
+  if (receipt.projectId !== id) notFound();
+  const receiptCtx = { ...ctx, companyId: receipt.companyId };
+
   // Inventory is optional for the receipt ficha — never 404 the whole page.
   try {
-    stockMovements = await listStockMovements({ purchaseReceiptId: receiptId }, ctx);
+    stockMovements = await listStockMovements({ purchaseReceiptId: receiptId }, receiptCtx);
   } catch (err) {
     if (!(err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND"))) {
       throw err;
     }
+    inventoryAvailable = false;
   }
 
-  billing = {
-    receivedAmount: "0",
-    invoicedAmount: "0",
-    draftReservedAmount: "0",
-    paidAmount: "0",
-    pendingToInvoice: "0",
-    hasReceivedQuantity: false,
-    draftInvoiceCount: 0,
-    unlinkedInvoiceCount: 0,
-    openDraftInvoiceId: null,
-    lineMatches: [],
-    matchWarningCount: 0,
-  };
   try {
-    billing = await getPurchaseOrderBillingSummary(receipt.purchaseOrderId, ctx);
+    billing = await getPurchaseOrderBillingSummary(receipt.purchaseOrderId, receiptCtx);
   } catch (err) {
-    if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) {
+    if (!(err instanceof ServiceError && ["FORBIDDEN", "VALIDATION", "CONFLICT"].includes(err.code))) {
       if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
       throw err;
     }
+    billingAvailable = false;
+    if (err instanceof ServiceError && err.code !== "FORBIDDEN") billingWarning = err.message;
   }
 
   if (receipt.projectId !== id) notFound();
@@ -110,7 +106,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
 
   let receiptAttachments: Awaited<ReturnType<typeof listEntityDocuments>> = [];
   try {
-    receiptAttachments = await listEntityDocuments("PURCHASE_RECEIPT", receiptId, ctx, {
+    receiptAttachments = await listEntityDocuments("PURCHASE_RECEIPT", receiptId, receiptCtx, {
       projectId: id,
     });
   } catch (err) {
@@ -130,7 +126,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
   const isConfirmed = receipt.status === "CONFIRMED";
   const canInvoiceNow =
     isConfirmed &&
-    billing.hasReceivedQuantity &&
+    billing?.hasReceivedQuantity &&
     isPositiveMoneyAmount(billing.pendingToInvoice);
   const highlightBilling = canInvoiceNow && sp.siguiente === "facturar";
   const actionBtn = procurementActionBtnClass;
@@ -149,7 +145,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
         {receipt.purchaseOrderCode}
       </Link>
       <span aria-hidden>/</span>
-      <span className="text-foreground">Recepción</span>
+      <span className="min-w-0 break-words text-foreground [overflow-wrap:anywhere]">{receipt.code}</span>
     </nav>
   );
 
@@ -158,20 +154,20 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
   if (isDraft && canEditReceipt) {
     let warehouseOptions: Array<{ id: string; name: string }> = [];
     try {
-      const warehouses = await listWarehouses({ status: "ACTIVE" }, ctx);
-      warehouseOptions = warehouses.map((w) => ({ id: w.id, name: w.name }));
+      const warehouses = await listWarehouses({ status: "ACTIVE", companyId: receipt.companyId }, receiptCtx);
+      warehouseOptions = warehouses.filter((warehouse) => warehouse.projectId == null || warehouse.projectId === id).map((w) => ({ id: w.id, name: w.name }));
     } catch (err) {
       if (!(err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND"))) {
         throw err;
       }
     }
 
-    const order = await getPurchaseOrderById(receipt.purchaseOrderId, ctx);
+    const order = await getPurchaseOrderById(receipt.purchaseOrderId, receiptCtx);
     const [formLines, extraDrafts] = await Promise.all([
-      getPoLinesForReceiptForm(receipt.purchaseOrderId, order.lines, ctx, {
+      getPoLinesForReceiptForm(receipt.purchaseOrderId, order.lines, receiptCtx, {
         excludeReceiptId: receiptId,
       }),
-      countActiveDraftReceiptsForPo(receipt.purchaseOrderId, ctx, { excludeReceiptId: receiptId }),
+      countActiveDraftReceiptsForPo(receipt.purchaseOrderId, receiptCtx, { excludeReceiptId: receiptId }),
     ]);
     otherDraftCount = extraDrafts;
     const initialQuantities: Record<string, string> = {};
@@ -213,13 +209,13 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
     <PageShell
       variant="default"
       className="space-y-6"
-      breadcrumbLabel={receipt.purchaseOrderCode}
+      breadcrumbLabel={receipt.code}
     >
       {documentTrail}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:flex-wrap">
-        <h1 className="text-2xl font-bold tracking-tight">
-          Recepción — {receipt.purchaseOrderCode}
+        <h1 className="min-w-0 break-words text-2xl font-bold tracking-tight [overflow-wrap:anywhere]">
+          {receipt.code}
         </h1>
         <PurchaseReceiptStatusBadge status={receipt.status} />
       </div>
@@ -227,7 +223,9 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
       <ActionErrorBanner message={sp.actionError} />
       <ActionErrorBanner message={sp.invoiceError} />
 
-      {isConfirmed && (
+      {!billingAvailable ? <p className="rounded-lg border bg-muted px-4 py-3 text-sm" role="status">{billingWarning}</p> : null}
+      {!inventoryAvailable ? <p className="rounded-lg border bg-muted px-4 py-3 text-sm" role="status">Los movimientos de inventario no están disponibles para tu acceso o configuración; no se puede comprobar su ausencia.</p> : null}
+      {isConfirmed && billingAvailable && billing && (
         <PoBillingNextStepPanel
           projectId={id}
           purchaseOrderId={receipt.purchaseOrderId}

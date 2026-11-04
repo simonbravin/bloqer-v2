@@ -1,4 +1,4 @@
-import { addDecimal, roundToDecimals } from "@bloqer/utils";
+import { addDecimal, compareDecimal, roundToDecimals } from "@bloqer/utils";
 
 /** Schedule progress is Prisma Decimal(5,2) — always 2 dp half-up ([D-053] non-money scale for %). */
 export function serializeProgressPct(raw: string | number): string {
@@ -34,8 +34,9 @@ function toCents2(raw: string): bigint {
 
 /** Pure helpers for D-045 sync — testable without Prisma / without IEEE float. */
 export function capSyncProgressPct(pct: string | number): string | null {
+  if (compareDecimal(pct, "0") < 0) return null;
   const rounded = serializeProgressPct(pct);
-  if (toCents2(rounded) <= BigInt(0)) return null;
+  if (toCents2(rounded) < BigInt(0)) return null;
   // Over 100% (bad jobsite data / qty overflow) → clamp so sync still advances the item.
   if (toCents2(rounded) > BigInt(10000)) return "100.00";
   return rounded;

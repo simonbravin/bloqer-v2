@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useScheduleAction } from "../lib/use-schedule-action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ScheduleTreeItemDto } from "@bloqer/services";
@@ -33,14 +34,16 @@ const NONE_AFTER = "__none__";
 export function ScheduleCreateDialog({
   projectId,
   treeItems,
+  canLinkWbs = true,
 }: {
   projectId: string;
   /** Full active tree for placement (ignores URL filters). */
   treeItems: ScheduleTreeItemDto[];
+  canLinkWbs?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useScheduleAction();
   const [type, setType] = useState<"TASK" | "MILESTONE">("TASK");
   const [wbsNodeId, setWbsNodeId] = useState("");
   const [parentId, setParentId] = useState<string>(ROOT);
@@ -123,6 +126,7 @@ export function ScheduleCreateDialog({
 
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isRunning()) return;
     const fd = new FormData(e.currentTarget);
     const name = (fd.get("name") as string).trim();
     const startDate = (fd.get("startDate") as string) || null;
@@ -179,6 +183,7 @@ export function ScheduleCreateDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && isRunning()) return;
         setOpen(next);
         if (!next) resetForm();
       }}
@@ -197,15 +202,15 @@ export function ScheduleCreateDialog({
               avance (en tareas); no cambia la altura en el Gantt.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-3 py-4">
+          <fieldset disabled={pending} className="grid min-w-0 gap-3 py-4">
             <div className="space-y-1">
               <Label htmlFor="sched-name">Nombre</Label>
               <Input id="sched-name" name="name" required maxLength={500} />
             </div>
             <div className="space-y-1">
-              <Label>Tipo</Label>
+              <Label htmlFor="sched-type">Tipo</Label>
               <Select value={type} onValueChange={(v) => setType(v as "TASK" | "MILESTONE")}>
-                <SelectTrigger>
+                <SelectTrigger id="sched-type">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,7 +236,7 @@ export function ScheduleCreateDialog({
                 </div>
               </div>
             )}
-            <ScheduleWbsPicker
+            {canLinkWbs ? <ScheduleWbsPicker
               projectId={projectId}
               value={wbsNodeId}
               onValueChange={(id) => {
@@ -239,11 +244,11 @@ export function ScheduleCreateDialog({
                 setWbsNodeId(id);
               }}
               disabled={pending}
-            />
+            /> : <p className="text-xs text-muted-foreground">La tarea o el hito se creará sin vínculo EDT.</p>}
             <div className="space-y-2 rounded-md border p-3">
               <Label className="text-sm font-medium">Ubicación</Label>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Colocar bajo</Label>
+                <Label htmlFor="sched-parent" className="text-xs text-muted-foreground">Colocar bajo</Label>
                 <Select
                   value={parentId}
                   onValueChange={(v) => {
@@ -252,7 +257,7 @@ export function ScheduleCreateDialog({
                     setPlacementHint(null);
                   }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="sched-parent">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -266,9 +271,9 @@ export function ScheduleCreateDialog({
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Insertar después de</Label>
+                <Label htmlFor="sched-after" className="text-xs text-muted-foreground">Insertar después de</Label>
                 <Select value={afterItemId} onValueChange={setAfterItemId}>
-                  <SelectTrigger>
+                  <SelectTrigger id="sched-after">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -290,7 +295,7 @@ export function ScheduleCreateDialog({
                 <p className="text-xs text-muted-foreground">{placementHint}</p>
               )}
             </div>
-          </div>
+          </fieldset>
           <DialogFooter>
             <Button type="submit" disabled={pending}>
               Crear

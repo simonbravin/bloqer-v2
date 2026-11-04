@@ -32,7 +32,7 @@ const STATUS_OPTIONS: (ScheduleItemStatus | "ALL")[] = [
 
 type Props = {
   budgets: AvailableBudget[];
-  currentBudgetId: string;
+  currentBudgetId: string | null;
   delayedOnly: boolean;
 };
 
@@ -73,16 +73,18 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
     push(sp);
   }
 
-  const currentStatus = params.get("status") ?? "ALL";
-  const currentType = params.get("type") ?? "ALL";
+  const rawStatus = params.get("status");
+  const currentStatus = STATUS_OPTIONS.includes(rawStatus as ScheduleItemStatus) ? rawStatus! : "ALL";
+  const rawType = params.get("type");
+  const currentType = rawType === "TASK" || rawType === "MILESTONE" ? rawType : "ALL";
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
       {budgets.length > 1 && (
-        <div className="space-y-1">
-          <Label className="text-xs">Presupuesto</Label>
-          <Select value={currentBudgetId} onValueChange={setBudget}>
-            <SelectTrigger className="h-8 w-72 text-xs">
+        <div className="w-full min-w-0 space-y-1 sm:w-auto">
+          <Label htmlFor="schedule-filter-budget" className="text-xs">Presupuesto</Label>
+          <Select value={currentBudgetId ?? ""} onValueChange={setBudget}>
+            <SelectTrigger id="schedule-filter-budget" className="h-8 w-full text-xs sm:w-72">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -96,9 +98,9 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
         </div>
       )}
       <div className="space-y-1">
-        <Label className="text-xs">Tipo</Label>
+        <Label htmlFor="schedule-filter-type" className="text-xs">Tipo</Label>
         <Select value={currentType} onValueChange={setItemType}>
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger id="schedule-filter-type" className="h-8 w-36 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -109,9 +111,9 @@ export function ScheduleFilters({ budgets, currentBudgetId, delayedOnly }: Props
         </Select>
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Estado</Label>
+        <Label htmlFor="schedule-filter-status" className="text-xs">Estado</Label>
         <Select value={currentStatus} onValueChange={setStatus}>
-          <SelectTrigger className="h-8 w-40 text-xs">
+          <SelectTrigger id="schedule-filter-status" className="h-8 w-40 text-xs">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

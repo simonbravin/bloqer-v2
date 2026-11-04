@@ -1,0 +1,3258 @@
+{
+  "phase": "AG-06",
+  "status": "corrected_verified_locally_with_approved_scope",
+  "recordedAt": "2026-11-04T19:51:43.726Z",
+  "report": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-procurement.md",
+  "predecessor": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-closure.json",
+  "mode": "module audit with approved corrections and proportional cross-module regression",
+  "branch": "codex/pruebas",
+  "head": "3407c023eb00dec9d6361e4842af016480b1c813",
+  "finalRevision": "local uncommitted working tree; final source and delta hashes against initial AG06 snapshot",
+  "published": false,
+  "lastVerifiedPublication": {
+    "phases": "AG-00 through AG-04",
+    "head": "3407c023",
+    "pr": 3
+  },
+  "approval": {
+    "explicitUserApproval": true,
+    "decisions": [
+      {
+        "id": "D-125",
+        "question": "Q-072",
+        "implemented": true,
+        "proposal": "2026-11-04-ag-06-purchase-comparability-proposal.md"
+      },
+      {
+        "id": "D-126",
+        "question": "Q-073",
+        "implemented": true,
+        "proposal": "2026-11-04-ag-06-request-history-proposal.md"
+      },
+      {
+        "id": "D-127",
+        "question": "Q-074",
+        "implemented": true,
+        "proposal": "2026-11-04-ag-06-receipt-number-proposal.md"
+      },
+      {
+        "id": "D-128",
+        "question": "Q-076",
+        "implemented": false,
+        "scopeDecisionImplemented": true,
+        "futureDevelopment": "P-AG06-01",
+        "proposal": "2026-11-04-ag-06-partial-close-scope-proposal.md"
+      },
+      {
+        "id": "D-129",
+        "question": "Q-075",
+        "implemented": true,
+        "proposal": "2026-11-04-ag-06-confirmation-fx-proposal.md"
+      }
+    ],
+    "localBrowserAuthorization": "Explicit user approval at AG-02, reused for the same isolated synthetic test workflow",
+    "deploymentAuthorizedOrPerformedInThisPhase": false
+  },
+  "findings": [
+    {
+      "id": "GA-AG-06-001",
+      "priority": "P1",
+      "title": "SC: aislamiento en lecturas, mutaciones y vínculos hijos",
+      "aliases": [
+        "REQ-01"
+      ],
+      "observed": "La obra compartida permitía resolver SC de otra empresa o contar hijos por UUID sin autorizar al padre.",
+      "correction": "Filtros del documento y comprobación tenant/empresa/obra/ACL antes de leer u operar.",
+      "evidence": [
+        "requests-audit-live-first",
+        "requests-audit-live-fixture-recheck"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-002",
+      "priority": "P1",
+      "title": "OC/recepción: empresa del documento y padres coherentes",
+      "aliases": [
+        "orders.company_scope",
+        "orders.joined_graph"
+      ],
+      "observed": "Varias entradas comprobaban obra/tenant pero omitían empresa o consistencia de padres WBS/APU/producto/SC/cotización.",
+      "correction": "Grafo compartido procurementOrderParentScopeInclude y assertPurchaseOrderRelations en lecturas y operaciones, incluido límite OC→AP.",
+      "evidence": [
+        "orders-audit-live-second",
+        "platform-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-003",
+      "priority": "P1",
+      "title": "Actions de SC/cotizaciones ligadas a la obra real",
+      "aliases": [
+        "AG06-FE-01"
+      ],
+      "observed": "La obra de la ruta podía diferir del padre del documento enviado a una Action.",
+      "correction": "Resolver padre y comprobar la obra antes de invocar la mutación e invalidar sus vistas.",
+      "evidence": [
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "procurement-actions.test.ts"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-004",
+      "priority": "P1",
+      "title": "SC/cotización/OC: revalidación dentro del bloqueo y auditoría atómica",
+      "aliases": [
+        "REQ-02",
+        "REQ-05",
+        "orders.races_and_acl"
+      ],
+      "observed": "Edición, devolución, anulación, adjudicación y conteos de facturas activas podían usar líneas, estado, proveedor o cobertura anteriores al bloqueo.",
+      "correction": "Project→Company→SC/OC cuando corresponde; relectura y gates dentro de TX, audit en la misma TX y rechazo de payload viejo.",
+      "evidence": [
+        "requests-audit-live-first",
+        "orders-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-005",
+      "priority": "P1",
+      "title": "Numeración SC/OC por empresa entre obras compartidas",
+      "aliases": [
+        "REQ-04"
+      ],
+      "observed": "El máximo por empresa se calculaba sin serializar altas de proyectos distintos; SC compartida no resolvía empresa activa.",
+      "correction": "Bloqueo Company FOR NO KEY UPDATE después de Project y antes de SC/OC; usar empresa autorizada, sin adivinar para contexto global.",
+      "evidence": [
+        "requests-audit-live-first",
+        "requests-audit-live-fixture-recheck",
+        "orders-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-006",
+      "priority": "P1",
+      "title": "D-126: devolución e históricos de cotizaciones",
+      "aliases": [
+        "REQ-03",
+        "AG06-FE-08"
+      ],
+      "observed": "Ofertas rechazadas/sustituidas permitían devolución y luego reemplazo de IDs/cantidades o snapshots históricos.",
+      "correction": "Nunca devolver con historial; históricos DRAFT conservan líneas/cantidades/referencias y permiten cabecera no destructiva, incluso al reenviar.",
+      "evidence": [
+        "requests-audit-live-first",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-007",
+      "priority": "P1",
+      "title": "OC directa: impedir reserva de ítems de otra SC",
+      "aliases": [
+        "orders.direct_award_injection"
+      ],
+      "observed": "updatePurchaseOrder aceptaba purchaseRequestLineId en una OC sin SC y podía bloquear otra adjudicación por índice único.",
+      "correction": "Rechazar vínculos de adjudicación en OC directa y comprobar los padres de los FKs presentes en las demás órdenes, sin inventar FKs históricos.",
+      "evidence": [
+        "orders-audit-live-second",
+        "independent review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-008",
+      "priority": "P1",
+      "title": "Moneda/FX de cotización, adjudicación y OC",
+      "aliases": [
+        "REQ-06",
+        "orders.fx_capture",
+        "AG06-FE-06"
+      ],
+      "observed": "Cambiar moneda podía reutilizar otro FX; adjudicación dejaba totalAmountArs cero y formularios no exponían o conservaban el FX.",
+      "correction": "Parser FX6 canónico, carga manual, actualización de total ARS al editar y copia de moneda/FX de la oferta adjudicada; UI y DTO nativos.",
+      "evidence": [
+        "requests-audit-live-first",
+        "orders-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-009",
+      "priority": "P1",
+      "title": "D-125: referencia, varianza y saldo comparables",
+      "aliases": [
+        "orders.currency_baseline",
+        "AG06-FE-07"
+      ],
+      "observed": "Importes originales de distintas monedas se comparaban o sumaban como si fueran equivalentes, incluso al copiar precios APU.",
+      "correction": "Moneda/unidad demostrables; NO_BUDGET_BASELINE y nota vigente si no son comparables; saldo null con aviso, sin subtotal falso ni FX inferido.",
+      "evidence": [
+        "orders-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "knowledge acceptance"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-010",
+      "priority": "P2",
+      "title": "Insumo APU explícito, naturaleza y cantidades exactas",
+      "aliases": [
+        "orders.explicit_apu",
+        "orders.nature_under_lock"
+      ],
+      "observed": "El hint LAB/EQ quedaba detrás de MATERIAL; inferencia de naturaleza usaba un preview y la necesidad física pasaba por Number.",
+      "correction": "Respetar APU explícito, Decimal para cantidades e inferencia vigente dentro del Project lock, conservando costType explícito.",
+      "evidence": [
+        "orders-audit-live-second",
+        "orders-apu-lock-regression-live"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-011",
+      "priority": "P2",
+      "title": "SC: DTO serializado y estimado completo en moneda nativa",
+      "aliases": [
+        "REQ-07"
+      ],
+      "observed": "El spread de relaciones exponía Decimal; estimados rotulaban USD como ARS, omitían líneas sin base o reemplazaban snapshots nulos por precios actuales.",
+      "correction": "DTO explícito, ISO por línea y estimado solo con base completa/comparable; no sustituir un snapshot enviado faltante.",
+      "evidence": [
+        "requests-audit-live-first",
+        "requests-audit-live-fixture-recheck",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-012",
+      "priority": "P2",
+      "title": "Entradas parciales, fechas y precisión",
+      "aliases": [
+        "REQ-10"
+      ],
+      "observed": "Regex aceptaba fechas imposibles, defaults reescribían moneda omitida y motivos en blanco pasaban el schema.",
+      "correction": "Fechas calendario, trim, FX6 y updates parciales; histórico sin fecha conserva la excepción documentada D-096.",
+      "evidence": [
+        "validators",
+        "requests-audit-live-first"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-013",
+      "priority": "P2",
+      "title": "Readjudicación e historia de punteros de cobertura",
+      "aliases": [
+        "REQ-08"
+      ],
+      "observed": "Cachés de adjudicaciones anuladas bloqueaban readjudicar o se limpiaban en solicitudes ajenas y estados terminales.",
+      "correction": "Recuperar solo los vínculos válidos del documento, conservar OC históricas y atomizar lotes/criterio D-118 por ítem.",
+      "evidence": [
+        "requests-audit-live-first"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-014",
+      "priority": "P1",
+      "title": "Aprobación: nota obligatoria y actor habilitado",
+      "aliases": [
+        "orders.approval_note",
+        "orders.approval_eligibility",
+        "AG06-FE-12"
+      ],
+      "observed": "Aprobar recalculaba varianza pero ignoraba nota faltante; UI solo miraba rol y omitía segregación/alto nivel.",
+      "correction": "Exigir justificación vigente y exponer elegibilidad canónica del servicio; explicar la intervención de otro aprobador.",
+      "evidence": [
+        "orders-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-015",
+      "priority": "P1",
+      "title": "Recepción: cantidades agregadas, tolerancia y depósito",
+      "aliases": [
+        "receipts.aggregate_and_warehouse",
+        "AG06-FE-05"
+      ],
+      "observed": "Filas repetidas se validaban separadas y productos podían confirmarse sin entrada de stock por falta de depósito; UI bloqueaba tolerancia válida.",
+      "correction": "Sumar por línea OC, exigir depósito autorizado para productos y revalidar su elegibilidad; UI conserva tolerancia del servicio y explica servicios sin stock.",
+      "evidence": [
+        "orders-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-016",
+      "priority": "P1",
+      "title": "Reversa de recepción sin stock negativo ni movimientos ajenos",
+      "aliases": [
+        "receipts.stock_reversal"
+      ],
+      "observed": "Dos ingresos de cuatro se comprobaban individualmente con cinco disponibles y su reversa podía dejar negativo; se tocaban movimientos ajenos o de consumo.",
+      "correction": "Agrupar producto/depósito, bloquear y comprobar el total, revalidar recibo y revertir solo IN propios; rollback íntegro si falta stock.",
+      "evidence": [
+        "orders-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-017",
+      "priority": "P2",
+      "title": "Idempotencia de recepción y notas por línea",
+      "aliases": [
+        "REQ-09",
+        "receipts.replay"
+      ],
+      "observed": "Replay ignoraba notas, podía colisionar por delimitadores o fallar después de completar la OC y en creates concurrentes con la misma key.",
+      "correction": "Fingerprint de tuplas normalizadas incluyendo notas; resolver replay válido antes de elegibilidad/reservas y otra vez bajo lock; un ID/efecto/número.",
+      "evidence": [
+        "orders-audit-live-second",
+        "idempotency pure tests"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-018",
+      "priority": "P2",
+      "title": "D-127: identidad de recepciones nuevas e históricas",
+      "aliases": [
+        "receipts.number",
+        "AG06-FE-15"
+      ],
+      "observed": "No había número propio y varias recepciones de una OC mostraban el mismo código de orden.",
+      "correction": "Campo number Int? e índice por tenant/empresa/número; RC-NNN para altas nuevas serializadas, UUID histórico preservado, sin reutilización ni backfill.",
+      "evidence": [
+        "orders-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "migration isolated",
+        "visual-final.json: RC-001 and RC-002 confirmed"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-019",
+      "priority": "P1",
+      "title": "Política de compras: validación de parches y atomicidad",
+      "aliases": [
+        "root-policy"
+      ],
+      "observed": "Coerción de booleanos, Number y validación de un patch aislado podían habilitar flags o dejar límites incompatibles al editar simultáneamente; faltaba auditoría atómica.",
+      "correction": "Zod canónico/Decimal, validar estado fusionado después de lock de Company, preservar omitidos, registrar before/after en la misma TX e invalidar consumidores.",
+      "evidence": [
+        "platform-audit-live-second",
+        "company-procurement-settings.test.ts"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-020",
+      "priority": "P1",
+      "title": "Audiencia de avisos y SLA por empresa/usuario activo",
+      "aliases": [
+        "root-notifications"
+      ],
+      "observed": "Owner de otra empresa en obra compartida o usuario inactivo podían recibir avisos; ejecución manual recorría otras empresas.",
+      "correction": "Filtrar pertenencia activa, estado User, empresa del documento y ACL de obra antes de campana/email; acotar contexto manual sin limitar cron global autorizado.",
+      "evidence": [
+        "platform-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-021",
+      "priority": "P2",
+      "title": "Hub Compras: permisos y significado de indicadores",
+      "aliases": [
+        "AG06-FE-09",
+        "root-hub"
+      ],
+      "observed": "Rol SC-only consultaba OC/recepciones o veía accesos inaccesibles; etiquetas confundían cualquier oferta con suficiencia y cobertura total.",
+      "correction": "Gates PROJECTS/PROCUREMENT, canViewOrders y consultas omitidas para secciones ocultas; Sin cotizaciones recibidas y Adjudicadas con significado explícito.",
+      "evidence": [
+        "platform-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-022",
+      "priority": "P2",
+      "title": "OC y facturación: moneda nativa y cálculo no disponible",
+      "aliases": [
+        "root-ap-currency",
+        "AG06-FE-11"
+      ],
+      "observed": "El resumen rotulaba USD como ARS o sumaba documentos incompatibles; lecturas podían incorporar NC/ND como cobertura física.",
+      "correction": "Moneda explícita, FX6/amount2 serializados y rechazo del cálculo mezclado conservando documentos originales; NC/ND no alteran cobertura física por D-115.",
+      "evidence": [
+        "platform-audit-live-second",
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-023",
+      "priority": "P1",
+      "title": "OC→AP: padres financieros y cabecera manual",
+      "aliases": [
+        "root-ap-scope"
+      ],
+      "observed": "Preview/generación omitían el grafo WBS/APU; alta/edición/emisión manual podían vincular OC de otra empresa en obra compartida.",
+      "correction": "Reutilizar grafo canónico y validar tenant/empresa/obra/proveedor/moneda antes y dentro de la escritura; validar facturas y Payable antes de resumir.",
+      "evidence": [
+        "platform-audit-live-second",
+        "independent review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-024",
+      "priority": "P1",
+      "title": "Borrador AP desde recepción: sumar cantidades y conservar origen",
+      "aliases": [
+        "root-ap-draft"
+      ],
+      "observed": "Un Map sobrescribía renglones repetidos y actualizar un borrador de otra moneda podía reinterpretar sus precios nativos.",
+      "correction": "Sumar por línea OC, comprobar el grafo del recibo y rechazar sobreescritura incompatible. Carga manual sin FK de línea conserva su aviso informativo y su permiso vigente.",
+      "evidence": [
+        "platform-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-025",
+      "priority": "P1",
+      "title": "Edición parcial AP concurrente: no mezclar validación vieja",
+      "aliases": [
+        "root-ap-concurrency"
+      ],
+      "observed": "Dos ediciones podían combinar proveedor anterior con OC retargeteada después de validar el snapshot original.",
+      "correction": "Claim DRAFT con updatedAt exacto y audit en la misma TX; rechazar el patch desactualizado y conservar la edición ganadora.",
+      "evidence": [
+        "platform-invoice-concurrency-live",
+        "independent review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-026",
+      "priority": "P2",
+      "title": "Invalidación de todos los consumidores de compras",
+      "aliases": [
+        "AG06-FE-02"
+      ],
+      "observed": "Mutaciones no refrescaban detalle, tableros, materiales/MO/equipos, pendientes o cronograma ligados.",
+      "correction": "Helper de revalidación común por obra/documento y actualización de consumidores reales, incluidas políticas.",
+      "evidence": [
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "procurement-actions.test.ts"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-027",
+      "priority": "P2",
+      "title": "Formularios: doble envío, fallas de transporte y datos conservados",
+      "aliases": [
+        "AG06-FE-03",
+        "AG06-FE-04"
+      ],
+      "observed": "Clicks antes del rerender duplicaban intentos, rechazos de red escapaban y callbacks action de React19 vaciaban formularios rechazados.",
+      "correction": "Mutex síncrono y transición compartida, error recuperable, onSubmit sin reset tras rechazo y diálogos que no cierran mientras procesan.",
+      "evidence": [
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "browser sample"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-028",
+      "priority": "P2",
+      "title": "Fuentes opcionales AP/Inventario sin ceros ficticios",
+      "aliases": [
+        "AG06-FE-10"
+      ],
+      "observed": "Fallos de consulta o falta de acceso se presentaban como cero facturado, ninguna recepción o ausencia de stock.",
+      "correction": "Estado no disponible con razón y documentos permitidos separados; diferenciar desconocido de ausencia comprobada.",
+      "evidence": [
+        "frontend-results.json: 74 procurement tests, 16 groups"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-029",
+      "priority": "P2",
+      "title": "Contexto global y opciones de la empresa/obra del documento",
+      "aliases": [
+        "AG06-FE-14"
+      ],
+      "observed": "Detalle de OC compartida fallaba al pedir settings con empresa null; edición usaba defaults silenciosos/opciones ajenas.",
+      "correction": "Resolver política, WBS, proveedores/documentos con order.companyId; filtrar productos globales/propios y depósitos de obra/generales permitidos.",
+      "evidence": [
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "independent review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-030",
+      "priority": "P2",
+      "title": "Presentación de recepción, confirmaciones y lectura móvil",
+      "aliases": [
+        "AG06-FE-13"
+      ],
+      "observed": "Depósito y anulación de borrador tenían feedback distinto; móvil omitía historia DRAFT/CANCELLED visible en escritorio.",
+      "correction": "Patrones del sistema, mensajes de stock/servicio, confirmación de anulación y lectura móvil de histórico sin ampliar acciones.",
+      "evidence": [
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "browser sample"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-031",
+      "priority": "P1",
+      "title": "Saldo WBS: no incorporar una OC de otra obra",
+      "aliases": [
+        "orders.legacy_commitment_project"
+      ],
+      "observed": "Una FK legacy al mismo WBS podía introducir compromisos de otro proyecto aunque el PO quedaba rechazado en su ficha.",
+      "correction": "Validar proyecto del compromiso contra presupuesto antes de sumar y fallar genéricamente, sin ocultar importes.",
+      "evidence": [
+        "orders-audit-live-second"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-032",
+      "priority": "P2",
+      "title": "Transacciones complejas: presupuesto de tiempo y DTO fuera del lock",
+      "aliases": [
+        "orders.transaction_budget"
+      ],
+      "observed": "El timeout heredado de cinco segundos vencía en operaciones válidas con relecturas reales; joins de presentación retenían bloqueos.",
+      "correction": "maxWait10s/timeout30s en estas operaciones y cargar DTO final después del commit cuando es seguro; conservar revalidación y auditoría atómica.",
+      "evidence": [
+        "orders-audit-live-first failure",
+        "orders-audit-live-second pass"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-033",
+      "priority": "P2",
+      "title": "Documentación de implementación, estados y período",
+      "aliases": [
+        "root-docs"
+      ],
+      "observed": "Listas históricas decían que WBS/plazos/baseline/avisos no existían; alias de estados y precondición de período contradecían fuentes posteriores.",
+      "correction": "Inventario real, estados canónicos y alcance D-078 reconciliados con Hallazgo; Guía/Ayuda y knowledge/evals actualizados.",
+      "evidence": [
+        "docs/help",
+        "knowledge acceptance",
+        "independent review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-034",
+      "priority": "P1",
+      "title": "D-129: aprobación vigente al cambiar FX al confirmar",
+      "aliases": [
+        "orders.confirmation_fx",
+        "D129"
+      ],
+      "observed": "Un EDIT podía cambiar FX de una OC aprobada y superar monto/nivel/segregación sin renovar aprobación.",
+      "correction": "Aprobación habilitada con nuevo ARS/varianza/nota/segregación, sello y evento existente dentro de la confirmación atómica; FX igual conserva permiso anterior.",
+      "evidence": [
+        "orders-confirmation-fx-d129-live",
+        "frontend-results.json: 74 procurement tests, 16 groups",
+        "independent review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-035",
+      "priority": "P2",
+      "title": "Cierre parcial formal: brecha de producto delimitada por D-128",
+      "aliases": [
+        "Q-076",
+        "D-128"
+      ],
+      "observed": "BR-PUR-013 anunciaba una acción sin representación física ni cálculo completo implementados.",
+      "correction": "Owner aprobó desarrollo separado con diseño previo; quitar instrucciones que la presentaban como disponible, conservar frenos y registrar pendiente explícito.",
+      "evidence": [
+        "D-128 and approved proposal"
+      ],
+      "status": "deferred_by_explicit_owner_scope",
+      "origin": "Confirmado en la revisión indicada. Preexistencia atribuida solo donde la fuente base permite comprobarla; no se presume regresión desde el diff acumulado AG-05/06."
+    },
+    {
+      "id": "GA-AG-06-036",
+      "priority": "P1",
+      "title": "Cierre de la OC: saldo fiscal y cobertura emitida, sin mezclar reservas",
+      "aliases": [
+        "root-final-settlement",
+        "D-112",
+        "D-115"
+      ],
+      "observed": "La ficha consideraba completo el pago cuando paidAmount bruto alcanzaba invoicedAmount neto+IVA: con factura124 y pago121 quedaba una deuda3 por percepción y podía indicarse pago completo. Además, pendingToInvoice incluye reservas DRAFT y se usaba como si acreditara cobertura emitida, pudiendo completar el proceso con otro borrador pendiente.",
+      "correction": "Dos indicadores derivados en el servicio: cobertura recibida realmente emitida (sin reservas DRAFT) y cancelación de todas las obligaciones válidas de facturas/ND emitidas (PAID con saldo canónico normalizado cero). Las ND emitidas vinculadas directamente o mediante la factura referida se validan y mantienen su deuda y pagos efectivos; no alteran cobertura física. React consume ambos hechos; etiquetas distinguen neto+IVA, percepciones, efectivo y cancelación por NC. No se agregan campos persistidos ni reglas financieras nuevas.",
+      "evidence": [
+        "platform-payment-settlement-live",
+        "platform-issued-and-debit-closure-live",
+        "frontend RSC and workflow regressions",
+        "independent final billing review"
+      ],
+      "status": "corrected_verified_locally",
+      "origin": "Confirmado al revisar el cierre de la presentación durante AG-06; no atribuido al diff acumulado."
+    }
+  ],
+  "findingCounts": {
+    "total": 36,
+    "correctedVerifiedLocally": 35,
+    "deferredByExplicitOwnerScope": 1,
+    "openConfirmedDefectsWithinClosureScope": 0
+  },
+  "environment": {
+    "databaseHost": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+    "databaseName": "bloqer_audit_ag01_20261103",
+    "effectiveGuard": "assertAuditDatabaseIdentity before every maintained fixture",
+    "syntheticFixturesOnly": true,
+    "externalProvidersDisabled": true,
+    "envFilesChanged": false,
+    "normalDevDatabaseChanged": false,
+    "productionDatabaseChanged": false,
+    "migration": {
+      "name": "20261104183000_purchase_receipt_company_number",
+      "isolatedDatabaseApplied": true,
+      "totalAppliedMigrations": 71,
+      "historicalRowsRenumbered": false,
+      "backfill": false,
+      "clientGenerated": true,
+      "otherEnvironmentsApplied": false,
+      "futureDeploymentPrerequisite": "Apply this migration in the authorized deployment target before running the new Prisma client"
+    }
+  },
+  "correctionBoundaries": {
+    "earlierAg05WorkPreserved": true,
+    "noNewDependencies": true,
+    "newPersistedFieldApproved": "PurchaseReceipt.number Int? (D-127); unique tenant/company/number",
+    "billingFlagsDerivedOnly": [
+      "allReceivedAmountIssued",
+      "allIssuedInvoicesSettled"
+    ],
+    "fiscalRulesPreserved": [
+      "D-112: coverage net+IVA excludes perceptions; cash is fiscal total",
+      "D-115: NC/ND do not create physical coverage; canonical valid obligations and credits determine financial settlement"
+    ],
+    "partialCloseImplemented": false,
+    "simplifiedRolesImplemented": false,
+    "completeApInventoryReportingNotificationAuditsCompleted": false
+  },
+  "review": {
+    "specialists": [
+      {
+        "agent": "ag06_requests_quotes",
+        "responsibility": "SC, quote, awards, history, validators, concurrency and the late AP billing-boundary correction",
+        "handoff": "requests-results.json"
+      },
+      {
+        "agent": "ag06_orders_receipts",
+        "responsibility": "OC approval/confirmation, FX/variance, parent graph, receipts, stock boundary, company numbering",
+        "handoff": "orders-results.json"
+      },
+      {
+        "agent": "ag06_frontend",
+        "responsibility": "48 UI/action/consumer files, 16 groups and 74 procurement tests",
+        "handoff": "frontend-results.json"
+      },
+      {
+        "agent": "root",
+        "responsibility": "Policy, hub, notification audiences, AP boundary, docs/help/knowledge, SQL runs, migration, final build/browser and consolidation"
+      }
+    ],
+    "independent": {
+      "agent": "ag06_verification",
+      "filesEdited": false,
+      "browserSqlBuildExecuted": false,
+      "ownExecutedSubsets": {
+        "services": 79,
+        "frontend": 36,
+        "d129": 1,
+        "finalBilling": 4
+      },
+      "additionalFindingsCorrected": [
+        "Direct OC request-line injection",
+        "Cross-company manual AP linkage",
+        "Legacy AP parent graph validation",
+        "SC currency and misleading partial estimate",
+        "Global shared-project settings",
+        "Stale concurrent AP partial edit"
+      ],
+      "finalReview": "No open findings in the scoped final re-read, including draft/issued coverage, fiscal total, ND debt, cash and canonical credits",
+      "countsOverlapGeneral": true
+    },
+    "specialistHandoffsAreHistoricalSnapshots": true,
+    "coordinatorFinalEvidenceOverridesPendingHandoffStatuses": true
+  },
+  "limitations": [
+    "Only Owner browser sample in AG-06; ACL and restricted roles checked in SQL and component tests",
+    "D-129 foreign-FX confirmation covered by SQL and UI tests; no complete foreign-order browser confirmation",
+    "Historical UUID receipt identity tested in SQL/components; browser proof uses two new receipt numbers",
+    "No complete platform E2E or production portal smoke",
+    "No real supplier communication, invoice issuance or cash payments in browser",
+    "No external email, storage or LLM calls; retrieval tests are not remote model evals",
+    "No full WCAG/NVDA certification or performance benchmark",
+    "Other module audits wait for their assigned phases; partial close requires a separately approved design"
+  ],
+  "next": {
+    "phase": "AG-07",
+    "started": false,
+    "authorization": "Wait for Owner instruction before beginning",
+    "futureDevelopment": "P-AG06-01 (formal partial close, D-128)"
+  },
+  "revalidation": "Select affected suites and consumers from TESTING_STRATEGY and PLATFORM_AUDIT_RUNBOOK after schema, permission, FX/variance, parent, receipt or consumer changes",
+  "startedAt": "2026-11-04T15:44:05.847Z",
+  "provenance": {
+    "initialSnapshot": "output/platform-audit/ag-06-2026-11-04/initial-snapshot.json",
+    "finalManifest": "output/platform-audit/ag-06-2026-11-04/final-source-manifest.json",
+    "finalManifestSha256": "33247d045b7a88bebe54123a670b2de6f4f59d79b3290f3dc4756cbedabe4982",
+    "finalReportMarkdownSha256": "c60bdd9e98099b3cbc009c2f3ebea90fd4ec9dde6c957dc5a6e9f8a74d1d7c2f",
+    "preexistingChangeCount": 149,
+    "preexistingPathsPresent": true,
+    "preexistingUnchangedCount": 135,
+    "preexistingExtendedPaths": [
+      "apps/web/features/help/lib/articles/planning-procurement.ts",
+      "docs/bloqer2.0/00-product/DECISION_LOG.md",
+      "docs/bloqer2.0/00-product/OPEN_QUESTIONS.md",
+      "docs/bloqer2.0/03-finance/MONEY_MODEL.md",
+      "docs/bloqer2.0/04-formulas/COST_FORMULAS.md",
+      "docs/bloqer2.0/08-architecture/DEPLOYMENT_SMOKE_TEST.md",
+      "docs/bloqer2.0/08-architecture/PENDING_ARCHITECTURE_ITEMS.md",
+      "docs/bloqer2.0/08-architecture/PLATFORM_AUDIT_PLAN.md",
+      "docs/bloqer2.0/08-architecture/TESTING_STRATEGY.md",
+      "docs/bloqer2.0/08-architecture/platform-audit/README.md",
+      "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "packages/ai/knowledge/generated/docs-index.json",
+      "packages/services/src/procurement/purchase-order.service.ts",
+      "packages/services/src/procurement/purchase-receipt.service.ts"
+    ],
+    "sourceFileCount": 2604,
+    "deltaFromInitial": [
+      {
+        "path": "apps/web/app/(app)/configuracion/politicas/actions.ts",
+        "sha256": "6f14c5b424616ba9e0d5d56ce5dba6711b0f3261c5efc5860945bec05de4669d",
+        "beforeSha256": "509b61ba21d75b2dee20c33c8ba0c90d936ce5b80127bd3a37df4cb5b21d88c4",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/compras/page.tsx",
+        "sha256": "9e03b747403cdd050e7a6b9caed29e1d9d0258b6b3ecb02b97be006062235060",
+        "beforeSha256": "d11ebafe7733a1342811cad63a37c1ab445fc4586248b95a821b08f1f600761f",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/[poId]/editar/page.tsx",
+        "sha256": "5100df4cec78e01b54b1aeb9a3e76bd88047fa24a96e64c405e41bc4c285b092",
+        "beforeSha256": "b04b25e8a0a5dc4ecfda4a68c270b83ae0d22278c926971bd10fba4cf642c191",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/[poId]/page.tsx",
+        "sha256": "e8fe7fc8cb8551c2341dd35aba6b191b321a8918b16edb95f219182fbe6ffefa",
+        "beforeSha256": "ab63090d3b02525ba978dd3f786a7c14066b019443821a556876cec8a26e6266",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/[poId]/recepciones/nueva/page.tsx",
+        "sha256": "f4afd05447831008b8e166e95dbcb68364a21f555d901238f0c1d89689571d58",
+        "beforeSha256": "0c012689b8fb0091ce0c5c5d1be4f667e39e5e8a12a6f592567b3c81d9cf2e10",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/actions.ts",
+        "sha256": "211fcf5e82777a69ba9cf22b0264a584581e9d9f82f54c5b82034a2ec04c7298",
+        "beforeSha256": "1f92381db1f4a4b19d62d97fdaaa431eb0b1ed05def3c2e1f49cb964124556b7",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/nueva/page.tsx",
+        "sha256": "85fb33ed6bb72f240883db9d915f21956dc4d2da25b519f72f045dc438b0ff80",
+        "beforeSha256": "77d988cc5c7ed9fc75ed4b544af31c74b6cba7bc52e64cea566328a4d33345a8",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/page.tsx",
+        "sha256": "f5e79e96d4ec5788f6bebc793a5ad4ae69aca901a6e0762d47927659f838175a",
+        "beforeSha256": "e76140ea128f14fb21b5968ff777836a58271b18e3bace318398824613bb21f4",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/recepciones/[receiptId]/page.tsx",
+        "sha256": "0b4ecd9ceeddd93d22178e2175a02250dc968047c7dd2b7f52697cd55da3c57d",
+        "beforeSha256": "00b1229b66b95470192324cc2ca5854893e8ee9542a97ae5daef972d64966c0a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/recepciones/page.tsx",
+        "sha256": "a49379f3a58662db45317c8828c7d3b0773a32ab7fe24b0edf8cd8bb47a0d011",
+        "beforeSha256": "9d78d0cbae1045b6116b97b20a7f0fd4e4bdfa173e216ce707d2f8c3ee7006eb",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/[prId]/editar/page.tsx",
+        "sha256": "8245e537bce400c0b7ec1410353bcc3176a9d06ee269c7be2925bff2771ab5fe",
+        "beforeSha256": "ef71e9200a35f30fd7cd3da9be418bbc387e90c065b4b7957e30d43d99b9361c",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/[prId]/page.tsx",
+        "sha256": "ede519eaeff8cc5318c3c7de312705d34a3ccfbe42212b3b43c91fe736231eea",
+        "beforeSha256": "8fcae09da5e9124e854e5c0b25eb9c8d6ecc70b08e3f5e62593d1ea0b997c9c8",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/actions.ts",
+        "sha256": "b04c6a24ecaaf718b02f79ab2c262f514d2b54725397c48f27b17d2dabcabf23",
+        "beforeSha256": "bc5044ceee5a9d792cc4b68a4c8fed2edfa2a54db69d5308e56e33e73b0e9e0a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/nueva/page.tsx",
+        "sha256": "2f2d42d7060c35342111d62e6eec8e6c394c125be374c458ba74e3e690aaf764",
+        "beforeSha256": "220c19ca58cad3d3647ccb539517712c42e7c6d1953326590ab7841e875dc975",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/page.tsx",
+        "sha256": "5f0c9a10f2fe16e6968e9f8193d54308b37a4663e36af00c6a51abf46870e884",
+        "beforeSha256": "9f11591b679d82e1e4aaff83499dbb1fca0b38cb0d45f72cecb9caf40bbefdc0",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/help/lib/articles/planning-procurement.ts",
+        "sha256": "f4af60f03657ba39ea99c316d51fb49a16764192a099125b866d9e5c786c09c0",
+        "beforeSha256": "9f8620b6f1cd05da3b4b39e80f8e24a42d98b3328da14427511dc32cb6ae90c8",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/authorize-and-commit-po-button.tsx",
+        "sha256": "9836d35dcc177b20c7e1a57650a614f750ba8be63b6e806f25b3affc1e77a968",
+        "beforeSha256": "7ed7b123a997b4c9e8497a47bf979ecb97ac43403b6754dfe49e0dbc26994345",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/cancel-purchase-order-button.tsx",
+        "sha256": "6280f05ace8715fdfd3422f1f540b48c70b7be5e3569ea053d6f3c6a0c5e3505",
+        "beforeSha256": "7e600ca83c9c1b3a85655c92ba47e17aa95d2c0ff3e8322dc20c2794b24f091f",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/company-procurement-notification-settings-form.tsx",
+        "sha256": "1dfad87c36ba8908b54c9b78826aa5ace6814b3372b9d001b61e02c7e5840fd0",
+        "beforeSha256": "5b6d41b388f1383962cef3c5f37df874bd72f0b4fe22313bcc6413d819ffaf6d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/company-procurement-settings-form.tsx",
+        "sha256": "bed00245040300452e53a324fddad9ed7bbcbba1f7e65ac04fb9efff166158c2",
+        "beforeSha256": "b619bc46488e4dc0b56166dead132b166a68a7bfe556f91d7b40db5cadaf705f",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/confirm-purchase-order-button.tsx",
+        "sha256": "d851e2ebc9e4bf65b8ef23859ec968dcc9bc905e22ce11a0db81729be82b4096",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/new-purchase-order-dialog.tsx",
+        "sha256": "2f163aab17d8d1c64e1224048d71ab2dd739b3fdf3bd8cad7dfecb9f810a0788",
+        "beforeSha256": "7445509dff974ba9f3a600fab3253093aab1d0dc9ac2d1fff9c93bc56354d4a6",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/new-purchase-request-dialog.tsx",
+        "sha256": "4a73e8959b46e08055b4bd3e5dc9709d17e580b2bd48f11af62a72bf9572c236",
+        "beforeSha256": "415c4df9ca44f9f4e82c5ad6df4ad6a049c63695b172fa43ec0a91453484c402",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/po-billing-next-step-panel.tsx",
+        "sha256": "f6adcdc827fe2e7539bad70ad2316ff05908d3d66765e34407f01a2e2e904c37",
+        "beforeSha256": "8b31f7d8e95abd8f0c79b456565332b8d718fd02e28575e93b96a9099751dc2a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/po-line-budget-ref.tsx",
+        "sha256": "793ea7ca1319e9f2eef39fbc69331b258850bef7dc6ad520e49b1904ec33a0ed",
+        "beforeSha256": "3109b83b52eb1a0d897d65a33ed62ed40eb57a33e781fec2d156a84f2a18ba22",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/procurement-quote-form.tsx",
+        "sha256": "3d158dc5d3faf3c2a342cc18a9aef88e834ac01d285c380c827f8b7628c42f23",
+        "beforeSha256": "6e216ffc1ad700e7cf126ef55a7801aff17523c272d161a0926925fa1a255e98",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/procurement-quotes-section.tsx",
+        "sha256": "c3996663d8fd8fe71263d182a5d5fe8ee3cbe9f408d944ed5d5913802615dec2",
+        "beforeSha256": "64ce28beb56cbcdda5c5c5126c7f472adc9d14ea001a30753efe16b79b4a3d3a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/procurement-submit-button.tsx",
+        "sha256": "8a6b74a5b6706dd222d90f9b0545746b3d6e2c15ef841f8cd1a440a7c7e7aec7",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-approval-actions.tsx",
+        "sha256": "7d9c7698272d56bccb85b035b50bf8c2196cf0f13fe45de4e97253ca583646bc",
+        "beforeSha256": "9f325635510284b26b003e75a8a9417d38c839a0d6bd3957e6922fa9eadf66a6",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-edit-form.tsx",
+        "sha256": "de0f939deb191a4ff7b5a7766c3a722904692d3b0ca6f1553dcadbb56a45a6dd",
+        "beforeSha256": "74e60f12489352ac67d7794bfc3f6bc6b1fbb3c67624ee20fbc4b238631fafa1",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-form.tsx",
+        "sha256": "eae674908087c87fe55da547746f36bd46abca47c5a7c59d1b13f5bb6d21cc2c",
+        "beforeSha256": "5b61d3d5c748dfacadaf15a8acfccafbedda6c990349e492a09406f595ef0cd4",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-lines-editor.tsx",
+        "sha256": "01cb16dc8252db79a5f90bf13db57ef5747c9b9497d5a48327e87fed8b21604f",
+        "beforeSha256": "06de335f5fce070f52c8d2777da68b3141e28e51a04952b7deac379a18239f6b",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-mobile-fiche.tsx",
+        "sha256": "97a079980a9453a3436e43c5d943d252c1545d778c2faa22ba837c9359c32240",
+        "beforeSha256": "10b2ac8cdfe805e710e3cea0d3d4613bf8ba89d3b85d18ecf12d42a4093e2f34",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-next-step.tsx",
+        "sha256": "bd7989d636e6aef49ad838572f998f7523bba606fcc49ef3f2fa4b41d1857181",
+        "beforeSha256": "ae0d37106965091abe0a67d9df2a1a681a6622fe150bf0c582a72f7a6a6e48b0",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-order-variance-readout.tsx",
+        "sha256": "688128b8c0a5f91142bd302bd3ba84f979c1803ff822d834722923c3055bd686",
+        "beforeSha256": "22485b603b7dc23969e2cfd79bf6e7fa9ec8f41133ca216e69d2ccd7ee2f5640",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-receipt-cards.tsx",
+        "sha256": "4d6e1e0b1c0644b3c5535b9762c414530af329bc86c7d37ab5fdebf6ea41a492",
+        "beforeSha256": "e04d11eb808ad2562ba0e47692e659b16c574e2a81e1978eca9db5c7d8a213b4",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-receipt-list.tsx",
+        "sha256": "ba23d43a7eaa18d1f755aba9b107c8d72b94c434871174710771ca37e1c5914d",
+        "beforeSha256": "7292d7dbcbe50c0fd07c40bc204dcca60bec68c33faed6f35031ef9f4d1a0f65",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-receipt-table.tsx",
+        "sha256": "e6a3d167925d285f6cc50751f8b8a95f0316a9d6726e6f5fdd699ed3ff5c0fb2",
+        "beforeSha256": "d71e7a2285d122efc3f1237f4c5c4d08363b164629755c24f1f0af258b3a7313",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-request-award-matrix.tsx",
+        "sha256": "5812072f37b62f5a1e51f89c39e28958ba663eea77e53a6339458bdade3151cc",
+        "beforeSha256": "6fa61dfce2f7d1b6ba59facd67b72cc7681b9b9fe8db530a622b568dbd6ff42e",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-request-create-composer.tsx",
+        "sha256": "d7e50d073879221834dcc09342b6743d75113b4d0da41da62c5b727ef079e95a",
+        "beforeSha256": "bb6c1af1304465182c4ef17593e5be057229bc222c0eda6f308e5dd8d51bd96b",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-request-detail-mobile-sections.tsx",
+        "sha256": "0bcef1dea71d47f1098e5e2c5978d81d83f3672e339e17afee39a544521e98ef",
+        "beforeSha256": "07e8040275edfe9667af9138eea9a9e5bd1739dedc930e0f7c6fa55643481ba3",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-request-form.tsx",
+        "sha256": "d970bff95d03edab1af4ea2bcc64d9359a38bab05020009e28eeb80835e64603",
+        "beforeSha256": "a9959bcf1adde568754ea58c0511f9183dff19543e3bbfaa4cda50f0624c2535",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/purchase-request-return-actions.tsx",
+        "sha256": "168c358ed05d6d9d4d1bfce6c18c454bf73ab06c6d94764cc8122fc5a328f195",
+        "beforeSha256": "06bc5bfe465911110a39885d7e9b06b54826328c70b772b0bf8e278c6669b4fc",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/components/receipt-form.tsx",
+        "sha256": "55d8a80d5d101fa4d5ff3c8f329e6a6e98aea1ce29047abb63cca53a5fd4b8d5",
+        "beforeSha256": "0aeecffdb9e6b4be94375fb88bfd15c33885e7f74b9d51dcf7930d101525a7c6",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/lib/procurement-actions.test.ts",
+        "sha256": "efaf4a21add2f712a210a7265afc4b284a400b7b3114791fbffa1e8ff113d113",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/lib/procurement-interactions.test.ts",
+        "sha256": "a31b720e88fd5da345ab2beeee94e2f340484871727b52f882f055bb1a938fa8",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/lib/procurement-read-views.test.ts",
+        "sha256": "7b37a09fd25b92085499306a4bcca93cbd1528a2ae527d48d148111b0985e05e",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/lib/purchase-order-process-steps.ts",
+        "sha256": "f12a476c1dabf7e346526626b4ec4479b178b1fbc159a105935064296f893f4d",
+        "beforeSha256": "af0e6f972dd23bcf169d82917614c2ad590fe39d8ec4e329f0a50678ea58df68",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/lib/revalidate-procurement-paths.ts",
+        "sha256": "71a7335a149a77ad55a58f4828392ae82335c49ccc098e0f9f5f2e802a6ab056",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "apps/web/features/procurement/lib/use-procurement-action.ts",
+        "sha256": "6e094043b467cc59715d41369418633dad3e3f736d8e7a4fe543fa83c5c269b4",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/00-product/DECISION_LOG.md",
+        "sha256": "673be79803668ee255cda261538eab7805be61ee674a94c786b27861e2c729cf",
+        "beforeSha256": "b0b193ade91e26e37bf85f6377479be963e4d7793a34a67528539b47a600dcb1",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/00-product/OPEN_QUESTIONS.md",
+        "sha256": "ba292072254644e537d7463ad3240cc168f6b3f51cbf04f6556a49474f30cb40",
+        "beforeSha256": "68e9850257fdca10bec74104aff067328d73484746f2b01dca454122420909f8",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/01-domain/APPROVAL_WORKFLOWS.md",
+        "sha256": "73828be9a02f55f8b1220c9c20769afba6b6492947a4008b69bb41ea25e6204f",
+        "beforeSha256": "ac00f118ca19b36abd12d0773e905148a4d6a9f848d9ed276950cc4f78cd301a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/01-domain/BUSINESS_RULES.md",
+        "sha256": "522eed81c5fa3d085a10a68ab8bc7485e21094f1fd88b2ed80dfd0d71ba5d415",
+        "beforeSha256": "019ec236e235185662b46fdc299db2ebd36b858160fe22517a502650170900c1",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/01-domain/CORE_ENTITIES.md",
+        "sha256": "dae6c87d5e17717e8819723e05fa4dc558caf4c8991a91bcd3a5eaafe0a1773f",
+        "beforeSha256": "b8a7cdab37612784fe8cf2587fd73f1aa3ab3a6c9332bb61186997737ef3595b",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/01-domain/STATE_MACHINES.md",
+        "sha256": "0b1ee0641863d68ac89944d4aedd9ed7795203dda43f58869bf52f86b3e98f30",
+        "beforeSha256": "dbfabb946d5839dfa744de18602d1136a5d5d50e98868d0b658893075873fd5f",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
+        "sha256": "2cbc0409ece84e8c0a66291b5b3c622586ff66e1211095161bc48e3f9450bb5d",
+        "beforeSha256": "2c54528f664d07c4ce7c53faa08bd65991a8bdedccc84e97592b7c20f33b9958",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/PROCUREMENT.md",
+        "sha256": "75b67b2669d8529a8c5476c347ce682ad44d50ebc024036e3492855117459535",
+        "beforeSha256": "3b03c91dee07175f1dfc0ea1f7d8ad0cf69f95efca6624a05025a2585869212d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md",
+        "sha256": "5985c92ccaa23bce3dd5f8f8874c79ae9187d3b11f7d215b8b7bc4b7e47b0457",
+        "beforeSha256": "76af622cf53b1bac9e8007200c7e7f278093416ae9bbb2594f8d5e0f56196d9f",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/PURCHASE_REQUESTS.md",
+        "sha256": "fb8866a684f1e66bf8651341416c7552e503ff0d3a7debfc477594686ea66016",
+        "beforeSha256": "028fdbe9f5e3e4e4d5a513e2761f95ae498581bc0df34884600bc40544172589",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/03-finance/MONEY_MODEL.md",
+        "sha256": "5fd453fd867c8ed8e0f5fdce706733f2e2fd7e5619f33c297323c29f2f659dfc",
+        "beforeSha256": "83d4f7029a9ea3e03731f3ec34b5b78c4ccdc1bcc58eba9016008933e8a5f284",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/04-formulas/COST_FORMULAS.md",
+        "sha256": "bc8369f937c82d7aecc806c56661acaa40b795ae9433420ae29bacd761fd93a2",
+        "beforeSha256": "83fc56cd9f8ba38357d5d8b97c62de5b4b8cb282c25d1b64fd131ee2e6d9dc0a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/05-workflows/REGISTER_PURCHASE.md",
+        "sha256": "e9fbe1502033081047d22c0ef0768ab5e274879eb455d75b7713cc5f8d6667cf",
+        "beforeSha256": "25aae8a909e81b97f431336a1dd8fbfabbafd70e6d20e2445c16cc1b5da74efe",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/DEPLOYMENT_SMOKE_TEST.md",
+        "sha256": "d6aedd012760a0ba9b9476935ed00efdd3358ccbe8f0f2794c1285cbf05471fe",
+        "beforeSha256": "03f49b208efc0205043e9047c333c7a2bd61f7fd36a699de014c56f5e2633611",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/PENDING_ARCHITECTURE_ITEMS.md",
+        "sha256": "9b45ae37c8eb9d732270da42b45dec49fa66f29f56fc347b13284c38c68a0a50",
+        "beforeSha256": "d7e26f8baf4b4801368d9b9f627091d525f844ca6fd6437122346778d9999fd4",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/PLATFORM_AUDIT_PLAN.md",
+        "sha256": "3b09a941782720c53b41722c3df08b48852ae486777b6b8b8da18670cb960e7d",
+        "beforeSha256": "2ee82c6b37a776d0108b2edf6d3fe9e8de6c6a4e5f83db7e31cb79b08edc6a7d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/TECHNICAL_ERD.md",
+        "sha256": "c3ce94d483de78c996460070a00f1ee0e9408e3e6bde5f8a77444811e9b10692",
+        "beforeSha256": "daa42ed108fe19aa1fab6f83005375fc5a626f650133110d92e8cd2bce9f2e50",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/TESTING_STRATEGY.md",
+        "sha256": "8b2215c0ab7f9b8beac55f9404fdc7e188e64529554864fa8c0a48d28f5125e8",
+        "beforeSha256": "9104991adc55d3a7050a6e62e1fa9385f109be397deb091483845b629641e170",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-confirmation-fx-proposal.md",
+        "sha256": "c98055a606fd1df78eb5a6615269a6e853b7e48a8d7312bd17d69a71245e1105",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-partial-close-scope-proposal.md",
+        "sha256": "66abd6f5fa46e8cee328ca7f091d1b79160cdf5be03f35dc284c96316d2a4c28",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-procurement.md",
+        "sha256": "c60bdd9e98099b3cbc009c2f3ebea90fd4ec9dde6c957dc5a6e9f8a74d1d7c2f",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-purchase-comparability-proposal.md",
+        "sha256": "bfdc9161601851efcfdf396af8f12d0bdb7438a0ea402adeeaf4f63dd88d60e6",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-receipt-number-proposal.md",
+        "sha256": "195ac4258bafa4acf0377dbed552da617bfdef407fec3a61977a6354f66db256",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-06-request-history-proposal.md",
+        "sha256": "7977aaa551637868c86fd1f705380060ce5c3bb28f99be1e067dfbfe9755adeb",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/README.md",
+        "sha256": "ac68f66824cd6ed5eec5d26fffa559d0f3d766d80d5f37568b2d598bd63eccf6",
+        "beforeSha256": "99c4a8914d502a1a360a1ddb6a0360bc2e9a09f9b11e2f1923925900ac94fee8",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/quote-usd-reference-ars-desktop-dark.png",
+        "sha256": "2051622dad3be45ea05e7fee6c33983b331c114958514b31c4a0521a1c66895c",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipt-draft-final-light.png",
+        "sha256": "3cd7ee6cd646ab52dbfc74e6f76ef7989a0cd9deb2255948d22bf82e07caad8f",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipt-rc001-desktop-light.png",
+        "sha256": "813dc0b5bb0a8c88bf5297710a7240580de7040ed187b9bee06294bceb57d512",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipts-two-codes-final-light.png",
+        "sha256": "86c064fee0d6e1fa4fada0f1901b0e4c6356cc9ed4aa06945b06eb1afca556bf",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipts-two-codes-final-mobile-dark.png",
+        "sha256": "c275e54499e175e41f939ecd8cb6d0a2364fccdab38872576e11e3838e0ee9d5",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/request-mobile-light.png",
+        "sha256": "c4c2d0ff57fc9b91b8cccb5e3d778455740fa003c9eaf71a0b67d68c4b501614",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/BLOQER_AI_MANUAL_SMOKE.md",
+        "sha256": "66508709a234f3104ea19ab7381289d8d9e3e4eefadc08b8b96b0e0c5d13a2ae",
+        "beforeSha256": "98e1525eb61d1caddd55f29748534289ccb7b0f3f8cd428644255b60aa6bb1ed",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+        "sha256": "e4425beb6bbd3c9225386e963ad2bc0cedce536c71ab2c674ed3a45314273df2",
+        "beforeSha256": "c30b5b974f3c135e023b92ec321a1360bf8e3073156a73941941758f8154569f",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/ai/evals/mvp-questions.json",
+        "sha256": "2a1b8cc27b17fff72c98b70f2a4735d71fa7917a58220b25c013da5a83326296",
+        "beforeSha256": "a4431eabaee9ff2d6ee6db65df5d59c3778e9ae108b18254d06b5f07ea9710be",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/ai/knowledge/generated/docs-index.json",
+        "sha256": "29b9b2e07724ee123a6a3051e115c1e765d32daf201480da28e0f78b880f3e58",
+        "beforeSha256": "323bfff0120e7c31c9de363f85b7c032bcc5b4a6b47afc3cd818311c5102f7f2",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/ai/src/knowledge/procurement-knowledge.test.ts",
+        "sha256": "50a73e6a1ae0a558d0e5443edbb523b697312a73cea5b01fc2aa4c093122beaa",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/database/prisma/migrations/20261104183000_purchase_receipt_company_number/migration.sql",
+        "sha256": "3e87faea207af5ee7c44e7ef77b78d9e1842ed88defb617fb5f70e3c262ccd63",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/database/prisma/schema.prisma",
+        "sha256": "c242160330d206582054291715ef1ac1eabead42b6b530b187ad80a3212b7834",
+        "beforeSha256": "2e7fb74b889f5eeac3dbc7f533ba0c3b62aa25fc4621063e98174cd3199d7ec7",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/ap/supplier-invoice-from-po.service.ts",
+        "sha256": "ff6181b98c6ecb085407019000e7a5b1b5e15120e0d7ed6119a5f5dfa7ae2956",
+        "beforeSha256": "7ce223138519b81b6abc76242028fae4bae051d177e5a766c9ecb3c17dcdcdd6",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/ap/supplier-invoice.service.ts",
+        "sha256": "a2752368b7f8b7e04fe7db9e9c199b12f51a526e2820c5a00d207f663ddac894",
+        "beforeSha256": "cf777a4bbfa3db73b95dbcc5f5000c5f388b4c576aa910c6b888e632089e99d3",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/idempotency/idempotency.test.ts",
+        "sha256": "2d08ef7bc707b319ab11e00612ff5ed5db55c17e216cfc0aa4baac404e93a563",
+        "beforeSha256": "c8d20320070479b00904eac7da1a20a2ab19564115c32cf0e09d09371cbc33d2",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/idempotency/idempotency.ts",
+        "sha256": "5a8d2b8e58b4b20eca3701cae576e5085252b5e0b4db495a63d4bdd963d81a9c",
+        "beforeSha256": "594e168b7cc4db122f18503828b5cfb13e57ab0f0644fb86a9b8e09ee56ceb2d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/inventory/stock-movement.service.ts",
+        "sha256": "5ee3914da9b322d85764688c1c7617511e99f498390060933c5d71d113b226c5",
+        "beforeSha256": "02d5dcf4bfcd56ef804d04d23fceeb16e95dadf13275db902e745097d726c2f7",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/company-procurement-settings.service.ts",
+        "sha256": "cdac42a10fffb66bfc91ed4bd4bf0596a6b095143721f2e44d2d0600b4896518",
+        "beforeSha256": "945b03e5f0a47071da962fbc8592959481b5b0691eaf88527754d41fbb898b75",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/create-purchase-request-schema.test.ts",
+        "sha256": "a40dfce40f6d39d0875f738be7f47f91a2daff3962f993ee88e521b81f6bce36",
+        "beforeSha256": "95789f960dd45a4e84784ad30a0c0ce5fb48ad3b1df458ca1a3ab4199babe58c",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-budget-baseline.ts",
+        "sha256": "e727e67220948656d3ae31c59ed3fe195e6cc6c5514975f6d5aca3b84348c4ea",
+        "beforeSha256": "60ff8569559da6f4887f375ce971eb790e20a856753eb5737d159614ece5b8d6",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-notification-audience.ts",
+        "sha256": "a6a20f67d0892f7f4726caee81f3446af9f5f64893403ab64ab7e12bf62fd8d2",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-notifications.service.ts",
+        "sha256": "adf706e23a4e0b7851665ca5fade7d0e611dbf7982f9962bb732b29f503ea4d5",
+        "beforeSha256": "9f6e6cd9e6d10849949c0cc2a63752a1c39db84b8ac0e59e09fd104d39546b90",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-order-scope.test.ts",
+        "sha256": "ca11f1e6776da19de89c64bc0fb968f0c1f38edda302ffb45fa5a27a4801bdfa",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-orders-audit.live.test.ts",
+        "sha256": "c63b14e33453d32dcb4a87d0862d7d4f35f14d33ff596e18d2d8d6838a90740a",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-overdue-alerts.service.ts",
+        "sha256": "20543ae936a3911f856cd4247643e0a6884d74c10c47e0f57d0b43fd9c6cb435",
+        "beforeSha256": "943fae92d1352604dfdd3345f03bd80af0a2d75cd6b8ae2c4fa0d779289d8b10",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-platform-audit.live.test.ts",
+        "sha256": "a7f88d32e93a58cca73de1413f206ff94635fd18922a0da6a6748faa2be73b35",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-project-cancellation-race.test.ts",
+        "sha256": "0f0ba538a91046b4e28ebebac0392e95ebe44ed8664b2a19b39f4643b276af54",
+        "beforeSha256": "b7a0e5d49812e0d6f6b913427d30c30b0043098add0cd5f466a84b51c455c6e6",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-quote.service.ts",
+        "sha256": "ef99de0b9733d4544071e38274ec315656a5df1b897ab0054ea9360bcfef73dd",
+        "beforeSha256": "dc9e64db902ea784e8dd1d601e3692dc210a487ee59cd9369a1219fe90a09c76",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/procurement-wbs.ts",
+        "sha256": "9c39295b20eedb26e21a6b49c5e5db75f55a750826d62c041ff65aaaec3afc3b",
+        "beforeSha256": "bcdf3c53d6a86c8ed6724d93b71558f0029ff509c7fee7050962ff3d5e6d386d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/project-procurement-hub.service.ts",
+        "sha256": "606a52b94ef71d0f35fc158a5e68dbd6de0499e33266bef3e0d39cc8fcc1785c",
+        "beforeSha256": "59f75302f89a8700920d60ebfb4289b8869266b21a18f58e489fd4adde54a6b3",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-order-availability.test.ts",
+        "sha256": "9b0b4bc445fdd9b989c5caeed4bab93c2c75a78d9994ba1c3235351285826cc3",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-order-workflow.service.ts",
+        "sha256": "84fc100c626c96ba7b8d277e53d95b369ee844feae36916ba3dc9e09976132c7",
+        "beforeSha256": "3c71740edd9c5ad182878fe5d1c0416da6569d600057d4629558ed6670451ff4",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-order.service.ts",
+        "sha256": "85e159b562ae101be9f364cdd8e662c9e53f8e40d424ca4fbbb5ee0a4567f740",
+        "beforeSha256": "d6c3b49e48fe76a8a3528469108d3641159b55c8591a8fa06b8df2133fa6e95d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-receipt-availability.test.ts",
+        "sha256": "ef70ca6e603a1f9eaa3f6bea57629603c5adc92444c9d26751cdd702eed0a331",
+        "beforeSha256": "2d3a535a5cb1ba6a75c00169b0e7c8e0bbb8b58acbdb57a0c69d28ad777a20a0",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-receipt-guards.ts",
+        "sha256": "e55e34df19870a21a29187a01645b4a37b8b4370cf2f813b5cbe3ad10004653b",
+        "beforeSha256": "e9c68559ede0e1c7c8d21b7a557a3f0192fba1c14367fc633448fc89d6d72746",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-receipt.service.ts",
+        "sha256": "17e706012fb99611a718fb5228ac54da1301f3c29bfff88779b47dfed9435cf0",
+        "beforeSha256": "09d4e276e6e4330832674815831e20bc3edfd51121ca6f13bc0ff9cad9942b8c",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-request-list-enrichment.test.ts",
+        "sha256": "f4a0674543f653fc56744bd98aec505dd44537d49616c1360e2943243f7361cb",
+        "beforeSha256": "4a923151f614d7dc1be79b4724d0e284ab4cf3edb663840a1831b6a92939b9a9",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-request-list-enrichment.ts",
+        "sha256": "3609ba669d0ab67f3db472fd4d8ef49e2693046d1c82c6c89fa0eb62af7a8b0c",
+        "beforeSha256": "d5b81dfdc1b68319e2b100d672791511268ae52a86ba11869e3066ee80a445d0",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-request-return-guards.test.ts",
+        "sha256": "c61ae93ea961042ea74e926cd5ee2b1f58b078f83caf97a8500e906032bdcb1a",
+        "beforeSha256": "4f33260b6083dd8019799e9b696adf321645c8fc5fba501c590aa8faf432779d",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-request-return-guards.ts",
+        "sha256": "066172eba1a44f3b83c5d31d533923241d91c0321cbae73ee0955fddb3475b5b",
+        "beforeSha256": "2da366889a07da383d12b3f6df4461f54eaeca342b64fb724cdb15266adcd376",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-request-to-po.service.ts",
+        "sha256": "59c96d33a8a89e505560a1e8673a4779a23b68bbaf9dc19045df48dcc4034ece",
+        "beforeSha256": "7606c653de2a3a11747b7850edf5011c44954028d857b68c100cb7b60125072a",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-request.service.ts",
+        "sha256": "fdd6ad58d7cae1d7c8a0d9532af509ecf6dff49fc0c1f9096efa5a7b0f57acb2",
+        "beforeSha256": "1e763fcb8d8c36b0d3f73cbc313a9f5f6e234da0f3b5aa55b4f072af6237f74b",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-requests-audit.live.test.ts",
+        "sha256": "b56ad997852f316e0815fbc864f442c68722baf29a9c8bee9f4fc976052b56f4",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-variance-pure.ts",
+        "sha256": "b41489e3b340d2bebf9548faf5a51f0e2b9c24523d490aa1bea7ddc27287edb0",
+        "beforeSha256": "f0752ee536eed8ebb9b9c2e28f28b1a88c9c7931a859eaa7257587f4c59ca38b",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-variance.test.ts",
+        "sha256": "b80c23fb5133ec1b714720e7ecf15636648c01401f66ae2e3ae9fd75ac5e206b",
+        "beforeSha256": "16f1439d29abf92563271c0fdb1cbdc3823546d0ef318add0756276a5e03f547",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/services/src/procurement/quote-request-access.test.ts",
+        "sha256": "ce6daa32897151b8bcf31f5af0e920d2f88589dc0efdabe579d25f02e5fd6eaf",
+        "beforeSha256": "0fd2d0db6b2e690346a6f00f717d01958a67beb5c887ade591500cb9375538ea",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/validators/src/company-procurement-settings.test.ts",
+        "sha256": "574aec3ca30f00aea9d963ec44bac9b73937a0a0b80fab1ecc751160e6d93123",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/validators/src/company-procurement-settings.ts",
+        "sha256": "1460b9df1f707bb075a3f283e741f1f0df2c7c6a62ad5a74da8291b8647a403d",
+        "beforeSha256": "8231c5d6bb9cd3e4c31673bcb5522b283422058027dfa2e951fc7c81d9ce9959",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/validators/src/procurement-input.test.ts",
+        "sha256": "310e5a5cfade96dea2ec050d069550a5d2f5c0d8ba168423e90296a827e6f503",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/validators/src/procurement.ts",
+        "sha256": "e0c4287c91ca687ee9574804d1244a252f4ade5ea46f9dc69a3b6a3e9c069649",
+        "beforeSha256": "7ccf68723571004f7ad83223c512ba81a90950e8b1e59728c4eb8217a03259de",
+        "kind": "modified_during_AG06"
+      },
+      {
+        "path": "packages/validators/src/purchase-request-inputs.test.ts",
+        "sha256": "ea8ce19817858cbaac0940ed5d639394999418b78f427e96bf69a66cd634798c",
+        "beforeSha256": null,
+        "kind": "added_during_AG06"
+      },
+      {
+        "path": "packages/validators/src/purchase-request.ts",
+        "sha256": "d982cf89b08305443b1f29da863d0e3ef4b0ea7bbed745578a1d354807a2c309",
+        "beforeSha256": "230db33fc48ca9cc1bf89ed92588ac04772ce173d60ca5c3ca5bbd860677f5de",
+        "kind": "modified_during_AG06"
+      }
+    ],
+    "deletedFiles": [],
+    "dependencyManifestChanges": [],
+    "finalBuildSourceHashesAllMatch": true,
+    "finalBuildSourceHashCount": 14,
+    "jsonReportExcludedFromOwnManifest": true
+  },
+  "scopeInventories": {
+    "purchaseRequests": [
+      {
+        "flow": "SC create/list/detail/update/submit/return/cancel",
+        "documented": "PURCHASE_REQUESTS; D050/068/096/126; BR-PUR-025; inherited tenant/company and project ACL",
+        "implemented": [
+          "purchase-request.service.ts",
+          "purchase-request-scope.ts",
+          "purchase-request-return-guards.ts"
+        ],
+        "exposed": [
+          "/proyectos/[id]/solicitudes-compra",
+          "/proyectos/[id]/solicitudes-compra/[prId]",
+          "/proyectos/[id]/solicitudes-compra/[prId]/editar",
+          "features/procurement/components/purchase-request-form.tsx",
+          "search_purchase_requests AI read tool"
+        ],
+        "proven": "offline scope guards, D126 guards, valid calendar dates, estimate/serialization unit regressions; 24-case maintained SQL suite prepared for root execution"
+      },
+      {
+        "flow": "Quotation create/edit/delete and comparison DTO",
+        "documented": "PROCUREMENT; D008/050/053/086/093/112/118; explicit classifications and quote currency/FX persisted in existing schema",
+        "implemented": [
+          "procurement-quote.service.ts",
+          "validators/src/purchase-request.ts"
+        ],
+        "exposed": [
+          "SC detail ProcurementQuotesSection",
+          "ProcurementQuoteForm",
+          "SC Server Actions"
+        ],
+        "proven": "offline authorization/mutation project guards, FX6/date/nonnegative tax validator tests; live SQL supplier, history, DTO and FX cases prepared"
+      },
+      {
+        "flow": "Single/partial/batch awards, coverage, linked cancellation and reaward",
+        "documented": "D044/050/053/068/118; BR-PUR-024; approved D126 preserves historical offer links",
+        "implemented": [
+          "purchase-request-to-po.service.ts",
+          "shared procurement-wbs.ts and budget baseline owned by PO agent"
+        ],
+        "exposed": [
+          "PurchaseRequestAwardMatrix",
+          "selectQuoteAndCreatePoAction",
+          "createPurchaseOrdersFromAwardsAction",
+          "PO confirmation/cancellation callbacks"
+        ],
+        "proven": "offline access/project-lock ordering; live SQL partial FX/typification, company numbering, rollback, legacy canceled pointer recovery prepared; historical D118 live suite not executed by child"
+      },
+      {
+        "flow": "Receipt retry payload equality including line notes",
+        "documented": "D066 and existing idempotent receipt create contract; line notes are already persisted and user editable input",
+        "implemented": [
+          "idempotency.ts:linesFingerprint/purchaseReceiptReplayMatches"
+        ],
+        "exposed": [
+          "purchase-receipt.service.ts create replay path",
+          "receipt API/form consumers owned by PO/UX agents"
+        ],
+        "proven": "receipt replay unit tests reject changed notes and accept quantity precision/null/order equivalence; no API signature change"
+      }
+    ],
+    "purchaseOrderReceipt": [
+      {
+        "case": "OC directa y edición monetaria",
+        "documented": [
+          "D-006",
+          "D-008",
+          "D-050",
+          "D-053",
+          "D-086",
+          "D-093",
+          "D-117",
+          "BR-PUR-007",
+          "BR-PUR-008"
+        ],
+        "implemented": [
+          "createPurchaseOrder",
+          "updatePurchaseOrder",
+          "calcLine",
+          "recalcPurchaseOrderTotals",
+          "resolveInvoiceLineMoney",
+          "computeDocumentFxAmounts",
+          "PurchaseOrder",
+          "PurchaseOrderLine"
+        ],
+        "exposed": [
+          "/proyectos/[id]/ordenes-compra/nueva",
+          "/proyectos/[id]/ordenes-compra/[poId]/editar",
+          "createPurchaseOrderAction",
+          "updatePurchaseOrderAction"
+        ],
+        "tested": [
+          "purchase-order-calc.service.test.ts",
+          "procurement-input.test.ts",
+          "procurement-orders-audit.live.test.ts: FX manual, importes históricos, FK de adjudicación, numeración concurrente e inferencia de naturaleza bajo lock"
+        ]
+      },
+      {
+        "case": "Origen SC/cotización y relaciones heredadas",
+        "documented": [
+          "ADR-018",
+          "D-044",
+          "D-050",
+          "D-068",
+          "D-109",
+          "BR-PUR-024"
+        ],
+        "implemented": [
+          "procurementOrderParentScopeInclude",
+          "procurementOrderLineScopeInclude",
+          "assertPurchaseOrderRelations",
+          "assertWbsLineForProject",
+          "assertCostAnalysisLineForWbs",
+          "assertPoLinesWithinSelectedQuote"
+        ],
+        "exposed": [
+          "Detalle/edición de OC adjudicada",
+          "Receipt y facturación desde OC consumen el mismo grafo de origen"
+        ],
+        "tested": [
+          "procurement-order-scope.test.ts: grafos válidos, históricos sin FK y contradicciones de tenant/empresa/obra/padres",
+          "procurement-orders-audit.live.test.ts: rechazo de inyección y adjudicación legítima real"
+        ]
+      },
+      {
+        "case": "Enviar, aprobar, devolver, autorizar/comprometer y confirmar",
+        "documented": [
+          "D-044",
+          "D-050",
+          "D-105",
+          "D-106",
+          "D-107",
+          "D-129",
+          "BR-APR-004",
+          "APPROVAL_WORKFLOWS §2.2"
+        ],
+        "implemented": [
+          "submitPurchaseOrder",
+          "approvePurchaseOrder",
+          "returnPurchaseOrder",
+          "authorizeAndCommitPurchaseOrder",
+          "confirmPurchaseOrder",
+          "getPurchaseOrderApprovalAvailability",
+          "recheckPoForMutation"
+        ],
+        "exposed": [
+          "Acciones de detalle de OC, derivadas en servidor de permisos y segregación vigentes"
+        ],
+        "tested": [
+          "purchase-order-availability.test.ts",
+          "purchase-variance.test.ts",
+          "procurement-orders-audit.live.test.ts: umbral ARS, otro aprobador, revalidación de justificación, obra inaccesible/inactiva y grupo D129",
+          "procurement-project-cancellation-race.test.ts mantenido por agente SC"
+        ]
+      },
+      {
+        "case": "Referenciales, moneda del APU y saldo",
+        "documented": [
+          "D-050",
+          "D-053",
+          "D-068",
+          "D-095",
+          "D-109",
+          "D-125",
+          "BR-PUR-009",
+          "BR-PUR-011"
+        ],
+        "implemented": [
+          "listProcurementWbsOptions",
+          "budgetBaselineForPurchaseLine",
+          "budgetBaselineForWbs",
+          "getWbsBudgetReference",
+          "evaluateLineVariance",
+          "applyVarianceSnapshots"
+        ],
+        "exposed": [
+          "Selector EDT/APU, moneda explícita, costo referencial y advertencia de saldo no calculable",
+          "DTO budgetCurrency/currencyComparable/budgetWarning"
+        ],
+        "tested": [
+          "procurement-budget-baseline.test.ts",
+          "purchase-variance.test.ts: D-125",
+          "procurement-orders-audit.live.test.ts: LAB explícito, monedas incompatibles, saldo mixto y compromiso de obra ajena"
+        ]
+      },
+      {
+        "case": "Anulación de OC y frontera fiscal",
+        "documented": [
+          "D-020",
+          "D-050",
+          "D-066",
+          "BR-PUR-013",
+          "STATE_MACHINES §7"
+        ],
+        "implemented": [
+          "cancelPurchaseOrder",
+          "Project/PO locks",
+          "Protección por receipt confirmada o factura activa vía cabecera o línea",
+          "Anulación de borradores de receipt en la misma transacción"
+        ],
+        "exposed": [
+          "Anular OC en detalle según permisos/estado"
+        ],
+        "tested": [
+          "procurement-orders-audit.live.test.ts: cancelación concurrente con borrador de recepción y factura con vínculo solo en línea",
+          "procurement-project-cancellation-race.test.ts"
+        ]
+      },
+      {
+        "case": "Borrador de recepción y reintentos",
+        "documented": [
+          "D-020",
+          "D-053",
+          "BR-PUR-004",
+          "BR-PUR-005",
+          "BR-PUR-006",
+          "Runbook: reintento/concurrencia/rollback"
+        ],
+        "implemented": [
+          "createPurchaseReceipt",
+          "updatePurchaseReceipt",
+          "findActiveDraftReceiptId",
+          "countActiveDraftReceiptsForPo",
+          "getPoLinesForReceiptForm",
+          "purchaseReceiptReplayMatches",
+          "withIdempotentCreate"
+        ],
+        "exposed": [
+          "/proyectos/[id]/recepciones/nueva",
+          "/proyectos/[id]/recepciones/[receiptId]",
+          "createPurchaseReceiptAction",
+          "updatePurchaseReceiptAction"
+        ],
+        "tested": [
+          "purchase-receipt-availability.test.ts",
+          "procurement-orders-audit.live.test.ts: misma key concurrente, replay tras recepción total, notas distintas, update vs confirm",
+          "Fingerprint de notas mantenido por agente SC"
+        ]
+      },
+      {
+        "case": "Confirmación física, tolerancia y stock",
+        "documented": [
+          "D-020",
+          "D-053",
+          "D-067",
+          "D-104",
+          "BR-PUR-006",
+          "BR-INV-005"
+        ],
+        "implemented": [
+          "confirmPurchaseReceipt",
+          "assertReceiptLinesFit",
+          "assertWarehouseOkForPo",
+          "recomputePOStatus",
+          "completeMilestonesFromPurchaseReceipt",
+          "createReceiptStockMovement"
+        ],
+        "exposed": [
+          "Confirmar recepción; el depósito es obligatorio al confirmar productos, no para guardar borrador de servicio"
+        ],
+        "tested": [
+          "purchase-receipt-guards.test.ts",
+          "three-way-match-pure.test.ts",
+          "procurement-orders-audit.live.test.ts: falta de depósito, depósito inactivo, suma de filas duplicadas, tolerancia 5%, doble confirmación sin efectos duplicados"
+        ]
+      },
+      {
+        "case": "Anulación de recepción y reversa de existencias",
+        "documented": [
+          "D-020",
+          "D-124",
+          "INVENTORY",
+          "STOCK_FORMULAS",
+          "ADR-018"
+        ],
+        "implemented": [
+          "cancelPurchaseReceipt",
+          "cancelReceiptStockMovements",
+          "lockStockBalanceKey",
+          "getStockBalance",
+          "Suma por warehouse/product y locks ordenados"
+        ],
+        "exposed": [
+          "Anular recepción; misma transacción revierte cantidades y solo IN originados en esa recepción"
+        ],
+        "tested": [
+          "procurement-orders-audit.live.test.ts: dos IN4+4 con disponible5 rechazan todo; caso válido; fuente de tenant ajeno rechazada; OUT de consumo con traza de receipt queda intacto"
+        ]
+      },
+      {
+        "case": "Numeración de recepción",
+        "documented": [
+          "D-050.8",
+          "D-127"
+        ],
+        "implemented": [
+          "PurchaseReceipt.number nullable",
+          "RC-NNN para nuevas recepciones",
+          "Recepción histórica UUID para previas",
+          "Project→Company→PO y max(number) por tenant/empresa",
+          "Migración/índice por coordinador"
+        ],
+        "exposed": [
+          "DTO number/code, conservando purchaseOrderCode separado",
+          "Frontend adapta lista, tarjetas y ficha"
+        ],
+        "tested": [
+          "procurement-orders-audit.live.test.ts: concurrentes entre proyectos, independencia por empresa, no reutilizar anuladas/replay, históricos sin numerar"
+        ]
+      },
+      {
+        "case": "Cierre de período operativo",
+        "documented": [
+          "D-078",
+          "PERIOD_CLOSE_AND_LOCKS",
+          "BR-PUR-014 armonizada por coordinador"
+        ],
+        "implemented": [
+          "Cierre vigente para tesorería/GL; validación cruzada de OC/recepción/factura sin esos efectos permanece diferida"
+        ],
+        "exposed": [
+          "No se agregó bloqueo operativo por analogía"
+        ],
+        "tested": [
+          "Inspección normativa y de código; pruebas de cierre de tesorería/GL fuera de este ownership"
+        ]
+      },
+      {
+        "case": "Cierre parcial de saldo no recibido",
+        "documented": [
+          "D-128",
+          "BR-PUR-013",
+          "STATE_MACHINES tabla PurchaseOrder destino conceptual (cierre)",
+          "PURCHASE_ORDERS_AND_RECEIPTS §8/§13"
+        ],
+        "implemented": [],
+        "exposed": [],
+        "tested": [
+          "Búsqueda dirigida en todos services/validators/web no encontró helper, action o ruta. Schema sin representación de cierre/cantidad desistida. Owner aprobó D-128: desarrollo separado, fuera del lote correctivo AG-06."
+        ],
+        "limit": "No se declara implementado ni se inventa campo/estado/reducción del compromiso."
+      }
+    ],
+    "frontend": [
+      {
+        "useCase": "Procurement hub, lists and shortcuts",
+        "documented": [
+          "PROCUREMENT",
+          "PURCHASE_REQUESTS",
+          "D-106 existing access"
+        ],
+        "implemented": [
+          "apps/web/app/(app)/proyectos/[id]/compras/page.tsx",
+          "packages/services/src/procurement/project-procurement-hub.service.ts",
+          "apps/web/features/procurement/components/purchase-request-list-filters.tsx",
+          "apps/web/features/procurement/components/purchase-order-list-filters.tsx"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/compras",
+            "/proyectos/[id]/solicitudes-compra",
+            "/proyectos/[id]/ordenes-compra",
+            "/proyectos/[id]/recepciones"
+          ],
+          "access": "Scoped services + tenant module gates; SC-only hides PO/receipt counters and order shortcuts; cost analysis additionally requires BUDGETS + canViewProjectCostControlReport."
+        },
+        "tested": [
+          "SC-only hub hides protected counts and financial shortcuts",
+          "analysis shortcut respects destination budget gate",
+          "existing matches-list-status-filter and purchase-delivery-overdue tests"
+        ],
+        "limits": "Offline render tree and pure filter tests; real role navigation/browser assigned to root."
+      },
+      {
+        "useCase": "SC create, edit, send, cancel and return",
+        "documented": [
+          "PURCHASE_REQUESTS",
+          "D-096",
+          "D-126"
+        ],
+        "implemented": [
+          "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/actions.ts",
+          "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/[prId]/editar/page.tsx",
+          "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/[prId]/page.tsx",
+          "apps/web/features/procurement/components/purchase-request-form.tsx",
+          "apps/web/features/procurement/components/purchase-request-create-composer.tsx"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/solicitudes-compra?create=1",
+            "/proyectos/[id]/solicitudes-compra/nueva",
+            "/proyectos/[id]/solicitudes-compra/[prId]",
+            "/proyectos/[id]/solicitudes-compra/[prId]/editar"
+          ],
+          "access": "Canonical SC role/service guards; create body and mutation parents bind to route project. Return only with no quote history. Historical or multi-WBS draft edit preserves original line IDs and sends header only."
+        },
+        "tested": [
+          "route-project binding and denied parent",
+          "header-only preserves lines/date by omission",
+          "return reason survives transport rejection",
+          "draft dialog close blocked while saving",
+          "existing purchase-request-form-lines tests",
+          "SC desktop/mobile mixed USD/ARS/unknown budget references and quote-history parity"
+        ],
+        "limits": "Offline callback tests do not replace backend SQL/FK/concurrency verification assigned to other agents."
+      },
+      {
+        "useCase": "Quotes, comparison and partial/multiple awards",
+        "documented": [
+          "PROCUREMENT",
+          "PURCHASE_REQUESTS",
+          "D-008",
+          "MONEY_MODEL existing line tax handling",
+          "D-126"
+        ],
+        "implemented": [
+          "apps/web/features/procurement/components/procurement-quote-form.tsx",
+          "apps/web/features/procurement/components/procurement-quotes-section.tsx",
+          "apps/web/features/procurement/components/purchase-request-award-matrix.tsx",
+          "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/actions.ts"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/solicitudes-compra/[prId]"
+          ],
+          "access": "Quote mutation requires SC route membership; quick award also binds quote to the supplied request. History stays visible after cancel/draft but mutating controls follow editable states. Quote FX persisted by canonical services and inherited by awarded OC."
+        },
+        "tested": [
+          "quote create/update/delete parent binding",
+          "quick award quote membership",
+          "batch award parent binding",
+          "existing purchase-request-award-selection and quote-line-edit-values tests",
+          "Quote form comparison notices change with currency without converting native reference price"
+        ],
+        "limits": "No browser interaction or SQL award transaction from this agent; VAT/IIBB policy unchanged."
+      },
+      {
+        "useCase": "OC creation/edit and budget comparisons",
+        "documented": [
+          "PURCHASE_ORDERS_AND_RECEIPTS",
+          "MONEY_MODEL",
+          "D-008",
+          "D-125"
+        ],
+        "implemented": [
+          "apps/web/features/procurement/components/purchase-order-form.tsx",
+          "apps/web/features/procurement/components/purchase-order-edit-form.tsx",
+          "apps/web/features/procurement/components/purchase-order-lines-editor.tsx",
+          "apps/web/features/procurement/components/purchase-order-variance-readout.tsx",
+          "apps/web/features/procurement/components/po-line-budget-ref.tsx"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/ordenes-compra?create=1",
+            "/proyectos/[id]/ordenes-compra/nueva",
+            "/proyectos/[id]/ordenes-compra/[poId]/editar"
+          ],
+          "access": "OC edit role + service guards. New OC currency explicit; existing OC currency immutable. Manual FX uses shared finance field, six-decimal server schema. Budget preview calls canonical pure variance helper with both currencies."
+        },
+        "tested": [
+          "APU PU copied only for matching currency",
+          "new OC dialog locks while saving",
+          "full web types and scoped lint",
+          "Global shared-project PO editor uses order-company settings and option scope; no silent settings fallback"
+        ],
+        "limits": "Money calculations in React are previews from existing pure helpers. Critical totals and variance remain service-authoritative; backend and browser proof by root/OC agent."
+      },
+      {
+        "useCase": "OC send, approve, return, authorize+commit, confirm and cancel",
+        "documented": [
+          "PURCHASE_ORDERS_AND_RECEIPTS",
+          "D-008",
+          "D-106",
+          "D-107",
+          "D-125",
+          "D-129"
+        ],
+        "implemented": [
+          "apps/web/app/(app)/proyectos/[id]/ordenes-compra/actions.ts",
+          "apps/web/app/(app)/proyectos/[id]/ordenes-compra/[poId]/page.tsx",
+          "apps/web/features/procurement/components/purchase-order-approval-actions.tsx",
+          "apps/web/features/procurement/components/confirm-purchase-order-button.tsx",
+          "apps/web/features/procurement/components/authorize-and-commit-po-button.tsx",
+          "apps/web/features/procurement/components/cancel-purchase-order-button.tsx",
+          "packages/services/src/procurement/purchase-order-workflow.service.ts"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/ordenes-compra/[poId]"
+          ],
+          "access": "Server-derived getPurchaseOrderApprovalAvailability controls approve/return independently and explains blocked self-approval/high-level policy. Confirm dialog preserves stored FX and requires explicit foreign FX; server guards remain authoritative. D129 warning explains that changing approved FX requires a qualified approver; eligibility is never calculated in React."
+        },
+        "tested": [
+          "approval controls consume server eligibility and preserve allowed return",
+          "foreign FX validation forwarded through action",
+          "blank foreign confirmation blocked and exact FX sent once",
+          "shared mutation lock/network recovery",
+          "Global PO detail resolves policy/documents from authorized order company",
+          "Changed foreign confirmation FX: canonical rejection keeps dialog/input, does not refresh or duplicate, permits close only after request resolves and accepts success only from service."
+        ],
+        "limits": "No client reimplementation of approval financial policy. Actual SQL lifecycle/concurrency tests owned by backend agent/root."
+      },
+      {
+        "useCase": "Receipt creation, save, confirm and cancellation",
+        "documented": [
+          "PURCHASE_ORDERS_AND_RECEIPTS",
+          "D-067",
+          "D-096",
+          "INVENTORY boundary",
+          "D-127"
+        ],
+        "implemented": [
+          "apps/web/features/procurement/components/receipt-form.tsx",
+          "apps/web/app/(app)/proyectos/[id]/ordenes-compra/actions.ts",
+          "apps/web/app/(app)/proyectos/[id]/recepciones/[receiptId]/page.tsx",
+          "apps/web/features/procurement/components/receipt-create-composer.tsx"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/ordenes-compra/[poId]/recepciones/nueva",
+            "/proyectos/[id]/recepciones/[receiptId]"
+          ],
+          "access": "Canonical receipt edit role and parent/project service checks. Positive over-receipt quantities reach current tolerance validator; negatives rejected. Warehouse destination label and product-FK stock/access guidance visible even without warehouse options. Shared accessible cancellation dialog and pending state. Own identifier comes from service code; new RC sequence and historical UUID are separate from OC of origin. Warehouse options use explicit company and general/current-project scope."
+        },
+        "tested": [
+          "1.05 received against remaining1 reaches service tolerance and preserves draft after rejection",
+          "receipt confirmation invalidates linked parent/detail paths",
+          "denied Inventory and AP are unknown, never empty/zero",
+          "Receipt cards/table distinguish multiple same-OC documents, preserve historical UUID, retain source OC link and carry own number/code through project and PO mappers",
+          "Receipt detail numbered/historical identity and breadcrumb",
+          "New/draft receipt warehouse options use document-company filter and exclude other project warehouses",
+          "Existing receipt regression covers empty warehouse options: no selector but persistent stock/access explanation."
+        ],
+        "limits": "No real stock increments, tolerance SQL locks or concurrency proof here; backend/root own those."
+      },
+      {
+        "useCase": "OC/receipt billing next step and linked AP documents",
+        "documented": [
+          "PURCHASE_ORDERS_AND_RECEIPTS",
+          "D-008",
+          "D-067 soft matching unchanged",
+          "INDARI manual no-FK preserved",
+          "D-006/D-108 draft versus issued obligation",
+          "D-112",
+          "D-115"
+        ],
+        "implemented": [
+          "apps/web/features/procurement/components/po-billing-next-step-panel.tsx",
+          "apps/web/app/(app)/proyectos/[id]/ordenes-compra/[poId]/page.tsx",
+          "apps/web/app/(app)/proyectos/[id]/recepciones/[receiptId]/page.tsx",
+          "packages/services/src/ap/supplier-invoice-from-po.service.ts",
+          "apps/web/features/procurement/components/purchase-order-next-step.tsx",
+          "apps/web/features/procurement/lib/purchase-order-process-steps.ts"
+        ],
+        "exposed": {
+          "routes": [
+            "/proyectos/[id]/ordenes-compra/[poId]",
+            "/proyectos/[id]/recepciones/[receiptId]"
+          ],
+          "access": "Summary and invoices fetched separately through services. FORBIDDEN means inaccessible; VALIDATION/CONFLICT means noncomputable summary with source message. Accessible original-currency invoice list stays visible. Invoice/pay process stages omitted when source is unavailable. Financial completion uses service-derived issued-payable settlement and issued-only received coverage; draft reserves do not complete the process. Cash and credit-note settlement are presented as no outstanding payment balance, including debit notes."
+        },
+        "tested": [
+          "FORBIDDEN AP has no fake zero summary or invoice absence",
+          "mismatched route stops optional billing reads",
+          "VALIDATION/CONFLICT summary keeps accessible invoice list",
+          "all summary amounts use native OC currency",
+          "payment121 on invoice total124 (net100/VAT21/IIBB3), settlement=false: Pagar remains current",
+          "paid0 plus canonical credit-note settlement=true and full issued coverage: process completes with no-pending-balance message",
+          "received242, issued121, draft reservation121, pendingToInvoice0, issued payables settled=true but full issued coverage=false: Facturar remains current and Pagar upcoming"
+        ],
+        "limits": "AP matching/accounting policy and external invoice creation remain outside frontend ownership."
+      },
+      {
+        "useCase": "Company procurement/notification settings and shared post-mutation readers",
+        "documented": [
+          "PROCUREMENT",
+          "CHANGE_IMPACT_POLICY",
+          "D-090"
+        ],
+        "implemented": [
+          "apps/web/features/procurement/components/company-procurement-settings-form.tsx",
+          "apps/web/features/procurement/components/company-procurement-notification-settings-form.tsx",
+          "apps/web/features/procurement/lib/use-procurement-action.ts",
+          "apps/web/features/procurement/lib/revalidate-procurement-paths.ts"
+        ],
+        "exposed": {
+          "routes": [
+            "/configuracion/politicas"
+          ],
+          "access": "Existing parent settings authorization preserved. Client onSubmit prevents React19 auto-reset after rejection. Shared hook locks before rerender, safely reports unknown transport result and preserves draft. Invalidation refreshes procurement, pending/dashboard, cost/finance, material/resource, schedule and inventory consumers."
+        },
+        "tested": [
+          "mutation lock before rerender, sanitized transport error and retry",
+          "coverage and dynamic detail invalidation assertions",
+          "full web types + scoped lint"
+        ],
+        "limits": "Settings backend/policy/report/PDF/API/AI consumers assigned to root; no external write or production action."
+      }
+    ]
+  },
+  "sourceTraces": {
+    "requests": [
+      {
+        "requirement": "SC document company/tenant/project and state contracts",
+        "route": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/[prId]/page.tsx",
+        "ui": "apps/web/features/procurement/components/purchase-request-form.tsx",
+        "entry": "apps/web/app/(app)/proyectos/[id]/solicitudes-compra/actions.ts:69 create, 87 update, 107 submit, 124 return, 145 cancel",
+        "validator": "packages/validators/src/purchase-request.ts:20/29/39",
+        "service": "packages/services/src/procurement/purchase-request.service.ts:listPurchaseRequestsByProject/getPurchaseRequestById/createPurchaseRequest/updatePurchaseRequest/submitPurchaseRequest/returnPurchaseRequest/cancelPurchaseRequest",
+        "authorization": "assertProcurementTenantModule + canView/EditPurchaseRequests + assertPurchaseRequestScope + project access/operational guard; Project lock and recheck in transaction",
+        "dataAccess": "Service calls Prisma directly under documented service-layer architecture; no fictitious repository. PurchaseRequest/Line roots and required parent checks, Budget/WBS/APU/Product joins",
+        "effects": "Atomic state/line writes plus audit; notification after successful commit. No old snapshot or FK IDs used after writer lock",
+        "read": "Explicit line serialization, private budget currency map, quote/PO joins destructured before public DTO",
+        "invalidation": "revalidateProcurementPaths + SC list/detail/edit and linked OC routes; frontend agent owns and tests these consumers",
+        "alternateConsumer": "packages/services/src/ai/tools/procurement-tools.ts:20 searchPurchaseRequestsTool calls scoped listPurchaseRequestsByProject; no SC mutation AI tool found in assigned sources"
+      },
+      {
+        "requirement": "Full SC quote lines, supplier activity, D118 classification, manual FX6",
+        "entry": "SC actions.ts:createProcurementQuoteAction/updateProcurementQuoteAction/deleteProcurementQuoteAction",
+        "ui": "features/procurement/components/procurement-quote-form.tsx",
+        "validator": "packages/validators/src/purchase-request.ts:createProcurementQuoteSchema/updateProcurementQuoteSchema",
+        "service": "packages/services/src/procurement/procurement-quote.service.ts:167/284/390",
+        "dataAccess": "Prisma ProcurementQuote/Line and required PurchaseRequest/Line; lock Project then SC, reload current SC lines; assertContactRoleInTenant with transaction Contact lock",
+        "effects": "Quote totals and classifications plus audit in same transaction; currency change requires corresponding new FX; same currency omitted FX retains stored value",
+        "read": "listProcurementQuotesForRequest/listProcurementQuotesDetailedForRequest supply fxRate6, money2, qty4 and reject malformed supplier/PRline parent links",
+        "invalidation": "shared procurement invalidator and SC detail; quote comparison UI handled by UX"
+      },
+      {
+        "requirement": "Multi-supplier partial awards without duplicate active lines or numbering collisions",
+        "entry": "selectQuoteAndCreatePoAction/createPurchaseOrdersFromAwardsAction",
+        "ui": "features/procurement/components/purchase-request-award-matrix.tsx",
+        "validator": "createPurchaseOrderFromQuoteLinesSchema/createPurchaseOrdersFromAwardsSchema",
+        "service": "purchase-request-to-po.service.ts:createPurchaseOrderFromQuoteLines/createPurchaseOrdersFromAwards/createOnePoFromQuoteLinesInTx",
+        "dataAccess": "Project -> Company numbering -> SC lock; current owned WBS/APU/Product/supplier rechecked; ProcurementQuoteLine and active award uniqueness; bounded transaction",
+        "effects": "Existing native quote monetary components and FX copied; totalAmountArs computed at creation; explicit APU category retained when legacy costType null; atomic audit/caches/statuses",
+        "read": "getPurchaseRequestPoLinks loads and authorizes parent before child reads and checks order/selected quote/cache ownership",
+        "consumers": "PO detail/workflow/receipts/AP boundary, SC list estimate and linked-order banners; callbacks avoid reviving CANCELLED or DRAFT request histories"
+      }
+    ],
+    "frontendConsumers": {
+      "traced": [
+        "SC/OC/receipt detail and editors",
+        "procurement lists/hub",
+        "materials/labor/equipment coverage",
+        "project pending/dashboard",
+        "cost/finance/inventory/schedule readers",
+        "billing and original-currency invoice lists",
+        "quote-line-edit and award-selection pure helpers"
+      ],
+      "ownedByCoordinatorOrOtherAgent": [
+        "DB repositories/services/validators",
+        "AP matching and accounting",
+        "stock mutations",
+        "policy/notifications/settings backend",
+        "CSV/XLSX/PDF/report consumers",
+        "operational guide/help/AI knowledge",
+        "build/browser/integration evidence"
+      ]
+    }
+  },
+  "verification": {
+    "general": {
+      "pass": 2335,
+      "fail": 0,
+      "skipped": 0,
+      "liveSuitesOmitted": 29,
+      "tasks": 9,
+      "pdfIncluded": true,
+      "result": "output/platform-audit/ag-06-2026-11-04/general-tests-closure-final.result.json",
+      "log": "output/platform-audit/ag-06-2026-11-04/general-tests-closure-final.log",
+      "pdfCountIncluded": 13
+    },
+    "sql": {
+      "requests": {
+        "passedDistinct": 24,
+        "tests": [
+          "scopes every request mutation and child-link read to tenant, company and project membership",
+          "enforces procurement gates and read-only roles before writing a request",
+          "serializes company-wide request numbers across different projects",
+          "snapshots the current locked lines when a draft edit wins after submit's preview",
+          "rechecks all quotation history when quote creation wins after return's preview",
+          "rejects a stale quote payload when return, edit and resubmit replace its previewed lines",
+          "rechecks linked active orders when an award wins after cancellation's preview",
+          "rolls return and cancellation back atomically when their audit insertion fails",
+          "D126 blocks return for rejected and superseded histories without rewriting any offer",
+          "D126 keeps historical draft line identities and permits only non-destructive header edits",
+          "returns a request without quotes, edits and resubmits with fresh snapshots and audit",
+          "does not replace a missing submitted snapshot with a later live APU cost",
+          "requires manual foreign FX, preserves omitted FX/currency on edit and serializes six decimal places",
+          "revalidates a supplier's active role before quote edits and awards",
+          "records partial multi-PO FX totals and preserves LABOR typification from an explicit legacy APU",
+          "allocates distinct company-wide order numbers for concurrent awards in separate projects",
+          "recovers canceled legacy award pointers before reaward and retains the historical canceled order",
+          "rejects malformed historical quote sources and foreign suppliers before exposing their joined data",
+          "rejects a legacy foreign WBS/APU at read and award boundaries with no new order",
+          "batch awards remain atomic when a later group is invalid",
+          "linked cancellation preserves terminal history and never clears another request's award cache",
+          "creates on a shared project using the active company and excludes another company's requests",
+          "rejects cross-company WBS/APU/products and cross-tenant products without partial documents",
+          "uses native budget currency, withholds partial estimates and never exposes raw Prisma joins"
+        ],
+        "runs": [
+          "requests-audit-live-first",
+          "requests-audit-live-fixture-recheck"
+        ]
+      },
+      "orders": {
+        "passedDistinct": 43,
+        "tests": [
+          "isolates company documents on a shared project across get, list, links and receipt helpers",
+          "rejects foreign company WBS and product references before creating a direct OC",
+          "rejects a legacy cross-company joined WBS before returning labels or using its cost",
+          "rejects request-line injection into direct OC create and edit without reserving an award",
+          "rejects a legacy direct OC carrying a foreign SC-line parent before reads or mutation",
+          "keeps legitimate awarded SC and quote parent links when editing and committing the OC",
+          "keeps explicit LAB APU baseline, currency, unit and exact physical quantity",
+          "captures native USD FX and uses ARS thresholds while keeping same-currency variance native",
+          "D-125 keeps a cross-currency purchase but requires its existing no-baseline justification",
+          "D-125 suppresses a mixed-currency commitment saldo without discarding foreign amounts",
+          "rejects a legacy commitment from another project instead of including it in an accessible WBS saldo",
+          "rechecks the existing justification gate when the budget baseline changes before approval",
+          "serializes direct OC numbering across two projects in the same company",
+          "blocks product receipt confirmation without a warehouse and keeps all physical effects absent",
+          "rechecks warehouse eligibility when a product receipt is confirmed",
+          "checks the sum of repeated receipt entries against ordered quantity",
+          "returns the same receipt for concurrent identical creates with a single idempotency key",
+          "replays an existing receipt after full confirmation without creating or applying quantities twice",
+          "D-127 serializes new receipt numbers across projects in the same company",
+          "D-127 has an independent sequence for each company on a shared project",
+          "D-127 preserves replay numbers and does not reuse cancelled receipt numbers",
+          "D-127 keeps historical UUID identification without numbering on read, edit or confirmation",
+          "honors configured over-receipt tolerance on the aggregate, without duplicate confirm effects",
+          "rejects reversal of two four-unit stock entries when only five remain and rolls back everything",
+          "reverses grouped receipt stock when the complete balance is still available",
+          "refuses receipt lines belonging to a different OC before exposing or confirming them",
+          "serializes draft receipt creation with OC cancellation and leaves no active orphan",
+          "serializes receipt edits with confirmation and uses the actual persisted quantities",
+          "requires project access and active status for cancellation and return",
+          "rejects a valid APU ID whose declared budget contradicts its own CostItem and WBS",
+          "does not reverse foreign-tenant stock rows linked to an own receipt",
+          "leaves consumption traces intact when cancelling only the originating receipt IN movements",
+          "preserves exact historical PO line amounts on unchanged net-price edits",
+          "blocks OC cancellation protected by an active fiscal line even without its legacy header link",
+          "infers APU and WBS nature from the locked graph after an interleaved APU edit, preserving explicit nature",
+          "D129 blocks a changed FX crossing the approval threshold for a standard buyer without mutating the approved OC",
+          "D129 requires approval permission for any changed FX even when the new amount is below the high-level threshold",
+          "D129 reapplies requester segregation for high-level FX changes and for the current no-self-approval policy",
+          "D129 renews approval and audits old/new FX before confirming with an authorized other owner",
+          "D129 rechecks missing variance justifications and rolls back their tentative snapshots",
+          "D129 applies the current EXTRA_APPROVAL variance level independently of the amount threshold",
+          "D129 keeps EDIT-only confirmation and the previous approval when the numeric FX is unchanged",
+          "D129 rolls back approval, FX, variance and its approval audit if the confirmation audit fails"
+        ],
+        "runs": [
+          "orders-audit-live-second",
+          "orders-apu-lock-regression-live",
+          "orders-confirmation-fx-d129-live"
+        ]
+      },
+      "platform": {
+        "passedDistinct": 30,
+        "tests": [
+          "rejects invalid direct policy input before replacing stored values",
+          "validates partial policy changes against the stored complementary limit",
+          "serializes concurrent individually valid policy changes without storing min greater than max",
+          "rounds policy money and records a scoped before/after audit atomically",
+          "rolls policy changes back when audit insertion fails",
+          "preserves company isolation even for an owner changing policies",
+          "resolves shared-project policy from the selected company without guessing for a global context",
+          "counts only own-company requests, quotes, orders and receipts in a shared-project hub",
+          "keeps SC-only hub access without consulting hidden orders or receipts",
+          "honors the project module gate before hub source reads",
+          "filters shared-project procurement audiences by document company and active user",
+          "creates SC submission notices only for eligible own-company and global recipients",
+          "runs manual SLA reminders only within the active company",
+          "keeps billing in the PO native currency rather than relabeling USD as ARS",
+          "rejects a mixed-currency billing calculation while retaining readable original documents",
+          "rejects contradictory invoice-company parents before billing or listing them",
+          "rejects a foreign PO-line FK even within the same company and project",
+          "rejects an inconsistent payable before using its paid amount",
+          "keeps fiscal NC and ND separate from physical receipt coverage",
+          "sums repeated receipt lines when creating the real automatic AP draft",
+          "rejects a foreign-budget OC in AP preview and generation without creating an invoice",
+          "rejects cross-company OC headers in manual invoice creation, editing and issue",
+          "rejects a receipt-company contradiction before creating an AP draft",
+          "does not overwrite a native-priced automatic draft after its currency changes",
+          "does not claim an amount over-receipt from incompatible invoice and PO currencies",
+          "rejects a stale partial invoice edit after another edit changes its OC and supplier",
+          "does not settle an OC at neto+IVA while its issued invoice still owes IIBB",
+          "settles every issued invoice through canonical credits without claiming a cash payment",
+          "keeps draft reservations separate from issued coverage when deriving OC completion",
+          "keeps issued debit-note debt in OC settlement without altering physical coverage"
+        ],
+        "runs": [
+          "platform-audit-live-second",
+          "platform-invoice-concurrency-live",
+          "platform-payment-settlement-live",
+          "platform-issued-and-debit-closure-live"
+        ]
+      },
+      "schedule": {
+        "passedDistinct": 3,
+        "tests": [
+          "receipt confirmation completes a linked milestone while preserving TASK progress",
+          "rejects a receipt line from a different order before changing quantities or milestones",
+          "a project paused after receipt preflight prevents its milestone and quantity effects"
+        ],
+        "runs": [
+          "schedule-receipt-regression-live"
+        ]
+      },
+      "totalPassedDistinct": 100,
+      "evidenceRunsIncludingCorrectedInitialRun": [
+        {
+          "name": "requests-audit-live-first",
+          "file": "src/procurement/purchase-requests-audit.live.test.ts",
+          "startedAt": "2026-11-04T18:16:28.344Z",
+          "finishedAt": "2026-11-04T18:32:47.274Z",
+          "exitCode": 1,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "requests-audit-live-first.log"
+        },
+        {
+          "name": "requests-audit-live-fixture-recheck",
+          "file": "src/procurement/purchase-requests-audit.live.test.ts",
+          "pattern": "creates on a shared project|rejects cross-company WBS/APU|uses native budget currency",
+          "startedAt": "2026-11-04T18:30:54.871Z",
+          "finishedAt": "2026-11-04T18:32:58.046Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "requests-audit-live-fixture-recheck.log"
+        },
+        {
+          "name": "orders-audit-live-second",
+          "file": "src/procurement/procurement-orders-audit.live.test.ts",
+          "startedAt": "2026-11-04T18:29:00.055Z",
+          "finishedAt": "2026-11-04T18:45:23.805Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "orders-audit-live-second.log"
+        },
+        {
+          "name": "orders-apu-lock-regression-live",
+          "file": "src/procurement/procurement-orders-audit.live.test.ts",
+          "pattern": "infers APU and WBS nature",
+          "startedAt": "2026-11-04T18:37:36.389Z",
+          "finishedAt": "2026-11-04T18:38:40.772Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "orders-apu-lock-regression-live.log"
+        },
+        {
+          "name": "orders-confirmation-fx-d129-live",
+          "file": "src/procurement/procurement-orders-audit.live.test.ts",
+          "pattern": "D129",
+          "startedAt": "2026-11-04T18:52:10.432Z",
+          "finishedAt": "2026-11-04T18:55:36.406Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "orders-confirmation-fx-d129-live.log"
+        },
+        {
+          "name": "platform-audit-live-second",
+          "file": "src/procurement/procurement-platform-audit.live.test.ts",
+          "startedAt": "2026-11-04T18:20:57.373Z",
+          "finishedAt": "2026-11-04T18:24:11.422Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "platform-audit-live-second.log"
+        },
+        {
+          "name": "platform-invoice-concurrency-live",
+          "file": "src/procurement/procurement-platform-audit.live.test.ts",
+          "pattern": "stale partial invoice",
+          "startedAt": "2026-11-04T18:29:41.384Z",
+          "finishedAt": "2026-11-04T18:30:23.312Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "platform-invoice-concurrency-live.log"
+        },
+        {
+          "name": "platform-payment-settlement-live",
+          "file": "src/procurement/procurement-platform-audit.live.test.ts",
+          "pattern": "does not settle an OC|settles every issued invoice",
+          "startedAt": "2026-11-04T19:12:54.104Z",
+          "finishedAt": "2026-11-04T19:13:39.772Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "platform-payment-settlement-live.log"
+        },
+        {
+          "name": "platform-issued-and-debit-closure-live",
+          "file": "src/procurement/procurement-platform-audit.live.test.ts",
+          "pattern": "keeps draft reservations separate from issued coverage|keeps issued debit-note debt in OC settlement|keeps fiscal NC and ND separate from physical receipt coverage",
+          "startedAt": "2026-11-04T19:23:55.832Z",
+          "finishedAt": "2026-11-04T19:25:18.399Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "platform-issued-and-debit-closure-live.log"
+        },
+        {
+          "name": "schedule-receipt-regression-live",
+          "file": "src/schedule/schedule-audit.live.test.ts",
+          "pattern": "receipt",
+          "startedAt": "2026-11-04T18:33:15.029Z",
+          "finishedAt": "2026-11-04T18:34:20.645Z",
+          "exitCode": 0,
+          "signal": null,
+          "database": "bloqer_audit_ag01_20261103",
+          "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+          "guardBeforeWrites": true,
+          "log": "schedule-receipt-regression-live.log"
+        }
+      ],
+      "verifiedLeafCases": {
+        "requests": [
+          {
+            "name": "scopes every request mutation and child-link read to tenant, company and project membership",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "enforces procurement gates and read-only roles before writing a request",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "serializes company-wide request numbers across different projects",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "snapshots the current locked lines when a draft edit wins after submit's preview",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "rechecks all quotation history when quote creation wins after return's preview",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "rejects a stale quote payload when return, edit and resubmit replace its previewed lines",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "rechecks linked active orders when an award wins after cancellation's preview",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "rolls return and cancellation back atomically when their audit insertion fails",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "D126 blocks return for rejected and superseded histories without rewriting any offer",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "D126 keeps historical draft line identities and permits only non-destructive header edits",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "returns a request without quotes, edits and resubmits with fresh snapshots and audit",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "does not replace a missing submitted snapshot with a later live APU cost",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "requires manual foreign FX, preserves omitted FX/currency on edit and serializes six decimal places",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "revalidates a supplier's active role before quote edits and awards",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "records partial multi-PO FX totals and preserves LABOR typification from an explicit legacy APU",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "allocates distinct company-wide order numbers for concurrent awards in separate projects",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "recovers canceled legacy award pointers before reaward and retains the historical canceled order",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "rejects malformed historical quote sources and foreign suppliers before exposing their joined data",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "rejects a legacy foreign WBS/APU at read and award boundaries with no new order",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "batch awards remain atomic when a later group is invalid",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "linked cancellation preserves terminal history and never clears another request's award cache",
+            "status": "ok",
+            "run": "requests-audit-live-first"
+          },
+          {
+            "name": "creates on a shared project using the active company and excludes another company's requests",
+            "status": "ok",
+            "run": "requests-audit-live-fixture-recheck"
+          },
+          {
+            "name": "rejects cross-company WBS/APU/products and cross-tenant products without partial documents",
+            "status": "ok",
+            "run": "requests-audit-live-fixture-recheck"
+          },
+          {
+            "name": "uses native budget currency, withholds partial estimates and never exposes raw Prisma joins",
+            "status": "ok",
+            "run": "requests-audit-live-fixture-recheck"
+          }
+        ],
+        "orders": [
+          {
+            "name": "isolates company documents on a shared project across get, list, links and receipt helpers",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects foreign company WBS and product references before creating a direct OC",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects a legacy cross-company joined WBS before returning labels or using its cost",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects request-line injection into direct OC create and edit without reserving an award",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects a legacy direct OC carrying a foreign SC-line parent before reads or mutation",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "keeps legitimate awarded SC and quote parent links when editing and committing the OC",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "keeps explicit LAB APU baseline, currency, unit and exact physical quantity",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "captures native USD FX and uses ARS thresholds while keeping same-currency variance native",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "D-125 keeps a cross-currency purchase but requires its existing no-baseline justification",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "D-125 suppresses a mixed-currency commitment saldo without discarding foreign amounts",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects a legacy commitment from another project instead of including it in an accessible WBS saldo",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rechecks the existing justification gate when the budget baseline changes before approval",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "serializes direct OC numbering across two projects in the same company",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "blocks product receipt confirmation without a warehouse and keeps all physical effects absent",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rechecks warehouse eligibility when a product receipt is confirmed",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "checks the sum of repeated receipt entries against ordered quantity",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "returns the same receipt for concurrent identical creates with a single idempotency key",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "replays an existing receipt after full confirmation without creating or applying quantities twice",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "D-127 serializes new receipt numbers across projects in the same company",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "D-127 has an independent sequence for each company on a shared project",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "D-127 preserves replay numbers and does not reuse cancelled receipt numbers",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "D-127 keeps historical UUID identification without numbering on read, edit or confirmation",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "honors configured over-receipt tolerance on the aggregate, without duplicate confirm effects",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects reversal of two four-unit stock entries when only five remain and rolls back everything",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "reverses grouped receipt stock when the complete balance is still available",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "refuses receipt lines belonging to a different OC before exposing or confirming them",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "serializes draft receipt creation with OC cancellation and leaves no active orphan",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "serializes receipt edits with confirmation and uses the actual persisted quantities",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "requires project access and active status for cancellation and return",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "rejects a valid APU ID whose declared budget contradicts its own CostItem and WBS",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "does not reverse foreign-tenant stock rows linked to an own receipt",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "leaves consumption traces intact when cancelling only the originating receipt IN movements",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "preserves exact historical PO line amounts on unchanged net-price edits",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "blocks OC cancellation protected by an active fiscal line even without its legacy header link",
+            "status": "ok",
+            "run": "orders-audit-live-second"
+          },
+          {
+            "name": "infers APU and WBS nature from the locked graph after an interleaved APU edit, preserving explicit nature",
+            "status": "ok",
+            "run": "orders-apu-lock-regression-live"
+          },
+          {
+            "name": "D129 blocks a changed FX crossing the approval threshold for a standard buyer without mutating the approved OC",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 requires approval permission for any changed FX even when the new amount is below the high-level threshold",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 reapplies requester segregation for high-level FX changes and for the current no-self-approval policy",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 renews approval and audits old/new FX before confirming with an authorized other owner",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 rechecks missing variance justifications and rolls back their tentative snapshots",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 applies the current EXTRA_APPROVAL variance level independently of the amount threshold",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 keeps EDIT-only confirmation and the previous approval when the numeric FX is unchanged",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          },
+          {
+            "name": "D129 rolls back approval, FX, variance and its approval audit if the confirmation audit fails",
+            "status": "ok",
+            "run": "orders-confirmation-fx-d129-live"
+          }
+        ],
+        "platform": [
+          {
+            "name": "rejects invalid direct policy input before replacing stored values",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "validates partial policy changes against the stored complementary limit",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "serializes concurrent individually valid policy changes without storing min greater than max",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rounds policy money and records a scoped before/after audit atomically",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rolls policy changes back when audit insertion fails",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "preserves company isolation even for an owner changing policies",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "resolves shared-project policy from the selected company without guessing for a global context",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "counts only own-company requests, quotes, orders and receipts in a shared-project hub",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "keeps SC-only hub access without consulting hidden orders or receipts",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "honors the project module gate before hub source reads",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "filters shared-project procurement audiences by document company and active user",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "creates SC submission notices only for eligible own-company and global recipients",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "runs manual SLA reminders only within the active company",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "keeps billing in the PO native currency rather than relabeling USD as ARS",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects a mixed-currency billing calculation while retaining readable original documents",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects contradictory invoice-company parents before billing or listing them",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects a foreign PO-line FK even within the same company and project",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects an inconsistent payable before using its paid amount",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "keeps fiscal NC and ND separate from physical receipt coverage",
+            "status": "ok",
+            "run": "platform-issued-and-debit-closure-live"
+          },
+          {
+            "name": "sums repeated receipt lines when creating the real automatic AP draft",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects a foreign-budget OC in AP preview and generation without creating an invoice",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects cross-company OC headers in manual invoice creation, editing and issue",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects a receipt-company contradiction before creating an AP draft",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "does not overwrite a native-priced automatic draft after its currency changes",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "does not claim an amount over-receipt from incompatible invoice and PO currencies",
+            "status": "ok",
+            "run": "platform-audit-live-second"
+          },
+          {
+            "name": "rejects a stale partial invoice edit after another edit changes its OC and supplier",
+            "status": "ok",
+            "run": "platform-invoice-concurrency-live"
+          },
+          {
+            "name": "does not settle an OC at neto+IVA while its issued invoice still owes IIBB",
+            "status": "ok",
+            "run": "platform-payment-settlement-live"
+          },
+          {
+            "name": "settles every issued invoice through canonical credits without claiming a cash payment",
+            "status": "ok",
+            "run": "platform-payment-settlement-live"
+          },
+          {
+            "name": "keeps draft reservations separate from issued coverage when deriving OC completion",
+            "status": "ok",
+            "run": "platform-issued-and-debit-closure-live"
+          },
+          {
+            "name": "keeps issued debit-note debt in OC settlement without altering physical coverage",
+            "status": "ok",
+            "run": "platform-issued-and-debit-closure-live"
+          }
+        ],
+        "schedule": [
+          {
+            "name": "receipt confirmation completes a linked milestone while preserving TASK progress",
+            "status": "ok",
+            "run": "schedule-receipt-regression-live"
+          },
+          {
+            "name": "rejects a receipt line from a different order before changing quantities or milestones",
+            "status": "ok",
+            "run": "schedule-receipt-regression-live"
+          },
+          {
+            "name": "a project paused after receipt preflight prevents its milestone and quantity effects",
+            "status": "ok",
+            "run": "schedule-receipt-regression-live"
+          }
+        ]
+      },
+      "identity": "output/platform-audit/ag-06-2026-11-04/database-identity.json",
+      "testsUseMaintainedGuard": true,
+      "resultsOfFirstFailedRunsRetained": true
+    },
+    "types": {
+      "tasksPassed": 13,
+      "result": "output/platform-audit/ag-06-2026-11-04/types-all-closure-final.result.json",
+      "exitCode": 0,
+      "startedAt": "2026-11-04T19:24:52.147Z",
+      "finishedAt": "2026-11-04T19:25:44.577Z",
+      "databaseDisabled": true,
+      "externalProvidersDisabled": true,
+      "vercelUnset": true
+    },
+    "lint": {
+      "errors": 0,
+      "warnings": 0,
+      "result": "output/platform-audit/ag-06-2026-11-04/lint-all-closure-final.result.json",
+      "exitCode": 0,
+      "startedAt": "2026-11-04T19:25:44.578Z",
+      "finishedAt": "2026-11-04T19:26:05.126Z",
+      "databaseDisabled": true,
+      "externalProvidersDisabled": true,
+      "vercelUnset": true
+    },
+    "build": {
+      "job": "AG06 final full workspace build after approved D125-D129 and final billing settlement corrections",
+      "startedAt": "2026-11-04T19:28:57.548Z",
+      "finishedAt": "2026-11-04T19:31:24.993Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": "full-build-final.log",
+      "databaseDisabled": true,
+      "externalProviderKeysShadowed": true,
+      "vercelUnset": true,
+      "prismaGenerationAlreadyPassed": true,
+      "sources": [
+        {
+          "file": "packages/database/prisma/schema.prisma",
+          "sha256": "c242160330d206582054291715ef1ac1eabead42b6b530b187ad80a3212b7834"
+        },
+        {
+          "file": "packages/database/prisma/migrations/20261104183000_purchase_receipt_company_number/migration.sql",
+          "sha256": "3e87faea207af5ee7c44e7ef77b78d9e1842ed88defb617fb5f70e3c262ccd63"
+        },
+        {
+          "file": "packages/services/src/procurement/purchase-order.service.ts",
+          "sha256": "85e159b562ae101be9f364cdd8e662c9e53f8e40d424ca4fbbb5ee0a4567f740"
+        },
+        {
+          "file": "packages/services/src/procurement/purchase-order-workflow.service.ts",
+          "sha256": "84fc100c626c96ba7b8d277e53d95b369ee844feae36916ba3dc9e09976132c7"
+        },
+        {
+          "file": "packages/services/src/procurement/purchase-request.service.ts",
+          "sha256": "fdd6ad58d7cae1d7c8a0d9532af509ecf6dff49fc0c1f9096efa5a7b0f57acb2"
+        },
+        {
+          "file": "packages/services/src/procurement/purchase-receipt.service.ts",
+          "sha256": "17e706012fb99611a718fb5228ac54da1301f3c29bfff88779b47dfed9435cf0"
+        },
+        {
+          "file": "packages/services/src/procurement/procurement-wbs.ts",
+          "sha256": "9c39295b20eedb26e21a6b49c5e5db75f55a750826d62c041ff65aaaec3afc3b"
+        },
+        {
+          "file": "packages/services/src/ap/supplier-invoice-from-po.service.ts",
+          "sha256": "ff6181b98c6ecb085407019000e7a5b1b5e15120e0d7ed6119a5f5dfa7ae2956"
+        },
+        {
+          "file": "packages/services/src/ap/supplier-invoice.service.ts",
+          "sha256": "a2752368b7f8b7e04fe7db9e9c199b12f51a526e2820c5a00d207f663ddac894"
+        },
+        {
+          "file": "apps/web/features/procurement/components/receipt-form.tsx",
+          "sha256": "55d8a80d5d101fa4d5ff3c8f329e6a6e98aea1ce29047abb63cca53a5fd4b8d5"
+        },
+        {
+          "file": "apps/web/features/procurement/components/confirm-purchase-order-button.tsx",
+          "sha256": "d851e2ebc9e4bf65b8ef23859ec968dcc9bc905e22ce11a0db81729be82b4096"
+        },
+        {
+          "file": "apps/web/features/procurement/components/po-billing-next-step-panel.tsx",
+          "sha256": "f6adcdc827fe2e7539bad70ad2316ff05908d3d66765e34407f01a2e2e904c37"
+        },
+        {
+          "file": "apps/web/app/(app)/proyectos/[id]/ordenes-compra/[poId]/page.tsx",
+          "sha256": "e8fe7fc8cb8551c2341dd35aba6b191b321a8918b16edb95f219182fbe6ffefa"
+        },
+        {
+          "file": "packages/ai/knowledge/generated/docs-index.json",
+          "sha256": "29b9b2e07724ee123a6a3051e115c1e765d32daf201480da28e0f78b880f3e58"
+        }
+      ],
+      "sourceHashesAllStillMatch": true,
+      "sourceHashesCheckedAt": "2026-11-04T19:50:02.305Z"
+    },
+    "knowledge": {
+      "chunks": 542,
+      "sourceHash": "a5418c64a3d02863c4d1144f203cc2095fc28cf002005a27521b04c6bb745ce0",
+      "retrievalCasesAdded": 7,
+      "remoteModelEvaluationsExecuted": false,
+      "indexBuildResult": "output/platform-audit/ag-06-2026-11-04/knowledge-index-closure-final.result.json",
+      "indexCheckResult": "output/platform-audit/ag-06-2026-11-04/knowledge-check-closure-final.result.json",
+      "atClosureFreshness": {
+        "result": "output/platform-audit/ag-06-2026-11-04/knowledge-check-at-closure.result.json",
+        "exitCode": 0,
+        "startedAt": "2026-11-04T19:50:39.866Z",
+        "finishedAt": "2026-11-04T19:50:40.583Z",
+        "command": "pnpm --filter @bloqer/ai check-docs-index",
+        "networkRequired": false
+      }
+    },
+    "visual": {
+      "completedAt": "2026-11-04T19:41:52.464Z",
+      "environment": {
+        "origin": "http://localhost:3100",
+        "database": "bloqer_audit_ag01_20261103",
+        "syntheticOnly": true,
+        "externalProvidersEnabled": false,
+        "build": "full-build-final"
+      },
+      "actor": "synthetic Owner",
+      "sample": {
+        "projectId": "8c543210-c6a6-4a5e-9fb6-e1014f29f8d4",
+        "request": "SC-9103",
+        "order": "OC-9305",
+        "confirmedReceipts": [
+          "RC-001",
+          "RC-002"
+        ],
+        "finalReceiptId": "ee1a2e58-df22-4dd0-a7ad-e6c6393da8f9"
+      },
+      "observations": [
+        "RC-002 confirmed using final full build; both receipts listed with distinct codes and same origin OC-9305",
+        "Non-product warehouse explanation visible with zero warehouses",
+        "Final billing panel separates received/issued net+IVA, actual cash paid and pending net+IVA; received 242, issued 0, paid 0, pending 242 ARS",
+        "Desktop light list and mobile 390x844 light/dark cards read with both confirmed receipt codes",
+        "Prior intermediate-build sample covered SC, USD quote vs ARS reference, direct order, approval and confirmation, first receipt and cancellation dialog dismissal"
+      ],
+      "limitations": [
+        "Owner browser sample only; negative roles/ACL checked in SQL and component suites",
+        "Foreign-FX confirmation rule covered by SQL and UI tests, not a complete browser foreign-order confirmation",
+        "No real supplier communication, invoice issuance, cash payment, external model, email or storage calls",
+        "No full accessibility certification or global platform E2E claim"
+      ],
+      "artifacts": [
+        "quote-usd-reference-ars-desktop-dark.png",
+        "request-mobile-light.png",
+        "receipt-rc001-desktop-light.png",
+        "receipt-draft-final-light.png",
+        "receipts-two-codes-final-light.png",
+        "receipts-two-codes-final-mobile-dark.png"
+      ],
+      "cleanup": {
+        "originalTheme": "dark",
+        "themeRestored": true,
+        "viewportOverrideReset": true,
+        "logoutVerifiedAt": "/login",
+        "temporaryTabId": "16",
+        "temporaryTabClosed": true
+      },
+      "screenshots": [
+        {
+          "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/quote-usd-reference-ars-desktop-dark.png",
+          "sha256": "2051622dad3be45ea05e7fee6c33983b331c114958514b31c4a0521a1c66895c"
+        },
+        {
+          "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/request-mobile-light.png",
+          "sha256": "c4c2d0ff57fc9b91b8cccb5e3d778455740fa003c9eaf71a0b67d68c4b501614"
+        },
+        {
+          "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipt-rc001-desktop-light.png",
+          "sha256": "813dc0b5bb0a8c88bf5297710a7240580de7040ed187b9bee06294bceb57d512"
+        },
+        {
+          "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipt-draft-final-light.png",
+          "sha256": "3cd7ee6cd646ab52dbfc74e6f76ef7989a0cd9deb2255948d22bf82e07caad8f"
+        },
+        {
+          "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipts-two-codes-final-light.png",
+          "sha256": "86c064fee0d6e1fa4fada0f1901b0e4c6356cc9ed4aa06945b06eb1afca556bf"
+        },
+        {
+          "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag06/receipts-two-codes-final-mobile-dark.png",
+          "sha256": "c275e54499e175e41f939ecd8cb6d0a2364fccdab38872576e11e3838e0ee9d5"
+        }
+      ],
+      "initialSample": "output/platform-audit/ag-06-2026-11-04/visual-initial.json"
+    },
+    "migration": {
+      "result": "output/platform-audit/ag-06-2026-11-04/receipt-number-migrate-isolated.result.json",
+      "exitCode": 0,
+      "startedAt": "2026-11-04T18:13:00.553Z",
+      "finishedAt": "2026-11-04T18:13:27.427Z"
+    },
+    "canvas": {
+      "exitCode": 0,
+      "checkedAt": "2026-11-04T19:47:21.484Z",
+      "file": "C:/Users/bravi/.cursor/projects/c-Dev-bloqer-v2/canvases/bloqer-platform-audit.canvas.tsx",
+      "sdk": "C:/Users/bravi/.cursor/skills-cursor/canvas/sdk/index.d.ts",
+      "reactTypes": "Canvas host supplied @types/react 0.0.0, consistently resolved for SDK and JSX runtime",
+      "correctedAttempt": "Prior ad hoc typecheck mixed canvas host JSX types with repository React19 types. No source edit required; corrected module resolution only.",
+      "diagnostics": 0,
+      "sha256": "ab2c7c9f0711da94c8aa73996a2e7637305f3e048310410865c25847484006f8",
+      "result": "output/platform-audit/ag-06-2026-11-04/canvas-typecheck-result.json"
+    },
+    "cleanup": {
+      "port3100Free": true,
+      "creationTimeVerified": true,
+      "commandVerified": true,
+      "stoppedAt": "2026-11-04T19:43:05.4062226+00:00",
+      "startedAt": "2026-11-04T19:33:20.352Z",
+      "pid": 75236,
+      "visualLogoutVerified": true,
+      "temporaryTabClosed": true
+    },
+    "localLinks": {
+      "checked": 118,
+      "broken": 0
+    },
+    "attemptsCorrected": [
+      "Prisma dynamic delegate mock substitution adjusted in maintained harness; failed cases repeated",
+      "Second budget fixture changed to a real addendum; affected selections repeated",
+      "Complex transaction 5-second timeout reproduced; bounded 30-second timeout, 10-second maxWait and postcommit DTO applied and SQL repeated",
+      "Wrong guard import failed before migration/fixture writes; corrected path and guarded isolated migration passed",
+      "Initial build output mkdir permission error; explicit workspace permission retry and final root build passed",
+      "Canvas check initially mixed host React shim and repo React19; consistent host types resolve with zero source edits and zero final diagnostics",
+      "Server cleanup guard initially rejected a localized JSON DateTime conversion; raw ISO UTC comparison verified the exact process before stopping"
+    ],
+    "sourceFreeze": {
+      "checkedAt": "2026-11-04T19:51:43.724Z",
+      "manifestSourceFilesMatched": 2604,
+      "runtimeCriticalBuildHashesMatched": 14,
+      "noSourceEditsAfterFinalBuild": true,
+      "reportJsonExcludedFromOwnHashManifest": true
+    },
+    "diffCheck": {
+      "exitCode": 0,
+      "log": "output/platform-audit/ag-06-2026-11-04/git-diff-check-final.log",
+      "nonblockingLineEndingAdvisories": true
+    }
+  }
+}

@@ -8,8 +8,12 @@ import { resolveApprovedBudgetForProject } from "../reports/report-budget-resolv
 import { parseFilterDate } from "../reports/report-month";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { validateResourceVarianceDates } from "./resource-variance-filters";
+import { assertBudgetCurrency } from "../cost-control/comparison-currency";
+import { assertBudgetCostGraph } from "../budget/budget-cost-graph";
 import {
   asCostCategory,
+  isResourceBoardCategory,
   RESOURCE_BOARD_LABELS_ES,
   type ResourceBoardCategory,
 } from "./resource-board-pure";
@@ -73,22 +77,25 @@ export async function getResourceVarianceReport(
   filters: ResourceVarianceFilters,
   ctx: ServiceContext,
 ): Promise<ResourceVarianceResult> {
+  if (!isResourceBoardCategory(costCategory)) {
+    throw new ServiceError("VALIDATION", "El tipo de recurso debe ser Mano de obra o Equipos");
+  }
   if (!canViewProjectCostControlReport(ctx.roles) && !can(ctx.roles, "VIEW", "PROJECTS")) {
     throw new ServiceError(
       "FORBIDDEN",
       `Sin permisos para ver varianza de ${RESOURCE_BOARD_LABELS_ES[costCategory].toLowerCase()}`,
     );
   }
-
-  await requireProjectAccess(projectId, ctx);
-
-  const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
-  if (!budget) return { type: "NO_APPROVED_BUDGETS", costCategory };
+  validateResourceVarianceDates(filters);
 
   const gate = await getTenantModuleGate(ctx);
-  if (!gate.isEnabled("BUDGETS")) {
-    throw new ServiceError("FORBIDDEN", "Presupuestos deshabilitado");
+  if (!gate.isEnabled("BUDGETS") || !gate.isEnabled("PROJECTS")) {
+    throw new ServiceError("FORBIDDEN", "Proyectos o presupuestos deshabilitados");
   }
+  await requireProjectAccess(projectId, ctx);
+  const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
+  if (!budget) return { type: "NO_APPROVED_BUDGETS", costCategory };
+  await assertBudgetCostGraph(budget.id);
 
   const category = asCostCategory(costCategory);
   const warnings: string[] = [
@@ -103,12 +110,12 @@ export async function getResourceVarianceReport(
   );
 
   const costItems = await prisma.costItem.findMany({
-    where: { budgetId: budget.id, wbsNode: { type: "ITEM" } },
+    where: { budgetId: budget.id, wbsNode: { budgetId: budget.id, type: "ITEM" } },
     select: {
       wbsNodeId: true,
       quantity: true,
       analysisLines: {
-        where: { category },
+        where: { budgetId: budget.id, category },
         select: { totalCost: true },
       },
     },
@@ -121,12 +128,14 @@ export async function getResourceVarianceReport(
   }
 
   const accruedMap = new Map<string, Prisma.Decimal>();
-  if (gate.isEnabled("AP")) {
+  if (gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP")) {
     const lines = await prisma.supplierInvoiceLine.findMany({
       where: {
         invoice: {
           projectId,
           tenantId: ctx.tenantId,
+          // SupplierInvoice.companyId is NOT NULL.
+          ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
           status: "ISSUED",
           subcontractCertificationId: null,
           ...(dateWhere(filters.dateFrom, filters.dateTo)
@@ -134,14 +143,17 @@ export async function getResourceVarianceReport(
             : {}),
         },
         wbsNodeId: { not: null },
+        wbsNode: { budgetId: budget.id },
         OR: [
           { costType: category },
+          { costType: null, costAnalysisLine: { budgetId: budget.id, category } },
           {
             AND: [
               { costType: null },
               {
                 purchaseOrderLine: {
-                  OR: [{ costType: category }, { costAnalysisLine: { category } }],
+                  purchaseOrder: { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) },
+                  OR: [{ costType: category }, { costType: null, costAnalysisLine: { category } }],
                 },
               },
             ],
@@ -152,6 +164,11 @@ export async function getResourceVarianceReport(
         wbsNodeId: true,
         lineSubtotal: true,
         costType: true,
+        costAnalysisLine: { select: {
+          budgetId: true, category: true,
+          costItem: { select: { budgetId: true, wbsNodeId: true } },
+        } },
+        invoice: { select: { documentKind: true, currency: true } },
         purchaseOrderLine: {
           select: { costType: true, costAnalysisLine: { select: { category: true } } },
         },
@@ -160,22 +177,27 @@ export async function getResourceVarianceReport(
 
     for (const line of lines) {
       if (!line.wbsNodeId) continue;
-      // Align with board: explicit costType, else OC type or OC APU category.
-      if (line.costType) {
-        if (line.costType !== category) continue;
-      } else {
-        const po = line.purchaseOrderLine;
-        const ok =
-          po?.costType === category || po?.costAnalysisLine?.category === category;
-        if (!ok) continue;
+      if (line.costAnalysisLine && (
+        line.costAnalysisLine.budgetId !== budget.id ||
+        line.costAnalysisLine.costItem.budgetId !== budget.id ||
+        line.costAnalysisLine.costItem.wbsNodeId !== line.wbsNodeId
+      )) {
+        throw new ServiceError("CONFLICT", "Hay documentos con vínculos de empresa, obra o presupuesto inconsistentes. Revisá su trazabilidad antes de consultar los costos.");
       }
+      // D-110: an own APU hint wins over the OC fallback; never count one line in both boards.
+      const sourceCategory = line.costType ?? line.costAnalysisLine?.category ??
+        line.purchaseOrderLine?.costType ?? line.purchaseOrderLine?.costAnalysisLine?.category;
+      if (sourceCategory !== category) continue;
+      assertBudgetCurrency(budget.currency, line.invoice.currency);
       accruedMap.set(
         line.wbsNodeId,
-        (accruedMap.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).plus(line.lineSubtotal),
+        (accruedMap.get(line.wbsNodeId) ?? new Prisma.Decimal(0)).plus(
+          line.invoice.documentKind === "CREDIT_NOTE" ? line.lineSubtotal.negated() : line.lineSubtotal,
+        ),
       );
     }
   } else {
-    warnings.push("Módulo AP deshabilitado: no se calcula el gasto facturado.");
+    warnings.push("AP no disponible: no se consulta el gasto facturado.");
   }
 
   const byWbs: ResourceWbsVarianceRow[] = [];

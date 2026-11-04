@@ -1,15 +1,18 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { can, physicalNeedQty } from "@bloqer/domain";
+import { can } from "@bloqer/domain";
 import {
   addCalendarDays,
   calendarPartsInTimeZone,
   formatCalendarDate,
   PRODUCT_TIMEZONE,
-  toIsoDateInTimeZone,
 } from "@bloqer/utils";
 import { uniqueRelatedId } from "./materials-field";
+import { needQtyFromApuLineExact } from "./material-commitment-pure";
+import { companyScopeFilter } from "../company-scope";
+import { requireProjectAccess } from "../security/access";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
-import { canViewProjectCostControlReport } from "../project/project-nav-guards";
+import { canViewProjectCostControlReport, canViewProjectScheduleArea } from "../project/project-nav-guards";
+import { canViewProcurementProjectArea, canViewPurchaseRequests } from "../procurement/procurement-access";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { resolveApprovedBudgetForProject } from "../reports/report-budget-resolve";
@@ -156,8 +159,8 @@ function normalizeDesc(s: string): string {
   return s.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function rowKey(wbsNodeId: string, productId: string | null, description: string): string {
-  return `${wbsNodeId}::${productId ?? `d:${normalizeDesc(description)}`}`;
+function rowKey(wbsNodeId: string, productId: string | null, description: string, unit?: string | null): string {
+  return `${wbsNodeId}::${productId ?? `d:${normalizeDesc(description)}`}::u:${normalizeDesc(unit ?? "")}`;
 }
 
 function rangesOverlap(
@@ -186,11 +189,7 @@ export async function getProjectMaterialsBoard(
     throw new ServiceError("FORBIDDEN", "Presupuestos o proyectos deshabilitados");
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId: ctx.tenantId },
-    select: { id: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  await requireProjectAccess(projectId, ctx);
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };
@@ -198,6 +197,13 @@ export async function getProjectMaterialsBoard(
   const window = filters.window ?? "next_14_days";
   const { start: winStart, end: winEnd } = resolveWindow(window);
   const warnings: string[] = [];
+  const canReadRequests = gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(ctx.roles);
+  const canReadOrders = gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(ctx.roles);
+  const canReadInventory = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
+  const canReadSchedule = gate.isEnabled("SCHEDULE") && canViewProjectScheduleArea(ctx.roles);
+  if (!canReadRequests || !canReadOrders) warnings.push("Cobertura de pedidos incompleta: no tenés disponibles todas las fuentes de compras.");
+  if (!canReadInventory) warnings.push("Inventario no disponible: no se consulta el consumo de materiales.");
+  if (!canReadSchedule) warnings.push("Cronograma no disponible: no se consultan fechas de necesidad.");
 
   const wbsLeaves = await prisma.wbsNode.findMany({
     where: {
@@ -210,12 +216,12 @@ export async function getProjectMaterialsBoard(
   });
 
   const costItems = await prisma.costItem.findMany({
-    where: { budgetId: budget.id, wbsNode: { type: "ITEM" } },
+    where: { budgetId: budget.id, wbsNode: { budgetId: budget.id, type: "ITEM" } },
     select: {
       wbsNodeId: true,
       quantity: true,
       analysisLines: {
-        where: { category: "MATERIAL" },
+        where: { budgetId: budget.id, category: "MATERIAL" },
         select: {
           id: true,
           productId: true,
@@ -231,6 +237,7 @@ export async function getProjectMaterialsBoard(
   });
 
   type Agg = {
+    rowKey: string;
     wbsNodeId: string;
     costAnalysisLineId: string | null;
     productId: string | null;
@@ -244,21 +251,21 @@ export async function getProjectMaterialsBoard(
   };
 
   const map = new Map<string, Agg>();
+  const byApuId = new Map<string, Agg>();
 
   for (const item of costItems) {
     for (const line of item.analysisLines) {
       // [D-047] recurso: partidaQuantity; lump legacy / unit `gl`: no necesidad física
-      const needQty = new Prisma.Decimal(
-        physicalNeedQty(
-          line.partidaQuantity != null ? Number(line.partidaQuantity.toString()) : null,
-          Number(line.coefficient.toString()),
-          Number(item.quantity.toString()),
-          { isLumpSum: line.isLumpSum, unit: line.unit },
-        ),
-      );
+      const needQty = needQtyFromApuLineExact({
+        partidaQuantity: line.partidaQuantity,
+        coefficient: line.coefficient,
+        itemQuantity: item.quantity,
+        isLumpSum: line.isLumpSum,
+        unit: line.unit,
+      });
       // Non-purchasable lines must not appear as material need rows.
       if (needQty.isZero()) continue;
-      const key = rowKey(item.wbsNodeId, line.productId, line.description);
+      const key = rowKey(item.wbsNodeId, line.productId, line.description, line.unit);
       const needCost = new Prisma.Decimal(line.totalCost).mul(item.quantity);
       const prev = map.get(key);
       if (prev) {
@@ -267,10 +274,11 @@ export async function getProjectMaterialsBoard(
         // Ambiguous merge → drop single APU hint.
         if (prev.costAnalysisLineId !== line.id) {
           prev.costAnalysisLineId = null;
-          prev.unit = prev.unit === line.unit ? prev.unit : null;
         }
+        byApuId.set(line.id, prev);
       } else {
-        map.set(key, {
+        const row: Agg = {
+          rowKey: key,
           wbsNodeId: item.wbsNodeId,
           costAnalysisLineId: line.id,
           productId: line.productId,
@@ -281,7 +289,9 @@ export async function getProjectMaterialsBoard(
           orderedQty: ZERO,
           receivedQty: ZERO,
           consumedQty: ZERO,
-        });
+        };
+        map.set(key, row);
+        byApuId.set(line.id, row);
       }
     }
   }
@@ -291,22 +301,37 @@ export async function getProjectMaterialsBoard(
     productId: string | null,
     description: string,
     costAnalysisLineId?: string | null,
+    unit?: string | null,
   ): Agg => {
     // Prefer exact APU match when present.
+    let incompatibleUnit = false;
     if (costAnalysisLineId) {
-      for (const row of map.values()) {
-        if (row.costAnalysisLineId === costAnalysisLineId) return row;
+      const row = byApuId.get(costAnalysisLineId);
+      if (row?.wbsNodeId === wbsNodeId) {
+        if (!unit?.trim() || normalizeDesc(row.unit ?? "") === normalizeDesc(unit)) return row;
+        incompatibleUnit = true;
+        warnings.push("Hay cantidades con una unidad distinta a su insumo APU; se muestran separadas y no cubren su necesidad.");
       }
     }
-    const key = rowKey(wbsNodeId, productId, description);
+    if (!incompatibleUnit) {
+      const candidates = [...map.values()].filter((row) =>
+        row.wbsNodeId === wbsNodeId &&
+        (productId ? row.productId === productId : !row.productId && normalizeDesc(row.description) === normalizeDesc(description)) &&
+        (!unit?.trim() || normalizeDesc(row.unit ?? "") === normalizeDesc(unit)),
+      );
+      if (candidates.length === 1) return candidates[0]!;
+      if (candidates.length > 1) warnings.push("Hay pedidos o consumos sin una unidad inequívoca; no se reparten entre insumos.");
+    }
+    const key = rowKey(wbsNodeId, productId, description, unit) + (incompatibleUnit ? "::unlinked" : "");
     let row = map.get(key);
     if (!row) {
       row = {
+        rowKey: key,
         wbsNodeId,
-        costAnalysisLineId: costAnalysisLineId ?? null,
+        costAnalysisLineId: null,
         productId,
         description,
-        unit: null,
+        unit: unit?.trim() || null,
         needQty: ZERO,
         needCost: ZERO,
         orderedQty: ZERO,
@@ -319,19 +344,22 @@ export async function getProjectMaterialsBoard(
   };
 
   const [prLines, poLines, consumptions, scheduleLinks] = await Promise.all([
-    prisma.purchaseRequestLine.findMany({
+    canReadRequests ? prisma.purchaseRequestLine.findMany({
       where: {
         purchaseRequest: {
           projectId,
           tenantId: ctx.tenantId,
+          // PurchaseRequest.companyId is NOT NULL.
+          ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
           status: { in: [...ORDERED_PR_STATUSES] },
         },
         // Unawarded SC lines = still "pedido". Awarded lines counted via active PO lines below.
         awardedPurchaseOrderId: null,
         wbsNodeId: { not: null },
+        wbsNode: { budgetId: budget.id },
         OR: [
           { costType: "MATERIAL" },
-          { costAnalysisLine: { category: "MATERIAL" } },
+          { costType: null, costAnalysisLine: { category: "MATERIAL" } },
         ],
       },
       select: {
@@ -339,18 +367,22 @@ export async function getProjectMaterialsBoard(
         costAnalysisLineId: true,
         productId: true,
         description: true,
+        unit: true,
         quantity: true,
         purchaseRequest: { select: { id: true, number: true } },
       },
-    }),
-    prisma.purchaseOrderLine.findMany({
+    }) : Promise.resolve([]),
+    canReadOrders ? prisma.purchaseOrderLine.findMany({
       where: {
         purchaseOrder: {
           projectId,
           tenantId: ctx.tenantId,
+          // PurchaseOrder.companyId is NOT NULL.
+          ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
           status: { not: "CANCELLED" },
         },
         wbsNodeId: { not: null },
+        wbsNode: { budgetId: budget.id },
         OR: [
           // Financially committed POs (pre-existing).
           { purchaseOrder: { status: { in: [...ORDERED_PO_STATUSES] } } },
@@ -366,7 +398,7 @@ export async function getProjectMaterialsBoard(
           {
             OR: [
               { costType: "MATERIAL" },
-              { costAnalysisLine: { category: "MATERIAL" } },
+              { costType: null, costAnalysisLine: { category: "MATERIAL" } },
             ],
           },
         ],
@@ -376,34 +408,42 @@ export async function getProjectMaterialsBoard(
         costAnalysisLineId: true,
         productId: true,
         description: true,
+        unit: true,
         quantity: true,
         receivedQuantity: true,
         purchaseOrder: { select: { id: true, number: true } },
       },
-    }),
-    gate.isEnabled("INVENTORY")
+    }) : Promise.resolve([]),
+    canReadInventory
       ? prisma.stockMovement.findMany({
           where: {
             projectId,
             tenantId: ctx.tenantId,
+            // StockMovement.companyId is NOT NULL.
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
             status: "CONFIRMED",
             type: "OUT",
             sourceType: "CONSUMPTION",
             wbsNodeId: { not: null },
+            wbsNode: { budgetId: budget.id },
+            product: { tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
           },
           select: {
             wbsNodeId: true,
             productId: true,
             notes: true,
             quantity: true,
+            product: { select: { unit: true } },
           },
         })
       : Promise.resolve([]),
-    gate.isEnabled("SCHEDULE")
+    canReadSchedule
       ? prisma.scheduleItemWbsLink.findMany({
           where: {
+            tenantId: ctx.tenantId,
             wbsNode: { budgetId: budget.id },
             scheduleItem: {
+              tenantId: ctx.tenantId,
               schedule: { projectId, tenantId: ctx.tenantId },
               status: { not: "CANCELLED" },
             },
@@ -428,9 +468,10 @@ export async function getProjectMaterialsBoard(
       line.productId,
       line.description,
       line.costAnalysisLineId,
+      line.unit,
     );
     row.orderedQty = row.orderedQty.add(line.quantity);
-    if (line.costAnalysisLineId) {
+    if (line.costAnalysisLineId && row.costAnalysisLineId === line.costAnalysisLineId) {
       const list = prIdsByCal.get(line.costAnalysisLineId) ?? [];
       list.push(line.purchaseRequest.id);
       prIdsByCal.set(line.costAnalysisLineId, list);
@@ -444,10 +485,11 @@ export async function getProjectMaterialsBoard(
       line.productId,
       line.description,
       line.costAnalysisLineId,
+      line.unit,
     );
     row.orderedQty = row.orderedQty.add(line.quantity);
     row.receivedQty = row.receivedQty.add(line.receivedQuantity);
-    if (line.costAnalysisLineId) {
+    if (line.costAnalysisLineId && row.costAnalysisLineId === line.costAnalysisLineId) {
       const list = poIdsByCal.get(line.costAnalysisLineId) ?? [];
       list.push(line.purchaseOrder.id);
       poIdsByCal.set(line.costAnalysisLineId, list);
@@ -456,19 +498,9 @@ export async function getProjectMaterialsBoard(
   }
   for (const sm of consumptions) {
     if (!sm.wbsNodeId) continue;
-    // Prefer productId key; notes text is fragile for matching APU descriptions.
-    if (sm.productId) {
-      const byProduct = [...map.values()].find(
-        (r) => r.wbsNodeId === sm.wbsNodeId && r.productId === sm.productId,
-      );
-      if (byProduct) {
-        byProduct.consumedQty = byProduct.consumedQty.add(sm.quantity);
-        continue;
-      }
-    }
     const noteParts = sm.notes?.split(" · ") ?? [];
     const desc = noteParts.length >= 2 ? noteParts[1]! : "Consumo";
-    const row = ensureRow(sm.wbsNodeId, sm.productId, desc);
+    const row = ensureRow(sm.wbsNodeId, sm.productId, desc, null, sm.product.unit);
     row.consumedQty = row.consumedQty.add(sm.quantity);
   }
 
@@ -477,10 +509,10 @@ export async function getProjectMaterialsBoard(
   const wbsScheduled = new Set<string>();
   if (winStart && winEnd) {
     for (const link of scheduleLinks) {
-      wbsScheduled.add(link.wbsNodeId);
       const start = link.scheduleItem.startDate;
       const end = link.scheduleItem.endDate;
       if (start || end) {
+        wbsScheduled.add(link.wbsNodeId);
         const s = start ?? end!;
         const e = end ?? start!;
         const prev = wbsRequired.get(link.wbsNodeId);
@@ -503,11 +535,11 @@ export async function getProjectMaterialsBoard(
     }
   } else {
     for (const link of scheduleLinks) {
-      wbsScheduled.add(link.wbsNodeId);
       wbsInWindow.add(link.wbsNodeId);
       const start = link.scheduleItem.startDate;
       const end = link.scheduleItem.endDate;
       if (start || end) {
+        wbsScheduled.add(link.wbsNodeId);
         const s = start ?? end!;
         const e = end ?? start!;
         const prev = wbsRequired.get(link.wbsNodeId);
@@ -563,7 +595,7 @@ export async function getProjectMaterialsBoard(
       ? uniqueRelatedId(poIdsByCal.get(agg.costAnalysisLineId) ?? [])
       : null;
     rows.push({
-      rowKey: rowKey(agg.wbsNodeId, agg.productId, agg.description),
+      rowKey: agg.rowKey,
       wbsNodeId: agg.wbsNodeId,
       wbsCode: meta.code,
       wbsName: meta.name,
@@ -579,8 +611,9 @@ export async function getProjectMaterialsBoard(
       consumedQty: agg.consumedQty.toFixed(4),
       shortfallQty: shortfall.toFixed(4),
       pendingReceiptQty: pendingReceipt.toFixed(4),
-      requiredStart: required ? toIsoDateInTimeZone(required.start) : null,
-      requiredEnd: required ? toIsoDateInTimeZone(required.end) : null,
+      // Schedule dates are PostgreSQL DATE values represented at UTC midnight.
+      requiredStart: required ? required.start.toISOString().slice(0, 10) : null,
+      requiredEnd: required ? required.end.toISOString().slice(0, 10) : null,
       missingProduct: !agg.productId,
       unscheduled,
       overCommitted: agg.orderedQty.greaterThan(agg.needQty) && agg.needQty.greaterThan(0),
@@ -599,9 +632,9 @@ export async function getProjectMaterialsBoard(
   );
 
   const productIds = [...new Set(rows.map((r) => r.productId).filter((id): id is string => Boolean(id)))];
-  if (productIds.length > 0) {
+  if (canReadInventory && productIds.length > 0) {
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds }, tenantId: ctx.tenantId },
+      where: { id: { in: productIds }, tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
       select: { id: true, sku: true },
     });
     const skuById = new Map(products.map((p) => [p.id, p.sku]));
@@ -632,6 +665,6 @@ export async function getProjectMaterialsBoard(
       consumedQty: totCons.toFixed(4),
       shortfallRows: rows.filter((r) => !/^-?0+(\.0+)?$/.test(r.shortfallQty.trim())).length,
     },
-    warnings,
+    warnings: [...new Set(warnings)],
   };
 }

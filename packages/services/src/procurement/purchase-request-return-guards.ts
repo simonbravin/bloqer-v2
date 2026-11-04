@@ -1,11 +1,13 @@
 import type { ProcurementQuoteStatus } from "@bloqer/database";
 import { ServiceError } from "../types";
 
-/** Quotes that block return-to-draft ([BR-PUR-025]); excludes REJECTED/SUPERSEDED. */
+/** D-126: every historical quote blocks return-to-draft, regardless of status. */
 export const PURCHASE_REQUEST_BLOCKING_QUOTE_STATUSES = [
   "DRAFT",
   "RECEIVED",
   "SELECTED",
+  "REJECTED",
+  "SUPERSEDED",
 ] as const satisfies readonly ProcurementQuoteStatus[];
 
 export function isBlockingProcurementQuoteStatus(status: string): boolean {
@@ -15,7 +17,7 @@ export function isBlockingProcurementQuoteStatus(status: string): boolean {
 /**
  * Gates for SUBMITTED → DRAFT ([BR-PUR-025]).
  * Call after loading status + counts from DB.
- * `quoteCount` must count only {@link PURCHASE_REQUEST_BLOCKING_QUOTE_STATUSES}.
+ * `quoteCount` counts all quotations, including rejected/superseded history.
  */
 export function assertPurchaseRequestReturnable(input: {
   status: string;
@@ -32,7 +34,7 @@ export function assertPurchaseRequestReturnable(input: {
   if (input.quoteCount > 0) {
     throw new ServiceError(
       "CONFLICT",
-      "Ya hay cotizaciones cargadas. No se puede devolver a borrador.",
+      "Esta solicitud ya tiene antecedentes de cotización. No se puede devolver a borrador; anulala y creá otra para cambiar sus ítems.",
     );
   }
   if (input.activePoCount > 0) {

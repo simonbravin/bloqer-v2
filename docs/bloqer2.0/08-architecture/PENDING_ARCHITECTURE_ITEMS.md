@@ -125,6 +125,23 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 - Al resolver un ítem: marcar **HECHO** con fecha y enlace a PR/ADR, o **MOVIDO** a `OPEN_QUESTIONS` si era ambigüedad de producto.  
 - Los agentes IA: **no** borrar filas sin confirmación; agregar fila si surge nueva duda técnica.
 
+## P-AG05-01 — Memoria del servidor de desarrollo durante smoke prolongado
+
+- **Estado:** observación técnica abierta, 04/11/2026; causa de producto no confirmada. No autoriza cambiar arquitectura, dependencias ni límites globales de memoria.
+- **Evidencia:** `output/platform-audit/ag-05-2026-11-04/local-server.log`. Después de aproximadamente una hora con recompilaciones HMR y varias rutas, el proceso local Next dev terminó con `FATAL ERROR ... JavaScript heap out of memory`, cerca de 12,9 GB de heap, al compilar el resumen de una obra para el VIEWER sintético. El login/dashboard ya habían cargado; la navegación de obra quedó sin verificar en esa corrida. Proceso y puerto efectivos comprobados como ausentes después del fallo.
+- **Límite:** una caída de dev durante una auditoría con múltiples ediciones no demuestra la misma falla en el build publicado. Tampoco se presenta una prueba corta del build como garantía de memoria estable a largo plazo.
+- **Próxima comprobación:** repetir navegación de consulta en build local fresco con base aislada y proveedores deshabilitados; separar compilación/HMR de ejecución normal. Si se reproduce, perfilar el recorrido y los imports antes de proponer una corrección. Conservar como entrada de regresión/rendimiento AG-14 y reabrir antes si afecta un recorrido necesario de otra etapa.
+- **Repetición acotada realizada:** build de producción local aprobado; en proceso nuevo, VIEWER accedió a obra asignada, cronograma y detalle sin edición y cerró sesión. Evidencia `visual-checks.json`, `preview-server.log` y `preview-environment.json` de AG-05. La instancia se detuvo luego del smoke; este recorrido corto no comprueba estabilidad de HMR ni memoria a largo plazo, por lo que la observación no se marca resuelta.
+
+## AG-06 — Cierre parcial formal de órdenes
+
+### P-AG06-01 — Representación del saldo que no se recibirá
+
+- **Estado:** desarrollo separado aprobado por el Owner, D-128/Q-076 (04/11/2026). No implementado; no bloquea el cierre correctivo AG-06 en su alcance aprobado.
+- **Evidencia:** BR-PUR-013 y destino conceptual «cierre» en el diagrama, pero no hay acción, enum ni campo de remanente desistido en el schema. No se simula editando cantidades/importes de una OC confirmada ni anulando documentos reales.
+- **Antes del código:** especificar representación y efecto exacto en compromiso/exposición, recepción tardía/reversa, facturas/NC/ND, permisos, trazabilidad y migración. El Owner debe aprobar el diseño y las reglas/campos nuevos; D-128 solo aprueba la separación de alcance.
+- **Fuentes:** [propuesta aprobada](./platform-audit/2026-11-04-ag-06-partial-close-scope-proposal.md), [informe AG-06](./platform-audit/2026-11-04-ag-06-procurement.md). La guía y ayuda distinguen esta capacidad futura de las recepciones parciales actuales.
+
 ## AG-00 — Aislamiento: reconciliación documental resuelta
 
 Diagnóstico inicial del 03/11/2026: [subanálisis de arquitectura](./platform-audit/2026-11-03-ag-00-architecture.md). El usuario confirmó explícitamente la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), formalizada en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md). El cierre siguiente es documental/arquitectónico; no equivale a comprobar SQL ni autorización de todos los recorridos y no introduce schema, migraciones o middleware.

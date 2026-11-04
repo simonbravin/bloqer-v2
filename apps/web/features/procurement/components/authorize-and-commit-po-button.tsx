@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +19,7 @@ import {
   procurementActionBtnClass,
   procurementDialogBtnClass,
 } from "../lib/procurement-ui";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 type Props = {
   poId: string;
@@ -36,7 +37,7 @@ export function AuthorizeAndCommitPoButton({
   variant = "default",
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,7 +70,7 @@ export function AuthorizeAndCommitPoButton({
           Autorizar y comprometer
         </Button>
       </div>
-      <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialog open={open} onOpenChange={(next) => { if (!isRunning()) setOpen(next); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>¿Autorizar y comprometer?</AlertDialogTitle>

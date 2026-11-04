@@ -16,6 +16,18 @@ No anunciar B02 como disponible hasta resolver P-IND-04 y acreditar el alias del
 4. OC borrador: probar referencia ausente, unidad distinta, partida global y precio sobre referencia. Verificar mensajes por causa y acceso a **Editar → Justificación desvío**, conservando umbrales y permisos. Partida global no se compara como precio unitario. Revisar código/proveedor y **Ver solicitud de origen**; una OC directa no muestra un origen ficticio.
 5. Consultar ayuda por «adjudicar algunos ítems», «precio con IVA» y «sin referencia presupuestaria»; verificar que guía, ayuda y respuestas documentales AI describan el mismo flujo. No usar estos checks para declarar resueltos OC-051 ni los datos históricos.
 
+## Regresión de planificación y costos — AG-05
+
+Aplicar después de publicar una revisión que incluya AG-05; la publicación de AG-00–04 no contiene esas correcciones posteriores. Antes, ejecutar las [suites aisladas mantenidas](./TESTING_STRATEGY.md#regresión-reutilizable-de-planificación-y-costos--ag-05). Los casos mutantes usan datos sintéticos autorizados; no alterar obras reales para demostrar el smoke.
+
+1. Una obra sin presupuesto aprobado permite planificar tareas independientes, consultar las vistas y exportar fechas sin moneda/costo ficticios. Con presupuesto, importar una partida sin fechas conserva las tareas independientes. Una falla económica funcional no debe eliminar el cronograma temporal.
+2. En escritorio comprobar Gantt, calendario, Kanban y tabla; en Field, filtros, búsqueda/limpieza y detalle a 390 px. Una barra corta mantiene el avance en el tooltip sin cortar sus dígitos. Errores de guardado conservan los campos; el envío pendiente no admite doble acción/cierre prematuro.
+3. Materiales y recursos muestran unidades por fila y moneda ISO del presupuesto. Los KPI de cantidades heterogéneas son conteos de filas; la adjudicación parcial conserva las líneas libres de SC. No confundir cobertura con compromiso financiero.
+4. EDT y costos: obra/presupuesto accesibles, fuentes permitidas, importes netos y período coherente en detalle y tabla; el detalle del período no presenta saldos globales. Una relación inconsistente devuelve un error funcional sin datos ajenos. CSV con moneda y cantidades no comparables vacías, nunca una conversión supuesta.
+5. Con fixtures acordadas, verificar aprobación de parte y confirmación de recepción, refresh del cronograma y consumidores; repetir sus suites SQL de concurrencia antes de publicar, sin usar una prueba de UI como sustituto del rollback/lock.
+
+Q-069/Q-070/Q-071 aprobadas en D-122/D-123/D-124: comprobar error funcional por moneda contribuyente distinta, cantidades de factura + ND − NC por recurso/unidad compatibles y costo/varianza de consumo **Sin valuación** cuando falta trazabilidad. UI/CSV/PDF conservan desconocido y advertencia; una ausencia comprobada admite cero. Exposición documental y cantidades siguen independientes. El cronograma temporal permanece disponible ante incompatibilidad económica y su exportación avisa sin importes ficticios. RFIs mantiene desarrollo posterior separado según D-122.
+
 ## Comprobaciones generales
 
 | # | Check | Pass criteria |
@@ -106,6 +118,20 @@ Pendiente de smoke UI en versión publicada. Pruebas automatizadas: `packages/se
 8. Enviar simultáneamente dos cotizaciones del mismo proveedor para una SC: solo una se guarda. Con un único cupo restante, enviar ofertas de dos proveedores distintos: solo una se guarda y la otra informa el máximo permitido. Verificar que el mínimo de ofertas no se infle por cargas duplicadas. Los dos casos están cubiertos por la suite aislada.
 
 **Recuperación:** no eliminar columna/enum ni migraciones aplicadas. El código anterior puede leer el esquema ampliado, pero desconoce la clasificación y permitiría adjudicar ceros. Si ya se cargaron ofertas nuevas, no reabrir adjudicaciones con esa versión: priorizar corrección hacia adelante o mantener ese flujo detenido hasta restaurar D-118. Revertir código no revierte documentos ni caja.
+# Compras — regresión AG-06 (2026-11-04)
+
+Corrida local aislada y publicación tienen evidencias separadas. La migración aditiva `20261104183000_purchase_receipt_company_number` debe aplicarse antes del cliente que usa el correlativo D-127. Mantener números históricos NULL, sin backfill. No interpretar las pruebas locales como aplicación en `portal.bloqer.app`; producción solo se migra/publica con autorización específica y destino verificado.
+
+1. Crear SC de ensayo con referencia ARS y cotizar USD con FX explícito: la ficha conserva ambas monedas, no copia/compara precios como si fueran iguales y la OC pide la justificación vigente sin inventar porcentaje. Comparar también saldo con un compromiso de otra moneda.
+2. Devolver una SC sin ofertas con motivo y reenviar. Con cualquier oferta, incluida Rechazada/Reemplazada, impedir devolución. Los borradores históricos conservan IDs/cantidades/referencias y admiten solo cabecera no destructiva.
+3. Abrir una OC de obra compartida como miembro global: política, opciones y documentos corresponden a su empresa. Una petición que agrega a una OC directa un ítem de otra SC se rechaza sin reservarlo.
+4. Recibir con producto exige Depósito destino; un servicio sin producto no genera stock. Sumar filas repetidas antes de comprobar tolerancia. Anular stock requiere el total del mismo producto/depósito, sin existencias negativas. Conservar el efecto D-104 de hitos y TASK sin cambios.
+5. Comprobar códigos RC distintos para dos altas de una misma empresa y OC, empresa separada con su propia secuencia, históricos UUID y reintento sin número nuevo. Anular conserva el correlativo.
+6. Verificar OC→AP: empresa/obra/proveedor/moneda y padres WBS/APU coherentes en preview y alta/edición/emisión. Resumen no calculable ante monedas incompatibles, documentos originales consultables. Dos ediciones parciales concurrentes no combinan el proveedor viejo con una OC nueva.
+7. Repetir lista/detalle/formulario en escritorio/teléfono, tema claro/oscuro, permisos restringidos y AP/Inventario no disponibles. Comprobar campos conservados tras error, un solo envío y acciones según el aprobador real.
+8. Cambiar FX al confirmar una OC aprobada con un actor sin aprobación suficiente: rechazo sin cambios. Con aprobador habilitado: nueva aprobación auditada y confirmación atómicas. Repetir segregación y FX sin cambios según D-129.
+9. Ayuda/guía y knowledge deben identificar D-125/126/127/128/129. El cierre parcial formal D-128 **no está disponible**; no simularlo editando cantidades confirmadas.
+
 # Certificaciones — regresión 2026-10-22 (D-119)
 
 Sin cambios de schema/ERD estructural ni migraciones. No hay backfill ni corrección automática de históricos. Los índices existentes evitan duplicar número de certificado, partida por certificado, factura activa por certificado, CxC por factura y cobranza por idempotency key.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,15 +28,16 @@ export function ScheduleBlockDialog({
 }) {
   const [reason, setReason] = useState("");
 
+  useEffect(() => { if (open) setReason(""); }, [open, itemName]);
+
   function submit() {
     const trimmed = reason.trim();
     if (!trimmed) return;
     onConfirm(trimmed);
-    setReason("");
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!pending) onOpenChange(next); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Bloquear tarea</DialogTitle>
@@ -48,6 +49,8 @@ export function ScheduleBlockDialog({
           <Label htmlFor="block-reason">Causa</Label>
           <Textarea
             id="block-reason"
+            disabled={pending}
+            maxLength={2000}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder="Ej.: falta de materiales, lluvia, espera de aprobación…"

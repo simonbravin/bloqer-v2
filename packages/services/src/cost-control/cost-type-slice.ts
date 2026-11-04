@@ -35,6 +35,7 @@ export function costTypeBucketHasActivity(b: CostTypeBucket): boolean {
     Number(b.committedCost) !== 0 ||
     Number(b.accruedCost) !== 0 ||
     Number(b.paidCost) !== 0 ||
+    b.inventoryConsumedCost == null ||
     Number(b.inventoryConsumedCost) !== 0 ||
     Number(b.openCommittedCost) !== 0
   );
@@ -102,11 +103,11 @@ export function sliceCostControlByCostType(
     committedCost: "0",
     accruedCost: "0",
     paidCost: "0",
-    inventoryConsumedCost: "0",
     openCommittedCost: "0",
     expectedCostExposure: "0",
     costVariance: "0",
   };
+  let inventoryConsumedCost: string | null = "0";
 
   for (const row of sourceRows) {
     const bucket = (row.byCostType ?? []).find((b) => b.costType === costType);
@@ -116,7 +117,9 @@ export function sliceCostControlByCostType(
     acc.committedCost = moneyPlus(acc.committedCost, bucket.committedCost);
     acc.accruedCost = moneyPlus(acc.accruedCost, bucket.accruedCost);
     acc.paidCost = moneyPlus(acc.paidCost, bucket.paidCost);
-    acc.inventoryConsumedCost = moneyPlus(acc.inventoryConsumedCost, bucket.inventoryConsumedCost);
+    inventoryConsumedCost = inventoryConsumedCost == null || bucket.inventoryConsumedCost == null
+      ? null
+      : moneyPlus(inventoryConsumedCost, bucket.inventoryConsumedCost);
     acc.openCommittedCost = moneyPlus(acc.openCommittedCost, bucket.openCommittedCost);
     acc.expectedCostExposure = moneyPlus(acc.expectedCostExposure, bucket.expectedCostExposure);
     acc.costVariance = moneyPlus(acc.costVariance, bucket.costVariance);
@@ -126,6 +129,7 @@ export function sliceCostControlByCostType(
     rows,
     totals: {
       ...acc,
+      inventoryConsumedCost,
       budgetTotalSale: "0",
       certifiedIssued: "0",
       certifiedApproved: "0",

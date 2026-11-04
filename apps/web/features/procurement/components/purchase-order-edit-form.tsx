@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { compareDecimal } from "@bloqer/utils";
@@ -9,6 +9,7 @@ import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { PROCUREMENT_FORM_PAGE_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -24,6 +25,7 @@ import {
 } from "./purchase-order-lines-editor";
 import { updatePurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import type { SupplierOption } from "./purchase-order-form";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 interface Props {
   projectId: string;
@@ -46,10 +48,11 @@ export function PurchaseOrderEditForm({
   varianceSettings,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, run: startTransition, isRunning } = useProcurementAction();
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const [supplierContactId, setSupplierContactId] = useState(order.supplierContactId);
+  const [fxRate, setFxRate] = useState(order.fxRate ?? "");
   const awardLocked = Boolean(order.purchaseRequestId);
   const [lines, setLines] = useState<PurchaseOrderLine[]>(
     order.lines.length > 0
@@ -87,6 +90,7 @@ export function PurchaseOrderEditForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isRunning()) return;
     setError(null);
     if (lines.some((l) => !l.wbsNodeId)) {
       setError("Cada línea debe tener un ítem EDT");
@@ -114,6 +118,7 @@ export function PurchaseOrderEditForm({
     startTransition(async () => {
       const res = await updatePurchaseOrderAction(order.id, projectId, {
         supplierContactId,
+        fxRate: order.currency === "ARS" ? undefined : fxRate,
         issueDate:            fd.get("issueDate") as string,
         expectedDeliveryDate: (fd.get("expectedDeliveryDate") as string) || null,
         notes:                (fd.get("notes") as string) || null,
@@ -137,6 +142,7 @@ export function PurchaseOrderEditForm({
   return (
     <div className={`${PROCUREMENT_FORM_PAGE_CLASS} rounded-lg border bg-card p-4 sm:p-6`}>
       <form onSubmit={handleSubmit} className="space-y-5">
+<fieldset disabled={isPending} className="min-w-0 space-y-5">
         {error && (
           <p
             ref={errorRef}
@@ -188,8 +194,12 @@ export function PurchaseOrderEditForm({
 
         <hr />
 
+        <p className="text-sm text-muted-foreground">Moneda de la OC: {order.currency}</p>
+        <ManualFxField id="po-edit-fx-rate" currency={order.currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
+
         <PurchaseOrderLinesEditor
           lines={lines}
+          currency={order.currency}
           onChange={setLines}
           wbsOptions={wbsOptions}
           productOptions={productOptions}
@@ -229,7 +239,8 @@ export function PurchaseOrderEditForm({
             {isPending ? "Guardando…" : "Guardar cambios"}
           </Button>
         </div>
-      </form>
+      </fieldset>
+</form>
     </div>
   );
 }

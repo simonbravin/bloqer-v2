@@ -79,6 +79,8 @@ export type WbsOption = {
   code: string;
   name: string;
   budgetName: string;
+  budgetCurrency?: string;
+  budgetWarning?: string | null;
   budgetUnitCost?: string | null;
   budgetUnit?: string | null;
   availableSaldo?: string | null;
@@ -106,6 +108,7 @@ function linePreview(l: PurchaseOrderLine) {
 
 interface Props {
   lines: PurchaseOrderLine[];
+  currency?: string;
   onChange: (lines: PurchaseOrderLine[]) => void;
   wbsOptions: WbsOption[];
   productOptions?: ProductOption[];
@@ -139,6 +142,7 @@ function createLineKey(): string {
 
 export function PurchaseOrderLinesEditor({
   lines,
+  currency = "ARS",
   onChange,
   wbsOptions,
   productOptions = [],
@@ -252,7 +256,7 @@ export function PurchaseOrderLinesEditor({
       description: apu.description,
       unit: apu.unit,
       productId: apu.productId ?? line.productId,
-      unitPrice: line.unitPrice.trim() ? line.unitPrice : apu.unitCost,
+      unitPrice: line.unitPrice.trim() ? line.unitPrice : wbs?.budgetCurrency === currency ? apu.unitCost : "",
       quantity: prefillQty,
     };
     onChange(lines.map((l, idx) => (idx === i ? next : l)));
@@ -265,6 +269,7 @@ export function PurchaseOrderLinesEditor({
 
   /** Trae el costo unitario del presupuesto (APU) al campo Precio unit. */
   function fillBudgetUnitPrice(i: number, wbs?: WbsOption) {
+    if (wbs?.budgetCurrency !== currency) return;
     if (!wbs?.budgetUnitCost || !isPositiveMoneyAmount(wbs.budgetUnitCost)) return;
     update(i, "unitPrice", wbs.budgetUnitCost);
     toast.success("Precio unitario completado con el referencial del presupuesto.");
@@ -272,6 +277,7 @@ export function PurchaseOrderLinesEditor({
 
   /** Ajusta la cantidad para consumir el saldo disponible de la partida. */
   function consumePartidaSaldo(i: number, line: PurchaseOrderLine, wbs?: WbsOption) {
+    if (wbs?.budgetCurrency !== currency) return;
     if (wbs?.availableSaldo == null) return;
     if (!isPositiveMoneyAmount(wbs.availableSaldo)) {
       toast.error("La partida no tiene saldo disponible para consumir.");
@@ -393,6 +399,7 @@ export function PurchaseOrderLinesEditor({
           const lineKey = lineKeys[i] ?? String(i);
           const p = linePreview(line);
           const wbs = wbsOptions.find((w) => w.id === line.wbsNodeId);
+          const currencyComparable = Boolean(wbs?.budgetCurrency && wbs.budgetCurrency === currency);
           const selectedApu = wbs?.apuLines?.find((a) => a.id === line.costAnalysisLineId);
           const budgetUnit = selectedApu?.unit ?? wbs?.budgetUnit ?? null;
           const sameUnitApus = (wbs?.apuLines ?? []).filter(
@@ -412,6 +419,8 @@ export function PurchaseOrderLinesEditor({
               discountPct: line.discountPct?.trim() || "0",
               budgetUnitCost,
               budgetUnit,
+              budgetCurrency: wbs?.budgetCurrency ?? null,
+              purchaseCurrency: currency,
             },
             varianceSettings,
           );
@@ -444,8 +453,8 @@ export function PurchaseOrderLinesEditor({
               {/* Row 1: EDT + Insumo APU */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1">
-                  <Label className="text-xs">EDT (obligatorio)</Label>
-                  <SearchableCombobox
+                  <Label htmlFor={`po-line-${lineKey}-wbs`} className="text-xs">EDT (obligatorio)</Label>
+                  <SearchableCombobox id={`po-line-${lineKey}-wbs`}
                     popoverWidth="wide"
                     className={LINE_FIELD_CLASS}
                     options={wbsComboboxOptions}
@@ -454,7 +463,7 @@ export function PurchaseOrderLinesEditor({
                     placeholder="Elegir EDT…"
                     searchPlaceholder="Buscar partida…"
                   />
-                  {wbs?.availableSaldo != null && (
+                  {wbs?.availableSaldo != null && wbs.budgetCurrency === currency && (
                     <button
                       type="button"
                       onClick={() => consumePartidaSaldo(i, line, wbs)}
@@ -463,7 +472,7 @@ export function PurchaseOrderLinesEditor({
                         wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
                       }`}
                     >
-                      Saldo part.: {formatDecimalArFromString(wbs.availableSaldo)}
+                      Saldo part. ({wbs.budgetCurrency}): {formatDecimalArFromString(wbs.availableSaldo)}
                       {wbs.wouldExceedBudget ? " (alerta)" : ""}
                     </button>
                   )}
@@ -472,6 +481,8 @@ export function PurchaseOrderLinesEditor({
                       Esta partida ya está cerca o por encima del saldo disponible (aviso; no bloquea).
                     </p>
                   ) : null}
+                  {wbs?.budgetWarning ? <p className="text-xs text-amber-900 dark:text-amber-100" role="status">{wbs.budgetWarning}</p> : null}
+                  {wbs && !currencyComparable ? <p className="text-xs text-amber-900 dark:text-amber-100">Referencia en {wbs.budgetCurrency ?? "moneda no identificada"}; ingresá el precio en {currency}. No se convierte automáticamente.</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor={`po-line-${lineKey}-cost-type`} className="text-xs">
@@ -499,8 +510,8 @@ export function PurchaseOrderLinesEditor({
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Insumo APU</Label>
-                  <SearchableCombobox
+                  <Label htmlFor={`po-line-${lineKey}-apu`} className="text-xs">Insumo APU</Label>
+                  <SearchableCombobox id={`po-line-${lineKey}-apu`}
                     popoverWidth="wide"
                     className={LINE_FIELD_CLASS}
                     options={withNoneOption(
@@ -538,8 +549,8 @@ export function PurchaseOrderLinesEditor({
 
               {productOptions.length > 0 && (
                 <div className="space-y-1">
-                  <Label className="text-xs">Producto</Label>
-                  <SearchableCombobox
+                  <Label htmlFor={`po-line-${lineKey}-product`} className="text-xs">Producto</Label>
+                  <SearchableCombobox id={`po-line-${lineKey}-product`}
                     popoverWidth="wide"
                     className={LINE_FIELD_CLASS}
                     options={productComboboxOptions}
@@ -561,8 +572,8 @@ export function PurchaseOrderLinesEditor({
 
               {/* Descripción en fila completa para leer/editar sin apretar montos. */}
               <div className="space-y-1">
-                <Label className="text-xs">Descripción</Label>
-                <Input
+                <Label htmlFor={`po-line-${lineKey}-description`} className="text-xs">Descripción</Label>
+                <Input id={`po-line-${lineKey}-description`}
                   required
                   value={line.description}
                   onChange={(e) => update(i, "description", e.target.value)}
@@ -573,8 +584,8 @@ export function PurchaseOrderLinesEditor({
 
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Unidad</Label>
-                  <UnitSelect
+                  <Label htmlFor={`po-line-${lineKey}-unit`} className="text-xs">Unidad</Label>
+                  <UnitSelect id={`po-line-${lineKey}-unit`}
                     value={line.unit}
                     onChange={(v) => update(i, "unit", v)}
                     placeholder="un"
@@ -582,8 +593,8 @@ export function PurchaseOrderLinesEditor({
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Cantidad</Label>
-                  <DecimalInput
+                  <Label htmlFor={`po-line-${lineKey}-quantity`} className="text-xs">Cantidad</Label>
+                  <DecimalInput id={`po-line-${lineKey}-quantity`}
                     precision={4}
                     required
                     value={line.quantity}
@@ -593,8 +604,8 @@ export function PurchaseOrderLinesEditor({
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Precio unitario</Label>
-                  <DecimalInput
+                  <Label htmlFor={`po-line-${lineKey}-unit-price`} className="text-xs">Precio unitario</Label>
+                  <DecimalInput id={`po-line-${lineKey}-unit-price`}
                     precision={4}
                     required
                     value={line.unitPrice}
@@ -609,6 +620,7 @@ export function PurchaseOrderLinesEditor({
                     {budgetUnitCost != null ? (
                       <button
                         type="button"
+                        disabled={wbs?.budgetCurrency !== currency}
                         onClick={() => {
                           if (selectedApu?.unitCost) {
                             update(i, "unitPrice", selectedApu.unitCost);
@@ -620,7 +632,7 @@ export function PurchaseOrderLinesEditor({
                         title="Usar este costo como precio unitario"
                         className="max-w-full truncate text-left underline decoration-dotted underline-offset-2 hover:text-foreground"
                       >
-                        {formatDecimalArFromString(budgetUnitCost)}
+                        {wbs?.budgetCurrency ?? "Moneda no disponible"} {formatDecimalArFromString(budgetUnitCost)}
                         {budgetUnit ? ` / ${budgetUnitLabel(budgetUnit) || budgetUnit}` : ""}
                       </button>
                     ) : (
@@ -641,9 +653,9 @@ export function PurchaseOrderLinesEditor({
               </div>
 
               <p className="text-[11px] text-muted-foreground">
-                PU {line.unitPrice.trim() ? formatUnitPriceFromString(line.unitPrice) : "—"}
+                PU ({currency}) {line.unitPrice.trim() ? formatUnitPriceFromString(line.unitPrice) : "—"}
                 {" · "}
-                Ref {budgetUnitCost ? formatUnitPriceFromString(budgetUnitCost) : "—"}
+                Ref ({wbs?.budgetCurrency ?? "moneda no disponible"}) {budgetUnitCost ? formatUnitPriceFromString(budgetUnitCost) : "—"}
                 {" · "}
                 Desvío{" "}
                 {liveVariance.variancePct ? (
@@ -658,6 +670,8 @@ export function PurchaseOrderLinesEditor({
                   >
                     {formatRatePctWithSymbol(liveVariance.variancePct)}
                   </span>
+                ) : !currencyComparable ? (
+                  "moneda no comparable"
                 ) : partidaRefIsGlobal ? (
                   "no aplica (partida global)"
                 ) : liveVariance.varianceTier === "UNIT_MISMATCH" ? (
@@ -671,8 +685,8 @@ export function PurchaseOrderLinesEditor({
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Desc. %</Label>
-                  <DecimalInput
+                  <Label htmlFor={`po-line-${lineKey}-discount`} className="text-xs">Desc. %</Label>
+                  <DecimalInput id={`po-line-${lineKey}-discount`}
                     precision={4}
                     value={line.discountPct ?? "0"}
                     onValueChange={(v) => update(i, "discountPct", v)}
@@ -681,12 +695,12 @@ export function PurchaseOrderLinesEditor({
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">IVA %</Label>
+                  <Label htmlFor={`po-line-${lineKey}-tax`} className="text-xs">IVA %</Label>
                   <Select
                     value={normalizeIvaRatePreset(line.taxRate) ?? undefined}
                     onValueChange={(v) => update(i, "taxRate", v)}
                   >
-                    <SelectTrigger className={LINE_FIELD_CLASS}>
+                    <SelectTrigger id={`po-line-${lineKey}-tax`} className={LINE_FIELD_CLASS}>
                       <SelectValue placeholder={line.taxRate || "21"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -709,11 +723,11 @@ export function PurchaseOrderLinesEditor({
               {/* Row 3: variance justification */}
               {showVarianceJustification && (
                 <div className="space-y-1">
-                  <Label className="text-xs">
+                  <Label htmlFor={`po-line-${lineKey}-justification`} className="text-xs">
                     Justificación desvío
                     {justificationRequired ? " (obligatoria)" : ""}
                   </Label>
-                  <Input
+                  <Input id={`po-line-${lineKey}-justification`}
                     value={line.varianceJustification ?? ""}
                     onChange={(e) => update(i, "varianceJustification", e.target.value)}
                     placeholder={
@@ -746,6 +760,7 @@ export function PurchaseOrderLinesEditor({
         })}
       </div>
 
+      <p className="text-xs text-muted-foreground">Totales en {currency}. Las referencias de otra moneda no se convierten ni se comparan.</p>
       <DocumentTaxTotalsFooter
         subtotal={totals.subtotal}
         taxAmount={totals.tax}

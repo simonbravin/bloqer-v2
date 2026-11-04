@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
     const fmt = (sp.format ?? "csv").toLowerCase();
     if (fmt === "json") {
       const data = await getProjectCostControl(projectId, filters, auth.ctx);
-      return NextResponse.json(data);
+      return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store" } });
     }
     if (fmt === "pdf") {
       const { buffer, filename } = await exportProjectCostControlPdf(projectId, filters, auth.ctx);

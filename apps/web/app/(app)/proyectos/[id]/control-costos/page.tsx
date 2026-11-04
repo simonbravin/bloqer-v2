@@ -23,7 +23,9 @@ import { PageShell } from "@/components/layout/page-shell";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { budgetFilterOptionLabel } from "@/features/budgets/components/budget-status-badge";
 import { Button } from "@/components/ui/button";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyDisplay } from "@/lib/format-money";
+
+import { planningReadError } from "@/features/cost-control/lib/planning-read-error";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -71,7 +73,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
     result = await getProjectCostControl(projectId, filters, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    throw err;
+    return <PageShell className="space-y-6"><ProjectPageHeader title="EDT y costos" />{planningReadError(err, `/proyectos/${projectId}/control-costos`)}</PageShell>;
   }
 
   let compositionResult = null;
@@ -104,7 +106,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
 
   const subtitle =
     result.type === "REPORT"
-      ? `Presupuesto: ${result.budgetName}`
+      ? `Presupuesto: ${result.budgetName} · Moneda: ${result.currency}`
       : result.type === "BUDGET_SELECTION_REQUIRED"
         ? `${result.availableBudgets.length} presupuestos aprobados`
         : undefined;
@@ -225,6 +227,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
           )}
 
           <CostControlSummaryCards
+            currency={result.currency}
             totals={filteredKpis?.totals ?? result.totals}
             costTypeLabel={costTypeFilter ? COST_TYPE_LABELS_ES[costTypeFilter] : undefined}
           />
@@ -238,10 +241,10 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
               }
             >
               {plannedComposition ? (
-                <BudgetCompositionChart composition={plannedComposition} />
+                <BudgetCompositionChart composition={plannedComposition} currency={result.currency} />
               ) : null}
               {hasComparison && costTypeComparison ? (
-                <CostTypeComparisonChart comparison={costTypeComparison} />
+                <CostTypeComparisonChart comparison={costTypeComparison} currency={result.currency} />
               ) : null}
             </div>
           ) : null}
@@ -253,6 +256,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
             </div>
           ) : (
             <CostControlTable
+              currency={result.currency}
               rows={result.rows}
               totals={result.totals}
               projectId={projectId}
@@ -265,6 +269,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
             Number(result.unallocatedReceivedCost) > 0 ||
             Number(result.unallocatedAccruedCost) > 0 ||
             Number(result.unallocatedPaidCost) > 0 ||
+            result.unallocatedInventoryConsumedCost == null ||
             Number(result.unallocatedInventoryConsumedCost) > 0) && (
             <div className="rounded-lg border bg-card p-4">
               <p className="text-sm font-semibold mb-3">Costos no asignados a EDT</p>
@@ -278,7 +283,7 @@ export default async function ControlCostosPage({ params, searchParams }: PagePr
                 ].map(({ label, v }) => (
                   <div key={label}>
                     <p className="text-muted-foreground">{label}</p>
-                    <p className="font-medium">{formatMoneyAmount(v)}</p>
+                    <p className="font-medium">{v == null ? "Sin valuación" : formatMoneyDisplay(v, result.currency)}</p>
                   </div>
                 ))}
               </div>

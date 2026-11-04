@@ -18,6 +18,7 @@ import {
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
+import { companyScopeFilter } from "../company-scope";
 import {
   assertJobsiteLogApprovable,
   buildProgressSnapshotEntry,
@@ -25,7 +26,7 @@ import {
   remainingPhysicalPct,
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { resolveActiveCompanyId } from "../company/company.service";
@@ -278,16 +279,20 @@ export async function getWbsIncrementalProgressSnapshot(
     /** Lifecycle validation: include other SUBMITTED partes in the 100% cap. */
     includeSubmitted?: boolean;
   },
+  db: Prisma.TransactionClient = prisma,
 ): Promise<WbsIncrementalProgressSnapshot> {
   await assertJobsiteLogTenantModule(ctx);
+  if (!canViewJobsiteLogArea(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
+  await requireProjectAccess(projectId, ctx);
   const logStatuses: Array<"APPROVED" | "SUBMITTED"> = options?.includeSubmitted
     ? ["APPROVED", "SUBMITTED"]
     : ["APPROVED"];
-  const rows = await prisma.jobsiteLogProgress.findMany({
+  const rows = await db.jobsiteLogProgress.findMany({
     where: {
       jobsiteLog: {
         tenantId: ctx.tenantId,
         projectId,
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
         status: { in: logStatuses },
         ...(options?.excludeLogId ? { id: { not: options.excludeLogId } } : {}),
       },
@@ -330,13 +335,14 @@ export async function getWbsCumulativePhysicalPct(
 }
 
 
-async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, tenantId: string) {
-  const wbs = await prisma.wbsNode.findFirst({
-    where: { id: wbsNodeId, budget: { tenantId } },
+async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma) {
+  const wbs = await db.wbsNode.findFirst({
+    where: { id: wbsNodeId, budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) } },
     include: { budget: { select: { projectId: true, tenantId: true } } },
   });
   if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${wbsNodeId}`);
-  if (wbs.budget.tenantId !== tenantId || wbs.budget.projectId !== projectId) {
+  if (wbs.budget.tenantId !== ctx.tenantId || wbs.budget.projectId !== projectId) {
     throw new ServiceError("CONFLICT", "La partida EDT no pertenece a este proyecto");
   }
   if (wbs.type !== "ITEM") {
@@ -354,20 +360,21 @@ async function validateJobsiteLogBusinessRules(
     includeSubmittedInProgressCap?: boolean;
     enforceStockOnLifecycle?: boolean;
   },
+  db: Prisma.TransactionClient = prisma,
 ) {
   for (const p of input.progress ?? []) {
-    await assertWbsBelongsToProject(p.wbsNodeId, projectId, tenantId);
+    await assertWbsBelongsToProject(p.wbsNodeId, projectId, ctx, db);
   }
 
   for (const lb of input.labor ?? []) {
     if (lb.contactId) {
-      const contact = await prisma.contact.findUnique({ where: { id: lb.contactId } });
+      const contact = await db.contact.findUnique({ where: { id: lb.contactId } });
       if (!contact || contact.tenantId !== tenantId || contact.status !== "ACTIVE") {
         throw new ServiceError("CONFLICT", "El contacto de mano de obra no existe o no está activo");
       }
     }
     if (lb.subcontractId) {
-      const sub = await prisma.subcontract.findUnique({ where: { id: lb.subcontractId } });
+      const sub = await db.subcontract.findUnique({ where: { id: lb.subcontractId } });
       if (!sub || sub.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
       if (sub.projectId !== projectId) throw new ServiceError("CONFLICT", "El subcontrato no pertenece a este proyecto");
     }
@@ -375,14 +382,14 @@ async function validateJobsiteLogBusinessRules(
 
   for (const m of input.materials ?? []) {
     if (m.wbsNodeId) {
-      await assertWbsBelongsToProject(m.wbsNodeId, projectId, tenantId);
+      await assertWbsBelongsToProject(m.wbsNodeId, projectId, ctx, db);
     }
     if (m.productId) {
-      const product = await prisma.product.findUnique({ where: { id: m.productId } });
+      const product = await db.product.findUnique({ where: { id: m.productId } });
       if (!product || product.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Producto no encontrado");
     }
     if (m.warehouseId) {
-      const warehouse = await prisma.warehouse.findUnique({ where: { id: m.warehouseId } });
+      const warehouse = await db.warehouse.findUnique({ where: { id: m.warehouseId } });
       if (!warehouse || warehouse.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
     }
   }
@@ -390,7 +397,7 @@ async function validateJobsiteLogBusinessRules(
   const approvedSnapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx, {
     excludeLogId: options?.excludeLogId,
     includeSubmitted: options?.includeSubmittedInProgressCap ?? true,
-  });
+  }, db);
 
   const draftPctByWbs = new Map<string, Prisma.Decimal>();
   for (const p of input.progress ?? []) {
@@ -437,7 +444,7 @@ async function validateJobsiteLogBusinessRules(
     }
 
     for (const { productId, warehouseId, qty } of qtyByPair.values()) {
-      const balance = await getStockBalance({ tenantId, warehouseId, productId });
+      const balance = await getStockBalance({ tenantId, warehouseId, productId }, db);
       if (qty.greaterThan(balance)) {
         throw new ServiceError(
           "CONFLICT",
@@ -453,8 +460,9 @@ async function validateJobsiteLogFromDb(
   projectId: string,
   tenantId: string,
   ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma,
 ) {
-  const existing = await prisma.jobsiteLog.findUnique({
+  const existing = await db.jobsiteLog.findUnique({
     where: { id: logId },
     include: {
       progress: {
@@ -530,6 +538,7 @@ async function validateJobsiteLogFromDb(
       includeSubmittedInProgressCap: true,
       enforceStockOnLifecycle: true,
     },
+    db,
   );
 }
 
@@ -725,7 +734,7 @@ export async function listJobsiteLogsByProject(
       wbsNodeIdFilter = undefined;
     } else {
       try {
-        await assertWbsBelongsToProject(f.wbsNodeId, projectId, ctx.tenantId);
+        await assertWbsBelongsToProject(f.wbsNodeId, projectId, ctx);
         wbsNodeIdFilter = f.wbsNodeId;
       } catch (err) {
         if (err instanceof ServiceError && err.code === "NOT_FOUND") {
@@ -954,6 +963,7 @@ export async function updateJobsiteLog(
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (ctx.companyId && existing.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede editarse`);
   }
@@ -974,18 +984,26 @@ export async function updateJobsiteLog(
   );
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const current = await tx.jobsiteLog.findFirst({ where: { id, tenantId: ctx.tenantId, projectId: existing.projectId } });
+    if (!current || current.status !== "DRAFT" || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+      throw new ServiceError("CONFLICT", "El parte cambió o ya no está en borrador. Recargá e intentá de nuevo.");
+    }
+    if (ctx.companyId && current.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
+    await validateJobsiteLogBusinessRules({ progress: input.progress, labor: input.labor, materials: input.materials }, current.projectId, ctx.tenantId, ctx, { excludeLogId: id }, tx);
     await tx.jobsiteLog.update({
       where: { id },
       data: {
-        logDate:      input.logDate ? new Date(input.logDate) : existing.logDate,
-        title:        input.title        !== undefined ? input.title        : existing.title,
-        workFront:    input.workFront    !== undefined ? input.workFront    : existing.workFront,
-        shift:        input.shift        !== undefined ? input.shift        : existing.shift,
-        weather:      input.weather      !== undefined ? input.weather      : existing.weather,
-        generalNotes: input.generalNotes !== undefined ? normalizeRichNote(input.generalNotes) : existing.generalNotes,
-        blockers:     input.blockers     !== undefined ? input.blockers     : existing.blockers,
-        incidents:    input.incidents    !== undefined ? input.incidents    : existing.incidents,
-        safetyNotes:  input.safetyNotes  !== undefined ? input.safetyNotes  : existing.safetyNotes,
+        logDate:      input.logDate ? new Date(input.logDate) : current.logDate,
+        title:        input.title        !== undefined ? input.title        : current.title,
+        workFront:    input.workFront    !== undefined ? input.workFront    : current.workFront,
+        shift:        input.shift        !== undefined ? input.shift        : current.shift,
+        weather:      input.weather      !== undefined ? input.weather      : current.weather,
+        generalNotes: input.generalNotes !== undefined ? normalizeRichNote(input.generalNotes) : current.generalNotes,
+        blockers:     input.blockers     !== undefined ? input.blockers     : current.blockers,
+        incidents:    input.incidents    !== undefined ? input.incidents    : current.incidents,
+        safetyNotes:  input.safetyNotes  !== undefined ? input.safetyNotes  : current.safetyNotes,
         updatedBy:    ctx.actorUserId,
       },
     });
@@ -1000,19 +1018,19 @@ export async function updateJobsiteLog(
       materials: input.materials ?? [],
       issues:    input.issues    ?? [],
     });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      companyId: current.companyId,
+      projectId: current.projectId,
+      action: "JOBSITE_LOG_UPDATED",
+      entityType: "JobsiteLog",
+      entityId: id,
+      after: { logDate: input.logDate },
+    }, tx);
     return tx.jobsiteLog.findUniqueOrThrow({ where: { id }, include: logInclude });
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    companyId: existing.companyId,
-    projectId: existing.projectId,
-    action: "JOBSITE_LOG_UPDATED",
-    entityType: "JobsiteLog",
-    entityId: id,
-    after: { logDate: input.logDate },
-  });
 
   return serializeLog(result);
 }
@@ -1035,6 +1053,7 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (ctx.companyId && existing.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede enviarse`);
   }
@@ -1052,29 +1071,40 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
 
   await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);
 
-  const flipped = await prisma.jobsiteLog.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-    data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El parte ya no está en borrador. Recargá e intentá de nuevo.",
-  );
-  const updated = await prisma.jobsiteLog.findUniqueOrThrow({
-    where: { id },
-    include: logInclude,
-  });
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    companyId: existing.companyId,
-    projectId: existing.projectId,
-    action: "JOBSITE_LOG_SUBMITTED",
-    entityType: "JobsiteLog",
-    entityId: id,
-    before: { status: existing.status },
-    after: { status: "SUBMITTED" },
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const current = await tx.jobsiteLog.findFirst({ where: { id, tenantId: ctx.tenantId, projectId: existing.projectId } });
+    if (!current || current.status !== "DRAFT" || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+      throw new ServiceError("CONFLICT", "El parte cambió o ya no está en borrador. Recargá e intentá de nuevo.");
+    }
+    if (ctx.companyId && current.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
+    await validateJobsiteLogFromDb(id, current.projectId, ctx.tenantId, ctx, tx);
+    const flipped = await tx.jobsiteLog.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El parte ya no está en borrador. Recargá e intentá de nuevo.",
+    );
+    const updated = await tx.jobsiteLog.findUniqueOrThrow({
+      where: { id },
+      include: logInclude,
+    });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      companyId: current.companyId,
+      projectId: current.projectId,
+      action: "JOBSITE_LOG_SUBMITTED",
+      entityType: "JobsiteLog",
+      entityId: id,
+      before: { status: current.status },
+      after: { status: "SUBMITTED" },
+    }, tx);
+    return updated;
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await notifyJobsiteLogSubmitted({
     ctx,
@@ -1096,6 +1126,7 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (ctx.companyId && existing.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
   assertJobsiteLogApprovable(existing.status);
 
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
@@ -1108,8 +1139,18 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
 
   let stockMovementsCreated = 0;
   const updated = await prisma.$transaction(async (tx) => {
-    // Claim SUBMITTED → APPROVED before stock/schedule side effects (TOCTOU-safe).
-    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} FOR UPDATE`;
+    // Serialize project lifecycle and manual schedule edits before document locks.
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const current = await tx.jobsiteLog.findFirst({
+      where: { id, tenantId: ctx.tenantId, projectId: existing.projectId },
+    });
+    if (!current || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+      throw new ServiceError("CONFLICT", "El parte cambió durante la aprobación. Recargá e intentá de nuevo.");
+    }
+    assertJobsiteLogApprovable(current.status);
+    await validateJobsiteLogFromDb(id, current.projectId, ctx.tenantId, ctx, tx);
+    if (ctx.companyId && current.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
     const flipped = await tx.jobsiteLog.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
       data: { status: "APPROVED", updatedBy: ctx.actorUserId },
@@ -1138,36 +1179,36 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
 
     await syncScheduleProgressFromJobsiteLog(id, existing.projectId, ctx, tx);
 
+    if (stockMovementsCreated > 0) {
+      await log({
+        tenantId:    ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        companyId:   existing.companyId,
+        projectId:   existing.projectId,
+        action:      "JOBSITE_LOG_STOCK_CONSUMED",
+        entityType:  "JobsiteLog",
+        entityId:    id,
+        after:       { stockMovementsCreated },
+      }, tx);
+    }
+
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      companyId: existing.companyId,
+      projectId: existing.projectId,
+      action: "JOBSITE_LOG_APPROVED",
+      entityType: "JobsiteLog",
+      entityId: id,
+      before: { status: existing.status },
+      after: { status: "APPROVED" },
+    }, tx);
+
     return tx.jobsiteLog.findUniqueOrThrow({
       where: { id },
       include: logInclude,
     });
-  });
-
-  if (stockMovementsCreated > 0) {
-    await log({
-      tenantId:    ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      companyId:   existing.companyId,
-      projectId:   existing.projectId,
-      action:      "JOBSITE_LOG_STOCK_CONSUMED",
-      entityType:  "JobsiteLog",
-      entityId:    id,
-      after:       { stockMovementsCreated },
-    });
-  }
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    companyId: existing.companyId,
-    projectId: existing.projectId,
-    action: "JOBSITE_LOG_APPROVED",
-    entityType: "JobsiteLog",
-    entityId: id,
-    before: { status: existing.status },
-    after: { status: "APPROVED" },
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await notifyJobsiteLogApproved({
     ctx,

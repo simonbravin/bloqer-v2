@@ -5,6 +5,7 @@ import {
   getPurchaseRequestById,
   getProjectShellInfo,
   listProcurementWbsOptions,
+  listProcurementQuotesForRequest,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -57,23 +58,20 @@ export default async function EditarSolicitudCompraPage({ params }: PageProps) {
   const distinctWbsIds = [
     ...new Set(pr.lines.map((line) => line.wbsNodeId).filter((wbsId): wbsId is string => Boolean(wbsId))),
   ];
-  if (distinctWbsIds.length > 1) {
-    redirect(
-      `/proyectos/${id}/solicitudes-compra/${prId}?actionError=${encodeURIComponent(
-        "Esta solicitud tiene ítems en varias partidas EDT. Por ahora solo se puede editar desde escritorio creando una nueva solicitud.",
-      )}`,
-    );
-  }
+  const historicalQuotes = await listProcurementQuotesForRequest(prId, ctx);
+  const readOnlyLines = historicalQuotes.length > 0 || distinctWbsIds.length > 1;
 
   let wbsOptions: WbsOption[] = [];
   try {
-    const wbsNodes = await listProcurementWbsOptions(id, ctx);
+    const wbsNodes = readOnlyLines ? [] : await listProcurementWbsOptions(id, ctx);
     wbsOptions = wbsNodes.map((n) => ({
       id: n.id,
       code: n.code,
       name: n.name,
       budgetName: n.budgetName,
       budgetUnitCost: n.budgetUnitCost,
+      budgetCurrency: n.budgetCurrency,
+      budgetWarning: n.budgetWarning,
       budgetUnit: n.budgetUnit,
       availableSaldo: n.availableSaldo,
       wouldExceedBudget: n.wouldExceedBudget,
@@ -92,7 +90,9 @@ export default async function EditarSolicitudCompraPage({ params }: PageProps) {
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={`Editar ${pr.code}`}>
       <ProjectPageHeader
         title={`Editar ${pr.code}`}
-        subtitle="Corregí cantidades, ítems o la fecha requerida. Después volvé a enviar la solicitud."
+        subtitle={readOnlyLines
+          ? "Actualizá la fecha requerida o las notas. Los ítems originales se conservan."
+          : "Corregí cantidades, ítems o la fecha requerida. Después volvé a enviar la solicitud."}
       />
       {pr.returnReason ? (
         <p className={procurementAmberBannerClass}>
@@ -103,6 +103,7 @@ export default async function EditarSolicitudCompraPage({ params }: PageProps) {
         <PurchaseRequestForm
           mode="edit"
           purchaseRequestId={pr.id}
+          readOnlyLines={readOnlyLines}
           projectId={id}
           wbsOptions={wbsOptions}
           variant="plain"

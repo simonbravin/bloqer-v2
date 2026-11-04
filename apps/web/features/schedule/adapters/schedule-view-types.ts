@@ -182,11 +182,11 @@ export function filterScheduleItemsForDisplay(
   items: ScheduleWorkspaceItemDto[],
   statusFilter: string | null,
 ): ScheduleWorkspaceItemDto[] {
-  if (statusFilter) return items;
+  if (statusFilter && Object.hasOwn(STATUS_LABELS, statusFilter)) return items;
   return items.filter((i) => i.status !== "CANCELLED");
 }
 
-export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto): KanbanCard {
+export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto, showBudgetContext = true): KanbanCard {
   const badges: string[] = [];
   if (item.startDate && item.endDate) {
     badges.push(`${formatDateAr(item.startDate)} → ${formatDateAr(item.endDate)}`);
@@ -196,9 +196,11 @@ export function mapItemToKanbanCard(item: ScheduleWorkspaceItemDto): KanbanCard 
   if (item.metrics?.committedCost && item.metrics.committedCost !== "0.00" && !item.metrics.committedCost.startsWith("-")) {
     badges.push("Con compras");
   }
-  const primary = primaryWbsLink(item);
-  if (primary) badges.push(primary.wbsCode);
-  else if (!hasPrimaryWbsLink(item)) badges.push("Sin EDT");
+  if (showBudgetContext) {
+    const primary = primaryWbsLink(item);
+    if (primary) badges.push(primary.wbsCode);
+    else if (!hasPrimaryWbsLink(item)) badges.push("Sin EDT");
+  }
   return {
     id: item.id,
     name: item.name,

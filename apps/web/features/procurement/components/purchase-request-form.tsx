@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
@@ -33,6 +33,7 @@ import {
   type PurchaseRequestLineDraft,
 } from "../lib/purchase-request-form-lines";
 import { procurementAmberCalloutClass } from "../lib/procurement-ui";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 interface PurchaseRequestFormProps {
   projectId: string;
@@ -69,6 +70,9 @@ interface PurchaseRequestFormProps {
   extraSections?: React.ReactNode;
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
+  /** Historical quotes or multiple WBS: edit header without replacing source line IDs. */
+  readOnlyLines?: boolean;
   onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
 }
 
@@ -102,12 +106,15 @@ export function PurchaseRequestForm({
   extraSections,
   onCancel,
   onSuccess,
+  onPendingChange,
+  readOnlyLines = false,
   onCreated,
 }: PurchaseRequestFormProps) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition } = useProcurementAction(onPendingChange);
   const [error, setError] = useState<string | null>(null);
   const isEdit = mode === "edit" && Boolean(purchaseRequestId);
+  const requireNeededByDate = !isEdit || Boolean(initialValues?.neededByDate);
   const [wbsNodeId, setWbsNodeId] = useState<string>(
     initialValues?.wbsNodeId ?? initialLine?.wbsNodeId ?? "",
   );
@@ -197,19 +204,21 @@ export function PurchaseRequestForm({
     <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
       <form
         className="space-y-5"
-        action={(fd) => {
+        onSubmit={(event) => {
+          event.preventDefault();
+          const fd = new FormData(event.currentTarget);
           startTransition(async () => {
             setError(null);
-            if (!wbsNodeId) {
+            if (!readOnlyLines && !wbsNodeId) {
               setError("Seleccioná un ítem EDT");
               return;
             }
             const neededByDate = fd.get("neededByDate")?.toString() ?? "";
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(neededByDate)) {
+            if ((requireNeededByDate || neededByDate) && !/^\d{4}-\d{2}-\d{2}$/.test(neededByDate)) {
               setError("La fecha requerida es obligatoria");
               return;
             }
-            const prepared = preparePurchaseRequestLinesForSubmit(
+            const prepared = readOnlyLines ? { ok: true as const, lines: [] } : preparePurchaseRequestLinesForSubmit(
               lines,
               wbsNodeId,
               selectedWbs?.budgetUnit ?? "un",
@@ -232,14 +241,16 @@ export function PurchaseRequestForm({
               return;
             }
             const payload = {
-              neededByDate,
+              ...(neededByDate ? { neededByDate } : {}),
               notes: fd.get("notes")?.toString() || null,
-              lines: prepared.lines,
+              ...(!readOnlyLines ? { lines: prepared.lines } : {}),
             };
             const result = isEdit
               ? await updatePurchaseRequestAction(purchaseRequestId!, projectId, payload)
               : await createPurchaseRequestAction(projectId, {
                   projectId,
+                  neededByDate,
+                  lines: prepared.lines,
                   ...payload,
                 });
             if ("error" in result) {
@@ -278,7 +289,7 @@ export function PurchaseRequestForm({
       >
         {prefilledFromMaterials ? (
           <p className={procurementAmberCalloutClass}>
-            Prefill desde{" "}
+            Solicitud iniciada desde{" "}
             {prefillFrom === "mano-obra"
               ? "Mano de obra"
               : prefillFrom === "equipos"
@@ -294,13 +305,15 @@ export function PurchaseRequestForm({
           </p>
         ) : null}
 
+        {readOnlyLines ? <p className={procurementAmberCalloutClass}>Se conservan los ítems originales de esta solicitud. Podés actualizar la fecha requerida y las notas.</p> : null}
+        <fieldset disabled={readOnlyLines || pending} className="min-w-0 space-y-5">
         <section className="space-y-4">
           <h2 className="text-sm font-semibold">Dónde se usa</h2>
           <div className="space-y-2">
             <Label htmlFor="pr-wbs">Ítem EDT (obligatorio)</Label>
             {wbsOptions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No hay ítems EDT en presupuestos aprobados/cerrados.
+                {readOnlyLines ? "La imputación original se conserva." : "No hay ítems EDT en presupuestos aprobados/cerrados."}
               </p>
             ) : (
               <>
@@ -323,8 +336,11 @@ export function PurchaseRequestForm({
             )}
             {selectedWbs?.availableSaldo != null ? (
               <p className="text-xs text-muted-foreground">
-                Saldo disponible partida: {formatDecimalArFromString(selectedWbs.availableSaldo)}
+                Saldo disponible partida: {formatDecimalArFromString(selectedWbs.availableSaldo)} {selectedWbs.budgetCurrency}
               </p>
+            ) : null}
+            {selectedWbs?.budgetWarning ? (
+              <p className={procurementAmberCalloutClass} role="status">{selectedWbs.budgetWarning}</p>
             ) : null}
             {selectedWbs?.wouldExceedBudget ? (
               <p className="text-xs text-destructive">
@@ -368,7 +384,7 @@ export function PurchaseRequestForm({
           ) : null}
           {wbsNodeId && draftEstimateTotal ? (
             <p className="text-xs font-medium text-muted-foreground">
-              Monto est. solicitud (insumos APU): {formatDecimalArFromString(draftEstimateTotal)}
+              Monto est. solicitud (insumos APU): {formatDecimalArFromString(draftEstimateTotal)} {selectedWbs?.budgetCurrency}
             </p>
           ) : null}
 
@@ -468,7 +484,7 @@ export function PurchaseRequestForm({
                     {boundApu?.unitCost ? (
                       <p className="text-xs text-muted-foreground">
                         Ref. presup.: {formatDecimalArFromString(boundApu.unitCost)}/u
-                        {lineEstimate ? ` · Monto est.: ${formatDecimalArFromString(lineEstimate)}` : ""}
+                        {lineEstimate ? ` · Monto est.: ${formatDecimalArFromString(lineEstimate)}${selectedWbs?.budgetCurrency ? ` ${selectedWbs.budgetCurrency}` : ""}` : ""}
                       </p>
                     ) : null}
                   </section>
@@ -482,23 +498,25 @@ export function PurchaseRequestForm({
           </p>
         </section>
 
+        </fieldset>
         <section className="space-y-4">
           <h2 className="text-sm font-semibold">Cuándo</h2>
           <div className="space-y-2">
             <Label htmlFor="neededByDate">
-              Fecha requerida <span className="text-destructive" aria-hidden>*</span>
+              Fecha requerida {requireNeededByDate ? <span className="text-destructive" aria-hidden>*</span> : null}
             </Label>
             <Input
               id="neededByDate"
               name="neededByDate"
               type="date"
-              required
-              aria-required="true"
+              required={requireNeededByDate}
+              aria-required={requireNeededByDate}
               defaultValue={initialValues?.neededByDate ?? undefined}
+              disabled={pending}
               className="min-h-11 md:min-h-9"
             />
             <p className="text-xs text-muted-foreground">
-              Cuándo se necesita el material en obra. Es obligatoria para priorizar cotizaciones y entregas.
+              Cuándo se necesita el material en obra. {requireNeededByDate ? "Es obligatoria para priorizar cotizaciones y entregas." : "Podés completarla para priorizar cotizaciones y entregas."}
             </p>
           </div>
         </section>
@@ -509,7 +527,7 @@ export function PurchaseRequestForm({
           <h2 className="text-sm font-semibold">Observaciones</h2>
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>
-            <AutoGrowTextarea id="notes" name="notes" defaultValue={initialValues?.notes ?? undefined} />
+            <AutoGrowTextarea id="notes" name="notes" disabled={pending} defaultValue={initialValues?.notes ?? undefined} />
           </div>
         </section>
 
@@ -518,6 +536,7 @@ export function PurchaseRequestForm({
             type="button"
             variant="outline"
             className="min-h-11 md:min-h-9"
+            disabled={pending}
             onClick={onCancel ?? (() => router.back())}
           >
             Cancelar
@@ -526,7 +545,7 @@ export function PurchaseRequestForm({
             type="submit"
             className="min-h-11 md:min-h-9"
             data-testid={isEdit ? "purchase-request-edit-submit" : "purchase-request-create-submit"}
-            disabled={pending || wbsOptions.length === 0 || !wbsNodeId}
+            disabled={pending || (!readOnlyLines && (wbsOptions.length === 0 || !wbsNodeId))}
           >
             {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear solicitud"}
           </Button>

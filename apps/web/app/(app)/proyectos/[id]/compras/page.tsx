@@ -6,6 +6,7 @@ import {
   canEditPurchaseOrders,
   canEditPurchaseRequests,
   canViewProjectCostControlReport,
+  canViewSubcontractsArea,
   getProjectProcurementHub,
   getProjectShellInfo,
   getTenantModuleGate,
@@ -51,12 +52,13 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
   }
 
   const canCreateSc = canEditPurchaseRequests(current.tenantCtx.roles);
-  const canCreateOc = canEditPurchaseOrders(current.tenantCtx.roles);
+  const canCreateOc = hub.canViewOrders && canEditPurchaseOrders(current.tenantCtx.roles);
   const gate = await getTenantModuleGate(ctx);
   const showMateriales =
     gate.isEnabled("PROJECTS") &&
     gate.isEnabled("BUDGETS") &&
     (canViewProjectCostControlReport(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
+  const showProcurementAnalysis = hub.canViewOrders && gate.isEnabled("BUDGETS") && canViewProjectCostControlReport(ctx.roles);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -99,18 +101,18 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
           href={`${hub.links.solicitudes}?status=SUBMITTED`}
         />
         <KpiStatCard
-          label="Esperando cotización"
+          label="Sin cotizaciones recibidas"
           value={String(hub.purchaseRequests.awaitingQuotes)}
           href={`${hub.links.solicitudes}?status=SUBMITTED`}
         />
         <KpiStatCard
-          label="Cotización elegida"
+          label="Adjudicadas"
           value={String(hub.purchaseRequests.quoteSelected)}
           href={`${hub.links.solicitudes}?status=QUOTE_SELECTED`}
         />
       </KpiStatGrid>
 
-      <KpiStatGrid
+      {hub.canViewOrders ? <KpiStatGrid
         title="Órdenes de compra"
         columns={4}
         actions={
@@ -141,13 +143,14 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
           value={String(hub.purchaseOrders.confirmedOpen + hub.purchaseOrders.partiallyReceived)}
           href={hub.links.recepciones}
         />
-      </KpiStatGrid>
+      </KpiStatGrid> : null}
 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Accesos rápidos</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2 text-sm">
+          {hub.canViewOrders ? <>
           <Button asChild variant="outline" size="sm">
             <Link href={hub.links.recepciones}>
               Recepciones (últimas 2 sem.: {hub.receipts.recentConfirmed})
@@ -156,9 +159,10 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
           <Button asChild variant="outline" size="sm">
             <Link href={hub.links.reporteProveedores}>Reporte de proveedores</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          {showProcurementAnalysis ? <Button asChild variant="outline" size="sm">
             <Link href={hub.links.reporteCompras}>Análisis de compras</Link>
-          </Button>
+          </Button> : null}
+          </> : null}
           {showMateriales ? (
             <Button asChild variant="outline" size="sm">
               <Link href={`/proyectos/${projectId}/materiales`}>Cobertura de materiales</Link>
@@ -167,12 +171,12 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
           <Button asChild variant="outline" size="sm">
             <Link href={hub.links.solicitudes}>Todas las solicitudes</Link>
           </Button>
-          <Button asChild variant="outline" size="sm">
+          {hub.canViewOrders ? <Button asChild variant="outline" size="sm">
             <Link href={hub.links.ordenes}>Todas las órdenes</Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
+          </Button> : null}
+          {gate.isEnabled("SUBCONTRACTS") && canViewSubcontractsArea(ctx.roles) ? <Button asChild variant="outline" size="sm">
             <Link href={`/proyectos/${projectId}/subcontratos`}>Paquetes de obra → Subcontratos</Link>
-          </Button>
+          </Button> : null}
         </CardContent>
       </Card>
     </PageShell>

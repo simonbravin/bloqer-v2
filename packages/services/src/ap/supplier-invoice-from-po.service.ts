@@ -35,13 +35,15 @@ import {
   type InvoiceDraftLineInput,
   type PoLineForInvoiceDraft,
 } from "./supplier-invoice-from-po-pure";
-import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
+import { getCompanyProcurementSettings } from "../procurement/company-procurement-settings.service";
 import {
   evaluateThreeWayLineQtyMatch,
   invoiceExceedsReceivedWithTolerance,
 } from "../procurement/three-way-match-pure";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
+import { computeObligationBalanceDue, normalizeObligationBalanceDue } from "../finance/obligation-balance";
 import { PO_INVOICE_LINKABLE_STATUSES } from "../procurement/procurement-constants";
+import { assertPurchaseOrderRelations, procurementOrderLineScopeInclude, procurementOrderParentScopeInclude } from "../procurement/procurement-wbs";
 
 export {
   buildAutoFromPoInternalNotes,
@@ -51,12 +53,19 @@ export {
 } from "./supplier-invoice-from-po-markers";
 
 export type PurchaseOrderBillingSummary = {
+  currency: string;
   receivedAmount: string;
   /** Amount on ISSUED invoices only (CxP / job-cost issued). */
   invoicedAmount: string;
   /** Amount reserved by open DRAFT invoices (blocks duplicate auto-drafts). */
   draftReservedAmount: string;
+  /** Actual treasury payments on issued invoices and linked debit notes; excludes credits. */
   paidAmount: string;
+  /** All ISSUED invoices and their linked debit notes have a valid PAID obligation
+   * with zero canonical balance. Includes credits ([D-115]); false without invoices. */
+  allIssuedInvoicesSettled: boolean;
+  /** Received neto+IVA is covered by ISSUED invoices, excluding DRAFT reservations. */
+  allReceivedAmountIssued: boolean;
   /** Received − (ISSUED + DRAFT reserved). */
   pendingToInvoice: string;
   hasReceivedQuantity: boolean;
@@ -86,7 +95,8 @@ async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext, db
   const po = await db.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
     include: {
-      lines: { orderBy: { sortOrder: "asc" } },
+      ...procurementOrderParentScopeInclude,
+      lines: { orderBy: { sortOrder: "asc" }, include: procurementOrderLineScopeInclude },
     },
   });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
@@ -95,7 +105,41 @@ async function loadPoForBilling(purchaseOrderId: string, ctx: ServiceContext, db
     throw new ServiceError("FORBIDDEN", "La orden de compra no pertenece a la empresa activa");
   }
   await requireProjectAccess(po.projectId, ctx);
+  assertPurchaseOrderRelations(po);
   return po;
+}
+
+type BillingOrderScope = Awaited<ReturnType<typeof loadPoForBilling>>;
+type BillingInvoiceScope = {
+  tenantId: string;
+  companyId: string;
+  projectId: string | null;
+  supplierContactId: string;
+  lines: Array<{ purchaseOrderLineId: string | null }>;
+};
+
+function assertBillingInvoiceScope(invoice: BillingInvoiceScope, po: BillingOrderScope): void {
+  const lineIds = new Set(po.lines.map((line) => line.id));
+  if (invoice.tenantId !== po.tenantId || invoice.companyId !== po.companyId ||
+      invoice.projectId !== po.projectId || invoice.supplierContactId !== po.supplierContactId ||
+      invoice.lines.some((line) => line.purchaseOrderLineId && !lineIds.has(line.purchaseOrderLineId))) {
+    throw new ServiceError("CONFLICT", "La factura y la orden de compra tienen relaciones inconsistentes. Revisá sus comprobantes antes de calcular la facturación.");
+  }
+}
+
+const billingInvoiceScopeSelect = {
+  tenantId: true, companyId: true, projectId: true, supplierContactId: true,
+} as const;
+
+function isBillingPayableSettled(payable: {
+  status: string;
+  originalAmount: Prisma.Decimal;
+  paidAmount: Prisma.Decimal;
+  creditedAmount: Prisma.Decimal;
+} | null): boolean {
+  return payable != null && payable.status === "PAID" && normalizeObligationBalanceDue(
+    computeObligationBalanceDue(payable.originalAmount, payable.paidAmount, payable.creditedAmount),
+  ).isZero();
 }
 
 function toPoLineDraft(
@@ -144,18 +188,20 @@ export async function getPurchaseOrderBillingSummary(
 
   const invoices = await prisma.supplierInvoice.findMany({
     where: {
-      tenantId: ctx.tenantId,
       purchaseOrderId,
+      documentKind: "INVOICE",
       status: { in: ["DRAFT", "ISSUED"] },
     },
     select: {
+      ...billingInvoiceScopeSelect,
       id: true,
+      currency: true,
       subtotal: true,
       taxAmount: true,
       totalAmount: true,
       status: true,
       createdAt: true,
-      payable: { select: { paidAmount: true, status: true } },
+      payable: { select: { ...billingInvoiceScopeSelect, supplierInvoiceId: true, currency: true, originalAmount: true, paidAmount: true, creditedAmount: true, status: true } },
       lines: { select: { purchaseOrderLineId: true, quantity: true } },
     },
     orderBy: { createdAt: "asc" },
@@ -164,12 +210,23 @@ export async function getPurchaseOrderBillingSummary(
   let invoicedAmount = new Prisma.Decimal(0);
   let draftReservedAmount = new Prisma.Decimal(0);
   let paidAmount = new Prisma.Decimal(0);
+  let issuedInvoiceCount = 0;
+  let allIssuedInvoicesSettled = true;
   let draftInvoiceCount = 0;
   let unlinkedInvoiceCount = 0;
   let openDraftInvoiceId: string | null = null;
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
+    assertBillingInvoiceScope(inv, po);
+    if (inv.currency !== po.currency) {
+      throw new ServiceError("VALIDATION", "No se puede calcular la facturación: la orden y sus facturas tienen monedas distintas. Los comprobantes conservan su moneda; no se convierten ni se suman importes incompatibles.");
+    }
+    if (inv.payable && (inv.payable.tenantId !== inv.tenantId || inv.payable.companyId !== inv.companyId ||
+        inv.payable.projectId !== inv.projectId || inv.payable.supplierContactId !== inv.supplierContactId ||
+        inv.payable.supplierInvoiceId !== inv.id || inv.payable.currency !== inv.currency)) {
+      throw new ServiceError("CONFLICT", "La factura y su cuenta por pagar tienen relaciones inconsistentes.");
+    }
     if (inv.lines.some((line) => !line.purchaseOrderLineId)) unlinkedInvoiceCount += 1;
     // Coverage vs recibido uses neto+IVA only — IIBB is crédito fiscal, not goods coverage ([D-112]).
     const goodsTaxAmount = inv.subtotal.plus(inv.taxAmount);
@@ -186,6 +243,8 @@ export async function getPurchaseOrderBillingSummary(
       continue;
     }
     invoicedAmount = invoicedAmount.add(goodsTaxAmount);
+    issuedInvoiceCount += 1;
+    if (!isBillingPayableSettled(inv.payable)) allIssuedInvoicesSettled = false;
     if (inv.payable && inv.payable.status !== "CANCELLED") {
       paidAmount = paidAmount.add(inv.payable.paidAmount);
     }
@@ -196,7 +255,46 @@ export async function getPurchaseOrderBillingSummary(
     }
   }
 
-  const settings = await getCompanyProcurementSettingsForProject(po.projectId, ctx);
+  // D-115: a debit note opens its own obligation, including when it inherits
+  // this OC only through its referenced invoice. It never adds physical coverage.
+  const validatedInvoiceIds = new Set(invoices.map((invoice) => invoice.id));
+  const debitNotes = await prisma.supplierInvoice.findMany({
+    where: {
+      documentKind: "DEBIT_NOTE", status: "ISSUED",
+      OR: [{ purchaseOrderId }, { referencedSupplierInvoiceId: { in: [...validatedInvoiceIds] } }],
+    },
+    select: {
+      ...billingInvoiceScopeSelect,
+      id: true, currency: true, purchaseOrderId: true,
+      referencedSupplierInvoice: { select: {
+        ...billingInvoiceScopeSelect,
+        id: true, documentKind: true, status: true, purchaseOrderId: true, currency: true,
+      } },
+      payable: { select: { ...billingInvoiceScopeSelect, supplierInvoiceId: true, currency: true, originalAmount: true, paidAmount: true, creditedAmount: true, status: true } },
+    },
+  });
+  for (const note of debitNotes) {
+    const parent = note.referencedSupplierInvoice;
+    if (note.tenantId !== po.tenantId || note.companyId !== po.companyId || note.projectId !== po.projectId ||
+        note.supplierContactId !== po.supplierContactId || note.currency !== po.currency ||
+        (note.purchaseOrderId != null && note.purchaseOrderId !== purchaseOrderId) ||
+        !parent || !validatedInvoiceIds.has(parent.id) || parent.documentKind !== "INVOICE" || parent.status !== "ISSUED" ||
+        parent.purchaseOrderId !== purchaseOrderId || parent.tenantId !== po.tenantId || parent.companyId !== po.companyId ||
+        parent.projectId !== po.projectId || parent.supplierContactId !== po.supplierContactId || parent.currency !== po.currency) {
+      throw new ServiceError("CONFLICT", "La nota de débito y su factura u orden de compra tienen relaciones inconsistentes.");
+    }
+    if (note.payable && (note.payable.tenantId !== note.tenantId || note.payable.companyId !== note.companyId ||
+        note.payable.projectId !== note.projectId || note.payable.supplierContactId !== note.supplierContactId ||
+        note.payable.supplierInvoiceId !== note.id || note.payable.currency !== note.currency)) {
+      throw new ServiceError("CONFLICT", "La nota de débito y su cuenta por pagar tienen relaciones inconsistentes.");
+    }
+    if (!isBillingPayableSettled(note.payable)) allIssuedInvoicesSettled = false;
+    if (note.payable && note.payable.status !== "CANCELLED") {
+      paidAmount = paidAmount.add(note.payable.paidAmount);
+    }
+  }
+
+  const settings = await getCompanyProcurementSettings(po.companyId, ctx);
   const matchTol = new Prisma.Decimal(settings.invoiceMatchTolerancePct);
   const lineMatches = po.lines.map((line) =>
     evaluateThreeWayLineQtyMatch(
@@ -214,12 +312,16 @@ export async function getPurchaseOrderBillingSummary(
 
   const coveredAmount = invoicedAmount.add(draftReservedAmount);
   const pendingToInvoice = computePendingToInvoiceAmount(receivedAmount, coveredAmount);
+  const pendingIssuedCoverage = computePendingToInvoiceAmount(receivedAmount, invoicedAmount);
 
   return {
     receivedAmount: serializeMoneyDecimal(receivedAmount),
+    currency: po.currency,
     invoicedAmount: serializeMoneyDecimal(invoicedAmount),
     draftReservedAmount: serializeMoneyDecimal(draftReservedAmount),
     paidAmount: serializeMoneyDecimal(paidAmount),
+    allIssuedInvoicesSettled: issuedInvoiceCount > 0 && allIssuedInvoicesSettled,
+    allReceivedAmountIssued: issuedInvoiceCount > 0 && hasReceivedQuantity && serializeMoneyDecimal(pendingIssuedCoverage) === "0.00",
     pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
     hasReceivedQuantity,
     draftInvoiceCount,
@@ -291,17 +393,16 @@ export async function getPurchaseOrderInvoiceDraftPreview(
 export async function listSupplierInvoicesByPurchaseOrder(
   purchaseOrderId: string,
   ctx: ServiceContext,
-): Promise<ProjectSupplierInvoiceListRow[]> {
+): Promise<Array<Omit<ProjectSupplierInvoiceListRow, "fxRate" | "amountArs"> & { fxRate: string; amountArs: string }>> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles) && !canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de la OC");
   }
 
-  await loadPoForBilling(purchaseOrderId, ctx);
+  const po = await loadPoForBilling(purchaseOrderId, ctx);
 
   const invoices = await prisma.supplierInvoice.findMany({
     where: {
-      tenantId: ctx.tenantId,
       purchaseOrderId,
       status: { not: "CANCELLED" },
     },
@@ -313,14 +414,17 @@ export async function listSupplierInvoicesByPurchaseOrder(
     orderBy: [{ number: "asc" }, { id: "asc" }],
   });
 
+  for (const invoice of invoices) assertBillingInvoiceScope(invoice, po);
   return invoices.map((inv) => ({
     ...inv,
+    fxRate: serializeFxRateDecimal(inv.fxRate),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     subtotal: serializeMoneyDecimal(inv.subtotal),
     taxAmount: serializeMoneyDecimal(inv.taxAmount),
     iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
     iibbPerceptionAmount: serializeMoneyDecimal(inv.iibbPerceptionAmount),
     totalAmount: serializeMoneyDecimal(inv.totalAmount),
-    code: `FP-${String(inv.number).padStart(5, "0")}`,
+    code: `${inv.documentKind === "CREDIT_NOTE" ? "NC" : inv.documentKind === "DEBIT_NOTE" ? "ND" : "FP"}-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
     subcontractId: null,
@@ -356,6 +460,7 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
       currency: true,
       supplierContactId: true,
       status: true,
+      documentKind: true,
       lines: { select: { purchaseOrderLineId: true, quantity: true, description: true } },
     },
   });
@@ -368,6 +473,8 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
   if (!inv.purchaseOrderId || inv.status === "CANCELLED") return [];
 
   const po = await loadPoForBilling(inv.purchaseOrderId, ctx);
+  assertBillingInvoiceScope(inv, po);
+  if (inv.documentKind !== "INVOICE") return [];
 
   const warnings: string[] = [];
   if (inv.lines.some((line) => !line.purchaseOrderLineId)) {
@@ -375,14 +482,13 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
   }
   const receivedAmount = sumPoLinesReceivedAmount(po.lines.map(toPoLineDraft));
 
-  const settings = inv.projectId
-    ? await getCompanyProcurementSettingsForProject(inv.projectId, ctx)
-    : await getCompanyProcurementSettingsForProject(po.projectId, ctx);
+  const settings = await getCompanyProcurementSettings(po.companyId, ctx);
   const matchTol = new Prisma.Decimal(settings.invoiceMatchTolerancePct);
 
   // Compare neto+IVA to received (lineTotal sum); exclude IIBB percepción ([D-112]).
   const invoiceGoodsTax = inv.subtotal.plus(inv.taxAmount);
   if (
+    inv.currency === po.currency &&
     invoiceExceedsReceivedWithTolerance(invoiceGoodsTax, receivedAmount, matchTol) &&
     (receivedAmount.greaterThan(0) || invoiceGoodsTax.greaterThan(0))
   ) {
@@ -395,15 +501,16 @@ export async function getSupplierInvoicePurchaseOrderWarnings(
   // Per-line qty using this invoice's lines + other ISSUED invoices on same PO
   const otherIssued = await prisma.supplierInvoice.findMany({
     where: {
-      tenantId: ctx.tenantId,
       purchaseOrderId: inv.purchaseOrderId,
       status: "ISSUED",
+      documentKind: "INVOICE",
       id: { not: supplierInvoiceId },
     },
-    select: { lines: { select: { purchaseOrderLineId: true, quantity: true } } },
+    select: { ...billingInvoiceScopeSelect, lines: { select: { purchaseOrderLineId: true, quantity: true } } },
   });
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
   for (const other of otherIssued) {
+    assertBillingInvoiceScope(other, po);
     for (const line of other.lines) {
       if (!line.purchaseOrderLineId) continue;
       const prev = invoicedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
@@ -500,6 +607,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
         tenantId: ctx.tenantId,
         purchaseOrderId: input.purchaseOrderId,
         status: "DRAFT",
+        documentKind: "INVOICE",
         OR: [
           { internalNotes },
           { internalNotes: { startsWith: autoFromPoPrefix } },
@@ -510,6 +618,13 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
         supplierContact: { select: { legalName: true, fantasyName: true } },
       },
     });
+
+    if (existingDraft) {
+      assertBillingInvoiceScope(existingDraft, po);
+      if (existingDraft.currency !== po.currency) {
+        throw new ServiceError("CONFLICT", "El borrador cambió de moneda y no se puede actualizar automáticamente con precios de la OC. Completá sus líneas manualmente.");
+      }
+    }
 
     let receiptQuantities: Map<string, string> | undefined;
     if (input.purchaseReceiptId) {
@@ -522,19 +637,24 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
       if (receipt.purchaseOrderId !== input.purchaseOrderId) {
         throw new ServiceError("CONFLICT", "La recepción no pertenece a esta orden de compra");
       }
+      if (receipt.companyId !== po.companyId || receipt.projectId !== po.projectId ||
+          receipt.lines.some((line) => !po.lines.some((poLine) => poLine.id === line.purchaseOrderLineId))) {
+        throw new ServiceError("CONFLICT", "La recepción y la orden de compra tienen relaciones inconsistentes.");
+      }
       if (receipt.status !== "CONFIRMED") {
         throw new ServiceError("CONFLICT", "Solo se puede facturar desde recepciones confirmadas");
       }
-      receiptQuantities = new Map(
-        receipt.lines.map((l) => [l.purchaseOrderLineId, serializeQtyDecimal(l.quantityReceived)]),
-      );
+      receiptQuantities = new Map();
+      for (const line of receipt.lines) {
+        const previous = new Prisma.Decimal(receiptQuantities.get(line.purchaseOrderLineId) ?? "0");
+        receiptQuantities.set(line.purchaseOrderLineId, serializeQtyDecimal(previous.add(line.quantityReceived)));
+      }
     }
 
     const poLines = po.lines.map(toPoLineDraft);
     // Exclude the open auto-draft so a later receipt can refresh its lines ([D-108]).
     const coveredQtyByPoLine = await loadCoveredQtyByPoLine(
-      input.purchaseOrderId,
-      ctx.tenantId,
+      po,
       existingDraft?.id ?? null,
       tx,
     );
@@ -669,22 +789,22 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
 
 /** Qty already on ISSUED + other DRAFTs (optionally excluding one auto-draft being refreshed). */
 async function loadCoveredQtyByPoLine(
-  purchaseOrderId: string,
-  tenantId: string,
+  po: BillingOrderScope,
   excludeDraftId: string | null,
   db: Prisma.TransactionClient = prisma,
 ): Promise<Map<string, Prisma.Decimal>> {
   const invoices = await db.supplierInvoice.findMany({
     where: {
-      tenantId,
-      purchaseOrderId,
+      purchaseOrderId: po.id,
+      documentKind: "INVOICE",
       status: { in: ["DRAFT", "ISSUED"] },
       ...(excludeDraftId ? { id: { not: excludeDraftId } } : {}),
     },
-    select: { lines: { select: { purchaseOrderLineId: true, quantity: true } } },
+    select: { ...billingInvoiceScopeSelect, lines: { select: { purchaseOrderLineId: true, quantity: true } } },
   });
   const map = new Map<string, Prisma.Decimal>();
   for (const inv of invoices) {
+    assertBillingInvoiceScope(inv, po);
     for (const line of inv.lines) {
       if (!line.purchaseOrderLineId) continue;
       const prev = map.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);

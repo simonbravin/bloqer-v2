@@ -10,15 +10,54 @@ import {
   resolveBudgetRefKind,
 } from "./purchase-variance.service";
 
+const ars = { budgetCurrency: "ARS", purchaseCurrency: "ARS" };
+
 const settings = {
   varianceSoftAlertPct: "10",
   varianceNoteRequiredPct: "25",
   varianceExtraApprovalPct: "25",
 };
 
+test("D-125 rejects original-currency price comparison without requiring high-level approval", () => {
+  const result = evaluateLineVariance({ unit: "un", unitPrice: "100", budgetUnitCost: "1", budgetUnit: "un", budgetCurrency: "USD", purchaseCurrency: "ARS" }, settings);
+  assert.equal(result.varianceTier, "NO_BUDGET_BASELINE");
+  assert.equal(result.variancePct, null);
+  assert.equal(result.requiresJustification, true);
+  assert.equal(result.requiresExtraApproval, false);
+});
+
+test("D-125 currency incomparability precedes the neutral global-unit shortcut", () => {
+  const result = evaluateLineVariance({ unit: "un", unitPrice: "100", budgetUnitCost: "1000", budgetUnit: "gl", budgetCurrency: "USD", purchaseCurrency: "ARS" }, settings);
+  assert.equal(result.varianceTier, "NO_BUDGET_BASELINE");
+  assert.equal(result.requiresJustification, true);
+  assert.equal(result.varianceUnitMismatch, false);
+});
+
+test("D-125 missing currency never pretends a unit price comparison is comparable", () => {
+  for (const missing of [{ budgetCurrency: null, purchaseCurrency: "ARS" }, { budgetCurrency: "ARS", purchaseCurrency: null }]) {
+    const result = evaluateLineVariance({ unit: "un", unitPrice: "1", budgetUnitCost: "1", budgetUnit: "un", ...missing }, settings);
+    assert.equal(result.variancePct, null);
+    assert.equal(result.varianceTier, "NO_BUDGET_BASELINE");
+  }
+});
+
+test("D-125 keeps zero and fully discounted lines neutral across currencies", () => {
+  for (const price of [{ unitPrice: "0", discountPct: "0" }, { unitPrice: "100", discountPct: "100" }]) {
+    const result = evaluateLineVariance({ unit: "un", budgetUnitCost: "1", budgetUnit: "un", budgetCurrency: "USD", purchaseCurrency: "ARS", ...price }, settings);
+    assert.equal(result.varianceTier, "NONE");
+    assert.equal(result.requiresJustification, false);
+  }
+});
+
+test("D-125 retains same-currency USD deviation thresholds without converting to ARS", () => {
+  const result = evaluateLineVariance({ unit: "un", unitPrice: "130", budgetUnitCost: "100", budgetUnit: "un", budgetCurrency: "USD", purchaseCurrency: "USD" }, settings);
+  assert.equal(result.varianceTier, "EXTRA_APPROVAL");
+  assert.equal(result.variancePct, "30.0000");
+});
+
 test("evaluateLineVariance returns NONE under soft threshold", () => {
   const r = evaluateLineVariance(
-    { unit: "m2", unitPrice: "105", budgetUnitCost: "100", budgetUnit: "m2" },
+    { ...ars, unit: "m2", unitPrice: "105", budgetUnitCost: "100", budgetUnit: "m2" },
     settings,
   );
   assert.equal(r.varianceTier, "NONE");
@@ -27,7 +66,7 @@ test("evaluateLineVariance returns NONE under soft threshold", () => {
 
 test("evaluateLineVariance returns EXTRA_APPROVAL over extra threshold", () => {
   const r = evaluateLineVariance(
-    { unit: "m2", unitPrice: "130", budgetUnitCost: "100", budgetUnit: "m2" },
+    { ...ars, unit: "m2", unitPrice: "130", budgetUnitCost: "100", budgetUnit: "m2" },
     settings,
   );
   assert.equal(r.varianceTier, "EXTRA_APPROVAL");
@@ -37,7 +76,7 @@ test("evaluateLineVariance returns EXTRA_APPROVAL over extra threshold", () => {
 
 test("evaluateLineVariance requires a note between soft and extra thresholds", () => {
   const r = evaluateLineVariance(
-    { unit: "m2", unitPrice: "115", budgetUnitCost: "100", budgetUnit: "m2" },
+    { ...ars, unit: "m2", unitPrice: "115", budgetUnitCost: "100", budgetUnit: "m2" },
     settings,
   );
   assert.equal(r.varianceTier, "NOTE_REQUIRED");
@@ -47,7 +86,7 @@ test("evaluateLineVariance requires a note between soft and extra thresholds", (
 
 test("evaluateLineVariance savings vs baseline stay NONE (no justification)", () => {
   const r = evaluateLineVariance(
-    { unit: "gl", unitPrice: "1200000", budgetUnitCost: "28000000", budgetUnit: "gl" },
+    { ...ars, unit: "gl", unitPrice: "1200000", budgetUnitCost: "28000000", budgetUnit: "gl" },
     settings,
   );
   assert.equal(r.varianceTier, "NONE");
@@ -57,7 +96,7 @@ test("evaluateLineVariance savings vs baseline stay NONE (no justification)", ()
 
 test("evaluateLineVariance requires a note when no budget baseline exists", () => {
   const r = evaluateLineVariance(
-    { unit: "m2", unitPrice: "115", budgetUnitCost: null, budgetUnit: "m2" },
+    { ...ars, unit: "m2", unitPrice: "115", budgetUnitCost: null, budgetUnit: "m2" },
     settings,
   );
   assert.equal(r.varianceTier, "NO_BUDGET_BASELINE");
@@ -67,7 +106,7 @@ test("evaluateLineVariance requires a note when no budget baseline exists", () =
 
 test("evaluateLineVariance returns UNIT_MISMATCH when units differ", () => {
   const r = evaluateLineVariance(
-    { unit: "kg", unitPrice: "10", budgetUnitCost: "10", budgetUnit: "m2" },
+    { ...ars, unit: "kg", unitPrice: "10", budgetUnitCost: "10", budgetUnit: "m2" },
     settings,
   );
   assert.equal(r.varianceTier, "UNIT_MISMATCH");
@@ -96,7 +135,7 @@ test("formatMissingVarianceJustificationError lists lines and points to Editar",
 
 test("evaluateLineVarianceLenient does not throw on incomplete unit price", () => {
   const r = evaluateLineVarianceLenient(
-    { unit: "un", unitPrice: "12.", budgetUnitCost: "100", budgetUnit: "un" },
+    { ...ars, unit: "un", unitPrice: "12.", budgetUnitCost: "100", budgetUnit: "un" },
     settings,
   );
   assert.equal(r.varianceTier, "NONE");
@@ -106,7 +145,7 @@ test("evaluateLineVarianceLenient does not throw on incomplete unit price", () =
 test("evaluateLineVariance throws on incomplete unit price (submit must not skip the gate)", () => {
   assert.throws(() =>
     evaluateLineVariance(
-      { unit: "un", unitPrice: "12.", budgetUnitCost: "100", budgetUnit: "un" },
+      { ...ars, unit: "un", unitPrice: "12.", budgetUnitCost: "100", budgetUnit: "un" },
       settings,
     ),
   );
@@ -115,6 +154,7 @@ test("evaluateLineVariance throws on incomplete unit price (submit must not skip
 test("evaluateLineVariance does not treat global partida vs physical line as a desvío", () => {
   const r = evaluateLineVariance(
     {
+      ...ars,
       unit: "un",
       unitPrice: "107452.35",
       budgetUnitCost: "158669372",
@@ -136,7 +176,7 @@ test("poRequiresHighLevelApproval is true at threshold", () => {
 
 test("evaluateLineVariance uses effective unit price after discount [D-093]", () => {
   const r = evaluateLineVariance(
-    { unit: "m2", unitPrice: "130", discountPct: "10", budgetUnitCost: "100", budgetUnit: "m2" },
+    { ...ars, unit: "m2", unitPrice: "130", discountPct: "10", budgetUnitCost: "100", budgetUnit: "m2" },
     settings,
   );
   // 130 × (1−10%) = 117 vs 100 → 17% → NOTE_REQUIRED (soft 10, extra 25)

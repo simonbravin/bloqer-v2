@@ -21,7 +21,8 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { Button } from "@/components/ui/button";
 import { WbsItemDrilldownDialog } from "@/features/cost-control";
 import { controlCostosItemHref } from "@/lib/control-costos-href";
-import { formatDecimalArFromString } from "@/lib/format-money";
+import { budgetUnitLabel } from "@/lib/budget-units";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { formatMaterialsFieldQty } from "./materials-field-format";
 
 type OpenWbs = { wbsNodeId: string; wbsCode: string; wbsName: string };
@@ -37,6 +38,7 @@ type Props = {
   canRequest?: boolean;
   /** Resolved board budget id (not only URL param). */
   budgetId?: string;
+  currency?: string;
 };
 
 export function MaterialsBoardTable({
@@ -44,6 +46,7 @@ export function MaterialsBoardTable({
   projectId,
   canRequest = true,
   budgetId,
+  currency,
 }: Props) {
   const [openItem, setOpenItem] = useState<OpenWbs | null>(null);
   const drillFilters = { budgetId };
@@ -70,7 +73,7 @@ export function MaterialsBoardTable({
                 className="text-right"
                 title="Costo APU presupuestado de la línea (total). No baja con lo ya pedido."
               >
-                $ Presup.
+                Presup.{currency ? ` (${currency})` : ""}
               </TableHead>
               <TableHead className="text-right">Pedido</TableHead>
               <TableHead className="text-right">Recibido</TableHead>
@@ -118,6 +121,9 @@ export function MaterialsBoardTable({
                     <span className="truncate block" title={row.description}>
                       {row.description}
                     </span>
+                    <span className="block text-[10px] text-muted-foreground">
+                      Unidad: {row.unit ? budgetUnitLabel(row.unit) : "—"}
+                    </span>
                     {row.missingProduct ? (
                       <span className="text-[10px] text-yellow-700 dark:text-yellow-400">
                         Sin producto vinculado
@@ -153,7 +159,7 @@ export function MaterialsBoardTable({
                     {formatMaterialsFieldQty(row.needQty)}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
-                    {formatDecimalArFromString(row.needCost)}
+                    {formatMoneyAmount(row.needCost, currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
                     {formatMaterialsFieldQty(row.orderedQty)}

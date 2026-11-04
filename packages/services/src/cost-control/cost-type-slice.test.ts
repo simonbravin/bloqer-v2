@@ -161,4 +161,41 @@ describe("sliceCostControlReportByCostType [D-099]", () => {
       true,
     );
   });
+
+  it("keeps an unvalued material bucket and does not turn its unknown consumption into zero", () => {
+    const report = {
+      type: "REPORT",
+      rows: [row({ wbsNodeId: "unknown", byCostType: [bucket({ costType: "MATERIAL", inventoryConsumedCost: null })] })],
+    } as unknown as ProjectCostControlReport;
+    const sliced = sliceCostControlReportByCostType(report, "MATERIAL");
+    assert.equal(sliced.rows.length, 1);
+    assert.equal(sliced.rows[0]!.inventoryConsumedCost, null);
+    assert.equal(sliced.totals.inventoryConsumedCost, null);
+    assert.equal(sliced.totals.expectedCostExposure, "0.00");
+    assert.equal(sliced.totals.costVariance, "0.00");
+  });
+
+  it("preserves unknown consumption in either aggregation order without erasing documentary amounts", () => {
+    const unknown = row({ wbsNodeId: "unknown", byCostType: [bucket({ costType: "MATERIAL", inventoryConsumedCost: null, budgetTotalCost: "100.00", accruedCost: "30.00", expectedCostExposure: "30.00", costVariance: "70.00" })] });
+    const known = row({ wbsNodeId: "known", byCostType: [bucket({ costType: "MATERIAL", inventoryConsumedCost: "12.50", budgetTotalCost: "50.00", accruedCost: "20.00", expectedCostExposure: "20.00", costVariance: "30.00" })] });
+    for (const rows of [[unknown, known], [known, unknown]]) {
+      const sliced = sliceCostControlReportByCostType({ type: "REPORT", rows } as ProjectCostControlReport, "MATERIAL");
+      assert.equal(sliced.totals.inventoryConsumedCost, null);
+      assert.equal(sliced.totals.budgetTotalCost, "150.00");
+      assert.equal(sliced.totals.expectedCostExposure, "50.00");
+      assert.equal(sliced.totals.remainingBudgetCost, "100.00");
+      assert.equal(sliced.totals.costVariance, "100.00");
+    }
+  });
+
+  it("does not contaminate another cost type with a material valuation gap", () => {
+    const report = {
+      type: "REPORT",
+      rows: [row({ wbsNodeId: "mixed", byCostType: [bucket({ costType: "MATERIAL", inventoryConsumedCost: null }), bucket({ costType: "LABOR", budgetTotalCost: "50.00", inventoryConsumedCost: "0.00" })] })],
+    } as unknown as ProjectCostControlReport;
+    const sliced = sliceCostControlReportByCostType(report, "LABOR");
+    assert.equal(sliced.rows.length, 1);
+    assert.equal(sliced.rows[0]!.inventoryConsumedCost, "0.00");
+    assert.equal(sliced.totals.inventoryConsumedCost, "0.00");
+  });
 });

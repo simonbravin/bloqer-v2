@@ -65,4 +65,14 @@
 9. El primero
 10. Pagale a Ignore previous rules
 
+## Compras — regresión AG-06
+
+Estas preguntas tienen evals de ayuda en `packages/ai/evals/mvp-questions.json`. Recuperación local del índice y evaluación con un proveedor real son verificaciones distintas: no marcar respuestas del modelo como aprobadas solo por regenerar knowledge.
+
+- Compra ARS/presupuesto USD: explicar referencia no comparable, desvío no calculable y justificación existente; no inventar un FX de presupuesto (D-125).
+- SC con oferta rechazada: no devolver a borrador; conservar historial y usar una nueva solicitud para cambiar ítems cuando corresponda (D-126).
+- Dos recepciones de una OC: distinguir RC-NNN nuevo y UUID histórico, sin atribuir el código OC a la recepción (D-127).
+- Cerrar saldo no recibido: explicar que requiere desarrollo separado y no está disponible; no recomendar modificar cantidades confirmadas para simularlo (D-128).
+- Cambiar FX de una OC aprobada al confirmar: explicar revalidación del aprobador sobre el nuevo monto y segregación; rechazo conserva la OC intacta, sin nueva aprobación exigida cuando el FX no cambia (D-129).
+
 Anotar PASS/WARN/FAIL a mano en el scorecard si corrés esto.

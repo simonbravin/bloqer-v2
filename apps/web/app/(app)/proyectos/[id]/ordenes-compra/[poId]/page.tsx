@@ -33,6 +33,7 @@ import {
 } from "@/features/procurement";
 import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
 import { PurchaseOrderNextStep } from "@/features/procurement/components/purchase-order-next-step";
+import { ConfirmPurchaseOrderButton } from "@/features/procurement/components/confirm-purchase-order-button";
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
 import { AuthorizeAndCommitPoButton } from "@/features/procurement/components/authorize-and-commit-po-button";
 import { PurchaseOrderVarianceReadout } from "@/features/procurement/components/purchase-order-variance-readout";
@@ -46,6 +47,7 @@ import { isStorageConfigured } from "@bloqer/config";
 import {
   canApprovePurchaseOrders,
   canAuthorizeAndCommitPo,
+  getPurchaseOrderApprovalAvailability,
   willApproveAutoConfirmPo,
   canEditPurchaseOrders,
   canEditPurchaseReceipts,
@@ -62,14 +64,13 @@ import { PageShell } from "@/components/layout/page-shell";
 import { ProcessStepper } from "@/components/ui/process-stepper";
 import { ScrollToElement } from "@/components/navigation/scroll-to-element";
 import { ProcurementAmberCallout } from "@/features/procurement/components/procurement-amber-callout";
-import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
+import { procurementActionBtnClass, procurementAmberBannerClass } from "@/features/procurement/lib/procurement-ui";
 import { purchaseOrderProcessSteps } from "@/features/procurement/lib/purchase-order-process-steps";
-import { compareDecimal } from "@bloqer/utils";
 import {
   submitPurchaseOrderAction,
-  confirmPurchaseOrderAction,
 } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
 import { Button } from "@/components/ui/button";
+import { ProcurementSubmitButton } from "@/features/procurement/components/procurement-submit-button";
 import { varianceJustificationReasonEs } from "@bloqer/services/purchase-variance-pure";
 
 interface PageProps {
@@ -90,13 +91,16 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     roles: current.tenantCtx.roles,
   };
 
-  let order, receipts, billing, linkedInvoices, project, procurementSettings;
+  let order, receipts, billing, linkedInvoices, project;
+  let billingAvailable = true;
+  let invoicesAvailable = true;
+  let billingWarning = "La información de facturación y pagos no está disponible para tu acceso o configuración. No se puede comprobar el saldo de esta OC.";
+  let invoicesWarning = "Los comprobantes vinculados no están disponibles para tu acceso o configuración.";
   try {
-    [order, receipts, project, procurementSettings] = await Promise.all([
+    [order, receipts, project] = await Promise.all([
       getPurchaseOrderById(poId, ctx),
       listReceiptsByPurchaseOrder(poId, ctx),
       getProjectShellInfo(id, ctx),
-      getCompanyProcurementSettingsForProject(id, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "NOT_FOUND") notFound();
@@ -104,12 +108,19 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     throw err;
   }
 
-  // Billing/AP panel is optional when CxP module is off or actor lacks AP+procurement view.
+  if (order.projectId !== id) notFound();
+  const orderCtx = { ...ctx, companyId: order.companyId };
+  const procurementSettings = await getCompanyProcurementSettingsForProject(id, orderCtx);
+
+  // An unreadable AP source is unknown, never an empty billing result.
   billing = {
+    currency: order.currency,
     receivedAmount: "0",
     invoicedAmount: "0",
     draftReservedAmount: "0",
     paidAmount: "0",
+    allIssuedInvoicesSettled: false,
+    allReceivedAmountIssued: false,
     pendingToInvoice: "0",
     hasReceivedQuantity: false,
     draftInvoiceCount: 0,
@@ -120,17 +131,21 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   };
   linkedInvoices = [] as Awaited<ReturnType<typeof listSupplierInvoicesByPurchaseOrder>>;
   try {
-    [billing, linkedInvoices] = await Promise.all([
-      getPurchaseOrderBillingSummary(poId, ctx),
-      listSupplierInvoicesByPurchaseOrder(poId, ctx),
-    ]);
+    billing = await getPurchaseOrderBillingSummary(poId, orderCtx);
   } catch (err) {
-    if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+    if (!(err instanceof ServiceError && ["FORBIDDEN", "VALIDATION", "CONFLICT"].includes(err.code))) throw err;
+    billingAvailable = false;
+    if (err.code !== "FORBIDDEN") billingWarning = err.message;
+  }
+  try {
+    linkedInvoices = await listSupplierInvoicesByPurchaseOrder(poId, orderCtx);
+  } catch (err) {
+    if (!(err instanceof ServiceError && ["FORBIDDEN", "VALIDATION", "CONFLICT"].includes(err.code))) throw err;
+    invoicesAvailable = false;
+    if (err.code !== "FORBIDDEN") invoicesWarning = err.message;
   }
 
-  if (order.projectId !== id) notFound();
-
-  const poAttachments = await listEntityDocuments("PURCHASE_ORDER", poId, ctx, { projectId: id });
+  const poAttachments = await listEntityDocuments("PURCHASE_ORDER", poId, orderCtx, { projectId: id });
   const storageConfigured = isStorageConfigured();
   const canEditAttachments = canEditPurchaseOrders(current.tenantCtx.roles);
 
@@ -140,7 +155,20 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const isApproved = order.status === "APPROVED";
   const isReceivable = ["CONFIRMED", "PARTIALLY_RECEIVED"].includes(order.status);
   const draftReceipt = receipts.find((r) => r.status === "DRAFT");
-  const canApprovePo = canApprovePurchaseOrders(current.tenantCtx.roles);
+  const canReviewPo = canApprovePurchaseOrders(current.tenantCtx.roles);
+  const approvalAvailability = getPurchaseOrderApprovalAvailability(
+    procurementSettings,
+    {
+      status: order.status,
+      totalAmount: order.totalAmount,
+      currency: order.currency,
+      fxRate: order.fxRate,
+      totalAmountArs: order.totalAmountArs,
+      originRequestedByUserId: order.originRequestedByUserId,
+      lines: order.lines,
+    },
+    ctx,
+  );
   const canEditPo = canEditPurchaseOrders(current.tenantCtx.roles);
   const canReceive = canEditPurchaseReceipts(current.tenantCtx.roles);
   const willAutoConfirmOnApprove = willApproveAutoConfirmPo(procurementSettings, {
@@ -175,7 +203,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     isPositiveMoneyAmount(billing.pendingToInvoice);
   const highlightBilling = canInvoiceNow && sp.siguiente === "facturar";
   const billingPanel =
-    showBilling && !isCancelled ? (
+    billingAvailable && showBilling && !isCancelled ? (
       <PoBillingNextStepPanel
         projectId={id}
         purchaseOrderId={poId}
@@ -201,15 +229,12 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const canCancel =
     !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const hasIssuedInvoice = isPositiveMoneyAmount(billing.invoicedAmount);
-  const invoiceSettled = !isPositiveMoneyAmount(billing.pendingToInvoice);
-  // Stepper "complete" requires received fully invoiced AND payables covering invoiced.
-  const fullyPaid =
-    hasIssuedInvoice &&
-    invoiceSettled &&
-    compareDecimal(billing.paidAmount || "0", billing.invoicedAmount || "0") >= 0;
+  const invoiceSettled = billingAvailable && billing.allReceivedAmountIssued === true;
+  // Services resolve outstanding payables, including credit-note settlement (D-112/D-115).
+  const fullyPaid = billingAvailable && billing.allIssuedInvoicesSettled === true;
   const hasActions =
     (isDraft && canEditPo) ||
-    (isSubmitted && (canApprovePo || showAuthorizeAndCommit)) ||
+    (isSubmitted && (approvalAvailability.canApprove || approvalAvailability.canReturn || showAuthorizeAndCommit)) ||
     (isApproved && canEditPo) ||
     (isReceivable && canReceive) ||
     canCancel;
@@ -219,6 +244,8 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
   const receiptItems: PurchaseReceiptListItem[] = receipts.map((r) => ({
     id: r.id,
+    number: r.number,
+    code: r.code,
     purchaseOrderCode: r.purchaseOrderCode,
     purchaseOrderId: r.purchaseOrderId,
     supplierName: r.supplierName,
@@ -268,13 +295,13 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                     redirect(poPath);
                   }}
                 >
-                  <Button
-                    type="submit"
+                  <ProcurementSubmitButton
+                    pendingLabel="Enviando…"
                     className={actionBtn}
                     variant={showAuthorizeAndCommit ? "outline" : "default"}
                   >
                     Enviar a aprobación
-                  </Button>
+                  </ProcurementSubmitButton>
                 </form>
                 {showAuthorizeAndCommit ? (
                   <AuthorizeAndCommitPoButton
@@ -285,31 +312,21 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                 ) : null}
               </>
             )}
-            {isSubmitted && canApprovePo && (
+            {isSubmitted && (approvalAvailability.canApprove || approvalAvailability.canReturn) && (
               <PurchaseOrderApprovalActions
                 poId={poId}
                 projectId={id}
                 willAutoConfirm={willAutoConfirmOnApprove}
                 approveVariant={showAuthorizeAndCommit ? "outline" : "default"}
+                canApprove={approvalAvailability.canApprove}
+                canReturn={approvalAvailability.canReturn}
               />
             )}
             {isSubmitted && showAuthorizeAndCommit ? (
               <AuthorizeAndCommitPoButton poId={poId} projectId={id} className={actionBtn} />
             ) : null}
             {isApproved && canEditPo && (
-              <form
-                className="w-full sm:w-auto"
-                action={async () => {
-                  "use server";
-                  const res = await confirmPurchaseOrderAction(poId, id);
-                  if ("error" in res) redirectWithActionError(poPath, res.error);
-                  redirect(poPath);
-                }}
-              >
-                <Button type="submit" className={actionBtn}>
-                  Confirmar al proveedor
-                </Button>
-              </form>
+              <ConfirmPurchaseOrderButton poId={poId} projectId={id} currency={order.currency} initialFxRate={order.fxRate} className={actionBtn} />
             )}
             {isReceivable && canReceive && (
               <Button asChild className={actionBtn} data-testid="po-register-receipt">
@@ -355,13 +372,18 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           confirmedAt: order.confirmedAt,
           // Returned-to-draft then cancelled: was past Borrador at least once.
           leftDraft: Boolean(order.returnedAt),
-        })}
+        }).filter((step) => billingAvailable || !["invoice", "pay"].includes(step.id))}
       />
 
-      <PurchaseOrderNextStep status={order.status} />
+      <PurchaseOrderNextStep status={order.status} paymentSettled={fullyPaid && invoiceSettled} />
 
       <ActionErrorBanner message={sp.actionError} />
       <ActionErrorBanner message={sp.invoiceError} />
+      {isSubmitted && canReviewPo && approvalAvailability.approvalBlockedReason ? (
+        <p className={procurementAmberBannerClass} role="status">
+          {approvalAvailability.approvalBlockedReason}
+        </p>
+      ) : null}
       {isDraft && canEditPo && linesNeedingJustification.length > 0 ? (
         <ProcurementAmberCallout>
           <p>
@@ -393,6 +415,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
       ) : null}
 
       {billingPanel}
+      {!billingAvailable ? <p className={procurementAmberBannerClass} role="status">{billingWarning}</p> : null}
       {highlightBilling ? <ScrollToElement id="facturar" /> : null}
 
       <PurchaseOrderMobileFiche
@@ -489,6 +512,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                   <TableCell className="text-right text-muted-foreground">
                     <PoLineBudgetRef
                       unitCost={line.budgetUnitCostSnapshot}
+                currency={line.budgetCurrency}
                       unit={line.budgetUnit}
                       refKind={line.budgetRefKind}
                       suggestedApu={line.suggestedApu}
@@ -497,12 +521,13 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
                   <TableCell>
                     <PurchaseOrderVarianceReadout
                       variancePct={line.variancePct}
+              currencyComparable={line.currencyComparable}
                       varianceTier={line.varianceTier}
                       justification={line.varianceJustification}
                       refKind={line.budgetRefKind}
                     />
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{formatMoneyAmount(line.lineTotal, order.currency)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -512,17 +537,17 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         <div className="flex justify-end gap-8 text-sm">
           <div className="text-right">
             <p className="text-muted-foreground">Subtotal</p>
-            <p className="tabular-nums">{formatMoneyAmount(order.subtotal)}</p>
+            <p className="tabular-nums">{formatMoneyAmount(order.subtotal, order.currency)}</p>
           </div>
           <div className="text-right">
             <p className="text-muted-foreground">IVA</p>
-            <p className="tabular-nums">{formatMoneyAmount(order.taxAmount)}</p>
+            <p className="tabular-nums">{formatMoneyAmount(order.taxAmount, order.currency)}</p>
           </div>
           <div className="text-right">
             <p className="text-muted-foreground">
               {IIBB_PERCEPTION_LABEL_ES} ({formatRatePctFromString(order.iibbPerceptionRate)}%)
             </p>
-            <p className="tabular-nums">{formatMoneyAmount(order.iibbPerceptionAmount)}</p>
+            <p className="tabular-nums">{formatMoneyAmount(order.iibbPerceptionAmount, order.currency)}</p>
           </div>
           <div className="text-right">
             <p className="font-semibold">Total</p>
@@ -553,12 +578,13 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         </Suspense>
       </DataTableSection>
 
-      <DataTableSection title="Facturas vinculadas">
+      {invoicesAvailable ? <DataTableSection title="Facturas vinculadas">
         <SupplierInvoiceTable
           invoices={invoiceItems}
           hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
         />
-      </DataTableSection>
+      </DataTableSection> : null}
+      {!invoicesAvailable ? <p className={procurementAmberBannerClass} role="status">{invoicesWarning}</p> : null}
 
       <div className="hidden md:block">
         <EntityDocumentsPanel

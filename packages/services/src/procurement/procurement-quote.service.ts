@@ -7,7 +7,7 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseOrders, canViewPurchaseRequests } from "./procurement-access";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal, serializeFxRateDecimal } from "../finance/money-decimal";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
@@ -194,11 +194,13 @@ export async function createProcurementQuote(
   const quote = await prisma.$transaction(async (tx) => {
     await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
-    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id } });
+    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id }, include: { lines: true } });
     await assertPurchaseRequestScope(current, ctx, "mutate");
     if (current.status !== "SUBMITTED") {
       throw new ServiceError("CONFLICT", "La solicitud no admite nuevas cotizaciones en este estado");
     }
+    assertQuoteLinesMatchRequest(current.lines, input.lines);
+    await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
     // Check capacity only after acquiring the SC lock: another creator may have
     // consumed the slot or added this supplier while this transaction waited.
     const settings = await getCompanyProcurementSettings(current.companyId, ctx, tx);
@@ -240,7 +242,7 @@ export async function createProcurementQuote(
     const { subtotal, taxAmount, iibbPerceptionAmount, totalAmount, offers } = await writeQuoteLines(
       tx,
       created.id,
-      pr.lines,
+      current.lines,
       input.lines,
       pricesIncludeTax,
       iibbPerceptionRate,
@@ -293,11 +295,6 @@ export async function updateProcurementQuote(
   const quote = await loadMutableQuote(quoteId, ctx);
   assertQuoteBelongsToRequest(quote, purchaseRequestId);
   const pr = quote.purchaseRequest;
-  const prLines = await prisma.purchaseRequestLine.findMany({
-    where: { purchaseRequestId: pr.id },
-    select: { id: true, quantity: true },
-  });
-  assertQuoteLinesMatchRequest(prLines, input.lines);
   assertQuoteHasPricedLines(input.lines);
 
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
@@ -306,6 +303,12 @@ export async function updateProcurementQuote(
     await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
     const quote = await loadMutableQuote(quoteId, ctx, tx);
+    assertQuoteBelongsToRequest(quote, purchaseRequestId);
+    await assertContactRoleInTenant(quote.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
+    const prLines = await tx.purchaseRequestLine.findMany({
+      where: { purchaseRequestId: quote.purchaseRequestId }, select: { id: true, quantity: true },
+    });
+    assertQuoteLinesMatchRequest(prLines, input.lines);
     const locked = await tx.procurementQuote.updateMany({
       where: {
         id: quoteId,
@@ -338,10 +341,11 @@ export async function updateProcurementQuote(
       previousLines,
     );
 
+    const currency = input.currency ?? quote.currency;
     const fx = computeDocumentFxAmounts(
-      input.currency ?? quote.currency,
+      currency,
       totalAmount,
-      input.fxRate ? new Prisma.Decimal(input.fxRate) : quote.fxRate,
+      input.fxRate ? new Prisma.Decimal(input.fxRate) : currency === quote.currency ? quote.fxRate : null,
     );
 
     await tx.procurementQuote.update({
@@ -436,6 +440,7 @@ export async function listProcurementQuotesForRequest(
     status: string;
     totalAmount: string;
     totalAmountArs: string;
+    fxRate: string;
     currency: string;
     validUntil: string | null;
     leadTimeDays: number | null;
@@ -451,16 +456,20 @@ export async function listProcurementQuotesForRequest(
   const quotes = await prisma.procurementQuote.findMany({
     where: { purchaseRequestId, tenantId: ctx.tenantId },
     include: {
-      supplierContact: { select: { legalName: true, fantasyName: true } },
+      supplierContact: { select: { tenantId: true, legalName: true, fantasyName: true } },
     },
     orderBy: { createdAt: "asc" },
   });
+  if (quotes.some((quote) => quote.supplierContact.tenantId !== ctx.tenantId)) {
+    throw new ServiceError("CONFLICT", "Una cotización contiene relaciones de proveedor inconsistentes");
+  }
   return quotes.map((q) => ({
     id: q.id,
     supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
     status: q.status,
     totalAmount: serializeMoneyDecimal(q.totalAmount),
     totalAmountArs: serializeMoneyDecimal(q.totalAmountArs),
+    fxRate: serializeFxRateDecimal(q.fxRate),
     currency: q.currency,
     validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
     leadTimeDays: q.leadTimeDays,
@@ -477,6 +486,7 @@ export async function listProcurementQuotesDetailedForRequest(
     status: string;
     totalAmount: string;
     totalAmountArs: string;
+    fxRate: string;
     currency: string;
     validUntil: string | null;
     leadTimeDays: number | null;
@@ -495,6 +505,7 @@ export async function listProcurementQuotesDetailedForRequest(
       lineTax: string;
       lineTotal: string;
       budgetUnitCostSnapshot: string | null;
+      budgetCurrency: string | null;
     }>;
   }>
 > {
@@ -508,11 +519,14 @@ export async function listProcurementQuotesDetailedForRequest(
   const quotes = await prisma.procurementQuote.findMany({
     where: { purchaseRequestId, tenantId: ctx.tenantId },
     include: {
-      supplierContact: { select: { legalName: true, fantasyName: true } },
+      supplierContact: { select: { tenantId: true, legalName: true, fantasyName: true } },
       lines: {
         include: {
           purchaseRequestLine: {
             select: {
+              purchaseRequestId: true,
+              wbsNodeId: true,
+              wbsNode: { select: { budget: { select: { tenantId: true, companyId: true, projectId: true, currency: true } } } },
               description: true,
               budgetUnitCostSnapshot: true,
               quantity: true,
@@ -525,12 +539,22 @@ export async function listProcurementQuotesDetailedForRequest(
     },
     orderBy: { createdAt: "asc" },
   });
+  if (quotes.some((quote) => quote.supplierContact.tenantId !== ctx.tenantId ||
+    quote.lines.some((line) => {
+      const source = line.purchaseRequestLine, budget = source.wbsNode?.budget;
+      return source.purchaseRequestId !== purchaseRequestId || Boolean(source.wbsNodeId &&
+        (!budget || budget.tenantId !== request.tenantId || budget.projectId !== request.projectId ||
+          (budget.companyId != null && budget.companyId !== request.companyId)));
+    }))) {
+    throw new ServiceError("CONFLICT", "Una cotización contiene relaciones de origen inconsistentes");
+  }
   return quotes.map((q) => ({
     id: q.id,
     supplierName: q.supplierContact.fantasyName ?? q.supplierContact.legalName,
     status: q.status,
     totalAmount: serializeMoneyDecimal(q.totalAmount),
     totalAmountArs: serializeMoneyDecimal(q.totalAmountArs),
+    fxRate: serializeFxRateDecimal(q.fxRate),
     currency: q.currency,
     validUntil: q.validUntil?.toISOString().slice(0, 10) ?? null,
     leadTimeDays: q.leadTimeDays,
@@ -551,6 +575,7 @@ export async function listProcurementQuotesDetailedForRequest(
       budgetUnitCostSnapshot: l.purchaseRequestLine.budgetUnitCostSnapshot != null
         ? serializeUnitPriceDecimal(l.purchaseRequestLine.budgetUnitCostSnapshot)
         : null,
+      budgetCurrency: l.purchaseRequestLine.wbsNode?.budget.currency ?? null,
     })),
   }));
 }

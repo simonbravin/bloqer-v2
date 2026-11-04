@@ -9,6 +9,7 @@ import {
   shortfallOf,
   serializeApuCommitment,
   type MaterialNeedSeed,
+  needQtyFromApuLineExact,
 } from "./material-commitment-pure";
 
 const seed = (over: Partial<MaterialNeedSeed> = {}): MaterialNeedSeed => ({
@@ -131,5 +132,37 @@ describe("material-commitment-pure", () => {
       quantity: 2,
     });
     assert.equal(matched, false);
+  });
+
+  it("keeps stored quantity precision above the IEEE safe-integer boundary", () => {
+    const need = needQtyFromApuLineExact({ partidaQuantity: "99999999999999.9999", coefficient: "1", itemQuantity: "1", isLumpSum: false, unit: "kg" });
+    const map = buildApuCommitmentMap([seed({ needQty: need })]);
+    assert.equal(serializeApuCommitment(map.get("apu-1")!).needQty, "99999999999999.9999");
+  });
+
+  it("multiplies exact coefficients and item quantities without losing the fourth decimal", () => {
+    const need = needQtyFromApuLineExact({ partidaQuantity: null, coefficient: "9999999999.1234", itemQuantity: "9999.9999", isLumpSum: false, unit: "un" });
+    assert.equal(need.toFixed(4), "99999998991234.0001");
+    assert.equal(needQtyFromApuLineExact({ partidaQuantity: "20", coefficient: "3", itemQuantity: "4", isLumpSum: false, unit: "gl" }).toString(), "0");
+    assert.equal(needQtyFromApuLineExact({ partidaQuantity: "20", coefficient: "3", itemQuantity: "4", isLumpSum: true, unit: "un" }).toString(), "0");
+  });
+
+  it("rejects an APU from another WBS even when its id exists in the same map", () => {
+    const map = buildApuCommitmentMap([seed()]);
+    const result = applyOrderedToApuMap(map, buildFallbackIndex(map), { wbsNodeId: "foreign-wbs", costAnalysisLineId: "apu-1", productId: "prod-1", description: "Cemento", quantity: "9" });
+    assert.equal(result, false);
+    assert.equal(serializeApuCommitment(map.get("apu-1")!).orderedQty, "0.0000");
+  });
+
+  it("does not replace a foreign explicit APU hint with a name/product match", () => {
+    const map = buildApuCommitmentMap([seed()]);
+    assert.equal(applyOrderedToApuMap(map, buildFallbackIndex(map), { wbsNodeId: "wbs-1", costAnalysisLineId: "foreign-apu", productId: "prod-1", description: "Cemento", quantity: "9" }), false);
+    assert.equal(serializeApuCommitment(map.get("apu-1")!).orderedQty, "0.0000");
+  });
+
+  it("does not cover kilograms with bags, preserving the full physical shortfall", () => {
+    const map = buildApuCommitmentMap([seed()]);
+    assert.equal(applyOrderedToApuMap(map, buildFallbackIndex(map), { wbsNodeId: "wbs-1", costAnalysisLineId: "apu-1", productId: "prod-1", description: "Cemento", unit: "bolsa", quantity: "9" }), false);
+    assert.equal(serializeApuCommitment(map.get("apu-1")!).shortfallQty, "10.0000");
   });
 });

@@ -1,0 +1,1493 @@
+{
+  "phase": "AG-05",
+  "status": "independent_corrections_verified_awaiting_product_decisions",
+  "recordedAt": "2026-11-04T05:42:06.189Z",
+  "startedAt": "2026-11-04T03:59:47.008Z",
+  "branch": "codex/pruebas",
+  "head": "3407c023eb00dec9d6361e4842af016480b1c813",
+  "finalRevision": "local working tree after published HEAD; not committed or deployed",
+  "previousPublication": {
+    "sha": "3407c023eb00dec9d6361e4842af016480b1c813",
+    "pr": "https://github.com/simonbravin/bloqer-v2/pull/3",
+    "productionStatus": "success",
+    "evidence": "2026-11-04-ag-00-ag-04-publication.md"
+  },
+  "report": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.md",
+  "scope": [
+    "schedule/Gantt/Field",
+    "materials",
+    "labor/equipment",
+    "cost-control",
+    "direct D-045/D-104 writers",
+    "affected report/export/AI/help consumers"
+  ],
+  "scopeExclusions": [
+    "full procurement/inventory/AP/subcontract/accounting audits",
+    "formal RFI/contract/CO development",
+    "unapproved Q069/070/071 financial rules",
+    "external providers",
+    "authenticated production workflows"
+  ],
+  "findings": [
+    {
+      "id": "GA-AG-05-001",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "entradas de cronograma/contexto/historial omitían permisos, gates o pertenencia. Guards reales en `schedule-helpers`, `schedule.service` y consumidores; SQL de acceso directo y negativos.",
+      "codePaths": [
+        "packages/services/src/schedule/schedule-helpers.ts",
+        "packages/services/src/schedule/schedule.service.ts",
+        "packages/services/src/schedule/schedule-item-context.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-002",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "mutaciones leían antes de la serialización y podían guardar estado/auditoría incoherentes. Lock Project, relectura y auditoría atómica; rollback y carreras SQL.",
+      "codePaths": [
+        "packages/services/src/schedule/schedule.service.ts",
+        "packages/services/src/schedule/schedule-audit.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-003",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "árbol, dependencias y orden admitían referencias inconsistentes o carrera de ciclo. Validación del conjunto, extremos y jerarquía dentro del lock; batch SQL, ciclos opuestos e idempotencia comprobados.",
+      "codePaths": [
+        "packages/services/src/schedule/schedule.service.ts",
+        "packages/services/src/schedule/schedule-placement.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-004",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "fechas/datos inválidos y serialización de días alteraban recorridos. Validator de calendario real, rangos/progreso/motivos y fecha SQL sin desplazamiento por zona. No se inventó un bug horario en stock `@db.Date`.",
+      "codePaths": [
+        "packages/validators/src/schedule.ts",
+        "packages/services/src/resources/resource-variance-filters.ts",
+        "packages/services/src/materials/project-materials-board.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-005",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "una base económica ausente, inaccesible o fallada impedía planificar, contrario a D-039. Workspace temporal independiente, sin metadatos ajenos/sustituidos; advertencia económica opcional, fechas y exportaciones disponibles.",
+      "codePaths": [
+        "packages/services/src/schedule/schedule-workspace.service.ts",
+        "packages/services/src/schedule/schedule-field-workspace.service.ts",
+        "apps/web/features/schedule/components/schedule-workspace.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-006",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "D-045 podía usar parte previo y omitir un cero físico explícito. Escritores coordinados/relectura y sincronización de cero; acumulación compartida estable entre empresas verificada.",
+      "codePaths": [
+        "packages/services/src/jobsite-log/jobsite-log.service.ts",
+        "packages/services/src/schedule/schedule-progress-sync.service.ts",
+        "packages/services/src/schedule/schedule-progress-sync-pure.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-007",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "D-104 podía confirmar con fuentes/líneas obsoletas o incompatibles. Lock/relectura/validación/auditoría antes de efectos; no se cambió la semántica de AP postcommit.",
+      "codePaths": [
+        "packages/services/src/procurement/purchase-receipt.service.ts",
+        "packages/services/src/schedule/schedule-milestone-from-receipt.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-008",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "exportaciones presuponían base económica y podían construir ejes de duración no acotada. Nullable real en DTO/PDF/XLSX y máximo técnico de 120 meses calendario inclusivos para Gantt; tabla sola mantiene rango sin ese eje.",
+      "codePaths": [
+        "packages/services/src/schedule/schedule-export-pure.ts",
+        "packages/services/src/schedule/schedule-export.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-009",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "tableros y commitments podían consultar fuentes/presupuestos fuera de empresa/ACL o capacidad específica. `ServiceContext` completo, filtros por entidad y permisos de cada fuente; consumidores OC y CC adaptados.",
+      "codePaths": [
+        "packages/services/src/materials/material-commitment.ts",
+        "packages/services/src/materials/project-materials-board.service.ts",
+        "packages/services/src/resources/project-resource-board.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-010",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "adjudicación parcial eliminaba toda la SC o duplicaba cobertura. Sustitución por línea adjudicada, conservando libres y distinguiendo cobertura de compromiso financiero; SQL de adjudicación parcial.",
+      "codePaths": [
+        "packages/services/src/materials/material-commitment-pure.ts",
+        "packages/services/src/materials/project-materials-board.service.ts",
+        "packages/services/src/resources/project-resource-board.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-011",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "redondeo intermedio/unidades mezcladas distorsionaban necesidad y cobertura. Decimal, agrupación por unidad y vinculación inequívoca; unidades incompatibles separadas, sin conversiones nuevas.",
+      "codePaths": [
+        "packages/services/src/materials/project-materials-board.service.ts",
+        "packages/services/src/resources/project-resource-board.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-012",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "varianza monetaria de recursos sumaba NC como positiva. Signos D-115 y permisos/fechas coherentes; la cantidad de notas sigue en Q-070.",
+      "codePaths": [
+        "packages/services/src/resources/resource-variance.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-013",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "costos/detalle/selectores confundían empresa de obra compartida con empresa de presupuesto y podían omitir ACL. Guard independiente antes de lecturas; agrega control canónico a selector y acumulado mensual sin retirar capacidades legítimas.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/reports/report-budget-resolve.ts",
+        "packages/services/src/cost-control/project-accrued-aggregation.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-014",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "relaciones secundarias podían introducir datos de otro presupuesto/documento. Guard Budget/CostItem/APU bidireccional y validación de cabecera/línea/parent/payable/recepción/subcontrato; CONFLICT genérico sin identificadores ajenos.",
+      "codePaths": [
+        "packages/services/src/budget/budget-cost-graph.ts",
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/reports/material-variance.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-015",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "piso de compromiso agregado compensaba en exceso otras OC/tipos. Mapa por compromiso, imputación real y piso antes de agrupar; tests puros y SQL con sobreconsumo/tipificación diferente.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-exposure.ts",
+        "packages/services/src/cost-control/cost-control.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-016",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "no imputado/mensual mezclaba bruto con neto y referencias de otro presupuesto. Neto D-095, signos D-115, company scope y selección de WBS correcta; SQL con impuestos y adenda.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/cost-control/project-accrued-aggregation.ts",
+        "packages/services/src/reports/project-income-expense.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-017",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "cantidades de recurso se comparaban con unidad de partida distinta. DTO nullable/UI/CSV coherentes; importes sin conversión de unidades.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-control-types.ts",
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/report-exports/report-export.service.ts",
+        "apps/web/features/cost-control/components/cost-control-table.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-018",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "documentos filtrados y resumen de detalle podían describir períodos distintos. Mismo rango de fechas, `periodFiltered`, rótulos de período y ocultación de saldos globales; SQL y revisión independiente.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "apps/web/features/cost-control/components/wbs-item-drilldown.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-019",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "consultas financieras auxiliares se usaban como condición de entrada a tableros de cantidades. Selector accesible de presupuestos, sin probe económico redundante; D-039 preservado.",
+      "codePaths": [
+        "packages/services/src/reports/report-budget-resolve.ts",
+        "apps/web/features/resources/resource-board-page.tsx",
+        "apps/web/app/(app)/proyectos/[id]/materiales/page.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-020",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "fuentes restringidas podían aparentar costo completo y tool AI omitía advertencias. Gate/permiso antes de leer cada fuente y warnings conservados en consumidores/AI; fuentes omitidas no se confunden con ausencia probada.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/ai/tools/materials-tools.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-021",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "actions no vinculaban siempre entidad/obra ni normalizaban errores/refresh de todos los consumidores. Binding service, Zod/error funcional e invalidación coherente de cronograma/materiales/recursos/costos/avances.",
+      "codePaths": [
+        "apps/web/features/schedule/actions/schedule-actions.ts",
+        "packages/services/src/schedule/schedule.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-022",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "doble envío, cierre pendiente y respuesta tardía podían perder contexto/datos de usuario. Mutex síncrono, recuperación de red, campos preservados y descarte de requests anteriores; evidencia focal y navegador de importación pendiente.",
+      "codePaths": [
+        "apps/web/features/schedule/lib/use-schedule-action.ts",
+        "apps/web/features/schedule/components/schedule-item-dialog.tsx",
+        "apps/web/features/schedule/components/schedule-import-dialog.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-023",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "filtros Field y búsqueda diferida podían quedar desalineados al navegar/limpiar. Sincronización URL/estado y cancelación explícita del debounce; consumidores compartidos preservan API compatible.",
+      "codePaths": [
+        "apps/web/hooks/use-debounced-search-param.ts",
+        "apps/web/features/cost-control/components/cost-control-filters.tsx",
+        "apps/web/features/schedule/components/schedule-field-experience.tsx",
+        "apps/web/features/materials/materials-field-experience.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-024",
+      "priority": "P1",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "helper puro importado desde frontera `use client` impedía su uso servidor. Extraído a adapter puro; regresión RSC y tipos/build verifican esa frontera.",
+      "codePaths": [
+        "apps/web/features/schedule/adapters/schedule-progress-values.ts",
+        "apps/web/features/schedule/components/schedule-progress-dimensions.tsx"
+      ]
+    },
+    {
+      "id": "GA-AG-05-025",
+      "priority": "P2",
+      "state": "Resuelto localmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "KPI sumaban unidades heterogéneas, faltaban unidades/moneda explícitas y una barra corta cortaba el porcentaje. Conteos de filas, unidad por fila, ISO de presupuesto, null visible, controles accesibles y porcentaje solo con espacio, manteniendo tooltip. `CalendarBody` además omitía keys estables en sus features: Fragment por ID elimina la advertencia real de React; el contador adicional usa «más». Sin nuevas fórmulas. Las últimas correcciones de presentación se verificaron con captura/recarga, tipos, lint y build, sin inventar tests cosméticos.",
+      "codePaths": [
+        "apps/web/components/kibo-ui/calendar/index.tsx",
+        "apps/web/features/materials/materials-board-table.tsx",
+        "apps/web/features/resources/resource-board-table.tsx",
+        "apps/web/features/schedule/components/schedule-gantt-view.tsx",
+        "apps/web/app/globals.css"
+      ]
+    },
+    {
+      "id": "GA-AG-05-026",
+      "priority": "P2",
+      "state": "Resuelto documentalmente",
+      "status": "resolved_locally",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "resumen de MONEY_MODEL describía OC APPROVED como compromiso, contradiciendo D-044/estados reales. Se conservan estados CONFIRMED/PARTIALLY_RECEIVED/RECEIVED, piso por compromiso y fallback D-066 en fórmulas; `## Hallazgo` registra la contradicción resuelta.",
+      "codePaths": [
+        "docs/bloqer2.0/03-finance/MONEY_MODEL.md",
+        "docs/bloqer2.0/04-formulas/COST_FORMULAS.md"
+      ]
+    },
+    {
+      "id": "GA-AG-05-027",
+      "priority": "P1",
+      "state": "Pendiente de Q-069",
+      "status": "product_decision_pending",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "importes originales de monedas distintas no son comparables por declarar una moneda. [Propuesta](./2026-11-04-ag-05-comparability-scope-proposal.md): base nativa del presupuesto y error funcional al detectar otra moneda; sin FX implícito ni omisión silenciosa. Guard financiero aún no aplicado.",
+      "codePaths": [
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/resources/resource-variance.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-028",
+      "priority": "P2",
+      "state": "Pendiente de Q-070",
+      "status": "product_decision_pending",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "cantidades de NC/ND se suman positivas en cobertura de recursos. D-115 solo resuelve dinero. [Propuesta](./2026-11-04-ag-05-resource-notes-proposal.md): cantidades netas por recurso/unidad, o alternativa INVOICE-only. No se adoptó una fórmula sin aprobación.",
+      "codePaths": [
+        "packages/services/src/resources/project-resource-board.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-029",
+      "priority": "P1",
+      "state": "Pendiente de Q-071",
+      "status": "product_decision_pending",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "consumos sin costo/moneda trazables aparecen como cero, pudiendo afirmar ahorro no demostrado. [Propuesta](./2026-11-04-ag-05-stock-valuation-proposal.md): Sin valuación/— y varianza no calculable; sin FIFO, FX ni backfill. D-083 difiere la valuación completa; no se inventó costo de stock.",
+      "codePaths": [
+        "packages/services/src/reports/material-variance.service.ts",
+        "packages/services/src/cost-control/cost-control.service.ts",
+        "packages/services/src/inventory/stock-movement.service.ts",
+        "packages/services/src/procurement/purchase-receipt.service.ts"
+      ]
+    },
+    {
+      "id": "GA-AG-05-030",
+      "priority": "P2",
+      "state": "Brecha de alcance, decisión pendiente",
+      "status": "scope_decision_pending",
+      "origin": "not_individually_attributed_to_historical_commit",
+      "details": "RFIs no implementadas; no se confunden con partes de obra/adendas económicas. Se propone diferir desarrollo formal con definición propia mediante Q-069; Q-006 y Q-057 mantienen su estado. No se presenta ausencia de módulo como bug de una implementación existente.",
+      "codePaths": [
+        "docs/bloqer2.0/02-modules/RFIS.md",
+        "docs/bloqer2.0/02-modules/CHANGE_ORDERS.md"
+      ]
+    }
+  ],
+  "verification": {
+    "general": {
+      "passed": 2182,
+      "failed": 0,
+      "skippedSuites": [
+        "D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)",
+        "Bloqer AI live isolation (Neon DEV)",
+        "AP integrity (isolated database)",
+        "AG-04 budgets: lifecycle, isolation, rollback and policy locks",
+        "AG-04 WBS/APU: SQL graph, import volume and atomic integrity",
+        "certification → invoice → receivable → collection (isolated DB)",
+        "AG-03 CLIENT/project concurrency on isolated SQL",
+        "AG-03 directory on an explicitly isolated SQL database",
+        "AG-05 cost control: real scopes, allocation and comparability",
+        "AG-05 cost sources: SQL relations, APU identity and document scope",
+        "AG-05 planning boards: isolated SQL scope, coverage and date-only values",
+        "AG-01 first workspace SQL lifecycle",
+        "procurement regression baseline (isolated database)",
+        "D-118 quote coverage and historical preservation (isolated database)",
+        "AG-03 Projects functional SQL audit",
+        "D-111 Phase C membership admin (Neon DEV)",
+        "AG-03 project row locks, FK checks and ACL administration",
+        "AG-05 schedule SQL integrity",
+        "AG-04 budget to schedule SQL atomicity",
+        "AG-01 project/company/notification SQL isolation",
+        "AG-01 tenant administration (isolated audit database)",
+        "AG-01 context and settings on an isolated SQL database",
+        "user service PostgreSQL profile and owner safeguards",
+        "credentials PostgreSQL lifecycle"
+      ],
+      "job": "test",
+      "startedAt": "2026-11-04T05:10:49.447Z",
+      "finishedAt": "2026-11-04T05:11:55.464Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": "output/platform-audit/ag-05-2026-11-04/verification-test.log",
+      "databaseDisabled": true,
+      "externalServicesDisabled": true,
+      "lastPurePresentationChanges": "General run preceded final unit/currency/calendar-key presentation fixes; final typecheck, lint, build, UI reload and docs index check cover those edits without new cosmetic-only tests."
+    },
+    "typecheck": {
+      "job": "typecheck-final",
+      "startedAt": "2026-11-04T05:25:18.766Z",
+      "finishedAt": "2026-11-04T05:26:39.019Z",
+      "exitCode": 0,
+      "log": "output/platform-audit/ag-05-2026-11-04/verification-typecheck-final.log",
+      "databaseDisabled": true
+    },
+    "lint": {
+      "job": "lint-final",
+      "startedAt": "2026-11-04T05:25:18.779Z",
+      "finishedAt": "2026-11-04T05:25:54.691Z",
+      "exitCode": 0,
+      "log": "output/platform-audit/ag-05-2026-11-04/verification-lint-final.log",
+      "databaseDisabled": true
+    },
+    "sql": {
+      "distinctPassed": 81,
+      "failedInFinalSelections": 0,
+      "newAg05": 72,
+      "ag04ImportRegression": 9,
+      "groups": {
+        "schedule": {
+          "distinct": 39,
+          "runs": [
+            {
+              "log": "schedule-live-final.log",
+              "passed": 32,
+              "failed": 0,
+              "cases": [
+                "all direct writes respect disabled schedule, including same-status requests",
+                "a reader cannot bypass EDIT with a same-status Kanban request",
+                "write audit failure rolls back every mutation, including sibling ranks and links",
+                "rechecks a project paused after preflight before changing a task",
+                "permits planning in DRAFT and prevents fresh writes in final project states",
+                "serializes inverse dependency additions so a concurrent pair cannot create a cycle",
+                "reuses a duplicate dependency without a second row or audit",
+                "rejects a parent or route entity from another project",
+                "does not link WBS groups or a baseline owned by another company",
+                "enforces project assignment on helpers and direct schedule reads",
+                "applies module gates to task context and history without leaking disabled sources",
+                "returns read-only Field and desktop workspaces on a paused project without seeding baseline",
+                "allows independent desktop planning before any budget is approved",
+                "keeps temporal planning usable with BUDGETS disabled and does not rewrite its baseline",
+                "moves a 503-sibling schedule with one batch update and keeps all ranks",
+                "approval synchronizes TASK progress atomically and leaves MILESTONE unchanged",
+                "a precached draft edit cannot replace progress after submit and approval synchronize the schedule",
+                "concurrent submissions recheck the physical cap under the project lock",
+                "an explicit approved zero resets a manual exception instead of ignoring the measurement",
+                "approval audit failure rolls back both the log and schedule sync",
+                "a project paused after approval preflight prevents the source and schedule effect",
+                "receipt confirmation completes a linked milestone while preserving TASK progress",
+                "a project paused after receipt preflight prevents its milestone and quantity effects",
+                "concurrent imports create one schedule and one task/link per WBS node",
+                "concurrent ensure calls reuse one schedule and one creation event",
+                "a failing creation audit rolls back schedule creation",
+                "a failing import audit rolls back baseline, tasks and links on an existing schedule",
+                "rejects a budget outside this project without creating a schedule",
+                "blocks import on a paused project without changing its planning",
+                "cannot copy a company-owned budget through a shared project from another company",
+                "audits an empty budget baseline change without inventing imported tasks",
+                "imports 503 tasks and their WBS links with two batch writes"
+              ]
+            },
+            {
+              "log": "schedule-residual-live.log",
+              "passed": 5,
+              "failed": 0,
+              "cases": [
+                "hides financial metadata when the persisted baseline belongs to another company",
+                "an optional financial conflict preserves tasks, authorized links and temporal export with a warning",
+                "does not swallow authorization or unexpected financial read failures",
+                "receipt confirmation completes a linked milestone while preserving TASK progress",
+                "rejects a receipt line from a different order before changing quantities or milestones"
+              ]
+            },
+            {
+              "log": "schedule-closing-live.log",
+              "passed": 4,
+              "failed": 0,
+              "cases": [
+                "exports and reopens a real temporal XLSX without an invented currency or Gantt sheet",
+                "ignores legacy dependencies whose counterpart belongs to another schedule",
+                "an optional financial conflict preserves tasks, authorized links and temporal export with a warning",
+                "preserves the global Real of a shared WBS regardless of the approving company order"
+              ]
+            }
+          ]
+        },
+        "boards": {
+          "distinct": 11,
+          "runs": [
+            {
+              "log": "resources-sql-final.log",
+              "passed": 10,
+              "failed": 0,
+              "cases": [
+                "rejects unassigned and other-company projects before material/resource data",
+                "does not expose another company's budget under the shared project",
+                "keeps different material units separate and excludes another company's requests",
+                "preserves SQL DATE labels and flags a linked task without dates as unscheduled",
+                "counts active draft awards once and retains the other unawarded request lines",
+                "subtracts credit notes from net monetary resource variance without mixing company sources",
+                "does not return purchase/AP IDs or figures without their source permissions",
+                "honors disabled source modules while preserving budget needs",
+                "never covers an APU need with a different physical unit in its request",
+                "rejects a disabled root module instead of querying its planning data"
+              ]
+            },
+            {
+              "log": "resources-relational-sql.log",
+              "passed": 1,
+              "failed": 0,
+              "cases": [
+                "does not expose legacy APU children whose budget contradicts their cost item"
+              ]
+            }
+          ]
+        },
+        "costRelations": {
+          "distinct": 16,
+          "runs": [
+            {
+              "log": "cost-relations-sql.log",
+              "passed": 12,
+              "failed": 0,
+              "cases": [
+                "rejects CostItem budget/WBS contradictions before reporting monetary values",
+                "rejects APU budget/CostItem contradictions instead of silently excluding the child",
+                "rejects an own invoice pointing to another tenant's PO header",
+                "rejects an own invoice pointing to a PO from another company on the shared project",
+                "rejects a PO-line FK from a different project even without a header link",
+                "rejects a line from another PO of the same project when the invoice has a header",
+                "checks the related PO of a note's older parent even when the parent is outside the period",
+                "rejects a note whose parent belongs to another tenant",
+                "rejects an own payment whose payable belongs to another tenant",
+                "rejects distinct payment and payable invoice IDs even within the same scope",
+                "rejects a foreign APU hint reached only through a PO line",
+                "preserves shared budgets and classifies retagged invoice/payment by their own APU"
+              ]
+            },
+            {
+              "log": "cost-relations-receipts-subcontracts-sql.log",
+              "passed": 4,
+              "failed": 0,
+              "cases": [
+                "rejects a receipt line whose receipt header belongs to a different PO",
+                "keeps a valid receipt in net received cost after relation validation",
+                "rejects a certification line taken from a different subcontract",
+                "keeps a valid subcontract certification and its precise exposure"
+              ]
+            }
+          ]
+        },
+        "costControl": {
+          "distinct": 15,
+          "runs": [
+            {
+              "log": "cost-control-live-final.log",
+              "passed": 13,
+              "failed": 0,
+              "cases": [
+                "checks project ACL before detail, selectors and accrued queries",
+                "filters budget company independently of a shared project",
+                "does not offset over-invoicing against a different order or cost type",
+                "a credit without direct PO links consumes the same unique commitment as its invoice",
+                "keeps unassigned accrual net of IVA",
+                "does not label a different budget's spend as unassigned",
+                "does not equate resource quantities in kg with the WBS unit",
+                "monthly accrual uses net cost and the same company scope",
+                "material variance rejects an APU child with a contradictory budget",
+                "material and resource CSV exports identify the budget currency",
+                "applies the document period to the drilldown and rejects impossible dates",
+                "excludes AP and order details for an assigned foreman without those source permissions",
+                "preserves restricted-source warnings in the AI materials interface"
+              ]
+            },
+            {
+              "log": "cost-control-residual-live.log",
+              "passed": 4,
+              "failed": 0,
+              "cases": [
+                "material variance rejects an APU child with a contradictory budget",
+                "material variance rejects a CostItem declared in A but linked to WBS B",
+                "material variance rejects an APU declared in A but linked to CostItem B",
+                "applies the document period to the drilldown and rejects impossible dates"
+              ]
+            }
+          ]
+        }
+      },
+      "effectiveDatabase": "bloqer_audit_ag01_20261103",
+      "effectiveHost": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+      "migrations": 70,
+      "guardBeforeFixtureWrites": true
+    },
+    "pdf": {
+      "passed": 3,
+      "log": "schedule-pdf-smoke-final.log",
+      "separateFromGeneralRunner": true
+    },
+    "xlsx": "Real public export buffers generated and reopened in isolated SQL; not browser download",
+    "build": {
+      "job": "production-build",
+      "startedAt": "2026-11-04T05:30:29.614Z",
+      "finishedAt": "2026-11-04T05:32:40.199Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": "output/platform-audit/ag-05-2026-11-04/verification-build.log",
+      "databaseDisabled": true,
+      "vercelUnset": true,
+      "providersNotExercised": true,
+      "note": "Build used disabled DB and unset VERCEL. Existing app env.local AI configuration could load during Next compilation; no AI/provider requests were exercised. Preview explicitly shadows those keys with disabled values."
+    },
+    "visual": {
+      "phase": "AG-05",
+      "origin": "http://localhost:3100",
+      "projectId": "8c543210-c6a6-4a5e-9fb6-e1014f29f8d4",
+      "syntheticOnly": true,
+      "role": "OWNER",
+      "checks": [
+        {
+          "name": "Invalid dates preserve input",
+          "result": "passed: dialog remained open and values were preserved; no task created"
+        },
+        {
+          "name": "Create one unlinked task",
+          "result": "passed: one named task persisted and focus returned to opener"
+        },
+        {
+          "name": "Table view",
+          "result": "passed: URL view=table and task dates 04/11/2026–10/11/2026, independent financial cells —"
+        },
+        {
+          "name": "Manual task progress",
+          "result": "passed: 25% persisted, task shown En curso after refresh"
+        },
+        {
+          "name": "Import EDT without draft dates",
+          "result": "passed: one linked task appeared with no start/end; original task kept 25% and dates"
+        },
+        {
+          "name": "Import pending dismissal guard",
+          "result": "passed: Escape left the importing dialog open and disabled"
+        },
+        {
+          "name": "Kanban view",
+          "result": "passed: URL view=kanban and both linked/unlinked tasks present with their state actions"
+        },
+        {
+          "name": "Gantt desktop dark",
+          "result": "passed: linked task without dates and 25% independent task, 1440×1000, document width 1440"
+        },
+        {
+          "name": "Gantt short-bar labels",
+          "result": "passed: monthly 12.67px label hidden, tooltip retains 25%; daily 282.67px label visible"
+        },
+        {
+          "name": "Field 390px light",
+          "result": "passed: no page overflow, today task25%, detail sheet/close, Todas includes undated linked item"
+        },
+        {
+          "name": "Field search/clear",
+          "result": "passed: AG05 search hides the other row, clearing restores both rows"
+        },
+        {
+          "name": "Materials Field light 390px",
+          "result": "passed: one synthetic material, 10un need/shortfall, no-date preserved, detail and Pedir link prefilled correctly, document width390"
+        },
+        {
+          "name": "Labor desktop light",
+          "result": "passed: operational tab, row-count KPIs and truthful empty APU message; no positive labor rows in browser fixture"
+        },
+        {
+          "name": "Equipment desktop light",
+          "result": "passed: operational tab, row-count KPIs and empty APU message; positive quantities covered by SQL, not browser"
+        },
+        {
+          "name": "Cost detail period and currency",
+          "result": "passed: dateFrom=2026-11-01/dateTo=2026-11-30 passed into detail, physical/economic/cost titles say período, no global Restante/Saldo qty, budget currency ARS explicit; synthetic document costs zero"
+        },
+        {
+          "name": "Materials desktop units/currency",
+          "result": "passed after correction: Unidad visible beside material, Moneda ARS, Presup. (ARS), quantity row10 and row-count KPIs, 1440px no page overflow"
+        },
+        {
+          "name": "Calendar desktop",
+          "result": "passed: view=calendar, selected button and dated AG05 task present in November2026; undated linked task not asserted on calendar"
+        },
+        {
+          "name": "Calendar stable feature keys",
+          "result": "passed: actual React key warning reproduced in CalendarBody, stable keyed Fragment applied, fresh reload keeps task and produces no new warn/error logs; +N más translated"
+        },
+        {
+          "name": "VIEWER optional project navigation",
+          "result": "incomplete: login and assigned-project dashboard observed; dev server exited with JavaScript heap OOM before assigned project loaded; no read-only screen claimed"
+        },
+        {
+          "name": "VIEWER compiled local build",
+          "result": "passed: existing assigned project and schedule loaded; no create/import actions; task dialog shows stored dates/progress as text with no save/mutation controls; original dark theme restored. This short smoke does not prove long-run memory stability."
+        }
+      ],
+      "observedLimits": [
+        "Desktop1440x1000 dark/light and emulated phone390x844 light; not physical device or screen reader audit",
+        "SQL covers positive labor/equipment; browser fixture has empty labor/equipment",
+        "No browser download event attempted",
+        "Dev server OOM log preserved; do not infer production failure from this result"
+      ],
+      "recordedAt": "2026-11-04T05:36:21.218Z",
+      "rolesObserved": [
+        "OWNER",
+        "VIEWER"
+      ],
+      "preview": {
+        "mode": "local compiled production build",
+        "role": "VIEWER",
+        "viewport": "1280x720 default",
+        "theme": "dark",
+        "signedOut": true,
+        "positiveScheduleReadOnly": true,
+        "origin": "http://localhost:3100"
+      },
+      "cleanup": {
+        "viewportReset": true,
+        "themeRestored": true,
+        "ownerSignedOut": true,
+        "viewerSignedOut": true,
+        "errorTab": "temporary dev-error tab could not be closed through URL policy; left unmarked for automatic end-of-turn cleanup",
+        "finalCompiledTabClosed": true
+      }
+    },
+    "documentationLinks": {
+      "at": "2026-11-04T05:41:03.271Z",
+      "markdownFiles": 17,
+      "localLinksChecked": 416,
+      "newBrokenLinks": [],
+      "preexistingBrokenLinks": []
+    },
+    "knowledge": {
+      "chunks": 529,
+      "sourceHashPrefix": "b151b22517de",
+      "freshnessExitCode": 0
+    },
+    "independentReview": {
+      "reviewers": [
+        "ag05_frontend",
+        "release_verification"
+      ],
+      "revalidation": "Two cost residuals fixed; four SQL cases passed by coordinator reviewed independently; verifier executed10webtests passed. Schedule financial-fallback residuals fixed and revalidated.",
+      "withdrawnObservation": "Stock movementDate is @db.Date; timestamp end-of-day repro not applicable."
+    },
+    "canvas": {
+      "at": "2026-11-04T05:21:29.496Z",
+      "file": "C:/Users/bravi/.cursor/projects/c-Dev-bloqer-v2/canvases/bloqer-platform-audit.canvas.tsx",
+      "errors": []
+    }
+  },
+  "decisionsPending": [
+    {
+      "id": "Q-069",
+      "proposal": "2026-11-04-ag-05-comparability-scope-proposal.md",
+      "approvalReceived": false,
+      "implemented": false
+    },
+    {
+      "id": "Q-070",
+      "proposal": "2026-11-04-ag-05-resource-notes-proposal.md",
+      "approvalReceived": false,
+      "implemented": false
+    },
+    {
+      "id": "Q-071",
+      "proposal": "2026-11-04-ag-05-stock-valuation-proposal.md",
+      "approvalReceived": false,
+      "implemented": false
+    }
+  ],
+  "schemaChanged": false,
+  "newDependencies": false,
+  "envFilesEdited": false,
+  "ag05Published": false,
+  "nextPhaseStarted": false,
+  "observations": [
+    {
+      "id": "P-AG05-01",
+      "status": "open_observation",
+      "detail": "Long HMR dev session exited with heap OOM; short fresh compiled VIEWER smoke passed. No confirmed product cause or long-term memory guarantee."
+    }
+  ],
+  "cleanup": {
+    "dev": {
+      "phase": "AG-05",
+      "pid": 38868,
+      "startedAt": "2026-11-04T04:26:47.588Z",
+      "origin": "http://localhost:3100",
+      "database": "bloqer_audit_ag01_20261103",
+      "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+      "externalServicesDisabled": true,
+      "syntheticOnly": true,
+      "stoppedAt": "2026-11-04T05:29:45.6725019Z",
+      "stopReason": "Dev child terminated after FATAL ERROR JavaScript heap out of memory during optional VIEWER project navigation; source log preserved.",
+      "recordedProcessTreeAbsent": true,
+      "port3100Listening": false
+    },
+    "compiled": {
+      "phase": "AG-05",
+      "mode": "fresh compiled production build, local only",
+      "pid": 72868,
+      "startedAt": "2026-11-04T05:33:40.5Z",
+      "origin": "http://localhost:3100",
+      "database": "bloqer_audit_ag01_20261103",
+      "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+      "externalProviderEnvShadowed": true,
+      "syntheticOnly": true,
+      "ephemeralAuthSecretPersisted": false,
+      "log": "output/platform-audit/ag-05-2026-11-04/preview-server.log",
+      "stoppedAt": "2026-11-04T05:37:46.5685786Z",
+      "stoppedProcessIds": [
+        72868
+      ],
+      "port3100Listening": false,
+      "viewerSignedOut": true,
+      "shortSmokeWorkingSetBytes": 412712960,
+      "memoryLimit": "One short compiled smoke; not a long-running memory regression or production benchmark."
+    }
+  },
+  "attribution": {
+    "initial": "output/platform-audit/ag-05-2026-11-04/initial-snapshot.json",
+    "manifest": "output/platform-audit/ag-05-2026-11-04/final-manifest.json",
+    "note": "JSON excludes its own recursive hash; runtime manifest additionally hashes this JSON. Prior-publication record is evidence of first objective, not an AG05 product change.",
+    "files": [
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/control-costos/[wbsNodeId]/page.tsx",
+        "status": "modified",
+        "sha256": "ae92bba87a22a023bbd66654e98bd208e0e2bff3ef04754e1f1a7b315901baa1"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/control-costos/page.tsx",
+        "status": "modified",
+        "sha256": "7f556db96410e2aa1e123ef237a677bfaa7c0db5dfc8c2f3036648fa76001cd6"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cronograma/page.tsx",
+        "status": "modified",
+        "sha256": "784f40235f71973300c88baa8fc45dbea69d7b0aba801906e6933aac8c7da892"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/materiales/page.tsx",
+        "status": "modified",
+        "sha256": "fcf11072732b9481812bab35a5ebb1ccb09993aa06af317b113ba1bd0a033e33"
+      },
+      {
+        "path": "apps/web/app/api/reports/proyectos/[projectId]/control-costos.csv/route.ts",
+        "status": "modified",
+        "sha256": "09e5befd43d86d239cb003c788b1ca83b77dca8d40b4e6c5b85fdfa2d70de63a"
+      },
+      {
+        "path": "apps/web/app/api/reports/proyectos/[projectId]/materiales.csv/route.ts",
+        "status": "modified",
+        "sha256": "3c2615e69c49822edd113e1cdcf9459edd7c70fd4a27a3654de623a5425b3a3c"
+      },
+      {
+        "path": "apps/web/app/api/reports/proyectos/[projectId]/recursos.csv/route.ts",
+        "status": "modified",
+        "sha256": "51ddb4ee0bbd2f40e83f1fe672a0c6d23b6769d4ab70894c727263d3c9003c1a"
+      },
+      {
+        "path": "apps/web/app/globals.css",
+        "status": "modified",
+        "sha256": "7473a47cd564e6d733a66a7ccca9e435265e848697605d8def3527bd14b45930"
+      },
+      {
+        "path": "apps/web/components/kibo-ui/calendar/index.tsx",
+        "status": "modified",
+        "sha256": "41ac290f21c698e200338c89bff58b5d84ae5f1a8319ce46aaf3b80ecf07a64f"
+      },
+      {
+        "path": "apps/web/features/cost-control/components/cost-control-filters.tsx",
+        "status": "modified",
+        "sha256": "f145692fa76174f1d167cc350aaa41da0b40bf8fa8925d674426c2ce55fe4730"
+      },
+      {
+        "path": "apps/web/features/cost-control/components/cost-control-summary-cards.tsx",
+        "status": "modified",
+        "sha256": "a6fc4862d2d16760678e8de39a84e6324e32603c990f548fc9869e9eb78099ce"
+      },
+      {
+        "path": "apps/web/features/cost-control/components/cost-control-table.tsx",
+        "status": "modified",
+        "sha256": "411eff5a1085309965f27bcfd75c6b7382e5f53e76b9f3d753f6795cef3397b8"
+      },
+      {
+        "path": "apps/web/features/cost-control/components/wbs-item-drilldown-dialog.tsx",
+        "status": "modified",
+        "sha256": "9b0154f594e3749c429ee6c075db970f49ab950e80c93a783c6cb92ce76018e0"
+      },
+      {
+        "path": "apps/web/features/cost-control/components/wbs-item-drilldown.tsx",
+        "status": "modified",
+        "sha256": "bb3dc8cd0e0c7220f627c81212e4ce5443971e15e54d73f8f2aa457bd2e0a936"
+      },
+      {
+        "path": "apps/web/features/cost-control/lib/cost-control-views.test.ts",
+        "status": "added",
+        "sha256": "c4d0019dab20b0b9e4dfe5ba0307fc94f464b0b97527b380c304bceffba1fe80"
+      },
+      {
+        "path": "apps/web/features/cost-control/lib/planning-export-routes.test.ts",
+        "status": "added",
+        "sha256": "b1aafd825804bfbd556bdc32d40e9b0570c6a7d4075a433642e662bf879b052d"
+      },
+      {
+        "path": "apps/web/features/cost-control/lib/planning-read-error.tsx",
+        "status": "added",
+        "sha256": "300fd33d1aa502542dbcb21b2265b3e2282a73470ec9608fd9d1acb6ab2005eb"
+      },
+      {
+        "path": "apps/web/features/help/lib/articles/control.ts",
+        "status": "modified",
+        "sha256": "15f4c5a15e66c46b70ab8cefc4f95202254f6c79d4da2550d745c3ac9dd857d0"
+      },
+      {
+        "path": "apps/web/features/help/lib/articles/planning-procurement.ts",
+        "status": "modified",
+        "sha256": "72172a13daed6547fea91113af3d16f7a6af37d3ed3b69a243843aabc60f1ede"
+      },
+      {
+        "path": "apps/web/features/materials/materials-board-table.tsx",
+        "status": "modified",
+        "sha256": "3f5a699aaf08342cf881b3a6bcf76ef46e0c96c5e805227b827c34cc0a8cc2b6"
+      },
+      {
+        "path": "apps/web/features/materials/materials-field-experience.tsx",
+        "status": "modified",
+        "sha256": "c2f697213da592e58378cf8da70d00f517e0f3a5d5e77862e57b9f0a7ee426ee"
+      },
+      {
+        "path": "apps/web/features/projects/cost-type-comparison-chart.tsx",
+        "status": "modified",
+        "sha256": "95f9ad78cbfe8c1bd23d405253c381648758a001c4103168ce9e21e6f3fdba7a"
+      },
+      {
+        "path": "apps/web/features/reports/budget-composition-chart.tsx",
+        "status": "modified",
+        "sha256": "14f0f07b1d0c233168ad21215abb354124aebe8b0028237c5c273decccd7dec6"
+      },
+      {
+        "path": "apps/web/features/reports/material-wbs-table.tsx",
+        "status": "modified",
+        "sha256": "b9b65baa24aa95c7ae4568e8b5930b9b141e9d66d470049e490ebca4d42b248d"
+      },
+      {
+        "path": "apps/web/features/resources/resource-board-page.tsx",
+        "status": "modified",
+        "sha256": "5ad60fba7930c446c73e311ab4fbc2bee32519ed1c17d7a76be52daec646fe5c"
+      },
+      {
+        "path": "apps/web/features/resources/resource-board-table.tsx",
+        "status": "modified",
+        "sha256": "3ff8c872418db8043b107f197e84243e2a84713c8b497001bf2f04823c1f71ba"
+      },
+      {
+        "path": "apps/web/features/schedule/actions/schedule-actions.ts",
+        "status": "modified",
+        "sha256": "20faa4ec5b26911e5cf857805c9ba0676bbbfd5c297315c3acb2b1adc986deb0"
+      },
+      {
+        "path": "apps/web/features/schedule/adapters/schedule-progress-values.ts",
+        "status": "added",
+        "sha256": "71e6646e5131241f5431281aed0e9662dc2cc979a434a22482eb194a09fb3c08"
+      },
+      {
+        "path": "apps/web/features/schedule/adapters/schedule-view-types.ts",
+        "status": "modified",
+        "sha256": "d97ff6fbb865988cc5add362fc61cabd24191e1cdbf3438bf50064bfad95fc51"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-block-dialog.tsx",
+        "status": "modified",
+        "sha256": "c4bca89411e1165b315d8912b4d793a7a5008a8518dc1b190e6c09adf86515b1"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-calendar-view.tsx",
+        "status": "modified",
+        "sha256": "fb9a21651035f89d331f129ba772c868fd48657c387b9c45aa5cc0bd4303aa47"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-cancel-dialog.tsx",
+        "status": "modified",
+        "sha256": "0f3e72450d9e60d8a8deeec45ef62f527fdb0db092b0b9ccb13ab4d453a8d0c3"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-create-dialog.tsx",
+        "status": "modified",
+        "sha256": "0d45031b85ae7498b027d4645adc894ab694d515d15a0353d062d136b461c39e"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-empty-state.tsx",
+        "status": "modified",
+        "sha256": "1bf2f60569b57f1423b0f80dbe4e5a253269a521c3f0d7746c9a29138e945681"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-field-experience.tsx",
+        "status": "modified",
+        "sha256": "e16fe480b7aad35fd4357a6025517ea29114a7738ff1ba4881efe0c72e88c712"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-field-item-sheet.tsx",
+        "status": "modified",
+        "sha256": "900582aa2af25c434aadfb6409ede7d276c46ae5c5680b60c1298fae99bdf6d8"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-filters.tsx",
+        "status": "modified",
+        "sha256": "60c964741c5cd9624d07afaf6ef26ac314f8c4a280af86942295b0caa7c8eccc"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-gantt-toolbar.tsx",
+        "status": "modified",
+        "sha256": "b9a5ce3cebc8f4b2cc936569ba0f3535bb99bb338e47080d26375516eef7177a"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-gantt-view.tsx",
+        "status": "modified",
+        "sha256": "96794e14aeab28ea7e6195e5c0cbfd371e619f4d0d764d90317854c96e44647b"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-import-dialog.tsx",
+        "status": "modified",
+        "sha256": "af3f6656349f18dfedd656c5fc3c9c0fb436eb86abfabb12e065e4d6be51b5de"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-item-dialog.tsx",
+        "status": "modified",
+        "sha256": "f1acc65d4dd8d2f8db61b87ff273f75ccabf2728e63f9cd1597f99449e144107"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-kanban-view.tsx",
+        "status": "modified",
+        "sha256": "1c805838af8f34e2ab87a3170cf27a96645fdf2cda217135eee421e22583bf79"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-progress-dimensions.tsx",
+        "status": "modified",
+        "sha256": "c96ad831df0e21f4d036a12566f6661eb5a35cb10780821d7461ed4b0f1eb81d"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-reorder-controls.tsx",
+        "status": "modified",
+        "sha256": "0498c63dadf044d2bc01e0de9b28e9fe82cd2a00c51bc59fc682b690f1f98b21"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-table-view.tsx",
+        "status": "modified",
+        "sha256": "bd0b3a51511fadf1a32a1fda909f679b197a67a04334d072a879672e6824e5d8"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-wbs-picker.tsx",
+        "status": "modified",
+        "sha256": "9791240fb22fa479c8125573537e824743cc1e3f943cf733997eb83480157467"
+      },
+      {
+        "path": "apps/web/features/schedule/components/schedule-workspace.tsx",
+        "status": "modified",
+        "sha256": "d180831d0ccdb3dab244da4cf642b15114aaaaca817923be38a6663eadf82aab"
+      },
+      {
+        "path": "apps/web/features/schedule/lib/schedule-actions.test.ts",
+        "status": "added",
+        "sha256": "b20cd927cca61391c1fa5134f11b6e68ea6c1b0b5e79a0efa371a5115daad441"
+      },
+      {
+        "path": "apps/web/features/schedule/lib/schedule-interactions.test.ts",
+        "status": "added",
+        "sha256": "f9d5b5888a2bac87387d74a2a80b0965a96f79dc9302f8a3d1966a50c4cce9b6"
+      },
+      {
+        "path": "apps/web/features/schedule/lib/use-schedule-action.ts",
+        "status": "added",
+        "sha256": "2adbdc122f2d7effb39d1b301af8b3c7719f077365699ab593116177d2b0a5b3"
+      },
+      {
+        "path": "apps/web/hooks/use-debounced-search-param.test.ts",
+        "status": "added",
+        "sha256": "41acb328a57fdc274f52e8a0a89311658f7c6b74bcfa43a18db8847e3a3d013d"
+      },
+      {
+        "path": "apps/web/hooks/use-debounced-search-param.ts",
+        "status": "modified",
+        "sha256": "3297e61de1c1f0a786979726519844978f021221eefc0998eb008a3b049acd77"
+      },
+      {
+        "path": "docs/bloqer2.0/00-product/OPEN_QUESTIONS.md",
+        "status": "modified",
+        "sha256": "223a4512a4728faea05d93b440aef10b95284eb326b55a194ff04d7dae565730"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/CHANGE_ORDERS.md",
+        "status": "modified",
+        "sha256": "be3600d5ab1700aa6a030c46d9134ccf457b09e728af9b9ef4f208a0b7aa2eb3"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/PROJECT_SCHEDULING.md",
+        "status": "modified",
+        "sha256": "83b515ec752ee6394dd6015b101837ca113fd7607d67ef75e4d6eb0c214ae357"
+      },
+      {
+        "path": "docs/bloqer2.0/02-modules/RFIS.md",
+        "status": "modified",
+        "sha256": "6083609c5ed971bb4f9dc68b84bf0a9abdde52f1a676a9d8cc1b650e2f7fa9f5"
+      },
+      {
+        "path": "docs/bloqer2.0/03-finance/MONEY_MODEL.md",
+        "status": "modified",
+        "sha256": "7bd788da7412141afff8393389105c04e593ae7974c60b3a70afaf43bc33e3e8"
+      },
+      {
+        "path": "docs/bloqer2.0/04-formulas/COST_FORMULAS.md",
+        "status": "modified",
+        "sha256": "e72e5eb6025e9ae7a6e8ce3a7115f736d41034102a53010c359e9e31cafec069"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/DEPLOYMENT_SMOKE_TEST.md",
+        "status": "modified",
+        "sha256": "b80c1d1505516b69146a6bad34a6fe5af985acfa65d7773312026977fa4d3c86"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/PENDING_ARCHITECTURE_ITEMS.md",
+        "status": "modified",
+        "sha256": "d7e26f8baf4b4801368d9b9f627091d525f844ca6fd6437122346778d9999fd4"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/PLATFORM_AUDIT_PLAN.md",
+        "status": "modified",
+        "sha256": "47bee5a2c0e87647686c83a27fc22d1a2dcf64a1ed9cbdb11aec67a46df39754"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/TESTING_STRATEGY.md",
+        "status": "modified",
+        "sha256": "da5ffa8a54b1c1f30b43ed9462ff77b8d70d96e2863cfac211dba0aace07b368"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-00-ag-04-publication.md",
+        "status": "added",
+        "sha256": "95f8df44c5fec0e8abf2bd13e72e4f6f0f4eaddb299173ce232f8754159f60db"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-comparability-scope-proposal.md",
+        "status": "added",
+        "sha256": "71bbb147a5f493f3a65bff5bf821c7b8e4348d43c2d73ad6669f114ab3ad2879"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.md",
+        "status": "added",
+        "sha256": "f89ae2856bde9fb226093fd19ae5af754d2ef7cbceb43854951d0579b1d7ac15"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-resource-notes-proposal.md",
+        "status": "added",
+        "sha256": "25171a543dd2e5b4a95d25d3b563d47e264f593ba56492062bfb3dca18fb212f"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-stock-valuation-proposal.md",
+        "status": "added",
+        "sha256": "07478fe84f1ae9ffd7acd39b6a7c2cb5a739431f91636b370faa6cc8663a093a"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/README.md",
+        "status": "modified",
+        "sha256": "d0e70ed5df9dadd266c31302f95c1245192a2dd7ffabb2b7a952f5be11b7a7b8"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/cost-detail-period-light.png",
+        "status": "added",
+        "sha256": "2ab3d362b1c57ef2ae0d8636f0dae98c84edfb5cd17d1a726f8e087b450334d6"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/gantt-desktop-dark-before-label.png",
+        "status": "added",
+        "sha256": "eb12b0745c289dadb96d7a46dfcc872fab065bb09961acd54a1c8ad3d5e28121"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/gantt-desktop-dark.png",
+        "status": "added",
+        "sha256": "c5228084869c50fe189b1bfd8dc0ff1e534d481fc4ca1a6f274a467839a9197c"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/materials-desktop-light.png",
+        "status": "added",
+        "sha256": "9478b7b0651536d469b8eeae179027ef622aaa42d09311e81fc1cc3d4af850ea"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/materials-field-light.png",
+        "status": "added",
+        "sha256": "b24f157ade24826dbce7bd98ed98524d328a9c8f845d52c644238de75ea6d047"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/schedule-field-light.png",
+        "status": "added",
+        "sha256": "ba0873b7df9b19f1fe720e55db8842e376d87f257d8ab95a715049d2514f4e58"
+      },
+      {
+        "path": "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/schedule-viewer-compiled-dark.png",
+        "status": "added",
+        "sha256": "e4f82e538fbb0b41ba8082df69c2c4d060d8f137f1707f45802b56e0fb07593c"
+      },
+      {
+        "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+        "status": "modified",
+        "sha256": "e3f33d4352749c490b45d885e4ce4d0f37f797238ce6d849b0181a7c52ef8307"
+      },
+      {
+        "path": "packages/ai/knowledge/generated/docs-index.json",
+        "status": "modified",
+        "sha256": "5252a34f314151a5ef7316d43e5a2502580b0c224a81c6a98a48bbf5707f76a1"
+      },
+      {
+        "path": "packages/report-pdf/src/pdf/schedule-pdf.smoke.test.tsx",
+        "status": "modified",
+        "sha256": "0309c815caca41a7e53a7f3c916385962c7b612988502f04a2546b65d1ba099e"
+      },
+      {
+        "path": "packages/services/src/ai/tools/materials-tools.ts",
+        "status": "modified",
+        "sha256": "08453b7c39900ef48804bb12a4dc85e5b048d12dada675916de170d666f8ab67"
+      },
+      {
+        "path": "packages/services/src/budget/budget-cost-graph.ts",
+        "status": "added",
+        "sha256": "f9c9fba79524b056e9ca4f23fca1c3a350e95e6ba08b54bf9e93d2adc8c2b502"
+      },
+      {
+        "path": "packages/services/src/cost-control/cost-control-audit.live.test.ts",
+        "status": "added",
+        "sha256": "99476148aa2ceb5deff640e67a88928a3e52eb75d87dfd495fd4d7d9c8c4eb02"
+      },
+      {
+        "path": "packages/services/src/cost-control/cost-control-relations.live.test.ts",
+        "status": "added",
+        "sha256": "a6e2677c164dfaf18028668924def31ebef99d864e2d6f98f8bb44594337eabf"
+      },
+      {
+        "path": "packages/services/src/cost-control/cost-control-types.ts",
+        "status": "modified",
+        "sha256": "b14d0c74e80c8041f955a382cdf36ebe0b7d416c128d2e36feba68341a2cf32f"
+      },
+      {
+        "path": "packages/services/src/cost-control/cost-control.service.ts",
+        "status": "modified",
+        "sha256": "ee6e26f992b9e6434509954bbd51660a8345fff9dfd168342bb8d1921bac306c"
+      },
+      {
+        "path": "packages/services/src/cost-control/cost-exposure.test.ts",
+        "status": "modified",
+        "sha256": "da8baea26a763e4b391c8fb324c7d0261f5baf214b98d18bd4d01a1bcb9b9d55"
+      },
+      {
+        "path": "packages/services/src/cost-control/cost-exposure.ts",
+        "status": "modified",
+        "sha256": "71efaa61f83b0926c1d09f664abcae4706677dfa7d494c3ebdaa3d12475504a1"
+      },
+      {
+        "path": "packages/services/src/cost-control/project-accrued-aggregation.ts",
+        "status": "modified",
+        "sha256": "87eeb301753623169d8165994d683b53c40581e93ea47a2a986064eca9b48398"
+      },
+      {
+        "path": "packages/services/src/jobsite-log/jobsite-log.service.ts",
+        "status": "modified",
+        "sha256": "abeb1cc63451ac44d417f8f595f8a9419bea089505db7cfe64500b67745e13d0"
+      },
+      {
+        "path": "packages/services/src/materials/material-commitment-pure.test.ts",
+        "status": "modified",
+        "sha256": "36a01b2fda9929adcbede23c45202b1923e290e0bba7b712fca33d3b9cf71163"
+      },
+      {
+        "path": "packages/services/src/materials/material-commitment-pure.ts",
+        "status": "modified",
+        "sha256": "15dfab42fcde453920e51f548b77428fe632af661be98f91934f1eedb64cd3dc"
+      },
+      {
+        "path": "packages/services/src/materials/material-commitment.ts",
+        "status": "modified",
+        "sha256": "bf09246ff67e20b9922d3695cfd8a7bbad566555e209e9d5298cbd27f32eb67e"
+      },
+      {
+        "path": "packages/services/src/materials/planning-boards-audit.live.test.ts",
+        "status": "added",
+        "sha256": "72585d45a03a000f6d3ef43f792c85d9c7e2c4a9a747a651f77be9ee8d5e9611"
+      },
+      {
+        "path": "packages/services/src/materials/project-materials-board.service.ts",
+        "status": "modified",
+        "sha256": "bc4e9445dd0d6084f26b6fd6c6d58fa8e53008336983607223a85c85af2de80f"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-order.service.ts",
+        "status": "modified",
+        "sha256": "d6c3b49e48fe76a8a3528469108d3641159b55c8591a8fa06b8df2133fa6e95d"
+      },
+      {
+        "path": "packages/services/src/procurement/purchase-receipt.service.ts",
+        "status": "modified",
+        "sha256": "09d4e276e6e4330832674815831e20bc3edfd51121ca6f13bc0ff9cad9942b8c"
+      },
+      {
+        "path": "packages/services/src/report-exports/report-export.service.ts",
+        "status": "modified",
+        "sha256": "cad3384df6bd3f926035b0c9b306d2d1ef3a1daf499077892e259b2e24048b02"
+      },
+      {
+        "path": "packages/services/src/reports/material-variance.service.ts",
+        "status": "modified",
+        "sha256": "364911a1d49271bf3978a6d28b7a338bd101ba1bc1cbfdc0663bdf5c29dcb32d"
+      },
+      {
+        "path": "packages/services/src/reports/project-income-expense.service.ts",
+        "status": "modified",
+        "sha256": "47c486908854b489b8b032834d6d2c47fc4bc19d71de13bae431dd5885c95d50"
+      },
+      {
+        "path": "packages/services/src/reports/report-budget-resolve.ts",
+        "status": "modified",
+        "sha256": "734ac0bf88ec55bae662cafb8f8b203736c0ce5b358f1223ed4a6ca60097df28"
+      },
+      {
+        "path": "packages/services/src/resources/project-resource-board.service.ts",
+        "status": "modified",
+        "sha256": "6271e68bcd02d33992bf274bb620f7b738b693804773d3ee6cf117d06a3995b3"
+      },
+      {
+        "path": "packages/services/src/resources/resource-variance-filters.test.ts",
+        "status": "added",
+        "sha256": "b947ed92251de472f23f4534c924ddc94dc8c6c4d51b9e18249a971df821126b"
+      },
+      {
+        "path": "packages/services/src/resources/resource-variance-filters.ts",
+        "status": "added",
+        "sha256": "1a0f7073d9d2834aaca9ea68d443dae7341c2410c0065eff992331003c479b9e"
+      },
+      {
+        "path": "packages/services/src/resources/resource-variance.service.ts",
+        "status": "modified",
+        "sha256": "aa02396b76884d6870ad800295839b86c2a34fa077dcbcccc5bcf80e888bea64"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-audit-fixture.ts",
+        "status": "added",
+        "sha256": "bab1d78799a557042dc2048d4e9e5f11ddc589b06a002871cee58553516c904b"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-audit.live.test.ts",
+        "status": "added",
+        "sha256": "25442206b6adbbd454d36be5fe2c52c2071b047cba0891a67ded327092b02658"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-audit.ts",
+        "status": "modified",
+        "sha256": "61e6b2057f292803906e9c6c60a6792be5e8e842df8eb8e409b4553633d9b4bb"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-export-pure.test.ts",
+        "status": "modified",
+        "sha256": "016e4b1cae76686e0db5eff1b557ce44d8c1ce7e26070f442ee1bdd92c7efeb0"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-export-pure.ts",
+        "status": "modified",
+        "sha256": "46a3c8e92aeec00bd1b11198cac2b9c7457d689003841f589ecb484e532b2c37"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-export.service.ts",
+        "status": "modified",
+        "sha256": "f8d67d5f3444029cfba44ad92aa518c957f10ebac422d730da22b3ff212b15b9"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-field-workspace.service.ts",
+        "status": "modified",
+        "sha256": "22dfc5aa89a4a89baebe9135f136a90980874f03533e4180939d5ee96782b363"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-helpers.ts",
+        "status": "modified",
+        "sha256": "dcce8370d6b728966c026fd0926a7fad7ca83af867f92be3e7e6485fc6975ebf"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-input-integrity.test.ts",
+        "status": "added",
+        "sha256": "4dc00de6865f3a1d460835976622202697969129348ffdc90b6ca8882c8eb87f"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-item-context.service.ts",
+        "status": "modified",
+        "sha256": "baf653c174a0b8d7c8068c61bfe9e90463e2c7d84b5be28b62419040aed4c503"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-milestone-from-receipt.ts",
+        "status": "modified",
+        "sha256": "602b6aad1229f52ba591d4f73129cf11b84e2ef6cdf3151cfa3580b5a1918d30"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-placement.ts",
+        "status": "modified",
+        "sha256": "730efd748d785ea7f0c5ea50b5b1a739c48a7ebe33c463e1be817181004d898b"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-progress-sync-pure.test.ts",
+        "status": "modified",
+        "sha256": "de18108a65e39678b4e518f752fd531738c6e7a8b93558017b296685fbc4d65e"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-progress-sync-pure.ts",
+        "status": "modified",
+        "sha256": "f7d349b2e670719f0873caf1a1708e857f02cecde9806d9c10933bb8caeeac55"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-progress-sync.service.ts",
+        "status": "modified",
+        "sha256": "c3f2f57f722d88e4f598140dfd722d3e4b1502fb8943cf17b7fe62b12c21fc60"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule-workspace.service.ts",
+        "status": "modified",
+        "sha256": "43255f3014e571887f273bbec3a27b4840dc3673cdc023d8180654feab2d7c8f"
+      },
+      {
+        "path": "packages/services/src/schedule/schedule.service.ts",
+        "status": "modified",
+        "sha256": "df7bae819a828e41dd038540eb0333d93ac9def18a77f6f89d11226bb0861d06"
+      },
+      {
+        "path": "packages/validators/src/schedule.ts",
+        "status": "modified",
+        "sha256": "fab384dac2bd1c81b74f2c77547cccda2ee41383c8c2e0c458ce10e7cab4e74c"
+      }
+    ]
+  },
+  "recordKind": "historical_partial_report",
+  "supersededBy": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-closure.json",
+  "historicalDiscoveryCorrection": "The three schedule PDF .tsx smoke cases were already included in 2182 general passes, even when also run focally; do not add them as distinct cases.",
+  "historicalRecordAnnotatedAt": "2026-11-04T15:27:21.207Z"
+}

@@ -24,13 +24,14 @@ export function PurchaseReceiptCards({
           className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
-              OC {r.purchaseOrderCode}
+            <span className="min-w-0 break-words font-mono text-xs [overflow-wrap:anywhere]" title={r.code}>
+              {r.code}
             </span>
             <span className="shrink-0">
               <PurchaseReceiptStatusBadge status={r.status} />
             </span>
           </div>
+          <p className="mt-1 text-xs text-muted-foreground">OC de origen: {r.purchaseOrderCode}</p>
           <p className="mt-2 truncate font-semibold" title={r.supplierName}>
             {r.supplierName}
           </p>

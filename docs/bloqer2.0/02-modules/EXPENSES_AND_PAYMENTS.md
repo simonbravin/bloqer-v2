@@ -51,6 +51,7 @@ Ver PurchaseInvoice, Payable en [`STATE_MACHINES.md`](../01-domain/STATE_MACHINE
 - **Tipo de documento ([D-115]):** Factura / Nota de crédito / Nota de débito en `SupplierInvoice.documentKind`. NC aplica crédito a CxP sin caja; ND abre Payable nueva.
 
 ## 11. Validaciones
+- Vínculo a OC, incluso manual solo de cabecera: misma empresa, tenant, obra, proveedor y moneda; OC y padres WBS/APU coherentes. Se revalida al crear/editar/emitir antes de mutar. No se atribuyen renglones por descripción/importe y la carga manual sin FK de línea sigue permitida con sus avisos.
 - Payee coherente en factura y pago ([BR-AP-001] / [D-089]): `SUPPLIER` o `EMPLOYEE` si no hay OC; `SUPPLIER` si hay OC.
 - Periodo abierto ([BR-TRZ-003]).
 - `invoice_letter` presente al emitir si empresa o proveedor tienen `country = AR` ([D-084]).

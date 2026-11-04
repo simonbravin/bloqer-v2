@@ -231,7 +231,7 @@
 ### PurchaseOrder
 - **Propósito:** orden de compra a proveedor.
 - **Atributos clave:** supplier_id, project_id (opcional), number, issue_date, expected_date, items[], subtotal, taxes[], total, currency, status, document_id.
-- **Estados:** `DRAFT | SUBMITTED | APPROVED | CONFIRMED | RECEIVED_PARTIAL | RECEIVED_FULL | CANCELLED`.
+- **Estados:** `DRAFT | SUBMITTED | APPROVED | CONFIRMED | PARTIALLY_RECEIVED | RECEIVED | CANCELLED`, conforme a STATE_MACHINES; se corrigen alias obsoletos detectados en AG-06.
 
 ### PurchaseOrderLine
 - **Propósito:** línea de OC.
@@ -239,7 +239,7 @@
 
 ### Receipt
 - **Propósito:** recepción de bienes/servicios contra una OC.
-- **Atributos clave:** po_id, receipt_date, items[], status, warehouse_id (si aplica), document_id.
+- **Atributos clave:** po_id, receipt_date, items[], status, warehouse_id (si aplica), document_id. Implementación `PurchaseReceipt.number`: entero nullable, único por `(tenantId, companyId, number)`; servicio asigna correlativo a las altas nuevas, UI `RC-NNN` (D-127). Históricos conservan UUID y número nulo, sin backfill.
 - **Estados:** `DRAFT | CONFIRMED | CANCELLED`.
 
 ### ReceiptLine

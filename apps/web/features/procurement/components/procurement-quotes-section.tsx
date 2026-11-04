@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { formatDbDate } from "@/lib/format";
 import type { QuoteLineOfferKind } from "@bloqer/domain";
 import { canQuickAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
@@ -22,6 +22,7 @@ import {
 } from "./procurement-quote-form";
 import type { SupplierOption } from "./purchase-order-form";
 import { formatMoneyAmount, formatQtyWithUnit, formatRatePctFromString, formatUnitPriceFromString, isZeroRatePct } from "@/lib/format-money";
+import { PoLineBudgetRef } from "./po-line-budget-ref";
 
 type PrLine = {
   id: string;
@@ -29,6 +30,7 @@ type PrLine = {
   unit: string;
   quantity: string;
   budgetUnitCostSnapshot?: string | null;
+  budgetCurrency: string | null;
   awardedPurchaseOrderId?: string | null;
 };
 
@@ -38,6 +40,7 @@ type QuoteRow = {
   status: string;
   totalAmount: string;
   currency: string;
+  fxRate?: string;
   validUntil: string | null;
   leadTimeDays: number | null;
   iibbPerceptionRate?: string;
@@ -54,6 +57,7 @@ type QuoteRow = {
     lineTotal: string;
     lineSubtotal: string;
     lineTax: string;
+    budgetCurrency: string | null;
   }>;
 };
 
@@ -81,6 +85,7 @@ export function ProcurementQuotesSection({
   frozenQuoteIds = [],
 }: Props) {
   const [editingQuoteId, setEditingQuoteId] = useState<string | null>(null);
+  const submitting = useRef(false);
   const frozen = new Set(frozenQuoteIds);
   const freeLineIds = new Set(
     prLines.filter((l) => !l.awardedPurchaseOrderId).map((l) => l.id),
@@ -91,6 +96,7 @@ export function ProcurementQuotesSection({
     ? {
         quoteId: editingQuote.id,
         currency: editingQuote.currency,
+        fxRate: editingQuote.fxRate,
         supplierName: editingQuote.supplierName,
         validUntil: editingQuote.validUntil,
         leadTimeDays: editingQuote.leadTimeDays,
@@ -138,11 +144,15 @@ export function ProcurementQuotesSection({
                         {q.lines.map((l, i) => (
                           <li key={`${q.id}-${i}`}>
                             <strong>{quoteLineOfferLabel(l, freeLineIds.has(l.purchaseRequestLineId))}</strong>{" · "}
-                            {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} neto · IVA {formatRatePctFromString(l.taxRate)}%
+                            {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} {q.currency} neto · IVA {formatRatePctFromString(l.taxRate)}%
                             {!isZeroRatePct(l.discountPct)
                               ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
                               : ""}
                             {" · "}Total línea con IVA: {formatMoneyAmount(l.lineTotal, q.currency)} (sin IIBB)
+                            <div className="mt-0.5">
+                              Ref. presup.:
+                              <PoLineBudgetRef unitCost={prLines.find((line) => line.id === l.purchaseRequestLineId)?.budgetUnitCostSnapshot} currency={l.budgetCurrency} purchaseCurrency={q.currency} compact />
+                            </div>
                           </li>
                         ))}
                       </ul>
@@ -179,7 +189,7 @@ export function ProcurementQuotesSection({
                             projectId={projectId}
                             purchaseRequestId={purchaseRequestId}
                             canManage={canQuote}
-                            onEdit={() => setEditingQuoteId(q.id)}
+                            onEdit={() => { if (!submitting.current) setEditingQuoteId(q.id); }}
                             onDeleted={() => {
                               if (editingQuoteId === q.id) setEditingQuoteId(null);
                             }}
@@ -210,6 +220,7 @@ export function ProcurementQuotesSection({
           mode="edit"
           editValues={editValues}
           onCancelEdit={() => setEditingQuoteId(null)}
+          onPendingChange={(pending) => { submitting.current = pending; }}
         />
       ) : null}
 
@@ -219,6 +230,7 @@ export function ProcurementQuotesSection({
           purchaseRequestId={purchaseRequestId}
           suppliers={suppliers}
           lines={prLines}
+          onPendingChange={(pending) => { submitting.current = pending; }}
         />
       ) : null}
 

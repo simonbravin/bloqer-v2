@@ -20,11 +20,13 @@ export function ScheduleCalendarView({
   onSelect,
   filtersExcludeAll = false,
   unfilteredActiveCount = 0,
+  canEdit = false,
 }: {
   items: ScheduleWorkspaceItemDto[];
   onSelect: (item: ScheduleWorkspaceItemDto) => void;
   filtersExcludeAll?: boolean;
   unfilteredActiveCount?: number;
+  canEdit?: boolean;
 }) {
   const fallback = useMemo(() => new Date(), []);
   const features = useMemo(
@@ -45,11 +47,14 @@ export function ScheduleCalendarView({
       <ScheduleViewEmptyMessage
         filtersExcludeAll={filtersExcludeAll}
         unfilteredActiveCount={unfilteredActiveCount}
+        canEdit={canEdit}
       />
     );
   }
 
   return (
+    <div className="space-y-3">
+    {features.length === 0 ? <p role="status" className="text-sm text-muted-foreground">No hay tareas ni hitos con fecha en esta vista. Revisá sus fechas desde Tabla.</p> : null}
     <CalendarProvider locale="es-AR" startDay={1} className="rounded-md border p-4">
       <CalendarDatePicker className="mb-4">
         <CalendarMonthPicker />
@@ -72,5 +77,6 @@ export function ScheduleCalendarView({
         )}
       </CalendarBody>
     </CalendarProvider>
+    </div>
   );
 }

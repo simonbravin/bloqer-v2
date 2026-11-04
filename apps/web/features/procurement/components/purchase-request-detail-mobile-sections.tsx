@@ -11,6 +11,7 @@ import {
 import { PurchaseRequestStatusBadge } from "./purchase-request-status-badge";
 import { ProcurementQuoteStatusBadge } from "./procurement-quote-status-badge";
 import { SelectQuoteButton } from "./procurement-quote-form";
+import { PoLineBudgetRef } from "./po-line-budget-ref";
 import type { PurchaseRequestView } from "@bloqer/services";
 import type { ReactNode } from "react";
 
@@ -33,6 +34,7 @@ type QuoteCard = {
     quantity: string;
     unit: string;
     lineTotal: string;
+    budgetCurrency: string | null;
   }>;
 };
 
@@ -100,6 +102,10 @@ export function PurchaseRequestDetailMobileSections({
             <p className="text-sm tabular-nums text-muted-foreground">
               {formatQtyWithUnit(item.quantity, item.unit)}
             </p>
+            <div className="text-xs text-muted-foreground">
+              Ref. presup.:
+              <PoLineBudgetRef unitCost={item.budgetUnitCostSnapshot} currency={item.budgetCurrency} compact />
+            </div>
             {item.awardedPurchaseOrderId ? (
               <p className="text-xs text-muted-foreground">Adjudicado</p>
             ) : null}
@@ -119,7 +125,7 @@ export function PurchaseRequestDetailMobileSections({
         {documents}
       </section>
 
-      {quotes.length > 0 && ["SUBMITTED", "QUOTE_SELECTED", "COMPLETED"].includes(pr.status) ? (
+      {quotes.length > 0 ? (
         <section className="space-y-3">
           <h2 className="font-semibold">Cotizaciones</h2>
           {showAwardShortcut ? (
@@ -155,12 +161,16 @@ export function PurchaseRequestDetailMobileSections({
                     {q.lines.map((l, i) => (
                       <li key={`${q.id}-${i}`}>
                         <strong>{quoteLineOfferLabel(l, Boolean(l.purchaseRequestLineId && freeLineIds.has(l.purchaseRequestLineId)))}</strong>{" · "}
-                        {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} neto
+                        {l.description}: {formatQtyWithUnit(l.quantity, l.unit)} × {formatUnitPriceFromString(l.unitPrice)} {q.currency} neto
                         {!isZeroRatePct(l.discountPct)
                           ? ` · desc. ${formatRatePctFromString(l.discountPct)}%`
                           : ""}
                         {" · "}IVA {formatRatePctFromString(l.taxRate)}%
                         {" · "}Total línea con IVA: {formatMoneyAmount(l.lineTotal, q.currency)} (sin IIBB)
+                        <div className="mt-0.5">
+                          Ref. presup.:
+                          <PoLineBudgetRef unitCost={pr.lines.find((line) => line.id === l.purchaseRequestLineId)?.budgetUnitCostSnapshot} currency={l.budgetCurrency} purchaseCurrency={q.currency} compact />
+                        </div>
                       </li>
                     ))}
                   </ul>

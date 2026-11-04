@@ -1,9 +1,33 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { Prisma } from "@bloqer/database";
-import { computeCostExposureLayers } from "./cost-exposure";
+import { computeCostExposureByCommitment, computeCostExposureLayers } from "./cost-exposure";
 
 describe("computeCostExposureLayers [BR-COS-002]", () => {
+  it("does not consume a second order with over-invoicing of the first", () => {
+    const result = computeCostExposureByCommitment({
+      accrued: new Prisma.Decimal(150),
+      commitments: [
+        { committed: new Prisma.Decimal(100), accruedLinked: new Prisma.Decimal(150) },
+        { committed: new Prisma.Decimal(100), accruedLinked: new Prisma.Decimal(0) },
+      ],
+    });
+    assert.equal(result.openCommitted.toFixed(2), "100.00");
+    assert.equal(result.expectedCostExposure.toFixed(2), "250.00");
+  });
+
+  it("a linked credit reopens only its original commitment", () => {
+    const result = computeCostExposureByCommitment({
+      accrued: new Prisma.Decimal(60),
+      commitments: [
+        { committed: new Prisma.Decimal(100), accruedLinked: new Prisma.Decimal(60) },
+        { committed: new Prisma.Decimal(200), accruedLinked: new Prisma.Decimal(0) },
+      ],
+    });
+    assert.equal(result.openCommitted.toFixed(2), "240.00");
+    assert.equal(result.expectedCostExposure.toFixed(2), "300.00");
+  });
+
   it("matches COST_FORMULAS §1.7 example (OC 10k / factura 4k)", () => {
     const committed = new Prisma.Decimal(10000);
     const accrued = new Prisma.Decimal(4000);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -31,6 +31,7 @@ import {
   procurementActionBtnClass,
   procurementDialogBtnClass,
 } from "../lib/procurement-ui";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 type Props = {
   poId: string;
@@ -42,6 +43,8 @@ type Props = {
    * so there is a single primary CTA.
    */
   approveVariant?: "default" | "outline";
+  canApprove?: boolean;
+  canReturn?: boolean;
 };
 
 export function PurchaseOrderApprovalActions({
@@ -49,15 +52,18 @@ export function PurchaseOrderApprovalActions({
   projectId,
   willAutoConfirm = false,
   approveVariant = "default",
+  canApprove = true,
+  canReturn = true,
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction();
   const [approveOpen, setApproveOpen] = useState(false);
   const [returnOpen, setReturnOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   function approve() {
+    if (!canApprove) return;
     startTransition(async () => {
       setError(null);
       const res = await approvePurchaseOrderAction(poId, projectId);
@@ -72,6 +78,7 @@ export function PurchaseOrderApprovalActions({
   }
 
   function returnPo() {
+    if (!canReturn) return;
     const trimmed = reason.trim();
     if (trimmed.length < 3) {
       setError("El motivo es obligatorio.");
@@ -93,7 +100,7 @@ export function PurchaseOrderApprovalActions({
   return (
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
       <ActionErrorBanner message={error ?? undefined} className="w-full basis-full" />
-      <Button
+      {canApprove ? <Button
         type="button"
         variant={approveVariant}
         className={procurementActionBtnClass}
@@ -102,8 +109,8 @@ export function PurchaseOrderApprovalActions({
         onClick={() => setApproveOpen(true)}
       >
         {willAutoConfirm ? "Aprobar y comprometer" : "Aprobar"}
-      </Button>
-      <Button
+      </Button> : null}
+      {canReturn ? <Button
         type="button"
         variant="outline"
         className={procurementActionBtnClass}
@@ -112,9 +119,9 @@ export function PurchaseOrderApprovalActions({
         onClick={() => setReturnOpen(true)}
       >
         Devolver
-      </Button>
+      </Button> : null}
 
-      <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
+      <AlertDialog open={approveOpen} onOpenChange={(open) => { if (!isRunning()) setApproveOpen(open); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -150,7 +157,7 @@ export function PurchaseOrderApprovalActions({
         </AlertDialogContent>
       </AlertDialog>
 
-      <Sheet open={returnOpen} onOpenChange={setReturnOpen}>
+      <Sheet open={returnOpen} onOpenChange={(open) => { if (!isRunning()) setReturnOpen(open); }}>
         <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-xl">
           <SheetHeader className="text-left">
             <SheetTitle>Devolver a borrador</SheetTitle>
@@ -159,11 +166,13 @@ export function PurchaseOrderApprovalActions({
             </SheetDescription>
           </SheetHeader>
           <div className="mt-4 space-y-3">
+            <ActionErrorBanner message={error ?? undefined} />
             <Label htmlFor="po-return-reason">Motivo</Label>
             <Textarea
               id="po-return-reason"
               data-testid="po-return-reason"
               value={reason}
+              disabled={pending}
               onChange={(e) => setReason(e.target.value)}
               required
               minLength={3}

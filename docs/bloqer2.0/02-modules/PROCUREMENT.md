@@ -35,7 +35,7 @@ Desde `SUBMITTED` se puede **devolver a `DRAFT`** con motivo ([BR-PUR-016]).
 - Crear **solicitud de compra** (camino formal con cotizaciones) o **OC directa** (si política/umbral lo permiten).
 - Cargar y comparar cotizaciones (precio + plazo).
 - Enviar / aprobar / rechazar-devolver / confirmar OC.
-- Registrar recepciones parciales; cerrar saldo pendiente ([BR-PUR-013]); facturar y pagar.
+- Registrar recepciones parciales; facturar y pagar. Cerrar saldo pendiente ([BR-PUR-013]) es desarrollo separado pendiente (D-128), no una acción disponible.
 
 ## 9. Pantallas y vistas necesarias
 - `/proyectos/[id]/solicitudes-compra` — SC y cotizaciones.
@@ -52,7 +52,9 @@ Desde `SUBMITTED` se puede **devolver a `DRAFT`** con motivo ([BR-PUR-016]).
 ## 11. Validaciones
 - Proveedor con rol SUPPLIER activo.
 - Líneas con WBS del proyecto y presupuesto aprobado/cerrado.
-- Periodo abierto para mutaciones con impacto ([BR-PUR-014]).
+- Períodos: D-078 aplica el cierre al movimiento de tesorería y al asiento contable; el bloqueo transversal de documentos operativos está diferido ([BR-PUR-014]).
+- Empresa/obra y padres de todas las referencias se comprueban antes de leer u operar; una obra compartida no habilita documentos de otra empresa.
+- La compra conserva su moneda y FX; referencia y saldo requieren moneda comparable, con aviso y justificación cuando corresponda (D-125).
 - Cotizaciones mínimas y vigencia antes de seleccionar ([BR-PUR-010]).
 
 ## 12. Fórmulas relacionadas
@@ -81,7 +83,11 @@ Desde `SUBMITTED` se puede **devolver a `DRAFT`** con motivo ([BR-PUR-016]).
 - Notificaciones in-app + email + SLA ([BR-PUR-015], [D-050]).
 
 ## 18. Fase de implementación
-**Fase 1** (núcleo implementado). Alineación documental [D-050]; pendientes de producto/código: WBS hard-required en UI/validators, lead time en cotización, email automático + SLA, baseline en OC directa, rechazo con motivo, saldo de partida, cierre parcial.
+**Fase 1, núcleo implementado.** Inventario AG-06: WBS obligatorio, plazo de cotización, baseline de OC directa, devolución con motivo, saldo, notificaciones in-app/email y SLA existen en servicios y pantallas. El cierre parcial formal BR-PUR-013 no tiene implementación ni representación física completa; D-128 aprueba su desarrollo separado con diseño previo. Los proveedores externos no se ejecutan en la auditoría aislada. D-125/D-126 corrigen moneda e historial; D-127 completa el correlativo de recepciones nuevas conservando los históricos. La evidencia y límites se registran en el informe AG-06.
+
+## Hallazgo — AG-06: pendientes históricos y alcance de períodos
+
+La lista anterior de gaps provenía de la alineación documental D-050 y no reflejaba la implementación actual. Se sustituyó por un inventario comprobable. La precondición genérica de período abierto contradecía el alcance posterior D-078; se conserva ese alcance documentado, sin introducir un bloqueo operativo nuevo.
 
 ## 19. Preguntas abiertas
 - _Ninguna bloqueante para el procedimiento canónico._ Detalle de implementación de SLA (horas exactas) configurable en settings.

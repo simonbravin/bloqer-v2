@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useScheduleAction } from "../lib/use-schedule-action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ScheduleItemStatus } from "@bloqer/database";
@@ -66,7 +67,7 @@ export function ScheduleKanbanView({
   unfilteredActiveCount?: number;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useScheduleAction();
   const [blockTarget, setBlockTarget] = useState<ScheduleWorkspaceItemDto | null>(null);
 
   const boardItems = useMemo(
@@ -82,7 +83,7 @@ export function ScheduleKanbanView({
     return ids.map((id) => ({ id, name: STATUS_LABELS[id] ?? id }));
   }, [items]);
 
-  const cards = useMemo(() => boardItems.map((item) => mapItemToKanbanCard(item)), [boardItems]);
+  const cards = useMemo(() => boardItems.map((item) => mapItemToKanbanCard(item, workspace.budgetId != null)), [boardItems, workspace.budgetId]);
   const [data, setData] = useState<KanbanRow[]>(cards);
 
   useEffect(() => {
@@ -100,6 +101,7 @@ export function ScheduleKanbanView({
       <ScheduleViewEmptyMessage
         filtersExcludeAll={filtersExcludeAll}
         unfilteredActiveCount={unfilteredActiveCount}
+        canEdit={workspace.canEdit}
       />
     );
   }
@@ -111,9 +113,10 @@ export function ScheduleKanbanView({
         toast.error(res.error);
         syncDataFromServer();
       } else {
+        if (status === "BLOCKED") setBlockTarget(null);
         router.refresh();
       }
-    });
+    }, syncDataFromServer);
   }
 
   function resolveTargetColumn(overId: string | undefined): ScheduleItemStatus | null {
@@ -128,7 +131,7 @@ export function ScheduleKanbanView({
   }
 
   function handleDragEnd(event: DragEndEvent) {
-    if (!workspace.canEdit) {
+    if (!workspace.canEdit || isRunning()) {
       syncDataFromServer();
       return;
     }
@@ -208,6 +211,7 @@ export function ScheduleKanbanView({
                       className="cursor-pointer space-y-2 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       onClick={() => onSelect(item)}
                       onKeyDown={(e) => {
+                        if (e.target !== e.currentTarget) return;
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           onSelect(item);
@@ -290,13 +294,12 @@ export function ScheduleKanbanView({
 
       <ScheduleBlockDialog
         open={blockTarget != null}
-        onOpenChange={(o) => !o && setBlockTarget(null)}
+        onOpenChange={(o) => { if (!o && !isRunning()) setBlockTarget(null); }}
         itemName={blockTarget?.name ?? ""}
         pending={pending}
         onConfirm={(reason) => {
           if (!blockTarget) return;
           move(blockTarget.id, "BLOCKED", reason);
-          setBlockTarget(null);
         }}
       />
     </>

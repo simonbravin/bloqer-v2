@@ -925,6 +925,24 @@ describe("purchaseReceiptReplayMatches", () => {
       false,
     );
   });
+
+  it("rejects a retry with different line observations", () => {
+    assert.equal(purchaseReceiptReplayMatches(base, {
+      purchaseOrderId: base.purchaseOrderId, receiptDate: "2026-08-20",
+      lines: [{ ...base.lines[0]!, notes: "Dos unidades dañadas" }],
+    }), false);
+    assert.equal(purchaseReceiptReplayMatches({ ...base, lines: [{ ...base.lines[0]!, notes: "Con embalaje" }] }, {
+      purchaseOrderId: base.purchaseOrderId, receiptDate: "2026-08-20", lines: base.lines,
+    }), false);
+  });
+
+  it("normalizes omitted/null observations and quantity precision while ignoring row order", () => {
+    const second = { purchaseOrderLineId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", quantityReceived: "1.0000", notes: "Caja | sellada : sí" };
+    assert.equal(purchaseReceiptReplayMatches({ ...base, lines: [{ ...base.lines[0]!, notes: null }, second] }, {
+      purchaseOrderId: base.purchaseOrderId, receiptDate: "2026-08-20",
+      lines: [second, { ...base.lines[0]!, quantityReceived: "2.5000" }],
+    }), true);
+  });
 });
 
 describe("jobsiteLogReplayMatches", () => {

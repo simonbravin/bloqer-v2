@@ -23,6 +23,7 @@ import {
   createPurchaseReceiptSchema,
   updatePurchaseReceiptSchema,
   returnPurchaseOrderSchema,
+  confirmPurchaseOrderSchema,
   type CreatePurchaseOrderInput,
   type UpdatePurchaseOrderInput,
   type CreatePurchaseReceiptInput,
@@ -30,6 +31,7 @@ import {
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
+import { revalidateProcurementPaths } from "@/features/procurement/lib/revalidate-procurement-paths";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
@@ -50,6 +52,7 @@ function handle(err: unknown): { error: string } {
 }
 
 function revalidatePO(projectId: string, poId?: string) {
+  revalidateProcurementPaths(projectId);
   revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
   if (poId) revalidatePath(`/proyectos/${projectId}/ordenes-compra/${poId}`);
   revalidatePath("/pendientes");
@@ -165,12 +168,15 @@ export async function returnPurchaseOrderAction(
 export async function confirmPurchaseOrderAction(
   poId: string,
   projectId: string,
+  data: { fxRate?: string } = {},
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   const mismatch = await assertPoBelongsToProject(poId, projectId, ctx);
   if (mismatch) return mismatch;
+  const parsed = confirmPurchaseOrderSchema.safeParse(data);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Tipo de cambio inválido" };
   try {
-    await confirmPurchaseOrder(poId, ctx);
+    await confirmPurchaseOrder(poId, ctx, parsed.data);
     revalidatePO(projectId, poId);
     return { ok: true };
   } catch (err) {
@@ -221,6 +227,7 @@ export async function createPurchaseReceiptAction(
   if (mismatch) return mismatch;
   try {
     const receipt = await createPurchaseReceipt(parsed.data, ctx);
+    revalidateProcurementPaths(projectId);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receipt.id}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${data.purchaseOrderId}`);
@@ -248,6 +255,7 @@ export async function updatePurchaseReceiptAction(
       return { error: "La recepción no pertenece a este proyecto u orden" };
     }
     const receipt = await updatePurchaseReceipt(receiptId, parsed.data, ctx);
+    revalidateProcurementPaths(projectId);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
@@ -272,6 +280,7 @@ export async function confirmPurchaseReceiptAction(
       return { error: "La recepción no pertenece a este proyecto u orden" };
     }
     const confirmed = await confirmPurchaseReceipt(receiptId, ctx);
+    revalidateProcurementPaths(projectId);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
@@ -302,6 +311,7 @@ export async function cancelPurchaseReceiptAction(
       return { error: "La recepción no pertenece a este proyecto u orden" };
     }
     await cancelPurchaseReceipt(receiptId, ctx);
+    revalidateProcurementPaths(projectId);
     revalidatePath(`/proyectos/${projectId}/recepciones`);
     revalidatePath(`/proyectos/${projectId}/recepciones/${receiptId}`);
     revalidatePath(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT, QUOTE_LINE_OFFER_KINDS } from "@bloqer/domain";
-import { positiveQtyString, discountPctString, unitPriceString, ratePctString } from "./money";
+import { positiveQtyString, discountPctString, unitPriceString, ratePctString, optionalFxRateString } from "./money";
 import { costCategorySchema } from "./budget";
 
 const purchaseRequestLineSchema = z.object({
@@ -11,7 +11,7 @@ const purchaseRequestLineSchema = z.object({
   /** Job-cost nature ([D-099]). Defaults to APU category or MATERIAL in the service. */
   costType: costCategorySchema.optional().nullable(),
   lineType: z.enum(["MATERIAL", "SERVICE", "OTHER"]).default("MATERIAL"),
-  description: z.string().min(1, "Descripción requerida"),
+  description: z.string().trim().min(1, "Descripción requerida"),
   unit: z.string().default(""),
   quantity: positiveQtyString,
   sortOrder: z.number().int().default(0),
@@ -21,9 +21,7 @@ export const createPurchaseRequestSchema = z.object({
   projectId: z.string().uuid(),
   neededByDate: z
     .string({ required_error: "La fecha requerida es obligatoria" })
-    .regex(/^\d{4}-\d{2}-\d{2}$/, {
-      message: "La fecha requerida es obligatoria",
-    }),
+    .date("Ingresá una fecha requerida válida"),
   notes: z.string().optional().nullable(),
   lines: z.array(purchaseRequestLineSchema).min(1, "Debe tener al menos una línea"),
 });
@@ -31,22 +29,22 @@ export const createPurchaseRequestSchema = z.object({
 export const updatePurchaseRequestSchema = z.object({
   neededByDate: z
     .string({ required_error: "La fecha requerida es obligatoria" })
-    .regex(/^\d{4}-\d{2}-\d{2}$/, {
-      message: "La fecha requerida es obligatoria",
-    }),
+    .date("Ingresá una fecha requerida válida")
+    .optional(),
   notes: z.string().optional().nullable(),
-  lines: z.array(purchaseRequestLineSchema).min(1, "Debe tener al menos una línea"),
+  /** D-126: header-only updates must not replace historically linked items. */
+  lines: z.array(purchaseRequestLineSchema).min(1, "Debe tener al menos una línea").optional(),
 });
 
 export const returnPurchaseRequestSchema = z.object({
-  reason: z.string().min(3, "Indicá el motivo de la devolución").max(2000),
+  reason: z.string().trim().min(3, "Indicá el motivo de la devolución").max(2000),
 });
 
 const quoteLineSchema = z.object({
   purchaseRequestLineId: z.string().uuid(),
   offerKind: z.enum(QUOTE_LINE_OFFER_KINDS).optional().nullable(),
   unitPrice: unitPriceString,
-  taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
+  taxRate: ratePctString.refine((value) => !value.startsWith("-"), "El impuesto no puede ser negativo").default("21"),
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder: z.number().int().default(0),
 });
@@ -54,9 +52,9 @@ const quoteLineSchema = z.object({
 export const createProcurementQuoteSchema = z.object({
   purchaseRequestId: z.string().uuid(),
   supplierContactId: z.string().uuid(),
-  currency: z.string().length(3).default("ARS"),
-  fxRate: z.string().regex(/^\d+(\.\d+)?$/).optional(),
-  validUntil: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/, "Moneda inválida").default("ARS"),
+  fxRate: optionalFxRateString,
+  validUntil: z.string().date("Ingresá una fecha de vigencia válida").optional().nullable(),
   leadTimeDays: z.coerce.number().int().min(0).max(3650).optional().nullable(),
   notes: z.string().optional().nullable(),
   /** Ephemeral input flag [D-086]: unit price is gross (Factura B). Not persisted. */
@@ -72,12 +70,13 @@ export const updateProcurementQuoteSchema = createProcurementQuoteSchema
     supplierContactId: true,
   })
   .extend({
+    currency: z.string().trim().regex(/^[A-Z]{3}$/, "Moneda inválida").optional(),
     /** Optional on edit — omit keeps stored rate ([D-112]). */
     iibbPerceptionRate: ratePctString.optional(),
   });
 
 export const confirmPurchaseOrderSchema = z.object({
-  fxRate: z.string().regex(/^\d+(\.\d+)?$/).optional(),
+  fxRate: optionalFxRateString,
 });
 
 /** Award whole PR lines from one quote onto a new DRAFT PO ([BR-PUR-024]). */

@@ -79,6 +79,7 @@ flowchart LR
 - **Auto-confirmar al aprobar ([D-107]):** si `autoConfirmOnApprove` (default off), aprobar OC no alto nivel pasa a `CONFIRMED` en la misma TX. Alto nivel no auto-confirma.
 - **Rechazo / devolución ([BR-PUR-016]):** desde `SUBMITTED`, el aprobador puede devolver a `DRAFT` con **motivo obligatorio** (auditado). El creador corrige y reenvía. No se “des-aprueba” un `APPROVED`/`CONFIRMED`.
 - **Segregación ([BR-APR-004]):** quien originó la SC/OC no aprueba, salvo `allowSelfApproval` y sin alto monto ni `EXTRA_APPROVAL`.
+- **FX al confirmar (D-129):** si se modifica el FX de una OC APPROVED, quien confirma debe poder aprobar el nuevo monto ARS y la varianza con la segregación vigente. Se renuevan aprobador/fecha y evento existente `purchase_order.approved` antes de confirmar, en la misma transacción. Si no está habilitado, no cambia el documento y otro aprobador puede revisarlo/confirmarlo. Con FX sin cambios permanece el permiso EDIT de confirmación; luego de CONFIRMED es inmutable.
 - Toda línea de OC de proyecto lleva WBS ([BR-PUR-007], [D-050]).
 
 **Quién:**

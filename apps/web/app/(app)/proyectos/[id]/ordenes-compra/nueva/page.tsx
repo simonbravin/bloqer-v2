@@ -56,6 +56,8 @@ export default async function NuevaOrdenCompraPage({ params }: PageProps) {
       name: n.name,
       budgetName: n.budgetName,
       budgetUnitCost: n.budgetUnitCost,
+      budgetCurrency: n.budgetCurrency,
+      budgetWarning: n.budgetWarning,
       budgetUnit: n.budgetUnit,
       availableSaldo: n.availableSaldo,
       wouldExceedBudget: n.wouldExceedBudget,

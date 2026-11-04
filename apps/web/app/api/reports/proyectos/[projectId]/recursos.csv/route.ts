@@ -40,7 +40,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ projectId: 
     const fmt = (sp.format ?? "csv").toLowerCase();
     if (fmt === "json") {
       const data = await getResourceVarianceReport(projectId, costCategory, filters, auth.ctx);
-      return NextResponse.json(data);
+      return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store" } });
     }
     if (fmt === "csv") {
       const { content, filename } = await exportResourceVarianceCsv(

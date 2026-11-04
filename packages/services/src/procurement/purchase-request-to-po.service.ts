@@ -12,6 +12,10 @@ import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 import { assertPurchaseRequestScope } from "./purchase-request-scope";
 import { lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { isProcurementQuoteExpired } from "./quote-validity";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
+import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
+import { assertCostAnalysisLineForWbs, assertWbsLineForProject, lockProcurementCompanyForNumbering } from "./procurement-wbs";
+import { isCrossCompany } from "../company-scope";
 
 // Multi-supplier awards include locks, line writes and audit in one atomic transaction.
 // Bound their duration explicitly; the Prisma 5s default expired on the isolated Neon regression.
@@ -36,22 +40,28 @@ export async function computePurchaseRequestCoverage(
   purchaseRequestId: string,
   db: Tx | typeof prisma = prisma,
 ): Promise<PurchaseRequestCoverage> {
-  // Heal cancelled-OC award artifacts so re-award / quote edit cannot hit unique/FK traps.
-  await db.purchaseOrderLine.updateMany({
-    where: {
-      purchaseOrder: { purchaseRequestId, status: "CANCELLED" },
-      OR: [{ isActiveAward: true }, { procurementQuoteLineId: { not: null } }],
-    },
-    data: { isActiveAward: false, procurementQuoteLineId: null },
-  });
-
+  const request = await db.purchaseRequest.findUnique({ where: { id: purchaseRequestId }, select: { tenantId: true, companyId: true, projectId: true } });
+  if (!request) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   const lines = await db.purchaseRequestLine.findMany({
     where: { purchaseRequestId },
     select: {
       id: true,
       awardedPurchaseOrderId: true,
-      awardedPurchaseOrder: { select: { status: true } },
+      awardedPurchaseOrder: { select: { status: true, tenantId: true, companyId: true, projectId: true, purchaseRequestId: true } },
     },
+  });
+  if (lines.some((line) => line.awardedPurchaseOrder && (
+    line.awardedPurchaseOrder.tenantId !== request.tenantId || line.awardedPurchaseOrder.companyId !== request.companyId ||
+    line.awardedPurchaseOrder.projectId !== request.projectId || line.awardedPurchaseOrder.purchaseRequestId !== purchaseRequestId))) {
+    throw new ServiceError("CONFLICT", "La solicitud contiene adjudicaciones inconsistentes");
+  }
+  // Recovery is scoped to this request and runs under its writer's existing locks.
+  await db.purchaseOrderLine.updateMany({
+    where: {
+      purchaseOrder: { purchaseRequestId, ...request, status: "CANCELLED" },
+      OR: [{ isActiveAward: true }, { procurementQuoteLineId: { not: null } }],
+    },
+    data: { isActiveAward: false, procurementQuoteLineId: null },
   });
   const totalLineCount = lines.length;
   // Treat cancelled / missing PO links as unawarded ([BR-PUR-024] integrity).
@@ -236,6 +246,8 @@ async function createOnePoFromQuoteLinesInTx(
   if (uniqueLineIds.length === 0) {
     throw new ServiceError("VALIDATION", "Seleccioná al menos un ítem");
   }
+  await computePurchaseRequestCoverage(pr.id, tx);
+  await assertContactRoleInTenant(quote.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
 
   const quoteLineByPrLine = new Map(
     quote.lines.map((ql) => [ql.purchaseRequestLineId, ql] as const),
@@ -246,6 +258,30 @@ async function createOnePoFromQuoteLinesInTx(
   });
   if (prLines.length !== uniqueLineIds.length) {
     throw new ServiceError("CONFLICT", "Hay ítems que no pertenecen a esta solicitud");
+  }
+  const lineCtx = { ...ctx, companyId: pr.companyId };
+  const checkedWbs = new Set<string>();
+  const checkedApuLinks = new Set<string>();
+  const categoryByApu = new Map<string, Awaited<ReturnType<typeof assertCostAnalysisLineForWbs>>>();
+  for (const line of prLines) {
+    if (!line.wbsNodeId) throw new ServiceError("CONFLICT", "Cada ítem debe tener una partida EDT");
+    if (!checkedWbs.has(line.wbsNodeId)) {
+      await assertWbsLineForProject(line.wbsNodeId, pr.projectId, ctx.tenantId, { ctx: lineCtx, db: tx });
+      checkedWbs.add(line.wbsNodeId);
+    }
+    const apuKey = `${line.wbsNodeId}:${line.costAnalysisLineId}`;
+    if (line.costAnalysisLineId && !checkedApuLinks.has(apuKey)) {
+      categoryByApu.set(line.costAnalysisLineId,
+        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: lineCtx, db: tx }));
+      checkedApuLinks.add(apuKey);
+    }
+  }
+  const productIds = [...new Set(prLines.map((line) => line.productId).filter((id): id is string => Boolean(id)))];
+  if (productIds.length) {
+    const products = await tx.product.findMany({ where: { id: { in: productIds }, tenantId: ctx.tenantId }, select: { id: true, companyId: true } });
+    if (products.length !== productIds.length || products.some((product) => isCrossCompany(product.companyId, lineCtx))) {
+      throw new ServiceError("CONFLICT", "Uno o más productos no pertenecen al alcance de la solicitud");
+    }
   }
 
   const settings = await getCompanyProcurementSettings(pr.companyId, ctx, tx);
@@ -328,6 +364,7 @@ async function createOnePoFromQuoteLinesInTx(
     lineTaxes: selectedQuoteLines.map((line) => line.lineTax),
     iibbPerceptionRate: quote.iibbPerceptionRate,
   });
+  const fx = computeDocumentFxAmounts(quote.currency, totals.totalAmount, quote.fxRate);
   const po = await tx.purchaseOrder.create({
     data: {
       tenantId: ctx.tenantId,
@@ -340,7 +377,8 @@ async function createOnePoFromQuoteLinesInTx(
       number,
       issueDate: new Date(),
       currency: quote.currency,
-      fxRate: quote.fxRate,
+      fxRate: fx.fxRate,
+      totalAmountArs: fx.amountArs,
       iibbPerceptionRate: quote.iibbPerceptionRate,
       ...totals,
       status: PurchaseOrderStatus.DRAFT,
@@ -356,7 +394,7 @@ async function createOnePoFromQuoteLinesInTx(
       prl.costAnalysisLineId,
       resolveLineCostType({
         costType: prl.costType,
-        apuCategory: null,
+        apuCategory: prl.costAnalysisLineId ? categoryByApu.get(prl.costAnalysisLineId) ?? null : null,
         wbsDominantCostType: prl.wbsNodeId ? wbsDominant.get(prl.wbsNodeId) ?? null : null,
       }),
     );
@@ -444,6 +482,7 @@ export async function createPurchaseOrderFromQuoteLines(
     }
     await assertPurchaseRequestScope(quote.purchaseRequest, ctx, "mutate");
     await lockProjectForOperationalMutation(tx, quote.purchaseRequest.projectId, ctx);
+    await lockProcurementCompanyForNumbering(tx, quote.purchaseRequest.companyId, ctx.tenantId);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${quote.purchaseRequestId} FOR UPDATE`;
 
     const poId = await createOnePoFromQuoteLinesInTx(
@@ -506,6 +545,7 @@ export async function createPurchaseOrdersFromAwards(
     }
     await assertPurchaseRequestScope(pr, ctx, "mutate");
     await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
+    await lockProcurementCompanyForNumbering(tx, pr.companyId, ctx.tenantId);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
 
     const maxNum = await tx.purchaseOrder.aggregate({
@@ -563,7 +603,7 @@ export async function selectProcurementQuoteAndCreatePo(
     where: { id: procurementQuoteId },
     include: {
       lines: true,
-      purchaseRequest: { include: { lines: true } },
+      purchaseRequest: { include: { lines: { include: { awardedPurchaseOrder: { select: { status: true } } } } } },
     },
   });
   if (!quote || quote.tenantId !== ctx.tenantId) {
@@ -572,7 +612,7 @@ export async function selectProcurementQuoteAndCreatePo(
 
   await assertPurchaseRequestScope(quote.purchaseRequest, ctx, "mutate");
   const freeLineIds = quote.purchaseRequest.lines
-    .filter((l) => !l.awardedPurchaseOrderId)
+    .filter((l) => !l.awardedPurchaseOrderId || l.awardedPurchaseOrder?.status === "CANCELLED")
     .map((l) => l.id)
     .filter((id) => quote.lines.some((ql) => ql.purchaseRequestLineId === id &&
       ql.offerKind !== "NOT_QUOTED" && ql.offerKind !== "BONIFIED" && ql.lineTotal.greaterThan(0)));
@@ -594,11 +634,16 @@ export async function onPurchaseOrderConfirmed(
 ): Promise<void> {
   const po = await tx.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
-    select: { purchaseRequestId: true, projectId: true, companyId: true },
+    select: { purchaseRequestId: true, projectId: true, companyId: true, tenantId: true },
   });
   if (!po?.purchaseRequestId) return;
-
+  if (po.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${po.purchaseRequestId} FOR UPDATE`;
+  const request = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: po.purchaseRequestId } });
+  await assertPurchaseRequestScope(request, ctx, "read");
+  if (request.companyId !== po.companyId || request.projectId !== po.projectId || request.status === "CANCELLED" || request.status === "DRAFT") {
+    throw new ServiceError("CONFLICT", "La orden y su solicitud de origen tienen relaciones o estados inconsistentes");
+  }
   await syncPurchaseRequestStatusAfterCoverage(po.purchaseRequestId, ctx, tx);
 }
 
@@ -613,11 +658,16 @@ export async function onPurchaseOrderCancelledLinkedToRequest(
 ): Promise<void> {
   const po = await tx.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
-    select: { purchaseRequestId: true, selectedProcurementQuoteId: true },
+    select: { purchaseRequestId: true, tenantId: true, companyId: true, projectId: true },
   });
   if (!po?.purchaseRequestId) return;
-
+  if (po.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${po.purchaseRequestId} FOR UPDATE`;
+  const request = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: po.purchaseRequestId } });
+  await assertPurchaseRequestScope(request, ctx, "read");
+  if (request.companyId !== po.companyId || request.projectId !== po.projectId) {
+    throw new ServiceError("CONFLICT", "La orden y su solicitud de origen tienen relaciones inconsistentes");
+  }
 
   // Clear quote-line FK so edit/delete cotización works after Anular ([BR-PUR-024]).
   // Keep purchaseRequestLineId for history; isActiveAward=false frees the partial unique.
@@ -627,12 +677,14 @@ export async function onPurchaseOrderCancelledLinkedToRequest(
   });
 
   await tx.purchaseRequestLine.updateMany({
-    where: { awardedPurchaseOrderId: purchaseOrderId },
+    where: { awardedPurchaseOrderId: purchaseOrderId, purchaseRequestId: po.purchaseRequestId },
     data: { awardedPurchaseOrderId: null },
   });
 
-  await rewindQuotesIfNoActiveAwards(po.purchaseRequestId, tx);
-  await syncPurchaseRequestStatusAfterCoverage(po.purchaseRequestId, ctx, tx);
+  if (request.status !== "CANCELLED" && request.status !== "DRAFT") {
+    await rewindQuotesIfNoActiveAwards(po.purchaseRequestId, tx);
+    await syncPurchaseRequestStatusAfterCoverage(po.purchaseRequestId, ctx, tx);
+  }
 }
 
 /** @deprecated Use onPurchaseOrderCancelledLinkedToRequest */

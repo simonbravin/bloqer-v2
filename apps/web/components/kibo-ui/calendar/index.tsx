@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   createContext,
+  Fragment,
   memo,
   type ReactNode,
   useCallback,
@@ -268,11 +269,13 @@ export const CalendarBody = ({ features, children }: CalendarBodyProps) => {
       >
         {day}
         <div>
-          {featuresForDay.slice(0, 3).map((feature) => children({ feature }))}
+          {featuresForDay.slice(0, 3).map((feature) => (
+            <Fragment key={feature.id}>{children({ feature })}</Fragment>
+          ))}
         </div>
         {featuresForDay.length > 3 && (
           <span className="block text-muted-foreground text-xs">
-            +{featuresForDay.length - 3} more
+            +{featuresForDay.length - 3} más
           </span>
         )}
       </div>

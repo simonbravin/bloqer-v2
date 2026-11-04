@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { ZodError } from "zod";
 import {
   addScheduleDependency,
+  assertScheduleEntityProject,
   cancelScheduleItem,
   copyScheduleProgressFromPhysical,
   createScheduleItem,
@@ -31,6 +33,7 @@ import {
   linkWbsNodesSchema,
   moveScheduleItemSchema,
   removeScheduleDependencySchema,
+  scheduleItemStatusSchema,
   unlinkWbsNodeSchema,
   updateScheduleItemDatesSchema,
   updateScheduleItemNameSchema,
@@ -52,17 +55,23 @@ async function getCtx() {
 function revalidateCronograma(projectId: string) {
   revalidatePath(`/proyectos/${projectId}/cronograma`);
   revalidatePath(`/proyectos/${projectId}`);
+  revalidatePath(`/proyectos/${projectId}/materiales`);
+  revalidatePath(`/proyectos/${projectId}/mano-obra`);
+  revalidatePath(`/proyectos/${projectId}/equipos`);
+  revalidatePath(`/proyectos/${projectId}/control-costos`);
+  revalidatePath(`/proyectos/${projectId}/reportes/avances`);
 }
 
 function handle(err: unknown): { error: string } {
   if (err instanceof ServiceError) return { error: err.message };
+  if (err instanceof ZodError) return { error: "Revisá los datos del formulario." };
   return { error: "Error inesperado" };
 }
 
 export async function importScheduleFromBudgetAction(projectId: string, raw: unknown) {
   const ctx = await getCtx();
-  const input = importScheduleFromBudgetSchema.parse(raw);
   try {
+    const input = importScheduleFromBudgetSchema.parse(raw);
     await importScheduleFromBudget(projectId, input, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -73,8 +82,8 @@ export async function importScheduleFromBudgetAction(projectId: string, raw: unk
 
 export async function createScheduleItemAction(projectId: string, raw: unknown) {
   const ctx = await getCtx();
-  const input = createScheduleItemSchema.parse(raw);
   try {
+    const input = createScheduleItemSchema.parse(raw);
     await createScheduleItem(projectId, input, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -85,8 +94,8 @@ export async function createScheduleItemAction(projectId: string, raw: unknown) 
 
 export async function moveScheduleItemAction(projectId: string, raw: unknown) {
   const ctx = await getCtx();
-  const input = moveScheduleItemSchema.parse(raw);
   try {
+    const input = moveScheduleItemSchema.parse(raw);
     const result = await moveScheduleItem(projectId, input, ctx);
     revalidateCronograma(projectId);
     return {
@@ -114,8 +123,9 @@ export async function linkWbsNodesToScheduleItemAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = linkWbsNodesSchema.parse(raw);
   try {
+    const input = linkWbsNodesSchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     await linkWbsNodesToScheduleItem(
       scheduleItemId,
       input.wbsNodeIds,
@@ -135,8 +145,9 @@ export async function unlinkWbsNodeFromScheduleItemAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = unlinkWbsNodeSchema.parse(raw);
   try {
+    const input = unlinkWbsNodeSchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     await unlinkWbsNodeFromScheduleItem(scheduleItemId, input.wbsNodeId, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -151,8 +162,9 @@ export async function updateScheduleItemDatesAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = updateScheduleItemDatesSchema.parse(raw);
   try {
+    const input = updateScheduleItemDatesSchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     const { fsWarnings } = await updateScheduleItemDates(scheduleItemId, input, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const, fsWarnings };
@@ -178,8 +190,9 @@ export async function updateScheduleItemProgressAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = updateScheduleItemProgressSchema.parse(raw);
   try {
+    const input = updateScheduleItemProgressSchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     await updateScheduleItemProgress(scheduleItemId, input.progressPct, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -195,8 +208,10 @@ export async function moveScheduleItemStatusAction(
   blockReason?: string,
 ) {
   const ctx = await getCtx();
-  if (status === "BLOCKED") blockScheduleItemSchema.parse({ blockReason });
   try {
+    scheduleItemStatusSchema.parse(status);
+    if (status === "BLOCKED") blockScheduleItemSchema.parse({ blockReason });
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     const updated = await moveScheduleItemToStatus(scheduleItemId, status, ctx, blockReason);
     revalidateCronograma(projectId);
     return { ok: true as const, status: updated.status };
@@ -212,7 +227,9 @@ export async function copyProgressFromPhysicalAction(
 ) {
   const ctx = await getCtx();
   try {
-    await copyScheduleProgressFromPhysical(scheduleItemId, physicalPct, ctx);
+    const input = updateScheduleItemProgressSchema.parse({ progressPct: physicalPct });
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
+    await copyScheduleProgressFromPhysical(scheduleItemId, input.progressPct, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
   } catch (e) {
@@ -226,8 +243,9 @@ export async function updateScheduleItemNameAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = updateScheduleItemNameSchema.parse(raw);
   try {
+    const input = updateScheduleItemNameSchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     await updateScheduleItemName(scheduleItemId, input.name, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -239,6 +257,7 @@ export async function updateScheduleItemNameAction(
 export async function cancelScheduleItemAction(projectId: string, scheduleItemId: string) {
   const ctx = await getCtx();
   try {
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     await cancelScheduleItem(scheduleItemId, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -247,9 +266,10 @@ export async function cancelScheduleItemAction(projectId: string, scheduleItemId
   }
 }
 
-export async function listScheduleItemAuditAction(scheduleItemId: string) {
+export async function listScheduleItemAuditAction(projectId: string, scheduleItemId: string) {
   const ctx = await getCtx();
   try {
+    await assertScheduleEntityProject(projectId, { scheduleItemId }, ctx);
     const entries = await listScheduleItemAuditHistory(scheduleItemId, ctx);
     return {
       ok: true as const,
@@ -278,8 +298,9 @@ export async function removeScheduleDependencyAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = removeScheduleDependencySchema.parse(raw);
   try {
+    const input = removeScheduleDependencySchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { dependencyId: input.dependencyId }, ctx);
     await removeScheduleDependency(input.dependencyId, ctx);
     revalidateCronograma(projectId);
     return { ok: true as const };
@@ -294,8 +315,9 @@ export async function addScheduleDependencyAction(
   raw: unknown,
 ) {
   const ctx = await getCtx();
-  const input = addScheduleDependencySchema.parse(raw);
   try {
+    const input = addScheduleDependencySchema.parse(raw);
+    await assertScheduleEntityProject(projectId, { scheduleId }, ctx);
     await addScheduleDependency(
       scheduleId,
       input.predecessorId,

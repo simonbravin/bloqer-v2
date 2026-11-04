@@ -22,9 +22,9 @@ describe("isBlockingProcurementQuoteStatus", () => {
     assert.equal(isBlockingProcurementQuoteStatus("SELECTED"), true);
   });
 
-  it("ignores rejected or superseded quotes", () => {
-    assert.equal(isBlockingProcurementQuoteStatus("REJECTED"), false);
-    assert.equal(isBlockingProcurementQuoteStatus("SUPERSEDED"), false);
+  it("preserves rejected or superseded quote history under D-126", () => {
+    assert.equal(isBlockingProcurementQuoteStatus("REJECTED"), true);
+    assert.equal(isBlockingProcurementQuoteStatus("SUPERSEDED"), true);
   });
 });
 
@@ -64,7 +64,7 @@ describe("assertPurchaseRequestReturnable [BR-PUR-025]", () => {
           activePoCount: 0,
           awardedLineCount: 0,
         }),
-      "cotizaciones",
+      "cotización",
     );
   });
 

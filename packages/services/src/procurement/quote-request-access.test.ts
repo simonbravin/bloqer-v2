@@ -11,6 +11,10 @@ import {
   createPurchaseOrderFromQuoteLines, createPurchaseOrdersFromAwards,
   selectProcurementQuoteAndCreatePo,
 } from "./purchase-request-to-po.service";
+import {
+  cancelPurchaseRequest, getPurchaseRequestById, getPurchaseRequestPoLinks,
+  listPurchaseRequestsByProject, returnPurchaseRequest, submitPurchaseRequest, updatePurchaseRequest,
+} from "./purchase-request.service";
 
 // Prisma delegates are dynamic proxies, not own methods supported by mock.method.
 const restore: Array<() => void> = [];
@@ -44,6 +48,13 @@ describe("quote and award service scope", { concurrency: false }, () => {
       { procurementQuoteId: "quote", purchaseRequestLineIds: ["line"] },
     ], context),
     shortcut: (context: ServiceContext) => selectProcurementQuoteAndCreatePo("quote", context),
+    requestRead: (context: ServiceContext) => getPurchaseRequestById(request.id, context),
+    requestList: (context: ServiceContext) => listPurchaseRequestsByProject(request.projectId, context),
+    requestLinks: (context: ServiceContext) => getPurchaseRequestPoLinks(request.id, context),
+    requestUpdate: (context: ServiceContext) => updatePurchaseRequest(request.id, { notes: "Header" }, context),
+    requestSubmit: (context: ServiceContext) => submitPurchaseRequest(request.id, context),
+    requestReturn: (context: ServiceContext) => returnPurchaseRequest(request.id, "Corregir", context),
+    requestCancel: (context: ServiceContext) => cancelPurchaseRequest(request.id, context),
   };
 
   beforeEach(() => {
@@ -77,7 +88,7 @@ describe("quote and award service scope", { concurrency: false }, () => {
   for (const [name, run] of Object.entries(operations)) {
     it(`${name}: denies another tenant`, async () => {
       await assert.rejects(() => run({ ...ctx, tenantId: "other-tenant", roles: ["OWNER"] }),
-        (error: unknown) => error instanceof ServiceError && error.code === "NOT_FOUND");
+        (error: unknown) => error instanceof ServiceError && error.code === (name === "requestList" ? "FORBIDDEN" : "NOT_FOUND"));
     });
     it(`${name}: denies a user without membership in the request project`, async () => {
       await assert.rejects(() => run(ctx), (error: unknown) =>
@@ -87,7 +98,7 @@ describe("quote and award service scope", { concurrency: false }, () => {
       await assert.rejects(() => run({ ...ctx, companyId: "other-company", roles: ["OWNER"] }),
         (error: unknown) => error instanceof ServiceError && error.code === "FORBIDDEN");
     });
-    if (name !== "list" && name !== "detail") {
+    if (!["list", "detail", "requestRead", "requestList", "requestLinks"].includes(name)) {
       for (const status of ["DRAFT", "ON_HOLD", "COMPLETED", "CANCELLED"]) {
         it(`${name}: blocks mutations in a ${status} project`, async () => {
           projectStatus = status;

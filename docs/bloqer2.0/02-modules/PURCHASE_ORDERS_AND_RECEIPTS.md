@@ -50,7 +50,7 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 - **Autorizar y comprometer ([D-105]):** si `CompanyProcurementSettings.allowAuthorizeAndCommit` (default off) y la OC no es de alto nivel, desde `DRAFT`/`SUBMITTED` se puede autorizar y confirmar en un acto (persiste APPROVED+CONFIRMED). Alto nivel sigue sin atajo.
 - Al enviar: calcular tiers de varianza ([BR-PUR-009]); si no hay alto nivel, puede auto-aprobarse en el mismo acto (con segregación [BR-APR-004]); **no** auto-confirma.
 - Mostrar **costo referencial** y **saldo de partida** al armar/enviar ([BR-PUR-011]).
-- Registrar recepción(es) parciales; **cerrar saldo** no recibido ([BR-PUR-013]).
+- Registrar recepción(es) parciales. **Cerrar saldo** no recibido ([BR-PUR-013]) requiere desarrollo separado (D-128); no hay acción disponible ni estado nuevo.
 - Anular solo si no hay recepciones confirmadas ni facturas activas.
 
 ## 9. Pantallas y vistas necesarias
@@ -70,7 +70,9 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 ## 11. Validaciones
 - Cantidades recepción ≤ pendiente OC ± tolerancia.
 - Depósito obligatorio si línea inventariable.
-- Periodo abierto para confirmar OC/recepción/factura con impacto ([BR-PUR-014]).
+- Período cerrado: controles D-078 sobre tesorería y asientos; el control transversal de OC/recepción/factura operativa sigue diferido ([BR-PUR-014]).
+- Sumar líneas repetidas de una recepción por ítem de OC antes de comprobar tolerancia. Para productos se requiere depósito destino; servicios sin producto no generan stock.
+- Alta y modificación, aprobación, recepción y vínculo OC→AP validan empresa/obra y el grafo de padres. Las comprobaciones se repiten dentro de la transacción antes de mutar.
 - Emergencia sobre umbral: motivo + OWNER/ADMIN + flag de settings.
 
 ## 12. Fórmulas relacionadas
@@ -81,6 +83,8 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 - Servicio sin stock: recepción confirma “hecho” sin movimiento inventario.
 - OC en moneda extranjera: FX en factura puede diferir — política multi-moneda ([D-008]).
 - Matching 3 vías OC ↔ recepción ↔ factura ([BR-PUR-012]).
+- Panel de facturación: cobertura monetaria neto + IVA, sin IIBB (D-112); pagos son importes efectivos completos. El indicador `allIssuedInvoicesSettled` es derivado, no persistido: requiere facturas emitidas, Payables consistentes en estado PAID y saldo canónico normalizado cero (D-115). Sin facturas/Payable válido no afirma cierre. La nota de crédito puede saldar sin pago de caja; la presentación dice sin saldo pendiente, no pago efectivo.
+- Ese indicador financiero incluye obligaciones de ND emitidas vinculadas a la OC o referenciadas a sus facturas; las NC/ND siguen fuera de la cobertura/cantidades de recepción. El indicador derivado `allReceivedAmountIssued` usa solo cobertura emitida: las reservas DRAFT evitan duplicados pero no completan Facturar (D-006/D-108).
 - Cierre parcial con saldo sin recibir ([BR-PUR-013]).
 
 ## 14. Reportes relacionados
@@ -101,7 +105,11 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 - Notificaciones ([BR-PUR-015]).
 
 ## 18. Fase de implementación
-**Fase 1** (núcleo). Gaps de implementación documentados en [D-050] y [BR-PUR-011]–[BR-PUR-016]: baseline en OC directa, rechazo con motivo, email/SLA, saldo de partida, cierre parcial formal.
+**Fase 1, núcleo implementado.** Baseline directo, devolución con motivo, email/SLA y saldo están implementados. El cierre parcial formal BR-PUR-013 sigue sin acción/representación física; Q-076 requiere definición de alcance. AG-06 corrige alcance, concurrencia, FX/monedas e integridad de recepciones/facturación. D-127 agrega correlativo a recepciones nuevas: `RC-NNN`, único por tenant y empresa; los históricos conservan UUID y número nulo. Anulación y reintento no reutilizan ni cambian el número.
+
+## Hallazgo — AG-06: numeración, período y estado de implementación
+
+La afirmación de numeración ya cerrada omitía que el schema solo tenía UUID para recepciones. Q-074/D-127 aprueba el campo y la migración aditiva, sin backfill. Se reemplaza la lista obsoleta de gaps por el inventario actual y se armoniza el alcance de períodos con D-078.
 
 ## 19. Preguntas abiertas
-- _Ninguna bloqueante._ Numeración por empresa cerrada en [D-050] (ex Q-002 para OC/SC/recepciones).
+- Q-075 resuelta en D-129: si cambia el FX al confirmar se renueva la aprobación con actor habilitado y segregación dentro de la misma transacción; si no, OC intacta. Numeración: D-050 para OC/SC y D-127 para recepciones nuevas, con históricos UUID preservados. Cierre parcial formal diferido expresamente por D-128.

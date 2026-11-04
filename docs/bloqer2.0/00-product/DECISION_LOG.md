@@ -1924,6 +1924,88 @@
 
 ---
 
+### D-122 — Base monetaria comparable de planificación y límite de RFIs en AG-05
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA.
+- **Decidido por:** Owner, aprobación explícita de las tres propuestas recomendadas de AG-05 en este chat.
+- **Decisión:** EDT y costos y la varianza monetaria de Mano de obra/Equipos comparan en la moneda original del presupuesto seleccionado. Si una fuente accesible que contribuye al resultado tiene otra moneda, se impide ese resultado económico con un mensaje funcional; no se convierte con FX implícito ni se omite la fuente para aparentar un total completo. Se respetan empresa, presupuesto, período y permisos antes de decidir qué contribuye. Las vistas de cantidades comparables y el cronograma temporal continúan disponibles.
+- **Límite:** no cambia la consolidación general a ARS de D-008, no agrega FX contractual ni modifica documentos históricos. El detalle de documentos solo puede conservar importes con su moneda identificada.
+- **Alcance de RFIs:** AG-05 cierra sobre capacidades implementadas de planificación, materiales, recursos y costos. RFIs queda como desarrollo posterior con definición propia; Q-006 no se resuelve ni se diseñan entidades/SLA por esta aprobación. Q-057 mantiene diferidos contratos, adendas legales y ChangeOrder formal.
+- **Resolución:** Q-069 y [propuesta aprobada](../08-architecture/platform-audit/2026-11-04-ag-05-comparability-scope-proposal.md). Sin schema, migraciones, backfill ni dependencias nuevas.
+- **Documentos afectados:** MULTI_CURRENCY_RULES, MONEY_MODEL, COST_FORMULAS, REPORTING, PROJECT_SCHEDULING, RFIS, CHANGE_ORDERS, guía/ayuda, knowledge, exportaciones y consumidores de costos.
+
+### D-123 — Cantidad facturada neta de recursos con NC/ND
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA.
+- **Decidido por:** Owner, misma aprobación explícita de AG-05.
+- **Decisión:** en cobertura APU de Mano de obra/Equipos, cantidad facturada neta = cantidades de INVOICE + DEBIT_NOTE − CREDIT_NOTE, únicamente con referencia de recurso y unidad compatibles. Factura 10 h, NC 2 h y ND 1 h producen 9 h netas. No se convierten unidades ni se atribuyen notas genéricas por similitud.
+- **Faltante:** conserva D-109: `max(0, necesidad − max(pedido, facturado_neto))`. No se agrega un piso al neto fiscal. La factura y sus notas no prueban recepción, consumo ni avance físico.
+- **Límite:** solo lectura de cobertura y explicación visible. No modifica notas/facturas, CxP, pagos, stock ni cantidades históricas; D-115 sigue definiendo signos monetarios.
+- **Resolución:** Q-070 y [propuesta aprobada](../08-architecture/platform-audit/2026-11-04-ag-05-resource-notes-proposal.md).
+- **Documentos afectados:** COST_FORMULAS, guía, ayuda, tablero/Field/detalle de recursos y regresiones.
+
+### D-124 — Costo de consumo desconocido no equivale a cero
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA.
+- **Decidido por:** Owner, misma aprobación explícita de AG-05.
+- **Decisión:** cuando un consumo de stock carece de valuación y moneda trazables, conservar cantidades y mostrar **Sin valuación** / **—** en su costo. La varianza basada en ese costo y los totales afectados son no calculables; no se afirma ahorro. Una fuente sin acceso no demuestra ausencia de consumos. Cero sigue siendo válido cuando se comprobó ausencia de consumos en el alcance autorizado.
+- **Trazabilidad:** `StockMovement` no guarda moneda ni vínculo de los consumos a una capa valorizada. Un unitario/total existente por sí solo no prueba moneda; no se asume ARS ni se atribuyen precios de recepciones a consumos sin vínculos. Solo se usan valores existentes con origen y moneda demostrables.
+- **Capas:** presupuesto y costos documentales de OC/facturas/pagos mantienen sus propias lecturas. La exposición y su varianza documental no incorporan consumo para evitar doble conteo; la falta de valuación no reemplaza esas capas por un valor ficticio.
+- **Distribución:** DTO, UI, CSV/PDF y herramientas AI conservan valor desconocido y advertencia; no transforman null en cero para calcular o exportar.
+- **Límite:** cambios de lectura/presentación, sin FIFO/promedio nuevo, cotización, backfill, migraciones ni modificación de existencias o valores históricos. La valuación completa sigue diferida por D-083.
+- **Resolución:** Q-071 y [propuesta aprobada](../08-architecture/platform-audit/2026-11-04-ag-05-stock-valuation-proposal.md).
+- **Documentos afectados:** INVENTORY, MONEY_MODEL, COST_FORMULAS, reportes de materiales/EDT, guía/ayuda, knowledge, exportaciones y consumidores AI.
+
+### D-125 — Referencia monetaria comparable en compras
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-06 (Q-072).
+- **Decisión:** conservar la compra en su moneda y FX documentados, y los umbrales de aprobación en ARS según ese FX. Comparar el precio contra APU/WBS solo con moneda demostrable coincidente y unidad compatible. Si el precio efectivo es positivo y la moneda de referencia difiere o falta, el porcentaje es no calculable y corresponde el tier existente `NO_BUDGET_BASELINE`, con su justificación vigente. Esta comprobación precede a la excepción de partida global; importe efectivo cero/bonificado mantiene su tratamiento existente. No fuerza alto nivel únicamente por moneda: aplican las reglas y umbrales existentes.
+- **Saldo de partida:** si debe sumar compromisos de otra moneda, mostrar saldo no calculable con aviso, conservando presupuesto/cantidades/documentos identificados por moneda. No convertir con FX presupuestario inferido ni presentar un subtotal como saldo completo.
+- **Alcance:** referencias/snapshots comparables de nuevas operaciones y presentación de SC/cotizaciones/OC. No cambia mínimo de ofertas, clasificación D-118, documentos procesados, pagos o stock. Sin persistencia nueva, migraciones o backfill.
+- **Propuesta aprobada:** [comparabilidad de compras AG-06](../08-architecture/platform-audit/2026-11-04-ag-06-purchase-comparability-proposal.md).
+
+### D-126 — Devolución de SC sin cotizaciones y protección del historial
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-06 (Q-073).
+- **Decisión:** `SUBMITTED → DRAFT` mediante Devolver a borrador solo si la SC nunca tuvo cotizaciones, además de los frenos vigentes por OC/cobertura, motivo y permisos. Ofertas rechazadas/sustituidas también impiden devolver; para cambiar ítems con antecedentes se usa anular y crear otra SC según permisos y frenos actuales.
+- **Históricos:** las SC ya en borrador con cotizaciones permanecen consultables; no se eliminan/reasignan líneas vinculadas ni se cambia la cantidad que representan sus ofertas anteriores. Se conserva la edición de cabecera que no altere el contenido de las ofertas. SC sin cotizaciones mantiene edición normal.
+- **Límite:** no elimina ofertas ni implementa versiones/snapshots nuevos; ese diseño requiere desarrollo propio. Sin nuevos estados, tablas, dependencias, migraciones o datos reescritos. Armoniza BR-PUR-025 y la tabla de estados con D-118.
+- **Propuesta aprobada:** [historial de SC AG-06](../08-architecture/platform-audit/2026-11-04-ag-06-request-history-proposal.md).
+
+### D-127 — Correlativo de nuevas recepciones con históricos preservados
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-06 (Q-074).
+- **Decisión:** agregar `PurchaseReceipt.number` entero opcional y único por `(tenantId, companyId, number)`. Toda alta nueva por el servicio recibe correlativo por empresa, serializado dentro de la transacción mediante el bloqueo de empresa compartido con SC/OC. El número se conserva al anular y no se reutiliza. La interfaz identifica `RC-<número>` y mantiene separada la OC de origen.
+- **Históricos:** las recepciones anteriores conservan `number = null` y su UUID, con identificación explícita de recepción histórica. No se inventa un orden documental retroactivo ni se renumeran documentos. Esta precisión complementa D-050.8.
+- **Migración:** campo e índice, sin backfill ni nuevos estados. Verificación en la base aislada de auditoría; no autoriza migrar producción ni publicar.
+- **Propuesta aprobada:** [identificación de recepciones AG-06](../08-architecture/platform-audit/2026-11-04-ag-06-receipt-number-proposal.md).
+- **Documentos afectados:** CORE_ENTITIES, ERD, PURCHASE_ORDERS_AND_RECEIPTS, numeración D-050/Q-002, guía/ayuda, validación y evidencia AG-06.
+
+### D-128 — Cierre parcial formal de OC como desarrollo separado
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-06 (Q-076).
+- **Decisión:** el cierre formal del saldo no recibido anunciado por BR-PUR-013 se desarrolla por separado, con especificación y aprobación previas de representación, efecto en compromiso/exposición, facturas/NC/ND, recepciones tardías/reversas, permisos y trazabilidad. No forma parte del lote correctivo AG-06.
+- **Estado real:** no existe una acción ni un estado/campo persistido para ese cierre; permanece como brecha funcional. No se modifican cantidades/importes de OC confirmadas para simularlo y se conservan los frenos de anulación con recepciones/facturas activas. Corregir los bugs de esos recorridos actuales sigue dentro de AG-06.
+- **Límite:** esta decisión no implementa BR-PUR-013 ni autoriza nuevos campos, estados, eventos o fórmulas. La guía/ayuda y el plan distinguen lo disponible de lo previsto.
+- **Propuesta aprobada:** [alcance de cierre parcial AG-06](../08-architecture/platform-audit/2026-11-04-ag-06-partial-close-scope-proposal.md).
+
+### D-129 — Revalidar aprobación al cambiar el FX de una OC aprobada
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-06 (Q-075).
+- **Decisión:** se conserva el FX manual al confirmar una OC `APPROVED`. Si cambia respecto del aprobado, el actor debe poder aprobar de nuevo el importe recalculado en ARS conforme a los umbrales, varianza y segregación vigentes. En la misma transacción se actualizan aprobador/fecha y se registra el evento existente `purchase_order.approved` con el cambio de FX antes de confirmar.
+- **Rechazo:** si no cumple los requisitos, se rechaza toda la operación sin modificar la OC `APPROVED`; un aprobador habilitado puede revisar e ingresar ese FX al confirmarla. No se agregan estados, eventos, campos ni permisos. Con FX aprobado sin cambios permanece el permiso actual de confirmación. Luego de `CONFIRMED` sigue la inmutabilidad de monto/FX.
+- **Verificación:** umbral superior, segregación, justificación vigente, aprobación autorizada, auditoría atómica y FX sin cambio. No modifica históricos ni autoriza publicar.
+- **Propuesta aprobada:** [FX de confirmación AG-06](../08-architecture/platform-audit/2026-11-04-ag-06-confirmation-fx-proposal.md).
+- **Documentos afectados:** MONEY_MODEL, APPROVAL_WORKFLOWS, STATE_MACHINES, PURCHASE_ORDERS_AND_RECEIPTS, REGISTER_PURCHASE, guía/ayuda y conocimiento AI.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

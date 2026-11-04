@@ -40,7 +40,7 @@ export function CostControlReportPdfDocument(props: Props) {
     truncated
       ? `Truncado: ${props.report.rows.length - MAX_COST_CONTROL_PDF_ROWS} filas omitidas (límite ${MAX_COST_CONTROL_PDF_ROWS}). CSV para detalle completo.`
       : null,
-    `Costos no asignados EDT: comprom. ${props.report.unallocatedCommittedCost}, recib. ${props.report.unallocatedReceivedCost}, deveng. ${props.report.unallocatedAccruedCost}, pag. ${props.report.unallocatedPaidCost}, inv. ${props.report.unallocatedInventoryConsumedCost}`,
+    `Costos no asignados EDT: comprom. ${props.report.unallocatedCommittedCost}, recib. ${props.report.unallocatedReceivedCost}, deveng. ${props.report.unallocatedAccruedCost}, pag. ${props.report.unallocatedPaidCost}, inv. ${props.report.unallocatedInventoryConsumedCost ?? "Sin valuación"}`,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -54,7 +54,7 @@ export function CostControlReportPdfDocument(props: Props) {
           filterLine={costControlFiltersLine(props.filters)}
         />
         <Text style={reportPdfStyles.meta}>
-          Presupuesto: {props.report.budgetName} ({props.report.budgetStatus})
+          Presupuesto: {props.report.budgetName} ({props.report.budgetStatus}) · Moneda: {props.report.currency}
         </Text>
         {props.report.warnings.length > 0 && (
           <View style={{ marginTop: 4 }}>
@@ -80,6 +80,7 @@ export function CostControlReportPdfDocument(props: Props) {
         <Text style={reportPdfStyles.meta}>Costo presupuestado: {props.report.totals.budgetTotalCost}</Text>
         <Text style={reportPdfStyles.meta}>Exposición esperada: {props.report.totals.expectedCostExposure}</Text>
         <Text style={reportPdfStyles.meta}>Restante presupuesto costo: {props.report.totals.remainingBudgetCost}</Text>
+        <Text style={reportPdfStyles.meta}>Consumo inventario: {props.report.totals.inventoryConsumedCost ?? "Sin valuación"}</Text>
 
         <Text style={reportPdfStyles.sectionTitle}>
           Líneas EDT ({truncated ? `primeras ${MAX_COST_CONTROL_PDF_ROWS}` : `${slice.length}`} de {props.report.rows.length})

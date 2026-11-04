@@ -18,6 +18,8 @@ export type PurchaseVarianceTier =
 export type BudgetRefKind = "UNIT_PRICE" | "GLOBAL_PARTIDA" | "NONE";
 
 export type VarianceLineInput = {
+  budgetCurrency: string | null;
+  purchaseCurrency: string | null;
   unit: string;
   unitPrice: string;
   discountPct?: string;
@@ -136,6 +138,12 @@ function evaluateLineVarianceUnsafe(
 ): VarianceLineResult {
   const soft = settings.varianceSoftAlertPct;
   const extra = settings.varianceExtraApprovalPct;
+
+  // D-125: no implicit FX and no neutral global-unit shortcut across currencies.
+  if (!line.budgetCurrency || !line.purchaseCurrency || line.budgetCurrency !== line.purchaseCurrency) {
+    const priced = compareDecimal(effectiveUnitPriceNet({ quantity: "1", unitPriceNet: line.unitPrice.trim() || "0", discountPct: line.discountPct ?? "0" }), "0") > 0;
+    return { variancePct: null, varianceTier: priced ? "NO_BUDGET_BASELINE" : "NONE", varianceUnitMismatch: false, requiresJustification: priced, requiresExtraApproval: false };
+  }
 
   if (!isComparablePurchaseBaseline(line.unit, line.budgetUnit)) {
     return NEUTRAL_VARIANCE;

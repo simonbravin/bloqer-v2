@@ -19,7 +19,7 @@ import { formatProgressPctDisplay } from "../adapters/schedule-field-labels";
 import {
   PROGRESS_DIMENSION_HINTS,
   scheduleProgressValues,
-} from "./schedule-progress-dimensions";
+} from "../adapters/schedule-progress-values";
 import { ScheduleViewEmptyMessage } from "./schedule-empty-state";
 import { ScheduleMissingEdtBadge } from "./schedule-missing-edt-badge";
 import { ScheduleReorderControls } from "./schedule-reorder-controls";
@@ -43,7 +43,7 @@ function HeaderHint({ label, hint }: { label: string; hint: string }) {
 export function ScheduleTableView({
   items,
   onSelect,
-  budgetCurrency = "ARS",
+  budgetCurrency,
   filtersExcludeAll = false,
   unfilteredActiveCount = 0,
   projectId,
@@ -52,7 +52,7 @@ export function ScheduleTableView({
 }: {
   items: ScheduleWorkspaceItemDto[];
   onSelect: (item: ScheduleWorkspaceItemDto) => void;
-  budgetCurrency?: string;
+  budgetCurrency?: string | null;
   filtersExcludeAll?: boolean;
   unfilteredActiveCount?: number;
   projectId?: string;
@@ -64,12 +64,13 @@ export function ScheduleTableView({
       <ScheduleViewEmptyMessage
         filtersExcludeAll={filtersExcludeAll}
         unfilteredActiveCount={unfilteredActiveCount}
+        canEdit={canEdit}
       />
     );
   }
 
   const money = (raw: string | undefined | null) =>
-    raw != null && raw !== "" ? formatMoneyAmount(raw, budgetCurrency) : "—";
+    raw != null && raw !== "" && budgetCurrency != null ? formatMoneyAmount(raw, budgetCurrency) : "—";
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -86,32 +87,10 @@ export function ScheduleTableView({
               <th className="px-2 py-1.5 font-medium whitespace-nowrap">Estado</th>
               <th className="px-2 py-1.5 font-medium">Inicio</th>
               <th className="px-2 py-1.5 font-medium">Fin</th>
-              <th className="px-2 py-1.5 font-medium text-right whitespace-nowrap">
-                <HeaderHint
-                  label={PROGRESS_DIMENSION_HINTS.real.label}
-                  hint={PROGRESS_DIMENSION_HINTS.real.hint}
-                />
-              </th>
-              <th className="px-2 py-1.5 font-medium text-right whitespace-nowrap">
-                <HeaderHint
-                  label={PROGRESS_DIMENSION_HINTS.time.label}
-                  hint={PROGRESS_DIMENSION_HINTS.time.hint}
-                />
-              </th>
-              <th className="px-2 py-1.5 font-medium text-right whitespace-nowrap">
-                <HeaderHint
-                  label={PROGRESS_DIMENSION_HINTS.quantity.label}
-                  hint={PROGRESS_DIMENSION_HINTS.quantity.hint}
-                />
-              </th>
-              <th className="px-2 py-1.5 font-medium text-right whitespace-nowrap">
-                <HeaderHint
-                  label={PROGRESS_DIMENSION_HINTS.cert.label}
-                  hint={PROGRESS_DIMENSION_HINTS.cert.hint}
-                />
-              </th>
-              <th className="px-2 py-1.5 font-medium text-right">Presup.</th>
-              <th className="px-2 py-1.5 font-medium text-right">Comprom.</th>
+              {(["real", "time", "quantity", "cert"] as const).filter((key) => budgetCurrency != null || key === "real" || key === "time").map((key) => (
+                <th key={key} className="px-2 py-1.5 font-medium text-right whitespace-nowrap"><HeaderHint label={PROGRESS_DIMENSION_HINTS[key].label} hint={PROGRESS_DIMENSION_HINTS[key].hint} /></th>
+              ))}
+              {budgetCurrency != null ? <><th className="px-2 py-1.5 font-medium text-right">Presup.</th><th className="px-2 py-1.5 font-medium text-right">Comprom.</th></> : null}
               <th className="px-2 py-1.5 font-medium">Alertas</th>
             </tr>
           </thead>
@@ -205,18 +184,18 @@ export function ScheduleTableView({
                           aria-label="Hito"
                         />
                       ) : null}
-                      <span className="min-w-0 flex-1 truncate" title={item.name}>
+                      <button type="button" className="min-w-0 flex-1 truncate rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title={item.name} aria-haspopup="dialog" onClick={(event) => { event.stopPropagation(); onSelect(item); }}>
                         {item.name}
-                      </span>
+                      </button>
                       {!nameAlreadyHasCode && primary ? (
                         <span className="shrink-0 text-[10px] text-muted-foreground">
                           {primary.wbsCode}
                         </span>
                       ) : null}
-                      <ScheduleMissingEdtBadge
+                      {budgetCurrency != null ? <ScheduleMissingEdtBadge
                         item={item}
                         className="shrink-0 px-1 py-0"
-                      />
+                      /> : null}
                     </div>
                   </td>
                   <td className="px-2 py-1 align-middle whitespace-nowrap">
@@ -235,7 +214,7 @@ export function ScheduleTableView({
                       ["quantity", progress.quantity],
                       ["cert", progress.certified],
                     ] as const
-                  ).map(([key, raw]) => (
+                  ).filter(([key]) => budgetCurrency != null || key === "real" || key === "time").map(([key, raw]) => (
                     <td
                       key={key}
                       className="px-2 py-1 align-middle text-right tabular-nums whitespace-nowrap"
@@ -244,12 +223,12 @@ export function ScheduleTableView({
                       {formatProgressPctDisplay(raw)}
                     </td>
                   ))}
-                  <td className="px-2 py-1 align-middle text-right tabular-nums whitespace-nowrap">
+                  {budgetCurrency != null ? <><td className="px-2 py-1 align-middle text-right tabular-nums whitespace-nowrap">
                     {money(item.metrics?.budgetTotalCost)}
                   </td>
                   <td className="px-2 py-1 align-middle text-right tabular-nums whitespace-nowrap">
                     {money(item.metrics?.committedCost)}
-                  </td>
+                  </td></> : null}
                   <td className="px-2 py-1 align-middle">
                     <div className="flex flex-nowrap items-center gap-0.5">
                       {alerts.map((a) => (

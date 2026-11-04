@@ -7,7 +7,7 @@ export function assertPoEligibleForReceipt(status: string): void {
   if (!(PO_RECEIPT_ELIGIBLE_STATUSES as readonly string[]).includes(status)) {
     throw new ServiceError(
       "CONFLICT",
-      `No se puede registrar recepción en una orden con estado "${status}". Primero emita la orden.`,
+      "La orden todavía no admite recepciones. Primero confirmala al proveedor.",
     );
   }
 }

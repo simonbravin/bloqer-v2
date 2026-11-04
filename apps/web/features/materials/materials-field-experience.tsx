@@ -68,7 +68,11 @@ export function MaterialsFieldExperience({
 
   const rowKeyParam = searchParams.get("rowKey");
   useEffect(() => {
-    if (!rowKeyParam) return;
+    if (!rowKeyParam) {
+      setSelectedKey(null);
+      setSheetOpen(false);
+      return;
+    }
     const exists = rows.some((r) => r.rowKey === rowKeyParam);
     if (exists) {
       setSelectedKey(rowKeyParam);
@@ -82,7 +86,11 @@ export function MaterialsFieldExperience({
   }, [rowKeyParam, rows]);
 
   useEffect(() => {
-    if (parseMaterialsFieldFilter(fieldParam)) return;
+    const next = parseMaterialsFieldFilter(fieldParam);
+    if (next) {
+      setFieldFilterState(next);
+      return;
+    }
     setFieldFilterState("shortfall");
     replaceParamsShallow((params) => {
       params.set("field", "shortfall");

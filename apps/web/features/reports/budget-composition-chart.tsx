@@ -7,15 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { costCategoryColor } from "@/lib/cost-category-colors";
 import { formatChartMoney } from "@/lib/format-money";
 
-function moneyTooltip(value: number) {
-  return formatChartMoney(value);
-}
-
 type Props = {
   composition: BudgetCompositionReport;
+  currency?: string;
 };
 
-export function BudgetCompositionChart({ composition }: Props) {
+export function BudgetCompositionChart({ composition, currency }: Props) {
   const chartData = useMemo(
     () =>
       composition.slices.map((s, i) => ({
@@ -47,7 +44,7 @@ export function BudgetCompositionChart({ composition }: Props) {
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Composición del presupuesto</CardTitle>
         <CardDescription>
-          Costo directo planificado · Total {formatChartMoney(composition.totalDirectCost)}
+          Costo directo planificado · Total {formatChartMoney(composition.totalDirectCost, currency)}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -73,7 +70,7 @@ export function BudgetCompositionChart({ composition }: Props) {
                   ))}
                 </Pie>
                 <Tooltip
-                  formatter={(value: number) => moneyTooltip(value)}
+                  formatter={(value: number) => formatChartMoney(value, currency)}
                   labelFormatter={(label) => label}
                 />
               </PieChart>

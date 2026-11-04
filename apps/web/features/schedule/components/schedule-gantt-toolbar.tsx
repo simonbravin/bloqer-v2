@@ -47,6 +47,7 @@ export function ScheduleGanttToolbar({
             key={opt.id}
             type="button"
             variant={range === opt.id ? "secondary" : "ghost"}
+            aria-pressed={range === opt.id}
             size="sm"
             className="h-7 px-2 text-xs"
             onClick={() => onRangeChange(opt.id)}
@@ -90,6 +91,7 @@ export function ScheduleGanttToolbar({
         size="sm"
         className="h-7 text-xs"
         onClick={() => onSidebarOpenChange(!sidebarOpen)}
+        aria-expanded={sidebarOpen}
       >
         {sidebarOpen ? (
           <>

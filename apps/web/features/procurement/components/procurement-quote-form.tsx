@@ -2,7 +2,7 @@
 
 import type { StoredDocumentLineMoney } from "@bloqer/utils";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { addDecimal, compareDecimal, resolveDocumentLineAmounts, calcIibbPerceptionAmount, roundMoney } from "@bloqer/utils";
@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
+import { CurrencySelect } from "@/components/ui/currency-select";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import {
   Select,
@@ -42,6 +44,8 @@ import {
   selectQuoteAndCreatePoAction,
   updateProcurementQuoteAction,
 } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
+import { useProcurementAction } from "../lib/use-procurement-action";
+import { PoLineBudgetRef } from "./po-line-budget-ref";
 
 /** Default alícuota IVA for new quote forms (matches IVA_RATE_PRESETS). */
 const DEFAULT_QUOTE_TAX_RATE = "21";
@@ -52,6 +56,7 @@ type PrLine = {
   unit: string;
   quantity: string;
   budgetUnitCostSnapshot?: string | null;
+  budgetCurrency: string | null;
 };
 
 type LineMoney = { unitPrice: string; discountPct: string; taxRate: string };
@@ -68,6 +73,7 @@ type QuoteLineInitial = {
 export type ProcurementQuoteEditValues = {
   quoteId: string;
   currency: string;
+  fxRate?: string;
   supplierName: string;
   validUntil: string | null;
   leadTimeDays: number | null;
@@ -83,6 +89,7 @@ interface ProcurementQuoteFormProps {
   mode?: "create" | "edit";
   editValues?: ProcurementQuoteEditValues;
   onCancelEdit?: () => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
 /** DecimalInput may emit "" while clearing; treat as zero for calc/payload. */
@@ -121,12 +128,16 @@ export function ProcurementQuoteForm({
   mode = "create",
   editValues,
   onCancelEdit,
+  onPendingChange,
 }: ProcurementQuoteFormProps) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction(onPendingChange);
   const [error, setError] = useState<string | null>(null);
   const isEdit = mode === "edit" && editValues != null;
-  const currency = isEdit ? editValues.currency : "ARS";
+  const [currency, setCurrency] = useState(isEdit ? editValues.currency : "ARS");
+  const [fxRate, setFxRate] = useState(editValues?.fxRate ?? "");
+  const fxRateRef = useRef(fxRate);
+  fxRateRef.current = fxRate;
 
   const lineInitialByPrId = useMemo(() => {
     const map = new Map<string, QuoteLineInitial>();
@@ -189,6 +200,7 @@ export function ProcurementQuoteForm({
   }
 
   function resetCreateForm() {
+    setCurrency("ARS"); setFxRate(""); fxRateRef.current = "";
     const rate = DEFAULT_QUOTE_TAX_RATE;
     const nextMoney = blankLineMoney(rate);
     setSupplierId("");
@@ -277,6 +289,7 @@ export function ProcurementQuoteForm({
       purchaseRequestId,
       supplierContactId: opts.supplierContactId,
       currency,
+      fxRate: currency === "ARS" ? undefined : fxRateRef.current,
       validUntil,
       leadTimeDays,
       pricesIncludeTax: opts.pricesIncludeTax,
@@ -299,7 +312,10 @@ export function ProcurementQuoteForm({
     <form
       key={isEdit ? editValues!.quoteId : `create-${createEpoch}`}
       className="space-y-4 rounded-lg border p-4"
-      action={(fd) => {
+      onSubmit={(event) => {
+            event.preventDefault();
+            if (isRunning()) return;
+            const fd = new FormData(event.currentTarget);
         startTransition(async () => {
           setError(null);
           const currentSupplierId = supplierIdRef.current;
@@ -334,6 +350,7 @@ export function ProcurementQuoteForm({
           const result = isEdit
             ? await updateProcurementQuoteAction(projectId, editValues!.quoteId, purchaseRequestId, {
                 currency: payload.currency,
+                fxRate: payload.fxRate,
                 validUntil: payload.validUntil,
                 leadTimeDays: payload.leadTimeDays,
                 pricesIncludeTax: payload.pricesIncludeTax,
@@ -356,7 +373,18 @@ export function ProcurementQuoteForm({
         });
       }}
     >
+<fieldset disabled={pending} className="min-w-0 space-y-5">
       <p className="font-medium text-sm">{isEdit ? "Editar cotización" : "Cargar cotización"} · {currency}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-1">
+          <Label htmlFor="quote-currency">Moneda de la cotización</Label>
+          <CurrencySelect id="quote-currency" value={currency} disabled={pending} onValueChange={(next) => {
+            if (next === currency) return;
+            setCurrency(next); setFxRate(""); fxRateRef.current = "";
+          }} />
+        </div>
+        <ManualFxField id="quote-fx-rate" currency={currency} value={fxRate} onValueChange={(next) => { setFxRate(next); fxRateRef.current = next; }} disabled={pending} />
+      </div>
       {error && (
         <p className="text-sm text-destructive" role="alert">
           {error}
@@ -365,18 +393,19 @@ export function ProcurementQuoteForm({
 
       {isEdit ? (
         <div className="space-y-1">
-          <Label>Proveedor</Label>
+          <Label htmlFor="quote-supplier">Proveedor</Label>
           <p className="text-sm font-medium">{editValues.supplierName}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          <Label>Proveedor</Label>
+          <Label htmlFor="quote-supplier">Proveedor</Label>
           {suppliers.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No hay proveedores activos. Cree un contacto con rol Proveedor primero.
             </p>
           ) : (
             <SearchableCombobox
+              id="quote-supplier"
               popoverWidth="wide"
               options={toSearchableOptions(suppliers)}
               value={supplierId}
@@ -490,10 +519,11 @@ export function ProcurementQuoteForm({
               <p className="font-medium">{line.description}</p>
               <p className="text-muted-foreground">
                 {formatQtyFromString(line.quantity)} {line.unit}
-                {line.budgetUnitCostSnapshot
-                  ? ` · ref. presup. ${formatUnitPriceFromString(line.budgetUnitCostSnapshot)}`
-                  : ""}
               </p>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Ref. presup.:
+                <PoLineBudgetRef unitCost={line.budgetUnitCostSnapshot} currency={line.budgetCurrency} purchaseCurrency={currency} compact />
+              </div>
             </div>
             <div className="space-y-1">
               <Label htmlFor={`offerKind_${line.id}`}>Oferta del ítem</Label>
@@ -615,7 +645,8 @@ export function ProcurementQuoteForm({
           </Button>
         ) : null}
       </div>
-    </form>
+    </fieldset>
+</form>
   );
 }
 
@@ -629,7 +660,7 @@ export function SelectQuoteButton({
   purchaseRequestId: string;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction();
 
   return (
     <Button
@@ -637,6 +668,7 @@ export function SelectQuoteButton({
       variant="outline"
       disabled={pending}
       onClick={() => {
+        if (isRunning()) return;
         startTransition(async () => {
           const result = await selectQuoteAndCreatePoAction(
             quoteId,
@@ -673,14 +705,14 @@ export function ProcurementQuoteRowActions({
   onDeleted?: () => void;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction();
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   if (!canManage) return null;
 
   return (
     <div className="flex flex-wrap justify-end gap-1">
-      <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={onEdit}>
+      <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => { if (!isRunning()) onEdit(); }}>
         Editar
       </Button>
       <Button
@@ -695,7 +727,7 @@ export function ProcurementQuoteRowActions({
       </Button>
       <ConfirmAlertDialog
         open={deleteOpen}
-        onOpenChange={setDeleteOpen}
+        onOpenChange={(next) => { if (!isRunning()) setDeleteOpen(next); }}
         title="¿Eliminar cotización?"
         description="Se borra la cotización y sus importes. Podés cargar una nueva del mismo proveedor después."
         confirmLabel="Eliminar"

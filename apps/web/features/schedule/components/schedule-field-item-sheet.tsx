@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useScheduleAction } from "../lib/use-schedule-action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ScheduleFieldItemDto } from "@bloqer/services";
@@ -40,7 +41,7 @@ export function ScheduleFieldItemSheet({
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useScheduleAction();
   const [blockReason, setBlockReason] = useState("");
   const [blocking, setBlocking] = useState(false);
 
@@ -82,7 +83,7 @@ export function ScheduleFieldItemSheet({
   }
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
+    <Sheet open={open} onOpenChange={(next) => { if (!isRunning()) onOpenChange(next); }}>
       <SheetContent
         side="bottom"
         className="max-h-[85vh] overflow-y-auto rounded-t-xl pb-[max(1.25rem,env(safe-area-inset-bottom))]"
@@ -110,7 +111,7 @@ export function ScheduleFieldItemSheet({
                 {primary.wbsCode} · {primary.wbsName}
               </p>
             ) : (
-              <p className="text-muted-foreground">Sin EDT vinculado.</p>
+              <p className="text-muted-foreground">Sin información de EDT disponible.</p>
             )}
 
             <p>
@@ -153,6 +154,8 @@ export function ScheduleFieldItemSheet({
                     <Label htmlFor="field-block-reason">Causa de bloqueo</Label>
                     <Textarea
                       id="field-block-reason"
+                      disabled={pending}
+                      maxLength={2000}
                       value={blockReason}
                       onChange={(e) => setBlockReason(e.target.value)}
                       rows={3}
@@ -170,6 +173,7 @@ export function ScheduleFieldItemSheet({
                         type="button"
                         variant="outline"
                         className="min-h-11"
+                        disabled={pending}
                         onClick={() => setBlocking(false)}
                       >
                         Cancelar

@@ -46,25 +46,26 @@ export default async function NuevaRecepcionPage({ params }: PageProps) {
   }
 
   if (order.projectId !== id) notFound();
+  const orderCtx = { ...ctx, companyId: order.companyId };
 
   if (!["CONFIRMED", "PARTIALLY_RECEIVED"].includes(order.status)) {
     redirect(poHref);
   }
 
   // Resume the same ficha if a DRAFT already exists (avoids false "máximo 0" errors).
-  const draftId = await findActiveDraftReceiptId(poId, ctx);
+  const draftId = await findActiveDraftReceiptId(poId, orderCtx);
   if (draftId) {
     redirect(`/proyectos/${id}/recepciones/${draftId}`);
   }
 
-  const formLines = await getPoLinesForReceiptForm(poId, order.lines, ctx);
+  const formLines = await getPoLinesForReceiptForm(poId, order.lines, orderCtx);
 
   // Warehouse list needs INVENTORY module + VIEW; receipt itself does not (warehouse optional).
   // Never 404 the receive form when deposits are unavailable.
   let warehouseOptions: Array<{ id: string; name: string }> = [];
   try {
-    const warehouses = await listWarehouses({ status: "ACTIVE" }, ctx);
-    warehouseOptions = warehouses.map((w) => ({ id: w.id, name: w.name }));
+    const warehouses = await listWarehouses({ status: "ACTIVE", companyId: order.companyId }, orderCtx);
+    warehouseOptions = warehouses.filter((warehouse) => warehouse.projectId == null || warehouse.projectId === id).map((w) => ({ id: w.id, name: w.name }));
   } catch (err) {
     if (!(err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND"))) {
       throw err;

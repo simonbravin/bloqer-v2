@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export function NewPurchaseOrderDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const submitting = useRef(false);
   const hasMounted = useHasMounted();
   const isMdUp = useIsMdUp();
   const nuevoHref = `/proyectos/${projectId}/ordenes-compra/nueva`;
@@ -67,6 +68,7 @@ export function NewPurchaseOrderDialog({
   }
 
   function closeDialog() {
+    if (submitting.current) return;
     setOpen(false);
     clearCreateQueryParam();
   }
@@ -96,6 +98,7 @@ export function NewPurchaseOrderDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && submitting.current) return;
         setOpen(next);
         if (!next) clearCreateQueryParam();
       }}
@@ -121,6 +124,7 @@ export function NewPurchaseOrderDialog({
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}
+            onPendingChange={(pending) => { submitting.current = pending; }}
           />
         ) : null}
       </DialogContent>

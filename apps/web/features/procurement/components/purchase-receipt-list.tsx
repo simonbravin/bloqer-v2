@@ -1,5 +1,7 @@
 export type PurchaseReceiptListItem = {
   id: string;
+  number: number | null;
+  code: string;
   purchaseOrderCode: string;
   purchaseOrderId?: string;
   supplierName: string;

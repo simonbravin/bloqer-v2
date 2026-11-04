@@ -1,5 +1,61 @@
 [
   {
+    "id": "help-po-payment-perception-ag06",
+    "category": "help",
+    "question": "Pagué el neto y el IVA, pero falta la percepción de la factura. ¿La OC puede figurar sin saldo?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["saldo real", "cuenta por pagar", "percepción", "percepcion"],
+    "notes": "D112/D115: pago bruto no se compara con cobertura neto+IVA; obligaciones propias de ND también importan."
+  },
+  {
+    "id": "help-po-draft-coverage-ag06",
+    "category": "help",
+    "question": "Un borrador cubre lo que recibí y la factura anterior está pagada. ¿Ya terminó el circuito de la OC?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["emitir", "emitida", "borrador", "Facturar"],
+    "notes": "D006/D108: reserva de borrador evita duplicados pero no acredita factura emitida ni cierre."
+  },
+  {
+    "id": "help-confirmation-fx-ag06",
+    "category": "help",
+    "question": "La OC ya está aprobada y quiero cambiar el dólar al confirmarla, ¿quién puede hacerlo?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["aprobar el nuevo", "aprobador habilitado", "segregación", "segregacion"],
+    "notes": "D129: FX distinto revalida aprobación en la misma transacción; sin autorización OC intacta. Con FX sin cambios no inventar una aprobación adicional."
+  },
+  {
+    "id": "help-procurement-currency-ag06",
+    "category": "help",
+    "question": "La compra está en ARS y el presupuesto en USD, ¿cómo interpreto la referencia y el desvío?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["comparable", "justificación", "justificacion"],
+    "notes": "D125: no convertir con FX presupuestario supuesto ni afirmar ahorro; compra y umbrales ARS se conservan."
+  },
+  {
+    "id": "help-request-history-ag06",
+    "category": "help",
+    "question": "Mi solicitud tiene una cotización rechazada, ¿puedo devolverla a borrador y cambiar sus ítems?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["historial", "nueva solicitud", "cualquier cotización", "ningún estado"],
+    "notes": "D126: una oferta rechazada también impide devolver; históricos conservados."
+  },
+  {
+    "id": "help-receipt-number-ag06",
+    "category": "help",
+    "question": "¿Cómo distingo dos recepciones de una misma OC y qué pasa con las históricas?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["RC-", "históric", "identificador"],
+    "notes": "D127: correlativo de altas nuevas; no inventar números históricos ni confundir código de recepción con OC."
+  },
+  {
+    "id": "help-partial-close-ag06",
+    "category": "help",
+    "question": "¿Dónde cierro el saldo de una OC que ya no voy a recibir?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["no está disponible", "todavía no", "desarrollo separado", "pendiente"],
+    "notes": "D128: no inventar acción de cierre ni indicar cambiar una OC confirmada para simularla."
+  },
+  {
     "id": "help-sc-1",
     "category": "help",
     "question": "¿Cómo creo una solicitud de compra?",

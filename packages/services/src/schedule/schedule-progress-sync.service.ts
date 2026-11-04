@@ -1,7 +1,11 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { log } from "../audit/audit.service";
 import { ServiceContext } from "../types";
-import { SCHEDULE_ITEM_ENTITY, scheduleItemSnapshot, statusChangeAuditAction } from "./schedule-audit";
+import {
+  SCHEDULE_ITEM_ENTITY,
+  scheduleItemSnapshot,
+  statusChangeAuditAction,
+} from "./schedule-audit";
 import { assertScheduleStatusTransition, isScheduleLeafItem } from "./schedule-helpers";
 import {
   capSyncProgressPct,
@@ -10,6 +14,7 @@ import {
   serializeProgressPct,
 } from "./schedule-progress-sync-pure";
 import { shouldSyncProgressFromJobsite } from "./schedule-placement";
+import { companyScopeFilter } from "../company-scope";
 
 type TxClient = Omit<
   typeof prisma,
@@ -23,6 +28,9 @@ async function sumApprovedPhysicalPct(
   excludeLogId: string,
   tx: TxClient,
 ): Promise<{ sum: Prisma.Decimal; hasPhysicalPct: boolean }> {
+  // D-045 persists one Real per project/WBS, including a shared project's approved
+  // sources. Scoping this aggregate by the approver's company makes the last
+  // approval overwrite other companies' progress on a shared WBS.
   const rows = await tx.jobsiteLogProgress.findMany({
     where: {
       wbsNodeId,
@@ -137,6 +145,17 @@ export async function syncScheduleProgressFromJobsiteLog(
   ctx: ServiceContext,
   tx: TxClient,
 ): Promise<number> {
+  const source = await tx.jobsiteLog.findFirst({
+    where: {
+      id: jobsiteLogId,
+      projectId,
+      tenantId: ctx.tenantId,
+      status: "APPROVED",
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    },
+    select: { id: true },
+  });
+  if (!source) return 0;
   const logProgress = await tx.jobsiteLogProgress.findMany({
     where: { jobsiteLogId },
     select: { wbsNodeId: true },
@@ -159,7 +178,7 @@ export async function syncScheduleProgressFromJobsiteLog(
 
   for (const wbsNodeId of wbsIds) {
     const pctDec = await resolveWbsPhysicalPct(projectId, wbsNodeId, jobsiteLogId, ctx, tx);
-    if (!pctDec || pctDec.lessThanOrEqualTo(0)) continue;
+    if (!pctDec || pctDec.lessThan(0)) continue;
 
     const pct = capSyncProgressPct(pctDec.toString());
     if (pct === null) continue;
@@ -169,6 +188,7 @@ export async function syncScheduleProgressFromJobsiteLog(
         tenantId: ctx.tenantId,
         wbsNodeId,
         isPrimary: true,
+        wbsNode: { budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) } },
         scheduleItem: {
           scheduleId: schedule.id,
           status: { notIn: ["CANCELLED", "COMPLETED"] },

@@ -28,7 +28,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
-import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "../procurement/procurement-wbs";
+import { assertCostAnalysisLineForWbs, assertWbsLineForProject, assertPurchaseOrderRelations, procurementOrderParentScopeInclude } from "../procurement/procurement-wbs";
 import { loadWbsDominantCostTypes, resolveLineCostType } from "../cost-control/cost-type";
 import { ensureDraftJournalFromSupplierInvoice } from "../accounting/accounting-auto-draft.service";
 import {
@@ -363,6 +363,24 @@ export async function assertSupplierInvoiceLinesPoLink(
       );
     }
   }
+}
+
+/** The linked OC is a financial parent, including for manual invoices without line links. */
+async function assertInvoicePurchaseOrderScope(
+  invoice: { purchaseOrderId?: string | null; tenantId: string; companyId: string; projectId: string | null; supplierContactId: string; currency: string },
+  db: Prisma.TransactionClient = prisma,
+): Promise<void> {
+  if (!invoice.purchaseOrderId) return;
+  const po = await db.purchaseOrder.findUnique({ where: { id: invoice.purchaseOrderId }, include: procurementOrderParentScopeInclude });
+  if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
+  if (po.tenantId !== invoice.tenantId || po.companyId !== invoice.companyId) {
+    throw new ServiceError("FORBIDDEN", "La orden de compra no pertenece a la empresa de la factura");
+  }
+  if (!invoice.projectId || po.projectId !== invoice.projectId || po.supplierContactId !== invoice.supplierContactId || po.currency !== invoice.currency) {
+    throw new ServiceError("CONFLICT", "La orden y la factura deben corresponder a la misma obra, proveedor y moneda");
+  }
+  assertPurchaseOrderLinkableForAp(po.status);
+  assertPurchaseOrderRelations(po);
 }
 
 export function assertSupplierInvoiceEditable(invoice: SupplierInvoice): void {
@@ -751,6 +769,9 @@ export async function createSupplierInvoice(
   }
 
   const companyId = await resolveCompanyIdForAp(projectId, ctx);
+  const invoiceOrderScope = { tenantId: ctx.tenantId, companyId, projectId,
+    supplierContactId: input.supplierContactId, currency: input.currency ?? "ARS", purchaseOrderId: input.purchaseOrderId };
+  await assertInvoicePurchaseOrderScope(invoiceOrderScope, db);
 
   const suggestedLetter =
     input.invoiceLetter ??
@@ -800,6 +821,7 @@ export async function createSupplierInvoice(
 
   const writeInvoice = async (tx: Prisma.TransactionClient) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    await assertInvoicePurchaseOrderScope(invoiceOrderScope, tx);
     const maxNum = await tx.supplierInvoice.aggregate({
       where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
       _max: { number: true },
@@ -1000,6 +1022,11 @@ export async function updateSupplierInvoice(
     }
   }
 
+  await assertInvoicePurchaseOrderScope({ ...existing,
+    supplierContactId: input.supplierContactId ?? existing.supplierContactId,
+    purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId,
+  });
+
   // Optional PO link validation on update
   if (input.purchaseOrderId !== undefined && input.purchaseOrderId !== null) {
     if (!existing.projectId) {
@@ -1059,12 +1086,17 @@ export async function updateSupplierInvoice(
 
   const inv = await prisma.$transaction(async (tx) => {
     if (existing.projectId) await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await assertInvoicePurchaseOrderScope({ ...existing,
+      supplierContactId: input.supplierContactId ?? existing.supplierContactId,
+      purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId,
+    }, tx);
     const nextPurchaseOrderId =
       input.purchaseOrderId !== undefined ? input.purchaseOrderId : undefined;
 
-    // Claim DRAFT so concurrent issue cannot leave an ISSUED invoice with rewritten lines.
+    // Claim the exact preview: another partial edit must not combine a stale
+    // supplier/OC validation with the header that was changed while waiting.
     const headerClaim = await tx.supplierInvoice.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT", updatedAt: existing.updatedAt },
       data: {
         supplierContactId: input.supplierContactId,
         issueDate:       input.issueDate ? new Date(input.issueDate) : undefined,
@@ -1084,7 +1116,7 @@ export async function updateSupplierInvoice(
     });
     assertOptimisticRowUpdate(
       headerClaim.count,
-      "La factura ya no está en borrador. Recargá e intentá de nuevo.",
+      "La factura cambió o ya no está en borrador. Recargá e intentá de nuevo.",
     );
 
     // Clearing OC header without rewriting lines must drop stale D-066 FKs.
@@ -1211,7 +1243,7 @@ export async function updateSupplierInvoice(
     );
 
     return inv;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return serializeInvoice(inv);
 }
@@ -1306,6 +1338,8 @@ export async function issueSupplierInvoice(
           : "Usá emitir nota de débito para este comprobante.",
       );
     }
+
+    await assertInvoicePurchaseOrderScope(inv, tx);
 
     assertInvoiceLetterOnIssue({
       invoiceLetter: inv.invoiceLetter,

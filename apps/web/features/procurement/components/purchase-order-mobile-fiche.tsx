@@ -134,7 +134,7 @@ export function PurchaseOrderMobileFiche({
                 Recibido {formatQtyFromString(line.receivedQuantity)}
               </p>
             ) : null}
-            <p className="text-sm font-semibold tabular-nums">{formatMoneyAmount(line.lineTotal)}</p>
+            <p className="text-sm font-semibold tabular-nums">{formatMoneyAmount(line.lineTotal, order.currency)}</p>
             {line.wbsNodeCode ? (
               <p className="text-sm text-muted-foreground">
                 {line.wbsNodeName ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : line.wbsNodeCode}
@@ -144,6 +144,7 @@ export function PurchaseOrderMobileFiche({
               <p className="text-muted-foreground">Ref. presup.</p>
               <PoLineBudgetRef
                 unitCost={line.budgetUnitCostSnapshot}
+                currency={line.budgetCurrency}
                 unit={line.budgetUnit}
                 refKind={line.budgetRefKind}
                 suggestedApu={line.suggestedApu}
@@ -152,6 +153,7 @@ export function PurchaseOrderMobileFiche({
             </div>
             <PurchaseOrderVarianceReadout
               variancePct={line.variancePct}
+              currencyComparable={line.currencyComparable}
               varianceTier={line.varianceTier}
               justification={line.varianceJustification}
               refKind={line.budgetRefKind}

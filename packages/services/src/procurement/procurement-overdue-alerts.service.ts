@@ -16,7 +16,7 @@ import {
   formatNotificationTitle,
 } from "../notifications/notification-copy";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
-import { filterUserIdsByProjectAccess } from "../security/access";
+import { filterProcurementNotificationRecipients } from "./procurement-notification-audience";
 import type { ServiceContext } from "../types";
 
 /**
@@ -120,11 +120,10 @@ async function fanOut(params: {
   metadata?: Prisma.JsonObject | null;
   summary: ProcurementOverdueRunSummary;
 }): Promise<void> {
-  const candidates = await filterUserIdsByProjectAccess(
-    params.tenantId,
-    params.projectId,
-    params.candidates,
-  );
+  const candidates = await filterProcurementNotificationRecipients({
+    tenantId: params.tenantId, companyId: params.companyId,
+    projectId: params.projectId, candidateUserIds: params.candidates,
+  });
   for (const recipientUserId of candidates) {
     const dup = await hasRecentDuplicate({
       tenantId: params.tenantId,
@@ -175,7 +174,7 @@ export async function runPurchaseOrderDeliveryOverdueAlert(
   const owners = await findActiveOwnerAdminUserIds(ctx.tenantId);
 
   const companies = await prisma.company.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: { tenantId: ctx.tenantId, status: "ACTIVE", ...(ctx.companyId ? { id: ctx.companyId } : {}) },
     select: { id: true },
   });
 
@@ -265,7 +264,7 @@ export async function runPurchaseRequestNeededByOverdueAlert(
   const owners = await findActiveOwnerAdminUserIds(ctx.tenantId);
 
   const companies = await prisma.company.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: { tenantId: ctx.tenantId, status: "ACTIVE", ...(ctx.companyId ? { id: ctx.companyId } : {}) },
     select: { id: true },
   });
 
@@ -381,7 +380,7 @@ export async function runPurchaseOrderReceivedWithoutInvoiceAlert(
   const owners = await findActiveOwnerAdminUserIds(ctx.tenantId);
 
   const companies = await prisma.company.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: { tenantId: ctx.tenantId, status: "ACTIVE", ...(ctx.companyId ? { id: ctx.companyId } : {}) },
     select: { id: true },
   });
 

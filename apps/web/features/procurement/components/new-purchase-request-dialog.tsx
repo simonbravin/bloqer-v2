@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,7 @@ export function NewPurchaseRequestDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const submitting = useRef(false);
   const hasMounted = useHasMounted();
   const isMdUp = useIsMdUp();
 
@@ -106,6 +107,7 @@ export function NewPurchaseRequestDialog({
   }
 
   function closeDialog() {
+    if (submitting.current) return;
     setOpen(false);
     clearCreateQueryParams();
   }
@@ -134,6 +136,7 @@ export function NewPurchaseRequestDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && submitting.current) return;
         setOpen(next);
         if (!next) clearCreateQueryParams();
       }}
@@ -158,6 +161,7 @@ export function NewPurchaseRequestDialog({
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}
+            onPendingChange={(pending) => { submitting.current = pending; }}
           />
         ) : null}
       </DialogContent>

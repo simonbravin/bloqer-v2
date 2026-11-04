@@ -1,6 +1,7 @@
 "use client";
 
-import { useTransition } from "react";
+import { useScheduleAction } from "../lib/use-schedule-action";
+
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { MoreVertical } from "lucide-react";
@@ -45,7 +46,7 @@ export function ScheduleReorderControls({
   layout?: "buttons" | "menu";
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useScheduleAction();
 
   function willPromoteLeafOnIndent(): boolean {
     const source =
@@ -74,6 +75,7 @@ export function ScheduleReorderControls({
   }
 
   function run(kind: MoveKind) {
+    if (isRunning()) return;
     if (kind === "indent" && willPromoteLeafOnIndent()) {
       const ok = window.confirm(
         "Si sangrás este ítem bajo el hermano de arriba, ese hermano pasará a contenedor (fechas derivadas, no editables). ¿Continuar?",

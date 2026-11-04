@@ -1,17 +1,40 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { ScheduleItemStatus } from "@bloqer/database";
 import {
+  addDecimal,
+  divideDecimal,
+  multiplyDecimal,
+  serializeMoney,
+  sortTreeOrder,
+} from "@bloqer/utils";
+import { canViewBudgetsArea } from "../project/project-nav-guards";
+import { requireProjectAccess, canViewProcurementCapability } from "../security/access";
+import { companyScopeFilter } from "../company-scope";
+import {
   getProjectCostControl,
   type CostControlRow,
   type AvailableBudget,
 } from "../cost-control/cost-control.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
-import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import {
+  assertTenantModuleEnabledWithGate,
+  getTenantModuleGate,
+} from "../tenant-modules/tenant-module.service";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
-import { computeDaysLate, formatDateOnly, computeTimePlanProgressPct, isFormerScheduleContainer, isScheduleLeafItem, mergeDerivedContainerDatesIntoDtos } from "./schedule-helpers";
-import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
-import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney, sortTreeOrder } from "@bloqer/utils";
+import {
+  computeDaysLate,
+  formatDateOnly,
+  computeTimePlanProgressPct,
+  isFormerScheduleContainer,
+  isScheduleLeafItem,
+  mergeDerivedContainerDatesIntoDtos,
+} from "./schedule-helpers";
+import {
+  ensureScheduleForProject,
+  findScheduleForProject,
+  ensureScheduleBaselineForProject,
+} from "./schedule.service";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 import {
   computeDeliveryAfterSiblingStart,
@@ -109,11 +132,13 @@ export type ScheduleWorkspaceDto = {
   baselineBudgetId: string | null;
   /** True when cost-control budget ≠ persisted schedule baseline (no silent rewrite). */
   baselineBudgetMismatch: boolean;
-  budgetId: string;
-  budgetName: string;
-  budgetStatus: string;
+  budgetId: string | null;
+  budgetName: string | null;
+  budgetStatus: string | null;
   /** ISO currency of the budget used for schedule item cost metrics (baseline when linked). */
-  budgetCurrency: string;
+  budgetCurrency: string | null;
+  /** Expected optional financial-data failures do not block temporal planning. */
+  metricsWarning?: string | null;
   availableBudgets: AvailableBudget[];
   canEdit: boolean;
   items: ScheduleWorkspaceItemDto[];
@@ -194,11 +219,7 @@ function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDt
 
   if (totalBudgetQty.gt(0)) {
     m.operationalProgressPct = serializeProgressPct(
-      divideDecimal(
-        multiplyDecimal(totalOpQty.toString(), "100"),
-        totalBudgetQty.toString(),
-        2,
-      ),
+      divideDecimal(multiplyDecimal(totalOpQty.toString(), "100"), totalBudgetQty.toString(), 2),
     );
   }
 
@@ -211,43 +232,7 @@ function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDt
   return m;
 }
 
-async function loadCostByCategoryForWbs(
-  wbsNodeIds: string[],
-): Promise<Map<string, ScheduleCostByCategory>> {
-  const map = new Map<string, ScheduleCostByCategory>();
-  if (wbsNodeIds.length === 0) return map;
-
-  const lines = await prisma.costAnalysisLine.findMany({
-    where: { costItem: { wbsNodeId: { in: wbsNodeIds } } },
-    select: {
-      category: true,
-      totalCost: true,
-      costItem: { select: { wbsNodeId: true, quantity: true } },
-    },
-  });
-
-  for (const wbsId of wbsNodeIds) {
-    map.set(wbsId, { ...EMPTY_CATEGORY });
-  }
-
-  for (const line of lines) {
-    const wbsId = line.costItem.wbsNodeId;
-    const bucket = map.get(wbsId);
-    if (!bucket) continue;
-    const cat = line.category as keyof ScheduleCostByCategory;
-    // [D-059] partida money = totalCost × CostItem.quantity — round money at 2 dp (D-053)
-    const partida = serializeMoney(
-      multiplyDecimal(line.totalCost.toString(), line.costItem.quantity.toString()),
-    );
-    bucket[cat] = serializeMoney(addDecimal(bucket[cat], partida));
-  }
-  return map;
-}
-
-function mergeCategoryTotals(
-  target: ScheduleCostByCategory,
-  source: ScheduleCostByCategory,
-): void {
+function mergeCategoryTotals(target: ScheduleCostByCategory, source: ScheduleCostByCategory): void {
   for (const k of Object.keys(target) as (keyof ScheduleCostByCategory)[]) {
     target[k] = serializeMoney(addDecimal(target[k], source[k]));
   }
@@ -256,7 +241,7 @@ function mergeCategoryTotals(
 /** Batch PO expectedDelivery + confirmed receipt dates per WBS ([D-104]). */
 async function loadProcurementDatesByWbs(
   projectId: string,
-  tenantId: string,
+  ctx: ServiceContext,
   wbsNodeIds: string[],
 ): Promise<Map<string, ProcurementDateByWbs>> {
   const map = new Map<string, ProcurementDateByWbs>();
@@ -269,8 +254,9 @@ async function loadProcurementDatesByWbs(
     where: {
       wbsNodeId: { in: wbsNodeIds },
       purchaseOrder: {
-        tenantId,
+        tenantId: ctx.tenantId,
         projectId,
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
         status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED"] },
         expectedDeliveryDate: { not: null },
       },
@@ -296,8 +282,9 @@ async function loadProcurementDatesByWbs(
     where: {
       purchaseOrderLine: { wbsNodeId: { in: wbsNodeIds } },
       purchaseReceipt: {
-        tenantId,
+        tenantId: ctx.tenantId,
         projectId,
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
         status: "CONFIRMED",
       },
     },
@@ -339,6 +326,27 @@ export type ScheduleWorkspaceQueryTimings = {
 
 let lastScheduleWorkspaceTimings: ScheduleWorkspaceQueryTimings | null = null;
 
+async function readOptionalCostControl(
+  projectId: string,
+  budgetId: string | undefined,
+  ctx: ServiceContext,
+) {
+  try {
+    return { report: await getProjectCostControl(projectId, { budgetId }, ctx), warning: null };
+  } catch (error) {
+    if (
+      error instanceof ServiceError &&
+      (error.code === "CONFLICT" || error.code === "VALIDATION")
+    ) {
+      return {
+        report: null,
+        warning: `Las métricas económicas no están disponibles: ${error.message}`,
+      };
+    }
+    throw error;
+  }
+}
+
 export function getLastScheduleWorkspaceTimings(): ScheduleWorkspaceQueryTimings | null {
   return lastScheduleWorkspaceTimings;
 }
@@ -361,100 +369,137 @@ export async function getProjectScheduleWorkspace(
   const moduleGateMs = mark(t);
 
   t = Date.now();
-  const cc = await getProjectCostControl(projectId, { budgetId: filters.budgetId }, ctx);
+  const project = await requireProjectAccess(projectId, ctx);
+  const canEdit =
+    canEditScheduleArea(ctx.roles) && (project.status === "DRAFT" || project.status === "ACTIVE");
+  const canReadBudgets = gate.isEnabled("BUDGETS") && canViewBudgetsArea(ctx.roles);
+  const optionalCosts = canReadBudgets
+    ? await readOptionalCostControl(projectId, filters.budgetId, ctx)
+    : { report: null, warning: null };
+  const result = optionalCosts.report;
+  let metricsWarning = optionalCosts.warning;
+  const cc = result?.type === "REPORT" ? result : null;
+  const availableBudgets =
+    result && result.type !== "NO_APPROVED_BUDGETS" ? [...result.availableBudgets] : [];
   const costControlMs = mark(t);
-  if (cc.type === "BUDGET_SELECTION_REQUIRED") {
-    return { type: "BUDGET_SELECTION_REQUIRED", availableBudgets: cc.availableBudgets };
-  }
-  if (cc.type === "NO_APPROVED_BUDGETS") {
-    return { type: "NO_APPROVED_BUDGETS" };
+  if (result?.type === "BUDGET_SELECTION_REQUIRED") {
+    return { type: "BUDGET_SELECTION_REQUIRED", availableBudgets };
   }
 
   t = Date.now();
   const existingSchedule = await findScheduleForProject(projectId, ctx);
-  if (!existingSchedule && !canEditScheduleArea(ctx.roles)) {
-      lastScheduleWorkspaceTimings = {
-        moduleGateMs,
-        costControlMs,
-        ensureScheduleMs: mark(t),
-        baselineWriteMs: 0,
-        secondCostControlMs: 0,
-        budgetCurrencyMs: 0,
-        itemCountMs: 0,
-        itemsMs: 0,
-        rollupSourceMs: 0,
-        costByCategoryMs: 0,
-        mapMs: 0,
-        totalMs: Date.now() - t0,
-      };
-      return {
-        type: "WORKSPACE",
-        projectId,
-        scheduleId: "",
-        baselineBudgetId: null,
-        baselineBudgetMismatch: false,
-        budgetId: cc.budgetId,
-        budgetName: cc.budgetName,
-        budgetStatus: cc.budgetStatus,
-        budgetCurrency: "ARS",
-        availableBudgets: cc.availableBudgets,
-        canEdit: false,
-        items: [],
-        treeItems: [],
-        summary: {
-          totalItems: 0,
-          unfilteredActiveCount: 0,
-          completedItems: 0,
-          delayedItems: 0,
-          scheduleProgressPct: null,
-        },
-      };
+  if (!existingSchedule && !canEdit) {
+    lastScheduleWorkspaceTimings = {
+      moduleGateMs,
+      costControlMs,
+      ensureScheduleMs: mark(t),
+      baselineWriteMs: 0,
+      secondCostControlMs: 0,
+      budgetCurrencyMs: 0,
+      itemCountMs: 0,
+      itemsMs: 0,
+      rollupSourceMs: 0,
+      costByCategoryMs: 0,
+      mapMs: 0,
+      totalMs: Date.now() - t0,
+    };
+    return {
+      type: "WORKSPACE",
+      projectId,
+      scheduleId: "",
+      baselineBudgetId: null,
+      baselineBudgetMismatch: false,
+      budgetId: cc?.budgetId ?? null,
+      budgetName: cc?.budgetName ?? null,
+      budgetStatus: cc?.budgetStatus ?? null,
+      budgetCurrency: cc?.currency ?? null,
+      metricsWarning,
+      availableBudgets,
+      canEdit: false,
+      items: [],
+      treeItems: [],
+      summary: {
+        totalItems: 0,
+        unfilteredActiveCount: 0,
+        completedItems: 0,
+        delayedItems: 0,
+        scheduleProgressPct: null,
+      },
+    };
   }
   const schedule = existingSchedule ?? (await ensureScheduleForProject(projectId, ctx));
   const ensureScheduleMs = mark(t);
 
   // Only seed baseline when empty — never silently rewrite (orphans WBS links).
   // Requires EDIT: VIEW must not mutate baseline on read.
-  let baselineBudgetId = schedule.baselineBudgetId;
+  let baselineBudgetId = canReadBudgets ? schedule.baselineBudgetId : null;
   t = Date.now();
-  if (!baselineBudgetId && canEditScheduleArea(ctx.roles)) {
-    await prisma.schedule.update({
-      where: { id: schedule.id },
-      data: { baselineBudgetId: cc.budgetId, updatedBy: ctx.actorUserId },
-    });
-    baselineBudgetId = cc.budgetId;
+  if (!baselineBudgetId && canEdit && cc) {
+    const seeded = await ensureScheduleBaselineForProject(projectId, cc.budgetId, ctx);
+    baselineBudgetId = seeded.baselineBudgetId;
   }
   const baselineWriteMs = mark(t);
-  const baselineBudgetMismatch = Boolean(baselineBudgetId && baselineBudgetId !== cc.budgetId);
+  let baselineBudgetMismatch = false;
 
   /** WBS links live on the baseline budget — join cost rows there so committed/cert don't show fake zeros. */
   let metricsCc = cc;
+  let budgetMetadata = cc
+    ? { id: cc.budgetId, name: cc.budgetName, status: cc.budgetStatus, currency: cc.currency }
+    : null;
   t = Date.now();
-  if (baselineBudgetMismatch && baselineBudgetId) {
-    const baselineCc = await getProjectCostControl(
-      projectId,
-      { budgetId: baselineBudgetId },
-      ctx,
-    );
-    if (baselineCc.type === "REPORT") {
-      metricsCc = baselineCc;
+  if (canReadBudgets && baselineBudgetId) {
+    const visibleBaseline = await prisma.budget.findFirst({
+      where: {
+        id: baselineBudgetId,
+        tenantId: ctx.tenantId,
+        projectId,
+        ...companyScopeFilter(ctx),
+        status: { in: ["APPROVED", "CLOSED"] },
+      },
+      select: {
+        id: true,
+        name: true,
+        status: true,
+        currency: true,
+        versionNumber: true,
+        parentBudgetId: true,
+      },
+    });
+    if (!visibleBaseline) {
+      baselineBudgetId = null;
+      metricsCc = null;
+      budgetMetadata = null;
+      metricsWarning = "Las métricas económicas no están disponibles en este contexto.";
+    } else {
+      budgetMetadata = visibleBaseline;
+      baselineBudgetMismatch = Boolean(cc && visibleBaseline.id !== cc.budgetId);
+      if (metricsWarning && availableBudgets.length === 0)
+        availableBudgets.push({
+          id: visibleBaseline.id,
+          name: visibleBaseline.name,
+          status: visibleBaseline.status,
+          versionNumber: visibleBaseline.versionNumber,
+          parentBudgetId: visibleBaseline.parentBudgetId,
+        });
+      if (baselineBudgetMismatch) {
+        const baselineCosts = await readOptionalCostControl(projectId, visibleBaseline.id, ctx);
+        metricsCc = baselineCosts.report?.type === "REPORT" ? baselineCosts.report : null;
+        metricsWarning = baselineCosts.warning;
+      }
     }
   }
   const secondCostControlMs = mark(t);
-  const costRowByWbs = new Map(metricsCc.rows.map((r) => [r.wbsNodeId, r]));
+  const costRowByWbs = new Map((metricsCc?.rows ?? []).map((r) => [r.wbsNodeId, r]));
 
   t = Date.now();
-  const metricsBudget = await prisma.budget.findUnique({
-    where: { id: metricsCc.budgetId },
-    select: { currency: true },
-  });
+  const budgetCurrency = budgetMetadata?.currency ?? null;
   const budgetCurrencyMs = mark(t);
-  const budgetCurrency = metricsBudget?.currency ?? "ARS";
 
   t = Date.now();
   const unfilteredActiveCount = await prisma.scheduleItem.count({
     where: {
       scheduleId: schedule.id,
+      tenantId: ctx.tenantId,
       status: { not: "CANCELLED" },
     },
   });
@@ -464,14 +509,37 @@ export async function getProjectScheduleWorkspace(
   const items = await prisma.scheduleItem.findMany({
     where: {
       scheduleId: schedule.id,
+      tenantId: ctx.tenantId,
       ...(filters.status ? { status: filters.status } : {}),
       ...(filters.itemType ? { type: filters.itemType } : {}),
     },
     orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
     include: {
-      wbsLinks: { include: { wbsNode: { select: { id: true, code: true, name: true } } } },
-      predecessors: { select: { id: true, predecessorId: true } },
-      successors: { select: { successorId: true } },
+      wbsLinks: {
+        where: budgetMetadata
+          ? {
+              tenantId: ctx.tenantId,
+              wbsNode: {
+                budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) },
+              },
+            }
+          : { id: { in: [] } },
+        include: { wbsNode: { select: { id: true, code: true, name: true } } },
+      },
+      predecessors: {
+        where: {
+          tenantId: ctx.tenantId,
+          predecessor: { scheduleId: schedule.id, tenantId: ctx.tenantId },
+        },
+        select: { id: true, predecessorId: true },
+      },
+      successors: {
+        where: {
+          tenantId: ctx.tenantId,
+          successor: { scheduleId: schedule.id, tenantId: ctx.tenantId },
+        },
+        select: { successorId: true },
+      },
     },
   });
   const itemsMs = mark(t);
@@ -479,7 +547,7 @@ export async function getProjectScheduleWorkspace(
   /** Rollup / leaf detection must use the full schedule tree — filters must not shrink it. */
   t = Date.now();
   const rollupSourceItems = await prisma.scheduleItem.findMany({
-    where: { scheduleId: schedule.id },
+    where: { scheduleId: schedule.id, tenantId: ctx.tenantId },
     select: {
       id: true,
       parentId: true,
@@ -509,17 +577,18 @@ export async function getProjectScheduleWorkspace(
     return depth;
   };
 
-  const allWbsIds = [
-    ...new Set(items.flatMap((i) => i.wbsLinks.map((l) => l.wbsNodeId))),
-  ];
   t = Date.now();
-  const categoryByWbs = await loadCostByCategoryForWbs(allWbsIds);
+  const categoryByWbs = new Map(
+    (metricsCc?.rows ?? []).map((row) => {
+      const categories: ScheduleCostByCategory = { ...EMPTY_CATEGORY };
+      for (const bucket of row.byCostType) categories[bucket.costType] = bucket.budgetTotalCost;
+      return [row.wbsNodeId, categories] as const;
+    }),
+  );
   const costByCategoryMs = mark(t);
 
   // Full-tree WBS for procurement risk siblings (before URL filters shrink the list).
-  const rollupWbsByItemId = new Map(
-    rollupSourceItems.map((i) => [i.id, [] as string[]]),
-  );
+  const rollupWbsByItemId = new Map(rollupSourceItems.map((i) => [i.id, [] as string[]]));
   const filteredItemIds = new Set(items.map((i) => i.id));
   for (const item of items) {
     rollupWbsByItemId.set(
@@ -530,11 +599,12 @@ export async function getProjectScheduleWorkspace(
   const missingWbsItemIds = rollupSourceItems
     .filter((i) => !filteredItemIds.has(i.id))
     .map((i) => i.id);
-  if (missingWbsItemIds.length > 0) {
+  if (missingWbsItemIds.length > 0 && budgetMetadata) {
     const extraLinks = await prisma.scheduleItemWbsLink.findMany({
       where: {
         scheduleItemId: { in: missingWbsItemIds },
         tenantId: ctx.tenantId,
+        wbsNode: { budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) } },
       },
       select: { scheduleItemId: true, wbsNodeId: true },
     });
@@ -545,14 +615,11 @@ export async function getProjectScheduleWorkspace(
     }
   }
 
-  const procurementWbsIds = [
-    ...new Set([...rollupWbsByItemId.values()].flat()),
-  ];
-  const procurementByWbs = await loadProcurementDatesByWbs(
-    projectId,
-    ctx.tenantId,
-    procurementWbsIds,
-  );
+  const procurementWbsIds = [...new Set([...rollupWbsByItemId.values()].flat())];
+  const procurementByWbs =
+    gate.isEnabled("PROCUREMENT") && canViewProcurementCapability(ctx.roles)
+      ? await loadProcurementDatesByWbs(projectId, ctx, procurementWbsIds)
+      : new Map<string, ProcurementDateByWbs>();
 
   const mapStarted = Date.now();
 
@@ -592,20 +659,12 @@ export async function getProjectScheduleWorkspace(
           const saleDec = new Prisma.Decimal(r.budgetTotalSale);
           metrics.operationalProgressPct = qtyDec.gt(0)
             ? serializeProgressPct(
-                divideDecimal(
-                  multiplyDecimal(r.operationalProgressQty, "100"),
-                  r.budgetQty,
-                  2,
-                ),
+                divideDecimal(multiplyDecimal(r.operationalProgressQty, "100"), r.budgetQty, 2),
               )
             : null;
           if (saleDec.gt(0)) {
             metrics.certifiedProgressPct = serializeProgressPct(
-              divideDecimal(
-                multiplyDecimal(r.certifiedApproved, "100"),
-                r.budgetTotalSale,
-                2,
-              ),
+              divideDecimal(multiplyDecimal(r.certifiedApproved, "100"), r.budgetTotalSale, 2),
             );
           }
         }
@@ -691,10 +750,7 @@ export async function getProjectScheduleWorkspace(
     }
   }
 
-  mergeDerivedContainerDatesIntoDtos(
-    dtoItems,
-    rollupSourceItems,
-  );
+  mergeDerivedContainerDatesIntoDtos(dtoItems, rollupSourceItems);
 
   // Former containers clear stale DB dates in merge — drop daysLate that used those dates.
   for (const dto of dtoItems) {
@@ -729,7 +785,9 @@ export async function getProjectScheduleWorkspace(
   const fullLeafIds = new Set(
     fullActive.filter((i) => isScheduleLeafItem(fullActive, i.id)).map((i) => i.id),
   );
-  const completedItems = fullActive.filter((i) => i.status === "COMPLETED").length;
+  const completedItems = fullActive.filter(
+    (i) => fullLeafIds.has(i.id) && i.status === "COMPLETED",
+  ).length;
   let delayedItems = 0;
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
@@ -743,17 +801,13 @@ export async function getProjectScheduleWorkspace(
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
     const former = isFormerScheduleContainer(fullActive, i.id);
-    const dur =
-      !former && i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
-    weighted = addDecimal(
-      weighted,
-      multiplyDecimal(i.progressPct.toString(), dur),
-    );
+    const dur = !former && i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
+    weighted = addDecimal(weighted, multiplyDecimal(i.progressPct.toString(), dur));
     weightSum = addDecimal(weightSum, dur);
   }
   const scheduleProgressPct = new Prisma.Decimal(weightSum).greaterThan(0)
-      ? serializeProgressPct(divideDecimal(weighted, weightSum, 2))
-      : null;
+    ? serializeProgressPct(divideDecimal(weighted, weightSum, 2))
+    : null;
 
   lastScheduleWorkspaceTimings = {
     moduleGateMs,
@@ -779,12 +833,13 @@ export async function getProjectScheduleWorkspace(
     scheduleId: schedule.id,
     baselineBudgetId,
     baselineBudgetMismatch,
-    budgetId: cc.budgetId,
-    budgetName: cc.budgetName,
-    budgetStatus: cc.budgetStatus,
+    budgetId: budgetMetadata?.id ?? null,
+    budgetName: budgetMetadata?.name ?? null,
+    budgetStatus: budgetMetadata?.status ?? null,
     budgetCurrency,
-    availableBudgets: cc.availableBudgets,
-    canEdit: canEditScheduleArea(ctx.roles),
+    metricsWarning,
+    availableBudgets,
+    canEdit,
     items: sortTreeOrder(dtoItems, (a, b) => a.name.localeCompare(b.name, "es")),
     treeItems,
     summary: {

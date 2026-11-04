@@ -6,6 +6,8 @@ import { requireProjectAccess } from "../security/access";
 
 export type ProjectProcurementHub = {
   projectId: string;
+  /** Do not present inaccessible order/receipt sources as empty counts. */
+  canViewOrders: boolean;
   purchaseRequests: {
     openDraft: number;
     submitted: number;
@@ -44,18 +46,15 @@ export async function getProjectProcurementHub(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el hub de compras");
   }
 
-  await requireProjectAccess(projectId, ctx);
-
   const gate = await getTenantModuleGate(ctx);
   if (!gate.isEnabled("PROCUREMENT")) {
     throw new ServiceError("FORBIDDEN", "Módulo de compras deshabilitado");
   }
 
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId: ctx.tenantId },
-    select: { id: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  if (!gate.isEnabled("PROJECTS")) throw new ServiceError("FORBIDDEN", "Módulo de proyectos deshabilitado");
+  await requireProjectAccess(projectId, ctx);
+  const canViewOrders = canViewProcurementProjectArea(ctx.roles);
+  const sourceWhere = { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
 
   const [
     prDraft,
@@ -70,43 +69,41 @@ export async function getProjectProcurementHub(
     prWithQuotes,
   ] = await Promise.all([
     prisma.purchaseRequest.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "DRAFT" },
+      where: { ...sourceWhere, status: "DRAFT" },
     }),
     prisma.purchaseRequest.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "SUBMITTED" },
+      where: { ...sourceWhere, status: "SUBMITTED" },
     }),
     prisma.purchaseRequest.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "QUOTE_SELECTED" },
+      where: { ...sourceWhere, status: "QUOTE_SELECTED" },
     }),
-    prisma.purchaseOrder.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "DRAFT" },
-    }),
-    prisma.purchaseOrder.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "SUBMITTED" },
-    }),
-    prisma.purchaseOrder.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "APPROVED" },
-    }),
-    prisma.purchaseOrder.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "CONFIRMED" },
-    }),
-    prisma.purchaseOrder.count({
-      where: { projectId, tenantId: ctx.tenantId, status: "PARTIALLY_RECEIVED" },
-    }),
-    prisma.purchaseReceipt.count({
+    canViewOrders ? prisma.purchaseOrder.count({
+      where: { ...sourceWhere, status: "DRAFT" },
+    }) : Promise.resolve(0),
+    canViewOrders ? prisma.purchaseOrder.count({
+      where: { ...sourceWhere, status: "SUBMITTED" },
+    }) : Promise.resolve(0),
+    canViewOrders ? prisma.purchaseOrder.count({
+      where: { ...sourceWhere, status: "APPROVED" },
+    }) : Promise.resolve(0),
+    canViewOrders ? prisma.purchaseOrder.count({
+      where: { ...sourceWhere, status: "CONFIRMED" },
+    }) : Promise.resolve(0),
+    canViewOrders ? prisma.purchaseOrder.count({
+      where: { ...sourceWhere, status: "PARTIALLY_RECEIVED" },
+    }) : Promise.resolve(0),
+    canViewOrders ? prisma.purchaseReceipt.count({
       where: {
-        projectId,
-        tenantId: ctx.tenantId,
+        ...sourceWhere,
         status: "CONFIRMED",
         receiptDate: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
       },
-    }),
+    }) : Promise.resolve(0),
     prisma.purchaseRequest.count({
       where: {
-        projectId,
-        tenantId: ctx.tenantId,
+        ...sourceWhere,
         status: "SUBMITTED",
-        quotes: { some: { status: { in: ["RECEIVED", "SELECTED"] } } },
+        quotes: { some: { tenantId: ctx.tenantId, status: { in: ["RECEIVED", "SELECTED"] } } },
       },
     }),
   ]);
@@ -114,6 +111,7 @@ export async function getProjectProcurementHub(
   const base = `/proyectos/${projectId}`;
   return {
     projectId,
+    canViewOrders,
     purchaseRequests: {
       openDraft: prDraft,
       submitted: prSubmitted,

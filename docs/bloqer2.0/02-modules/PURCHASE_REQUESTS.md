@@ -44,7 +44,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 ## 8. Acciones disponibles
 1. Crear / editar SC en borrador (todas las líneas con WBS).
 2. **Enviar** → snapshot de costo unitario presupuestario + cantidad; notifica a Compras ([BR-PUR-015]).
-3. **Devolver a borrador** desde `SUBMITTED` con motivo ([BR-PUR-025]): solo si no hay cotizaciones ni OC activas; limpia snapshots y permite editar de nuevo.
+3. **Devolver a borrador** desde `SUBMITTED` con motivo ([BR-PUR-025], D-126): solo si nunca tuvo cotizaciones de ningún estado y no hay OC/cobertura que lo impida; limpia snapshots y permite editar de nuevo. Con historial se conserva la solicitud y se usa una nueva para cambiar ítems. Un borrador histórico con cotizaciones permite corregir fecha/notas, conservando ítems, cantidades y snapshots al reenviar.
 4. Cargar ofertas suficientes para alcanzar `minQuotesRequired` por ítem (clasificación/precio por línea + **plazo de entrega** + `validUntil`, D-118).
 5. **Comparar** cotizaciones (total, desglose, plazo, ref. presupuesto / saldo de partida).
 6. Adjudicar por ítem (o atajo **Adjudicar cotizados → OC** sobre líneas libres de importe positivo) → una o más OC `DRAFT` ([BR-PUR-024]); los bonificados se seleccionan explícitamente en la matriz. Cobertura parcial deja la SC en `SUBMITTED`.
@@ -77,7 +77,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §7b.
 - Históricos conservan `offerKind = null` y sus importes; no hay backfill. Si el total de línea es positivo sigue disponible; un cero pendiente exige revisión antes de adjudicar. Las OC ya procesadas no se invalidan ni recalculan. Si la oferta está congelada, no se habilita edición excepcional.
 
 ## 12. Fórmulas relacionadas
-- Baseline material / unitario: APU del `CostItem` del WBS; ver [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md).
+- Baseline: insumo APU explícito de la partida (incluye LABOR/EQUIPMENT), o fallback documentado; referencia identificada con moneda y unidad. El estimado presupuestario solo existe si todos sus ítems tienen base comparable en la misma moneda; no se muestra un subtotal parcial como total. Ver D-125 y [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md).
 
 ## 13. Casos borde
 - Anular SC con OC `DRAFT`: se puede; con OC activa no-DRAFT: bloqueado.
@@ -107,7 +107,11 @@ Matriz canónica: [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md)
 - Notificar Compras al enviar SC; notificar solicitante cuando hay cotización seleccionada / OC confirmada o rechazada ([BR-PUR-015], [D-050]). Email e in-app identifican organización, proyecto y solicitante.
 
 ## 18. Fase de implementación
-**Fase 1** (núcleo). Pendiente de implementación respecto a [D-050]: WBS hard-required, lead time en cotización, UI de costo referencial / saldo, email + SLA.
+**Fase 1 implementada.** WBS obligatorio, plazo, referencia/saldo, email e in-app/SLA tienen implementación. AG-06 verifica contratos, aislamiento, concurrencia y preservación histórica D-126; el envío real por proveedores externos queda fuera de la base aislada.
+
+## Hallazgo — AG-06: historial y lista de gaps
+
+La documentación anterior no distinguía ofertas históricas al devolver una SC y seguía enumerando funcionalidades ya existentes como pendientes. D-126 resuelve la primera contradicción; el inventario actual reemplaza la segunda. D-125 exige identificar la moneda de cada referencia, incluso en solicitudes con partidas de presupuestos diferentes.
 
 ## 19. Preguntas abiertas
 - SLA exacto (horas) por defecto en settings — sugerido 48–72 h; no bloquea el procedimiento.

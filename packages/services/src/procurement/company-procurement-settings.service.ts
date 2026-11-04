@@ -1,10 +1,13 @@
 import { Prisma, prisma, type ApPaymentNotificationChannel } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { upsertCompanyProcurementSettingsSchema } from "@bloqer/validators";
+import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
 import { serializeMoneyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { isCrossCompany } from "../company-scope";
 import { requireProjectAccess } from "../security/access";
+import { lockProcurementCompanyForNumbering } from "./procurement-wbs";
 
 export type CompanyProcurementSettingsView = {
   companyId: string;
@@ -191,10 +194,11 @@ export async function getCompanyProcurementSettingsForProject(
   ctx: ServiceContext,
 ): Promise<CompanyProcurementSettingsView> {
   const project = await requireProjectAccess(projectId, ctx);
-  if (!project?.companyId) {
-    throw new ServiceError("CONFLICT", "El proyecto no tiene empresa asignada");
+  const companyId = project.companyId ?? ctx.companyId;
+  if (!companyId) {
+    throw new ServiceError("CONFLICT", "Elegí una empresa para consultar la política de compras de la obra compartida");
   }
-  return getCompanyProcurementSettings(project.companyId, ctx);
+  return getCompanyProcurementSettings(companyId, ctx);
 }
 
 export async function upsertCompanyProcurementSettings(
@@ -240,163 +244,185 @@ export async function upsertCompanyProcurementSettings(
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
   if (isCrossCompany(company.id, ctx)) throw new ServiceError("FORBIDDEN", "Empresa fuera de tu alcance");
 
-  const createData: Prisma.CompanyProcurementSettingsUpsertArgs["create"] = {
-    companyId,
-    poApprovalThresholdArs: parseNullableMoney(input.poApprovalThresholdArs ?? null),
-    purchaseRequestRequiredAboveArs: parseNullableMoney(
-      input.purchaseRequestRequiredAboveArs ?? null,
-    ),
-    minQuotesRequired: input.minQuotesRequired ?? DEFAULTS.minQuotesRequired,
-    maxQuotesAllowed: input.maxQuotesAllowed ?? DEFAULTS.maxQuotesAllowed,
-    quoteRequiredCategories:
-      input.quoteRequiredCategories === undefined
-        ? undefined
-        : input.quoteRequiredCategories === null
+  const parsed = upsertCompanyProcurementSettingsSchema.safeParse(input);
+  if (!parsed.success) {
+    throw new ServiceError("VALIDATION", parsed.error.issues.map((issue) => issue.message).join("; "));
+  }
+  input = parsed.data;
+
+  return prisma.$transaction(async (tx) => {
+    // Serialize partial policy updates so individually valid patches cannot break the merged policy.
+    await lockProcurementCompanyForNumbering(tx, companyId, ctx.tenantId);
+    const before = await getCompanyProcurementSettings(companyId, ctx, tx);
+    const merged = upsertCompanyProcurementSettingsSchema.safeParse({ ...before, ...input });
+    if (!merged.success) {
+      throw new ServiceError("VALIDATION", merged.error.issues.map((issue) => issue.message).join("; "));
+    }
+
+    const createData: Prisma.CompanyProcurementSettingsUpsertArgs["create"] = {
+      companyId,
+      poApprovalThresholdArs: parseNullableMoney(input.poApprovalThresholdArs ?? null),
+      purchaseRequestRequiredAboveArs: parseNullableMoney(
+        input.purchaseRequestRequiredAboveArs ?? null,
+      ),
+      minQuotesRequired: input.minQuotesRequired ?? DEFAULTS.minQuotesRequired,
+      maxQuotesAllowed: input.maxQuotesAllowed ?? DEFAULTS.maxQuotesAllowed,
+      quoteRequiredCategories:
+        input.quoteRequiredCategories === undefined
+          ? undefined
+          : input.quoteRequiredCategories === null
+            ? Prisma.JsonNull
+            : input.quoteRequiredCategories,
+      allowDirectPo: input.allowDirectPo ?? DEFAULTS.allowDirectPo,
+      allowSelfApproval: input.allowSelfApproval ?? DEFAULTS.allowSelfApproval,
+      allowAuthorizeAndCommit: input.allowAuthorizeAndCommit ?? DEFAULTS.allowAuthorizeAndCommit,
+      autoConfirmOnApprove: input.autoConfirmOnApprove ?? DEFAULTS.autoConfirmOnApprove,
+      autoDraftApInvoiceOnReceipt:
+        input.autoDraftApInvoiceOnReceipt ?? DEFAULTS.autoDraftApInvoiceOnReceipt,
+      allowEmergencyDirectPo: input.allowEmergencyDirectPo ?? DEFAULTS.allowEmergencyDirectPo,
+      varianceSoftAlertPct: parsePctOrDefault(
+        input.varianceSoftAlertPct,
+        DEFAULTS.varianceSoftAlertPct,
+      ),
+      varianceNoteRequiredPct: parsePctOrDefault(
+        input.varianceNoteRequiredPct,
+        DEFAULTS.varianceNoteRequiredPct,
+      ),
+      varianceExtraApprovalPct: parsePctOrDefault(
+        input.varianceExtraApprovalPct,
+        DEFAULTS.varianceExtraApprovalPct,
+      ),
+      overReceiptTolerancePct: parsePctOrDefault(
+        input.overReceiptTolerancePct,
+        DEFAULTS.overReceiptTolerancePct,
+      ),
+      invoiceMatchTolerancePct: parsePctOrDefault(
+        input.invoiceMatchTolerancePct,
+        DEFAULTS.invoiceMatchTolerancePct,
+      ),
+      approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
+      deliveryOverdueGraceDays:
+        input.deliveryOverdueGraceDays ?? DEFAULTS.deliveryOverdueGraceDays,
+      neededByOverdueGraceDays:
+        input.neededByOverdueGraceDays ?? DEFAULTS.neededByOverdueGraceDays,
+      receiptToInvoiceSlaDays:
+        input.receiptToInvoiceSlaDays ?? DEFAULTS.receiptToInvoiceSlaDays,
+      deliveryAlertsEnabled:
+        input.deliveryAlertsEnabled ?? DEFAULTS.deliveryAlertsEnabled,
+      neededByAlertsEnabled:
+        input.neededByAlertsEnabled ?? DEFAULTS.neededByAlertsEnabled,
+      receiptToInvoiceAlertsEnabled:
+        input.receiptToInvoiceAlertsEnabled ?? DEFAULTS.receiptToInvoiceAlertsEnabled,
+      apPaymentNotificationChannel:
+        input.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
+    };
+
+    // True partial update: only keys present in the payload are written.
+    const updateData: Prisma.CompanyProcurementSettingsUncheckedUpdateInput = {};
+    if (input.poApprovalThresholdArs !== undefined) {
+      updateData.poApprovalThresholdArs = parseNullableMoney(input.poApprovalThresholdArs);
+    }
+    if (input.purchaseRequestRequiredAboveArs !== undefined) {
+      updateData.purchaseRequestRequiredAboveArs = parseNullableMoney(
+        input.purchaseRequestRequiredAboveArs,
+      );
+    }
+    if (input.minQuotesRequired !== undefined) {
+      updateData.minQuotesRequired = input.minQuotesRequired;
+    }
+    if (input.maxQuotesAllowed !== undefined) {
+      updateData.maxQuotesAllowed = input.maxQuotesAllowed;
+    }
+    if (input.quoteRequiredCategories !== undefined) {
+      updateData.quoteRequiredCategories =
+        input.quoteRequiredCategories === null
           ? Prisma.JsonNull
-          : input.quoteRequiredCategories,
-    allowDirectPo: input.allowDirectPo ?? DEFAULTS.allowDirectPo,
-    allowSelfApproval: input.allowSelfApproval ?? DEFAULTS.allowSelfApproval,
-    allowAuthorizeAndCommit: input.allowAuthorizeAndCommit ?? DEFAULTS.allowAuthorizeAndCommit,
-    autoConfirmOnApprove: input.autoConfirmOnApprove ?? DEFAULTS.autoConfirmOnApprove,
-    autoDraftApInvoiceOnReceipt:
-      input.autoDraftApInvoiceOnReceipt ?? DEFAULTS.autoDraftApInvoiceOnReceipt,
-    allowEmergencyDirectPo: input.allowEmergencyDirectPo ?? DEFAULTS.allowEmergencyDirectPo,
-    varianceSoftAlertPct: parsePctOrDefault(
-      input.varianceSoftAlertPct,
-      DEFAULTS.varianceSoftAlertPct,
-    ),
-    varianceNoteRequiredPct: parsePctOrDefault(
-      input.varianceNoteRequiredPct,
-      DEFAULTS.varianceNoteRequiredPct,
-    ),
-    varianceExtraApprovalPct: parsePctOrDefault(
-      input.varianceExtraApprovalPct,
-      DEFAULTS.varianceExtraApprovalPct,
-    ),
-    overReceiptTolerancePct: parsePctOrDefault(
-      input.overReceiptTolerancePct,
-      DEFAULTS.overReceiptTolerancePct,
-    ),
-    invoiceMatchTolerancePct: parsePctOrDefault(
-      input.invoiceMatchTolerancePct,
-      DEFAULTS.invoiceMatchTolerancePct,
-    ),
-    approvalSlaHours: input.approvalSlaHours ?? DEFAULTS.approvalSlaHours,
-    deliveryOverdueGraceDays:
-      input.deliveryOverdueGraceDays ?? DEFAULTS.deliveryOverdueGraceDays,
-    neededByOverdueGraceDays:
-      input.neededByOverdueGraceDays ?? DEFAULTS.neededByOverdueGraceDays,
-    receiptToInvoiceSlaDays:
-      input.receiptToInvoiceSlaDays ?? DEFAULTS.receiptToInvoiceSlaDays,
-    deliveryAlertsEnabled:
-      input.deliveryAlertsEnabled ?? DEFAULTS.deliveryAlertsEnabled,
-    neededByAlertsEnabled:
-      input.neededByAlertsEnabled ?? DEFAULTS.neededByAlertsEnabled,
-    receiptToInvoiceAlertsEnabled:
-      input.receiptToInvoiceAlertsEnabled ?? DEFAULTS.receiptToInvoiceAlertsEnabled,
-    apPaymentNotificationChannel:
-      input.apPaymentNotificationChannel ?? DEFAULTS.apPaymentNotificationChannel,
-  };
+          : input.quoteRequiredCategories;
+    }
+    if (input.allowDirectPo !== undefined) {
+      updateData.allowDirectPo = input.allowDirectPo;
+    }
+    if (input.allowSelfApproval !== undefined) {
+      updateData.allowSelfApproval = input.allowSelfApproval;
+    }
+    if (input.allowAuthorizeAndCommit !== undefined) {
+      updateData.allowAuthorizeAndCommit = input.allowAuthorizeAndCommit;
+    }
+    if (input.autoConfirmOnApprove !== undefined) {
+      updateData.autoConfirmOnApprove = input.autoConfirmOnApprove;
+    }
+    if (input.autoDraftApInvoiceOnReceipt !== undefined) {
+      updateData.autoDraftApInvoiceOnReceipt = input.autoDraftApInvoiceOnReceipt;
+    }
+    if (input.allowEmergencyDirectPo !== undefined) {
+      updateData.allowEmergencyDirectPo = input.allowEmergencyDirectPo;
+    }
+    if (input.varianceSoftAlertPct !== undefined) {
+      updateData.varianceSoftAlertPct = parsePctOrDefault(
+        input.varianceSoftAlertPct,
+        DEFAULTS.varianceSoftAlertPct,
+      );
+    }
+    if (input.varianceNoteRequiredPct !== undefined) {
+      updateData.varianceNoteRequiredPct = parsePctOrDefault(
+        input.varianceNoteRequiredPct,
+        DEFAULTS.varianceNoteRequiredPct,
+      );
+    }
+    if (input.varianceExtraApprovalPct !== undefined) {
+      updateData.varianceExtraApprovalPct = parsePctOrDefault(
+        input.varianceExtraApprovalPct,
+        DEFAULTS.varianceExtraApprovalPct,
+      );
+    }
+    if (input.overReceiptTolerancePct !== undefined) {
+      updateData.overReceiptTolerancePct = parsePctOrDefault(
+        input.overReceiptTolerancePct,
+        DEFAULTS.overReceiptTolerancePct,
+      );
+    }
+    if (input.invoiceMatchTolerancePct !== undefined) {
+      updateData.invoiceMatchTolerancePct = parsePctOrDefault(
+        input.invoiceMatchTolerancePct,
+        DEFAULTS.invoiceMatchTolerancePct,
+      );
+    }
+    if (input.approvalSlaHours !== undefined) {
+      updateData.approvalSlaHours = input.approvalSlaHours;
+    }
+    if (input.deliveryOverdueGraceDays !== undefined) {
+      updateData.deliveryOverdueGraceDays = input.deliveryOverdueGraceDays;
+    }
+    if (input.neededByOverdueGraceDays !== undefined) {
+      updateData.neededByOverdueGraceDays = input.neededByOverdueGraceDays;
+    }
+    if (input.receiptToInvoiceSlaDays !== undefined) {
+      updateData.receiptToInvoiceSlaDays = input.receiptToInvoiceSlaDays;
+    }
+    if (input.deliveryAlertsEnabled !== undefined) {
+      updateData.deliveryAlertsEnabled = input.deliveryAlertsEnabled;
+    }
+    if (input.neededByAlertsEnabled !== undefined) {
+      updateData.neededByAlertsEnabled = input.neededByAlertsEnabled;
+    }
+    if (input.receiptToInvoiceAlertsEnabled !== undefined) {
+      updateData.receiptToInvoiceAlertsEnabled = input.receiptToInvoiceAlertsEnabled;
+    }
+    if (input.apPaymentNotificationChannel !== undefined) {
+      updateData.apPaymentNotificationChannel = input.apPaymentNotificationChannel;
+    }
 
-  // True partial update: only keys present in the payload are written.
-  const updateData: Prisma.CompanyProcurementSettingsUncheckedUpdateInput = {};
-  if (input.poApprovalThresholdArs !== undefined) {
-    updateData.poApprovalThresholdArs = parseNullableMoney(input.poApprovalThresholdArs);
-  }
-  if (input.purchaseRequestRequiredAboveArs !== undefined) {
-    updateData.purchaseRequestRequiredAboveArs = parseNullableMoney(
-      input.purchaseRequestRequiredAboveArs,
-    );
-  }
-  if (input.minQuotesRequired !== undefined) {
-    updateData.minQuotesRequired = input.minQuotesRequired;
-  }
-  if (input.maxQuotesAllowed !== undefined) {
-    updateData.maxQuotesAllowed = input.maxQuotesAllowed;
-  }
-  if (input.quoteRequiredCategories !== undefined) {
-    updateData.quoteRequiredCategories =
-      input.quoteRequiredCategories === null
-        ? Prisma.JsonNull
-        : input.quoteRequiredCategories;
-  }
-  if (input.allowDirectPo !== undefined) {
-    updateData.allowDirectPo = input.allowDirectPo;
-  }
-  if (input.allowSelfApproval !== undefined) {
-    updateData.allowSelfApproval = input.allowSelfApproval;
-  }
-  if (input.allowAuthorizeAndCommit !== undefined) {
-    updateData.allowAuthorizeAndCommit = input.allowAuthorizeAndCommit;
-  }
-  if (input.autoConfirmOnApprove !== undefined) {
-    updateData.autoConfirmOnApprove = input.autoConfirmOnApprove;
-  }
-  if (input.autoDraftApInvoiceOnReceipt !== undefined) {
-    updateData.autoDraftApInvoiceOnReceipt = input.autoDraftApInvoiceOnReceipt;
-  }
-  if (input.allowEmergencyDirectPo !== undefined) {
-    updateData.allowEmergencyDirectPo = input.allowEmergencyDirectPo;
-  }
-  if (input.varianceSoftAlertPct !== undefined) {
-    updateData.varianceSoftAlertPct = parsePctOrDefault(
-      input.varianceSoftAlertPct,
-      DEFAULTS.varianceSoftAlertPct,
-    );
-  }
-  if (input.varianceNoteRequiredPct !== undefined) {
-    updateData.varianceNoteRequiredPct = parsePctOrDefault(
-      input.varianceNoteRequiredPct,
-      DEFAULTS.varianceNoteRequiredPct,
-    );
-  }
-  if (input.varianceExtraApprovalPct !== undefined) {
-    updateData.varianceExtraApprovalPct = parsePctOrDefault(
-      input.varianceExtraApprovalPct,
-      DEFAULTS.varianceExtraApprovalPct,
-    );
-  }
-  if (input.overReceiptTolerancePct !== undefined) {
-    updateData.overReceiptTolerancePct = parsePctOrDefault(
-      input.overReceiptTolerancePct,
-      DEFAULTS.overReceiptTolerancePct,
-    );
-  }
-  if (input.invoiceMatchTolerancePct !== undefined) {
-    updateData.invoiceMatchTolerancePct = parsePctOrDefault(
-      input.invoiceMatchTolerancePct,
-      DEFAULTS.invoiceMatchTolerancePct,
-    );
-  }
-  if (input.approvalSlaHours !== undefined) {
-    updateData.approvalSlaHours = input.approvalSlaHours;
-  }
-  if (input.deliveryOverdueGraceDays !== undefined) {
-    updateData.deliveryOverdueGraceDays = input.deliveryOverdueGraceDays;
-  }
-  if (input.neededByOverdueGraceDays !== undefined) {
-    updateData.neededByOverdueGraceDays = input.neededByOverdueGraceDays;
-  }
-  if (input.receiptToInvoiceSlaDays !== undefined) {
-    updateData.receiptToInvoiceSlaDays = input.receiptToInvoiceSlaDays;
-  }
-  if (input.deliveryAlertsEnabled !== undefined) {
-    updateData.deliveryAlertsEnabled = input.deliveryAlertsEnabled;
-  }
-  if (input.neededByAlertsEnabled !== undefined) {
-    updateData.neededByAlertsEnabled = input.neededByAlertsEnabled;
-  }
-  if (input.receiptToInvoiceAlertsEnabled !== undefined) {
-    updateData.receiptToInvoiceAlertsEnabled = input.receiptToInvoiceAlertsEnabled;
-  }
-  if (input.apPaymentNotificationChannel !== undefined) {
-    updateData.apPaymentNotificationChannel = input.apPaymentNotificationChannel;
-  }
-
-  const row = await prisma.companyProcurementSettings.upsert({
-    where: { companyId },
-    create: createData,
-    update: updateData,
-  });
-  return serialize(row);
+    const row = await tx.companyProcurementSettings.upsert({
+      where: { companyId },
+      create: createData,
+      update: updateData,
+    });
+    const after = serialize(row);
+    await log({
+      tenantId: ctx.tenantId, companyId, actorUserId: ctx.actorUserId,
+      action: "company_procurement_settings.updated", entityType: "CompanyProcurementSettings", entityId: row.id,
+      before: { ...before }, after: { ...after },
+    }, tx);
+    return after;
+  }, { timeout: 15_000 });
 }

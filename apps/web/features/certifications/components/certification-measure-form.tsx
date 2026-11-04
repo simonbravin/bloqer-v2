@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import {
   compareQty,
   formatMoneyAmount,
+  formatMoneyDisplay,
   formatQtyFromString,
   formatRatePctWithSymbol,
   formatUnitPriceFromString,
@@ -221,7 +222,7 @@ export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved 
                 label="Comprometido del período"
                 value={formatMoneyAmount(row.cost.committedCost)}
               />
-              <Ref label="Consumido del período" value={formatMoneyAmount(row.cost.consumedCost)} />
+              <Ref label="Consumido del período" value={row.cost.consumedCost == null ? "Sin valuación" : formatMoneyDisplay(row.cost.consumedCost)} />
               <Ref label="Mano de obra" value={formatMoneyAmount(row.cost.laborCost)} />
               <Ref label="Equipos" value={formatMoneyAmount(row.cost.equipmentCost)} />
               <Ref label="Subcontratos" value={formatMoneyAmount(row.cost.subcontractCost)} />
