@@ -96,3 +96,11 @@
 - [`MONEY_MODEL.md`](../03-finance/MONEY_MODEL.md)  
 - [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md)  
 - [`PERMISSIONS_ROUTE_MATRIX.md`](./PERMISSIONS_ROUTE_MATRIX.md)
+
+## Hallazgo
+
+**03/11/2026 — GA-AG-00-006 / P-AG00-02:** la aceptación histórica de «hijos sin `tenantId` redundante» en §1 debe reconciliarse con la exigencia universal de tenant en [AGENTS raíz](../../../AGENTS.md) y con la columna obligatoria y el catálogo limitado de excepciones de [TENANT_ISOLATION_MODEL](./TENANT_ISOLATION_MODEL.md). El inventario local actual registra 22 hijos/configuraciones sin columna propia; ver el [subanálisis AG-00](./platform-audit/2026-11-03-ag-00-architecture.md).
+
+La aceptación histórica documentada no constituye una autorización nueva para ampliar excepciones ni sustituye una definición explícita del contrato físico. **Este hallazgo no relaja AGENTS, no aprueba el modelo como regla nueva ni autoriza migraciones.** La revisión de AG-01 debe comprobar pertenencia y autorización mediante el padre en los recorridos correspondientes. Seguimiento: [P-AG00-02](./PENDING_ARCHITECTURE_ITEMS.md).
+
+**Resolución 03/11/2026 — ADR-018:** el usuario confirmó la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), ahora formalizada en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md). La aceptación histórica de §1 queda referenciada al [catálogo cerrado de 22 hijos y sus padres dueños](./TENANT_ISOLATION_MODEL.md); no se amplía por analogía. Servicios/repositorios comprueban padre, tenant y referencias adicionales; el cliente Prisma simple no ofrece enforcement automático global. GA-AG-00-005/006 y P-AG00-01/02 se resuelven por reconciliación del contrato, sin cambiar schema ni acreditar SQL o autorización efectiva de todos los recorridos. El diagnóstico y el hallazgo anteriores se conservan como historial; la integración aislada corresponde a AG-01.

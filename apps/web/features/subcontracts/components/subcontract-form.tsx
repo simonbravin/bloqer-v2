@@ -138,7 +138,6 @@ export function SubcontractForm({
       applyBudgetHint(hint);
       appliedInitialWbs.current = true;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- apply once when hint list is ready
   }, [initialWbsNodeId, budgetHints]);
 
   function previewLineMoney(qty: string, price: string): string {

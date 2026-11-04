@@ -9,7 +9,7 @@ import {
 } from "./procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { serializeMoneyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import {
   getCompanyProcurementSettingsForProject,
   type CompanyProcurementSettingsView,
@@ -312,6 +312,7 @@ export async function authorizeAndCommitPurchaseOrder(
   const fromStatus = existing.status;
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     await recalcPurchaseOrderTotals(tx, id);
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
     if (po.totalAmount.lessThanOrEqualTo(0)) {
@@ -471,6 +472,7 @@ export async function submitPurchaseOrder(id: string, ctx: ServiceContext): Prom
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 
   const submitResult = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     await recalcPurchaseOrderTotals(tx, id);
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
     if (po.totalAmount.lessThanOrEqualTo(0)) {
@@ -680,6 +682,7 @@ export async function approvePurchaseOrder(id: string, ctx: ServiceContext): Pro
   const settings = await getCompanyProcurementSettingsForProject(existing.projectId, ctx);
 
   const outcome = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     await recalcPurchaseOrderTotals(tx, id);
     const poBefore = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
     const fx = computeDocumentFxAmounts(poBefore.currency, poBefore.totalAmount, poBefore.fxRate);
@@ -908,6 +911,7 @@ export async function confirmPurchaseOrder(
     : null;
 
   await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     await recalcPurchaseOrderTotals(tx, id);
     const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
     if (po.totalAmount.lessThanOrEqualTo(0)) {

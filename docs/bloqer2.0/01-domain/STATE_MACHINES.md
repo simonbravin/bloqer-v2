@@ -71,6 +71,8 @@ stateDiagram-v2
   RETURNED_FOR_CHANGES --> DRAFT : descartar revision
   APPROVED --> CLOSED : cerrar
   DRAFT --> CANCELLED : cancelar
+  IN_REVIEW --> CANCELLED : cancelar antes de aprobar
+  RETURNED_FOR_CHANGES --> CANCELLED : cancelar antes de aprobar
   APPROVED --> SUPERSEDED : reemplazado por nueva version
   CLOSED --> SUPERSEDED : reemplazado por nueva version
   SUPERSEDED --> [*]
@@ -99,6 +101,11 @@ stateDiagram-v2
 - `CLOSED`: base contractual; solo metadata [BR-BUD-008] ([BR-BUD-002]); **sin** excepción de toggle.
 - `SUPERSEDED`: histórico.
 - `CANCELLED`: nunca vigente como aprobado.
+- Cancelación previa a aprobación ([D-121]): `DRAFT`, `IN_REVIEW` o `RETURNED_FOR_CHANGES` → `CANCELLED`, con `EDIT BUDGETS` y acceso a la obra; no se cancela desde `APPROVED`/`CLOSED`.
+
+## Hallazgo — AG-04: diagrama de cancelación del presupuesto
+
+El diagrama omitía los orígenes de revisión que el código ya permitía. Q-068 fue resuelta explícitamente por el Owner en D-121: se conservan los tres orígenes actuales y se excluyen presupuestos aprobados/cerrados. No se agrega un estado ni un evento.
 
 **Change Order vs Adenda:** un **Change Order** aprobado **no** sustituye una **Adenda** cuando cambia precio vendido, alcance contractual o WBS contractual cerrada ([BR-CO-003]).
 
@@ -740,6 +747,10 @@ stateDiagram-v2
 - `ARCHIVED` no se borra; se preserva para auditoría.
 
 ---
+
+## Hallazgo AG-01 — alcance funcional frente al estado implementado (03/11/2026)
+
+El diagrama de **User** anterior conserva el ciclo funcional objetivo. En la implementación actual el enum `UserStatus` contiene `INVITED`, `ACTIVE`, `SUSPENDED`, `INACTIVE`: `INACTIVE` y `SUSPENDED` impiden ingresar. `CANCELLED` es un estado de **TenantInvitation**, no una columna/valor de User; el archivado `ARCHIVED` del usuario no tiene hoy implementación ni pantalla. La pantalla Equipo modifica **MembershipStatus** (`ACTIVE`/`INACTIVE`) y roles del tenant, no el estado global de la cuenta. Esta aclaración no agrega estados ni equipara reactivación de membresía con reactivación de cuenta. Implementar el ciclo funcional pendiente requiere una decisión explícita y su correspondiente cambio de schema/contratos; AG-01 verifica el comportamiento existente, no incorpora ese flujo.
 
 ## 22. Contact (Contacto)
 

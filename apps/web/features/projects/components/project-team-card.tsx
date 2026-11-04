@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ProjectTeamMemberKind } from "@bloqer/database";
 import { Button } from "@/components/ui/button";
@@ -63,6 +63,7 @@ export function ProjectTeamCard({
   const [kind, setKind] = useState<ProjectTeamMemberKind>("PROJECT_MANAGER");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const inFlight = useRef(false);
 
   const hasAssignedPm = members.some((m) => m.kind === "PROJECT_MANAGER" && m.membershipActive);
   const hasSupervisor = members.some((m) => m.canSuperviseJobsiteLog);
@@ -86,33 +87,37 @@ export function ProjectTeamCard({
     [pickerOptions],
   );
 
+  function runTeamAction(action: () => Promise<{ ok: true } | { error: string }>, afterSuccess?: () => void) {
+    if (!canEdit || inFlight.current) return;
+    inFlight.current = true;
+    setError(null);
+    startTransition(async () => {
+      try {
+        const result = await action();
+        if ("error" in result) {
+          setError(result.error);
+          return;
+        }
+        afterSuccess?.();
+        router.refresh();
+      } catch {
+        setError("No se pudo actualizar el equipo de obra. Volvé a intentar.");
+      } finally {
+        inFlight.current = false;
+      }
+    });
+  }
+
   function handleAdd() {
     if (!userId) {
       setError("Seleccioná un usuario");
       return;
     }
-    setError(null);
-    startTransition(async () => {
-      const result = await addProjectTeamMemberAction(projectId, { userId, kind });
-      if ("error" in result) {
-        setError(result.error);
-        return;
-      }
-      setUserId("");
-      router.refresh();
-    });
+    runTeamAction(() => addProjectTeamMemberAction(projectId, { userId, kind }), () => setUserId(""));
   }
 
   function handleRemove(memberId: string) {
-    setError(null);
-    startTransition(async () => {
-      const result = await removeProjectTeamMemberAction(projectId, memberId);
-      if ("error" in result) {
-        setError(result.error);
-        return;
-      }
-      router.refresh();
-    });
+    runTeamAction(() => removeProjectTeamMemberAction(projectId, memberId));
   }
 
   return (
@@ -209,7 +214,7 @@ export function ProjectTeamCard({
                 Agregar
               </Button>
             </div>
-            {error ? <p className="text-sm text-destructive">{error}</p> : null}
+            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
           </div>
         ) : null}
       </CardContent>

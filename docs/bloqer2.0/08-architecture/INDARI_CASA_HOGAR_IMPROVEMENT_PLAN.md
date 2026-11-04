@@ -434,6 +434,42 @@ La misma revisión completó el guard de empresa activa en `updateSalesInvoice`,
 
 Sin migraciones ni cambios de datos. El cierre de la revisión de código no equivale al cierre operativo: quedan commit/push/publicación de las correcciones locales, smoke operativo de §17 y definiciones/regularizaciones históricas Q-061/062/063 ya separadas del alcance implementado.
 
+## 21. Asociación histórica FP-027 / OC-006 y FP-029 / OC-011 (29/10/2026)
+
+El Owner autorizó expresamente corroborar y asociar estos dos pares de Casa Hogar. Es una regularización documental puntual, separada de la publicación del producto y de las otras observaciones del tablero.
+
+- **FP-027 → OC-006:** mismo contacto Fredes, proyecto de corrientes fuertes, cantidad global 1 y total ARS 1.810.000. Factura C pagada; OC recibida. La FP-108 vinculada previamente a la OC está anulada y no cuenta como facturación activa.
+- **FP-029 → OC-011:** mismo contacto Guerra, relevamiento/planimetría, cantidad global 1 y total ARS 1.500.000. Factura C pagada; OC recibida. La OC desglosa IVA y la factura C no: se conserva íntegra la factura, sin recalcular impuestos para igualar el neto de la OC.
+- Ambas facturas estaban en 1.3 — Oficina Técnica, sin vínculo de cabecera/línea; las OC corresponden a 4.2 — Proyectos ejecutivos. La regularización alinea la EDT de cada factura con su línea de OC (D-066), conservando el tipo de costo documentado en la factura.
+
+**Herramienta:** `packages/services/src/ap/supplier-invoice-po-reconciliation.service.ts`, operación `reconcilePaidSupplierInvoicesWithPurchaseOrders`. Uso exclusivo de plataforma, después de corroboración y autorización explícita. No se expone una acción nueva al cliente ni se habilita la edición general de facturas emitidas. Recibe alcance tenant/empresa/obra, pares e IDs de líneas explícitos, versiones esperadas y motivo. No infiere vínculos por similitud.
+
+**Límites:** solo factura emitida, pagada íntegramente, de una línea, sin OC/subcontrato/NC/ND; OC recibida completa, de una línea y sin otra factura activa. Mismo proveedor, moneda, cantidad y total final. Verifica EDT hoja del presupuesto, períodos abiertos, pagos consistentes y ausencia de asientos contabilizados. Bloqueo de empresa/documentos y versiones optimistas; todos los pares se corrigen en una única transacción. Solo escribe vínculo de cabecera, vínculo de línea, EDT y auditoría existente `supplier_invoice.updated` con antes/después, motivo y operador real. No toca importes, impuestos, CxP, pagos, movimientos, asientos ni recepciones.
+
+**Ejecutado y verificado en producción el 29/10/2026:** ambos pares asociados en una transacción; cabeceras y líneas vinculadas, EDT 4.2. OC recibidas, facturas emitidas y CxP pagadas; mismos dos pagos y movimientos confirmados. Se comprobó la conservación íntegra de datos fiscales, CxP, pagos, movimientos y asientos mediante fingerprint antes/después. Auditorías `e193298b-b53b-46c2-b096-057c7fccbe0d` y `01c1d34f-fac7-4316-8e73-65290fb8446a`, operador real de plataforma. La diferencia de IVA entre OC-011 y FP-029 se conserva expresamente y no se presenta como corregida por la asociación.
+
+**Validación:** 10 pruebas del servicio, 6 de anulación AP y 11 de exposición/tipos aprobadas; typecheck y lint del alcance aprobados. Sin migración ni despliegue: la asociación es de datos mediante el servicio interno. Sin impacto en rutas, botones, guía/ayuda o conocimiento AI: no se agregó UI ni tool AI.
+
+## 22. Depuración del diagnóstico y anulación de FP-052 (29/10/2026)
+
+El Owner confirmó estas aclaraciones; sustituyen cualquier recomendación previa basada solamente en avisos genéricos del tablero:
+
+- FP-083: gasto directo de obra por sereno; no solicitar su traslado de EDT por no haber estado presupuestado.
+- FP-025: costo general del proyecto; no proponer otra asociación por similitud con otros ploteos.
+- FP-090: corresponde a un subcontrato cargado históricamente por otro circuito. Indicación expresa de conservarlo sin cambios.
+- OC-002 / FP-023: vínculo correcto. No separarlas ni presentar el caso como una observación pendiente.
+- Partida 1.11: AYSAM y ploteos son gastos distintos; no hay una corrección de vínculo identificada por compartir partida. Lo mismo aplica a otros avisos que solo cruzan materiales y mano de obra independientes.
+
+**Anulación autorizada y ejecutada:** pago de FP-052 por ARS 14.600 y luego la factura; CxP, egreso y dos asientos en borrador quedaron anulados mediante los servicios existentes. Auditoría a nombre del operador de plataforma. FP-070, su vínculo con OC-027, CxP pagada, pago, movimiento y asientos se conservaron íntegros; verificados mediante fingerprint antes/después. Sin nuevas modificaciones de los demás documentos.
+
+**Texto de orientación:** `PurchaseOrderNextStep` elige el texto solamente por estado de OC. Su mensaje fijo de `RECEIVED` no consulta pagos y aparece también en OC-006/011, cuyas facturas están vinculadas y pagadas. Es una limitación de presentación, no evidencia de deuda pendiente. En esta intervención se explicó la causa; no se modificó ni publicó ese componente.
+
+## 23. Asociación FP-031 / OC-009 (29/10/2026)
+
+Autorización expresa del Owner y ejecución mediante `reconcilePaidSupplierInvoicesWithPurchaseOrders`: FP-031 de HVAC, factura A por ARS 2.365.550, vinculada en cabecera y línea a OC-009, recibida. Coinciden proveedor, concepto, cantidad, neto, IVA, total y partida 4.2; además la metadata original de la factura identifica esa misma OC. Se preservaron íntegros factura fiscal, CxP pagada, pago confirmado, movimiento y asientos; fingerprint antes/después sin diferencias económicas. Auditoría `685c3c7f-50f6-4654-b9d1-be2e553f7101` del operador real de plataforma.
+
+Comprobación con `getPurchaseOrderBillingSummary`: recibido, facturado y pagado ARS 2.365.550; pendiente de facturar 0, sin borradores abiertos, líneas sin vínculo ni avisos de matching; cantidad recibida/facturada 1/1. No se generó ningún pago nuevo. La OC conserva su estado operativo `RECEIVED`; el pago se deriva de la factura/CxP vinculada, sin inventar un estado `PAID` para OC. El texto fijo de próximo paso descrito en §22 no fue modificado por esta operación.
+
 ## Referencias canónicas
 
 - [Solicitudes y cotizaciones](../02-modules/PURCHASE_REQUESTS.md), [OC y recepciones](../02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [Gastos y pagos](../02-modules/EXPENSES_AND_PAYMENTS.md).

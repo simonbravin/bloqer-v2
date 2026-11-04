@@ -27,6 +27,7 @@ export function ProjectListExportButton({ projects }: { projects: ProjectListIte
 
   return (
     <ExportCsvButton
+      label="Exportar página CSV"
       filename="proyectos.csv"
       headers={["Código", "Nombre", "Cliente", "Tipo", "Estado"]}
       rows={rows}

@@ -4,18 +4,18 @@ import { updateTenantMemberRolesInputSchema, updateTenantMemberStatusInputSchema
 import type { UserRole } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
-import {
-  canEditTeamMembership,
-  canReadTenantConfigArea,
-} from "./tenant-settings-guards";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
+import { canEditTeamMembership } from "./tenant-settings-guards";
+import { assertTenantConfigReadAccess } from "./tenant-settings-access";
 import {
   assertStillHasActiveOwnerAfterDeactivate,
   assertStillHasActiveOwnerAfterRoleChange,
 } from "./tenant-owner-invariant";
 
 /**
- * Team mutations enforce “≥1 ACTIVE OWNER” when the tenant already had one, using a read-then-write pattern.
- * Two concurrent writers can still race; full serialisation would need DB-level locking (out of 10B scope).
+ * Lock the tenant before reading memberships so concurrent role/status changes
+ * cannot each remove a different OWNER based on the same stale owner count.
+ * The mutation and its audit entry commit together.
  */
 
 export type TenantMemberListRow = {
@@ -37,9 +37,7 @@ function dedupeRoles(roles: UserRole[]): PrismaUserRole[] {
 }
 
 export async function listTenantMembers(ctx: ServiceContext): Promise<TenantMemberListRow[]> {
-  if (!canReadTenantConfigArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el equipo");
-  }
+  await assertTenantConfigReadAccess(ctx);
   const rows = await prisma.userMembership.findMany({
     where: { tenantId: ctx.tenantId },
     orderBy: { createdAt: "asc" },
@@ -66,9 +64,7 @@ export async function getTenantMemberById(
   membershipId: string,
   ctx: ServiceContext,
 ): Promise<TenantMemberDetail> {
-  if (!canReadTenantConfigArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver el equipo");
-  }
+  await assertTenantConfigReadAccess(ctx);
   const m = await prisma.userMembership.findFirst({
     where: { id: membershipId, tenantId: ctx.tenantId },
     select: {
@@ -98,6 +94,7 @@ export async function updateTenantMemberRoles(
   roles: UserRole[],
   ctx: ServiceContext,
 ): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "USERS_PERMISSIONS");
   if (!canEditTeamMembership(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar roles");
   }
@@ -111,36 +108,39 @@ export async function updateTenantMemberRoles(
     throw new ServiceError("VALIDATION", "Al menos un rol es obligatorio");
   }
 
-  const existing = await prisma.userMembership.findFirst({
-    where: { id: parsed.data.membershipId, tenantId: ctx.tenantId },
-    select: { id: true, userId: true, status: true, roles: true },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Membresía no encontrada");
-
-  if (existing.status === "ACTIVE") {
-    const activeRows = await prisma.userMembership.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-      select: { id: true, roles: true },
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    const existing = await tx.userMembership.findFirst({
+      where: { id: parsed.data.membershipId, tenantId: ctx.tenantId },
+      select: { id: true, userId: true, status: true, roles: true },
     });
-    assertStillHasActiveOwnerAfterRoleChange(existing.id, unique, activeRows);
-  }
+    if (!existing) throw new ServiceError("NOT_FOUND", "Membresía no encontrada");
 
-  const beforeRoles = [...existing.roles] as UserRole[];
+    if (existing.status === "ACTIVE") {
+      const activeRows = await tx.userMembership.findMany({
+        where: { tenantId: ctx.tenantId, status: "ACTIVE", user: { status: "ACTIVE" } },
+        select: { id: true, roles: true },
+      });
+      assertStillHasActiveOwnerAfterRoleChange(existing.id, unique, activeRows);
+    }
 
-  await prisma.userMembership.update({
-    where: { id: existing.id },
-    data: { roles: unique },
-  });
+    const beforeRoles = [...existing.roles] as UserRole[];
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "MEMBERSHIP_ROLES_UPDATED",
-    entityType:  "UserMembership",
-    entityId:    existing.id,
-    before:      { userId: existing.userId, roles: beforeRoles },
-    after:       { userId: existing.userId, roles: unique },
-    ipAddress:   ctx.ipAddress,
+    await tx.userMembership.update({
+      where: { id: existing.id },
+      data: { roles: unique },
+    });
+
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "MEMBERSHIP_ROLES_UPDATED",
+      entityType:  "UserMembership",
+      entityId:    existing.id,
+      before:      { userId: existing.userId, roles: beforeRoles },
+      after:       { userId: existing.userId, roles: unique },
+      ipAddress:   ctx.ipAddress,
+    }, tx);
   });
 }
 
@@ -149,6 +149,7 @@ export async function updateTenantMemberStatus(
   status: MembershipStatus,
   ctx: ServiceContext,
 ): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "USERS_PERMISSIONS");
   if (!canEditTeamMembership(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cambiar el estado de la membresía");
   }
@@ -158,35 +159,38 @@ export async function updateTenantMemberStatus(
     throw new ServiceError("VALIDATION", msg);
   }
 
-  const existing = await prisma.userMembership.findFirst({
-    where: { id: parsed.data.membershipId, tenantId: ctx.tenantId },
-    select: { id: true, userId: true, status: true, roles: true },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Membresía no encontrada");
-
-  if (parsed.data.status === "INACTIVE" && existing.status === "ACTIVE") {
-    const activeRows = await prisma.userMembership.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-      select: { id: true, roles: true },
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    const existing = await tx.userMembership.findFirst({
+      where: { id: parsed.data.membershipId, tenantId: ctx.tenantId },
+      select: { id: true, userId: true, status: true, roles: true },
     });
-    assertStillHasActiveOwnerAfterDeactivate(activeRows, existing.id);
-  }
+    if (!existing) throw new ServiceError("NOT_FOUND", "Membresía no encontrada");
 
-  const beforeStatus = existing.status;
+    if (parsed.data.status === "INACTIVE" && existing.status === "ACTIVE") {
+      const activeRows = await tx.userMembership.findMany({
+        where: { tenantId: ctx.tenantId, status: "ACTIVE", user: { status: "ACTIVE" } },
+        select: { id: true, roles: true },
+      });
+      assertStillHasActiveOwnerAfterDeactivate(activeRows, existing.id);
+    }
 
-  await prisma.userMembership.update({
-    where: { id: existing.id },
-    data: { status: parsed.data.status },
-  });
+    const beforeStatus = existing.status;
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "MEMBERSHIP_STATUS_UPDATED",
-    entityType:  "UserMembership",
-    entityId:    existing.id,
-    before:      { userId: existing.userId, status: beforeStatus },
-    after:       { userId: existing.userId, status: parsed.data.status },
-    ipAddress:   ctx.ipAddress,
+    await tx.userMembership.update({
+      where: { id: existing.id },
+      data: { status: parsed.data.status },
+    });
+
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "MEMBERSHIP_STATUS_UPDATED",
+      entityType:  "UserMembership",
+      entityId:    existing.id,
+      before:      { userId: existing.userId, status: beforeStatus },
+      after:       { userId: existing.userId, status: parsed.data.status },
+      ipAddress:   ctx.ipAddress,
+    }, tx);
   });
 }

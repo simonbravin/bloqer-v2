@@ -1,4 +1,4 @@
-import { Prisma, prisma, Product, ProductStatus } from "@bloqer/database";
+import { prisma, Product, ProductStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { CreateProductInput, UpdateProductInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";

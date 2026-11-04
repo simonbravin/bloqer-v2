@@ -34,7 +34,7 @@ import { revalidatePath } from "next/cache";
 
 function revalidateContactSurfaces(contactId?: string) {
   revalidatePath("/directorio");
-  if (contactId) revalidatePath(`/directorio/${contactId}`);
+  if (contactId) revalidatePath(`/directorio/${contactId}`, "layout");
   revalidatePath("/finanzas/transacciones");
   revalidatePath("/finanzas/facturas-proveedor");
   revalidatePath("/proyectos", "layout");
@@ -151,7 +151,7 @@ export async function updateClientProfileAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateClientProfile(contactId, parsed.data, ctx);
-    revalidatePath(`/directorio/${contactId}`);
+    revalidateContactSurfaces(contactId);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -168,7 +168,7 @@ export async function updateSupplierProfileAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateSupplierProfile(contactId, parsed.data, ctx);
-    revalidatePath(`/directorio/${contactId}`);
+    revalidateContactSurfaces(contactId);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };
@@ -185,7 +185,7 @@ export async function updateSubcontractorProfileAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateSubcontractorProfile(contactId, parsed.data, ctx);
-    revalidatePath(`/directorio/${contactId}`);
+    revalidateContactSurfaces(contactId);
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };

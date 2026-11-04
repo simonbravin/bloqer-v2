@@ -10,7 +10,7 @@ import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import {
@@ -419,6 +419,7 @@ export async function registerApExpense(
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
+            if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
             const maxNum = await tx.supplierInvoice.aggregate({
               where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
               _max: { number: true },

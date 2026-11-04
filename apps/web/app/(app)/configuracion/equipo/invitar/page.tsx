@@ -2,7 +2,8 @@ import { notFound, redirect } from "next/navigation";
 import { OVERVIEW_ROLES } from "@bloqer/domain";
 import { formatUserRoleLabel } from "@/lib/user-role-label";
 import { getCurrentUser } from "@/lib/auth";
-import { canEditTeamMembership, canReadTenantConfigArea } from "@bloqer/services";
+import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { canEditTeamMembership, canReadTenantConfigArea, getTenantModuleGate } from "@bloqer/services";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createTenantInvitationAction } from "../invitation-actions";
@@ -20,6 +21,10 @@ export default async function ConfiguracionEquipoInvitarPage({ searchParams }: P
   if (!current?.tenantCtx) redirect("/login");
   if (!canReadTenantConfigArea(current.tenantCtx.roles)) notFound();
   if (!canEditTeamMembership(current.tenantCtx.roles)) notFound();
+  const ctx = await buildTenantServiceContext();
+  if (!ctx) redirect("/login");
+  const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("USERS_PERMISSIONS")) notFound();
 
   const sp = await searchParams;
   let errMsg: string | null = null;

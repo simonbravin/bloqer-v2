@@ -5,6 +5,7 @@ import { listPlatformTenantInvitations, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { formatDateTime } from "@/lib/format";
+import { formatUserRoleList } from "@/lib/user-role-label";
 import { Button } from "@/components/ui/button";
 import {
   Table,
@@ -80,7 +81,7 @@ export default async function PlatformTenantInvitationsPage({ params }: PageProp
               rows.map((inv) => (
                 <TableRow key={inv.id}>
                   <TableCell className="font-medium">{inv.email}</TableCell>
-                  <TableCell className="text-xs">{inv.roles.join(", ")}</TableCell>
+                  <TableCell className="text-xs">{formatUserRoleList(inv.roles)}</TableCell>
                   <TableCell>{invitationStatusLabel(inv.status)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {formatDateTime(inv.expiresAt)}

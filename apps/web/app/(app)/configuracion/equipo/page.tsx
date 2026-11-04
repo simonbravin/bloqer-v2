@@ -9,6 +9,8 @@ import {
   canReadTenantConfigArea,
   listTenantInvitations,
   listTenantMembers,
+  getTenantModuleGate,
+  ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
@@ -34,10 +36,14 @@ export default async function ConfiguracionEquipoPage() {
 
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
-  const rows = await listTenantMembers(ctx);
-  const invitations = await listTenantInvitations(ctx);
+  const [rows, invitations, gate] = await Promise.all([
+    listTenantMembers(ctx), listTenantInvitations(ctx), getTenantModuleGate(ctx),
+  ]).catch((error: unknown) => {
+    if (error instanceof ServiceError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND")) notFound();
+    throw error;
+  });
   const pendingInvitations = invitations.filter((i) => i.status === "PENDING");
-  const canInvite = canEditTeamMembership(current.tenantCtx.roles);
+  const canInvite = canEditTeamMembership(current.tenantCtx.roles) && gate.isEnabled("USERS_PERMISSIONS");
 
   return (
     <PageShell variant="default" className="space-y-6">

@@ -1,11 +1,10 @@
-import { wbsIncidencePercent } from "@bloqer/domain";
-import { serializeMoney } from "@bloqer/utils";
+import { addDecimal, compareDecimal, divideDecimal, multiplyDecimal, roundMoney, serializeMoney } from "@bloqer/utils";
 import {
-  computeTreeGrandTotals,
-  computeWbsRowMetrics,
+  computeTreeGrandTotalsExact,
+  computeWbsRowMetricsExact,
   VISIBLE_WBS_COST_CATEGORIES,
   type VisibleCostCategory,
-  type WbsRowMetrics,
+  type WbsRowMetricsExact,
 } from "./wbs-metrics";
 import type { WbsViewNode } from "./wbs.service";
 
@@ -29,6 +28,9 @@ export type BudgetSummaryKpis = {
   totalCostDirect: number;
   totalSalePrice: number;
   margin: number;
+  totalCostDirectDisplay: string;
+  totalSalePriceDisplay: string;
+  marginDisplay: string;
   /** (venta − costo) / venta × 100; null if sale ≤ 0 */
   marginPct: number | null;
   /** costo / venta × 100; null if sale ≤ 0 */
@@ -52,21 +54,25 @@ export type BudgetSummaryKpis = {
 
 function namedAmount(
   node: WbsViewNode,
-  amount: number,
-  whole: number,
+  amount: string,
+  whole: string,
 ): BudgetSummaryNamedAmount {
   return {
     code: node.code,
     name: node.name,
-    amount,
+    amount: Number(amount),
     amountDisplay: serializeMoney(amount),
-    incidencePct: wbsIncidencePercent(amount, whole) ?? 0,
+    incidencePct: incidencePercent(amount, whole) ?? 0,
   };
+}
+
+function incidencePercent(part: string, whole: string): number | null {
+  return compareDecimal(whole, "0") > 0 ? Number(divideDecimal(multiplyDecimal(part, "100"), whole, 4)) : null;
 }
 
 function walkLeaves(
   nodes: WbsViewNode[],
-  visit: (node: WbsViewNode, metrics: WbsRowMetrics) => void,
+  visit: (node: WbsViewNode, metrics: WbsRowMetricsExact) => void,
 ): void {
   for (const node of nodes) {
     if (node.children.length > 0) {
@@ -74,17 +80,17 @@ function walkLeaves(
       continue;
     }
     if (!node.costItem) continue;
-    visit(node, computeWbsRowMetrics(node));
+    visit(node, computeWbsRowMetricsExact(node));
   }
 }
 
 function walkGroups(
   nodes: WbsViewNode[],
-  visit: (node: WbsViewNode, metrics: WbsRowMetrics) => void,
+  visit: (node: WbsViewNode, metrics: WbsRowMetricsExact) => void,
 ): void {
   for (const node of nodes) {
     if (node.children.length === 0) continue;
-    visit(node, computeWbsRowMetrics(node));
+    visit(node, computeWbsRowMetricsExact(node));
     walkGroups(node.children, visit);
   }
 }
@@ -93,19 +99,17 @@ function walkGroups(
  * Pure KPIs for project/budget summary (EDT totals + leaf/group insights).
  */
 export function computeBudgetSummaryKpis(tree: WbsViewNode[]): BudgetSummaryKpis {
-  const grand = computeTreeGrandTotals(tree);
+  const grand = computeTreeGrandTotalsExact(tree);
   const { totalCostDirect, totalSalePrice } = grand;
-  const margin = totalSalePrice - totalCostDirect;
-  const marginPct =
-    totalSalePrice > 0 ? wbsIncidencePercent(margin, totalSalePrice) : null;
-  const costToSalePct =
-    totalSalePrice > 0 ? wbsIncidencePercent(totalCostDirect, totalSalePrice) : null;
+  const margin = roundMoney(addDecimal(totalSalePrice, multiplyDecimal(totalCostDirect, "-1")));
+  const marginPct = incidencePercent(margin, totalSalePrice);
+  const costToSalePct = incidencePercent(totalCostDirect, totalSalePrice);
 
   let costliestLeaf: BudgetSummaryNamedAmount | null = null;
   walkLeaves(tree, (node, metrics) => {
     const amount = metrics.totalCostDirect;
-    if (amount <= 0) return;
-    if (!costliestLeaf || amount > costliestLeaf.amount) {
+    if (compareDecimal(amount, "0") <= 0) return;
+    if (!costliestLeaf || compareDecimal(amount, costliestLeaf.amountDisplay) > 0) {
       costliestLeaf = namedAmount(node, amount, totalCostDirect);
     }
   });
@@ -115,44 +119,45 @@ export function computeBudgetSummaryKpis(tree: WbsViewNode[]): BudgetSummaryKpis
   let topIncidenceGroup: BudgetSummaryNamedAmount | null = null;
   walkGroups(tree, (node, metrics) => {
     const amount = metrics.totalCostDirect;
-    if (amount <= 0) return;
+    if (compareDecimal(amount, "0") <= 0) return;
     const named = namedAmount(node, amount, totalCostDirect);
     if (
       !topIncidenceGroup ||
-      named.incidencePct > topIncidenceGroup.incidencePct ||
-      (named.incidencePct === topIncidenceGroup.incidencePct &&
-        amount > topIncidenceGroup.amount)
+      compareDecimal(amount, topIncidenceGroup.amountDisplay) > 0
     ) {
       topIncidenceGroup = named;
     }
   });
 
   let dominantCategory: BudgetSummaryKpis["dominantCategory"] = null;
-  if (totalCostDirect > 0) {
+  if (compareDecimal(totalCostDirect, "0") > 0) {
     let bestCat: VisibleCostCategory = "MATERIAL";
-    let bestAmt = -1;
+    let bestAmt = "0.00";
     for (const cat of VISIBLE_WBS_COST_CATEGORIES) {
       const amt = grand.byCategory[cat];
-      if (amt > bestAmt) {
+      if (compareDecimal(amt, bestAmt) > 0) {
         bestAmt = amt;
         bestCat = cat;
       }
     }
-    if (bestAmt > 0) {
+    if (compareDecimal(bestAmt, "0") > 0) {
       dominantCategory = {
         category: bestCat,
         label: CATEGORY_LABEL_ES[bestCat],
-        amount: bestAmt,
+        amount: Number(bestAmt),
         amountDisplay: serializeMoney(bestAmt),
-        sharePct: wbsIncidencePercent(bestAmt, totalCostDirect) ?? 0,
+        sharePct: incidencePercent(bestAmt, totalCostDirect) ?? 0,
       };
     }
   }
 
   return {
-    totalCostDirect,
-    totalSalePrice,
-    margin,
+    totalCostDirect: Number(totalCostDirect),
+    totalSalePrice: Number(totalSalePrice),
+    margin: Number(margin),
+    totalCostDirectDisplay: totalCostDirect,
+    totalSalePriceDisplay: totalSalePrice,
+    marginDisplay: margin,
     marginPct,
     costToSalePct,
     costliestLeaf,

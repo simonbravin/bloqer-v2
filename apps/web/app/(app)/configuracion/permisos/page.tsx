@@ -14,10 +14,10 @@ import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import { Button } from "@/components/ui/button";
 import {
-  canEditPermissionMatrixNotes,
   canReadTenantConfigArea,
   getPermissionMatrixOverview,
   getTenantPermissionMatrixNotes,
+  getTenantModuleGate,
   ServiceError,
 } from "@bloqer/services";
 
@@ -43,11 +43,14 @@ export default async function ConfiguracionPermisosPage() {
 
   const sections = getPermissionModuleGroupSections();
   const unavailableModules = getUnavailablePermissionModulesForUi();
-  const canEditNotes = canEditPermissionMatrixNotes(current.tenantCtx.roles);
+  const gate = await getTenantModuleGate(ctx);
+  const canEditNotes =
+    (can(ctx.roles, "EDIT", "USERS_PERMISSIONS") && gate.isEnabled("USERS_PERMISSIONS")) ||
+    (can(ctx.roles, "EDIT", "TENANT_SETTINGS") && gate.isEnabled("TENANT_SETTINGS"));
   const moduleLabelsEs = TENANT_MODULE_LABEL_ES as Record<PermissionModule, string>;
   const canOpenEquipo =
-    can(current.tenantCtx.roles, "VIEW", "TENANT_SETTINGS") ||
-    can(current.tenantCtx.roles, "VIEW", "USERS_PERMISSIONS");
+    (can(ctx.roles, "VIEW", "TENANT_SETTINGS") && gate.isEnabled("TENANT_SETTINGS")) ||
+    (can(ctx.roles, "VIEW", "USERS_PERMISSIONS") && gate.isEnabled("USERS_PERMISSIONS"));
 
   return (
     <PageShell variant="default" className="space-y-6">

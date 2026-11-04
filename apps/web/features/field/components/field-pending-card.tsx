@@ -14,7 +14,7 @@ export function FieldPendingCard({ item }: { item: FieldPendingItem }) {
   return (
     <article
       className={`rounded-lg border bg-card px-4 py-3 ${
-        isOverdue ? "border-destructive/60 shadow-[inset_0_0_0_1px_theme(colors.destructive/30%)]" : ""
+        isOverdue ? "border-destructive/60 shadow-[inset_0_0_0_1px_hsl(var(--destructive)/0.3)]" : ""
       }`}
       data-testid="field-pending-card"
       data-entity-type={item.entityType}

@@ -98,4 +98,17 @@ describe("computeBudgetSummaryKpis", () => {
     assert.equal(k.costliestLeaf?.code, "2");
     assert.equal(k.topIncidenceGroup, null);
   });
+
+  it("preserves cents for large totals and selects the exact highest-cost leaf", () => {
+    const tree = [
+      leafNode("1", "Lower", { totalCost: "99999999999999.97", totalSale: "99999999999999.99" }),
+      leafNode("2", "Higher", { totalCost: "99999999999999.98", totalSale: "99999999999999.99" }),
+    ];
+    const k = computeBudgetSummaryKpis(tree);
+    assert.equal(k.totalCostDirectDisplay, "199999999999999.95");
+    assert.equal(k.totalSalePriceDisplay, "199999999999999.98");
+    assert.equal(k.marginDisplay, "0.03");
+    assert.equal(k.costliestLeaf?.code, "2");
+    assert.equal(k.costliestLeaf?.amountDisplay, "99999999999999.98");
+  });
 });

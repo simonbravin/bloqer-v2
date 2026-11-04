@@ -12,19 +12,20 @@ const TYPE_LABELS: Record<ProjectType, string> = {
 
 interface ProjectCardsProps {
   projects: ProjectListItem[];
+  canCreate: boolean;
 }
 
-export function ProjectCards({ projects }: ProjectCardsProps) {
+export function ProjectCards({ projects, canCreate }: ProjectCardsProps) {
   if (projects.length === 0) {
     return (
       <ListEmptyState
         title="Sin proyectos"
         description="No hay proyectos con los filtros aplicados, o todavía no creaste ninguno."
-        action={
+        action={canCreate ? (
           <Button asChild size="sm">
             <Link href="/proyectos/nuevo">Crear proyecto</Link>
           </Button>
-        }
+        ) : undefined}
       />
     );
   }

@@ -30,7 +30,7 @@ export async function GET(
     const fmt = (sp.format ?? "csv").toLowerCase();
     if (fmt === "json") {
       const data = await buildBudgetWbsExportPayload(budgetId, projectId, filters, auth.ctx);
-      return NextResponse.json(data);
+      return NextResponse.json(data, { headers: { "Cache-Control": "private, no-store" } });
     }
     if (fmt === "pdf") {
       const { buffer, filename } = await exportBudgetWbsPdf(budgetId, projectId, filters, auth.ctx);

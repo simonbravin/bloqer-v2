@@ -6,7 +6,7 @@ import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canRegisterApPayment } from "../ap/ap-access";
 import { ServiceContext, ServiceError } from "../types";
-import { getAccountBalance, AccountBalanceSummary } from "./balance.service";
+import { getAccountBalance } from "./balance.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { assertPeriodOpenUnderCompanyLock } from "./treasury-write-locks";
 

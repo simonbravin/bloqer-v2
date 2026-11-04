@@ -31,7 +31,7 @@ import {
   type SupplierInvoiceView,
 } from "./supplier-invoice.service";
 import { recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccessIfPresent } from "../security/access";
 import {
   assertJournalAllowsOperationalCancel,
@@ -47,6 +47,29 @@ async function assertProjectGuardIfPresent(
     await requireProjectAccessIfPresent(projectId, ctx);
     await assertProjectAllowsOperationalMutation(projectId, ctx);
   }
+}
+
+async function requireNoteMutationProject(
+  id: string,
+  ctx: ServiceContext,
+  projectScopeId: string | undefined,
+  permissionMessage: string,
+): Promise<string | null> {
+  const preview = await prisma.supplierInvoice.findUnique({
+    where: { id },
+    select: { tenantId: true, companyId: true, projectId: true },
+  });
+  if (!preview) throw new ServiceError("NOT_FOUND", "Nota de crédito/débito no encontrada");
+  if (preview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (projectScopeId !== undefined && preview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La nota no pertenece a este proyecto");
+  }
+  if (isCrossCompany(preview.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La nota no pertenece a la empresa activa");
+  }
+  if (!canMutateApForScope(ctx.roles, preview.projectId)) throw new ServiceError("FORBIDDEN", permissionMessage);
+  await assertProjectGuardIfPresent(preview.projectId, ctx);
+  return preview.projectId;
 }
 
 function sameProjectScope(
@@ -157,6 +180,7 @@ async function createNoteDraft(
     : parent.dueDate;
 
   const created = await prisma.$transaction(async (tx) => {
+    if (parent.projectId) await lockProjectForOperationalMutation(tx, parent.projectId, ctx);
     const number = await nextSupplierDocumentNumber(tx, {
       tenantId: ctx.tenantId,
       companyId: parent.companyId,
@@ -406,8 +430,10 @@ export async function issueSupplierCreditNote(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
+  const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de crédito");
 
   const result = await prisma.$transaction(async (tx) => {
+    if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -587,8 +613,10 @@ export async function issueSupplierDebitNote(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
+  const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de débito");
 
   const result = await prisma.$transaction(async (tx) => {
+    if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -715,8 +743,10 @@ export async function cancelSupplierCreditNote(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
+  const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para anular notas de crédito");
 
   const result = await prisma.$transaction(async (tx) => {
+    if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {

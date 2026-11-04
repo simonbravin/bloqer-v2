@@ -21,7 +21,9 @@ import { log } from "../audit/audit.service";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolveDefaultCompanyIdForTenant, findActiveCompanyInTenant } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
-import { canEditTeamMembership, canReadTenantConfigArea } from "./tenant-settings-guards";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
+import { canEditTeamMembership } from "./tenant-settings-guards";
+import { assertTenantConfigReadAccess } from "./tenant-settings-access";
 
 export type AcceptTenantInvitationActorContext = {
   actorUserId: string;
@@ -120,9 +122,7 @@ export async function listPendingInvitationsForEmail(email: string): Promise<Pen
 }
 
 export async function listTenantInvitations(ctx: ServiceContext): Promise<TenantInvitationRow[]> {
-  if (!canReadTenantConfigArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver invitaciones");
-  }
+  await assertTenantConfigReadAccess(ctx);
   await markExpiredPendingInvitationsForTenant(ctx.tenantId);
   const rows = await prisma.tenantInvitation.findMany({
     where: { tenantId: ctx.tenantId },
@@ -154,9 +154,7 @@ export async function getTenantInvitationById(
   invitationId: string,
   ctx: ServiceContext,
 ): Promise<TenantInvitationDetail> {
-  if (!canReadTenantConfigArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver invitaciones");
-  }
+  await assertTenantConfigReadAccess(ctx);
   await markExpiredPendingInvitationsForTenant(ctx.tenantId);
   const inv = await prisma.tenantInvitation.findFirst({
     where: { id: invitationId, tenantId: ctx.tenantId },
@@ -224,6 +222,7 @@ export async function createTenantInvitation(
   raw: unknown,
   ctx: ServiceContext,
 ): Promise<CreateTenantInvitationResult> {
+  await assertTenantModuleEnabled(ctx, "USERS_PERMISSIONS");
   if (!canEditTeamMembership(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para invitar usuarios");
   }
@@ -234,66 +233,70 @@ export async function createTenantInvitation(
   }
   const emailNorm = normalizeInvitationEmail(parsed.data.email);
   const uniqueRoles = dedupeInvitationRoles(parsed.data.roles as UserRole[]);
-  const companyId = await resolveDefaultCompanyIdForTenant(
-    ctx.tenantId,
-    parsed.data.companyId,
-  );
+  const { inserted, tenantName } = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    const companyId = await resolveDefaultCompanyIdForTenant(
+      ctx.tenantId,
+      parsed.data.companyId,
+      tx,
+    );
+    await markExpiredPendingInvitationsForTenant(ctx.tenantId, tx);
 
-  await markExpiredPendingInvitationsForTenant(ctx.tenantId);
-
-  const userWithEmail = await prisma.user.findFirst({
-    where: { email: { equals: emailNorm, mode: "insensitive" } },
-    select: { id: true },
-  });
-  if (userWithEmail) {
-    const active = await prisma.userMembership.findFirst({
-      where: { tenantId: ctx.tenantId, userId: userWithEmail.id, status: "ACTIVE" },
+    const userWithEmail = await tx.user.findFirst({
+      where: { email: { equals: emailNorm, mode: "insensitive" } },
       select: { id: true },
     });
-    if (active) {
-      throw new ServiceError("CONFLICT", "Ya existe un miembro activo con ese email en el tenant");
+    if (userWithEmail) {
+      const active = await tx.userMembership.findFirst({
+        where: { tenantId: ctx.tenantId, userId: userWithEmail.id, status: "ACTIVE" },
+        select: { id: true },
+      });
+      if (active) {
+        throw new ServiceError("CONFLICT", "Ya existe un miembro activo con ese email en el tenant");
+      }
     }
-  }
 
-  const pendingDup = await prisma.tenantInvitation.findFirst({
-    where: { tenantId: ctx.tenantId, email: emailNorm, status: "PENDING" },
-    select: { id: true },
-  });
-  if (pendingDup) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Ya hay una invitación pendiente para ese email. Cancelala o esperá a que venza.",
-    );
-  }
+    const pendingDup = await tx.tenantInvitation.findFirst({
+      where: { tenantId: ctx.tenantId, email: emailNorm, status: "PENDING" },
+      select: { id: true },
+    });
+    if (pendingDup) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Ya hay una invitación pendiente para ese email. Cancelala o esperá a que venza.",
+      );
+    }
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { id: ctx.tenantId },
-    select: { id: true, name: true },
-  });
-  if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+    const tenant = await tx.tenant.findFirst({
+      where: { id: ctx.tenantId },
+      select: { id: true, name: true },
+    });
+    if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
 
-  const inserted = await insertTenantInvitation(prisma, {
-    tenantId: ctx.tenantId,
-    invitedByUserId: ctx.actorUserId,
-    emailNorm,
-    roles: uniqueRoles,
-    companyId,
-    expiresInDays: parsed.data.expiresInDays,
-  });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "TENANT_INVITATION_CREATED",
-    entityType:  "TenantInvitation",
-    entityId:    inserted.invitationId,
-    after:       {
-      email: emailNorm,
+    const inserted = await insertTenantInvitation(tx, {
+      tenantId: ctx.tenantId,
+      invitedByUserId: ctx.actorUserId,
+      emailNorm,
       roles: uniqueRoles,
-      expiresAt: inserted.expiresAt.toISOString(),
       companyId,
-    },
-    ipAddress:   ctx.ipAddress,
+      expiresInDays: parsed.data.expiresInDays,
+    });
+
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "TENANT_INVITATION_CREATED",
+      entityType:  "TenantInvitation",
+      entityId:    inserted.invitationId,
+      after:       {
+        email: emailNorm,
+        roles: uniqueRoles,
+        expiresAt: inserted.expiresAt.toISOString(),
+        companyId,
+      },
+      ipAddress:   ctx.ipAddress,
+    }, tx);
+    return { inserted, tenantName: tenant.name };
   });
 
   let emailDispatched = false;
@@ -301,7 +304,7 @@ export async function createTenantInvitation(
   const emailDispatch = await sendTenantInvitationEmailMessage(
     emailNorm,
     inserted.invitationLink,
-    tenant.name,
+    tenantName,
     { invitedByUserId: ctx.actorUserId, roles: uniqueRoles },
   );
   emailDispatched = emailDispatch.dispatched;
@@ -319,6 +322,7 @@ export async function createTenantInvitation(
 }
 
 export async function cancelTenantInvitation(invitationId: string, ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "USERS_PERMISSIONS");
   if (!canEditTeamMembership(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar invitaciones");
   }
@@ -328,37 +332,40 @@ export async function cancelTenantInvitation(invitationId: string, ctx: ServiceC
     throw new ServiceError("VALIDATION", msg);
   }
 
-  await markExpiredPendingInvitationsForTenant(ctx.tenantId);
+  const cancelled = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    await markExpiredPendingInvitationsForTenant(ctx.tenantId, tx);
 
-  const inv = await prisma.tenantInvitation.findFirst({
-    where: { id: parsed.data.invitationId, tenantId: ctx.tenantId },
-    select: { id: true, status: true },
-  });
-  if (!inv) throw new ServiceError("NOT_FOUND", "Invitación no encontrada");
-  if (inv.status !== "PENDING") {
-    throw new ServiceError("CONFLICT", "Solo se pueden cancelar invitaciones pendientes");
-  }
+    const inv = await tx.tenantInvitation.findFirst({
+      where: { id: parsed.data.invitationId, tenantId: ctx.tenantId },
+      select: { id: true, status: true },
+    });
+    if (!inv) throw new ServiceError("NOT_FOUND", "Invitación no encontrada");
+    if (inv.status !== "PENDING") return false;
 
-  const now = new Date();
-  const cancelled = await prisma.tenantInvitation.updateMany({
-    where: { id: inv.id, tenantId: ctx.tenantId, status: "PENDING" },
-    data:  { status: "CANCELLED", cancelledAt: now },
-  });
-  assertOptimisticRowUpdate(
-    cancelled.count,
-    "La invitación ya no está pendiente. Recargá e intentá de nuevo.",
-  );
+    const now = new Date();
+    const cancelled = await tx.tenantInvitation.updateMany({
+      where: { id: inv.id, tenantId: ctx.tenantId, status: "PENDING" },
+      data:  { status: "CANCELLED", cancelledAt: now },
+    });
+    assertOptimisticRowUpdate(
+      cancelled.count,
+      "La invitación ya no está pendiente. Recargá e intentá de nuevo.",
+    );
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "TENANT_INVITATION_CANCELLED",
-    entityType:  "TenantInvitation",
-    entityId:    inv.id,
-    before:      { status: "PENDING" },
-    after:       { status: "CANCELLED", cancelledAt: now.toISOString() },
-    ipAddress:   ctx.ipAddress,
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "TENANT_INVITATION_CANCELLED",
+      entityType:  "TenantInvitation",
+      entityId:    inv.id,
+      before:      { status: "PENDING" },
+      after:       { status: "CANCELLED", cancelledAt: now.toISOString() },
+      ipAddress:   ctx.ipAddress,
+    }, tx);
+    return true;
   });
+  if (!cancelled) throw new ServiceError("CONFLICT", "Solo se pueden cancelar invitaciones pendientes");
 }
 
 export async function acceptTenantInvitation(
@@ -386,8 +393,15 @@ export async function acceptTenantInvitation(
 
   const actorEmailNorm = normalizeInvitationEmail(actorUser.email);
 
-  return prisma.$transaction(async (tx) => {
+  const accepted = await prisma.$transaction(async (tx) => {
     const th = hashInvitationToken(parsed.data.token);
+    const target = await tx.tenantInvitation.findFirst({
+      where: { tokenHash: th },
+      select: { tenantId: true },
+    });
+    if (!target) throw new ServiceError("NOT_FOUND", "Invitación no encontrada o token inválido");
+    // Shared with invitation creation/cancellation and membership role/status changes.
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${target.tenantId} FOR UPDATE`;
     const inv = await tx.tenantInvitation.findFirst({
       where: { tokenHash: th },
       select: {
@@ -419,7 +433,8 @@ export async function acceptTenantInvitation(
         where: { id: inv.id, status: "PENDING" },
         data: { status: "EXPIRED" },
       });
-      throw new ServiceError("CONFLICT", "La invitación expiró");
+      // Commit the terminal status before returning the error to the caller.
+      return null;
     }
 
     if (normalizeInvitationEmail(inv.email) !== actorEmailNorm) {
@@ -500,4 +515,6 @@ export async function acceptTenantInvitation(
 
     return { tenantId: inv.tenantId };
   });
+  if (!accepted) throw new ServiceError("CONFLICT", "La invitación expiró");
+  return accepted;
 }

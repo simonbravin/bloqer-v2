@@ -18,19 +18,21 @@ import type { BudgetListItem } from "./budget-list";
 export function BudgetTable({
   budgets,
   projectId,
+  canCreate = false,
 }: {
   budgets: BudgetListItem[];
   projectId: string;
+  canCreate?: boolean;
 }) {
   if (budgets.length === 0) {
     return (
       <ListEmptyState
         title="Sin presupuestos"
-        description="Creá el primer presupuesto del proyecto. Después podés crear una adenda vinculada a uno aprobado o cerrado."
+        description={canCreate ? "Creá el primer presupuesto del proyecto. Después podés crear una adenda vinculada a uno aprobado o cerrado." : "Todavía no hay presupuestos para este proyecto."}
         action={
-          <Button asChild size="sm">
+          canCreate ? <Button asChild size="sm">
             <Link href={`/proyectos/${projectId}/presupuestos/nuevo`}>Nuevo presupuesto</Link>
-          </Button>
+          </Button> : undefined
         }
       />
     );

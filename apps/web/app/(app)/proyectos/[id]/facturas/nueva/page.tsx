@@ -9,7 +9,8 @@ import {
   getCertificationById,
   getCompanyFiscalContext,
   getContactById,
-  getProjectById,
+  getProjectShellInfo,
+  getProjectClientContactId,
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
@@ -93,13 +94,16 @@ export default async function NuevaFacturaPage({ params, searchParams }: PagePro
     let clientCountry: string | null = null;
     let clientIvaCondition: string | null = null;
     try {
-      const project = await getProjectById(projectId, ctx);
+      const [project, clientContactId] = await Promise.all([
+        getProjectShellInfo(projectId, ctx),
+        getProjectClientContactId(projectId, ctx),
+      ]);
       const fiscal = await getCompanyFiscalContext(ctx, project.companyId);
       if (fiscal) {
         companyCountry = fiscal.country;
         companyIvaCondition = fiscal.ivaCondition;
       }
-      const client = await getContactById(project.clientContactId, ctx);
+      const client = await getContactById(clientContactId, ctx);
       clientCountry = client.country;
       clientIvaCondition = client.ivaCondition;
     } catch { /* defaults */ }

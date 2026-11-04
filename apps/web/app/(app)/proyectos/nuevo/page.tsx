@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
+import { can } from "@bloqer/domain";
 import { ProjectForm } from "@/features/projects";
 import { getCurrentUser } from "@/lib/auth";
-import { listAllContacts } from "@bloqer/services";
+import { getTenantModuleGate, listAllContacts } from "@bloqer/services";
 import { createProjectAction } from "../actions";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
@@ -16,6 +17,10 @@ export default async function NuevoProyectoPage() {
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+
+  if (!can(ctx.roles, "EDIT", "PROJECTS")) redirect("/proyectos");
+  const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("PROJECTS")) redirect("/dashboard");
 
   const clients = await listAllContacts(
     { role: "CLIENT", status: "ACTIVE" },

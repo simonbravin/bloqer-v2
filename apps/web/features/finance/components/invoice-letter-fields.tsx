@@ -1,5 +1,6 @@
 "use client";
 
+import { forwardRef, useId, type ComponentPropsWithoutRef, type ComponentRef } from "react";
 import {
   IVA_CONDITION_CODES,
   IVA_CONDITION_LABEL_ES,
@@ -25,38 +26,45 @@ import { cn } from "@/lib/utils";
 
 const NONE = "__none__";
 
-export function IvaConditionSelect({
-  id,
+type IvaConditionSelectProps = Omit<
+  ComponentPropsWithoutRef<typeof SelectTrigger>,
+  "value" | "onChange" | "children" | "defaultValue"
+> & {
+  value: IvaConditionCode | null | undefined;
+  onValueChange: (value: IvaConditionCode | null) => void;
+  label?: string;
+  allowEmpty?: boolean;
+};
+
+export const IvaConditionSelect = forwardRef<ComponentRef<typeof SelectTrigger>, IvaConditionSelectProps>(function IvaConditionSelect({
+  id: providedId,
   name,
   value,
   onValueChange,
   label = "Condición frente al IVA",
   className,
   allowEmpty = true,
-}: {
-  id?: string;
-  name?: string;
-  value: IvaConditionCode | null | undefined;
-  onValueChange: (value: IvaConditionCode | null) => void;
-  label?: string;
-  className?: string;
-  allowEmpty?: boolean;
-}) {
+  disabled,
+  ...triggerProps
+}, ref) {
+  const generatedId = useId();
+  const id = providedId ?? generatedId;
   const selectValue = value ?? (allowEmpty ? NONE : undefined);
   return (
     <div className={cn("space-y-2", className)}>
       {label ? <Label htmlFor={id}>{label}</Label> : null}
       {name ? (
-        <input type="hidden" name={name} value={value ?? ""} />
+        <input type="hidden" name={name} value={value ?? ""} disabled={disabled} />
       ) : null}
       <Select
+        disabled={disabled}
         value={selectValue}
         onValueChange={(v) => {
           if (v === NONE) onValueChange(null);
           else onValueChange(v as IvaConditionCode);
         }}
       >
-        <SelectTrigger id={id}>
+        <SelectTrigger {...triggerProps} ref={ref} id={id}>
           <SelectValue placeholder="Seleccionar condición" />
         </SelectTrigger>
         <SelectContent>
@@ -72,7 +80,7 @@ export function IvaConditionSelect({
       </Select>
     </div>
   );
-}
+});
 
 export function InvoiceLetterSelect({
   id,

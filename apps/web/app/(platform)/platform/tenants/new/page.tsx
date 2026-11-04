@@ -34,7 +34,7 @@ export default async function PlatformTenantsNewPage({ searchParams }: PageProps
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Crear organización</h1>
         <p className="text-sm text-muted-foreground">
-          Alta de tenant en trial, empresa principal e invitación al administrador.
+          Alta de organización en prueba, empresa principal e invitación al propietario.
         </p>
       </div>
       {errMsg ? (
@@ -46,7 +46,7 @@ export default async function PlatformTenantsNewPage({ searchParams }: PageProps
         <CardHeader>
           <CardTitle className="text-base">Datos de la organización</CardTitle>
           <CardDescription>
-            El contacto recibirá un enlace para aceptar la invitación con rol OWNER.
+            El contacto recibirá un enlace para aceptar la invitación con rol Propietario.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 
 /** Empty Directorio — distinguish truly empty tenant vs filtered miss ([D-090]). */
-export function ContactListEmpty({ hasActiveFilters }: { hasActiveFilters: boolean }) {
+export function ContactListEmpty({ hasActiveFilters, canCreate }: { hasActiveFilters: boolean; canCreate: boolean }) {
   if (hasActiveFilters) {
     return <ListEmptyState message="No se encontraron contactos con los filtros aplicados." />;
   }
@@ -16,9 +16,9 @@ export function ContactListEmpty({ hasActiveFilters }: { hasActiveFilters: boole
       description="Cargá un proveedor, cliente o empleado en el Directorio para operar compras, obras y pagos."
       action={
         <div className="flex flex-wrap justify-center gap-2">
-          <Button asChild size="sm">
+          {canCreate ? <Button asChild size="sm">
             <Link href="/directorio/nuevo?role=SUPPLIER">+ Nuevo proveedor</Link>
-          </Button>
+          </Button> : null}
           <Button asChild size="sm" variant="outline">
             <Link href="/ayuda/cargar-un-proveedor">Cómo se carga un proveedor</Link>
           </Button>

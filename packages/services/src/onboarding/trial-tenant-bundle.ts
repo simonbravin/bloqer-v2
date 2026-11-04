@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
-import type { Prisma } from "@bloqer/database";
+import { Prisma } from "@bloqer/database";
 import { OVERVIEW_MODULES } from "@bloqer/domain";
 import type { CompleteTrialOnboardingInput } from "@bloqer/validators";
 import { ServiceError } from "../types";
 
 const TRIAL_DAYS = 30;
+const TENANT_SLUG_ADVISORY_CLASS_ID = 824_014_003;
 
 function slugifyBase(displayName: string): string {
   const s = displayName
@@ -31,6 +32,9 @@ export async function createTrialTenantBundle(
   input: CompleteTrialOnboardingInput,
 ): Promise<TrialTenantBundleResult> {
   const baseSlug = slugifyBase(input.displayName);
+  // Different actors (including platform provisioning) may choose the same name.
+  // Serialize slug allocation before checking candidates; a unique error aborts a PG transaction.
+  await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(${TENANT_SLUG_ADVISORY_CLASS_ID}::integer, hashtext(${baseSlug}::text))`);
   let slug = baseSlug;
   for (let attempt = 0; attempt < 24; attempt++) {
     const candidate = attempt === 0 ? baseSlug : `${baseSlug}-${randomBytes(3).toString("hex")}`;

@@ -17,11 +17,19 @@ export function isProjectIdValue(value: string | null | undefined): value is str
   return typeof value === "string" && isUuid(value);
 }
 
+export function parseLastProjectIdCookie(cookieHeader: string): string | null {
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${LAST_PROJECT_COOKIE}=([^;]*)`));
+  if (!match?.[1]) return null;
+  try {
+    const raw = decodeURIComponent(match[1]);
+    return isProjectIdValue(raw) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
 export function readLastProjectIdFromDocument(): string | null {
-  if (typeof document === "undefined") return null;
-  const match = document.cookie.match(new RegExp(`(?:^|; )${LAST_PROJECT_COOKIE}=([^;]*)`));
-  const raw = match?.[1] ? decodeURIComponent(match[1]) : null;
-  return isProjectIdValue(raw) ? raw : null;
+  return typeof document === "undefined" ? null : parseLastProjectIdCookie(document.cookie);
 }
 
 export function writeLastProjectIdCookie(projectId: string): void {

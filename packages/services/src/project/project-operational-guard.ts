@@ -1,8 +1,9 @@
-import type { ProjectStatus } from "@bloqer/database";
+import type { Prisma, ProjectStatus } from "@bloqer/database";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import type { ProjectTenantScope } from "./require-project-in-tenant";
+import { lockProjectForMutation } from "./project-write-lock";
 
 const STATUS_MESSAGES: Record<ProjectStatus, string> = {
   DRAFT: "La obra está en borrador: no se permiten operaciones de compra, certificación ni movimientos financieros",
@@ -27,14 +28,28 @@ export async function assertProjectAllowsOperationalMutation(
 ): Promise<ProjectTenantScope> {
   const project = await requireProjectAccess(projectId, ctx);
 
-  if (project.status !== "ACTIVE") {
+  assertOperationalMutationStatus(project.status);
+  return project;
+}
+
+/** Transaction recheck; the caller must perform the ordinary ACL guard first. */
+export async function lockProjectForOperationalMutation(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<ProjectTenantScope> {
+  const project = await lockProjectForMutation(tx, projectId, ctx.tenantId);
+  assertOperationalMutationStatus(project.status);
+  return project;
+}
+
+function assertOperationalMutationStatus(status: ProjectStatus): void {
+  if (status !== "ACTIVE") {
     const message =
-      getProjectOperationalMutationBlockReason(project.status) ||
+      getProjectOperationalMutationBlockReason(status) ||
       "La obra no admite esta operación en su estado actual";
     throw new ServiceError("CONFLICT", message);
   }
-
-  return project;
 }
 
 /** Budget/WBS planning: allowed in DRAFT and ACTIVE; blocked in ON_HOLD, COMPLETED, CANCELLED. */
@@ -43,13 +58,26 @@ export async function assertProjectAllowsBudgetPlanning(
   ctx: ServiceContext,
 ): Promise<ProjectTenantScope> {
   const project = await requireProjectAccess(projectId, ctx);
+  assertBudgetPlanningStatus(project.status);
+  return project;
+}
 
-  if (project.status === "ON_HOLD") {
+/** Transaction recheck; the caller must perform the ordinary ACL guard first. */
+export async function lockProjectForBudgetPlanning(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<ProjectTenantScope> {
+  const project = await lockProjectForMutation(tx, projectId, ctx.tenantId);
+  assertBudgetPlanningStatus(project.status);
+  return project;
+}
+
+function assertBudgetPlanningStatus(status: ProjectStatus): void {
+  if (status === "ON_HOLD") {
     throw new ServiceError("CONFLICT", "La obra está pausada: no se pueden modificar presupuestos hasta reanudarla");
   }
-  if (project.status === "COMPLETED" || project.status === "CANCELLED") {
+  if (status === "COMPLETED" || status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "La obra es de solo lectura operativa");
   }
-
-  return project;
 }

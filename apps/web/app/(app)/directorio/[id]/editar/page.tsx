@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { can } from "@bloqer/domain";
 import { ContactForm } from "@/features/directory/components/contact-form";
 import { getCurrentUser } from "@/lib/auth";
 import { getContactById, ServiceError } from "@bloqer/services";
 import { updateContactAction } from "../../actions";
 import type { UpdateContactInput } from "@bloqer/validators";
 import { PageShell } from "@/components/layout/page-shell";
+import { PageListHeader } from "@/components/ui/page-list-header";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -22,6 +24,7 @@ export default async function EditarContactoPage({ params }: PageProps) {
     companyId: current.tenantCtx.companyId,
     roles: current.tenantCtx.roles,
   };
+  if (!can(ctx.roles, "EDIT", "DIRECTORY")) redirect(`/directorio/${id}`);
 
   let contact;
   try {
@@ -38,9 +41,7 @@ export default async function EditarContactoPage({ params }: PageProps) {
 
   return (
     <PageShell variant="form" className="space-y-6" breadcrumbLabel={contact.fantasyName ?? contact.legalName}>
-      <div className="flex items-center gap-4">
-        <h1 className="text-2xl font-bold tracking-tight">Editar contacto</h1>
-      </div>
+      <PageListHeader title="Editar contacto" />
 
       <p className="text-sm text-muted-foreground">
         Los roles (cliente, proveedor, etc.) no se cambian acá. Gestionalos en la{" "}

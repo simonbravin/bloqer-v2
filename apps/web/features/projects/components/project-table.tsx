@@ -26,9 +26,10 @@ const TYPE_LABELS: Record<ProjectType, string> = {
 
 interface ProjectTableProps {
   projects: ProjectListItem[];
+  canCreate: boolean;
 }
 
-export function ProjectTable({ projects }: ProjectTableProps) {
+export function ProjectTable({ projects, canCreate }: ProjectTableProps) {
   const accessors = useMemo(
     () => ({
       code: (p: ProjectListItem) => p.code ?? "",
@@ -47,18 +48,18 @@ export function ProjectTable({ projects }: ProjectTableProps) {
       <ListEmptyState
         title="Sin proyectos"
         description="No hay proyectos con los filtros aplicados, o todavía no creaste ninguno."
-        action={
+        action={canCreate ? (
           <Button asChild size="sm">
             <Link href="/proyectos/nuevo">Crear proyecto</Link>
           </Button>
-        }
+        ) : undefined}
       />
     );
   }
 
   return (
     <TableScroll>
-      <Table className="table-fixed">
+      <Table className="min-w-[56rem] table-fixed">
         <TableHeader>
           <TableRow>
             <SortableTableHead

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronRight } from "lucide-react";
+import { useId } from "react";
 import { NavItem } from "@/features/shell/components/nav-item";
 import { PendingCountBadge } from "@/components/ui/pending-count-badge";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,8 @@ export function CollapsibleNavSection({
   onToggle,
   items,
 }: CollapsibleNavSectionProps) {
-  const panelId = `nav-section-${sectionIndex}`;
+  const instanceId = useId();
+  const panelId = `nav-section-${sectionIndex}-${instanceId}`;
   const collapsedBadge = items.reduce((sum, item) => sum + (item.badgeCount ?? 0), 0);
   return (
     <div className="rounded-md">

@@ -12,7 +12,8 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { canRegisterApPayment, canViewApProjectArea, canViewCompanyAp } from "./ap-access";
 import { notifyPaymentConfirmed } from "./ap-notifications.service";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
@@ -262,6 +263,7 @@ export async function createPayment(
       }),
     create: async () => {
       const created = await prisma.$transaction(async (tx) => {
+        if (payablePreview.projectId) await lockProjectForOperationalMutation(tx, payablePreview.projectId, ctx);
         // Load payable inside txn for consistency
         const payable = await tx.payable.findUnique({ where: { id: input.payableId } });
         if (!payable) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
@@ -433,6 +435,7 @@ export async function cancelPayment(
   await assertJournalAllowsOperationalCancel(ctx, glParams);
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (paymentPreview.projectId) await lockProjectForMutation(tx, paymentPreview.projectId, ctx.tenantId);
     const p = await tx.payment.findUnique({ where: { id } });
     if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
     if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

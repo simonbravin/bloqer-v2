@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Upload } from "lucide-react";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/table";
 import { readSpreadsheetFile } from "../lib/read-spreadsheet";
 import type { BudgetImportRow } from "@bloqer/validators";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 export type WbsImportPreview = {
   valid: boolean;
@@ -54,7 +55,7 @@ export function WbsImportDialog({
   onSuccess,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { isPending, isRunning, run: startTransition } = useBudgetAction(toast.error);
   const [fileName, setFileName] = useState<string | null>(null);
   const [preview, setPreview] = useState<WbsImportPreview | null>(null);
   const [confirmed, setConfirmed] = useState(false);
@@ -68,12 +69,13 @@ export function WbsImportDialog({
   }, []);
 
   const handleOpenChange = (next: boolean) => {
+    if (!next && isRunning()) return;
     if (!next) reset();
     onOpenChange(next);
   };
 
   const handleFile = (file: File | null) => {
-    if (!file) return;
+    if (!file || isRunning()) return;
     setFileName(file.name);
     setPreview(null);
     setConfirmed(false);
@@ -97,14 +99,18 @@ export function WbsImportDialog({
   };
 
   const handleImport = () => {
-    if (!preview?.valid || !confirmed) return;
+    if (!preview?.valid || !confirmed || isRunning()) return;
     if (hasExistingNodes && !replaceExisting) {
       toast.error("Marcá reemplazar estructura o eliminá los nodos existentes.");
       return;
     }
 
     startTransition(async () => {
-      const rows = preview.rows.map(({ _row: _, _parentResolved: __, ...row }) => row);
+      const rows = preview.rows.map(({ _row, _parentResolved, ...row }) => {
+        void _row;
+        void _parentResolved;
+        return row;
+      });
       const result = await onExecute(rows, { replaceExisting: hasExistingNodes && replaceExisting });
       if ("error" in result) {
         toast.error(result.error);
@@ -113,7 +119,8 @@ export function WbsImportDialog({
       toast.success(
         `Importados ${result.createdNodes} nodos (${result.createdItems} ítems)`,
       );
-      handleOpenChange(false);
+      reset();
+      onOpenChange(false);
       onSuccess?.();
       router.refresh();
     });
@@ -121,7 +128,7 @@ export function WbsImportDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" closeButtonDisabled={isPending} aria-busy={isPending}>
         <DialogHeader>
           <DialogTitle>Importar estructura EDT</DialogTitle>
           <DialogDescription>
@@ -131,7 +138,7 @@ export function WbsImportDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <fieldset disabled={isPending} className="min-w-0 space-y-4">
           <div className="rounded-lg border border-dashed p-4">
             <Label
               htmlFor="wbs-import-file"
@@ -145,7 +152,10 @@ export function WbsImportDialog({
                 accept=".csv,.xlsx,.xls"
                 className="sr-only"
                 disabled={isPending}
-                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  handleFile(e.target.files?.[0] ?? null);
+                  e.target.value = "";
+                }}
               />
             </Label>
           </div>
@@ -164,14 +174,14 @@ export function WbsImportDialog({
             {preview?.profile === "multi_discipline" ? (
               <ul className="list-disc pl-4 space-y-0.5">
                 <li>Rubro (ARQ, EST…) → capítulo raíz del rubro</li>
-                <li>ARQ.1 / ARQ.1.1 → capítulo o subcapítulo</li>
-                <li>ARQ.1.1.1 → ítem hoja</li>
+                <li>Un código que tiene hijos → capítulo o subcapítulo</li>
+                <li>La última fila de cada rama, sin hijos → ítem hoja con APU</li>
                 <li>Profundidad máxima: 4 niveles (rubro → capítulo → subcapítulo → ítem)</li>
               </ul>
             ) : (
               <ul className="list-disc pl-4 space-y-0.5">
-                <li>1–2 segmentos → capítulo o subcapítulo</li>
-                <li>3 segmentos → ítem hoja</li>
+                <li>Un código que tiene hijos → capítulo o subcapítulo</li>
+                <li>La última fila de cada rama, sin hijos → ítem hoja con APU</li>
                 <li>Profundidad máxima: 3 niveles (1 → 1.1 → 1.1.1)</li>
               </ul>
             )}
@@ -261,7 +271,7 @@ export function WbsImportDialog({
               Corregí los errores del archivo para poder importar.
             </p>
           )}
-        </div>
+        </fieldset>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isPending}>
@@ -269,7 +279,7 @@ export function WbsImportDialog({
           </Button>
           <Button
             onClick={handleImport}
-            disabled={!preview?.valid || !confirmed || isPending}
+            disabled={!preview?.valid || !confirmed || (hasExistingNodes && !replaceExisting) || isPending}
           >
             {isPending ? "Importando…" : "Importar"}
           </Button>

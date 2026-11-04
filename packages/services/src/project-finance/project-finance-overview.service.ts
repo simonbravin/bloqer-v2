@@ -1,6 +1,5 @@
-import { Prisma } from "@bloqer/database";
 import type { PermissionModule } from "@bloqer/domain";
-import { can, type UserRole } from "@bloqer/domain";
+import { can } from "@bloqer/domain";
 import { getPayableAgingReport, getReceivableAgingReport } from "../aging/aging.service";
 import { canEditArArea, canViewArProjectArea } from "../ar/ar-access";
 import { countOpenSalesInvoicesByProject } from "../ar/sales-invoice.service";
@@ -14,11 +13,9 @@ import { getProjectShellInfo } from "../project/project.service";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { getTenantModuleGate, type TenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
-import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
+import { isPositiveMoneyDecimal } from "../finance/money-decimal";
 
 export { canShowProjectFinanzasNavLink } from "../project/project-nav-guards";
-
-const ZERO = new Prisma.Decimal(0);
 
 export type ProjectFinanceMoneyByCurrency = { currency: string; amount: string };
 
@@ -104,13 +101,6 @@ export type ProjectFinanceOverview = {
   warnings: ProjectFinanceOverviewWarning[];
   canViewCertifications: boolean;
 };
-
-function moneyRowsFromMap(m: Map<string, Prisma.Decimal>): ProjectFinanceMoneyByCurrency[] {
-  return [...m.entries()]
-    .filter(([, v]) => v.greaterThan(ZERO))
-    .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
-    .sort((a, b) => a.currency.localeCompare(b.currency));
-}
 
 function pushUniqueQuickAction(
   out: ProjectFinanceQuickAction[],

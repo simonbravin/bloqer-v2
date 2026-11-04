@@ -5,6 +5,7 @@ import { getPlatformTenantInvitationById, ServiceError } from "@bloqer/services"
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
 import { formatDateTime } from "@/lib/format";
+import { formatUserRoleList } from "@/lib/user-role-label";
 import {
   PLATFORM_INVITE_LINK_FLASH_COOKIE,
   PLATFORM_INVITE_EMAIL_FLASH_COOKIE,
@@ -74,7 +75,7 @@ export default async function PlatformTenantInvitationDetailPage({ params }: Pag
         </div>
         <div>
           <dt className="text-muted-foreground">Roles</dt>
-          <dd className="text-xs">{inv.roles.join(", ")}</dd>
+          <dd className="text-xs">{formatUserRoleList(inv.roles)}</dd>
         </div>
         <div>
           <dt className="text-muted-foreground">Invitó</dt>

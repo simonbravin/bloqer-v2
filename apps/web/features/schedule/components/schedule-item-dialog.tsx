@@ -113,17 +113,21 @@ export function ScheduleItemDialog({
 
   const wbsLinksKey =
     item?.wbsLinks.map((l) => `${l.wbsNodeId}:${l.isPrimary ? "1" : "0"}`).join("|") ?? "";
+  const selectedItemId = item?.id;
+  const selectedProgressPct = item?.progressPct;
+  const selectedStartDate = item?.startDate ?? "";
+  const selectedEndDate = item?.endDate ?? "";
 
   useEffect(() => {
-    if (!open || !item) return;
-    setProgressInput(item.progressPct);
-    setStartDateInput(item.startDate ?? "");
-    setEndDateInput(item.endDate ?? "");
+    if (!open || !selectedItemId || selectedProgressPct === undefined) return;
+    setProgressInput(selectedProgressPct);
+    setStartDateInput(selectedStartDate);
+    setEndDateInput(selectedEndDate);
     setWbsPick("");
     startTransition(async () => {
       const [auditRes, ctxRes] = await Promise.all([
-        listScheduleItemAuditAction(item.id),
-        getScheduleItemContextAction(projectId, item.id),
+        listScheduleItemAuditAction(selectedItemId),
+        getScheduleItemContextAction(projectId, selectedItemId),
       ]);
       if ("entries" in auditRes) setAudit(auditRes.entries);
       else setAudit([]);
@@ -132,10 +136,10 @@ export function ScheduleItemDialog({
     });
   }, [
     open,
-    item?.id,
-    item?.progressPct,
-    item?.startDate,
-    item?.endDate,
+    selectedItemId,
+    selectedProgressPct,
+    selectedStartDate,
+    selectedEndDate,
     wbsLinksKey,
     projectId,
   ]);

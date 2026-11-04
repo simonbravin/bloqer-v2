@@ -9,7 +9,8 @@ import {
   getCompanies,
   getCompanyProcurementSettings,
   getTenantNotificationEmailPolicy,
-  getTenantProjectAccessMode,
+  getTenantProjectAccessModeForAdmin,
+  getTenantModuleGate,
   hasTenantWideProjectAccess,
   isMissingNotificationEmailPrefsSchema,
   ServiceError,
@@ -54,24 +55,29 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
 
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
+  const gate = await getTenantModuleGate(ctx);
+  if (!(
+    (can(ctx.roles, "VIEW", "TENANT_SETTINGS") && gate.isEnabled("TENANT_SETTINGS")) ||
+    (can(ctx.roles, "VIEW", "USERS_PERMISSIONS") && gate.isEnabled("USERS_PERMISSIONS"))
+  )) notFound();
 
   const sp = await searchParams;
   const companies = await getCompanies(ctx);
   if (companies.length === 0) notFound();
 
   const companyId = sp.companyId ?? ctx.companyId ?? companies[0]!.id;
-  const company = companies.find((c) => c.id === companyId) ?? companies[0]!;
+  const company = companies.find((c) => c.id === companyId);
+  if (!company) notFound();
   const settings = await getCompanyProcurementSettings(company.id, ctx);
 
-  const canEditCompras =
-    can(current.tenantCtx.roles, "EDIT", "TENANT_SETTINGS") ||
-    current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
-  const canEditPresupuestos = canManageApprovedBudgetEditPolicy(current.tenantCtx.roles);
+  const canEditCompras = gate.isEnabled("TENANT_SETTINGS") && (
+    can(ctx.roles, "EDIT", "TENANT_SETTINGS") || ctx.roles.some((r) => r === "OWNER" || r === "ADMIN")
+  );
+  const canEditPresupuestos = gate.isEnabled("TENANT_SETTINGS") && canManageApprovedBudgetEditPolicy(ctx.roles);
   const canEditProjectAccess =
-    can(current.tenantCtx.roles, "EDIT", "TENANT_SETTINGS") ||
-    hasTenantWideProjectAccess(current.tenantCtx.roles);
-  const canEditEmailPolicy = current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
-  const projectAccessMode = await getTenantProjectAccessMode(ctx.tenantId);
+    gate.isEnabled("TENANT_SETTINGS") && (can(ctx.roles, "EDIT", "TENANT_SETTINGS") || hasTenantWideProjectAccess(ctx.roles));
+  const canEditEmailPolicy = gate.isEnabled("TENANT_SETTINGS") && ctx.roles.some((r) => r === "OWNER" || r === "ADMIN");
+  const projectAccessMode = await getTenantProjectAccessModeForAdmin(ctx);
 
   let emailPolicy: Awaited<ReturnType<typeof getTenantNotificationEmailPolicy>> | null = null;
   let emailPolicyMissingSchema = false;

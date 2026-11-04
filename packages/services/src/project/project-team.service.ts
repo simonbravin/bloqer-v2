@@ -1,10 +1,11 @@
 import type { ProjectTeamMemberKind } from "@bloqer/database";
-import { prisma } from "@bloqer/database";
+import { prisma, Prisma } from "@bloqer/database";
 import { can, type UserRole } from "@bloqer/domain";
 import type { AddProjectTeamMemberInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
 import { requireProjectAccess } from "../security/access";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 
 export type ProjectTeamMemberRow = {
@@ -53,6 +54,7 @@ export async function listProjectTeam(
   ctx: ServiceContext,
 ): Promise<ProjectTeamMemberRow[]> {
   assertCanViewProjectTeam(ctx.roles);
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
   await requireProjectAccess(projectId, ctx);
 
   const rows = await prisma.projectTeamMember.findMany({
@@ -63,7 +65,7 @@ export async function listProjectTeam(
       userId: true,
       kind: true,
       createdAt: true,
-      user: { select: { email: true, name: true } },
+      user: { select: { email: true, name: true, status: true } },
     },
   });
 
@@ -80,7 +82,7 @@ export async function listProjectTeam(
 
   return rows.map((r) => {
     const m = byUser.get(r.userId);
-    const membershipActive = m?.status === "ACTIVE";
+    const membershipActive = m?.status === "ACTIVE" && r.user.status === "ACTIVE";
     const roles = (membershipActive && m ? m.roles : []) as UserRole[];
     return {
       id: r.id,
@@ -91,7 +93,7 @@ export async function listProjectTeam(
       roles,
       membershipActive,
       canSuperviseJobsiteLog: isActiveJobsiteSupervisor(
-        m ? { status: m.status, roles: m.roles as UserRole[] } : undefined,
+        membershipActive && m ? { status: m.status, roles: m.roles as UserRole[] } : undefined,
       ),
       createdAt: r.createdAt,
     };
@@ -107,11 +109,12 @@ export async function listActiveMembersForProjectTeamPicker(
   ctx: ServiceContext,
 ): Promise<ProjectTeamPickerOption[]> {
   assertCanEditProjectTeam(ctx.roles);
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
   await requireProjectAccess(projectId, ctx);
 
   const [memberships, existing] = await Promise.all([
     prisma.userMembership.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+      where: { tenantId: ctx.tenantId, status: "ACTIVE", user: { status: "ACTIVE" } },
       orderBy: { createdAt: "asc" },
       select: {
         userId: true,
@@ -142,6 +145,7 @@ export async function addProjectTeamMember(
   ctx: ServiceContext,
 ): Promise<ProjectTeamMemberRow> {
   assertCanEditProjectTeam(ctx.roles);
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
   await requireProjectAccess(projectId, ctx);
 
   const membership = await prisma.userMembership.findFirst({
@@ -149,6 +153,7 @@ export async function addProjectTeamMember(
       tenantId: ctx.tenantId,
       userId: input.userId,
       status: "ACTIVE",
+      user: { status: "ACTIVE" },
     },
     select: {
       userId: true,
@@ -177,31 +182,39 @@ export async function addProjectTeamMember(
     throw new ServiceError("CONFLICT", "Ese usuario ya está en el equipo de obra");
   }
 
-  const row = await prisma.projectTeamMember.create({
-    data: {
-      tenantId: ctx.tenantId,
-      projectId,
-      userId: input.userId,
-      kind: input.kind,
-      createdBy: ctx.actorUserId,
-    },
-    select: {
-      id: true,
-      userId: true,
-      kind: true,
-      createdAt: true,
-      user: { select: { email: true, name: true } },
-    },
-  });
+  const row = await prisma.$transaction(async (tx) => {
+    const created = await tx.projectTeamMember.create({
+      data: {
+        tenantId: ctx.tenantId,
+        projectId,
+        userId: input.userId,
+        kind: input.kind,
+        createdBy: ctx.actorUserId,
+      },
+      select: {
+        id: true,
+        userId: true,
+        kind: true,
+        createdAt: true,
+        user: { select: { email: true, name: true } },
+      },
+    });
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    projectId,
-    action: "PROJECT_TEAM_MEMBER_ADDED",
-    entityType: "ProjectTeamMember",
-    entityId: row.id,
-    after: { userId: row.userId, kind: row.kind },
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      projectId,
+      action: "PROJECT_TEAM_MEMBER_ADDED",
+      entityType: "ProjectTeamMember",
+      entityId: created.id,
+      after: { userId: created.userId, kind: created.kind },
+    }, tx);
+    return created;
+  }).catch((error: unknown) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      throw new ServiceError("CONFLICT", "Ese usuario ya está en el equipo de obra");
+    }
+    throw error;
   });
 
   const roles = membership.roles as UserRole[];
@@ -224,6 +237,7 @@ export async function removeProjectTeamMember(
   ctx: ServiceContext,
 ): Promise<void> {
   assertCanEditProjectTeam(ctx.roles);
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
   await requireProjectAccess(projectId, ctx);
 
   const row = await prisma.projectTeamMember.findFirst({
@@ -232,16 +246,22 @@ export async function removeProjectTeamMember(
   });
   if (!row) throw new ServiceError("NOT_FOUND", "Miembro del equipo no encontrado");
 
-  await prisma.projectTeamMember.delete({ where: { id: row.id } });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    projectId,
-    action: "PROJECT_TEAM_MEMBER_REMOVED",
-    entityType: "ProjectTeamMember",
-    entityId: row.id,
-    before: { userId: row.userId, kind: row.kind },
+  await prisma.$transaction(async (tx) => {
+    const removed = await tx.projectTeamMember.deleteMany({
+      where: { id: row.id, tenantId: ctx.tenantId, projectId },
+    });
+    if (removed.count !== 1) {
+      throw new ServiceError("CONFLICT", "El equipo de obra cambió. Recargá e intentá de nuevo.");
+    }
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      projectId,
+      action: "PROJECT_TEAM_MEMBER_REMOVED",
+      entityType: "ProjectTeamMember",
+      entityId: row.id,
+      before: { userId: row.userId, kind: row.kind },
+    }, tx);
   });
 }
 

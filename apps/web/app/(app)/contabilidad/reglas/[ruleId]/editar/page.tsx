@@ -33,8 +33,6 @@ export default async function EditarReglaContablePage({
   const { data: accounts } = await listAccountingAccounts(ctx, { companyId: rule.companyId });
   const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
-  const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
-
   return (
     <PageShell variant="form" className="space-y-6" breadcrumbLabel={rule.name}>
       <div className="flex items-center gap-4">

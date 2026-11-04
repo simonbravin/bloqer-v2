@@ -1,4 +1,4 @@
-import { prisma, type ContactRoleType } from "@bloqer/database";
+import { prisma, type ContactRoleType, type Prisma } from "@bloqer/database";
 import { ServiceError } from "../types";
 
 const ROLE_LABEL_ES: Record<ContactRoleType, string> = {
@@ -112,19 +112,32 @@ export async function assertApInvoicePayee(
   await assertContactHasAnyRoleInTenant(contactId, AP_DIRECT_PAYEE_ROLES, tenantId);
 }
 
+/** Shared parent lock for Contact role/profile edits and transactional consumers. */
+export async function lockContactForMutation(
+  tx: Prisma.TransactionClient,
+  contactId: string,
+  tenantId: string,
+): Promise<void> {
+  // Serialize role/profile changes with consumers that validate the role inside
+  // their write transaction. NO KEY UPDATE permits FK checks on the parent.
+  await tx.$queryRaw`SELECT id FROM contacts WHERE id = ${contactId} AND "tenantId" = ${tenantId} FOR NO KEY UPDATE`;
+}
+
 /** Load contact + role and reject cross-tenant or inactive role. */
 export async function assertContactRoleInTenant(
   contactId: string,
   roleType: ContactRoleType,
   tenantId: string,
-  opts?: { contactNotFoundMessage?: string },
+  opts?: { contactNotFoundMessage?: string; tx?: Prisma.TransactionClient },
 ): Promise<void> {
+  if (opts?.tx) await lockContactForMutation(opts.tx, contactId, tenantId);
+  const db = opts?.tx ?? prisma;
   const [contact, role] = await Promise.all([
-    prisma.contact.findUnique({
+    db.contact.findUnique({
       where: { id: contactId },
       select: { id: true, tenantId: true, status: true },
     }),
-    prisma.contactRole.findUnique({
+    db.contactRole.findUnique({
       where: { contactId_role: { contactId, role: roleType } },
       select: { tenantId: true, status: true },
     }),

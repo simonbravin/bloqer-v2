@@ -221,7 +221,7 @@ function toScaledBigInt(raw: string, scale: number): bigint {
 
 function fromScaledBigInt(value: bigint, scale: number): string {
   const neg = value < BigInt(0);
-  let abs = neg ? -value : value;
+  const abs = neg ? -value : value;
   if (scale === 0) return `${neg ? "-" : ""}${abs.toString()}`;
   const digits = abs.toString().padStart(scale + 1, "0");
   const split = digits.length - scale;

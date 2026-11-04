@@ -1,0 +1,399 @@
+{
+  "date": "2026-11-03",
+  "phase": "AG-02",
+  "mode": "audit-fix-verify",
+  "status": "corrected and verified locally; representative browser smoke completed",
+  "head": "3b5ae7a038465ad6b3d60cde19c278a31019e165",
+  "branch": "codex/pruebas",
+  "base": "output/platform-audit/ag-02-2026-11-03/initial-snapshot.json",
+  "previousPhase": "2026-11-03-ag-01-identity-access.md",
+  "nextPhaseStarted": false,
+  "publication": {
+    "committed": false,
+    "deployed": false,
+    "productionChanged": false
+  },
+  "scope": [
+    "company/project/Field/platform shells",
+    "navigation, breadcrumbs, common controls",
+    "loading/empty/error/denied/success presentation",
+    "keyboard/focus, contrast, responsive, es-AR"
+  ],
+  "environment": {
+    "url": "http://localhost:3100",
+    "database": "bloqer_audit_ag01_20261103",
+    "syntheticData": true,
+    "externalServicesDisabled": true,
+    "localBrowserExplicitlyAuthorized": true
+  },
+  "verification": {
+    "unitCasesPassed": 1754,
+    "unitCasesFailed": 0,
+    "liveSuitesSkipped": 13,
+    "typecheckTasksPassed": 13,
+    "lint": "passed; final class-only follow-up checked in web config",
+    "aiIndexChunks": 513,
+    "aiIndexHashPrefix": "f810cf88b98f",
+    "browserEvidence": "output/platform-audit/ag-02-2026-11-03/browser-verification.json"
+  },
+  "findings": [
+    {
+      "id": "GA-AG-02-001",
+      "priority": "P2",
+      "title": "Configuración ignoraba permisos y módulos",
+      "location": "global-workspace-nav / configuracion-subnav",
+      "before": "Con SETTINGS/USERS apagados o un rol operativo aparecían accesos a pantallas que el servidor rechaza.",
+      "after": "El menú y la subnav derivan General, Equipo, Permisos y Políticas de los mismos permisos y gates existentes.",
+      "files": [
+        "apps/web/lib/global-workspace-nav.ts",
+        "apps/web/lib/configuracion-subnav.ts",
+        "apps/web/app/(app)/configuracion/layout.tsx"
+      ],
+      "verification": "shell-navigation.test.ts",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-002",
+      "priority": "P2",
+      "title": "Subsecciones financieras ignoraban el módulo padre",
+      "location": "buildGlobalWorkspaceNav",
+      "before": "Tesorería o Contabilidad podían mostrar hijos con su área principal apagada.",
+      "after": "Las secciones del menú global requieren el módulo padre y conservan los gates de cada hijo. ModuleSubnav unifica estado activo y alias de transferencias, sin agregar dependencias entre gates.",
+      "files": [
+        "apps/web/lib/global-workspace-nav.ts",
+        "apps/web/components/layout/module-subnav.tsx"
+      ],
+      "verification": "shell-navigation.test.ts",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-003",
+      "priority": "P2",
+      "title": "Resumen y documentos de Field omitían PROJECTS",
+      "location": "project-workspace-nav / field-quick-actions / getFieldHome",
+      "before": "Se ofrecía Resumen o Subir documento/foto aunque el servicio exige PROJECTS.",
+      "after": "La navegación, acciones rápidas y DTO Field usan el requisito existente de PROJECTS.",
+      "files": [
+        "packages/services/src/project/project-workspace-nav.ts",
+        "packages/services/src/field/field-home.service.ts",
+        "apps/web/lib/field-quick-actions.ts"
+      ],
+      "verification": "project-workspace-nav.test.ts; field-isolation.test.ts; field-nav.test.ts",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-004",
+      "priority": "P2",
+      "title": "Siete migas enlazaban contenedores sin página",
+      "location": "getShellBreadcrumb",
+      "before": "Agrupadores de certificaciones de subcontrato (tres casos), recepciones de OC (uno), facturas de empresa (dos) y pagos a proveedor (uno) generaban enlaces 404. Invitaciones sí tiene página y conserva su enlace.",
+      "after": "Solo las pantallas existentes se enlazan; los contenedores quedan como texto y se conservan los ancestros válidos.",
+      "files": [
+        "apps/web/lib/shell-breadcrumb.ts",
+        "apps/web/components/layout/shell-breadcrumb.tsx"
+      ],
+      "verification": "shell-breadcrumb.test.ts; inventario de páginas app/platform",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-005",
+      "priority": "P2",
+      "title": "Estado activo e identificadores del menú ambiguos",
+      "location": "NavItem / CollapsibleNavSection",
+      "before": "El enlace activo no anunciaba aria-current y rail/drawer duplicaban IDs al montarse juntos.",
+      "after": "Los links activos anuncian la página y cada instancia del panel tiene IDs únicos.",
+      "files": [
+        "apps/web/features/shell/components/nav-item.tsx",
+        "apps/web/features/shell/components/collapsible-nav-section.tsx"
+      ],
+      "verification": "smoke móvil y revisión del DOM",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-006",
+      "priority": "P2",
+      "title": "Cierre y foco del menú móvil incompletos",
+      "location": "MobileNavSheet / ShellLayout",
+      "before": "Elegir la ruta actual no cerraba el menú y Escape no devolvía foco al disparador; faltaba salto al contenido.",
+      "after": "El menú cierra por selección y devuelve foco al botón; Ir al contenido principal enfoca main.",
+      "files": [
+        "apps/web/components/layout/shell-layout.tsx",
+        "apps/web/components/layout/sidebar-shell-context.tsx"
+      ],
+      "verification": "smoke Escape, ruta actual y skip link",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-007",
+      "priority": "P2",
+      "title": "La consola SaaS mostraba navegación de Field",
+      "location": "PlatformShell",
+      "before": "La consola sin contexto operativo renderizaba barra inferior y espacio reservado de campo en teléfono.",
+      "after": "PlatformShell desactiva FieldNavigation; conserva su menú y el área útil de pantalla.",
+      "files": [
+        "apps/web/components/layout/platform-shell.tsx",
+        "apps/web/components/layout/shell-layout.tsx"
+      ],
+      "verification": "platform-light-390-after.jpg; DOM fieldNavCount=0",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-008",
+      "priority": "P2",
+      "title": "Preferencia de obra frágil entre sesiones y empresas",
+      "location": "last-project-cookie / active-tenant / auth-session-actions",
+      "before": "Una cookie malformada podía lanzar URIError; salir o cambiar realmente de empresa conservaba la preferencia.",
+      "after": "El parser ignora valores inválidos; logout y cambio real limpian la preferencia; refrescar la misma empresa la conserva.",
+      "files": [
+        "apps/web/lib/last-project-cookie.ts",
+        "apps/web/lib/active-tenant.ts",
+        "apps/web/lib/auth-session-actions.ts"
+      ],
+      "verification": "last-project-cookie.test.ts; active-tenant.test.ts",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-009",
+      "priority": "P2",
+      "title": "La navegación confiaba en una obra recordada sin validarla",
+      "location": "FieldBottomNav / FieldPlusSheet / FieldProjectPickerSheet",
+      "before": "En el smoke, Obra dirigía a un UUID antiguo ajeno al contexto; un fallo del selector se presentaba como lista vacía.",
+      "after": "Desde áreas generales Obra va al listado; Más usa la ruta actual; Registrar valida la preferencia contra obras visibles al abrir. Carga, vacío, error y Reintentar se distinguen.",
+      "files": [
+        "apps/web/features/field/components/field-bottom-nav.tsx",
+        "apps/web/features/field/components/field-more-sheet.tsx",
+        "apps/web/features/field/components/field-plus-sheet.tsx",
+        "apps/web/features/field/components/field-project-picker.tsx"
+      ],
+      "verification": "field-navigation.test.ts; smoke picker con dos obras sintéticas",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-010",
+      "priority": "P2",
+      "title": "Una respuesta tardía reemplazaba el proyecto vigente",
+      "location": "ProjectShellProvider / fetchProjectShell",
+      "before": "Navegar A→B cacheado permitía que la respuesta tardía A dejara datos/sidebar desincronizados; invalidar podía repoblar caché vieja.",
+      "after": "Cleanup e identidad de solicitud impiden aplicar respuestas de una ruta o solicitud invalidada.",
+      "files": [
+        "apps/web/lib/project-shell-context.tsx"
+      ],
+      "verification": "project-shell-context.test.ts: tres órdenes controlados de respuesta",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-011",
+      "priority": "P2",
+      "title": "Combobox ancho y asociaciones accesibles incompletos",
+      "location": "SearchableCombobox",
+      "before": "El mínimo de 28rem excedía móviles; faltaban ref/atributos de formularios y nombres del buscador/lista en español.",
+      "after": "Ancho y alto acotados al viewport, margen de colisión, forwardRef/atributos, apertura por flechas y labels CmdK en español.",
+      "files": [
+        "apps/web/components/ui/searchable-combobox.tsx"
+      ],
+      "verification": "smoke 390: x=12, ancho=366; búsqueda sin resultados; Escape devuelve foco",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-012",
+      "priority": "P2",
+      "title": "Diálogos y paneles sin límite de área útil",
+      "location": "DialogContent / AlertDialogContent / SheetContent",
+      "before": "Contenidos largos o ventanas bajas podían dejar controles fuera de alcance; el cierre del Dialog se anunciaba Close.",
+      "after": "Diálogos con márgenes, altura dinámica y scroll; sheets con límite de viewport y scroll; cierre Cerrar.",
+      "files": [
+        "apps/web/components/ui/dialog.tsx",
+        "apps/web/components/ui/alert-dialog.tsx",
+        "apps/web/components/ui/sheet.tsx"
+      ],
+      "verification": "dialog-short-light-390x400.jpg; altura 345px en viewport de 400px",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-013",
+      "priority": "P2",
+      "title": "Confirmaciones quedaban bloqueadas después de un fallo",
+      "location": "ConfirmDialog / ConfirmAlertDialog / ReasonAlertDialog",
+      "before": "submitting se restablecía solo al cerrar; consumidores como aplicar plantilla o desactivar regla mantienen abierto el diálogo cuando falla.",
+      "after": "Hook común con exclusión síncrona, espera de promesa, finally recuperable, error seguro y respeto de pending externo. Cancelar/cierre bloqueados durante la operación.",
+      "files": [
+        "apps/web/hooks/use-confirmation-action.ts",
+        "apps/web/components/ui/confirm-dialog.tsx",
+        "apps/web/components/ui/reason-alert-dialog.tsx"
+      ],
+      "verification": "use-confirmation-action.test.ts: 3 casos; inspección de consumidores; diálogo real sin confirmar mutación",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-014",
+      "priority": "P2",
+      "title": "Etiquetas repetidas de detalle duplicaban IDs",
+      "location": "DetailField",
+      "before": "Dos campos con igual etiqueta/icono compartían aria-labelledby.",
+      "after": "useId genera asociaciones únicas por instancia y el contenido permite partir palabras.",
+      "files": [
+        "apps/web/components/ui/detail-field-grid.tsx"
+      ],
+      "verification": "detail-field-grid.test.ts: render SSR con etiquetas duplicadas",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-015",
+      "priority": "P2",
+      "title": "Etiquetas de formulario y composición estrecha",
+      "location": "ProjectForm / ProjectFilters / PageListHeader / ProjectOverviewView",
+      "before": "Etiquetas de proyecto sin htmlFor, errores sin asociación, filtro sin nombre y error Required del cliente; columnas de formulario/datos demasiado angostas.",
+      "after": "Labels e IDs únicos, aria-invalid/describedby y alertas; mensaje de cliente español; formulario a una columna móvil; encabezados flexibles y metadatos con espacio en tablet.",
+      "files": [
+        "apps/web/features/projects/components/project-form.tsx",
+        "apps/web/features/projects/components/project-filters.tsx",
+        "packages/validators/src/project.ts",
+        "apps/web/components/ui/page-list-header.tsx",
+        "apps/web/features/projects/overview/project-overview-view.tsx"
+      ],
+      "verification": "project.test.ts; smoke de validación vacía sin envío al servidor",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-016",
+      "priority": "P2",
+      "title": "Encabezados de tabla se superponían en teléfono",
+      "location": "SortableTableHead / ProjectTable",
+      "before": "A 430px Código/Nombre y Tipo/Estado se montaban entre celdas; los valores se truncaban excesivamente.",
+      "after": "Headers limitados a su celda con nombre completo accesible; la tabla de proyectos conserva ancho legible con scroll dentro del panel.",
+      "files": [
+        "apps/web/components/ui/sortable-table-head.tsx",
+        "apps/web/features/projects/components/project-table.tsx"
+      ],
+      "verification": "projects-table-light-430.jpg antes; projects-table-light-430-after.jpg después",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-017",
+      "priority": "P2",
+      "title": "Contraste insuficiente de errores y texto secundario",
+      "location": "tokens CSS / Badge destructive",
+      "before": "Rojo claro sobre blanco y rojo oscuro sobre fondos oscuros no alcanzaban 4.5:1; muted claro sobre workspace y hover del badge requerían ajuste.",
+      "after": "Se conserva el tono rojo con luminancia adecuada por tema, texto del botón coherente y hover destructive a 90%.",
+      "files": [
+        "apps/web/app/globals.css",
+        "apps/web/components/ui/badge.tsx"
+      ],
+      "verification": "contrast-iteration.json; contrast-after.json; temas medidos desde DOM",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-018",
+      "priority": "P2",
+      "title": "Carga y fallos carecían de recuperación común en español",
+      "location": "not-found / error / loading",
+      "before": "La ruta inexistente mostraba el 404 genérico inglés sin enlace para continuar; faltaban fallbacks comunes de las áreas.",
+      "after": "404 con Ir al inicio; error con Volver a cargar/Ir al inicio sin detalles privados; inicio SaaS /platform; carga anunciable. Revisión independiente corrigió el destino SaaS y aria-busy del status.",
+      "files": [
+        "apps/web/app/not-found.tsx",
+        "apps/web/app/error.tsx",
+        "apps/web/app/(app)/error.tsx",
+        "apps/web/app/(platform)/error.tsx",
+        "apps/web/components/ui/page-error-state.tsx",
+        "apps/web/components/ui/workspace-loading-state.tsx",
+        "apps/web/app/(app)/loading.tsx",
+        "apps/web/app/(platform)/loading.tsx"
+      ],
+      "verification": "not-found-before.jpg; not-found-after.jpg; tipos y revisión independiente",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-019",
+      "priority": "P3",
+      "title": "El resaltado de vencimiento no generaba CSS",
+      "location": "FieldPendingCard",
+      "before": "Tailwind avisaba theme(colors.destructive/30%) inválido y descartaba la sombra interior.",
+      "after": "La sombra usa hsl(var(--destructive)/0.3), compatible con el token de ambos temas.",
+      "files": [
+        "apps/web/features/field/components/field-pending-card.tsx"
+      ],
+      "verification": "advertencia inicial del servidor y compilación posterior",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    },
+    {
+      "id": "GA-AG-02-020",
+      "priority": "P3",
+      "title": "Robustez y etiquetas del calendario compartido",
+      "location": "MonthCalendarGrid",
+      "before": "El API opcional onDayClick recibía teclado de un evento hijo; flechas sin nombre accesible. El consumidor actual no pasa onDayClick.",
+      "after": "Se ignora bubbling del hijo; Mes anterior/Mes siguiente y anuncio del mes. Mejora del contrato compartido; no se atribuye un fallo operativo al consumidor actual.",
+      "files": [
+        "apps/web/components/ui/month-calendar-grid.tsx"
+      ],
+      "verification": "inspección del componente y consumidor libro de obra; tipos/lint",
+      "status": "corrected",
+      "origin": "preexisting optional API robustness issue; no current onDayClick consumer",
+      "classification": "shared-component robustness improvement"
+    },
+    {
+      "id": "GA-AG-02-021",
+      "priority": "P2",
+      "title": "Crear proyecto se ofrecía a usuarios de solo lectura",
+      "location": "ProyectosPage / NuevoProyectoPage / ProjectListSection",
+      "before": "Header y vacíos mostraban Crear proyecto sin permiso EDIT; la ruta de alta cargaba contactos antes de comprobar permiso/módulo aunque el servicio rechazaba la mutación.",
+      "after": "CTA derivada de can(EDIT,PROJECTS), propagada a cards/table. Alta comprueba permiso y gate antes de contactos; sin permiso vuelve al listado y con módulo apagado al inicio.",
+      "files": [
+        "apps/web/app/(app)/proyectos/page.tsx",
+        "apps/web/app/(app)/proyectos/nuevo/page.tsx",
+        "apps/web/features/projects/components/project-list-section.tsx",
+        "apps/web/features/projects/components/project-cards.tsx",
+        "apps/web/features/projects/components/project-table.tsx"
+      ],
+      "verification": "project-create-controls.test.ts: 5 casos; smoke VIEWER",
+      "status": "corrected",
+      "origin": "present at initial inspection; fixes developed in local worktree",
+      "classification": "confirmed defect or documented UI deviation"
+    }
+  ],
+  "limits": [
+    "No production, migrations, live external services or real financial mutations.",
+    "Browser checks sample representative consumers, not all application routes.",
+    "Actual native browser zoom and assistive-technology certification are separate from responsive/reflow measurements.",
+    "Hook/provider harnesses execute real source with controlled hooks and callbacks; they do not certify React concurrent scheduling.",
+    "Picker network rejection and Reintentar were inspected in code, without an induced browser network failure; navigation unit harnesses do not execute the fetch.",
+    "Generic page error recovery inspected in code; 404 and real dialogs were exercised visually."
+  ]
+}

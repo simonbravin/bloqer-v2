@@ -160,7 +160,7 @@ function candidateLocalDate(
   let y = year;
   let m = month;
   let d = clampDayOfMonth(y, m, dom);
-  let runAt = localDateTimeToUtc(y, m, d, hour, minute, timeZone);
+  const runAt = localDateTimeToUtc(y, m, d, hour, minute, timeZone);
   if (runAt.getTime() <= after.getTime()) {
     m += 1;
     if (m > 12) {

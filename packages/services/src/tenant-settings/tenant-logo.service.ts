@@ -10,6 +10,7 @@ import {
 } from "@bloqer/storage";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { canEditTenantDisplaySettings } from "./tenant-settings-guards";
 
 export const TENANT_LOGO_MAX_BYTES = 2 * 1024 * 1024;
@@ -136,6 +137,7 @@ export async function uploadTenantLogo(
   input: { originalFileName: string; mimeType: string; sizeBytes: number; content: Buffer },
   ctx: ServiceContext,
 ): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
   if (!canEditTenantDisplaySettings(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar el logo del tenant");
   }
@@ -164,13 +166,6 @@ export async function uploadTenantLogo(
     );
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { id: ctx.tenantId },
-    select: { id: true, logoStorageKey: true, logoMimeType: true },
-  });
-  if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-
-  const previousKey = tenant.logoStorageKey;
   const storageKey = buildTenantLogoStorageKey(ctx.tenantId, detected.ext);
   assertLogoScopedOrThrow(ctx.tenantId, storageKey);
 
@@ -180,13 +175,48 @@ export async function uploadTenantLogo(
     throw new ServiceError("VALIDATION", "Error al guardar el logo. Intentá de nuevo.");
   }
 
-  await prisma.tenant.update({
-    where: { id: ctx.tenantId },
-    data: {
-      logoStorageKey: storageKey,
-      logoMimeType: detected.mimeType,
-    },
-  });
+  let previousKey: string | null;
+  try {
+    previousKey = await prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+      const tenant = await tx.tenant.findFirst({
+        where: { id: ctx.tenantId },
+        select: { id: true, logoStorageKey: true, logoMimeType: true },
+      });
+      if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+
+      await tx.tenant.update({
+        where: { id: ctx.tenantId },
+        data: { logoStorageKey: storageKey, logoMimeType: detected.mimeType },
+      });
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "TENANT_LOGO_UPLOADED",
+        entityType: "Tenant",
+        entityId: ctx.tenantId,
+        before: { hasLogo: Boolean(tenant.logoStorageKey), mimeType: tenant.logoMimeType },
+        after: {
+          hasLogo: true,
+          mimeType: detected.mimeType,
+          originalFileName: input.originalFileName.slice(0, 120),
+        },
+        ipAddress: ctx.ipAddress,
+      }, tx);
+      return tenant.logoStorageKey;
+    });
+  } catch (error) {
+    // A lost commit response is ambiguous: never delete the tenant's current logo.
+    // If the database cannot confirm the pointer, leave the object for later cleanup.
+    try {
+      const current = await prisma.tenant.findFirst({
+        where: { id: ctx.tenantId },
+        select: { logoStorageKey: true },
+      });
+      if (current?.logoStorageKey !== storageKey) await deleteObject(storageKey);
+    } catch { /* best-effort cleanup */ }
+    throw error;
+  }
 
   if (
     previousKey &&
@@ -200,46 +230,47 @@ export async function uploadTenantLogo(
     }
   }
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "TENANT_LOGO_UPLOADED",
-    entityType: "Tenant",
-    entityId: ctx.tenantId,
-    before: {
-      hasLogo: Boolean(previousKey),
-      mimeType: tenant.logoMimeType,
-    },
-    after: {
-      hasLogo: true,
-      mimeType: detected.mimeType,
-      originalFileName: input.originalFileName.slice(0, 120),
-    },
-    ipAddress: ctx.ipAddress,
-  });
 }
 
 export async function removeTenantLogo(ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
   if (!canEditTenantDisplaySettings(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar el logo del tenant");
   }
 
-  const tenant = await prisma.tenant.findFirst({
-    where: { id: ctx.tenantId },
-    select: { id: true, logoStorageKey: true, logoMimeType: true },
+  const keyToDelete = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    const tenant = await tx.tenant.findFirst({
+      where: { id: ctx.tenantId },
+      select: { id: true, logoStorageKey: true, logoMimeType: true },
+    });
+    if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+    if (!tenant.logoStorageKey) return null;
+
+    await tx.tenant.update({
+      where: { id: ctx.tenantId },
+      data: { logoStorageKey: null, logoMimeType: null },
+    });
+
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "TENANT_LOGO_REMOVED",
+      entityType: "Tenant",
+      entityId: ctx.tenantId,
+      before: {
+        hasLogo: true,
+        mimeType: tenant.logoMimeType,
+        invalidKeyCleared: !isTenantLogoStorageKey(ctx.tenantId, tenant.logoStorageKey),
+      },
+      after: { hasLogo: false },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+    return tenant.logoStorageKey;
   });
-  if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  if (!tenant.logoStorageKey) return;
+  if (!keyToDelete) return;
 
-  const keyToDelete = tenant.logoStorageKey;
-  const keyWasValid = isTenantLogoStorageKey(ctx.tenantId, keyToDelete);
-
-  await prisma.tenant.update({
-    where: { id: ctx.tenantId },
-    data: { logoStorageKey: null, logoMimeType: null },
-  });
-
-  if (keyWasValid && isStorageConfigured()) {
+  if (isTenantLogoStorageKey(ctx.tenantId, keyToDelete) && isStorageConfigured()) {
     try {
       assertLogoScopedOrThrow(ctx.tenantId, keyToDelete);
       await deleteObject(keyToDelete);
@@ -248,18 +279,4 @@ export async function removeTenantLogo(ctx: ServiceContext): Promise<void> {
     }
   }
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "TENANT_LOGO_REMOVED",
-    entityType: "Tenant",
-    entityId: ctx.tenantId,
-    before: {
-      hasLogo: true,
-      mimeType: tenant.logoMimeType,
-      invalidKeyCleared: !keyWasValid,
-    },
-    after: { hasLogo: false },
-    ipAddress: ctx.ipAddress,
-  });
 }

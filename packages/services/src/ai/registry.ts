@@ -11,6 +11,12 @@ import {
 
 const DEFAULT_ALLOWED_RISKS: readonly AiToolRisk[] = ["READ"];
 
+// Tool definitions retain their specific input types before registry storage.
+// The heterogeneous registry validates arguments with that tool's schema before execution.
+type RegisterableAiTool = Omit<BloqerAiTool, "execute"> & {
+  execute: (...args: never[]) => ReturnType<BloqerAiTool["execute"]>;
+};
+
 export type RegistryListOptions = {
   risks?: readonly AiToolRisk[];
   /** When set, apply zero-trust advertise filter (deny by default per policy). */
@@ -22,7 +28,7 @@ export type RegistryListOptions = {
 export class BloqerAiToolRegistry {
   private readonly tools = new Map<string, BloqerAiTool>();
 
-  register(tool: BloqerAiTool<any>): void {
+  register(tool: RegisterableAiTool): void {
     if (this.tools.has(tool.name)) {
       throw new Error(`Duplicate AI tool: ${tool.name}`);
     }

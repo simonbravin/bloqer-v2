@@ -799,6 +799,7 @@
   3. **G4:** Helpers centrales en `packages/services/src/security/access.ts`: `canViewProjectFinancials*`, `canViewCompanyFinancials*`, `canViewTreasury`, `canAccessProject` / `requireProjectAccess`, `resolveAccessibleProjectScope`. Sin módulos comerciales nuevos todavía.
   4. **G3:** Tabla nueva `ProjectMembership` (no extender `ProjectTeamMember`). `Tenant.projectAccessMode`: `TENANT_WIDE` (default) | `MEMBERSHIP_SCOPED`. Tenants existentes = TENANT_WIDE (cero lockout). Activar SCOPED solo tras preparar memberships; OWNER/ADMIN (`APPROVE PROJECTS` / users) = bypass tenant-wide.
   5. Permiso = qué; membership = dónde. Ambos necesarios bajo SCOPED.
+- **Enmienda aprobada por el Owner (2026-11-03, Q-067 / AG-03):** al crear una obra bajo `MEMBERSHIP_SCOPED`, si el creador requiere asignación según sus roles actuales, se crea su `ProjectMembership` exclusivamente para esa obra nueva, en la misma transacción que la obra y `project.created`. No se agregan roles, no se asignan otras obras ni se modifican accesos históricos. Quien ya tiene acceso global conserva su comportamiento. `ProjectTeamMember` sigue siendo un roster independiente de avisos. Se reutilizan tablas y eventos existentes, sin migración.
 - **Implicancias:** migración `20260906180000_d111_project_membership_access_mode`; matrix VIEWER; procurement/AP/AR access helpers; `listProjects` + schedule/AI usan ACL; servicios de agregación deben aplicar `resolveAccessibleProjectScope` antes de sumar (rollout incremental).
 - **Documentos afectados:** este log, [`BLOQER_AI_RBAC_GAPS_DESIGN.md`](../BLOQER_AI_RBAC_GAPS_DESIGN.md), [`BLOQER_AI_SECURITY_SCORECARD.md`](../BLOQER_AI_SECURITY_SCORECARD.md), [`USER_ROLES.md`](./USER_ROLES.md), [`PERMISSIONS_MATRIX.md`](./PERMISSIONS_MATRIX.md), Guía §0.3 / ayuda.
 
@@ -1908,6 +1909,18 @@
 - **Base desconocida y límite técnico:** si falta una base de costo comparable de alguna partida, no se usa el subtotal conocido como denominador: físico global, observado y cobertura ponderada quedan no calculables; los conteos siguen disponibles. El costo cero conocido conserva su tratamiento sin peso. La ventana visible de evolución admite hasta 120 meses calendario para acotar la generación de series, sin limitar el acumulado anterior ni modificar reglas financieras.
 - **Acceso y distribución:** aplicar permisos y module gates por sección antes de construir resultados o archivos; misma base de datos, filtros y reglas en pantalla, CSV, Excel, PDF y adjuntos. No exponer costos o cobranzas restringidos por ubicarlos dentro de un reporte operativo.
 - **Documentos afectados:** Q-066/Q-005b, `PROGRESS_FORMULAS`, `REPORTING`, `REPORT_CATALOG`, `OPERATIONAL_REPORTS`, guía §13, centro de ayuda, knowledge y validación de Bloqer AI.
+
+---
+
+### D-121 — Cancelación del presupuesto antes de su aprobación
+
+- **Fecha:** 2026-11-04.
+- **Estado:** ACTIVA.
+- **Decidido por:** Owner, aprobación explícita de la propuesta AG-04 en este chat.
+- **Contexto:** el servicio permitía cancelar desde `DRAFT`, `IN_REVIEW` y `RETURNED_FOR_CHANGES`; el diagrama solo dibujaba el primer origen y el catálogo de eventos usaba `*`.
+- **Decisión:** conservar los tres orígenes actuales. Quien tenga `EDIT BUDGETS` y acceso a la obra puede cancelar desde **Borrador**, **En revisión** o **Con observaciones**, siempre que la obra admita planificación. `APPROVED`, `CLOSED` y `CANCELLED` no admiten cancelación.
+- **Efectos:** transición a `CANCELLED` y evento existente `budget.cancelled` en la misma transacción; se conservan presupuesto y documentos relacionados. Sin nuevos roles, campos, estados, eventos ni migraciones.
+- **Resolución:** Q-068, [propuesta aprobada](../08-architecture/platform-audit/2026-11-03-ag-04-budget-cancellation-proposal.md).
 
 ---
 

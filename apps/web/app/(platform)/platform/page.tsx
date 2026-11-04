@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { getPlatformDashboardSummaryExtended, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
+import { formatSubscriptionStatusLabel, formatTenantStatusLabel } from "@/lib/tenant-status-label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -39,19 +40,19 @@ export default async function PlatformHomePage() {
         </Card>
         <Card className="rounded-xl border bg-card shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Trials ≤7 días</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pruebas ≤7 días</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold">{s.trialsEndingWithin7Days}</CardContent>
         </Card>
         <Card className="rounded-xl border bg-card shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Trials vencidos</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Pruebas vencidas</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold">{s.trialsExpired}</CardContent>
         </Card>
         <Card className="rounded-xl border bg-card shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Sin OWNER activo</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Sin propietario activo</CardTitle>
           </CardHeader>
           <CardContent className="text-2xl font-bold">{s.tenantsWithoutActiveOwner}</CardContent>
         </Card>
@@ -63,7 +64,7 @@ export default async function PlatformHomePage() {
         <CardContent className="space-y-1 text-sm">
           {Object.entries(s.byTenantStatus).map(([k, v]) => (
             <p key={k}>
-              {k}: {v}
+              {formatTenantStatusLabel(k)}: {v}
             </p>
           ))}
         </CardContent>
@@ -75,7 +76,7 @@ export default async function PlatformHomePage() {
         <CardContent className="space-y-1 text-sm">
           {Object.entries(s.bySubscriptionStatus).map(([k, v]) => (
             <p key={k}>
-              {k}: {v}
+              {formatSubscriptionStatusLabel(k)}: {v}
               {k === "PAST_DUE" && v > 0 ? (
                 <span className="text-muted-foreground"> — revisar en Vencimientos</span>
               ) : null}

@@ -37,7 +37,7 @@ export function buildProjectWorkspaceNavSections(
 
   const resumen: ProjectWorkspaceNavLink[] = [];
   if (can(roles, "VIEW", "PROJECTS")) {
-    resumen.push({ label: "Resumen", href: base, matchExact: true });
+    if (gate.isEnabled("PROJECTS")) resumen.push({ label: "Resumen", href: base, matchExact: true });
     resumen.push({ label: "Pendientes", href: `${base}/pendientes` });
   }
   if (resumen.length) sections.push({ title: "Resumen", items: resumen });

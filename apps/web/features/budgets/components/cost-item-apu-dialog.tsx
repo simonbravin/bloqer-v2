@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -30,7 +30,7 @@ import { UnitSelect } from "./unit-select";
 import { CostAnalysisLineForm } from "./cost-analysis-line-form";
 import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
 import type { WbsViewNode, CostAnalysisLineView, CostItemView } from "@bloqer/services";
-import type { SaveCostItemApuInput, UpdateCostAnalysisLineInput } from "@bloqer/validators";
+import { isBudgetDecimalWithinStorage, type SaveCostItemApuInput, type UpdateCostAnalysisLineInput } from "@bloqer/validators";
 import type { CostCategory } from "@bloqer/database";
 import {
   APU_GLOBAL_UNIT,
@@ -39,14 +39,16 @@ import {
   isGlobalUnit,
   migrateLegacyLumpToGlobalResource,
   normalizeStoredApuLineForItemQuantity,
-  previewApuEntry,
   recomputeLumpForItemQuantity,
   recomputeResourceForItemQuantity,
   toEntryApuLine,
-  toStoredApuLine,
   type ApuEntryMode,
 } from "@bloqer/domain";
-import { apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
+import { apuLinePartidaMoney, apuResourceQtyDisplay } from "../lib/wbs-apu-detail";
+import { useBudgetAction } from "../lib/use-budget-action";
+import { addDecimal, compareDecimal, divideDecimal, multiplyDecimal, roundQty, serializeMoney } from "@bloqer/utils";
+import { computeApuUnitContribution } from "@bloqer/services/budget-apu-calc";
+import { previewMoneyApuEntry as previewApuEntry, toStoredMoneyApuLine as toStoredApuLine } from "../lib/apu-money";
 
 type LocalLine = CostAnalysisLineView & {
   _isNew?: boolean;
@@ -65,7 +67,11 @@ function buildApuSnapshot(
     notes,
     lines: lines
       .filter((l) => !l._deleted)
-      .map(({ _isNew, _deleted, ...rest }) => rest),
+      .map(({ _isNew, _deleted, ...rest }) => {
+        void _isNew;
+        void _deleted;
+        return rest;
+      }),
   });
 }
 
@@ -91,16 +97,9 @@ function displayResourceQtyLabel(line: LocalLine, itemQty: number): string {
   return formatQtyFromString(String(d.qty));
 }
 
-/** Partida money for dialog table — resource uses cant×precio (stable while typing qty). */
+/** D-047: monetary contribution stored per item unit is authoritative. */
 function displayPartidaLineTotal(line: LocalLine, itemQty: number): number {
-  const unitContribution = parseFloat(line.totalCost) || 0;
-  if (line.isLumpSum) return unitContribution * itemQty;
-  if (line.partidaQuantity != null && line.partidaQuantity !== "") {
-    const pq = parseFloat(line.partidaQuantity) || 0;
-    const price = parseFloat(line.unitCost) || 0;
-    return pq * price;
-  }
-  return unitContribution * itemQty;
+  return apuLinePartidaMoney(line, itemQty);
 }
 
 /**
@@ -136,7 +135,7 @@ function migrateLegacyLumpLine(line: LocalLine, itemQty: number): LocalLine {
     unit: APU_GLOBAL_UNIT,
     coefficient: String(stored.coefficient),
     unitCost: String(stored.unitCost),
-    totalCost: String(stored.totalCost),
+    totalCost: computeApuUnitContribution(stored, itemQty),
     partidaQuantity: stored.partidaQuantity != null ? String(stored.partidaQuantity) : null,
     isLumpSum: false,
   };
@@ -161,11 +160,12 @@ function recomputeLocalLinesForItemQty(
 
     if (isLumpSum) {
       const next = recomputeLumpForItemQuantity(totalCost * oldQty, newQty);
+      const contribution = divideDecimal(multiplyDecimal(line.totalCost, String(oldQty)), String(newQty));
       return {
         ...line,
         coefficient: String(next.coefficient),
-        unitCost: String(next.unitCost),
-        totalCost: String(next.totalCost),
+        unitCost: contribution,
+        totalCost: contribution,
         partidaQuantity: String(next.partidaQuantity),
         isLumpSum: true,
       };
@@ -179,7 +179,7 @@ function recomputeLocalLinesForItemQty(
         ...line,
         coefficient: String(next.coefficient),
         unitCost: String(next.unitCost),
-        totalCost: String(next.totalCost),
+        totalCost: computeApuUnitContribution(next, newQty),
         partidaQuantity: String(next.partidaQuantity),
         isLumpSum: false,
       };
@@ -192,10 +192,18 @@ function recomputeLocalLinesForItemQty(
       ...line,
       coefficient: String(next.coefficient),
       unitCost: String(next.unitCost),
-      totalCost: String(next.totalCost),
+      totalCost: computeApuUnitContribution(next, newQty),
       partidaQuantity: null,
       isLumpSum: false,
     };
+  });
+}
+
+function prepareApuLinesForSave(lines: LocalLine[], oldQty: number, newQty: number): LocalLine[] {
+  return recomputeLocalLinesForItemQty(lines, oldQty, newQty).map((line) => {
+    if (line._deleted) return line;
+    const migrated = migrateLegacyLumpLine(line, newQty);
+    return { ...migrated, totalCost: computeApuUnitContribution(migrated, newQty) };
   });
 }
 
@@ -222,7 +230,8 @@ export function CostItemApuDialog({
   onSaveApu,
 }: CostItemApuDialogProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const formId = useId();
+  const { isPending, isRunning, run: startTransition } = useBudgetAction(toast.error);
   const [activeTab, setActiveTab] = useState<VisibleCostCategory>("MATERIAL");
   const [editLine, setEditLine] = useState<LocalLine | null>(null);
 
@@ -283,7 +292,7 @@ export function CostItemApuDialog({
 
   /** Apply qty change to local APU lines (blur / save) — not on every keystroke. */
   function syncLinesToQuantity(nextQtyRaw: number): LocalLine[] {
-    if (!(nextQtyRaw > 0) || !(linesQtyBasis > 0) || nextQtyRaw === linesQtyBasis) {
+    if (!(nextQtyRaw > 0) || nextQtyRaw === linesQtyBasis) {
       return lines;
     }
     const next = recomputeLocalLinesForItemQty(lines, linesQtyBasis, nextQtyRaw);
@@ -292,10 +301,16 @@ export function CostItemApuDialog({
     return next;
   }
 
+  const hasDraftLine = Boolean(newDesc.trim() || (parseFloat(newUnitCost) || 0) !== 0 || (parseFloat(newCoef) || 0) !== 1);
   const isDirty = useMemo(() => {
     if (!costItem || !initialSnapshot) return false;
-    return buildApuSnapshot(unit, quantity, notes, lines) !== initialSnapshot;
-  }, [costItem, unit, quantity, notes, lines, initialSnapshot]);
+    return hasDraftLine || buildApuSnapshot(unit, quantity, notes, lines) !== initialSnapshot;
+  }, [costItem, unit, quantity, notes, lines, initialSnapshot, hasDraftLine]);
+  const qtyN = parseFloat(quantity) || 0;
+  const previewLines = useMemo(() => isDirty && qtyN > 0
+    ? prepareApuLinesForSave(lines, linesQtyBasis, qtyN)
+    : lines, [isDirty, lines, linesQtyBasis, qtyN]);
+  const recalculatesMoney = isDirty && previewLines.some((line, index) => !line._deleted && compareDecimal(line.totalCost, lines[index]!.totalCost) !== 0);
 
   const unitByCategory = useMemo(() => {
     const amounts = {
@@ -304,26 +319,20 @@ export function CostItemApuDialog({
       EQUIPMENT: 0,
       SUBCONTRACT: 0,
     };
-    for (const line of lines) {
+    for (const line of previewLines) {
       if (line._deleted || line.category === "OTHER") continue;
       if (line.category in amounts) {
         amounts[line.category as VisibleCostCategory] += parseFloat(line.totalCost) || 0;
       }
     }
     return amounts;
-  }, [lines]);
+  }, [previewLines]);
 
   const unitCostDirect = useMemo(() => {
-    return (
-      unitByCategory.MATERIAL +
-      unitByCategory.LABOR +
-      unitByCategory.EQUIPMENT +
-      unitByCategory.SUBCONTRACT
-    );
-  }, [unitByCategory]);
+    return serializeMoney(previewLines.filter((line) => !line._deleted).reduce((total, line) => addDecimal(total, line.totalCost), "0"));
+  }, [previewLines]);
 
-  const qtyN = parseFloat(quantity) || 0;
-  const totalProjectCost = unitCostDirect * qtyN;
+  const totalProjectCost = serializeMoney(multiplyDecimal(unitCostDirect, roundQty(qtyN)));
   const entryPreview = useMemo(
     () =>
       previewApuEntry({
@@ -336,10 +345,11 @@ export function CostItemApuDialog({
     [entryMode, newCoef, newUnitCost, qtyN],
   );
 
-  const visibleLines = lines.filter((l) => !l._deleted && l.category === activeTab);
-  const legacyOtherLines = lines.filter((l) => !l._deleted && l.category === "OTHER");
+  const visibleLines = previewLines.filter((l) => !l._deleted && l.category === activeTab);
+  const legacyOtherLines = previewLines.filter((l) => !l._deleted && l.category === "OTHER");
 
   function requestClose(next: boolean) {
+    if (!next && isRunning()) return;
     if (!next && isDirty) {
       if (!confirm("Hay cambios sin guardar. ¿Cerrar igualmente?")) return;
     }
@@ -347,6 +357,7 @@ export function CostItemApuDialog({
   }
 
   function addInlineLine() {
+    if (!editable || isRunning()) return;
     if (!costItem || !newDesc.trim()) {
       toast.error("Ingresá una descripción");
       return;
@@ -364,6 +375,14 @@ export function CostItemApuDialog({
     const baseLines = syncLinesToQuantity(itemQty);
     const coefInput = parseFloat(newCoef) || 0;
     const ucInput = parseFloat(newUnitCost) || 0;
+    if (!Number.isFinite(coefInput) || !Number.isFinite(ucInput) || coefInput < 0 || ucInput < 0) {
+      toast.error("La cantidad de recurso y el precio deben ser números mayores o iguales a 0");
+      return;
+    }
+    if (![coefInput, ucInput, itemQty].every(isBudgetDecimalWithinStorage)) {
+      toast.error("El valor supera la capacidad del presupuesto");
+      return;
+    }
     // UI only exposes resource path; Global (`gl`) is non-purchasable via materials board.
     const stored = toStoredApuLine({
       mode: entryMode,
@@ -372,6 +391,10 @@ export function CostItemApuDialog({
       unitCost: ucInput,
       itemQuantity: itemQty,
     });
+    if (!isBudgetDecimalWithinStorage(stored.totalCost)) {
+      toast.error("El costo supera la capacidad del presupuesto");
+      return;
+    }
     const tempId = `temp_${crypto.randomUUID()}`;
     setLines([
       ...baseLines,
@@ -421,31 +444,36 @@ export function CostItemApuDialog({
   }
 
   function markDelete(lineId: string) {
+    if (!editable || isRunning()) return;
     setLines((prev) =>
       prev.map((l) => (l.id === lineId ? { ...l, _deleted: true } : l)),
     );
   }
 
   function handleSave() {
-    if (!costItem || !initialSnapshot) return;
+    if (!editable || !costItem || !initialSnapshot || isRunning()) return;
+    if (hasDraftLine) {
+      toast.error("Agregá la línea APU que estás cargando antes de guardar los cambios");
+      return;
+    }
     const qty = parseQuantityInput(quantity);
-    if (qty !== undefined && qty <= 0) {
+    if (qty === undefined || !Number.isFinite(qty) || qty <= 0) {
       toast.error("La cantidad del ítem debe ser mayor a 0");
+      return;
+    }
+    if (!unit.trim()) {
+      toast.error("Elegí la unidad del ítem");
       return;
     }
     startTransition(async () => {
       const qtyForLines = qty ?? (parseFloat(quantity) || linesQtyBasis);
       const syncedLines = syncLinesToQuantity(qtyForLines);
       // [D-047] Persist-time: legacy Monto global → resource + gl (lazy if never edited).
-      const linesForSave = syncedLines.map((l) =>
-        l._deleted ? l : migrateLegacyLumpLine(l, qtyForLines),
-      );
-      if (linesForSave.some((l, i) => l !== syncedLines[i])) {
-        setLines(linesForSave);
-      }
+      const linesForSave = prepareApuLinesForSave(syncedLines, qtyForLines, qtyForLines);
+      setLines(linesForSave);
       const payload: SaveCostItemApuInput = {
         costItemId: costItem.id,
-        unit: unit || undefined,
+        unit: unit.trim(),
         quantity: qty,
         notes: notes || null,
         lines: linesForSave
@@ -489,8 +517,8 @@ export function CostItemApuDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={requestClose}>
-        <DialogContent className="flex max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0">
-          <div className="border-b px-5 py-3 pr-12">
+        <DialogContent className="flex min-h-0 max-h-[90vh] max-w-5xl flex-col gap-0 overflow-hidden p-0" closeButtonDisabled={isPending} aria-busy={isPending}>
+          <div className="shrink-0 border-b px-5 py-3 pr-12">
             <DialogTitle className="text-base">
               APU — Análisis de precio unitario
             </DialogTitle>
@@ -504,7 +532,9 @@ export function CostItemApuDialog({
             ) : null}
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto px-5 py-3">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-5 py-3">
+          <fieldset disabled={isPending} className="min-w-0 space-y-3">
+            {recalculatesMoney && <p role="status" className="rounded-md border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">Vista previa al guardar: aportes del APU recalculados a 2 decimales.</p>}
             {/* 1. Datos del ítem */}
             <section className="form-section space-y-2 p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -517,17 +547,18 @@ export function CostItemApuDialog({
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <div className="space-y-0.5">
-                  <Label className="text-[11px]">Unidad</Label>
+                  <Label htmlFor={`${formId}-unit`} className="text-[11px]">Unidad</Label>
                   {editable ? (
-                    <UnitSelect value={unit} onChange={setUnit} className="h-8" />
+                    <UnitSelect id={`${formId}-unit`} value={unit} onChange={setUnit} className="h-8" />
                   ) : (
                     <p className="text-sm font-medium">{unit || "—"}</p>
                   )}
                 </div>
                 <div className="space-y-0.5">
-                  <Label className="text-[11px]">Cantidad</Label>
+                  <Label htmlFor={`${formId}-quantity`} className="text-[11px]">Cantidad</Label>
                   {editable ? (
                     <DecimalInput
+                      id={`${formId}-quantity`}
                       value={quantity}
                       onValueChange={(v) => {
                         quantityRef.current = v;
@@ -558,8 +589,9 @@ export function CostItemApuDialog({
               </div>
               {editable ? (
                 <div className="space-y-0.5">
-                  <Label className="text-[11px]">Notas</Label>
+                  <Label htmlFor={`${formId}-notes`} className="text-[11px]">Notas</Label>
                   <Textarea
+                    id={`${formId}-notes`}
                     rows={1}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -613,6 +645,7 @@ export function CostItemApuDialog({
                       type="button"
                       size="sm"
                       variant={activeTab === cat ? "default" : "outline"}
+                      aria-pressed={activeTab === cat}
                       className="h-7 text-xs"
                       onClick={() => setActiveTab(cat)}
                     >
@@ -643,8 +676,9 @@ export function CostItemApuDialog({
                   </p>
                   <div className="grid gap-2 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
                     <div className="space-y-0.5">
-                      <Label className="text-[11px]">Descripción</Label>
+                      <Label htmlFor={`${formId}-new-description`} className="text-[11px]">Descripción</Label>
                       <Input
+                        id={`${formId}-new-description`}
                         value={newDesc}
                         onChange={(e) => setNewDesc(e.target.value)}
                         placeholder="Nombre"
@@ -652,24 +686,26 @@ export function CostItemApuDialog({
                       />
                     </div>
                     <div className="space-y-0.5">
-                      <Label className="text-[11px]" title="Global = importe sin cantidad comprable">
+                      <Label htmlFor={`${formId}-new-unit`} className="text-[11px]" title="Global = importe sin cantidad comprable">
                         Unidad
                       </Label>
-                      <UnitSelect value={newUnit} onChange={setNewUnit} className="h-8" />
+                      <UnitSelect id={`${formId}-new-unit`} value={newUnit} onChange={setNewUnit} className="h-8" />
                     </div>
                     <div className="space-y-0.5">
-                      <Label className="text-[11px]">
+                      <Label htmlFor={`${formId}-new-coefficient`} className="text-[11px]">
                         {entryMode === "total" ? "Cant. recurso" : "Rendim."}
                       </Label>
                       <DecimalInput
+                        id={`${formId}-new-coefficient`}
                         value={newCoef}
                         onValueChange={setNewCoef}
                         className="h-8 font-mono"
                       />
                     </div>
                     <div className="space-y-0.5">
-                      <Label className="text-[11px]">Precio</Label>
+                      <Label htmlFor={`${formId}-new-price`} className="text-[11px]">Precio</Label>
                       <DecimalInput
+                        id={`${formId}-new-price`}
                         value={newUnitCost}
                         onValueChange={setNewUnitCost}
                         className="h-8 font-mono"
@@ -745,6 +781,7 @@ export function CostItemApuDialog({
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7"
+                                  aria-label={`Editar ${line.description}`}
                                   onClick={() => setEditLine(line)}
                                 >
                                   <Pencil className="h-3 w-3" />
@@ -753,6 +790,7 @@ export function CostItemApuDialog({
                                   variant="ghost"
                                   size="icon"
                                   className="h-7 w-7 text-destructive"
+                                  aria-label={`Quitar ${line.description}`}
                                   onClick={() => markDelete(line.id)}
                                 >
                                   <Trash2 className="h-3 w-3" />
@@ -768,20 +806,22 @@ export function CostItemApuDialog({
               )}
 
               {legacyOtherLines.length > 0 && (
-                <div className="space-y-1.5 rounded-md border border-amber-200 bg-amber-50/50 p-2">
-                  <p className="text-[11px] font-medium text-amber-900">Líneas legacy (Otros)</p>
+                <div className="space-y-1.5 rounded-md border border-amber-200 bg-amber-50/50 p-2 dark:border-amber-900 dark:bg-amber-950/20">
+                  <p className="text-[11px] font-medium text-amber-900 dark:text-amber-100">Líneas legacy (Otros), incluidas en el costo directo</p>
                   {legacyOtherLines.map((line) => (
                     <div key={line.id} className="flex items-center justify-between text-xs">
                       <span>{line.description}</span>
                       <Badge variant="secondary">{CATEGORY_LABELS.OTHER}</Badge>
+                      <span className="font-mono">{fmtMoney(line.totalCost, currency)} /u</span>
                     </div>
                   ))}
                 </div>
               )}
             </section>
+          </fieldset>
           </div>
 
-          <div className="flex justify-end gap-2 border-t px-5 py-2.5">
+          <div className="flex shrink-0 justify-end gap-2 border-t px-5 py-2.5">
             <Button type="button" variant="outline" onClick={() => requestClose(false)} disabled={isPending}>
               Cancelar
             </Button>

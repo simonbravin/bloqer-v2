@@ -15,6 +15,7 @@ export function isPlausibleInvitationEmail(email: string): boolean {
 
 /** Opaque accept URL — token is stashed in httpOnly cookie by middleware, never in the query. */
 export function buildInvitationAcceptCallbackUrl(_token?: string): string {
+  void _token;
   return "/invitaciones/aceptar";
 }
 

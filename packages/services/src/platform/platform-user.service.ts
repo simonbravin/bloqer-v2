@@ -1,5 +1,5 @@
 import type { UserRole } from "@bloqer/domain";
-import { prisma } from "@bloqer/database";
+import { prisma, type UserStatus } from "@bloqer/database";
 import { ServiceError } from "../types";
 import { assertPlatformAccess, type PlatformServiceContext } from "./platform-auth.service";
 
@@ -10,6 +10,7 @@ export type PlatformTenantUserRow = {
   name: string | null;
   roles: UserRole[];
   membershipStatus: string;
+  userStatus: UserStatus;
 };
 
 export async function listPlatformTenantUsers(
@@ -28,7 +29,7 @@ export async function listPlatformTenantUsers(
       id: true,
       status: true,
       roles: true,
-      user: { select: { id: true, email: true, name: true } },
+      user: { select: { id: true, email: true, name: true, status: true } },
     },
   });
   return rows.map((m) => ({
@@ -38,5 +39,6 @@ export async function listPlatformTenantUsers(
     name:         m.user.name,
     roles:        m.roles as UserRole[],
     membershipStatus: m.status,
+    userStatus: m.user.status,
   }));
 }

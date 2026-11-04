@@ -2,7 +2,7 @@ import "server-only";
 
 import { compare, hash } from "bcryptjs";
 import { getPublicAppBaseUrl, isEmailConfigured } from "@bloqer/config";
-import { prisma, type UserStatus } from "@bloqer/database";
+import { Prisma, prisma, type UserStatus } from "@bloqer/database";
 import {
   renderAuthEmailHtml,
   renderAuthEmailText,
@@ -35,6 +35,8 @@ import {
 } from "./credentials-token";
 
 const BCRYPT_COST = 12;
+// Separate lock namespace from first-tenant onboarding (824_014_001).
+const AUTH_TOKEN_ADVISORY_CLASS_ID = 824_014_002;
 
 /** Precomputed bcrypt of a fixed dummy string — keeps compare timing similar when user/hash missing. */
 const DUMMY_PASSWORD_HASH =
@@ -97,15 +99,12 @@ async function hashPassword(password: string): Promise<string> {
   return hash(password, BCRYPT_COST);
 }
 
-async function deleteTokensForIdentifier(identifier: string): Promise<void> {
-  await prisma.verificationToken.deleteMany({ where: { identifier } });
-}
-
-async function findLatestTokenRow(identifier: string) {
-  return prisma.verificationToken.findFirst({
-    where: { identifier },
-    orderBy: { expires: "desc" },
-  });
+async function lockAuthIdentity(tx: Prisma.TransactionClient, emailNorm: string): Promise<void> {
+  // One identity lock for both token purposes keeps issuance, consumption and
+  // takeover in the same lock order, including cross-purpose token cleanup.
+  await tx.$executeRaw(
+    Prisma.sql`SELECT pg_advisory_xact_lock(${AUTH_TOKEN_ADVISORY_CLASS_ID}::integer, hashtext(${emailNorm}::text))`,
+  );
 }
 
 function cooldownActive(expiresAt: Date, ttlMs: number): boolean {
@@ -119,21 +118,27 @@ async function issueAuthToken(params: {
   ttlMs: number;
 }): Promise<{ rawToken: string; expires: Date } | { cooldown: true }> {
   const identifier = authTokenIdentifier(params.purpose, params.emailNorm);
-  const existing = await findLatestTokenRow(identifier);
-  if (existing && existing.expires > new Date() && cooldownActive(existing.expires, params.ttlMs)) {
-    return { cooldown: true };
-  }
+  return prisma.$transaction(async (tx) => {
+    // Serialize issuance before checking cooldown; concurrent requests must not
+    // both delete/create and leave multiple active links or bypass the cooldown.
+    await lockAuthIdentity(tx, params.emailNorm);
+    const existing = await tx.verificationToken.findFirst({
+      where: { identifier },
+      orderBy: { expires: "desc" },
+    });
+    if (existing && existing.expires > new Date() && cooldownActive(existing.expires, params.ttlMs)) {
+      return { cooldown: true as const };
+    }
 
-  const rawToken = generateRawAuthToken();
-  const tokenHash = hashAuthToken(rawToken);
-  const expires = new Date(Date.now() + params.ttlMs);
-
-  await deleteTokensForIdentifier(identifier);
-  await prisma.verificationToken.create({
-    data: { identifier, token: tokenHash, expires },
+    const rawToken = generateRawAuthToken();
+    const tokenHash = hashAuthToken(rawToken);
+    const expires = new Date(Date.now() + params.ttlMs);
+    await tx.verificationToken.deleteMany({ where: { identifier } });
+    await tx.verificationToken.create({
+      data: { identifier, token: tokenHash, expires },
+    });
+    return { rawToken, expires };
   });
-
-  return { rawToken, expires };
 }
 
 async function dispatchAuthEmail(params: {
@@ -325,6 +330,7 @@ export async function verifyEmailWithToken(
     const emailNorm = row.identifier.slice(prefix.length);
     if (!emailNorm.includes("@")) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
 
+    await lockAuthIdentity(tx, emailNorm);
     const user = await tx.user.findUnique({
       where: { email: emailNorm },
       select: { id: true, emailVerified: true, status: true },
@@ -337,21 +343,22 @@ export async function verifyEmailWithToken(
     }
 
     const deleted = await tx.verificationToken.deleteMany({
-      where: { identifier: row.identifier, token: tokenHash },
+      where: { identifier: row.identifier, token: tokenHash, expires: { gt: new Date() } },
     });
     if (deleted.count === 0) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
 
-    if (!user.emailVerified || user.status !== "ACTIVE") {
-      await tx.user.update({
-        where: { id: user.id },
-        data: {
-          emailVerified: user.emailVerified ?? new Date(),
-          status: "ACTIVE",
-        },
-      });
-    }
-
-    return { ok: true as const };
+    const updated = await tx.user.updateMany({
+      where: { id: user.id, status: { in: ["ACTIVE", "INVITED"] } },
+      data: {
+        emailVerified: user.emailVerified ?? new Date(),
+        status: "ACTIVE",
+      },
+    });
+    // The status predicate is rechecked by PostgreSQL after a concurrent update.
+    // A token must never reactivate an account suspended after the initial read.
+    return updated.count === 1
+      ? { ok: true as const }
+      : { ok: false as const, error: GENERIC_VERIFY_FAIL };
   });
 }
 
@@ -470,6 +477,7 @@ export async function resetPasswordWithToken(
     const emailNorm = row.identifier.slice(prefix.length);
     if (!emailNorm.includes("@")) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
 
+    await lockAuthIdentity(tx, emailNorm);
     const user = await tx.user.findUnique({
       where: { email: emailNorm },
       select: { id: true, status: true },
@@ -483,12 +491,12 @@ export async function resetPasswordWithToken(
     }
 
     const deleted = await tx.verificationToken.deleteMany({
-      where: { identifier: row.identifier, token: tokenHash },
+      where: { identifier: row.identifier, token: tokenHash, expires: { gt: new Date() } },
     });
     if (deleted.count === 0) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
 
-    await tx.user.update({
-      where: { id: user.id },
+    const updated = await tx.user.updateMany({
+      where: { id: user.id, status: { in: ["ACTIVE", "INVITED"] } },
       data: {
         passwordHash,
         passwordUpdatedAt: now,
@@ -496,10 +504,16 @@ export async function resetPasswordWithToken(
         status: "ACTIVE",
       },
     });
+    if (updated.count !== 1) return { ok: false as const, error: GENERIC_VERIFY_FAIL };
 
     await tx.verificationToken.deleteMany({
       where: {
-        identifier: authTokenIdentifier(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, emailNorm),
+        identifier: {
+          in: [
+            authTokenIdentifier(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, emailNorm),
+            authTokenIdentifier(AUTH_TOKEN_PURPOSE.PASSWORD_RESET, emailNorm),
+          ],
+        },
       },
     });
 
@@ -566,24 +580,35 @@ export async function takeoverUnverifiedCredentialsStub(params: {
     return { userId: user.id, tookOver: false };
   }
 
-  const now = new Date();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      email: emailNorm,
-      emailVerified: now,
-      status: "ACTIVE",
-      // Prevent attacker who created the stub from keeping a known password after Google proves ownership.
-      passwordHash: null,
-      passwordUpdatedAt: now,
-      name: params.name ?? undefined,
-      image: params.image ?? undefined,
-    },
+  return prisma.$transaction(async (tx) => {
+    await lockAuthIdentity(tx, emailNorm);
+    const now = new Date();
+    const updated = await tx.user.updateMany({
+      where: {
+        id: user.id,
+        email: user.email,
+        emailVerified: null,
+        status: { in: ["ACTIVE", "INVITED"] },
+        accounts: { none: { provider: { not: "credentials" } } },
+      },
+      data: {
+        email: emailNorm,
+        emailVerified: now,
+        status: "ACTIVE",
+        // Prevent attacker who created the stub from keeping a known password after Google proves ownership.
+        passwordHash: null,
+        passwordUpdatedAt: now,
+        name: params.name ?? undefined,
+        image: params.image ?? undefined,
+      },
+    });
+    if (updated.count !== 1) return { userId: user.id, tookOver: false };
+
+    await tx.verificationToken.deleteMany({
+      where: { identifier: authTokenIdentifier(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, emailNorm) },
+    });
+    return { userId: user.id, tookOver: true };
   });
-
-  await deleteTokensForIdentifier(authTokenIdentifier(AUTH_TOKEN_PURPOSE.EMAIL_VERIFY, emailNorm));
-
-  return { userId: user.id, tookOver: true };
 }
 
 export type UserAuthGate = {

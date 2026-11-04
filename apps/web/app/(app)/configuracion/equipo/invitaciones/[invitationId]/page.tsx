@@ -11,6 +11,7 @@ import {
   canEditTeamMembership,
   canReadTenantConfigArea,
   getTenantInvitationById,
+  getTenantModuleGate,
   ServiceError,
 } from "@bloqer/services";
 import { cancelTenantInvitationAction } from "../../invitation-actions";
@@ -61,7 +62,8 @@ export default async function ConfiguracionEquipoInvitacionDetallePage({ params 
   const flashLink = c.get(TENANT_INVITE_LINK_FLASH_COOKIE)?.value ?? null;
   const flashEmailNote = c.get(TENANT_INVITE_EMAIL_FLASH_COOKIE)?.value ?? null;
 
-  const canEdit = canEditTeamMembership(current.tenantCtx.roles);
+  const gate = await getTenantModuleGate(ctx);
+  const canEdit = canEditTeamMembership(current.tenantCtx.roles) && gate.isEnabled("USERS_PERMISSIONS");
 
   return (
     <PageShell variant="form" className="space-y-6" breadcrumbLabel={inv.email}>

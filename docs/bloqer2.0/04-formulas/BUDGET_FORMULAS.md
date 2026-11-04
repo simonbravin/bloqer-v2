@@ -85,7 +85,11 @@ En el motor de ítems, la base es el **subtotal 1** (costo directo unitario + GG
 | **CF_pres** | \(10.000.000 \times 0{,}40 \times \frac{180}{365}\) ≈ **ARS 1.972.603** |
 
 ## Vigencia de variables ante estados del Budget
-Cantidades, PU de venta, análisis de costo y parámetros de `BudgetSettings` **solo se editan** con `Budget` en `DRAFT` (o bajo `IN_REVIEW` si el workflow lo permite). En `APPROVED` la estructura económica está **bloqueada** ([BR-BUD-006]); en `CLOSED` el cómputo contractual no cambia sin **Adenda** y budget complementario ([BR-BUD-002]).
+Cantidades, PU de venta, análisis de costo y parámetros de `BudgetSettings` se editan en `DRAFT` y `RETURNED_FOR_CHANGES`. En `IN_REVIEW` la economía permanece bloqueada ([D-030]). En `APPROVED` se bloquea por defecto ([BR-BUD-006]); la excepción [D-088] permite editarla únicamente con los interruptores de tenant **y** obra encendidos y permiso `EDIT BUDGETS`. `CLOSED` nunca se desbloquea: el cómputo contractual cambia mediante **Adenda** y budget complementario ([BR-BUD-002]). La obra debe admitir planificación (`DRAFT` o `ACTIVE`, [D-042]).
+
+## Hallazgo — AG-04: vigencia de estados
+
+La redacción anterior permitía interpretar edición económica durante `IN_REVIEW` y omitía `RETURNED_FOR_CHANGES` y la excepción D-088. Se reconcilia con la [tabla canónica de Budget](../01-domain/STATE_MACHINES.md#32-tabla--estado-del-presupuesto-vs-ediciones-permitidas), sin cambiar las fórmulas ni las decisiones vigentes.
 
 ## Referencias
 - [`../02-modules/BUDGETS.md`](../02-modules/BUDGETS.md)

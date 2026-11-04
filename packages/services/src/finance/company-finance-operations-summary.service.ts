@@ -1,4 +1,4 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { prisma } from "@bloqer/database";
 import { canViewCompanyAp } from "../ap/ap-access";
 import {
   aggregateCorporatePayableOperations,

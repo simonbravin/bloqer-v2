@@ -1,14 +1,13 @@
 /**
  * D-111 Phase B — live MEMBERSHIP_SCOPED matrix against Neon DEV.
  *
- * Gated: BLOQER_AI_LIVE_DB=1 (same as AI isolation) or BLOQER_D111_LIVE=1
- * Never production. Seeds SCOPED fixtures idempotently.
+ * Gated: BLOQER_AI_LIVE_DB=1 or BLOQER_D111_LIVE=1, plus an explicit isolated audit database.
+ * Never ordinary development or production. Seeds SCOPED fixtures idempotently.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { UserRole } from "@bloqer/database";
+import { assertAuditDatabaseIdentity, assertAuditFixtureDatabase } from "../testing/audit-fixture";
 import { AI_ADV } from "./fixtures/adversarial-ids";
 import {
   restoreTenantATenantWide,
@@ -40,36 +39,7 @@ import {
 } from "../security/access";
 import { ServiceError, type ServiceContext } from "../types";
 
-function loadEnvIfNeeded(): void {
-  if (process.env.DATABASE_URL) return;
-  for (const p of [resolve(process.cwd(), "../../.env"), resolve(process.cwd(), ".env")]) {
-    try {
-      for (const line of readFileSync(p, "utf8").split(/\r?\n/)) {
-        const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-        if (!m) continue;
-        let v = m[2]!;
-        if (
-          (v.startsWith('"') && v.endsWith('"')) ||
-          (v.startsWith("'") && v.endsWith("'"))
-        ) {
-          v = v.slice(1, -1);
-        }
-        if (process.env[m[1]!] === undefined) process.env[m[1]!] = v;
-      }
-      return;
-    } catch {
-      /* next */
-    }
-  }
-}
-
 const live = process.env.BLOQER_AI_LIVE_DB === "1" || process.env.BLOQER_D111_LIVE === "1";
-
-function assertNonProd(): void {
-  const url = process.env.DATABASE_URL ?? "";
-  assert.ok(!url.includes("ep-cold-mouse-appkpn84"), "refusing production Neon");
-  assert.ok(url.includes("ep-curly-math") || url.includes("localhost"), `expected DEV host, got ${url.slice(0, 80)}`);
-}
 
 function svc(
   tenantId: string,
@@ -105,9 +75,9 @@ describe("D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)", { skip: !live }, () =
   const t0 = { listProjectsMs: 0, dashboardMs: 0, scopeTwiceMs: 0 };
 
   before(async () => {
-    loadEnvIfNeeded();
-    assertNonProd();
+    assertAuditFixtureDatabase();
     ({ prisma } = await import("@bloqer/database"));
+    await assertAuditDatabaseIdentity(prisma);
     fx = await seedD111ScopedFixtures(prisma);
     const mode = await prisma.tenant.findUniqueOrThrow({
       where: { id: fx.tenantAId },
@@ -117,7 +87,7 @@ describe("D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)", { skip: !live }, () =
   });
 
   after(async () => {
-    // Leave Tenant A SCOPED for DEV validation (documented). Restore only if env asks.
+    // Keep only this disposable database's synthetic tenant SCOPED unless explicitly restoring it.
     if (process.env.BLOQER_D111_RESTORE_TENANT_WIDE === "1" && fx) {
       await restoreTenantATenantWide(prisma, fx.tenantAId);
     }
@@ -128,6 +98,7 @@ describe("D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)", { skip: !live }, () =
     console.log(
       `perf listProjects=${t0.listProjectsMs}ms dashboard=${t0.dashboardMs}ms scopeMemo=${t0.scopeTwiceMs}ms`,
     );
+    if (prisma) await prisma.$disconnect();
   });
 
   function mark(key: string, ok: boolean): void {
@@ -237,7 +208,7 @@ describe("D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)", { skip: !live }, () =
 
   it("aggregate: field pending + portfolio + dashboard KPIs scoped", async () => {
     const ctx = svc(fx.tenantAId, fx.pmAUserId, ["PROJECT_MANAGER"]);
-    const counts = await getMyFieldPendingCounts(ctx);
+    await getMyFieldPendingCounts(ctx);
     // Must not include A2 submitted PRs/OCs — counts can be >0 for A1 only
     const fieldProjects = await listFieldProjects(ctx);
     assert.ok(fieldProjects.every((p) => p.id !== fx.projectA2Id));

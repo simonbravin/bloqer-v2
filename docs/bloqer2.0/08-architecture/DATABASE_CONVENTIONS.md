@@ -38,8 +38,9 @@ Usar **PostgreSQL** con convenciones explícitas de nombres, tipos y límites, p
 
 ## Multitenancy
 
-- `tenant_id` **NOT NULL** en tablas operativas, salvo lista blanca en [`TENANT_ISOLATION_MODEL.md`](./TENANT_ISOLATION_MODEL.md).
+- `tenant_id` **NOT NULL** en raíces operativas. Los 22 hijos/configuraciones existentes del catálogo cerrado de [`TENANT_ISOLATION_MODEL.md`](./TENANT_ISOLATION_MODEL.md) heredan pertenencia mediante su padre dueño obligatorio ([ADR-018](./ARCHITECTURE_DECISION_RECORDS.md)); no se amplía esa lista por analogía. Los casos de identidad/raíz/plataforma están enumerados separadamente.
 - FKs deben referenciar filas del **mismo tenant** (validar en servicio; considerar **constraint** compuesta avanzada solo donde PG lo permita sin fricción).
+- El aislamiento vigente es explícito en servicios/repositorios: filtros de listados en la consulta y guards antes de usar/devolver cargas por ID o mutar. Para hijos se comprueban padre y referencias adicionales; no se atribuye enforcement global automático al cliente Prisma simple.
 
 ## Polimorfismo
 

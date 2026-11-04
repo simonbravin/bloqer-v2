@@ -260,10 +260,14 @@ En **shell de app** (no `/platform`). No usa `PlatformAdmin`; solo RBAC por memb
 | `/invitaciones/aceptar` | **Pública** (sin sesión: mensaje + login); con sesión: aceptar con token | Invitación válida (`peek` por token) | Aceptación: usuario autenticado cuyo **email** coincide con la invitación |
 
 - **Protección dominio:** no dejar el tenant **sin** al menos un miembro **ACTIVE** con rol **OWNER** si ya había uno antes del cambio (simulación sobre membresías activas). Desactivar al único OWNER activo queda bloqueado. **Aceptar invitación** respeta el mismo invariante al activar/reactivar membresía.
-- **Concurrencia:** dos mutaciones simultáneas (equipo o aceptar invitación) podrían, en teoría, violar el invariante entre lectura y escritura; mitigación completa requeriría bloqueo transaccional fuerte (no implementado).
+- **Concurrencia — corregida AG-01, 03/11/2026:** equipo, aceptación/cancelación de invitaciones, administración de asignaciones, estado de tenant y cambios relacionados adquieren el lock de fila del tenant antes de leer/modificar. Cambios importantes y su auditoría comparten transacción. El último propietario elegible exige `UserMembership.status = ACTIVE` y `User.status = ACTIVE`; una cuenta suspendida no cuenta como reemplazo. Creaciones tenant/plataforma de invitación comparten el lock para impedir dos PENDING del mismo email. La expiración se confirma aunque aceptar/cancelar luego devuelva conflicto.
 - **Invitaciones (10C):** `tenantId` solo desde `ServiceContext`; token crudo nunca en DB (solo `sha256`); sin bypass superadmin de plataforma en flujo tenant.
 - **Schema:** Phase 10C agrega `tenant_invitations` + enum; migraciones manuales / deploy — **sin** `db:push` en el proceso documentado.
 - **Servicios:** `packages/services/src/tenant-settings/*` incl. `tenant-invitations.service.ts`; mutaciones con `audit.service` `log()`.
+
+**Gates y empresa — AG-01:** lectura de General/Equipo/Permisos requiere una rama habilitada que el actor pueda ver (`TENANT_SETTINGS` o `USERS_PERMISSIONS`). Display/logo requieren `TENANT_SETTINGS`; gestión de miembros/invitaciones/asignaciones, `USERS_PERMISSIONS`; modo de acceso requiere `TENANT_SETTINGS` y la autoridad RBAC previa. Notas admiten una rama habilitada con EDIT. Los formularios combinan las mismas condiciones. Perfil personal no depende de habilitar administración de usuarios. Aceptar una invitación mantiene el contrato público token+sesión+email+tenant ACTIVE; no exige habilitar configuración ni acceso a plataforma.
+
+Las entradas primarias de `project.service` requieren `PROJECTS`. El shell compartido permite un área habilitada autorizada (p. ej. AP aunque PROJECTS esté apagado), siempre con empresa y ACL. `requireProjectAccess` no impone `PROJECTS` a otros servicios. Notificaciones personales no requieren `VIEW NOTIFICATIONS`; con el flag `NOTIFICATIONS` apagado, lecturas/contadores están vacíos y mutaciones directas quedan bloqueadas. El historial y la emisión interna operativa se conservan. `/platform` mantiene autorización separada y no aplica gates tenant.
 
 ## Phase 12A — RBAC audit snapshot (2026-05)
 

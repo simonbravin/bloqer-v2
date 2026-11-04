@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
@@ -14,17 +14,18 @@ import { updateBudgetSettingsSchema, type UpdateBudgetSettingsInput } from "@blo
 import { formatMoneyAmount, formatRatePctFromString } from "@/lib/format-money";
 import { computeBudgetSaleBreakdown } from "../lib/budget-sale-calc";
 import type { SettingsDefaults } from "./budget-settings-form";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 interface BudgetMarginConfigSectionProps {
   defaults: SettingsDefaults;
-  totalDirectCost: string;
+  items: readonly { quantity: string; unitCostDirect: string }[];
   totalSalePrice: string;
   currency: string;
   editable: boolean;
   onSubmit: (data: UpdateBudgetSettingsInput) => Promise<{ ok: true } | { error: string }>;
 }
 
-function fmt(value: number, currency: string) {
+function fmt(value: string | number, currency: string) {
   return formatMoneyAmount(String(value), currency);
 }
 
@@ -35,15 +36,16 @@ function pctLabel(value: unknown) {
 
 export function BudgetMarginConfigSection({
   defaults,
-  totalDirectCost,
+  items,
   totalSalePrice,
   currency,
   editable,
   onSubmit,
 }: BudgetMarginConfigSectionProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const formId = useId();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { isPending, run: startTransition } = useBudgetAction(setServerError);
 
   const form = useForm<UpdateBudgetSettingsInput>({
     resolver: zodResolver(updateBudgetSettingsSchema),
@@ -57,7 +59,6 @@ export function BudgetMarginConfigSection({
   });
 
   const watched = form.watch();
-  const directCost = parseFloat(totalDirectCost) || 0;
   const overheadPct = pctLabel(watched.overheadPct);
   const financialCostPct = pctLabel(watched.financialCostPct);
   const financialDaysAvg = Math.max(0, Math.trunc(pctLabel(watched.financialDaysAvg)));
@@ -66,17 +67,18 @@ export function BudgetMarginConfigSection({
 
   const breakdown = useMemo(
     () =>
-      computeBudgetSaleBreakdown(directCost, {
+      computeBudgetSaleBreakdown(items, {
         overheadPct,
         financialCostPct,
         financialDaysAvg,
         profitPct,
         taxPct,
       }),
-    [directCost, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct],
+    [items, overheadPct, financialCostPct, financialDaysAvg, profitPct, taxPct],
   );
 
   const handleSubmit = form.handleSubmit((data) => {
+    if (!editable) return;
     setServerError(null);
     startTransition(async () => {
       const result = await onSubmit(data);
@@ -90,8 +92,6 @@ export function BudgetMarginConfigSection({
     });
   });
 
-  const saleStored = parseFloat(totalSalePrice) || 0;
-
   return (
     <section id="configuracion" className="rounded-xl border bg-card shadow-sm scroll-mt-6">
       <div className="border-b px-4 py-3">
@@ -104,14 +104,15 @@ export function BudgetMarginConfigSection({
       </div>
 
       <form onSubmit={handleSubmit} className="grid gap-6 p-4 lg:grid-cols-2">
-        <div className="space-y-4">
+        <fieldset disabled={!editable || isPending} className="min-w-0 space-y-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             Márgenes globales
           </h3>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Gastos generales %</Label>
+              <Label htmlFor={`${formId}-overhead`}>Gastos generales %</Label>
               <DecimalInput
+                id={`${formId}-overhead`}
                 disabled={!editable}
                 {...bindRhfNumberDecimal(form.watch("overheadPct"), (n) =>
                   form.setValue("overheadPct", n, { shouldValidate: true, shouldDirty: true }),
@@ -120,8 +121,9 @@ export function BudgetMarginConfigSection({
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.overhead, currency)}</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Gastos financieros — tasa anual %</Label>
+              <Label htmlFor={`${formId}-financial`}>Gastos financieros — tasa anual %</Label>
               <DecimalInput
+                id={`${formId}-financial`}
                 disabled={!editable}
                 {...bindRhfNumberDecimal(form.watch("financialCostPct"), (n) =>
                   form.setValue("financialCostPct", n, { shouldValidate: true, shouldDirty: true }),
@@ -130,8 +132,9 @@ export function BudgetMarginConfigSection({
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.financialCost, currency)}</p>
             </div>
             <div className="space-y-1.5">
-              <Label>Días promedio financiamiento</Label>
+              <Label htmlFor={`${formId}-days`}>Días promedio financiamiento</Label>
               <Input
+                id={`${formId}-days`}
                 type="number"
                 step="1"
                 min="0"
@@ -145,8 +148,9 @@ export function BudgetMarginConfigSection({
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label>Utilidad %</Label>
+              <Label htmlFor={`${formId}-profit`}>Utilidad %</Label>
               <DecimalInput
+                id={`${formId}-profit`}
                 disabled={!editable}
                 {...bindRhfNumberDecimal(form.watch("profitPct"), (n) =>
                   form.setValue("profitPct", n, { shouldValidate: true, shouldDirty: true }),
@@ -155,8 +159,9 @@ export function BudgetMarginConfigSection({
               <p className="text-xs font-mono text-muted-foreground">{fmt(breakdown.profit, currency)}</p>
             </div>
             <div className="space-y-1.5">
-              <Label>IVA %</Label>
+              <Label htmlFor={`${formId}-tax`}>IVA %</Label>
               <DecimalInput
+                id={`${formId}-tax`}
                 disabled={!editable}
                 {...bindRhfNumberDecimal(form.watch("taxPct"), (n) =>
                   form.setValue("taxPct", n, { shouldValidate: true, shouldDirty: true }),
@@ -170,8 +175,11 @@ export function BudgetMarginConfigSection({
               {isPending ? "Guardando..." : "Guardar configuración"}
             </Button>
           )}
-          {serverError && <p className="text-sm text-destructive">{serverError}</p>}
-        </div>
+          {Object.values(form.formState.errors).map((error, index) => (
+            <p key={index} role="alert" className="text-sm text-destructive">{error?.message}</p>
+          ))}
+          {serverError && <p role="alert" className="text-sm text-destructive">{serverError}</p>}
+        </fieldset>
 
         <div className="space-y-3 rounded-lg border shell-surface-inset p-4">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -218,7 +226,7 @@ export function BudgetMarginConfigSection({
             </div>
             <div className="flex justify-between gap-2 text-xs text-muted-foreground">
               <dt>Total venta en presupuesto</dt>
-              <dd className="font-mono tabular-nums">{fmt(saleStored, currency)}</dd>
+              <dd className="font-mono tabular-nums">{fmt(totalSalePrice, currency)}</dd>
             </div>
           </dl>
         </div>

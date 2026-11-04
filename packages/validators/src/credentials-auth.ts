@@ -7,11 +7,24 @@ const emailSchema = z
   .max(320)
   .transform((e) => e.toLowerCase());
 
+function fitsBcryptByteLimit(password: string): boolean {
+  try {
+    // Each escaped byte becomes one character; this stays usable in browsers
+    // without importing Node Buffer or requiring DOM typings in this package.
+    return encodeURIComponent(password).replace(/%[0-9A-F]{2}/g, "_").length <= 72;
+  } catch {
+    return false;
+  }
+}
+
 /** bcrypt truncates at 72 bytes; enforce max length in validation. */
 export const passwordSchema = z
   .string()
   .min(10, "La contraseña debe tener al menos 10 caracteres")
   .max(72, "La contraseña no puede superar 72 caracteres")
+  .refine(fitsBcryptByteLimit, {
+    message: "La contraseña es demasiado larga; acortala si incluye acentos o emojis",
+  })
   .refine((p) => /[A-Za-z]/.test(p) && /\d/.test(p), {
     message: "La contraseña debe incluir al menos una letra y un número",
   });

@@ -8,6 +8,8 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./auth.config";
 import { BloqerPrismaAdapter } from "./bloqer-prisma-adapter";
+import { hasVerifiedGoogleEmail } from "./google-email-verification";
+import { resolveSignInPasswordEpoch } from "./session-password-epoch";
 import type { BloqerJwtToken } from "./types";
 
 function normalizeEmail(email: string): string {
@@ -48,8 +50,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (account?.provider === "google") {
         const email = user.email?.trim();
         if (!email) return false;
-        const emailVerified = (profile as { email_verified?: boolean } | undefined)?.email_verified;
-        if (emailVerified === false) return false;
+        if (!hasVerifiedGoogleEmail(profile)) return false;
 
         await takeoverUnverifiedCredentialsStub({
           email,
@@ -71,16 +72,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         // Existing stub / INVITED row: Google proved ownership — activate + canonicalize email.
         if (row && (row.status === "INVITED" || !row.emailVerified || row.email !== emailNorm)) {
           try {
-            await prisma.user.update({
-              where: { id: row.id },
+            const updated = await prisma.user.updateMany({
+              where: {
+                id: row.id,
+                status: row.status,
+                email: row.email,
+                emailVerified: row.emailVerified,
+              },
               data: {
                 status: row.status === "INVITED" ? "ACTIVE" : row.status,
                 emailVerified: row.emailVerified ?? new Date(),
                 ...(row.email !== emailNorm ? { email: emailNorm } : {}),
               },
             });
+            // A concurrent suspension/reset must not be overwritten by stale login data.
+            if (updated.count !== 1) return false;
           } catch {
-            // Unique heal race — ignore; account link already established.
+            // Fail closed; a subsequent login can retry a benign canonicalization race.
+            return false;
           }
         }
       }
@@ -94,12 +103,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       const token = baseResult as typeof params.token & BloqerJwtToken;
 
-      // Always refresh from DB on sign-in so claim matches User.passwordUpdatedAt
-      // (Credentials may set a stale/null pwdAt before this runs).
       if ((params.trigger === "signIn" || params.trigger === "signUp") && params.user?.id) {
         try {
-          const at = await getUserPasswordUpdatedAt(params.user.id);
-          token.pwdAt = at?.toISOString() ?? null;
+          token.pwdAt = await resolveSignInPasswordEpoch(
+            params.account?.provider,
+            { id: params.user.id, passwordUpdatedAt: params.user.passwordUpdatedAt },
+            getUserPasswordUpdatedAt,
+          );
         } catch {
           // Soft-fail: prefer completing login over blocking auth on a transient DB error.
           if (token.pwdAt === undefined) token.pwdAt = null;
@@ -112,8 +122,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async createUser({ user }) {
       if (!user.id) return;
       const emailNorm = user.email ? normalizeEmail(user.email) : null;
-      await prisma.user.update({
-        where: { id: user.id },
+      await prisma.user.updateMany({
+        where: { id: user.id, status: { in: ["ACTIVE", "INVITED"] } },
         data: {
           status: "ACTIVE",
           ...(emailNorm && emailNorm !== user.email ? { email: emailNorm } : {}),

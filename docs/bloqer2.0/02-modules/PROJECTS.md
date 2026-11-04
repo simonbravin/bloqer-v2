@@ -21,6 +21,7 @@ Sin proyecto formal no hay imputación clara de costos ni certificaciones cohere
 ## 6. Entidades principales
 - **Project** — núcleo.
 - **ProjectTeamMember** — roster de avisos por obra ([D-091]); etiqueta `PROJECT_MANAGER` \| `SITE_FOREMAN` \| `OTHER` (no otorga permisos).
+- **ProjectMembership** — acceso a la obra bajo el modo por asignación (D-111); independiente de los avisos.
 
 ## 7. Estados y transiciones
 Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` → `ACTIVE` → `ON_HOLD` / `COMPLETED` / `CANCELLED`.
@@ -30,7 +31,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - Activar, pausar, reanudar, completar, cancelar (con confirmación en UI).
 - Cancelar obra `ACTIVE`/`ON_HOLD`: solo OWNER/ADMIN ([BR-PROJ-005], [PERM-007]).
 - Reactivar obra `CANCELLED`: solo OWNER/ADMIN ([BR-PROJ-006], [PERM-007]).
-- **Equipo de obra** (`ProjectTeamMember`, [D-091]): asignar usuarios del tenant al roster de avisos (card al final de Configuración `/editar`). El Resumen muestra un aviso si no hay PM activo. **No** implementa aún RBAC “solo su proyecto” (R-USR-007); el techo de permisos sigue siendo global.
+- **Equipo de obra** (`ProjectTeamMember`, [D-091]): asignar usuarios del tenant con cuenta y membresía activas al roster de avisos (card al final de Configuración `/editar`). El Resumen muestra un aviso si no hay PM activo. El roster no otorga permisos; el acceso real usa `ProjectMembership` y el modo de acceso vigente (D-111).
 
 ## 9. Pantallas y vistas necesarias
 - Lista de proyectos con filtros estado, cliente, PM.
@@ -45,10 +46,12 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - **BR-PROJ-004**: cancelación no elimina datos financieros ([D-042]).
 - **BR-PROJ-005**: cancelar obra en curso — OWNER/ADMIN, motivo, sin documentos abiertos ([D-042]).
 - **BR-PROJ-006**: reactivación de obra cancelada — OWNER/ADMIN, auditada ([D-042]).
+- **D-111, enmienda Q-067 (03/11/2026):** si el modo por asignación y los roles vigentes del creador lo requieren, el alta incorpora su `ProjectMembership` únicamente a esa obra nueva, en la misma transacción que la obra y su auditoría. No concede roles ni otras obras y no cambia accesos históricos.
 - El tope acumulado de certificación es estricto en ambos `project_type` ([D-119]).
 
 ## 11. Validaciones
 - `start_date <= end_date` si ambos informados.
+- Las fechas opcionales se pueden vaciar al editar. Una fecha inválida se rechaza; no se descarta silenciosamente. Una actualización parcial compara la fecha modificada con la otra fecha ya guardada. Completar valida también inicio frente a fin real.
 - `code` único por tenant.
 
 ## 12. Fórmulas relacionadas
@@ -70,7 +73,11 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Project: `DRAFT` �
 - **Presupuestos**, **Cronograma**, **Contratos**, **Certificaciones**, **Compras**, **Inventario**, **Tesorería** (imputación).
 
 ## 16. Permisos
-Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md). Editar equipo de obra: `EDIT PROJECTS`. El techo “PM edita solo proyectos asignados” sigue **sin** enforcement en servicio (deuda R-USR-007).
+Ver [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md). Editar equipo de obra: `EDIT PROJECTS`, módulo habilitado y acceso a la obra. D-111 combina roles, empresa y modo `TENANT_WIDE` / `MEMBERSHIP_SCOPED`; en modo por asignación, los usuarios sin acceso global necesitan `ProjectMembership`. `ProjectTeamMember` conserva exclusivamente el roster D-091.
+
+## Hallazgo — Reconciliación del acceso vigente (AG-03, 03/11/2026)
+
+Las referencias anteriores a R-USR-007 sin enforcement eran anteriores a D-111 y contradecían los guards actuales, revalidados en AG-01. Se corrige esa descripción. El acceso del creador se incorpora por la aprobación explícita de [Q-067](../00-product/OPEN_QUESTIONS.md#q-067--acceso-del-creador-a-una-obra-nueva-en-modo-por-asignación), sin cambiar el techo de roles. La eventual simplificación general de roles sigue como propuesta separada.
 
 ## 17. Eventos disparados / consumidos
 - `project.*` ([`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md)).

@@ -37,6 +37,9 @@ export function JournalEntryLinesEditor({
   function update(idx: number, patch: Partial<LineEditorRow>) {
     if (sourcedLock) {
       const { debit: _d, credit: _c, currency: _cur, ...safe } = patch;
+      void _d;
+      void _c;
+      void _cur;
       if (Object.keys(safe).length === 0) return;
       const next = lines.map((l, i) => (i === idx ? { ...l, ...safe } : l));
       onChange(next);

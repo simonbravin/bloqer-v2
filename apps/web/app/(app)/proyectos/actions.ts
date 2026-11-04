@@ -37,8 +37,9 @@ async function getCtx() {
 }
 
 function revalidateProject(id: string) {
-  revalidatePath(`/proyectos/${id}`);
+  revalidatePath(`/proyectos/${id}`, "layout");
   revalidatePath("/proyectos");
+  revalidatePath("/dashboard");
 }
 
 export async function createProjectAction(
@@ -49,6 +50,7 @@ export async function createProjectAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const project = await createProject(parsed.data, ctx);
+    revalidateProject(project.id);
     return { id: project.id };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };

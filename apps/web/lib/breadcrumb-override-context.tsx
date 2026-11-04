@@ -104,8 +104,9 @@ export function BreadcrumbTailLabel({ label }: { label: string }) {
   const ownerId = useRef(Symbol("breadcrumb-tail"));
 
   React.useEffect(() => {
-    setTailLabel(ownerId.current, label);
-    return () => setTailLabel(ownerId.current, null);
+    const owner = ownerId.current;
+    setTailLabel(owner, label);
+    return () => setTailLabel(owner, null);
   }, [label, setTailLabel]);
 
   return null;
@@ -117,8 +118,9 @@ export function BreadcrumbSegmentLabels({ labels }: { labels: Record<string, str
   const ownerId = useRef(Symbol("breadcrumb-segments"));
 
   React.useEffect(() => {
-    setSegmentLabels(ownerId.current, labels);
-    return () => setSegmentLabels(ownerId.current, null);
+    const owner = ownerId.current;
+    setSegmentLabels(owner, labels);
+    return () => setSegmentLabels(owner, null);
   }, [labels, setSegmentLabels]);
 
   return null;

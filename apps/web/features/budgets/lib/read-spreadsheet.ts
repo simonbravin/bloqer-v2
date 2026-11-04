@@ -20,31 +20,69 @@ export async function readSpreadsheetFile(file: File): Promise<unknown[][]> {
   throw new Error("Formato no soportado. Usá .csv o .xlsx");
 }
 
-function detectCsvDelimiter(firstLine: string): "," | ";" {
-  const commas = (firstLine.match(/,/g) ?? []).length;
-  const semicolons = (firstLine.match(/;/g) ?? []).length;
+function detectCsvDelimiter(source: string): "," | ";" {
+  const text = source.trimStart();
+  let commas = 0;
+  let semicolons = 0;
+  let inQuotes = false;
+  let atFieldStart = true;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '"' && (inQuotes || atFieldStart)) {
+      if (inQuotes && text[i + 1] === '"') i++;
+      else inQuotes = !inQuotes;
+    } else if (!inQuotes) {
+      if (ch === "\n" || ch === "\r") break;
+      if (ch === ",") commas++;
+      if (ch === ";") semicolons++;
+      if (ch === "," || ch === ";") atFieldStart = true;
+      else if (ch?.trim()) atFieldStart = false;
+    }
+  }
   return semicolons > commas ? ";" : ",";
 }
 
-function parseCsvLine(line: string, delimiter: "," | ";"): string[] {
-  const cells: string[] = [];
+function parseCsvText(source: string): unknown[][] {
+  const text = source.replace(/^\uFEFF/, "");
+  const delimiter = detectCsvDelimiter(text);
+  const rows: string[][] = [];
+  let cells: string[] = [];
   let current = "";
   let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]!;
+  function finishRow() {
+    cells.push(current.trim());
+    if (cells.some((cell) => cell !== "")) rows.push(cells.slice(0, 2));
+    cells = [];
+    current = "";
+  }
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
     if (ch === '"') {
-      inQuotes = !inQuotes;
-      continue;
+      if (inQuotes && text[i + 1] === '"') {
+        current += '"';
+        i++;
+        continue;
+      }
+      if (inQuotes || current.trim() === "") {
+        inQuotes = !inQuotes;
+        continue;
+      }
     }
     if (ch === delimiter && !inQuotes) {
       cells.push(current.trim());
       current = "";
       continue;
     }
+    if ((ch === "\n" || ch === "\r") && !inQuotes) {
+      finishRow();
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      continue;
+    }
     current += ch;
   }
-  cells.push(current.trim());
-  return cells.slice(0, 2);
+  if (inQuotes) throw new Error("El CSV tiene un campo con comillas sin cerrar. Corregí el archivo y volvé a subirlo.");
+  finishRow();
+  return rows;
 }
 
 /** Usa texto formateado de celda (w) para conservar 11.10; Excel guarda 11.1 como número. */
@@ -80,11 +118,4 @@ function xlsxSheetToRows(
   }
 
   return rows;
-}
-
-function parseCsvText(text: string): unknown[][] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length === 0) return [];
-  const delimiter = detectCsvDelimiter(lines[0]!);
-  return lines.map((line) => parseCsvLine(line, delimiter));
 }

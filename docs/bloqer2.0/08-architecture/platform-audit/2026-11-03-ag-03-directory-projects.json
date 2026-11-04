@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "phase": "AG-03",
+  "date": "2026-11-03",
+  "status": "corrected_verified_local",
+  "mode": "audit_fix_verify",
+  "head": "3b5ae7a038465ad6b3d60cde19c278a31019e165",
+  "branch": "codex/pruebas",
+  "report": "2026-11-03-ag-03-directory-projects.md",
+  "baseline": "output/platform-audit/ag-03-2026-11-03/initial-snapshot.json",
+  "manifest": "output/platform-audit/ag-03-2026-11-03/final-manifest.json",
+  "findings": [
+    {
+      "id": "GA-AG-03-001",
+      "priority": "P1",
+      "title": "Directorio no aplicaba su módulo habilitado y exponía acciones a lectura",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-002",
+      "priority": "P2",
+      "title": "CUIT/CUIL admitía formatos inválidos, duplicados equivalentes y búsquedas inconsistentes",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-003",
+      "priority": "P1",
+      "title": "Contactos podían persistir sin auditoría o pisar cambios simultáneos",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-004",
+      "priority": "P2",
+      "title": "Perfiles permitían rol inactivo y no borraban campos opcionales",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-005",
+      "priority": "P2",
+      "title": "Selectores y paginación podían omitir contactos o aceptar offsets inválidos",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-006",
+      "priority": "P2",
+      "title": "Fechas inválidas se descartaban y no se podían limpiar",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-007",
+      "priority": "P1",
+      "title": "Metadatos y transiciones de obra no eran atómicos y perdían cambios",
+      "status": "corrected_verified",
+      "origin": "preexisting_with_transaction_timeout_corrected_during_remediation"
+    },
+    {
+      "id": "GA-AG-03-008",
+      "priority": "P1",
+      "title": "Lecturas auxiliares omitían autorización del proyecto",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-009",
+      "priority": "P2",
+      "title": "Equipo consideraba activa una cuenta global inactiva",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-010",
+      "priority": "P2",
+      "title": "Reactivación legacy confundía ausencia de bloqueantes con ausencia de historia",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-011",
+      "priority": "P1",
+      "title": "Cancelación podía competir con la creación/emisión de un bloqueante",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-012",
+      "priority": "P1",
+      "title": "Tipo de obra podía cambiar mientras se aprobaba un presupuesto",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-013",
+      "priority": "P1",
+      "title": "Locks nuevos podían invertir FK con administración de ACL",
+      "status": "corrected_verified",
+      "origin": "identified_during_ag03_remediation"
+    },
+    {
+      "id": "GA-AG-03-014",
+      "priority": "P2",
+      "title": "Quitar CLIENT y vincular una obra no coordinaban su comprobación",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-015",
+      "priority": "P2",
+      "title": "Creador sin acceso a la nueva obra en modo por asignación",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-016",
+      "priority": "P2",
+      "title": "Filtros perdían estado al seleccionar Todos o cambiar rápido",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-017",
+      "priority": "P2",
+      "title": "Guardados y confirmaciones fallidos no siempre permitían recuperar el intento",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-018",
+      "priority": "P2",
+      "title": "Lecturas quedaban desactualizadas tras mutar",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-019",
+      "priority": "P2",
+      "title": "Controles/ficha y acciones móviles tenían diferencias o recortes",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    },
+    {
+      "id": "GA-AG-03-020",
+      "priority": "P2",
+      "title": "CSV sugería un alcance mayor que el real",
+      "status": "corrected_verified",
+      "origin": "preexisting_or_not_fully_attributable_in_dirty_baseline"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "Q-067",
+      "status": "approved_implemented_verified",
+      "resolution": "Creator membership only for the new project when required by current scope and roles; same transaction; no new roles or historical memberships."
+    },
+    {
+      "id": "Q-024",
+      "status": "proposal_only",
+      "proposal": "2026-11-03-role-simplification-proposal.md"
+    }
+  ],
+  "verification": {
+    "unit": {
+      "passed": 1972,
+      "failed": 0,
+      "packages": 9,
+      "deltaFromAG02": 218,
+      "log": "output/platform-audit/ag-03-2026-11-03/workspace-test.log",
+      "note": "After the full run, scoped Project regressions and SQL were repeated for the timeout fix; final layout changes received directed lint/type and browser checks."
+    },
+    "typecheck": {
+      "passedTasks": 13,
+      "log": "output/platform-audit/ag-03-2026-11-03/workspace-typecheck.log",
+      "finalWebLog": "output/platform-audit/ag-03-2026-11-03/web-final-typecheck.log"
+    },
+    "lint": {
+      "passed": true,
+      "packagesAndWeb": true,
+      "log": "output/platform-audit/ag-03-2026-11-03/workspace-lint.log",
+      "finalLayoutLog": "output/platform-audit/ag-03-2026-11-03/web-final-layout-lint.log"
+    },
+    "sql": {
+      "passedDistinctCases": 45,
+      "failedUnresolved": 0,
+      "skippedSelected": 0,
+      "database": "bloqer_audit_ag01_20261103",
+      "verifiedIdentity": true,
+      "suites": [
+        {
+          "name": "directory",
+          "cases": 20,
+          "log": "output/platform-audit/ag-03-2026-11-03/live-final.log"
+        },
+        {
+          "name": "contact_project_concurrency",
+          "cases": 3,
+          "log": "output/platform-audit/ag-03-2026-11-03/live-final.log"
+        },
+        {
+          "name": "project_fk_acl_locks",
+          "cases": 3,
+          "log": "output/platform-audit/ag-03-2026-11-03/live-final.log"
+        },
+        {
+          "name": "project_functional",
+          "cases": 19,
+          "log": "output/platform-audit/ag-03-2026-11-03/project-live-after-timeout.log"
+        }
+      ],
+      "resolvedFailures": [
+        {
+          "type": "40P01",
+          "before": "output/platform-audit/ag-03-2026-11-03/code-key-lock-baseline.log",
+          "after": "output/platform-audit/ag-03-2026-11-03/live-final.log"
+        },
+        {
+          "type": "transaction_timeout_5000ms",
+          "before": "output/platform-audit/ag-03-2026-11-03/live-final.log",
+          "after": "output/platform-audit/ag-03-2026-11-03/project-live-after-timeout.log"
+        }
+      ]
+    },
+    "unitRunnerOmittedLiveSuites": 17,
+    "liveSuitesExecutedSeparately": 4,
+    "otherLiveSuitesNotRepeated": 13,
+    "knowledge": {
+      "chunks": 517,
+      "checkPassed": true,
+      "log": "output/platform-audit/ag-03-2026-11-03/ai-check-docs-index.log"
+    },
+    "visual": {
+      "environment": "local isolated synthetic",
+      "screenshots": "output/platform-audit/ag-03-2026-11-03/screenshots",
+      "viewports": [
+        "1280x720",
+        "390x844",
+        "320x740"
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "scope": "Declared sample of Directory and Project flows; no WCAG or device-complete certification.",
+      "roles": [
+        "OWNER",
+        "VIEWER"
+      ],
+      "observations": "output/platform-audit/ag-03-2026-11-03/visual-smoke.json"
+    }
+  },
+  "publication": {
+    "deployed": false,
+    "migrations": false,
+    "productionWrites": false,
+    "externalProviders": false
+  },
+  "nextPhase": {
+    "id": "AG-04",
+    "status": "waiting_for_owner_instruction"
+  }
+}

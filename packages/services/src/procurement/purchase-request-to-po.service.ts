@@ -10,6 +10,7 @@ import { canEditPurchaseOrders } from "./procurement-access";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
 import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 import { assertPurchaseRequestScope } from "./purchase-request-scope";
+import { lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { isProcurementQuoteExpired } from "./quote-validity";
 
 // Multi-supplier awards include locks, line writes and audit in one atomic transaction.
@@ -432,11 +433,17 @@ export async function createPurchaseOrderFromQuoteLines(
   const purchaseOrderId = await prisma.$transaction(async (tx) => {
     const quote = await tx.procurementQuote.findUnique({
       where: { id: procurementQuoteId },
-      select: { purchaseRequestId: true, tenantId: true },
+      select: {
+        purchaseRequestId: true,
+        tenantId: true,
+        purchaseRequest: { select: { projectId: true, tenantId: true, companyId: true } },
+      },
     });
     if (!quote || quote.tenantId !== ctx.tenantId) {
       throw new ServiceError("NOT_FOUND", "Cotización no encontrada");
     }
+    await assertPurchaseRequestScope(quote.purchaseRequest, ctx, "mutate");
+    await lockProjectForOperationalMutation(tx, quote.purchaseRequest.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${quote.purchaseRequestId} FOR UPDATE`;
 
     const poId = await createOnePoFromQuoteLinesInTx(
@@ -498,6 +505,7 @@ export async function createPurchaseOrdersFromAwards(
       throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
     }
     await assertPurchaseRequestScope(pr, ctx, "mutate");
+    await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
 
     const maxNum = await tx.purchaseOrder.aggregate({

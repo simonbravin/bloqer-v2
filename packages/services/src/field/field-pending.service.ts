@@ -4,6 +4,7 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
 import type { ServiceContext } from "../types";
+import { companyScopeFilter } from "../company-scope";
 import {
   FIELD_PENDING_GROUP_BY_SOURCE,
   fieldPendingComprasStageOrder,
@@ -126,9 +127,13 @@ export async function getMyFieldPendingItems(
     ? sources.filter((s) => FIELD_PENDING_GROUP_BY_SOURCE[s] === groupFilter)
     : sources;
 
-  const projectWhere = projectFilter
-    ? { projectId: projectFilter }
-    : projectIdWhereForScope(scope);
+  const projectScopeWhere = projectFilter ? { projectId: projectFilter } : projectIdWhereForScope(scope);
+  const projectWhere = {
+    ...projectScopeWhere,
+    // These operational sources have companyId NOT NULL; Certification is nullable below.
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+  };
+  const certificationProjectWhere = { ...projectScopeWhere, ...companyScopeFilter(ctx) };
   const counts = emptyCounts();
   const items: FieldPendingItem[] = [];
 
@@ -323,7 +328,7 @@ export async function getMyFieldPendingItems(
   const certListPromise =
     runCert && !countsOnly
       ? prisma.certification.findMany({
-          where: { tenantId: ctx.tenantId, status: "ISSUED", ...projectWhere },
+          where: { tenantId: ctx.tenantId, status: "ISSUED", ...certificationProjectWhere },
           orderBy: { createdAt: "asc" },
           take: INBOX_LIMIT,
           select: {
@@ -426,7 +431,7 @@ export async function getMyFieldPendingItems(
       : Promise.resolve(0),
     countCert
       ? prisma.certification.count({
-          where: { tenantId: ctx.tenantId, status: "ISSUED", ...projectWhere },
+          where: { tenantId: ctx.tenantId, status: "ISSUED", ...certificationProjectWhere },
         })
       : Promise.resolve(0),
     countSubCert

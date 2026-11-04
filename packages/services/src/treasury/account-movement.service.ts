@@ -1,4 +1,4 @@
-import { Prisma, prisma, AccountMovement } from "@bloqer/database";
+import { prisma, AccountMovement } from "@bloqer/database";
 import { can, hasCompanyFinanceRole } from "@bloqer/domain";
 import { auditTreasury } from "./treasury-audit";
 import { canViewCompanyTreasury } from "../finance/finance-access";

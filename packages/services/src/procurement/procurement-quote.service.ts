@@ -13,6 +13,7 @@ import { getCompanyProcurementSettings } from "./company-procurement-settings.se
 import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { assertQuoteNotFrozenByActivePo } from "./purchase-request-to-po.service";
 import { assertPurchaseRequestScope } from "./purchase-request-scope";
+import { lockProjectForOperationalMutation } from "../project/project-operational-guard";
 
 type QuoteWithRequest = Prisma.ProcurementQuoteGetPayload<{
   include: { purchaseRequest: true; lines: true };
@@ -191,6 +192,7 @@ export async function createProcurementQuote(
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
   const quote = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
     const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id } });
     await assertPurchaseRequestScope(current, ctx, "mutate");
@@ -301,6 +303,7 @@ export async function updateProcurementQuote(
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
   await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
     const quote = await loadMutableQuote(quoteId, ctx, tx);
     const locked = await tx.procurementQuote.updateMany({
@@ -395,6 +398,7 @@ export async function deleteProcurementQuote(
   const pr = quote.purchaseRequest;
 
   await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
     await loadMutableQuote(quoteId, ctx, tx);
     const deleted = await tx.procurementQuote.deleteMany({

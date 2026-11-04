@@ -40,13 +40,14 @@ export function SortableTableHead({
       <button
         type="button"
         className={cn(
-          "inline-flex items-center gap-1 font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm",
+          "inline-flex max-w-full items-center gap-1 font-medium hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm",
           active ? "text-foreground" : "text-muted-foreground",
         )}
         onClick={() => onSort(sortKey)}
         aria-label={ariaLabel}
+        title={label}
       >
-        {label}
+        <span className="min-w-0 truncate">{label}</span>
         <Icon className="size-3.5 shrink-0 opacity-70" aria-hidden />
       </button>
     </TableHead>

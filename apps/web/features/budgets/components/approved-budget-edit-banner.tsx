@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { updateProjectApprovedBudgetEditsPolicyAction } from "@/app/(app)/configuracion/politicas/actions";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 type Props = {
   projectId: string;
@@ -20,11 +21,11 @@ export function ApprovedBudgetEditBanner({
   readOnlyEdit = false,
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { isPending: pending, isRunning, run: startTransition } = useBudgetAction(setError);
 
   function freezeProject() {
-    if (!canManagePolicy || !projectAllow) return;
+    if (!canManagePolicy || !projectAllow || isRunning()) return;
     if (
       !window.confirm(
         "¿Congelar de nuevo los presupuestos aprobados de esta obra? Dejará de poder editarse la economía mientras el presupuesto esté aprobado.",
@@ -57,7 +58,7 @@ export function ApprovedBudgetEditBanner({
           ? "La obra tiene habilitada la excepción, pero tu usuario no puede editar presupuestos. Pedile a alguien con permiso de edición o congelá la excepción si sos OWNER/ADMIN."
           : "Podés agregar, quitar y editar partidas, APU, costos y venta. Cada cambio queda en el registro de auditoría. Cuando la obra esté definida, congelá esta excepción."}
       </p>
-      {error && <p className="mt-2 text-destructive">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-destructive">{error}</p>}
       {canManagePolicy && projectAllow ? (
         <div className="mt-3">
           <Button

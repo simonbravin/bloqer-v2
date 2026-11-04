@@ -38,7 +38,7 @@
 | `budget.approved` | `IN_REVIEW` → `APPROVED` |
 | `budget.closed` | `APPROVED` → `CLOSED` |
 | `budget.superseded` | reemplazado por nueva versión |
-| `budget.cancelled` | * → `CANCELLED` |
+| `budget.cancelled` | `DRAFT`, `IN_REVIEW` o `RETURNED_FOR_CHANGES` → `CANCELLED` ([D-121]) |
 | `budget.addendum_added` | nueva adenda creada bajo este budget |
 
 ### 2.2b Tenant (política)

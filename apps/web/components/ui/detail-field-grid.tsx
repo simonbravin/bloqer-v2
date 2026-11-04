@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import React, { useId, type ReactNode } from "react";
 import {
   resolveDetailFieldIcon,
   type DetailFieldIconAccent,
@@ -50,13 +50,13 @@ export function DetailField({
 }) {
   const iconMeta = iconKey ? resolveDetailFieldIcon(iconKey, iconAccent) : null;
   const IconComponent = iconMeta?.Icon;
-  const labelId = iconKey ? `detail-field-${iconKey}-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined;
+  const labelId = useId();
 
   return (
     <div
       role="group"
       aria-labelledby={labelId}
-      className={cn(fullWidth && "col-span-full", className)}
+      className={cn("min-w-0", fullWidth && "col-span-full", className)}
     >
       <dt className="flex items-center gap-2 text-muted-foreground">
         {IconComponent && iconMeta ? (
@@ -70,7 +70,7 @@ export function DetailField({
             <IconComponent className={cn("h-3.5 w-3.5", iconMeta.accentClass.icon)} />
           </span>
         ) : null}
-        <span id={labelId}>{label}</span>
+        <span id={labelId} className="min-w-0 break-words">{label}</span>
       </dt>
       <dd className={cn("mt-1 font-medium break-words", iconMeta && "pl-9")}>{children}</dd>
     </div>

@@ -1,12 +1,12 @@
 /**
  * D-111 Phase C — membership admin + mode switch (Neon DEV).
- * Gated: BLOQER_AI_LIVE_DB=1 or BLOQER_D111_LIVE=1. Never production.
+ * Gated: BLOQER_AI_LIVE_DB=1 or BLOQER_D111_LIVE=1, plus an explicit isolated audit database.
+ * Never ordinary development or production.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { after, before, describe, it } from "node:test";
 import type { UserRole } from "@bloqer/database";
+import { assertAuditDatabaseIdentity, assertAuditFixtureDatabase } from "../testing/audit-fixture";
 import { AI_ADV } from "../ai/fixtures/adversarial-ids";
 import {
   restoreTenantATenantWide,
@@ -23,39 +23,7 @@ import {
 } from "./project-membership.service";
 import { ServiceError, type ServiceContext } from "../types";
 
-function loadEnvIfNeeded(): void {
-  if (process.env.DATABASE_URL) return;
-  for (const p of [resolve(process.cwd(), "../../.env"), resolve(process.cwd(), ".env")]) {
-    try {
-      for (const line of readFileSync(p, "utf8").split(/\r?\n/)) {
-        const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-        if (!m) continue;
-        let v = m[2]!;
-        if (
-          (v.startsWith('"') && v.endsWith('"')) ||
-          (v.startsWith("'") && v.endsWith("'"))
-        ) {
-          v = v.slice(1, -1);
-        }
-        if (process.env[m[1]!] === undefined) process.env[m[1]!] = v;
-      }
-      return;
-    } catch {
-      /* next */
-    }
-  }
-}
-
 const live = process.env.BLOQER_AI_LIVE_DB === "1" || process.env.BLOQER_D111_LIVE === "1";
-
-function assertNonProd(): void {
-  const url = process.env.DATABASE_URL ?? "";
-  assert.ok(!url.includes("ep-cold-mouse-appkpn84"), "refusing production Neon");
-  assert.ok(
-    url.includes("ep-curly-math") || url.includes("localhost"),
-    `expected DEV host, got ${url.slice(0, 80)}`,
-  );
-}
 
 function svc(
   tenantId: string,
@@ -72,17 +40,18 @@ describe("D-111 Phase C membership admin (Neon DEV)", { skip: !live }, () => {
   const a = AI_ADV.tenantA;
 
   before(async () => {
-    loadEnvIfNeeded();
-    assertNonProd();
+    assertAuditFixtureDatabase();
     ({ prisma } = await import("@bloqer/database"));
+    await assertAuditDatabaseIdentity(prisma);
     fx = await seedD111ScopedFixtures(prisma);
   });
 
   after(async () => {
-    if (process.env.BLOQER_D111_RESTORE_TENANT_WIDE === "1") {
+    if (process.env.BLOQER_D111_RESTORE_TENANT_WIDE === "1" && fx) {
       await restoreTenantATenantWide(prisma, fx.tenantAId);
     }
     clearProjectAccessModeCache();
+    if (prisma) await prisma.$disconnect();
   });
 
   it("PM cannot manage memberships (FORBIDDEN)", async () => {

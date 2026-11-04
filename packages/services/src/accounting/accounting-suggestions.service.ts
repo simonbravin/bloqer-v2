@@ -15,7 +15,6 @@ import {
 import { resolveAccountingCompanyId } from "./accounting-company-context";
 import {
   treasuryMovementSupportsAccountingDraft,
-  treasuryMovementTypeSupportsAccountingDraft,
 } from "./accounting-treasury-gl-eligibility";
 import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
 import {

@@ -6,6 +6,7 @@ import {
   WbsTree,
   BudgetLifecycleDialog,
   BudgetMarginConfigSection,
+  BudgetMetadataSection,
   BudgetExportActions,
 } from "@/features/budgets";
 import { ApprovedBudgetEditBanner } from "@/features/budgets/components/approved-budget-edit-banner";
@@ -21,6 +22,7 @@ import {
   listBudgetsByProject,
   resolveBudgetEconomicEditability,
   getProjectApprovedBudgetEditFlags,
+  getProjectShellInfo,
   ServiceError,
   type WbsViewNode,
 } from "@bloqer/services";
@@ -29,6 +31,7 @@ import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
+import { budgetProjectReadOnlyReason } from "@/features/budgets/lib/budget-project-read-only";
 import {
   addWbsNodeAction,
   ensureWbsLeafForApuAction,
@@ -48,6 +51,7 @@ import {
   closeBudgetAction,
   cancelBudgetAction,
   updateBudgetSettingsAction,
+  updateBudgetAction,
 } from "../actions";
 
 interface PageProps {
@@ -73,13 +77,17 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   let parentBudget: { id: string; name: string; versionNumber: number } | null = null;
   let editability = { editable: false, approvedOverrideActive: false };
   let policyFlags = { tenantAllow: false, projectAllow: false, canManagePolicy: false };
+  let projectReadOnlyReason: string | null = null;
   try {
-    [budget, tree, lifecycleLog, scheduleBaseline] = await Promise.all([
+    const [loadedBudget, loadedTree, loadedLog, loadedBaseline, project] = await Promise.all([
       getBudgetById(budgetId, ctx),
       getWbsTree(budgetId, ctx),
       getBudgetLifecycleLog(budgetId, ctx),
       isBudgetScheduleBaseline(budgetId, ctx.tenantId),
+      getProjectShellInfo(projectId, ctx),
     ]);
+    [budget, tree, lifecycleLog, scheduleBaseline] = [loadedBudget, loadedTree, loadedLog, loadedBaseline];
+    projectReadOnlyReason = budgetProjectReadOnlyReason(project.status);
     try {
       policyFlags = await getProjectApprovedBudgetEditFlags(projectId, ctx);
       editability = await resolveBudgetEconomicEditability(budget);
@@ -108,10 +116,11 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
   if (!budget || budget.projectId !== projectId) notFound();
 
   const canEditBudgets = can(current.tenantCtx.roles, "EDIT", "BUDGETS");
-  const editable = editability.editable && canEditBudgets;
+  const editable = editability.editable && canEditBudgets && !projectReadOnlyReason;
   const wbsStructureEditable =
     editable && (!scheduleBaseline || editability.approvedOverrideActive);
-  const canCreateAddendum = budget.status === "APPROVED" || budget.status === "CLOSED";
+  const canApproveBudgets = can(current.tenantCtx.roles, "APPROVE", "BUDGETS") && !projectReadOnlyReason;
+  const canCreateAddendum = canEditBudgets && !projectReadOnlyReason && (budget.status === "APPROVED" || budget.status === "CLOSED");
   const hasLeafItems = (() => {
     function walk(nodes: WbsViewNode[]): boolean {
       for (const n of nodes) {
@@ -145,6 +154,16 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
     profitPct: s ? parseFloat(s.profitPct.toString()) : 0,
     taxPct: s ? parseFloat(s.taxPct.toString()) : 0,
   };
+  const salePreviewItems: { quantity: string; unitCostDirect: string }[] = [];
+  function collectSalePreviewItems(nodes: WbsViewNode[]) {
+    for (const node of nodes) {
+      if (node.costItem) {
+        salePreviewItems.push({ quantity: node.costItem.quantity, unitCostDirect: node.costItem.unitCostDirect });
+      }
+      collectSalePreviewItems(node.children);
+    }
+  }
+  collectSalePreviewItems(tree);
 
   return (
     <BudgetWbsViewProvider budgetId={budgetId}>
@@ -183,6 +202,8 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
               )}
               <BudgetLifecycleDialog
                 status={budget.status}
+                canEdit={canEditBudgets && !projectReadOnlyReason}
+                canApprove={canApproveBudgets}
                 lifecycleLog={lifecycleLog}
                 warnEmptyOnApprove={!hasLeafItems}
                 onSubmitForReview={submitForReviewAction.bind(null, budgetId, projectId)}
@@ -202,7 +223,9 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {editability.approvedOverrideActive ? (
+        {projectReadOnlyReason && <p role="status" className="rounded-lg border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">{projectReadOnlyReason}</p>}
+
+        {editability.approvedOverrideActive && !projectReadOnlyReason ? (
           <ApprovedBudgetEditBanner
             projectId={projectId}
             projectAllow={policyFlags.projectAllow}
@@ -270,7 +293,7 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
         {budget.settings ? (
           <BudgetMarginConfigSection
             defaults={settingsDefaults}
-            totalDirectCost={costStr}
+            items={salePreviewItems}
             totalSalePrice={saleStr}
             currency={budget.currency}
             editable={editable}
@@ -284,6 +307,13 @@ export default async function PresupuestoDetailPage({ params }: PageProps) {
             Sin parámetros económicos configurados.
           </section>
         )}
+        <BudgetMetadataSection
+          name={budget.name}
+          internalNotes={budget.internalNotes}
+          status={budget.status}
+          canEdit={canEditBudgets && !projectReadOnlyReason}
+          onSubmit={updateBudgetAction.bind(null, budgetId, projectId)}
+        />
       </PageShell>
     </BudgetWbsViewProvider>
   );

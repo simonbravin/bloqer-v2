@@ -1,6 +1,9 @@
 import type { LinkedEntityType, NotificationSeverity, NotificationStatus, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { isUuid } from "@bloqer/utils";
+import { companyScopeFilter } from "../company-scope";
+import { resolveAccessibleProjectScope } from "../security/access";
+import { assertTenantModuleEnabled, isTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 
 export type NotificationInboxFilter = "all" | "unread" | "read" | "archived";
@@ -90,6 +93,7 @@ function inboxStatusFilter(filter: NotificationInboxFilter): Pick<Prisma.Notific
  * Only allows creating a notification for the current user (inbox self-test / future use).
  */
 export async function createNotification(input: CreateNotificationInput, ctx: ServiceContext): Promise<{ id: string }> {
+  await assertTenantModuleEnabled(ctx, "NOTIFICATIONS");
   if (input.recipientUserId !== ctx.actorUserId) {
     throw new ServiceError("FORBIDDEN", "Solo podés crear notificaciones para tu usuario");
   }
@@ -160,6 +164,21 @@ export type ListMyNotificationsResult = {
   pageSize: number;
 };
 
+/** Re-evaluate access when reading, including notifications created before an ACL revocation. */
+async function myNotificationAccessWhere(ctx: ServiceContext): Promise<Prisma.NotificationWhereInput> {
+  const scope = await resolveAccessibleProjectScope(ctx);
+  return {
+    tenantId: ctx.tenantId,
+    recipientUserId: ctx.actorUserId,
+    AND: [
+      companyScopeFilter(ctx),
+      ...(scope === "ALL"
+        ? []
+        : [{ OR: [{ projectId: null }, { projectId: { in: scope.projectIds } }] }]),
+    ],
+  };
+}
+
 export async function listMyNotifications(
   filter: NotificationInboxFilter,
   ctx: ServiceContext,
@@ -178,9 +197,11 @@ export async function listMyNotifications(
       typeof rawSize === "number" && Number.isFinite(rawSize) ? Math.floor(rawSize) : NOTIFICATION_INBOX_PAGE_SIZE,
     ),
   );
+  if (!(await isTenantModuleEnabled(ctx, "NOTIFICATIONS"))) {
+    return { items: [], total: 0, page: 1, pageSize };
+  }
   const where = {
-    tenantId: ctx.tenantId,
-    recipientUserId: ctx.actorUserId,
+    ...await myNotificationAccessWhere(ctx),
     ...inboxStatusFilter(filter),
   };
 
@@ -204,10 +225,10 @@ export async function listMyNotifications(
 }
 
 export async function getUnreadNotificationCount(ctx: ServiceContext): Promise<number> {
+  if (!(await isTenantModuleEnabled(ctx, "NOTIFICATIONS"))) return 0;
   return prisma.notification.count({
     where: {
-      tenantId: ctx.tenantId,
-      recipientUserId: ctx.actorUserId,
+      ...await myNotificationAccessWhere(ctx),
       status: "UNREAD",
     },
   });
@@ -222,12 +243,13 @@ export type NotificationBellSnapshot = {
  * Header bell: unread badge + last N non-archived notifications (read or unread).
  */
 export async function getNotificationBellSnapshot(ctx: ServiceContext): Promise<NotificationBellSnapshot> {
+  if (!(await isTenantModuleEnabled(ctx, "NOTIFICATIONS"))) return { unreadCount: 0, items: [] };
+  const accessWhere = await myNotificationAccessWhere(ctx);
   const [unreadCount, rows] = await Promise.all([
-    getUnreadNotificationCount(ctx),
+    prisma.notification.count({ where: { ...accessWhere, status: "UNREAD" } }),
     prisma.notification.findMany({
       where: {
-        tenantId: ctx.tenantId,
-        recipientUserId: ctx.actorUserId,
+        ...accessWhere,
         status: { in: ["UNREAD", "READ"] },
       },
       orderBy: { createdAt: "desc" },
@@ -245,12 +267,12 @@ function assertOwnNotificationId(notificationId: string): void {
 }
 
 export async function markNotificationAsRead(notificationId: string, ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "NOTIFICATIONS");
   assertOwnNotificationId(notificationId);
   const res = await prisma.notification.updateMany({
     where: {
+      ...await myNotificationAccessWhere(ctx),
       id: notificationId,
-      tenantId: ctx.tenantId,
-      recipientUserId: ctx.actorUserId,
       status: "UNREAD",
     },
     data: { status: "READ", readAt: new Date() },
@@ -261,12 +283,12 @@ export async function markNotificationAsRead(notificationId: string, ctx: Servic
 }
 
 export async function markNotificationAsUnread(notificationId: string, ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "NOTIFICATIONS");
   assertOwnNotificationId(notificationId);
   const res = await prisma.notification.updateMany({
     where: {
+      ...await myNotificationAccessWhere(ctx),
       id: notificationId,
-      tenantId: ctx.tenantId,
-      recipientUserId: ctx.actorUserId,
       status: "READ",
     },
     data: { status: "UNREAD", readAt: null },
@@ -277,10 +299,10 @@ export async function markNotificationAsUnread(notificationId: string, ctx: Serv
 }
 
 export async function markAllNotificationsAsRead(ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "NOTIFICATIONS");
   await prisma.notification.updateMany({
     where: {
-      tenantId: ctx.tenantId,
-      recipientUserId: ctx.actorUserId,
+      ...await myNotificationAccessWhere(ctx),
       status: "UNREAD",
     },
     data: { status: "READ", readAt: new Date() },
@@ -288,12 +310,12 @@ export async function markAllNotificationsAsRead(ctx: ServiceContext): Promise<v
 }
 
 export async function archiveNotification(notificationId: string, ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "NOTIFICATIONS");
   assertOwnNotificationId(notificationId);
   const res = await prisma.notification.updateMany({
     where: {
+      ...await myNotificationAccessWhere(ctx),
       id: notificationId,
-      tenantId: ctx.tenantId,
-      recipientUserId: ctx.actorUserId,
       status: { in: ["UNREAD", "READ"] },
     },
     data: { status: "ARCHIVED", archivedAt: new Date() },

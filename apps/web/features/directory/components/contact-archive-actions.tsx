@@ -55,7 +55,7 @@ export function ContactArchiveActions({ contactId, status }: ContactArchiveActio
           {isPending ? "Reactivando..." : "Reactivar"}
         </Button>
       )}
-      {error ? <p className="max-w-xs text-right text-xs text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="max-w-xs text-right text-xs text-destructive">{error}</p> : null}
     </div>
   );
 }

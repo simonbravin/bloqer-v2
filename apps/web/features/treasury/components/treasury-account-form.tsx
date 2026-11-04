@@ -18,6 +18,7 @@ interface Props {
 }
 
 export function TreasuryAccountForm(_props: Props) {
+  void _props;
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);

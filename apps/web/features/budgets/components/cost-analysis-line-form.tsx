@@ -2,7 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useTransition } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { DecimalInput, bindRhfNumberDecimal } from "@/components/ui/decimal-input";
@@ -22,8 +22,6 @@ import {
   canUseTotalPartidaMode,
   convertApuEntryMode,
   isGlobalUnit,
-  previewApuEntry,
-  toStoredApuLine,
   type ApuEntryMode,
 } from "@bloqer/domain";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES } from "@/lib/budget-categories";
@@ -31,6 +29,8 @@ import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
 import { ApuEntryModeToggle } from "./apu-entry-mode-toggle";
 import { formatQtyFromString } from "@/lib/format-money";
+import { useBudgetAction } from "../lib/use-budget-action";
+import { previewMoneyApuEntry as previewApuEntry, toStoredMoneyApuLine as toStoredApuLine } from "../lib/apu-money";
 
 type CreateMode = {
   mode: "create";
@@ -62,11 +62,11 @@ type EditMode = {
   onSubmit: (data: UpdateCostAnalysisLineInput) => Promise<{ ok: true } | { error: string }>;
 };
 
-type CostAnalysisLineFormProps = (CreateMode | EditMode) & { onDone: () => void };
+type CostAnalysisLineFormProps = (CreateMode | EditMode) & { onDone: () => void; onPendingChange?: (pending: boolean) => void };
 
 export function CostAnalysisLineForm(props: CostAnalysisLineFormProps) {
-  const [isPending, startTransition] = useTransition();
   const [serverError, setServerError] = useState<string | null>(null);
+  const { isPending, run: startTransition } = useBudgetAction(setServerError, props.onPendingChange);
 
   if (props.mode === "create") {
     return <CreateLineForm {...props} isPending={isPending} startTransition={startTransition} serverError={serverError} setServerError={setServerError} />;
@@ -76,7 +76,7 @@ export function CostAnalysisLineForm(props: CostAnalysisLineFormProps) {
 
 type Shared = {
   isPending: boolean;
-  startTransition: ReturnType<typeof useTransition>[1];
+  startTransition: ReturnType<typeof useBudgetAction>["run"];
   serverError: string | null;
   setServerError: (e: string | null) => void;
   onDone: () => void;
@@ -285,6 +285,7 @@ function LineFormFields({
   itemUnit?: string;
   legacyLumpHint?: boolean;
 }) {
+  const formId = useId();
   const category = form.watch("category");
   const lineUnit = form.watch("unit") ?? "";
   const coef = Number(form.watch("coefficient")) || 0;
@@ -302,6 +303,7 @@ function LineFormFields({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
+      <fieldset disabled={isPending} className="min-w-0 space-y-4">
       <ApuEntryModeToggle
         value={entryMode}
         onChange={onEntryModeChange}
@@ -317,9 +319,9 @@ function LineFormFields({
 
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label>Categoría *</Label>
+          <Label htmlFor={`${formId}-category`}>Categoría *</Label>
           <Select value={category} onValueChange={(v) => form.setValue("category", v)}>
-            <SelectTrigger>
+            <SelectTrigger id={`${formId}-category`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -333,8 +335,9 @@ function LineFormFields({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label title="Global = importe sin cantidad comprable">Unidad *</Label>
+          <Label htmlFor={`${formId}-unit`} title="Global = importe sin cantidad comprable">Unidad *</Label>
           <UnitSelect
+            id={`${formId}-unit`}
             value={form.watch("unit") ?? ""}
             onChange={(v) => form.setValue("unit", v, { shouldValidate: true })}
           />
@@ -345,8 +348,8 @@ function LineFormFields({
       </div>
 
       <div className="space-y-1.5">
-        <Label>Descripción *</Label>
-        <Input placeholder="Hormigón H-21 elaborado en planta" {...form.register("description")} />
+        <Label htmlFor={`${formId}-description`}>Descripción *</Label>
+        <Input id={`${formId}-description`} placeholder="Hormigón H-21 elaborado en planta" {...form.register("description")} />
         {form.formState.errors.description && (
           <p className="text-xs text-destructive">{form.formState.errors.description.message}</p>
         )}
@@ -354,24 +357,27 @@ function LineFormFields({
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
-          <Label>{entryMode === "total" ? "Cant. recurso" : "Rendim."}</Label>
+          <Label htmlFor={`${formId}-coefficient`}>{entryMode === "total" ? "Cant. recurso" : "Rendim."}</Label>
           <DecimalInput
+            id={`${formId}-coefficient`}
             {...bindRhfNumberDecimal(form.watch("coefficient"), (n) =>
               form.setValue("coefficient", n, { shouldValidate: true, shouldDirty: true }),
             )}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Precio</Label>
+          <Label htmlFor={`${formId}-price`}>Precio</Label>
           <DecimalInput
+            id={`${formId}-price`}
             {...bindRhfNumberDecimal(form.watch("unitCost"), (n) =>
               form.setValue("unitCost", n, { shouldValidate: true, shouldDirty: true }),
             )}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Total</Label>
+          <Label htmlFor={`${formId}-total`}>Total</Label>
           <Input
+            id={`${formId}-total`}
             value={formatPreview(entryProduct)}
             readOnly
             className="bg-muted/50 font-mono text-sm"
@@ -387,12 +393,17 @@ function LineFormFields({
       </p>
 
       <div className="space-y-1.5">
-        <Label>Notas</Label>
-        <Textarea rows={2} placeholder="Observaciones..." {...form.register("notes")} />
+        <Label htmlFor={`${formId}-notes`}>Notas</Label>
+        <Textarea id={`${formId}-notes`} rows={2} placeholder="Observaciones..." {...form.register("notes")} />
       </div>
+      </fieldset>
+
+      {Object.entries(form.formState.errors).filter(([field]) => field !== "description" && field !== "unit").map(([field, error]) => (
+        <p key={field} role="alert" className="text-sm text-destructive">{error && typeof error === "object" && "message" in error ? String(error.message) : "Revisá este campo"}</p>
+      ))}
 
       {serverError && (
-        <p className="text-sm text-destructive">{serverError}</p>
+        <p role="alert" className="text-sm text-destructive">{serverError}</p>
       )}
 
       <div className="flex justify-end gap-2">

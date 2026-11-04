@@ -1,0 +1,928 @@
+{
+  "date": "2026-11-03",
+  "closedAt": "2026-11-03T19:30:59.909Z",
+  "status": "AG-01 corregida y verificada localmente y en PostgreSQL aislado",
+  "head": "3b5ae7a038465ad6b3d60cde19c278a31019e165",
+  "branch": "codex/pruebas",
+  "previous": "2026-11-03-ag-00-remediation.md",
+  "report": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-03-ag-01-identity-access.md",
+  "nextPhase": "AG-02; no iniciada, esperar indicación del usuario",
+  "resolutions": [
+    {
+      "id": "GA-AG-01-001",
+      "priority": "P1",
+      "title": "JWT de Credentials posterior a reset",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "El callback reemplazaba el epoch autenticado con una lectura más reciente de User; un login con la clave anterior podía recibir el epoch nuevo. `session-password-epoch` conserva el valor que realmente autenticó Credentials. Regresión del callback/helper y gate existente."
+    },
+    {
+      "id": "GA-AG-01-002",
+      "priority": "P1",
+      "title": "Reactivación involuntaria de cuenta",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Verify/reset/takeover y eventos de Google podían sobrescribir suspensión concurrente por actualizaciones basadas en una lectura anterior. Se usan predicados de estado y comprobación del resultado; Google exige `email_verified === true`. Tests unitarios y SQL intercalan suspensión entre lectura y escritura. No se afirma explotación observada en Google real."
+    },
+    {
+      "id": "GA-AG-01-003",
+      "priority": "P2",
+      "title": "Tokens y bloqueo invertido",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Emisión leía/borraba/creaba fuera de una sección serializada y podía duplicar tokens/evitar cooldown; consumo y takeover podían tomar locks en orden inverso. Emisión/verify/reset/takeover comparten advisory por email y revalidan expiración después de esperar. SQL prueba concurrencia y consumo único."
+    },
+    {
+      "id": "GA-AG-01-004",
+      "priority": "P2",
+      "title": "Contraseñas Unicode truncadas",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "El máximo de caracteres no limitaba los bytes que acepta bcrypt. Registro/reset validan 72 bytes UTF-8; login conserva compatibilidad histórica. Se actualizaron hints y ayuda. Tests ASCII/acentos/emojis/límite."
+    },
+    {
+      "id": "GA-AG-01-005",
+      "priority": "P1",
+      "title": "Anclaje inválido ampliaba sesión",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Una empresa explícita inexistente/inactiva/ajena terminaba en companyId null, que significa global. Ahora se descarta esa membresía para sesión; se prueban fallback válido y membresía sin roles. El onboarding informa acceso no disponible, conserva invitaciones y ofrece cerrar sesión."
+    },
+    {
+      "id": "GA-AG-01-006",
+      "priority": "P1",
+      "title": "IDs y shell de proyecto",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Shell/cliente y varias mutaciones comprobaban solo tenant; el ACL central tampoco comprobaba empresa. `requireProjectAccess`/`canAccessProject`, scope, shell, ID, listados y lifecycle intersectan empresa y ACL; null compartido sigue permitido. SQL usa dos tenants, dos empresas, obra compartida y ambos modos. El alta de factura desde certificación usa esos helpers mínimos para sus datos fiscales: no depende de obtener el registro completo del módulo Proyectos cuando AR está habilitado."
+    },
+    {
+      "id": "GA-AG-01-007",
+      "priority": "P1",
+      "title": "Preferencia y pendientes de Field",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Un proyecto preferido podía saltar la asignación; consultas/conteos omitían empresa. Preferencia, agenda, pickers y pendientes usan alcance vigente antes de consultar. SQL negativo y positivo, incluida preferencia revocada."
+    },
+    {
+      "id": "GA-AG-01-008",
+      "priority": "P1",
+      "title": "Avisos fuera de alcance actual",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Campana/inbox y sus mutaciones podían conservar datos de obras revocadas o de otra empresa; fan-out omitía algunos controles. Se limita lectura/mutación y audiencia por tenant, destinatario, empresa y ACL, aplicando D-092. SQL comprueba revocación posterior a entrega."
+    },
+    {
+      "id": "GA-AG-01-009",
+      "priority": "P1",
+      "title": "Administración de asignaciones",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "El editor revelaba empresas ajenas; reemplazos leían el diff fuera de transacción y logs podían fallar después del cambio. Ahora editor y destino se intersectan; lock/lectura/diff/cambio/log son atómicos. Se conservan asignaciones ocultas/canceladas. SQL prueba reemplazos paralelos, importación y rollback de cinco mutaciones."
+    },
+    {
+      "id": "GA-AG-01-010",
+      "priority": "P1",
+      "title": "Último propietario",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Dos demociones/desactivaciones podían dejar cero OWNER; una cuenta suspendida contaba como reemplazo. Equipo y estado global usan el mismo lock tenant y cuentan cuentas+membresías ACTIVE. SQL prueba las tres combinaciones concurrentes y el segundo propietario suspendido; plataforma expone también el estado de cuenta para recuperar acceso."
+    },
+    {
+      "id": "GA-AG-01-011",
+      "priority": "P1",
+      "title": "Invitaciones concurrentes y expiración",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Creación tenant/plataforma podía duplicar PENDING; cancelar/aceptar/cambiar tenant y auditar no compartían una sección atómica. Se unificó el lock y se releyó el estado. La transición EXPIRED se confirma antes de devolver conflicto. SQL cubre creación mixta, email incorrecto, reuso, cancelación/aceptación y vencidos."
+    },
+    {
+      "id": "GA-AG-01-012",
+      "priority": "P2",
+      "title": "Configuración incompleta o perdida",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Null explícito de sitio/IVA se convertía en undefined; la empresa editable ignoraba anclaje; notas parciales podían pisarse y auditoría fallar después de guardar. Se conserva null, se limita empresa y se serializa lectura/merge/cambio/log. SQL verifica persistencia, dos notas paralelas y rollback de empresa+tenant; se aplicó atomicidad a altas legacy de tenant/empresa/membresía."
+    },
+    {
+      "id": "GA-AG-01-013",
+      "priority": "P2",
+      "title": "Seguimiento SaaS",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Extensiones leían fecha antes del lock y perdían un incremento; atención cortaba en 300 antes de filtrar y el redondeo de días podía clasificar un trial recién vencido como por vencer. Lectura/cálculo bajo lock, predicados en DB sin corte prematuro y cálculo consistente. Se incluyen cuentas suspendidas en la detección de falta de propietarios. SQL prueba más de 300 organizaciones e incrementos simultáneos."
+    },
+    {
+      "id": "GA-AG-01-014",
+      "priority": "P2",
+      "title": "Límite público del servicio de usuarios",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Varias funciones devolvían User completo; perfil no exigía cuenta/tenant/membresía activos ni auditoría atómica. DTO selecciona campos públicos y la mutación valida actividad y registra dentro de transacción. La acción actual ya descartaba el resultado: **no se confirmó fuga de hashes al navegador**. Estado global no tiene consumidor web actual."
+    },
+    {
+      "id": "GA-AG-01-015",
+      "priority": "P2",
+      "title": "Logo y limpieza",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Pointer y auditoría separados, snapshots previos y cleanup concurrente podían dejar inconsistencia. Upload único antes de transacción; lectura+pointer+log bajo lock; limpieza después de commit y compensación solo si el nuevo objeto no está vigente. Ante commit incierto o DB inaccesible se conserva el objeto. Ocho tests con SDK R2 sustituido; no hubo R2 real."
+    },
+    {
+      "id": "GA-AG-01-016",
+      "priority": "P1",
+      "title": "Disponibilidad distinta de la navegación",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Entradas directas y formularios de proyectos/configuración/policies/avisos no siempre aplicaban el flag. Se combinaron rol+flag en servidor/UI, preservando lecturas operativas, perfil personal, aceptación pública e independencia de plataforma. Shell admite AP habilitado con PROJECTS apagado; NOTIFICATIONS off compone lecturas vacías. Tests unitarios y SQL de las ramas correspondientes."
+    },
+    {
+      "id": "GA-AG-01-017",
+      "priority": "P2",
+      "title": "Alta de organizaciones con igual nombre",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Actores distintos podían elegir el mismo slug entre consulta e inserción. Bundle compartido serializa por base de slug; onboarding y provisión admiten espera acotada de transacción (30 s). La prueba SQL encontró el timeout implícito de 5 s; corregido y repetido, incluido onboarding contra provisión de plataforma."
+    },
+    {
+      "id": "GA-AG-01-018",
+      "priority": "P3",
+      "title": "Terminología de administración",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Estados/roles técnicos aparecían sin traducir y la empresa automática se llamaba «Sin asignar». Se reutilizaron labels españoles, se aclaró **Automática si hay una sola empresa**, y acceso global conservando alcance de empresa. Tipos/lint y revisión de código; apariencia en navegador no ejecutada."
+    },
+    {
+      "id": "GA-AG-01-019",
+      "priority": "P2",
+      "title": "Filtros de registro producían error de servidor",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "URL con tenant inválido/límite fraccional o fuera de rango llegaba como excepción de validación. El parser usa el schema canónico, mantiene una consulta inválida sin ejecutar y muestra feedback; pruebas de valores válidos, repetidos y malformados."
+    },
+    {
+      "id": "GA-AG-01-020",
+      "priority": "P2",
+      "title": "Destino inseguro de fixtures D-111",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Suites opt-in aceptaban desarrollo normal por fragmentos de URL y fallback `.env`; sus fixtures modifican estados/contraseñas sintéticas y no debían ejecutarse allí. Exigen ahora base aislada explícita, host exacto, ambas URLs e identidad SQL; liberan conexión al terminar. Se reutiliza guard mantenido con regresiones, sin scripts de parche."
+    },
+    {
+      "id": "GA-AG-01-021",
+      "priority": "P2",
+      "title": "Ciclo de imports de política de email",
+      "status": "corregido y verificado en el alcance del informe",
+      "resolution": "Importar el servicio directamente recorría runner→alertas→email→constante aún no inicializada. El servicio de política usa RBAC puro con el mismo conjunto actual de actores y elimina ese ciclo. Prueba de importación/uso y getters con configuración apagada."
+    }
+  ],
+  "checks": [
+    {
+      "name": "verified-lint",
+      "args": [
+        "run",
+        "lint",
+        "--force",
+        "--concurrency=2"
+      ],
+      "start": "2026-11-03T19:25:22.628Z",
+      "end": "2026-11-03T19:26:24.110Z",
+      "exitCode": 0
+    },
+    {
+      "name": "verified-typecheck",
+      "args": [
+        "run",
+        "typecheck",
+        "--force",
+        "--concurrency=2"
+      ],
+      "start": "2026-11-03T19:25:22.640Z",
+      "end": "2026-11-03T19:26:48.226Z",
+      "exitCode": 0
+    },
+    {
+      "name": "verified-tests",
+      "args": [
+        "run",
+        "test",
+        "--force",
+        "--concurrency=2"
+      ],
+      "start": "2026-11-03T19:25:22.649Z",
+      "end": "2026-11-03T19:26:12.413Z",
+      "exitCode": 0
+    }
+  ],
+  "unitTests": {
+    "total": {
+      "tests": 1725,
+      "pass": 1725,
+      "fail": 0,
+      "skipped": 0
+    },
+    "skippedSuites": 13,
+    "discovery": {
+      "at": "2026-11-03T19:21:24.414Z",
+      "allFiles": 249,
+      "selectedFiles": 249,
+      "missing": [],
+      "packages": [
+        {
+          "name": "@bloqer/web",
+          "script": "node --import ../../packages/services/node_modules/tsx/dist/loader.mjs --test \"components/**/*.test.ts\" \"features/**/*.test.ts\" \"hooks/**/*.test.ts\" \"lib/**/*.test.ts\" && node --conditions react-server --test \"features/**/*.test.mjs\"",
+          "patterns": [
+            "components/**/*.test.ts",
+            "features/**/*.test.ts",
+            "hooks/**/*.test.ts",
+            "lib/**/*.test.ts",
+            "features/**/*.test.mjs"
+          ],
+          "files": 32
+        },
+        {
+          "name": "@bloqer/ai",
+          "script": "node --import tsx --test \"src/**/*.test.ts\"",
+          "patterns": [
+            "src/**/*.test.ts"
+          ],
+          "files": 6
+        },
+        {
+          "name": "@bloqer/auth",
+          "script": "node --import ../services/node_modules/tsx/dist/loader.mjs --test \"src/**/*.test.ts\"",
+          "patterns": [
+            "src/**/*.test.ts"
+          ],
+          "files": 2
+        },
+        {
+          "name": "@bloqer/domain",
+          "script": "node --import tsx --test \"src/**/*.test.ts\"",
+          "patterns": [
+            "src/**/*.test.ts"
+          ],
+          "files": 10
+        },
+        {
+          "name": "@bloqer/email",
+          "script": "node --import tsx --test \"src/**/*.test.ts\"",
+          "patterns": [
+            "src/**/*.test.ts"
+          ],
+          "files": 1
+        },
+        {
+          "name": "@bloqer/report-pdf",
+          "script": "node --import tsx --test \"src/**/*.test.ts\" \"src/**/*.test.tsx\"",
+          "patterns": [
+            "src/**/*.test.ts",
+            "src/**/*.test.tsx"
+          ],
+          "files": 5
+        },
+        {
+          "name": "@bloqer/services",
+          "script": "node --import tsx --test \"src/**/*.test.ts\" && node --conditions react-server --import tsx --test \"src/**/*.test.mts\"",
+          "patterns": [
+            "src/**/*.test.ts",
+            "src/**/*.test.mts"
+          ],
+          "files": 179
+        },
+        {
+          "name": "@bloqer/utils",
+          "script": "node --import tsx --test \"src/**/*.test.ts\"",
+          "patterns": [
+            "src/**/*.test.ts"
+          ],
+          "files": 9
+        },
+        {
+          "name": "@bloqer/validators",
+          "script": "node --import ../services/node_modules/tsx/dist/loader.mjs --test \"src/**/*.test.ts\"",
+          "patterns": [
+            "src/**/*.test.ts"
+          ],
+          "files": 5
+        }
+      ]
+    }
+  },
+  "sql": {
+    "target": {
+      "createdAt": "2026-11-03T18:44:59.118Z",
+      "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+      "database": "bloqer_audit_ag01_20261103",
+      "source": "empty database on verified development compute; no data copied; local env unchanged"
+    },
+    "existingMigrationsApplied": 70,
+    "newProductMigrations": 0,
+    "distinctCasesPassed": 91,
+    "runs": [
+      {
+        "start": "2026-11-03T19:10:57.273Z",
+        "end": "2026-11-03T19:16:08.671Z",
+        "files": [
+          "src/auth/credentials-auth.live.test.mts",
+          "src/user/user.service.live.test.ts",
+          "src/onboarding/onboarding.audit.live.test.ts",
+          "src/tenant-settings/tenant-settings.audit.live.test.ts",
+          "src/security/access.audit.live.test.ts",
+          "src/tenant-settings/tenant-administration.live.test.ts"
+        ],
+        "exitCode": 0,
+        "tests": 67,
+        "pass": 67,
+        "fail": 0,
+        "suites": 6,
+        "skipped": 0
+      },
+      {
+        "name": "live-platform-owner-final",
+        "start": "2026-11-03T19:19:02.149Z",
+        "end": "2026-11-03T19:19:13.026Z",
+        "args": [
+          "--test-name-pattern=suspended owner accounts",
+          "src/tenant-settings/tenant-administration.live.test.ts"
+        ],
+        "exitCode": 0,
+        "tests": 1,
+        "pass": 1,
+        "fail": 0,
+        "skipped": 0
+      },
+      {
+        "name": "live-d111-regression",
+        "start": "2026-11-03T19:19:13.027Z",
+        "end": "2026-11-03T19:22:31.177Z",
+        "args": [
+          "src/ai/d111-scoped-live.test.ts",
+          "src/project/project-membership.phase-c.live.test.ts"
+        ],
+        "exitCode": 0,
+        "tests": 23,
+        "pass": 23,
+        "fail": 0,
+        "skipped": 0
+      }
+    ],
+    "externalEmailDisabled": true,
+    "localEnvUnchanged": true,
+    "productionWrites": false
+  },
+  "sourceFiles": [
+    {
+      "file": "apps/web/app/(app)/configuracion/equipo/[membershipId]/page.tsx",
+      "sha256": "c47c27b55b4fa4036e0ef51ac0b88712125a239dd7767542973df5f7adfb3a40",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/equipo/invitaciones/[invitationId]/page.tsx",
+      "sha256": "74c65473e29e05beb3a4c597620e342f55937fc3a58a65de96187f94692e5056",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/equipo/invitar/page.tsx",
+      "sha256": "917438fe0e64adf6a2ea6f5db8134b5c5cae3056411c3b7eba010e31f3cccc39",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/equipo/page.tsx",
+      "sha256": "f969e08cedb13b383bccb1daed405d228b438b9122f3f47c09764f4a4ef2f475",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/page.tsx",
+      "sha256": "bc7081d07d8d1a7a5ef365e8a0fe949536db3666bc2c6deab50132aa603410a8",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/permisos/page.tsx",
+      "sha256": "88e7460898e9a9a0c3b9f09648662e4859c4be821358a5a427392e47d71920ba",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(app)/configuracion/politicas/page.tsx",
+      "sha256": "b4228b24588bc5c29ec3038de111705f2b8f559e9c25e7b0ad3dfd5775e7549c",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/page.tsx",
+      "sha256": "cc9fb473d6632a90a6d82bde75c507f87fb7926d8cfc59adb499261d09227e0a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/registro/page.tsx",
+      "sha256": "56e67f36b85f37b6b17de171c636633acb01f1ddd11a916d97a3970f18b08fe5",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/[tenantId]/invitations/[invitationId]/page.tsx",
+      "sha256": "b37a56a12f72d7c846127cd98c68a90922f845e719b4286d54076c90031c1c7f",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/[tenantId]/invitations/page.tsx",
+      "sha256": "a243c6e3e819a0fcfe2eddbc049272fa2865522f2ba99aa0a6498a759ce21a53",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/[tenantId]/page.tsx",
+      "sha256": "6a14c88cda4d09b5ccaf52264676d51dedc42b65de63128d7bb7df26f0b77bc1",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/[tenantId]/settings/page.tsx",
+      "sha256": "2ad46060dfb58ea2a6ba2bc8e03c8a8a2d6c5a0672f299a76835f2d32ab30bf7",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/[tenantId]/users/page.tsx",
+      "sha256": "f1fba3b21b420fb83354bf3af5632e02dded66670cccc596d4916132fdd61061",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/new/page.tsx",
+      "sha256": "6da636551e71c655d52c348303bc55725836ec4ebf44af660795a19b2722ae3e",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/tenants/page.tsx",
+      "sha256": "0af24ba64c0adc00313d3cd298f911dddc6c4c01de29e2411d2be3f00d82ec43",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/(platform)/platform/vencimientos/page.tsx",
+      "sha256": "f0a37d3c61fe2ffdd42b3cae2958321b3128706ae89aea1e48308f78c02ae08a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/onboarding/actions.ts",
+      "sha256": "2de294697de81ffd46827b9b0a6288ec3d0ffba7784ad970848d65013026b53f",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/app/onboarding/page.tsx",
+      "sha256": "3d6b19a2bf673842e886d07f97081b844c8f63703ba52ab5ab99a89f9348d605",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/auth/components/register-form.tsx",
+      "sha256": "5615a4bcede8a91f190eb132d347fc3163fb23f3a5f3e4f87282fe0a74d75488",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/auth/components/reset-password-form.tsx",
+      "sha256": "97efd557b54f65ae8eb7e9b74e35699ac35c05d370ceb12e1c97896ede87f09c",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/help/lib/articles/control.ts",
+      "sha256": "bd98d0819d8c03165a166ae12dad04c5a9b019efd2275ed8a608a228471fea28",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/help/lib/articles/setup-treasury.ts",
+      "sha256": "a3fcbbb5714e3fc4f83bfb8f12d6c07f1d0bfe6a16d231983d6552a88cb43a2b",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/platform/company-onboarding-fields.tsx",
+      "sha256": "0bea6a0215494daae1dbf867c83fda00815a15d98d4ba2e6f9c0abec87dca445",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/platform/platform-audit-labels.ts",
+      "sha256": "ca23d2e39bcaacc744156962d018fe1d63ce1cdaadd1e542ce71e9d30f5c5d3a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/platform/platform-tenant-alerts.tsx",
+      "sha256": "fa2aa9634f83dc564eab006ff238318d39589a0ba58f686f2d8fc776161d2c31",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/platform/tenant-invitation-form.tsx",
+      "sha256": "2d264e4d3e6646c15986e6e8ac1947c9d5dee3eae70b1b093efac94dc7484884",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/features/tenant-config/components/user-project-access-section.tsx",
+      "sha256": "d64a3df8f2b8329326a9376d475e1fa29e0e42c4a2cdc377f5c5a54b49c2e7de",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/01-domain/STATE_MACHINES.md",
+      "sha256": "a98f391df459b39b7889c17d234e5c7743b379725b6050f4624cada9f5d1b84a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/02-modules/NOTIFICATIONS.md",
+      "sha256": "cbd65d550417cbe7bea76f2f1141d8ac195ad415d6f67cf82e14019d8aca404a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/02-modules/USERS_AND_PERMISSIONS.md",
+      "sha256": "aa372c0b1adff6ab5175677b476f02396dee9a54546726386b5a009e16e95956",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/AUTH_ARCHITECTURE.md",
+      "sha256": "032ce5e01cc02207509a10060c87abf29d098b7f9d232207bf96cfea3ba75a9a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/PENDING_ARCHITECTURE_ITEMS.md",
+      "sha256": "8fb77fa8bbd17b9a8d5463c8fec92f1bd4ead26ba4a261c8e56b929abe203303",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/PERMISSIONS_ROUTE_MATRIX.md",
+      "sha256": "75b77b504a0395b6fe42b93a3b011e14bb3a02896d6e0d62d4c5c45dd85202dd",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/SAAS_ONBOARDING_ARCHITECTURE.md",
+      "sha256": "b8bca5b6452b58efc9cd1b6bc40add7cff67081ff5ce1d6bf56af8378d046fb3",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/TENANT_COMPANY_SCOPING.md",
+      "sha256": "a74a2f26416a664a1a73693562da3129441414e2bca5214fa89d5706078d52f0",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/TESTING_STRATEGY.md",
+      "sha256": "5bec69e11323f4d8698a0d262613ae79bc0cd64986bbdca78f7b398b3096ecae",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
+      "sha256": "19a8b82de66630b1c2228a524dd3cdeb41b462a886d50c6574310cc7c6dd9add",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/ai/knowledge/generated/docs-index.json",
+      "sha256": "4820e631d18a9a6c40f7c4d870aea41cc17baff5665f4f158e0b10747e6aa9d8",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/auth/package.json",
+      "sha256": "3e5702b20793d46e40f6b4e21d6bca3066b0e152c5ef5ba98641cbf0ab2210e2",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/auth/src/auth.ts",
+      "sha256": "de2f4b3f0d3f711b25610623e8798d802cb5fd129c83b539f7bdc5274aac28f8",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/package.json",
+      "sha256": "0d4bafce6f29530957ef1815ac4bdead2ebabfa1c9f9c7f833e2472999a05085",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/ai/d111-scoped-live.test.ts",
+      "sha256": "de5fc6705ffb16328b5038c8339468e1e92960217ba4ee54594d4d6125909be2",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/auth/credentials-auth.service.ts",
+      "sha256": "88ea90e7c92728d37fe616bdf3888e6393003ff6cec30140184370fabccd8cd0",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/budget/approved-budget-edits.service.ts",
+      "sha256": "c7468d1648e596bc19b59f742578a2ac30709c80d97196c1987c545d1bd8c8b5",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/company/company.service.ts",
+      "sha256": "71a14b7e0fea10d9270669936c021329b9c0a6e5b2281ec9ed7e06f01c038c2b",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/field/field-home.service.ts",
+      "sha256": "9ab2471d94e0c93de043f557e4dc713a14489a0ddb16e8cd5b89a4d241877fb3",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/field/field-pending.service.ts",
+      "sha256": "d494f08d89bc9d65a5f1bfc26e74c052db12b6e2c9d524cd3c444a46d41976fd",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/membership/membership.service.ts",
+      "sha256": "1c27c930a849afc8b93c34994bd40dcfd693284a75a5d6321d334bc16f197cd5",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/notifications/notification-email-preference.service.ts",
+      "sha256": "b138c66f1de2ae64073c8237df0b02a742f793e6492ec7d4b05fb2911fa0e4fb",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/notifications/notification.service.ts",
+      "sha256": "4742b105c74d27195a185759341b5f909e8d7c65bb0a8dcd0619167a5b4c15a6",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/onboarding/onboarding.service.ts",
+      "sha256": "96f41339320c5dbbbc693f5bdec5aa9400fb97a0d225b67deeb946571aa566b5",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/onboarding/trial-tenant-bundle.ts",
+      "sha256": "19e77692def7701e1c5aa1f792cca3a70710c59afcf590670db041013027ce64",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/platform/platform-operations.service.ts",
+      "sha256": "0802e7128537d686330d796e85bba970b0b5124586c90911cd8decf976381123",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/platform/platform-tenant-invitations.service.ts",
+      "sha256": "ed35bbe6f536d2e05df1e87b60a420be36caaead981f4560ef82d961a9229719",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/platform/platform-tenant-provision.service.ts",
+      "sha256": "6f20c588fa864403ce78744b40f1442856c46db0ce0500daae2f594757d69b12",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/platform/platform-tenant.service.ts",
+      "sha256": "d57c355186b9904efc05fc2a04f39f1c1296954e7ca1f46dab7a04377da3463a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/platform/platform-user.service.ts",
+      "sha256": "8e8fe8b1e2cc614e526d0e3f21a48d988322125f879775a5421c8af34988bbce",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/procurement/company-procurement-settings.service.ts",
+      "sha256": "945b03e5f0a47071da962fbc8592959481b5b0691eaf88527754d41fbb898b75",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/project/project-membership.phase-c.live.test.ts",
+      "sha256": "095b7ae528862ecb4bc1b71384f0ea134e3a72a64b8e9e3652146271845b569d",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/project/project-membership.service.ts",
+      "sha256": "433a5b42905a55c2318c5b36070ce1bb4697d80cce23dbd5d71a7244ce4fb1f7",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/project/project.service.ts",
+      "sha256": "b5ece6f79dc54055ef7ae82a2b5ac86ba26954da646ca188b7b864fa48192b3a",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/security/access.ts",
+      "sha256": "c228941c15b23a13b32ee3363c74222de5ba76e009d3f28b76e1e75f7c60bde6",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/team-management.service.ts",
+      "sha256": "417393e76482c517c8d26968e695fc59360564be18a01a371998b949cae42654",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-invitations.service.ts",
+      "sha256": "7657f32ff0ecfd946c94e6a998fe603763df5ecacaefc5b180c9f75e93d6e24e",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-logo.service.ts",
+      "sha256": "c4a85f0c387fde457f42ffba5346e76ef8c2fc6c5b10ae1f5fad6099712762f3",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-settings.service.ts",
+      "sha256": "32683b622a2eb25ad4be8940ee8e399df35ca09cfc032bff4a8e2e8964deedae",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/tenant/tenant.service.ts",
+      "sha256": "ed2f449b0384ec41ff98091b900a27322e72f5a3129e7e002a3c5770051274fc",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/services/src/user/user.service.ts",
+      "sha256": "6952e14eecc0c17e8134ad55d59eed1fc8270ece5a76d9280b97306673eb8faa",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/validators/src/credentials-auth.ts",
+      "sha256": "d8e459572d46dd6abcc6abf47fe67f8f8789ac8e90d9c995c2d5827f266349d1",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "packages/validators/src/tenant-settings.ts",
+      "sha256": "73399fdc6f3ff52103737bda2490a47792dfe609d9e50d6b91f33de69f7b6499",
+      "kind": "tracked; attribution verified against AG-00 baseline or phase assignments"
+    },
+    {
+      "file": "apps/web/lib/platform-audit-filters.test.ts",
+      "sha256": "4288f448b268d8eccf5d15be4c3ac1c5cc9ec50bf03d3ee1413affd9a0f6f344",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "apps/web/lib/platform-audit-filters.ts",
+      "sha256": "6b42a2b381b46b191a6471c66b8f2cf97fe3687ec30ecde5f15a5b9629c6c70f",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "apps/web/lib/tenant-status-label.ts",
+      "sha256": "00100de292d8284a03d8c26f55a5932a17944b43ed0dde05476951e799df4c02",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/auth/src/google-email-verification.test.ts",
+      "sha256": "91dde6a25378b1b5652ddf503ff8e06f45ce57f0c14c4962028d87660b81b32a",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/auth/src/google-email-verification.ts",
+      "sha256": "a04484fee51dc593467e333de113c000decc9d8b41b772c56334bbab374f1aad",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/auth/src/session-password-epoch.test.ts",
+      "sha256": "d96f073f70feec1ad166fd9b08acb9dc077dcddd9b84ec82cc5d8abec56b2744",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/auth/src/session-password-epoch.ts",
+      "sha256": "21d7f8d887b7696d97f76129b6076b21ca3d701579b50df67b4892d3c1ac149d",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/auth/credentials-auth.live.test.mts",
+      "sha256": "5516ed2e4927dd115c3150d721a05f61fbc6ae91b7ed7ab0755dcef52695d225",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/auth/credentials-auth.service.test.mts",
+      "sha256": "aa869506191902cafe2ec355bd16eecf758d6ebc7cd03d5a9664ee5d6fa8dfba",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/field/field-isolation.test.ts",
+      "sha256": "b48ac13ea3a889fb15e9e3991c72eee843045cc0e4a74eac3bf03a49f97bae53",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/membership/membership-session.test.ts",
+      "sha256": "dab36199fe8bf9b2e00a3d53f833c454527325ce1d035a7572c558b7ab3c048b",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/notifications/notification-isolation.test.ts",
+      "sha256": "f882b099ee7651dcced6dd3ccae04910bffdd6d61253d6cfc96a9c53fcb49c49",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/onboarding/onboarding.audit.live.test.ts",
+      "sha256": "77e18c94f92ca00e900928a5c083ff9829f57ff5a9f0b47cc32e3fb08fecc11f",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/platform/platform-operations.test.ts",
+      "sha256": "31c5a41ee35ce6496a72baa8376fefdab7e08963bf3b587d24c7b38bc937c411",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/project/project-membership.service.test.ts",
+      "sha256": "510495f88c51075abb3d8d05559dfc60a06760e7cdad38a43066fa80e11af0e7",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/security/access.audit.live.test.ts",
+      "sha256": "f77563266ed40c17c662869c9d2bd31fd6fae55d0f564750860ca7c33d36690e",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/security/project-access-isolation.test.ts",
+      "sha256": "9829847ef442b3982d7fc4ba324a9aa3aed90177c1d06cce1b3a79362f480317",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/policy-module-gates.test.ts",
+      "sha256": "0dbbc48a94f3a284b7b3aecfdb1e199c92889d06d384680eacd7b62485537ef3",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/team-management.test.ts",
+      "sha256": "d051d9e85f247ba0ab07b540de5255db7bc4f17b1582060e7476d6a7713ed409",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-administration.live.test.ts",
+      "sha256": "b1b576714991beab6e717691a707f93b822671f1ef957752f4af96439867e815",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-logo.service.test.ts",
+      "sha256": "bf02d829b9a3cfcf15e91cdb8dfb1eb6cfba4c574d6f4781e982632b5d869592",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-settings-access.ts",
+      "sha256": "51ff19554b2d02535af6d72d8a767ed25f288b6c97924b3458357df9ac320f99",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/tenant-settings/tenant-settings.audit.live.test.ts",
+      "sha256": "70576855c5dfb9d9b36578930f6d1cf07aaa7676e2b53699bbe16ec5d19393e4",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/testing/audit-fixture.test.ts",
+      "sha256": "b6ac34203c6e07c072d787bb6f53e189cda48dd3e81d94990310bb16af9f5ef3",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/testing/audit-fixture.ts",
+      "sha256": "afbb4b540c209c20ef4f6c5828b7d860aa6382af03134f0ac45e03151e1fcf9a",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/user/user.service.live.test.ts",
+      "sha256": "817da9b17ffabd856cb0b89f6491ca69e625a1351c9dddd088d97bff21b6546a",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/services/src/user/user.service.test.ts",
+      "sha256": "0207e3365ae41e49446e664edf8923e2056679915bbbf0374b82f0c096e8f4bf",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/validators/src/credentials-auth.test.ts",
+      "sha256": "2bb8917f2aed40d124c07436eee9db707beb758b9eb1ed5eac952c0f8c9d1b73",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "packages/validators/src/tenant-settings.test.ts",
+      "sha256": "ce1fed71b36c0af1f6dab1d8c925751bd302c92ee31705cf4664fb97a6f38f2a",
+      "kind": "new in AG-01"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-03-ag-01-identity-access.md",
+      "sha256": "f1462c8f2b3c4b386697f5c1c3967fc9f994c9736d68a052cbf5c1317128b99c",
+      "kind": "audit documentation updated in AG-01"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/platform-audit/README.md",
+      "sha256": "33a1bcd56e6e119a435d96f373681b9e5f0957ac553f39ba09ae7d6c1891d872",
+      "kind": "audit documentation updated in AG-01"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/PLATFORM_AUDIT_PLAN.md",
+      "sha256": "0e66dd149d90ad59c237f55bf6fb88eee7a02fe8bffc9a8b69fc12ac41db9ff7",
+      "kind": "audit documentation updated in AG-01"
+    },
+    {
+      "file": "docs/bloqer2.0/08-architecture/PLATFORM_AUDIT_RUNBOOK.md",
+      "sha256": "14969d54a694126af3a75fe3ae3b71c460398ec025022cbd5730cf2ea881e26c",
+      "kind": "audit documentation updated in AG-01"
+    },
+    {
+      "file": "apps/web/app/(app)/proyectos/[id]/facturas/nueva/page.tsx",
+      "kind": "AR metadata consumer of the corrected project shell/client helpers",
+      "sha256": "be5e349dc9e43addf70b322271450ed4bbb5eae772af89029030f1a694ca2d9a"
+    }
+  ],
+  "preservedPreexisting": [
+    "docs/bloqer2.0/08-architecture/INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md",
+    "docs/bloqer2.0/README.md",
+    "docs/bloqer2.0/08-architecture/README.md",
+    "packages/services/src/ap/supplier-invoice-po-reconciliation.service.ts",
+    "packages/services/src/ap/supplier-invoice-po-reconciliation.test.ts",
+    "AG-00 prior changes and audit assets"
+  ],
+  "notExecuted": [
+    "browser/smoke",
+    "real OAuth provider",
+    "real email delivery",
+    "real R2",
+    "build/deploy",
+    "portal verification"
+  ],
+  "limitations": [
+    "249 files selected does not mean all workflows covered",
+    "13 live suites skipped in unit run; SQL runs counted separately",
+    "no new User ARCHIVED/CANCELLED flow; functional target distinguished from implemented enum",
+    "project mode cache keeps existing multi-instance TTL of 5 seconds"
+  ],
+  "knowledge": {
+    "chunks": 510,
+    "sourceHashPrefix": "e17d74b07aef",
+    "guideAndHelpUpdated": true
+  },
+  "postConsumerChecks": {
+    "at": "2026-11-03T19:30:59.908Z",
+    "reason": "Final static consumer review replaced the full project read in the certification invoice page with already verified shell/client helpers; no financial rule, route or label change.",
+    "checks": [
+      {
+        "command": "pnpm --filter @bloqer/web typecheck",
+        "exitCode": 0
+      },
+      {
+        "command": "eslint app/(app)/proyectos/[id]/facturas/nueva/page.tsx --max-warnings 0",
+        "exitCode": 0
+      }
+    ],
+    "sqlImpact": "no service changes after the 91 passing SQL cases"
+  },
+  "canvas": {
+    "file": "C:/Users/bravi/.cursor/projects/c-Dev-bloqer-v2/canvases/bloqer-platform-audit.canvas.tsx",
+    "typescriptExitCode": 0,
+    "sha256": "e61b9a488cfa6c8435ee43736771cd9472f1c243b999d2f15f2fe51d3bfd6da2"
+  }
+}

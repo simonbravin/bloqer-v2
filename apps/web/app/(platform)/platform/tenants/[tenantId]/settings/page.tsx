@@ -3,6 +3,7 @@ import { getSession } from "@/lib/auth";
 import { getPlatformTenantById, ServiceError } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { getPlatformServiceContext } from "@/lib/platform-service-context";
+import { formatSubscriptionStatusLabel, formatTenantStatusLabel } from "@/lib/tenant-status-label";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,7 +59,7 @@ export default async function PlatformTenantSettingsPage({ params }: PageProps) 
             >
               {TENANT_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {formatTenantStatusLabel(s)}
                 </option>
               ))}
             </select>
@@ -80,7 +81,7 @@ export default async function PlatformTenantSettingsPage({ params }: PageProps) 
       </section>
 
       <section className="space-y-3 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
-        <h2 className="text-sm font-semibold">Plan y trial</h2>
+        <h2 className="text-sm font-semibold">Plan y prueba</h2>
         <form action={updatePlatformTenantPlanMetadataAction} className="grid gap-3">
           <input type="hidden" name="tenantId" value={tenant.id} />
           <div className="grid gap-1">
@@ -97,21 +98,21 @@ export default async function PlatformTenantSettingsPage({ params }: PageProps) 
             >
               {SUB_STATUSES.map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {formatSubscriptionStatusLabel(s)}
                 </option>
               ))}
             </select>
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="trialEndsAt">Fin de trial</Label>
+            <Label htmlFor="trialEndsAt">Fin de la prueba</Label>
             <Input id="trialEndsAt" name="trialEndsAt" type="date" defaultValue={trialStr} />
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" name="trialClear" className="rounded border" />
-              Quitar fecha de trial
+              Quitar fecha de prueba
             </label>
           </div>
           <div className="grid gap-1">
-            <Label htmlFor="billingCustomerId">Billing customer id (placeholder)</Label>
+            <Label htmlFor="billingCustomerId">Identificador de facturación (opcional)</Label>
             <Input
               id="billingCustomerId"
               name="billingCustomerId"
@@ -120,7 +121,7 @@ export default async function PlatformTenantSettingsPage({ params }: PageProps) 
             />
             <label className="flex items-center gap-2 text-xs text-muted-foreground">
               <input type="checkbox" name="billingClear" className="rounded border" />
-              Vaciar billing customer id
+              Vaciar identificador de facturación
             </label>
           </div>
           <div className="grid gap-1">

@@ -13,6 +13,11 @@ import { ServiceContext, ServiceError } from "../types";
 import { canReadTenantConfigArea } from "../tenant-settings/tenant-settings-guards";
 import { canViewBudgetsArea } from "../project/project-nav-guards";
 import { canManageApprovedBudgetEditPolicy } from "./budget.service";
+import { assertTenantModuleEnabled, assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { projectRowIdWhereForScope, requireProjectAccess, resolveAccessibleProjectScope } from "../security/access";
+import { assertTenantConfigReadAccess } from "../tenant-settings/tenant-settings-access";
+import { lockProjectForMutation } from "../project/project-write-lock";
+import { companyScopeFilter } from "../company-scope";
 
 export type ApprovedBudgetEditsPolicyView = {
   tenantAllow: boolean;
@@ -40,6 +45,7 @@ export async function getApprovedBudgetEditsPolicy(
   if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver la política de presupuestos");
   }
+  await assertTenantConfigReadAccess(ctx);
 
   const tenant = await prisma.tenant.findFirst({
     where: { id: ctx.tenantId },
@@ -47,8 +53,9 @@ export async function getApprovedBudgetEditsPolicy(
   });
   if (!tenant) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
 
+  const scope = await resolveAccessibleProjectScope(ctx);
   const projects = await prisma.project.findMany({
-    where: { tenantId: ctx.tenantId },
+    where: { tenantId: ctx.tenantId, ...projectRowIdWhereForScope(scope) },
     select: {
       id: true,
       code: true,
@@ -64,7 +71,7 @@ export async function getApprovedBudgetEditsPolicy(
     projectIds.length === 0
       ? []
       : await prisma.budget.findMany({
-          where: { tenantId: ctx.tenantId, projectId: { in: projectIds } },
+          where: { tenantId: ctx.tenantId, projectId: { in: projectIds }, ...companyScopeFilter(ctx) },
           select: {
             projectId: true,
             name: true,
@@ -90,7 +97,7 @@ export async function getApprovedBudgetEditsPolicy(
         list.find((b) => b.status === "APPROVED" && b.parentBudgetId == null) ??
         list.find((b) => b.status === "APPROVED");
       const approvedAddenda = list.filter(
-        (b) => b.status === "APPROVED" && b.parentBudgetId != null,
+        (b) => b !== approved && b.status === "APPROVED" && b.parentBudgetId != null,
       );
       const hasApprovedBudget = Boolean(approved);
       const approvedBudgetLabel = approved
@@ -153,39 +160,44 @@ export async function updateTenantApprovedBudgetEditsPolicy(
       "Solo OWNER o ADMIN pueden cambiar la política de edición de presupuestos aprobados",
     );
   }
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
   const parsed = updateTenantApprovedBudgetEditsPolicySchema.safeParse(raw);
   if (!parsed.success) {
     throw new ServiceError("VALIDATION", "Valor inválido para la política");
   }
   const { allow } = parsed.data;
 
-  const before = await prisma.tenant.findFirst({
-    where: { id: ctx.tenantId },
-    select: { allowApprovedBudgetEconomicEdits: true },
-  });
-  if (!before) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+  return prisma.$transaction(async (tx) => {
+    // Economic writers hold SHARE from before Project/Budget locks until commit.
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    const before = await tx.tenant.findFirst({
+      where: { id: ctx.tenantId },
+      select: { allowApprovedBudgetEconomicEdits: true },
+    });
+    if (!before) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
 
-  if (before.allowApprovedBudgetEconomicEdits === allow) {
+    if (before.allowApprovedBudgetEconomicEdits === allow) {
+      return { allow };
+    }
+
+    await tx.tenant.update({
+      where: { id: ctx.tenantId },
+      data: { allowApprovedBudgetEconomicEdits: allow },
+    });
+
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "tenant.approved_budget_edits_policy.changed",
+      entityType: "Tenant",
+      entityId: ctx.tenantId,
+      before: { allowApprovedBudgetEconomicEdits: before.allowApprovedBudgetEconomicEdits },
+      after: { allowApprovedBudgetEconomicEdits: allow },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+
     return { allow };
-  }
-
-  await prisma.tenant.update({
-    where: { id: ctx.tenantId },
-    data: { allowApprovedBudgetEconomicEdits: allow },
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "tenant.approved_budget_edits_policy.changed",
-    entityType: "Tenant",
-    entityId: ctx.tenantId,
-    before: { allowApprovedBudgetEconomicEdits: before.allowApprovedBudgetEconomicEdits },
-    after: { allowApprovedBudgetEconomicEdits: allow },
-    ipAddress: ctx.ipAddress,
-  });
-
-  return { allow };
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function updateProjectApprovedBudgetEditsPolicy(
@@ -198,72 +210,77 @@ export async function updateProjectApprovedBudgetEditsPolicy(
       "Solo OWNER o ADMIN pueden habilitar edición de presupuestos aprobados por obra",
     );
   }
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
   const parsed = updateProjectApprovedBudgetEditsPolicySchema.safeParse(raw);
   if (!parsed.success) {
     throw new ServiceError("VALIDATION", "Datos inválidos");
   }
   const { projectId, allow } = parsed.data;
+  await requireProjectAccess(projectId, ctx);
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      id: true,
-      tenantId: true,
-      status: true,
-      allowApprovedBudgetEconomicEdits: true,
-      companyId: true,
-    },
-  });
-  if (!project || project.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  }
-
-  if (allow && (project.status === "CANCELLED" || project.status === "COMPLETED")) {
-    throw new ServiceError(
-      "CONFLICT",
-      "No se puede habilitar edición de presupuestos aprobados en una obra cancelada o finalizada",
-    );
-  }
-
-  if (allow) {
-    const approved = await prisma.budget.findFirst({
-      where: { projectId, tenantId: ctx.tenantId, status: "APPROVED" },
-      select: { id: true },
+  return prisma.$transaction(async (tx) => {
+    await lockProjectForMutation(tx, projectId, ctx.tenantId);
+    const project = await tx.project.findUnique({
+      where: { id: projectId },
+      select: {
+        id: true,
+        tenantId: true,
+        status: true,
+        allowApprovedBudgetEconomicEdits: true,
+        companyId: true,
+      },
     });
-    if (!approved) {
+    if (!project || project.tenantId !== ctx.tenantId) {
+      throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+    }
+
+    if (allow && (project.status === "CANCELLED" || project.status === "COMPLETED")) {
       throw new ServiceError(
         "CONFLICT",
-        "Esta obra no tiene un presupuesto aprobado. Aprobá uno antes de habilitar la edición excepcional.",
+        "No se puede habilitar edición de presupuestos aprobados en una obra cancelada o finalizada",
       );
     }
-  }
 
-  if (project.allowApprovedBudgetEconomicEdits === allow) {
+    if (allow) {
+      const approved = await tx.budget.findFirst({
+        where: { projectId, tenantId: ctx.tenantId, status: "APPROVED", ...companyScopeFilter(ctx) },
+        select: { id: true },
+      });
+      if (!approved) {
+        throw new ServiceError(
+          "CONFLICT",
+          "Esta obra no tiene un presupuesto aprobado. Aprobá uno antes de habilitar la edición excepcional.",
+        );
+      }
+    }
+
+    if (project.allowApprovedBudgetEconomicEdits === allow) {
+      return { projectId, allow };
+    }
+
+    await tx.project.update({
+      where: { id: projectId },
+      data: {
+        allowApprovedBudgetEconomicEdits: allow,
+        updatedBy: ctx.actorUserId,
+      },
+    });
+
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "project.approved_budget_edits.changed",
+      entityType: "Project",
+      entityId: projectId,
+      projectId,
+      companyId: project.companyId ?? undefined,
+      before: { allowApprovedBudgetEconomicEdits: project.allowApprovedBudgetEconomicEdits },
+      after: { allowApprovedBudgetEconomicEdits: allow },
+      ipAddress: ctx.ipAddress,
+    }, tx);
+
     return { projectId, allow };
-  }
-
-  await prisma.project.update({
-    where: { id: projectId },
-    data: {
-      allowApprovedBudgetEconomicEdits: allow,
-      updatedBy: ctx.actorUserId,
-    },
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "project.approved_budget_edits.changed",
-    entityType: "Project",
-    entityId: projectId,
-    projectId,
-    companyId: project.companyId ?? undefined,
-    before: { allowApprovedBudgetEconomicEdits: project.allowApprovedBudgetEconomicEdits },
-    after: { allowApprovedBudgetEconomicEdits: allow },
-    ipAddress: ctx.ipAddress,
-  });
-
-  return { projectId, allow };
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 /** Project-scoped read of D-088 flags for budget UI. */
@@ -274,6 +291,9 @@ export async function getProjectApprovedBudgetEditFlags(
   if (!canViewBudgetsArea(ctx.roles) && !canManageApprovedBudgetEditPolicy(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver la política de presupuestos de la obra");
   }
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "BUDGETS");
+  await requireProjectAccess(projectId, ctx);
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     select: { tenantId: true, allowApprovedBudgetEconomicEdits: true },
@@ -288,6 +308,6 @@ export async function getProjectApprovedBudgetEditFlags(
   return {
     tenantAllow: Boolean(tenant?.allowApprovedBudgetEconomicEdits),
     projectAllow: project.allowApprovedBudgetEconomicEdits,
-    canManagePolicy: canManageApprovedBudgetEditPolicy(ctx.roles),
+    canManagePolicy: canManageApprovedBudgetEditPolicy(ctx.roles) && gate.isEnabled("TENANT_SETTINGS"),
   };
 }

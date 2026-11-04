@@ -15,7 +15,7 @@ import {
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canViewApProjectArea } from "./ap-access";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import {
   createSupplierInvoice,
   serializeSupplierInvoice,
@@ -478,6 +478,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   await assertProjectAllowsOperationalMutation(input.projectId, ctx);
 
   return prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, input.projectId, ctx);
     // Panel and receipt triggers serialize before reading coverage, then write in the same TX.
     await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${input.purchaseOrderId} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
     const po = await loadPoForBilling(input.purchaseOrderId, ctx, tx);

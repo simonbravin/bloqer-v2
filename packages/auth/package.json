@@ -9,7 +9,8 @@
     "./middleware": "./src/middleware-auth.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ../services/node_modules/tsx/dist/loader.mjs --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",

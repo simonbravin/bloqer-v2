@@ -45,6 +45,14 @@ test("OWNER can register consumption and field + does not include Pagar or Cobra
   );
 });
 
+test("a disabled PROJECTS module removes document uploads while retaining other enabled Field actions", () => {
+  const ids = listFieldQuickActions(["OWNER"], (module) => module !== "PROJECTS").map((action) => action.id);
+  assert.equal(ids.includes("document"), false);
+  assert.equal(ids.includes("jobsiteLog"), true);
+  assert.equal(ids.includes("purchaseRequest"), true);
+  assert.equal(ids.includes("consumption"), true);
+});
+
 test("pending inbox paths include company and project routes", () => {
   assert.equal(isPendingInboxPath("/pendientes"), true);
   assert.equal(isPendingInboxPath("/proyectos/abc/pendientes"), true);

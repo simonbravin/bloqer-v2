@@ -2,6 +2,9 @@ import { Prisma, prisma, type ApPaymentNotificationChannel } from "@bloqer/datab
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
 import { serializeMoneyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
+import { isCrossCompany } from "../company-scope";
+import { requireProjectAccess } from "../security/access";
 
 export type CompanyProcurementSettingsView = {
   companyId: string;
@@ -149,6 +152,7 @@ export async function getCompanyProcurementSettings(
     select: { id: true },
   });
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
+  if (isCrossCompany(company.id, ctx)) throw new ServiceError("FORBIDDEN", "Empresa fuera de tu alcance");
 
   const row = await db.companyProcurementSettings.findUnique({ where: { companyId } });
   if (!row) {
@@ -186,10 +190,7 @@ export async function getCompanyProcurementSettingsForProject(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<CompanyProcurementSettingsView> {
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId: ctx.tenantId },
-    select: { companyId: true },
-  });
+  const project = await requireProjectAccess(projectId, ctx);
   if (!project?.companyId) {
     throw new ServiceError("CONFLICT", "El proyecto no tiene empresa asignada");
   }
@@ -231,11 +232,13 @@ export async function upsertCompanyProcurementSettings(
       throw new ServiceError("FORBIDDEN", "Sin permisos para configurar compras");
     }
   }
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
 
   const company = await prisma.company.findFirst({
     where: { id: companyId, tenantId: ctx.tenantId },
   });
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
+  if (isCrossCompany(company.id, ctx)) throw new ServiceError("FORBIDDEN", "Empresa fuera de tu alcance");
 
   const createData: Prisma.CompanyProcurementSettingsUpsertArgs["create"] = {
     companyId,

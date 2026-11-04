@@ -37,6 +37,8 @@ El cliente como vista hereda estados del Contact (`ACTIVE` / `ARCHIVED`).
 - **BR-CLI-001**: solo contactos con rol `CLIENT` aparecen en esta vista.
 - **BR-CLI-002**: eliminar rol CLIENT solo si no hay proyecto activo con ese cliente (o con confirmación explícita).
 
+**Implementación vigente, AG-03 (03/11/2026):** la baja comprueba dentro de la transacción las obras no terminadas (`DRAFT`, `ACTIVE`, `ON_HOLD`) que todavía usan ese cliente. No hay un bypass por confirmación implementado. Las referencias de obras `COMPLETED`/`CANCELLED` son históricas y se conservan al quitar o reactivar el rol, junto con su perfil comercial. El alta o cambio de cliente del proyecto y la baja del rol comparten bloqueo del contacto para impedir una vinculación basada en una comprobación vencida.
+
 ## 11. Validaciones
 - `credit_limit >= 0` si informado.
 - `payment_terms_days >= 0`.

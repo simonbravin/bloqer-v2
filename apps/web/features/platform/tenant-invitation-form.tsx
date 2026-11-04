@@ -59,7 +59,7 @@ export function TenantInvitationForm({
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             defaultValue=""
           >
-            <option value="">— Sin asignar —</option>
+            <option value="">Automática si hay una sola empresa</option>
             {companies.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

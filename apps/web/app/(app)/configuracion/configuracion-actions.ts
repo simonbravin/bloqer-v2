@@ -96,6 +96,7 @@ export async function uploadTenantLogoAction(formData: FormData) {
 }
 
 export async function removeTenantLogoAction(_formData: FormData) {
+  void _formData;
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
 

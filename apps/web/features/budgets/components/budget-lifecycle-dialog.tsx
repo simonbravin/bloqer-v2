@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -18,11 +18,14 @@ import { BudgetStatusBadge } from "./budget-status-badge";
 import { formatDateTime } from "@/lib/format";
 import type { BudgetStatus } from "@bloqer/database";
 import type { BudgetLifecycleLogEntry } from "@bloqer/services";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 type LifecyclePayload = { comment?: string };
 
 interface BudgetLifecycleDialogProps {
   status: BudgetStatus;
+  canEdit: boolean;
+  canApprove: boolean;
   lifecycleLog: BudgetLifecycleLogEntry[];
   triggerLabel?: string;
   /** Soft warn when approving a budget with no leaf items (does not hard-block). */
@@ -118,6 +121,8 @@ function LifecycleLogList({ entries }: { entries: BudgetLifecycleLogEntry[] }) {
 
 export function BudgetLifecycleDialog({
   status,
+  canEdit,
+  canApprove,
   lifecycleLog,
   triggerLabel = "Ciclo de vida",
   warnEmptyOnApprove = false,
@@ -129,7 +134,8 @@ export function BudgetLifecycleDialog({
 }: BudgetLifecycleDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const { isPending, isRunning, run: startTransition } = useBudgetAction(setActionError);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [comment, setComment] = useState("");
   const isTerminal = status === "CLOSED" || status === "CANCELLED";
@@ -137,12 +143,14 @@ export function BudgetLifecycleDialog({
   function resetForm() {
     setPending(null);
     setComment("");
+    setActionError(null);
   }
 
   function run(
     action: () => Promise<{ ok: true } | { error: string }>,
     successMessage: string,
   ) {
+    setActionError(null);
     startTransition(async () => {
       const ok = await runLifecycle(action, successMessage);
       if (ok) {
@@ -157,6 +165,7 @@ export function BudgetLifecycleDialog({
     const trimmed = comment.trim();
     switch (pending?.kind) {
       case "return":
+        if (!canEdit || status !== "IN_REVIEW") return;
         if (!trimmed) {
           toast.error("Las observaciones son obligatorias");
           return;
@@ -164,25 +173,28 @@ export function BudgetLifecycleDialog({
         run(() => onReturnForChanges({ comment: trimmed }), "Devuelto con observaciones");
         break;
       case "submit":
+        if (!canEdit || (status !== "DRAFT" && status !== "RETURNED_FOR_CHANGES")) return;
         run(
           () => onSubmitForReview(trimmed ? { comment: trimmed } : undefined),
           "Presupuesto enviado a revisión",
         );
         break;
       case "approve":
+        if (!canApprove || status !== "IN_REVIEW") return;
         run(
           () => onApprove(trimmed ? { comment: trimmed } : undefined),
           "Presupuesto aprobado",
         );
         break;
       case "close":
+        if (!canApprove || status !== "APPROVED") return;
         run(
           () => onClose(trimmed ? { comment: trimmed } : undefined),
           "Presupuesto cerrado",
         );
         break;
       case "cancel":
-        if (!confirm("¿Cancelar este presupuesto? Esta acción no se puede deshacer.")) return;
+        if (!canEdit || !["DRAFT", "IN_REVIEW", "RETURNED_FOR_CHANGES"].includes(status)) return;
         run(
           () => onCancel(trimmed ? { comment: trimmed } : undefined),
           "Presupuesto cancelado",
@@ -210,6 +222,7 @@ export function BudgetLifecycleDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && isRunning()) return;
         setOpen(next);
         if (!next) resetForm();
       }}
@@ -219,7 +232,7 @@ export function BudgetLifecycleDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg" closeButtonDisabled={isPending} aria-busy={isPending}>
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-center gap-2">
             Ciclo de vida del presupuesto
@@ -234,12 +247,13 @@ export function BudgetLifecycleDialog({
           <LifecycleLogList entries={lifecycleLog} />
         </div>
 
-        {!isTerminal && (
+        {!isTerminal && (canEdit || canApprove) && (
           <>
             <Separator />
             {pending ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium">{pendingTitle}</p>
+                {pending.kind === "cancel" && <p className="text-sm text-muted-foreground">Vas a cancelar este presupuesto. Esta acción no se puede deshacer.</p>}
                 {pending.kind === "approve" && warnEmptyOnApprove ? (
                   <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-100">
                     Este presupuesto no tiene partidas hoja. Sin ítems del EDT no vas a poder
@@ -262,11 +276,13 @@ export function BudgetLifecycleDialog({
                         : "Opcional…"
                     }
                     disabled={isPending}
+                    maxLength={2000}
                   />
                 </div>
                 <div className="flex gap-2">
                   <Button
                     size="sm"
+                    variant={pending.kind === "cancel" ? "destructive" : "default"}
                     disabled={isPending}
                     onClick={confirmPending}
                   >
@@ -284,7 +300,7 @@ export function BudgetLifecycleDialog({
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {(status === "DRAFT" || status === "RETURNED_FOR_CHANGES") && (
+                {canEdit && (status === "DRAFT" || status === "RETURNED_FOR_CHANGES") && (
                   <Button
                     size="sm"
                     disabled={isPending}
@@ -295,24 +311,24 @@ export function BudgetLifecycleDialog({
                 )}
                 {status === "IN_REVIEW" && (
                   <>
-                    <Button
+                    {canApprove && <Button
                       size="sm"
                       disabled={isPending}
                       onClick={() => setPending({ kind: "approve" })}
                     >
                       Aprobar presupuesto
-                    </Button>
-                    <Button
+                    </Button>}
+                    {canEdit && <Button
                       size="sm"
                       variant="outline"
                       disabled={isPending}
                       onClick={() => setPending({ kind: "return" })}
                     >
                       Devolver con observaciones
-                    </Button>
+                    </Button>}
                   </>
                 )}
-                {status === "APPROVED" && (
+                {canApprove && status === "APPROVED" && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -322,6 +338,7 @@ export function BudgetLifecycleDialog({
                     Cerrar presupuesto
                   </Button>
                 )}
+                {canEdit && ["DRAFT", "IN_REVIEW", "RETURNED_FOR_CHANGES"].includes(status) && <>
                 <Separator />
                 <Button
                   size="sm"
@@ -332,6 +349,7 @@ export function BudgetLifecycleDialog({
                 >
                   Cancelar presupuesto
                 </Button>
+                </>}
               </div>
             )}
           </>
@@ -339,9 +357,10 @@ export function BudgetLifecycleDialog({
 
         {isTerminal && (
           <p className="text-sm text-muted-foreground">
-            Este presupuesto está en estado final y no admite más cambios.
+            El ciclo de vida de este presupuesto está finalizado.
           </p>
         )}
+        {actionError && <p role="alert" className="text-sm text-destructive">{actionError}</p>}
       </DialogContent>
     </Dialog>
   );

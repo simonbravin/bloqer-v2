@@ -2,11 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { formatCurrencyDisplay } from "@/lib/format";
+import { formatTenantStatusLabel } from "@/lib/tenant-status-label";
 import { formatTimezoneOptionLabel } from "@bloqer/utils";
 import {
   canEditTenantDisplaySettings,
   canReadTenantConfigArea,
   getTenantSettings,
+  getTenantModuleGate,
+  ServiceError,
 } from "@bloqer/services";
 import {
   Card,
@@ -52,9 +55,12 @@ export default async function ConfiguracionHomePage() {
 
   const ctx = await buildTenantServiceContext();
   if (!ctx) redirect("/login");
-  const tenant = await getTenantSettings(ctx);
+  const [tenant, gate] = await Promise.all([getTenantSettings(ctx), getTenantModuleGate(ctx)]).catch((error: unknown) => {
+    if (error instanceof ServiceError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND")) notFound();
+    throw error;
+  });
 
-  const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles);
+  const canEditDisplay = canEditTenantDisplaySettings(current.tenantCtx.roles) && gate.isEnabled("TENANT_SETTINGS");
   const company = tenant.primaryCompany;
   const fiscalId = company?.fiscalId ?? tenant.fiscalId;
   const legalName = company?.legalName ?? company?.name ?? null;
@@ -104,7 +110,7 @@ export default async function ConfiguracionHomePage() {
                 <DetailField label="Sitio web">{company.website ?? "—"}</DetailField>
               </>
             ) : null}
-            <DetailField label="Estado operativo">{tenant.status}</DetailField>
+            <DetailField label="Estado operativo">{formatTenantStatusLabel(tenant.status)}</DetailField>
           </DetailFieldGrid>
         </CardContent>
       </Card>

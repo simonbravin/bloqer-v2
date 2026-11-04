@@ -5,7 +5,7 @@ import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-e
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
 import { loadWbsDominantCostTypes, coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
@@ -347,6 +347,7 @@ export async function createPurchaseRequest(
   const wbsDominant = await loadWbsDominantCostTypes(wbsIds, ctx.tenantId);
 
   const pr = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, input.projectId, ctx);
     const number = await nextDocumentNumber(tx, ctx.tenantId, companyId);
     const created = await tx.purchaseRequest.create({
       data: {
@@ -436,6 +437,7 @@ export async function updatePurchaseRequest(
   const wbsDominant = await loadWbsDominantCostTypes(wbsIds, ctx.tenantId);
 
   await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     const flipped = await tx.purchaseRequest.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: {
@@ -504,6 +506,7 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
   await requireProjectAccess(existing.projectId, ctx);
 
   await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     for (const line of existing.lines) {
       if (!line.wbsNodeId) {
         throw new ServiceError(
@@ -619,6 +622,7 @@ export async function returnPurchaseRequest(
   });
 
   await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     const flipped = await tx.purchaseRequest.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
       data: {

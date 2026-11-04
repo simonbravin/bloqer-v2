@@ -7,7 +7,7 @@
 
 ## 1. ERD por bloques (5 diagramas)
 
-Para que el ERD sea legible, lo dividimos en 5 vistas funcionales. Cada entidad lleva su `tenant_id` (omitido visualmente).
+Para que el ERD sea legible, lo dividimos en 5 vistas funcionales. Toda entidad operativa pertenece a un tenant (omitido visualmente). La columna física y el catálogo cerrado de hijos que heredan por su padre obligatorio se definen en [ADR-018](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md) y [TENANT_ISOLATION_MODEL](../08-architecture/TENANT_ISOLATION_MODEL.md); el diagrama funcional no amplía esas excepciones.
 
 ---
 
@@ -391,7 +391,7 @@ flowchart LR
 ### Integridad multi-tenant
 
 - **R-INT-001**: ninguna FK puede apuntar a una entidad de otro tenant.
-- **R-INT-002**: el `tenant_id` se hereda automáticamente del padre cuando se crea una entidad hija.
+- **R-INT-002**: la pertenencia al tenant de una entidad hija se deriva de su padre autorizado al crearla. El servicio comprueba ese padre y la coherencia de las relaciones; no se presupone inyección automática del cliente Prisma. La persistencia física sigue el catálogo cerrado de ADR-018.
 
 ### Integridad de comprobantes
 

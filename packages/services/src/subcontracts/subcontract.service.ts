@@ -6,7 +6,7 @@ import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { resolveActiveCompanyId } from "../company/company.service";
@@ -208,6 +208,7 @@ export async function createSubcontract(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       result = await prisma.$transaction(async (tx) => {
+        await lockProjectForOperationalMutation(tx, input.projectId, ctx);
         // Allocate number inside the txn; retry on unique races.
         const maxNum = await tx.subcontract.aggregate({
           where: { tenantId: ctx.tenantId, companyId },
@@ -306,6 +307,7 @@ export async function updateSubcontract(
   }
 
   const result = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
     await tx.subcontract.update({
       where: { id },
       data: {
@@ -372,16 +374,19 @@ export async function updateSubcontractMeta(
   }
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
-  const updated = await prisma.subcontract.update({
-    where: { id },
-    data: {
-      notes:           input.notes          !== undefined ? input.notes          : existing.notes,
-      internalNotes:   input.internalNotes  !== undefined ? input.internalNotes  : existing.internalNotes,
-      expectedEndDate: input.expectedEndDate !== undefined ? (input.expectedEndDate ? new Date(input.expectedEndDate) : null) : existing.expectedEndDate,
-      startDate:       input.startDate       !== undefined ? (input.startDate ? new Date(input.startDate) : null) : existing.startDate,
-      updatedBy:       ctx.actorUserId,
-    },
-    include: subcontractInclude,
+  const updated = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    return tx.subcontract.update({
+      where: { id },
+      data: {
+        notes:           input.notes          !== undefined ? input.notes          : existing.notes,
+        internalNotes:   input.internalNotes  !== undefined ? input.internalNotes  : existing.internalNotes,
+        expectedEndDate: input.expectedEndDate !== undefined ? (input.expectedEndDate ? new Date(input.expectedEndDate) : null) : existing.expectedEndDate,
+        startDate:       input.startDate       !== undefined ? (input.startDate ? new Date(input.startDate) : null) : existing.startDate,
+        updatedBy:       ctx.actorUserId,
+      },
+      include: subcontractInclude,
+    });
   });
 
   return serializeSubcontract(updated);
@@ -404,22 +409,26 @@ export async function activateSubcontract(id: string, ctx: ServiceContext): Prom
     throw new ServiceError("CONFLICT", "El subcontrato debe tener al menos una línea antes de activarse");
   }
 
-  const flipped = await prisma.subcontract.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-    data: { status: "ACTIVE", updatedBy: ctx.actorUserId },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El subcontrato ya no está en borrador. Recargá e intentá de nuevo.",
-  );
-  const updated = await prisma.subcontract.findUniqueOrThrow({
-    where: { id },
-    include: subcontractInclude,
-  });
+  const updated = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    const flipped = await tx.subcontract.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      data: { status: "ACTIVE", updatedBy: ctx.actorUserId },
+    });
+    assertOptimisticRowUpdate(
+      flipped.count,
+      "El subcontrato ya no está en borrador. Recargá e intentá de nuevo.",
+    );
+    const row = await tx.subcontract.findUniqueOrThrow({
+      where: { id },
+      include: subcontractInclude,
+    });
 
-  await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "SUBCONTRACT_ACTIVATED", entityType: "Subcontract", entityId: id, after: { status: "ACTIVE" },
+    await log({
+      tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
+      action: "SUBCONTRACT_ACTIVATED", entityType: "Subcontract", entityId: id, after: { status: "ACTIVE" },
+    }, tx);
+    return row;
   });
 
   return serializeSubcontract(updated);

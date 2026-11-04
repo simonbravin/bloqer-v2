@@ -256,7 +256,7 @@ export async function getProjectProfitabilityReport(
   let overheadManualAmount: string | null = null;
   let overheadCalculatedAmount: string | null = null;
   let overheadCompanyPct: string | null = null;
-  let netMarginNote = netAvailable
+  const netMarginNote = netAvailable
     ? "Margen neto = margen bruto − GG imputados a la obra [D-040]. Los GG de empresa no entran en EDT y costos."
     : "Margen neto (y GG imputados) visible solo para OWNER o ADMIN [D-013].";
 

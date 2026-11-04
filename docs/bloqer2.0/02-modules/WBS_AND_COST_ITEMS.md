@@ -10,8 +10,8 @@ Estructurar el presupuesto en **jerarquía WBS** y **ítems hoja** con cantidad,
 Sin WBS no hay línea base para certificar ni para imputar compras por ítem. Las **compras de proyecto** exigen WBS en cada línea ([BR-PUR-007], [D-050]); los gastos generales / indirectos de obra se modelan como **partida(s) WBS presupuestables**, no como líneas sin imputación.
 
 ## 4. Datos que consume (inputs)
-- **Budget** cuyo `status` **permite** editar estructura económica (`DRAFT`, o `RETURNED_FOR_CHANGES`; **no** `APPROVED` ni `CLOSED` en lo económico) ([BR-BUD-006], [BR-BUD-002]).
-- **Presupuesto base del cronograma** (`Schedule.baselineBudgetId`): la **estructura WBS** queda bloqueada aunque el presupuesto siga en `DRAFT` (sí se pueden editar APU/costos en ítems existentes).
+- **Budget** cuyo `status` permite editar estructura económica: `DRAFT` o `RETURNED_FOR_CHANGES`; `APPROVED` únicamente con ambos interruptores D-088 encendidos. `IN_REVIEW` y `CLOSED` no admiten edición económica ([BR-BUD-006], [BR-BUD-007], [BR-BUD-002]).
+- **Presupuesto base del cronograma** (`Schedule.baselineBudgetId`): la **estructura WBS** queda bloqueada aunque el presupuesto siga en `DRAFT` (sí se pueden editar APU/costos en ítems existentes). La excepción D-088 también permite cambiar la estructura de un `APPROVED` usado como baseline; conserva las restricciones de integridad de vínculos operativos.
 - Catálogos **Unit**, **Category** (rubros), productos inventario opcional.
 
 ## 5. Datos que produce (outputs)
@@ -41,7 +41,7 @@ Ver [`../08-architecture/REPORTING_ERD_GUARDRAILS.md`](../08-architecture/REPORT
 En Bloqer **no** hay tabla `CostCenter`. El eje de imputación de costos e ingresos de obra es el **nodo WBS hoja** (`wbsNodeId` → partida del **EDT y costos**): compras, facturas de proveedor de proyecto, certificaciones, consumos de stock y control de costos. Los rubros APU (`CostAnalysisLine.category`) desagregan composición del ítem; no reemplazan la partida WBS.
 
 ## 7. Estados y transiciones
-Los ítems siguen el estado del Budget padre; no tienen máquina propia salvo líneas internas de borrador. Con `APPROVED`, el WBS económico está **congelado**; con `CLOSED`, los cambios contractuales van por **adenda** y **nuevo** budget complementario.
+Los ítems siguen el estado del Budget padre; no tienen máquina propia. Con `APPROVED`, el WBS económico está **congelado por defecto**, salvo la excepción controlada D-088; con `CLOSED`, los cambios contractuales van por **adenda** y **nuevo** budget complementario.
 
 ## 8. Acciones disponibles
 - Agregar/editar/reordenar nodos y ítems solo cuando el budget padre lo permite ([`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Budget).
@@ -86,7 +86,11 @@ Los ítems siguen el estado del Budget padre; no tienen máquina propia salvo l�
 - **Certificaciones** (líneas por CostItem), **Compras** (imputación), **Cronograma** (vínculo opcional).
 
 ## 16. Permisos
-PM edita estructura si `DRAFT` / `IN_REVIEW` según política; `APPROVED` = sin mutación económica del árbol; `CLOSED` = solo lectura del cómputo vendido salvo nueva versión por adenda.
+Quien tenga `EDIT BUDGETS` puede editar estructura en `DRAFT` / `RETURNED_FOR_CHANGES`, si no está bloqueada por el cronograma. `IN_REVIEW` no permite mutación económica. En `APPROVED` solo se edita bajo D-088; los interruptores los gestionan OWNER/ADMIN. `CLOSED` conserva el cómputo vendido y se complementa mediante adenda. La obra debe admitir planificación (`DRAFT` / `ACTIVE`, D-042).
+
+## Hallazgo — AG-04: estados y excepción de edición
+
+Las secciones 4, 7 y 16 conservaban textos anteriores a D-030/D-088, incluyendo edición durante revisión y bloqueo absoluto de `APPROVED`. Se reconcilian con [BUDGETS](./BUDGETS.md) y la [máquina de estados](../01-domain/STATE_MACHINES.md#3-budget-presupuesto), sin modificar decisiones vigentes.
 
 ## 17. Eventos disparados / consumidos
 - Hereda eventos de `budget`.

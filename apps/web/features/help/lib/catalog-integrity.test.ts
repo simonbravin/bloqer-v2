@@ -4,7 +4,13 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { HELP_ARTICLES, HELP_FEATURED_SLUGS, getHelpArticle, listHelpIntentChips } from "./catalog";
+import {
+  HELP_ARTICLES,
+  HELP_FEATURED_SLUGS,
+  HELP_INTENT_LABELS,
+  getHelpArticle,
+  listHelpIntentChips,
+} from "./catalog";
 import { HELP_PROCESS_MAPS } from "./process-maps";
 import type { HelpHref, HelpModule } from "./types";
 import { HELP_MODULE_LABELS } from "./types";
@@ -50,7 +56,8 @@ test("every article has required shape", () => {
       if (k !== k.trim() || k.length < 2) failures.push(`${a.slug}: bad keyword «${k}»`);
     }
     if (a.figure) {
-      if (!a.figure.src.startsWith("/help/")) failures.push(`${a.slug}: figure.src must start with /help/`);
+      if (!a.figure.src.startsWith("/help/"))
+        failures.push(`${a.slug}: figure.src must start with /help/`);
       if (!a.figure.alt?.trim()) failures.push(`${a.slug}: figure.alt empty`);
     }
     // Self-related is noise
@@ -68,10 +75,23 @@ test("no duplicate keywords within an article (normalized)", () => {
   assert.equal(failures.length, 0, failures.join(", "));
 });
 
-test("intent chips stay usable (not flooded)", () => {
-  const chips = listHelpIntentChips();
-  assert.ok(chips.length >= 8, String(chips.length));
-  assert.ok(chips.length <= 30, `too many chips: ${chips.length}`);
+test("niche objectives remain filterable without becoming uncurated chips", () => {
+  const chipIntents = new Set(listHelpIntentChips().map((chip) => chip.intent));
+  const nicheIntents = new Set(
+    HELP_ARTICLES.flatMap((article) => article.intents).filter(
+      (intent) => HELP_INTENT_LABELS[intent] === undefined,
+    ),
+  );
+  assert.ok(nicheIntents.size > 0, "catalog should exercise niche objectives without chip labels");
+  for (const intent of nicheIntents) {
+    assert.ok(!chipIntents.has(intent), `${intent}: uncurated chip`);
+    const hits = searchHelpArticles(HELP_ARTICLES, { intent, query: "" });
+    assert.ok(hits.length > 0, `${intent}: niche objective lost its articles`);
+    assert.ok(
+      hits.every((article) => article.intents.includes(intent)),
+      `${intent}: unrelated article`,
+    );
+  }
 });
 
 test("featured home slugs resolve", () => {
@@ -84,7 +104,10 @@ test("«oc» alone must not dump half the catalog", () => {
   const hits = searchHelpArticles(HELP_ARTICLES, { query: "oc" });
   assert.ok(hits.length <= 8, hits.map((h) => h.slug).join(", "));
   assert.ok(
-    hits.some((h) => h.slug.includes("orden-de-compra") || h.slug.includes("recibir") || h.slug.includes("oc")),
+    hits.some(
+      (h) =>
+        h.slug.includes("orden-de-compra") || h.slug.includes("recibir") || h.slug.includes("oc"),
+    ),
   );
 });
 

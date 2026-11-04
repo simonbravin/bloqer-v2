@@ -286,6 +286,14 @@ Leer en este orden:
 
 *(Índice narrado: [`08-architecture/README.md`](./08-architecture/README.md).)*
 
+### Auditoría global e incremental
+
+- [Plan de auditoría de plataforma](./08-architecture/PLATFORM_AUDIT_PLAN.md): etapas AG-00–AG-14, cobertura y dependencias para revisar la plataforma o una sola área.
+- [Procedimiento reutilizable](./08-architecture/PLATFORM_AUDIT_RUNBOOK.md): diagnóstico, corrección autorizada, agentes especializados y verificación con evidencia.
+- [Registro de auditorías](./08-architecture/platform-audit/README.md) y [plantilla de informe](./08-architecture/platform-audit/REPORT_TEMPLATE.md): avance, hallazgos, pruebas y revalidaciones por revisión.
+- [Diagnóstico AG-00 del 03/11/2026](./08-architecture/platform-audit/2026-11-03-ag-00-baseline.md): baseline ejecutado, [cobertura funcional](./08-architecture/platform-audit/2026-11-03-ag-00-coverage.md), [arquitectura](./08-architecture/platform-audit/2026-11-03-ag-00-architecture.md) e [inventario de evidencia](./08-architecture/platform-audit/2026-11-03-ag-00-inventory.json).
+- [Remediación y cierre AG-00](./08-architecture/platform-audit/2026-11-03-ag-00-remediation.md): seis hallazgos corregidos/verificados, [evidencia posterior](./08-architecture/platform-audit/2026-11-03-ag-00-remediation.json) y [propuesta de aislamiento aprobada](./08-architecture/platform-audit/2026-11-03-ag-00-isolation-proposal.md).
+
 ### Planes de mejora (trabajo en curso)
 
 | Archivo | Propósito |

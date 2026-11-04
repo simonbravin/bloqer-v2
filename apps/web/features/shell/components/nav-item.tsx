@@ -32,6 +32,7 @@ export function NavItem({ href, label, icon, matchExact, activeWhenPathPrefix, b
   return (
     <Link
       href={href}
+      aria-current={isActive ? "page" : undefined}
       aria-label={pendingHref && count > 0 ? pendingCountAriaLabel(count, label) : undefined}
       className={cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",

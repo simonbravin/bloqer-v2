@@ -106,7 +106,7 @@ export function parseNumberedSpreadsheetRows(rawRows: unknown[][]): SpreadsheetP
     for (const d of numberedDrafts) {
       if (d.discipline) disciplines.add(d.discipline);
     }
-    for (const [discipline, banner] of bannerByDiscipline) {
+    for (const discipline of bannerByDiscipline.keys()) {
       disciplines.add(discipline);
     }
 

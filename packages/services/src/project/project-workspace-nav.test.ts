@@ -91,3 +91,14 @@ test("project nav places Pendientes next to Resumen", () => {
   );
   assert.equal(resumen!.items[1]!.href, "/proyectos/proj-1/pendientes");
 });
+
+test("disabled PROJECTS removes overview and documents without hiding enabled operational modules", () => {
+  const gate: TenantModuleGate = { isEnabled: (module) => module !== "PROJECTS" };
+  const sections = buildProjectWorkspaceNavSections("proj-1", gate, ["OWNER"]);
+  const items = sections.flatMap((section) => section.items);
+  assert.equal(items.some((item) => item.label === "Resumen"), false);
+  assert.equal(items.some((item) => item.label === "Documentos"), false);
+  assert.ok(items.some((item) => item.href === "/proyectos/proj-1/pendientes"));
+  assert.ok(items.some((item) => item.href === "/proyectos/proj-1/cuentas-por-pagar"));
+  assert.ok(items.some((item) => item.href === "/proyectos/proj-1/libro-obra"));
+});

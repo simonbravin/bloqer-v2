@@ -2,7 +2,6 @@
 
 import {
   useState,
-  useTransition,
   useMemo,
   useCallback,
   useEffect,
@@ -99,6 +98,7 @@ import {
 } from "../lib/wbs-apu-detail";
 import { WbsSubdivideApuDialog } from "./wbs-subdivide-apu-dialog";
 import type { WbsCreatePreset } from "./wbs-node-form";
+import { useBudgetAction } from "../lib/use-budget-action";
 
 function fmt(value: number, currency: string) {
   return formatMoneyAmount(String(value), currency);
@@ -300,8 +300,6 @@ interface WbsTreeProps {
 
 export function WbsTree({
   nodes,
-  budgetId,
-  projectId: _projectId,
   currency,
   editable,
   structureEditable,
@@ -333,9 +331,15 @@ export function WbsTree({
   const canEditStructure = structureEditable ?? editable;
   const [importOpen, setImportOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<WbsViewNode | null>(null);
-  const [removePending, startRemoveTransition] = useTransition();
-  const [reorderPending, startReorderTransition] = useTransition();
-  const [, startApuTransition] = useTransition();
+  const { isPending: removePending, run: startRemoveTransition } = useBudgetAction(toast.error);
+  const { isPending: reorderPending, run: startReorderTransition } = useBudgetAction(toast.error);
+  const { isRunning: isOpeningApu, run: startApuTransition } = useBudgetAction(toast.error);
+  const nodeFormPendingRef = useRef(false);
+  const [nodeFormPending, setNodeFormPending] = useState(false);
+  function handleNodeFormPending(next: boolean) {
+    nodeFormPendingRef.current = next;
+    setNodeFormPending(next);
+  }
 
   void _onUpdateCostItem;
   void _onAddLine;
@@ -436,9 +440,10 @@ export function WbsTree({
   }
 
   function moveNode(node: WbsViewNode, direction: "up" | "down") {
+    if (!canEditStructure) return;
     const siblings = getSiblings(node);
     const idx = siblings.findIndex((s) => s.id === node.id);
-    if (direction === "up" && idx === 0) return;
+    if (idx < 0 || (direction === "up" && idx === 0)) return;
     if (direction === "down" && idx === siblings.length - 1) return;
 
     const next = [...siblings];
@@ -467,17 +472,18 @@ export function WbsTree({
   }
 
   function handleRemove(node: WbsViewNode) {
+    if (!canEditStructure) return;
     setDeleteTarget(node);
   }
 
   function confirmRemove() {
     const node = deleteTarget;
-    if (!node) return;
+    if (!node || !canEditStructure) return;
 
     const descendantCount = countDescendants(node);
     const removedIds = new Set(collectSubtreeIds(node));
 
-    startRemoveTransition(async () => {
+    return startRemoveTransition(async () => {
       const result = await onRemoveNode(node.id);
       if ("error" in result) {
         toast.error(result.error);
@@ -501,12 +507,17 @@ export function WbsTree({
   }
 
   function handleRowClick(node: WbsViewNode) {
+    if (isOpeningApu()) return;
     if (!isWbsStructuralLeaf(node)) {
       setGroupDialogNode(node);
       return;
     }
     if (node.costItem || !onEnsureLeafForApu) {
       setItemDialogNode(node);
+      return;
+    }
+    if (!editable) {
+      toast.info("Esta partida todavía no tiene un APU cargado.");
       return;
     }
     startApuTransition(async () => {
@@ -521,6 +532,7 @@ export function WbsTree({
   }
 
   function beginAddChild(node: WbsViewNode) {
+    if (!canEditStructure) return;
     const preset = resolveAddChildPreset(node);
     if (!preset) return;
     const suggestedCode = suggestChildCode(node, nodes);
@@ -805,7 +817,14 @@ export function WbsTree({
               className="overflow-x-auto overscroll-x-contain [scrollbar-width:thin] [&::-webkit-scrollbar]:h-1"
               title={node.name}
             >
-              <span className="block whitespace-nowrap pr-1">{node.name}</span>
+              <button
+                type="button"
+                className="block whitespace-nowrap pr-1 text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                aria-label={isWbsStructuralLeaf(node) ? `Abrir APU de ${node.code} — ${node.name}` : `Abrir capítulo ${node.code} — ${node.name}`}
+                onClick={(event) => { event.stopPropagation(); handleRowClick(node); }}
+              >
+                {node.name}
+              </button>
             </div>
           </TableCell>
           <TableCell className="py-0.5 text-sm text-muted-foreground w-20">
@@ -1142,15 +1161,15 @@ export function WbsTree({
         onOpenChange={(open) => { if (!open) setGroupDialogNode(null); }}
         node={groupDialogNode}
         currency={currency}
-        editable={editable}
+        editable={canEditStructure}
         onUpdateNode={onUpdateNode}
       />
 
       <Dialog
         open={dialogState.type !== "closed"}
-        onOpenChange={(open) => { if (!open) setDialogState({ type: "closed" }); }}
+        onOpenChange={(open) => { if (!open && !nodeFormPendingRef.current) setDialogState({ type: "closed" }); }}
       >
-        <DialogContent>
+        <DialogContent closeButtonDisabled={nodeFormPending} aria-busy={nodeFormPending}>
           <DialogHeader>
             <DialogTitle>
               {dialogState.type === "add"
@@ -1161,6 +1180,7 @@ export function WbsTree({
           {dialogState.type === "add" && (
             <WbsNodeForm
               mode="create"
+              onPendingChange={handleNodeFormPending}
               parentId={dialogState.parentId}
               preset={dialogState.preset}
               suggestedCode={dialogState.suggestedCode}
@@ -1176,6 +1196,7 @@ export function WbsTree({
           {dialogState.type === "edit" && (
             <WbsNodeForm
               mode="edit"
+              onPendingChange={handleNodeFormPending}
               defaults={{
                 code: dialogState.node.code,
                 name: dialogState.node.name,

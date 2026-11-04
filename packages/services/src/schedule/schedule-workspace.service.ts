@@ -174,7 +174,7 @@ function addDecStrings(a: string, b: string): string {
 function aggregateMetricsFromRows(rows: CostControlRow[]): ScheduleItemMetricsDto {
   if (rows.length === 0) return emptyMetrics();
 
-  let m = emptyMetrics();
+  const m = emptyMetrics();
   let totalOpQty = new Prisma.Decimal(0);
   let totalBudgetQty = new Prisma.Decimal(0);
 

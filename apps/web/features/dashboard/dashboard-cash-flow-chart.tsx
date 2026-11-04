@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import type { CashFlowCurrency, DashboardCashFlowChart, DashboardCashFlowRange } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,8 +26,7 @@ export function DashboardCashFlowChart({ chart }: { chart: DashboardCashFlowChar
   const defaultRange = available[0]?.id ?? "month";
   const [range, setRange] = useState<DashboardCashFlowRange>(defaultRange);
 
-  const report = chart.byRange[range] ?? [];
-  const primary = useMemo(() => pickPrimarySeries(report), [report]);
+  const primary = pickPrimarySeries(chart.byRange[range] ?? []);
 
   if (available.length === 0) return null;
 

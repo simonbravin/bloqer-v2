@@ -63,7 +63,9 @@ test("tight queries stay within hit budget", () => {
       continue;
     }
     if (hits.length > c.max) {
-      failures.push(`${c.q}: ${hits.length} hits > max ${c.max} → ${hits.map((h) => h.slug).join(", ")}`);
+      failures.push(
+        `${c.q}: ${hits.length} hits > max ${c.max} → ${hits.map((h) => h.slug).join(", ")}`,
+      );
     }
     if (c.topSlugIncludes && !hits[0]!.slug.includes(c.topSlugIncludes)) {
       failures.push(`${c.q}: top=${hits[0]!.slug} (want *${c.topSlugIncludes}*)`);
@@ -121,6 +123,21 @@ test("new concept/report articles are findable", () => {
   }
 });
 
-test("catalog size sanity", () => {
-  assert.ok(HELP_ARTICLES.length >= 55 && HELP_ARTICLES.length <= 90, String(HELP_ARTICLES.length));
+test("articles remain reachable through their module and objective filters as the catalog grows", () => {
+  assert.ok(HELP_ARTICLES.length > 0);
+  for (const article of HELP_ARTICLES) {
+    for (const helpModule of article.modules) {
+      for (const intent of article.intents) {
+        const hits = searchHelpArticles(HELP_ARTICLES, { module: helpModule, intent, query: "" });
+        assert.ok(
+          hits.some((hit) => hit.slug === article.slug),
+          `${article.slug}: ${helpModule} + ${intent}`,
+        );
+        assert.ok(
+          hits.every((hit) => hit.modules.includes(helpModule) && hit.intents.includes(intent)),
+          `${helpModule} + ${intent}: returned an article outside the combined filters`,
+        );
+      }
+    }
+  }
 });

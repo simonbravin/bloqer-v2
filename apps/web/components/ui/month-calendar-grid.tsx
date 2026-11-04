@@ -49,15 +49,17 @@ export function MonthCalendarGrid<T>({
           variant="outline"
           size="sm"
           type="button"
+          aria-label="Mes anterior"
           onClick={() => setCursor(new Date(Date.UTC(year, month - 1, 1)))}
         >
           ←
         </Button>
-        <span className="text-sm font-medium capitalize">{monthLabel}</span>
+        <span className="text-sm font-medium capitalize" aria-live="polite">{monthLabel}</span>
         <Button
           variant="outline"
           size="sm"
           type="button"
+          aria-label="Mes siguiente"
           onClick={() => setCursor(new Date(Date.UTC(year, month + 1, 1)))}
         >
           →
@@ -92,6 +94,7 @@ export function MonthCalendarGrid<T>({
               onKeyDown={
                 onDayClick
                   ? (e) => {
+                      if (e.target !== e.currentTarget) return;
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
                         onDayClick(key);

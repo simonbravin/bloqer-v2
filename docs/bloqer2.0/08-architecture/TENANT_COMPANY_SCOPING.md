@@ -20,10 +20,13 @@ Helpers canónicos: [`packages/services/src/company-scope.ts`](../../../packages
   **anclada** a una empresa. `ctx.companyId` refleja ese anclaje. Si la membresía no
   tiene empresa y el tenant tiene **exactamente una** `Company` ACTIVE, la sesión
   rellena `ctx.companyId` con esa empresa ([D-092]) — no es un selector.
+- Si una membresía tiene empresa explícita y esa empresa falta, está inactiva o pertenece a otro tenant, no produce un contexto de sesión global. Se busca otra membresía utilizable; si no existe, se informa acceso no disponible. Una membresía sin roles tampoco permite ingreso ([R-USR-001]). Solo un anclaje originalmente nulo admite el fallback de [D-092].
 - Un registro con `companyId = null` es **compartido / corporativo**: pertenece al tenant
   y debe ser visible para **cualquier** contexto de empresa.
 - Multi-empresa por tenant está permitido físicamente (N `Company` por `Tenant`); ver
   [`MULTITENANCY_ARCHITECTURE.md`](./MULTITENANCY_ARCHITECTURE.md) y `Q-001`.
+
+El acceso global por RBAC omite la necesidad de `ProjectMembership`, no el alcance de empresa. `requireProjectAccess`, shells/IDs, listados, Field, pendientes y lecturas de notificaciones aplican empresa y luego ACL; los proyectos `companyId = null` conservan su condición compartida. El editor de asignaciones limita la intersección administrador/destinatario y no elimina asignaciones ocultas durante un reemplazo parcial. La selección de empresas y la empresa editable de Configuración también respetan el anclaje. Ver cierre y evidencia [AG-01](./platform-audit/2026-11-03-ag-01-identity-access.md).
 
 ## 2. Clasificación de entidades (por nullabilidad de `companyId`)
 

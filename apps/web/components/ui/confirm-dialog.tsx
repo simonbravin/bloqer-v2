@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useConfirmationAction } from "@/hooks/use-confirmation-action";
 
 type Props = {
   open: boolean;
@@ -22,7 +23,7 @@ type Props = {
   pending?: boolean;
   /** Extra gate (e.g. lockout acknowledgment checkbox). */
   confirmDisabled?: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<unknown>;
 };
 
 export function ConfirmDialog({
@@ -37,31 +38,40 @@ export function ConfirmDialog({
   confirmDisabled = false,
   onConfirm,
 }: Props) {
+  const { busy, actionError, handleOpenChange, confirmAction } = useConfirmationAction({
+    open,
+    pending,
+    onOpenChange,
+  });
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md" closeButtonDisabled={busy} aria-busy={busy}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription asChild>
             <div className="text-sm text-muted-foreground space-y-2 pt-1">{description}</div>
           </DialogDescription>
         </DialogHeader>
+        {actionError ? <p className="text-sm text-destructive" role="alert">{actionError}</p> : null}
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={pending}
+            onClick={() => handleOpenChange(false)}
+            disabled={busy}
           >
             {cancelLabel}
           </Button>
           <Button
             type="button"
             variant={variant === "destructive" ? "destructive" : "default"}
-            onClick={onConfirm}
-            disabled={pending || confirmDisabled}
+            onClick={() => {
+              if (!confirmDisabled) void confirmAction(onConfirm);
+            }}
+            disabled={busy || confirmDisabled}
           >
-            {pending ? "Procesando…" : confirmLabel}
+            {busy ? "Procesando…" : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

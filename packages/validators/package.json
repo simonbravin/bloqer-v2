@@ -8,7 +8,8 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import ../services/node_modules/tsx/dist/loader.mjs --test \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@bloqer/domain": "workspace:*",

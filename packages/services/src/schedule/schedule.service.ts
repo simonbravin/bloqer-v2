@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Prisma, prisma } from "@bloqer/database";
 import type { ScheduleItemStatus, ScheduleItemType } from "@bloqer/database";
 import { compareWbsCodes, sortByWbsCode } from "../budget/wbs-code-rules";
@@ -24,8 +25,9 @@ import {
   SCHEDULE_ITEM_ENTITY,
   statusChangeAuditAction,
 } from "./schedule-audit";
-import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
+import { assertProjectAllowsBudgetPlanning, lockProjectForBudgetPlanning } from "../project/project-operational-guard";
 import { requireProjectAccess } from "../security/access";
+import { companyScopeFilter } from "../company-scope";
 import { serializeProgressPct, resolveScheduleStatusAfterProgressSync } from "./schedule-progress-sync-pure";
 import {
   applyMoveSibling,
@@ -202,7 +204,21 @@ export async function ensureScheduleForProject(projectId: string, ctx: ServiceCo
 
   await assertProjectScheduleMutation(projectId, ctx);
 
-  const created = await prisma.schedule.create({
+  return prisma.$transaction(async (tx) => {
+    await lockProjectForBudgetPlanning(tx, projectId, ctx);
+    return ensureScheduleInTx(tx, projectId, ctx);
+  }, { maxWait: 10_000, timeout: 30_000 });
+}
+
+/** The project write lock serializes creation and budget imports for this obra. */
+async function ensureScheduleInTx(
+  tx: Prisma.TransactionClient,
+  projectId: string,
+  ctx: ServiceContext,
+) {
+  const existing = await tx.schedule.findFirst({ where: { projectId, tenantId: ctx.tenantId } });
+  if (existing) return existing;
+  const created = await tx.schedule.create({
     data: {
       tenantId: ctx.tenantId,
       projectId,
@@ -218,6 +234,7 @@ export async function ensureScheduleForProject(projectId: string, ctx: ServiceCo
     created.id,
     undefined,
     { projectId, type: created.type },
+    tx,
   );
   return created;
 }
@@ -251,89 +268,101 @@ export async function importScheduleFromBudget(
   await assertProjectScheduleMutation(projectId, ctx);
   await assertProjectAccess(projectId, ctx);
   const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
+  assertTenantModuleEnabledWithGate(gate, "BUDGETS");
 
-  const budget = await prisma.budget.findFirst({
-    where: {
-      id: input.budgetId,
-      projectId,
-      tenantId: ctx.tenantId,
-      status: { in: ["APPROVED", "CLOSED"] },
-    },
-  });
-  if (!budget) {
-    throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado o no está aprobado/cerrado");
-  }
+  return prisma.$transaction(
+    async (tx) => {
+      // Same Project → Budget order as WBS mutations. Read the tree, baseline and
+      // existing links only after locking; a retry then imports only missing nodes.
+      await lockProjectForBudgetPlanning(tx, projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM budgets WHERE id = ${input.budgetId} AND "tenantId" = ${ctx.tenantId} AND "projectId" = ${projectId} AND (${ctx.companyId}::text IS NULL OR "companyId" IS NULL OR "companyId" = ${ctx.companyId}) FOR UPDATE`;
+      const budget = await tx.budget.findFirst({
+        where: {
+          id: input.budgetId,
+          projectId,
+          tenantId: ctx.tenantId,
+          ...companyScopeFilter(ctx),
+          status: { in: ["APPROVED", "CLOSED"] },
+        },
+      });
+      if (!budget) {
+        throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado o no está aprobado/cerrado");
+      }
 
-  const schedule = await ensureScheduleForProject(projectId, ctx);
+      const schedule = await ensureScheduleInTx(tx, projectId, ctx);
+      const previousBaselineId = schedule.baselineBudgetId;
+      const baselineChanged = previousBaselineId !== budget.id;
 
-  await prisma.schedule.update({
-    where: { id: schedule.id },
-    data: {
-      baselineBudgetId: budget.id,
-      updatedBy: ctx.actorUserId,
-    },
-  });
-
-  const wbsNodes = await prisma.wbsNode.findMany({
-    where: { budgetId: budget.id },
-    orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }, { code: "asc" }],
-  });
-
-  const existingLinks = await prisma.scheduleItemWbsLink.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      scheduleItem: { scheduleId: schedule.id },
-    },
-    select: { wbsNodeId: true, scheduleItemId: true },
-  });
-  const linkedWbs = new Set(existingLinks.map((l) => l.wbsNodeId));
-  const scheduleItemByWbsId = new Map<string, string>();
-  for (const link of existingLinks) {
-    scheduleItemByWbsId.set(link.wbsNodeId, link.scheduleItemId);
-  }
-  const includeGroups = input.includeGroups !== false;
-  const placeholderDates = input.placeholderDates === true;
-
-  let placeholderStart: Date | null = null;
-  let placeholderEnd: Date | null = null;
-  if (placeholderDates) {
-    const projectDates = await prisma.project.findUnique({
-      where: { id: projectId },
-      select: { startDate: true, expectedEndDate: true },
-    });
-    if (projectDates?.startDate && projectDates?.expectedEndDate) {
-      placeholderStart = projectDates.startDate;
-      placeholderEnd = projectDates.expectedEndDate;
-    }
-  }
-
-  const itemNodes = wbsNodes.filter((n) => n.type === "ITEM");
-  const groupNodes = includeGroups ? wbsNodes.filter((n) => n.type === "GROUP") : [];
-
-  const newItemNodes = itemNodes.filter((n) => !linkedWbs.has(n.id));
-  const siblingsByParent = new Map<string | null, typeof itemNodes>();
-  for (const node of newItemNodes) {
-    const key = node.parentId ?? null;
-    const list = siblingsByParent.get(key) ?? [];
-    list.push(node);
-    siblingsByParent.set(key, list);
-  }
-  for (const list of siblingsByParent.values()) {
-    list.sort((a, b) => a.sortOrder - b.sortOrder || compareWbsCodes(a.code, b.code));
-  }
-
-  let importedCount = 0;
-
-  await prisma.$transaction(async (tx) => {
-    for (const node of groupNodes) {
-      if (linkedWbs.has(node.id)) continue;
-      const parentScheduleId = node.parentId
-        ? scheduleItemByWbsId.get(node.parentId)
-        : undefined;
-
-      const created = await tx.scheduleItem.create({
+      await tx.schedule.update({
+        where: { id: schedule.id },
         data: {
+          baselineBudgetId: budget.id,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+
+      const wbsNodes = sortByWbsCode(
+        await tx.wbsNode.findMany({
+          where: { budgetId: budget.id },
+          orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }, { code: "asc" }],
+        }),
+      );
+
+      const existingLinks = await tx.scheduleItemWbsLink.findMany({
+        where: {
+          tenantId: ctx.tenantId,
+          scheduleItem: { scheduleId: schedule.id },
+        },
+        select: { wbsNodeId: true, scheduleItemId: true },
+      });
+      const linkedWbs = new Set(existingLinks.map((l) => l.wbsNodeId));
+      const scheduleItemByWbsId = new Map<string, string>();
+      for (const link of existingLinks) {
+        scheduleItemByWbsId.set(link.wbsNodeId, link.scheduleItemId);
+      }
+      const includeGroups = input.includeGroups !== false;
+      const placeholderDates = input.placeholderDates === true;
+
+      let placeholderStart: Date | null = null;
+      let placeholderEnd: Date | null = null;
+      if (placeholderDates) {
+        const projectDates = await tx.project.findUnique({
+          where: { id: projectId },
+          select: { startDate: true, expectedEndDate: true },
+        });
+        if (projectDates?.startDate && projectDates?.expectedEndDate) {
+          placeholderStart = projectDates.startDate;
+          placeholderEnd = projectDates.expectedEndDate;
+        }
+      }
+
+      const itemNodes = wbsNodes.filter((n) => n.type === "ITEM");
+      const groupNodes = includeGroups ? wbsNodes.filter((n) => n.type === "GROUP") : [];
+
+      const newItemNodes = itemNodes.filter((n) => !linkedWbs.has(n.id));
+      const siblingsByParent = new Map<string | null, typeof itemNodes>();
+      for (const node of newItemNodes) {
+        const key = node.parentId ?? null;
+        const list = siblingsByParent.get(key) ?? [];
+        list.push(node);
+        siblingsByParent.set(key, list);
+      }
+      for (const list of siblingsByParent.values()) {
+        list.sort((a, b) => a.sortOrder - b.sortOrder || compareWbsCodes(a.code, b.code));
+      }
+
+      const itemsToCreate: Prisma.ScheduleItemCreateManyInput[] = [];
+      const linksToCreate: Prisma.ScheduleItemWbsLinkCreateManyInput[] = [];
+
+      for (const node of groupNodes) {
+        if (linkedWbs.has(node.id)) continue;
+        const parentScheduleId = node.parentId ? scheduleItemByWbsId.get(node.parentId) : undefined;
+
+        const itemId = randomUUID();
+        itemsToCreate.push({
+          id: itemId,
           tenantId: ctx.tenantId,
           scheduleId: schedule.id,
           parentId: parentScheduleId ?? null,
@@ -343,47 +372,44 @@ export async function importScheduleFromBudget(
           status: "PLANNED",
           createdBy: ctx.actorUserId,
           updatedBy: ctx.actorUserId,
-          wbsLinks: {
-            create: {
-              tenantId: ctx.tenantId,
-              wbsNodeId: node.id,
-              isPrimary: true,
-            },
-          },
-        },
-      });
-      scheduleItemByWbsId.set(node.id, created.id);
-      linkedWbs.add(node.id);
-      importedCount += 1;
-    }
-
-    for (const node of itemNodes) {
-      if (linkedWbs.has(node.id)) continue;
-
-      const parentScheduleId = node.parentId
-        ? scheduleItemByWbsId.get(node.parentId)
-        : undefined;
-
-      let startDate: Date | null = null;
-      let endDate: Date | null = null;
-      let durationDays: number | null = null;
-
-      if (placeholderStart && placeholderEnd) {
-        const siblings = siblingsByParent.get(node.parentId ?? null) ?? [node];
-        const siblingIndex = Math.max(0, siblings.findIndex((s) => s.id === node.id));
-        const siblingCount = Math.max(siblings.length, 1);
-        const totalMs = placeholderEnd.getTime() - placeholderStart.getTime();
-        const slice = totalMs / siblingCount;
-        startDate = new Date(placeholderStart.getTime() + slice * siblingIndex);
-        endDate = new Date(
-          placeholderStart.getTime() + slice * (siblingIndex + 1) - MS_PER_DAY,
-        );
-        if (endDate < startDate) endDate = startDate;
-        durationDays = daysBetween(startDate, endDate);
+        });
+        linksToCreate.push({
+          tenantId: ctx.tenantId,
+          scheduleItemId: itemId,
+          wbsNodeId: node.id,
+          isPrimary: true,
+        });
+        scheduleItemByWbsId.set(node.id, itemId);
+        linkedWbs.add(node.id);
       }
 
-      const created = await tx.scheduleItem.create({
-        data: {
+      for (const node of itemNodes) {
+        if (linkedWbs.has(node.id)) continue;
+
+        const parentScheduleId = node.parentId ? scheduleItemByWbsId.get(node.parentId) : undefined;
+
+        let startDate: Date | null = null;
+        let endDate: Date | null = null;
+        let durationDays: number | null = null;
+
+        if (placeholderStart && placeholderEnd) {
+          const siblings = siblingsByParent.get(node.parentId ?? null) ?? [node];
+          const siblingIndex = Math.max(
+            0,
+            siblings.findIndex((s) => s.id === node.id),
+          );
+          const siblingCount = Math.max(siblings.length, 1);
+          const totalMs = placeholderEnd.getTime() - placeholderStart.getTime();
+          const slice = totalMs / siblingCount;
+          startDate = new Date(placeholderStart.getTime() + slice * siblingIndex);
+          endDate = new Date(placeholderStart.getTime() + slice * (siblingIndex + 1) - MS_PER_DAY);
+          if (endDate < startDate) endDate = startDate;
+          durationDays = daysBetween(startDate, endDate);
+        }
+
+        const itemId = randomUUID();
+        itemsToCreate.push({
+          id: itemId,
           tenantId: ctx.tenantId,
           scheduleId: schedule.id,
           parentId: parentScheduleId ?? null,
@@ -396,45 +422,51 @@ export async function importScheduleFromBudget(
           status: "PLANNED",
           createdBy: ctx.actorUserId,
           updatedBy: ctx.actorUserId,
-          wbsLinks: {
-            create: {
-              tenantId: ctx.tenantId,
-              wbsNodeId: node.id,
-              isPrimary: true,
+        });
+        linksToCreate.push({
+          tenantId: ctx.tenantId,
+          scheduleItemId: itemId,
+          wbsNodeId: node.id,
+          isPrimary: true,
+        });
+        scheduleItemByWbsId.set(node.id, itemId);
+        linkedWbs.add(node.id);
+      }
+
+      const importedCount = itemsToCreate.length;
+      if (importedCount > 0) {
+        // PostgreSQL checks self-FKs after the statement; preassigned UUIDs keep
+        // parent/child links while avoiding one remote round trip per task.
+        await tx.scheduleItem.createMany({ data: itemsToCreate });
+        await tx.scheduleItemWbsLink.createMany({ data: linksToCreate });
+        await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
+      }
+      if (importedCount > 0 || baselineChanged) {
+        await auditSchedule(
+          ctx,
+          "schedule.imported_from_budget",
+          SCHEDULE_ENTITY,
+          schedule.id,
+          { baselineBudgetId: previousBaselineId },
+          { budgetId: budget.id, baselineBudgetId: budget.id, importedCount },
+          tx,
+        );
+      }
+
+      return tx.schedule.findUniqueOrThrow({
+        where: { id: schedule.id },
+        include: {
+          items: {
+            orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
+            include: {
+              wbsLinks: { include: { wbsNode: { select: { id: true, code: true, name: true } } } },
             },
           },
         },
       });
-      scheduleItemByWbsId.set(node.id, created.id);
-      linkedWbs.add(node.id);
-      importedCount += 1;
-    }
-
-    if (importedCount > 0) {
-      await rollupScheduleContainerDatesInTx(schedule.id, ctx, tx);
-    }
-  });
-
-  if (importedCount > 0) {
-    await auditSchedule(
-      ctx,
-      "schedule.imported_from_budget",
-      SCHEDULE_ENTITY,
-      schedule.id,
-      undefined,
-      { budgetId: budget.id, importedCount },
-    );
-  }
-
-  return prisma.schedule.findUniqueOrThrow({
-    where: { id: schedule.id },
-    include: {
-      items: {
-        orderBy: [{ parentId: "asc" }, { sortOrder: "asc" }],
-        include: { wbsLinks: { include: { wbsNode: { select: { id: true, code: true, name: true } } } } },
-      },
     },
-  });
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 }
 
 export async function createScheduleItem(

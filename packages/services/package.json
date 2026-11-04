@@ -8,6 +8,8 @@
     "./certification-measurement-pure": "./src/certification/certification-measurement-pure.ts",
     ".": "./src/index.ts",
     "./budget-import-pure": "./src/budget/budget-import-pure.ts",
+    "./budget-sale-calc": "./src/budget/budget-sale-calc.ts",
+    "./budget-apu-calc": "./src/budget/budget-apu-calc.ts",
     "./wbs-metrics": "./src/budget/wbs-metrics.ts",
     "./dashboard-format": "./src/dashboard/dashboard-format.ts",
     "./tenant-module-gate": "./src/tenant-modules/tenant-module-gate.ts",
@@ -29,7 +31,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test \"src/**/*.test.ts\""
+    "test": "node --import tsx --test \"src/**/*.test.ts\" && node --conditions react-server --import tsx --test \"src/**/*.test.mts\""
   },
   "dependencies": {
     "@bloqer/ai": "workspace:*",

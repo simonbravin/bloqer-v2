@@ -38,8 +38,6 @@ export default async function EditarAsientoPage({
   ]);
   const picks = accountsResult.data.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
-  const q = cf.companyId ? `?empresa=${encodeURIComponent(cf.companyId)}` : "";
-
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={entry.reference ?? formatDate(entry.entryDate)}>
       <div className="flex items-center gap-4">

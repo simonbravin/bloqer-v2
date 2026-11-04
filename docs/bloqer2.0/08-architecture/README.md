@@ -77,6 +77,14 @@ Traducir la **fuente de verdad funcional** (producto, dominio, finanzas, fórmul
 53. [`PROJECT_FINANCE_QA_UAT_BY_ROLE.md`](./PROJECT_FINANCE_QA_UAT_BY_ROLE.md) — UAT finanzas de proyecto.
 54. [`RISK_REGISTER.md`](./RISK_REGISTER.md) — Riesgos de implementación.
 
+### Auditoría global e incremental
+
+- [PLATFORM_AUDIT_PLAN.md](./PLATFORM_AUDIT_PLAN.md): cobertura completa por etapas, recursos existentes y alcance selectivo según dependencias.
+- [PLATFORM_AUDIT_RUNBOOK.md](./PLATFORM_AUDIT_RUNBOOK.md): procedimiento de diagnóstico, corrección autorizada y verificación.
+- [Registro maestro](./platform-audit/README.md) y [plantilla de informe](./platform-audit/REPORT_TEMPLATE.md): evidencia y seguimiento de corridas; preparación del programa no equivale a auditoría ejecutada.
+- [AG-00 — diagnóstico del 03/11/2026](./platform-audit/2026-11-03-ag-00-baseline.md): [cobertura](./platform-audit/2026-11-03-ag-00-coverage.md), [arquitectura](./platform-audit/2026-11-03-ag-00-architecture.md) e [inventario](./platform-audit/2026-11-03-ag-00-inventory.json).
+- [AG-00 — remediación y cierre](./platform-audit/2026-11-03-ag-00-remediation.md): [evidencia posterior](./platform-audit/2026-11-03-ag-00-remediation.json) y [propuesta aprobada](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), formalizada en ADR-018.
+
 ## Relación con la documentación funcional
 
 - **Reglas y decisiones de producto:** [`../00-product/DECISION_LOG.md`](../00-product/DECISION_LOG.md), [`../01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md).

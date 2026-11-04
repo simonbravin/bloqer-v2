@@ -47,7 +47,7 @@ export function Header({
   showPlatformLink = false,
 }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
+    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 py-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <ShellHeaderLeading>
         {tenantName ? <AppShellBreadcrumb tenantName={tenantName} /> : null}
       </ShellHeaderLeading>

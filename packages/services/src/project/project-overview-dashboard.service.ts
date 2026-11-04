@@ -1,4 +1,4 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { prisma } from "@bloqer/database";
 import type { PermissionModule } from "@bloqer/domain";
 import { can } from "@bloqer/domain";
 import { formatWbsIncidencePercent } from "@bloqer/domain";
@@ -23,7 +23,6 @@ import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-
 import { compareDecimal } from "@bloqer/utils";
 import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
 import { canViewArProjectArea } from "../ar/ar-access";
-import { canViewApProjectArea } from "../ap/ap-access";
 import {
   canEditPurchaseOrders,
   canViewProcurementProjectArea,
@@ -33,8 +32,6 @@ import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
 import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
-
-const ZERO = new Prisma.Decimal(0);
 
 export type ProjectOverviewMoneyRow = { currency: string; amount: string };
 
@@ -174,17 +171,6 @@ function computeScheduleProgress(startIso: string | null, endIso: string | null)
   }
   const elapsed = t - s;
   return { percent: Math.min(100, Math.max(0, Math.round((elapsed / span) * 100))), note: null };
-}
-
-function addMoneyMap(m: Map<string, Prisma.Decimal>, currency: string, amount: Prisma.Decimal) {
-  m.set(currency, (m.get(currency) ?? ZERO).add(amount));
-}
-
-function mapMoneyMap(m: Map<string, Prisma.Decimal>): ProjectOverviewMoneyRow[] {
-  return [...m.entries()]
-    .filter(([, v]) => v.greaterThan(ZERO))
-    .map(([currency, amount]) => ({ currency, amount: serializeMoneyDecimal(amount) }))
-    .sort((a, b) => a.currency.localeCompare(b.currency));
 }
 
 function canViewJobsiteLogArea(roles: ServiceContext["roles"]): boolean {

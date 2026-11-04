@@ -17,7 +17,8 @@ import { assertTreasuryAccountCurrencyMatches } from "./treasury-currency-guards
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
+import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { ensureDraftJournalFromCollection } from "../accounting/accounting-auto-draft.service";
@@ -196,6 +197,7 @@ export async function createCollection(
       }),
     create: async () => {
       return prisma.$transaction(async (tx) => {
+        if (receivablePreview.projectId) await lockProjectForOperationalMutation(tx, receivablePreview.projectId, ctx);
         // Load receivable inside txn for consistency
         const receivable = await tx.receivable.findUnique({ where: { id: input.receivableId } });
         if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
@@ -451,6 +453,7 @@ export async function cancelCollection(
   await assertJournalAllowsOperationalCancel(ctx, glParams);
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (collectionPreview.projectId) await lockProjectForMutation(tx, collectionPreview.projectId, ctx.tenantId);
     const c = await tx.collection.findUnique({ where: { id } });
     if (!c) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
     if (c.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");

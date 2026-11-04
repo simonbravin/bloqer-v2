@@ -7,6 +7,8 @@ import { isTenantLogoStorageKey } from "@bloqer/storage";
 import { updateTenantDisplaySettingsInputSchema, updateTenantPermissionMatrixNotesInputSchema } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { ServiceContext, ServiceError } from "../types";
+import { assertTenantModuleEnabled, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { assertTenantConfigReadAccess } from "./tenant-settings-access";
 import {
   canEditPermissionMatrixNotes,
   canEditTenantDisplaySettings,
@@ -51,6 +53,7 @@ export async function getTenantDisplayTimezone(ctx: ServiceContext): Promise<str
   if (!canReadTenantConfigArea(ctx.roles) && !can(ctx.roles, "VIEW", "AUDIT")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para leer la zona horaria del tenant");
   }
+  if (!can(ctx.roles, "VIEW", "AUDIT")) await assertTenantConfigReadAccess(ctx);
   const row = await prisma.tenant.findFirst({
     where: { id: ctx.tenantId },
     select: { timezone: true },
@@ -63,6 +66,7 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
   if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver la configuración del tenant");
   }
+  await assertTenantConfigReadAccess(ctx);
   const row = await prisma.tenant.findFirst({
     where: { id: ctx.tenantId },
     select: {
@@ -76,7 +80,7 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
       createdAt: true,
       logoStorageKey: true,
       companies: {
-        where: { status: "ACTIVE" },
+        where: { status: "ACTIVE", ...(ctx.companyId ? { id: ctx.companyId } : {}) },
         orderBy: { createdAt: "asc" },
         take: 1,
         select: {
@@ -116,6 +120,7 @@ export async function getTenantSettings(ctx: ServiceContext): Promise<TenantSett
 }
 
 export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceContext): Promise<void> {
+  await assertTenantModuleEnabled(ctx, "TENANT_SETTINGS");
   if (!canEditTenantDisplaySettings(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar la configuración del tenant");
   }
@@ -126,44 +131,45 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
   }
   const { address, city, country, phone, website, ivaCondition, ...tenantFields } = parsed.data;
 
-  const before = await prisma.tenant.findFirst({
-    where: { id: ctx.tenantId },
-    select: {
-      name: true,
-      timezone: true,
-      baseCurrency: true,
-      companies: {
-        where: { status: "ACTIVE" },
-        orderBy: { createdAt: "asc" },
-        take: 1,
-        select: {
-          id: true,
-          address: true,
-          city: true,
-          country: true,
-          phone: true,
-          website: true,
-          ivaCondition: true,
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    const before = await tx.tenant.findFirst({
+      where: { id: ctx.tenantId },
+      select: {
+        name: true,
+        timezone: true,
+        baseCurrency: true,
+        companies: {
+          where: { status: "ACTIVE", ...(ctx.companyId ? { id: ctx.companyId } : {}) },
+          orderBy: { createdAt: "asc" },
+          take: 1,
+          select: {
+            id: true,
+            address: true,
+            city: true,
+            country: true,
+            phone: true,
+            website: true,
+            ivaCondition: true,
+          },
         },
       },
-    },
-  });
-  if (!before) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+    });
+    if (!before) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
 
-  const primary = before.companies[0];
-  const hasContactPatch =
-    address !== undefined ||
-    city !== undefined ||
-    country !== undefined ||
-    phone !== undefined ||
-    website !== undefined ||
-    ivaCondition !== undefined;
+    const primary = before.companies[0];
+    const hasContactPatch =
+      address !== undefined ||
+      city !== undefined ||
+      country !== undefined ||
+      phone !== undefined ||
+      website !== undefined ||
+      ivaCondition !== undefined;
 
-  if (hasContactPatch && !primary) {
-    throw new ServiceError("VALIDATION", "No hay empresa activa para actualizar datos de contacto");
-  }
+    if (hasContactPatch && !primary) {
+      throw new ServiceError("VALIDATION", "No hay empresa activa para actualizar datos de contacto");
+    }
 
-  await prisma.$transaction(async (tx) => {
     await tx.tenant.update({
       where: { id: ctx.tenantId },
       data: {
@@ -194,14 +200,12 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
         data: companyData,
       });
     }
-  });
-
-  const auditBefore = {
-    name: before.name,
-    timezone: before.timezone,
-    baseCurrency: before.baseCurrency,
-    ...(primary && hasContactPatch
-      ? {
+    const auditBefore = {
+      name: before.name,
+      timezone: before.timezone,
+      baseCurrency: before.baseCurrency,
+      ...(primary && hasContactPatch
+        ? {
           companyContact: {
             companyId: primary.id,
             address: primary.address,
@@ -212,14 +216,14 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
             ivaCondition: primary.ivaCondition,
           },
         }
-      : {}),
-  };
-  const auditAfter = {
-    name: tenantFields.name,
-    timezone: tenantFields.timezone,
-    baseCurrency: tenantFields.baseCurrency,
-    ...(primary && hasContactPatch
-      ? {
+        : {}),
+    };
+    const auditAfter = {
+      name: tenantFields.name,
+      timezone: tenantFields.timezone,
+      baseCurrency: tenantFields.baseCurrency,
+      ...(primary && hasContactPatch
+        ? {
           companyContact: {
             companyId: primary.id,
             address: address ?? primary.address,
@@ -230,18 +234,19 @@ export async function updateTenantDisplaySettings(raw: unknown, ctx: ServiceCont
             ivaCondition: ivaCondition === undefined ? primary.ivaCondition : ivaCondition,
           },
         }
-      : {}),
-  };
+        : {}),
+    };
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "TENANT_DISPLAY_SETTINGS_UPDATED",
-    entityType: "Tenant",
-    entityId: ctx.tenantId,
-    before: auditBefore,
-    after: auditAfter,
-    ipAddress: ctx.ipAddress,
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "TENANT_DISPLAY_SETTINGS_UPDATED",
+      entityType: "Tenant",
+      entityId: ctx.tenantId,
+      before: auditBefore,
+      after: auditAfter,
+      ipAddress: ctx.ipAddress,
+    }, tx);
   });
 }
 
@@ -281,6 +286,7 @@ export async function getTenantPermissionMatrixNotes(ctx: ServiceContext): Promi
   if (!canReadTenantConfigArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver la configuración del tenant");
   }
+  await assertTenantConfigReadAccess(ctx);
   const row = await prisma.tenant.findFirst({
     where: { id: ctx.tenantId },
     select: { permissionMatrixNotes: true },
@@ -293,45 +299,53 @@ export async function updateTenantPermissionMatrixNotes(raw: unknown, ctx: Servi
   if (!canEditPermissionMatrixNotes(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar notas de la matriz de permisos");
   }
+  const gate = await getTenantModuleGate(ctx);
+  if (!(
+    (can(ctx.roles, "EDIT", "USERS_PERMISSIONS") && gate.isEnabled("USERS_PERMISSIONS")) ||
+    (can(ctx.roles, "EDIT", "TENANT_SETTINGS") && gate.isEnabled("TENANT_SETTINGS"))
+  )) throw new ServiceError("FORBIDDEN", "El módulo está deshabilitado para este tenant.");
   const parsed = updateTenantPermissionMatrixNotesInputSchema.safeParse(raw);
   if (!parsed.success) {
     const msg = parsed.error.issues.map((i) => i.message).join("; ") || "validación";
     throw new ServiceError("VALIDATION", msg);
   }
-  const beforeRow = await prisma.tenant.findFirst({
-    where: { id: ctx.tenantId },
-    select: { permissionMatrixNotes: true },
-  });
-  if (!beforeRow) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
-  const prev = parsePermissionMatrixNotes(beforeRow.permissionMatrixNotes);
-  const nowIso = new Date().toISOString();
-  const merged: PermissionMatrixNotesMap = { ...prev };
-  for (const [mod, { text }] of Object.entries(parsed.data.notes)) {
-    const trimmed = text.trim();
-    if (trimmed === "") {
-      delete merged[mod as OverviewPermissionModule];
-    } else {
-      merged[mod as OverviewPermissionModule] = {
-        text: trimmed,
-        updatedAt:       nowIso,
-        updatedByUserId: ctx.actorUserId ?? null,
-      };
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
+    const beforeRow = await tx.tenant.findFirst({
+      where: { id: ctx.tenantId },
+      select: { permissionMatrixNotes: true },
+    });
+    if (!beforeRow) throw new ServiceError("NOT_FOUND", "Tenant no encontrado");
+    const prev = parsePermissionMatrixNotes(beforeRow.permissionMatrixNotes);
+    const nowIso = new Date().toISOString();
+    const merged: PermissionMatrixNotesMap = { ...prev };
+    for (const [mod, { text }] of Object.entries(parsed.data.notes)) {
+      const trimmed = text.trim();
+      if (trimmed === "") {
+        delete merged[mod as OverviewPermissionModule];
+      } else {
+        merged[mod as OverviewPermissionModule] = {
+          text: trimmed,
+          updatedAt: nowIso,
+          updatedByUserId: ctx.actorUserId ?? null,
+        };
+      }
     }
-  }
-  await prisma.tenant.update({
-    where: { id: ctx.tenantId },
-    data: { permissionMatrixNotes: merged as Prisma.InputJsonValue },
-  });
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "TENANT_PERMISSION_MATRIX_NOTES_UPDATED",
-    entityType:  "Tenant",
-    entityId:    ctx.tenantId,
-    before:      beforeRow.permissionMatrixNotes === null || beforeRow.permissionMatrixNotes === undefined
-      ? undefined
-      : (beforeRow.permissionMatrixNotes as Prisma.InputJsonValue),
-    after:       merged as Prisma.InputJsonValue,
-    ipAddress:   ctx.ipAddress,
+    await tx.tenant.update({
+      where: { id: ctx.tenantId },
+      data: { permissionMatrixNotes: merged as Prisma.InputJsonValue },
+    });
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "TENANT_PERMISSION_MATRIX_NOTES_UPDATED",
+      entityType: "Tenant",
+      entityId: ctx.tenantId,
+      before: beforeRow.permissionMatrixNotes === null || beforeRow.permissionMatrixNotes === undefined
+        ? undefined
+        : (beforeRow.permissionMatrixNotes as Prisma.InputJsonValue),
+      after: merged as Prisma.InputJsonValue,
+      ipAddress: ctx.ipAddress,
+    }, tx);
   });
 }

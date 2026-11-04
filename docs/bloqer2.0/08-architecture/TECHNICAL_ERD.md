@@ -11,7 +11,7 @@ Representar el dominio como **modelo relacional multitenant** con **UUIDs**, **d
 
 ## Diagrama ERD técnico (alto nivel)
 
-> Convención: todas las entidades operativas llevan `tenant_id` salvo catálogos globales explícitos ([`TENANT_ISOLATION_MODEL.md`](./TENANT_ISOLATION_MODEL.md)). En el diagrama se omiten campos de auditoría y algunos atributos no estructurales.
+> Convención: toda entidad operativa pertenece a un tenant. Las raíces conservan `tenant_id` propio; los hijos del catálogo cerrado de [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md) lo heredan por su padre dueño obligatorio, conforme a [`TENANT_ISOLATION_MODEL.md`](./TENANT_ISOLATION_MODEL.md). Los casos de identidad/raíz/plataforma se describen separadamente allí. En el diagrama se omiten campos de auditoría y algunos atributos no estructurales; no amplía excepciones físicas.
 
 ```mermaid
 erDiagram
