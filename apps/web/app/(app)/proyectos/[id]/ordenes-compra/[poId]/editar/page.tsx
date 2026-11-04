@@ -43,12 +43,14 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     redirect(`/proyectos/${id}/ordenes-compra/${poId}`);
   }
 
-  const [suppliersResult, wbsNodes, productsResult] = await Promise.all([
-    listAllContacts({ role: "SUPPLIER", status: "ACTIVE" }, ctx),
-    listProcurementWbsOptions(id, ctx),
-    listProducts({ status: "ACTIVE" }, ctx),
+  const orderCtx = { ...ctx, companyId: order.companyId };
+  const [suppliersResult, wbsNodes, productsResult, settings] = await Promise.all([
+    listAllContacts({ role: "SUPPLIER", status: "ACTIVE" }, orderCtx),
+    listProcurementWbsOptions(id, orderCtx),
+    listProducts({ status: "ACTIVE" }, orderCtx),
+    getCompanyProcurementSettingsForProject(id, orderCtx),
   ]);
-  const products = productsResult.data;
+  const products = productsResult.data.filter((product) => product.companyId == null || product.companyId === order.companyId);
 
   const suppliers: SupplierOption[] = suppliersResult.map(toContactPickerOption);
 
@@ -58,6 +60,8 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     name: n.name,
     budgetName: n.budgetName,
     budgetUnitCost: n.budgetUnitCost,
+    budgetCurrency: n.budgetCurrency,
+    budgetWarning: n.budgetWarning,
     budgetUnit: n.budgetUnit,
     availableSaldo: n.availableSaldo,
     wouldExceedBudget: n.wouldExceedBudget,
@@ -72,20 +76,12 @@ export default async function EditarOrdenCompraPage({ params }: PageProps) {
     unit: p.unit,
   }));
 
-  let allowEmergency = false;
-  let varianceSettings: { varianceSoftAlertPct: string; varianceExtraApprovalPct: string } | undefined;
-  try {
-    const settings = await getCompanyProcurementSettingsForProject(id, ctx);
-    allowEmergency =
-      settings.allowEmergencyDirectPo &&
-      current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
-    varianceSettings = {
-      varianceSoftAlertPct: settings.varianceSoftAlertPct,
-      varianceExtraApprovalPct: settings.varianceExtraApprovalPct,
-    };
-  } catch {
-    allowEmergency = false;
-  }
+  const allowEmergency = settings.allowEmergencyDirectPo &&
+    current.tenantCtx.roles.some((r) => r === "OWNER" || r === "ADMIN");
+  const varianceSettings = {
+    varianceSoftAlertPct: settings.varianceSoftAlertPct,
+    varianceExtraApprovalPct: settings.varianceExtraApprovalPct,
+  };
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>

@@ -46,16 +46,16 @@ export function PoBillingNextStepPanel({
       }
     >
       <div className="text-sm space-y-1">
-        <p className="font-medium">Facturación de la OC</p>
+        <p className="font-medium">Facturación de la OC · {billing.currency}</p>
         {billing.hasReceivedQuantity ? (
           <p className="text-muted-foreground text-xs">
-            Recibido: {formatMoneyAmount(billing.receivedAmount)} · Facturado (emitido):{" "}
-            {formatMoneyAmount(billing.invoicedAmount)} · Pagado: {formatMoneyAmount(billing.paidAmount)}
+            Recibido neto + IVA: {formatMoneyAmount(billing.receivedAmount, billing.currency)} · Facturado neto + IVA (emitido):{" "}
+            {formatMoneyAmount(billing.invoicedAmount, billing.currency)} · Pagado total: {formatMoneyAmount(billing.paidAmount, billing.currency)}
             {billing.draftInvoiceCount > 0
-              ? ` · ${billing.draftInvoiceCount} borrador(es) (${formatMoneyAmount(billing.draftReservedAmount)})`
+              ? ` · ${billing.draftInvoiceCount} borrador(es) neto + IVA (${formatMoneyAmount(billing.draftReservedAmount, billing.currency)})`
               : null}
             {pending
-              ? ` · Pendiente de facturar: ${formatMoneyAmount(billing.pendingToInvoice)}`
+              ? ` · Pendiente de facturar neto + IVA: ${formatMoneyAmount(billing.pendingToInvoice, billing.currency)}`
               : null}
           </p>
         ) : (
@@ -64,6 +64,9 @@ export function PoBillingNextStepPanel({
             proveedor.
           </p>
         )}
+        {billing.hasReceivedQuantity ? <p className="text-xs text-muted-foreground">
+          Recibido, facturado y pendiente se muestran sin percepciones. Pagado total se aplica al total del comprobante, que puede incluirlas; esas bases no se comparan para determinar si queda deuda.
+        </p> : null}
         {billing.unlinkedInvoiceCount > 0 ? (
           <ProcurementAmberCallout inset>
             <p className="text-xs text-amber-900 dark:text-amber-100">

@@ -6,7 +6,7 @@ import {
 } from "@bloqer/validators";
 
 /**
- * [D-096] · [BR-PUR-017] — `neededByDate` obligatorio al crear y editar SC en borrador.
+ * [D-096] · [BR-PUR-017] — required on create, preserved when omitted on edit.
  */
 
 const baseCreatePayload = {
@@ -70,6 +70,13 @@ describe("createPurchaseRequestSchema neededByDate", () => {
       assert.equal(parsed.data.neededByDate, "2026-09-15");
     }
   });
+
+  it("rejects impossible calendar dates instead of rolling into another day", () => {
+    for (const neededByDate of ["2026-02-29", "2026-04-31", "2026-13-01"]) {
+      assert.equal(createPurchaseRequestSchema.safeParse({ ...baseCreatePayload, neededByDate }).success, false);
+    }
+    assert.equal(createPurchaseRequestSchema.safeParse({ ...baseCreatePayload, neededByDate: "2024-02-29" }).success, true);
+  });
 });
 
 const baseUpdatePayload = {
@@ -79,8 +86,9 @@ const baseUpdatePayload = {
 };
 
 describe("updatePurchaseRequestSchema", () => {
-  it("requires neededByDate and at least one line", () => {
-    assert.equal(updatePurchaseRequestSchema.safeParse({ notes: "x" }).success, false);
+  it("allows header-only changes and preserves the existing date under D-096/D-126", () => {
+    assert.equal(updatePurchaseRequestSchema.safeParse({ notes: "x" }).success, true);
+    assert.equal(updatePurchaseRequestSchema.safeParse({ lines: baseCreatePayload.lines }).success, true);
     assert.equal(
       updatePurchaseRequestSchema.safeParse({ neededByDate: "2026-09-15", lines: [] }).success,
       false,

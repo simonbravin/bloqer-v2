@@ -40,7 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatMoneyAmount, formatQtyDisplay } from "@/lib/format-money";
+import { formatMoneyAmount, formatQtyWithUnit } from "@/lib/format-money";
 import { addDecimal, compareDecimal } from "@bloqer/utils";
 import { cn } from "@/lib/utils";
 import { CostVarianceBadge } from "./cost-variance-badge";
@@ -67,7 +67,7 @@ const COLUMN_HINTS: Partial<Record<EdtColumnId, string>> = {
     "Obligación reconocida: facturas de proveedor emitidas y certificaciones de subcontrato aprobadas.",
   paid: "Pagos confirmados imputables a esta partida.",
   consumed:
-    "Consumo de inventario (stock OUT CONFIRMED / CONSUMPTION) imputado a la partida. No suma a la exposición esperada.",
+    "Consumo de inventario (stock OUT CONFIRMED / CONSUMPTION) imputado a la partida. Sin valuación trazable se muestra —. No suma a la exposición esperada.",
   openCommitted:
     "Comprometido abierto = max(0, Comprometido − Devengado ligado al mismo compromiso). Evita doble conteo OC+factura.",
   exposure:
@@ -118,6 +118,7 @@ type DrilldownFilters = Pick<CostControlFilters, "budgetId" | "dateFrom" | "date
 type Props = {
   rows: CostControlRow[];
   totals: CostControlTotals;
+  currency: string;
   projectId: string;
   filters?: DrilldownFilters;
 };
@@ -135,47 +136,58 @@ function isModifiedClick(e: MouseEvent) {
   return e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0;
 }
 
-function cellValue(row: CostControlRow, col: EdtColumnId): ReactNode {
+function quantityValue(raw: string | null, unit: string): ReactNode {
+  if (raw != null) return formatQtyWithUnit(raw, unit);
+  return <span title="Unidades no comparables con la partida; consultá el detalle o el tablero del recurso"><span className="sr-only">Unidades no comparables con la partida; consultá el detalle o el tablero del recurso. </span>—</span>;
+}
+
+function consumedCostValue(raw: string | null, currency: string): ReactNode {
+  return raw == null
+    ? <span title="Sin valuación trazable"><span className="sr-only">Sin valuación. </span>—</span>
+    : formatMoneyAmount(raw, currency);
+}
+
+function cellValue(row: CostControlRow, col: EdtColumnId, currency: string): ReactNode {
   switch (col) {
     case "budgetCost":
-      return formatMoneyAmount(row.budgetTotalCost);
+      return formatMoneyAmount(row.budgetTotalCost, currency);
     case "budgetSale":
-      return formatMoneyAmount(row.budgetTotalSale);
+      return formatMoneyAmount(row.budgetTotalSale, currency);
     case "certified":
       return (
         <>
-          {formatMoneyAmount(row.certifiedApproved)}
+          {formatMoneyAmount(row.certifiedApproved, currency)}
           {row.flags.overCertified ? <span className="ml-1 text-destructive">!</span> : null}
         </>
       );
     case "committed":
-      return formatMoneyAmount(row.committedCost);
+      return formatMoneyAmount(row.committedCost, currency);
     case "received":
-      return formatMoneyAmount(row.receivedCost);
+      return formatMoneyAmount(row.receivedCost, currency);
     case "accrued":
-      return formatMoneyAmount(row.accruedCost);
+      return formatMoneyAmount(row.accruedCost, currency);
     case "paid":
-      return formatMoneyAmount(row.paidCost);
+      return formatMoneyAmount(row.paidCost, currency);
     case "consumed":
-      return formatMoneyAmount(row.inventoryConsumedCost);
+      return consumedCostValue(row.inventoryConsumedCost, currency);
     case "openCommitted":
-      return formatMoneyAmount(row.openCommittedCost);
+      return formatMoneyAmount(row.openCommittedCost, currency);
     case "exposure":
-      return formatMoneyAmount(row.expectedCostExposure);
+      return formatMoneyAmount(row.expectedCostExposure, currency);
     case "variance":
       return (
-        <CostVarianceBadge variance={row.costVariance} label={formatMoneyAmount(row.costVariance)} />
+        <CostVarianceBadge variance={row.costVariance} label={formatMoneyAmount(row.costVariance, currency)} />
       );
     case "physicalProgress":
-      return formatQtyDisplay(row.operationalProgressQty);
+      return formatQtyWithUnit(row.operationalProgressQty, row.unit);
     case "qtyBudgeted":
-      return formatQtyDisplay(row.budgetQty);
+      return formatQtyWithUnit(row.budgetQty, row.unit);
     case "qtyCommitted":
-      return formatQtyDisplay(row.qtyCommitted);
+      return quantityValue(row.qtyCommitted, row.unit);
     case "qtyReceived":
-      return formatQtyDisplay(row.qtyReceived);
+      return quantityValue(row.qtyReceived, row.unit);
     case "qtyConsumed":
-      return formatQtyDisplay(row.qtyConsumed);
+      return quantityValue(row.qtyConsumed, row.unit);
     case "pctPurchased":
       return <PctPill value={row.pctPurchased} />;
     case "pctReceived":
@@ -227,71 +239,76 @@ const COST_TYPE_FILTER_OPTIONS: { value: CostTypeFilter; label: string }[] = [
   ...COST_CATEGORY_OPTIONS,
 ];
 
-function bucketCellValue(bucket: CostTypeBucket, col: EdtColumnId): ReactNode {
+function bucketCellValue(bucket: CostTypeBucket, col: EdtColumnId, currency: string): ReactNode {
   switch (col) {
     case "budgetCost":
-      return formatMoneyAmount(bucket.budgetTotalCost);
+      return formatMoneyAmount(bucket.budgetTotalCost, currency);
     case "committed":
-      return formatMoneyAmount(bucket.committedCost);
+      return formatMoneyAmount(bucket.committedCost, currency);
     case "accrued":
-      return formatMoneyAmount(bucket.accruedCost);
+      return formatMoneyAmount(bucket.accruedCost, currency);
     case "paid":
-      return formatMoneyAmount(bucket.paidCost);
+      return formatMoneyAmount(bucket.paidCost, currency);
     case "consumed":
-      return formatMoneyAmount(bucket.inventoryConsumedCost);
+      return consumedCostValue(bucket.inventoryConsumedCost, currency);
     case "openCommitted":
-      return formatMoneyAmount(bucket.openCommittedCost);
+      return formatMoneyAmount(bucket.openCommittedCost, currency);
     case "exposure":
-      return formatMoneyAmount(bucket.expectedCostExposure);
+      return formatMoneyAmount(bucket.expectedCostExposure, currency);
     case "variance":
-      return formatMoneyAmount(bucket.costVariance);
+      return formatMoneyAmount(bucket.costVariance, currency);
     default:
       return "—";
   }
 }
 
-function sumQtyDisplay(rows: CostControlRow[], pick: (r: CostControlRow) => string): string {
+function sumQtyDisplay(rows: CostControlRow[], pick: (r: CostControlRow) => string | null): string {
+  const units = new Set(rows.map((row) => row.unit.trim()));
+  if (units.size !== 1 || units.has("")) return "—";
   let total = "0";
   for (const row of rows) {
+    const raw = pick(row);
+    if (raw == null) return "—";
     try {
-      total = addDecimal(total, pick(row) || "0");
+      total = addDecimal(total, raw || "0");
     } catch {
-      /* skip malformed qty */
+      return "—";
     }
   }
-  return formatQtyDisplay(total);
+  return formatQtyWithUnit(total, rows[0]!.unit);
 }
 
 function totalValue(
   totals: CostControlTotals,
   col: EdtColumnId,
   rows: CostControlRow[],
+  currency: string,
 ): ReactNode {
   switch (col) {
     case "budgetCost":
-      return formatMoneyAmount(totals.budgetTotalCost);
+      return formatMoneyAmount(totals.budgetTotalCost, currency);
     case "budgetSale":
-      return formatMoneyAmount(totals.budgetTotalSale);
+      return formatMoneyAmount(totals.budgetTotalSale, currency);
     case "certified":
-      return formatMoneyAmount(totals.certifiedApproved);
+      return formatMoneyAmount(totals.certifiedApproved, currency);
     case "committed":
-      return formatMoneyAmount(totals.committedCost);
+      return formatMoneyAmount(totals.committedCost, currency);
     case "received":
-      return formatMoneyAmount(totals.receivedCost);
+      return formatMoneyAmount(totals.receivedCost, currency);
     case "accrued":
-      return formatMoneyAmount(totals.accruedCost);
+      return formatMoneyAmount(totals.accruedCost, currency);
     case "paid":
-      return formatMoneyAmount(totals.paidCost);
+      return formatMoneyAmount(totals.paidCost, currency);
     case "consumed":
-      return formatMoneyAmount(totals.inventoryConsumedCost);
+      return consumedCostValue(totals.inventoryConsumedCost, currency);
     case "openCommitted":
-      return formatMoneyAmount(totals.openCommittedCost);
+      return formatMoneyAmount(totals.openCommittedCost, currency);
     case "exposure":
-      return formatMoneyAmount(totals.expectedCostExposure);
+      return formatMoneyAmount(totals.expectedCostExposure, currency);
     case "variance":
-      return formatMoneyAmount(totals.costVariance);
+      return formatMoneyAmount(totals.costVariance, currency);
     case "physicalProgress":
-      return formatQtyDisplay(totals.operationalProgressQty);
+      return sumQtyDisplay(rows, (row) => row.operationalProgressQty);
     case "qtyBudgeted":
       return sumQtyDisplay(rows, (r) => r.budgetQty);
     case "qtyCommitted":
@@ -308,6 +325,7 @@ function totalValue(
 
 function EdtRowCard({
   row,
+  currency,
   columns,
   projectId,
   filters,
@@ -317,6 +335,7 @@ function EdtRowCard({
   typeExpandAvailable,
 }: {
   row: CostControlRow;
+  currency: string;
   columns: EdtColumnId[];
   projectId: string;
   filters?: DrilldownFilters;
@@ -334,13 +353,14 @@ function EdtRowCard({
       tabIndex={0}
       onClick={() => onOpen(row)}
       onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onOpen(row);
         }
       }}
       className={cn(
-        "w-full cursor-pointer rounded-lg border bg-card p-3 text-left space-y-2",
+        "w-full cursor-pointer rounded-lg border bg-card p-3 text-left space-y-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         row.flags.overBudget && "border-red-300 dark:border-red-800",
       )}
     >
@@ -374,14 +394,14 @@ function EdtRowCard({
         </div>
         <CostVarianceBadge
           variance={row.costVariance}
-          label={formatMoneyAmount(row.costVariance)}
+          label={formatMoneyAmount(row.costVariance, currency)}
         />
       </div>
       <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
         {columns.slice(0, 8).map((col) => (
           <div key={col} className="flex justify-between gap-2">
             <dt className="text-muted-foreground">{EDT_COLUMN_LABELS[col]}</dt>
-            <dd className="tabular-nums text-right">{cellValue(row, col)}</dd>
+            <dd className="tabular-nums text-right">{cellValue(row, col, currency)}</dd>
           </div>
         ))}
       </dl>
@@ -395,7 +415,7 @@ function EdtRowCard({
               <li key={b.costType} className="flex justify-between gap-2">
                 <span className="font-medium text-foreground/80">{b.label}</span>
                 <span className="tabular-nums shrink-0">
-                  {formatMoneyAmount(b.budgetTotalCost)} → {formatMoneyAmount(b.expectedCostExposure)}
+                  {formatMoneyAmount(b.budgetTotalCost, currency)} → {formatMoneyAmount(b.expectedCostExposure, currency)}
                 </span>
               </li>
             ))}
@@ -406,7 +426,7 @@ function EdtRowCard({
   );
 }
 
-export function CostControlTable({ rows, totals, projectId, filters = {} }: Props) {
+export function CostControlTable({ rows, totals, currency, projectId, filters = {} }: Props) {
   const [openItem, setOpenItem] = useState<CostControlRow | null>(null);
   const [presetState, setPresetState] = useState<EdtPresetState>(defaultEdtPresetState);
   const [hydrated, setHydrated] = useState(false);
@@ -482,7 +502,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
       <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-3">
           <div className="space-y-1">
-            <Label className="text-xs">Vista de columnas</Label>
+            <Label htmlFor="cost-columns-preset" className="text-xs">Vista de columnas</Label>
             <Select
               value={presetState.preset}
               onValueChange={(v) => {
@@ -497,7 +517,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                 });
               }}
             >
-              <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectTrigger id="cost-columns-preset" className="h-8 w-44 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -531,12 +551,12 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
             </div>
           ) : null}
           <div className="space-y-1">
-            <Label className="text-xs">Tipo de costo</Label>
+            <Label htmlFor="cost-type-filter" className="text-xs">Tipo de costo</Label>
             <Select
               value={costTypeFilter}
               onValueChange={(v) => setCostTypeFilter(v as CostTypeFilter)}
             >
-              <SelectTrigger className="h-8 w-44 text-xs">
+              <SelectTrigger id="cost-type-filter" className="h-8 w-44 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -582,6 +602,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
               <EdtRowCard
                 key={row.wbsNodeId}
                 row={row}
+                currency={currency}
                 columns={columns}
                 projectId={projectId}
                 filters={filters}
@@ -696,7 +717,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                             ].includes(col) && "text-muted-foreground",
                           )}
                         >
-                          {cellValue(row, col)}
+                          {cellValue(row, col, currency)}
                         </TableCell>
                       ))}
                     </TableRow>
@@ -717,7 +738,7 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                         </TableCell>
                         {columns.map((col) => (
                           <TableCell key={col} className="text-right tabular-nums text-[11px]">
-                            {bucketCellValue(b, col)}
+                            {bucketCellValue(b, col, currency)}
                           </TableCell>
                         ))}
                       </TableRow>
@@ -731,8 +752,8 @@ export function CostControlTable({ rows, totals, projectId, filters = {} }: Prop
                     Total{filterActive ? ` · ${filterLabel}` : ""}
                   </TableCell>
                   {columns.map((col) => (
-                    <TableCell key={col} className="text-right">
-                      {totalValue(derivedTotals, col, derivedRows)}
+                    <TableCell key={col} className="text-right" title={col.startsWith("qty") || col === "physicalProgress" ? "Solo se suman cantidades comparables de una misma unidad." : undefined}>
+                      {totalValue(derivedTotals, col, derivedRows, currency)}
                     </TableCell>
                   ))}
                 </TableRow>

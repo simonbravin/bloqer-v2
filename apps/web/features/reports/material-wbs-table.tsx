@@ -10,11 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatMoneyDisplay } from "@/lib/format-money";
 
-type Props = { rows: MaterialWbsRow[] };
+type Props = { rows: MaterialWbsRow[]; currency?: string };
 
-export function MaterialWbsTable({ rows }: Props) {
+export function MaterialWbsTable({ rows, currency }: Props) {
   return (
     <TableScroll>
       <Table className="text-xs">
@@ -34,9 +34,9 @@ export function MaterialWbsTable({ rows }: Props) {
               <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                 {row.wbsName}
               </TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetMaterial)}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.consumedCost)}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.variance)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetMaterial, currency)}</TableCell>
+              <TableCell className="text-right font-mono" title={row.consumedCost == null ? "Sin valuación trazable" : undefined}>{formatMoneyDisplay(row.consumedCost, currency)}</TableCell>
+              <TableCell className="text-right font-mono" title={row.variance == null ? "No calculable: falta valuación del consumo" : undefined}>{formatMoneyDisplay(row.variance, currency)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

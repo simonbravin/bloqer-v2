@@ -1,6 +1,20 @@
 import { prisma } from "@bloqer/database";
 import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
-import { ServiceContext } from "../types";
+import { companyScopeFilter } from "../company-scope";
+import { canViewBudgetsArea } from "../project/project-nav-guards";
+import { requireProjectAccess } from "../security/access";
+import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { ServiceContext, ServiceError } from "../types";
+
+async function assertBudgetReportAccess(projectId: string, ctx: ServiceContext): Promise<void> {
+  if (!canViewBudgetsArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver presupuestos.");
+  }
+  await requireProjectAccess(projectId, ctx);
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
+  assertTenantModuleEnabledWithGate(gate, "BUDGETS");
+}
 
 export type ResolvedApprovedBudget = {
   id: string;
@@ -16,8 +30,9 @@ export async function resolveApprovedBudgetForProject(
   budgetId: string | undefined,
   ctx: ServiceContext,
 ): Promise<ResolvedApprovedBudget | null> {
+  await assertBudgetReportAccess(projectId, ctx);
   const budgets = await prisma.budget.findMany({
-    where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
+    where: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
     select: {
       id: true,
       name: true,
@@ -47,8 +62,9 @@ export async function listApprovedBudgetsForProject(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<ResolvedApprovedBudget[]> {
+  await assertBudgetReportAccess(projectId, ctx);
   return prisma.budget.findMany({
-    where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
+    where: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
     select: {
       id: true,
       name: true,

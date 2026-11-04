@@ -26,10 +26,7 @@ export function activeSiblings(
 ): ScheduleTreeNode[] {
   return items
     .filter(
-      (i) =>
-        (i.parentId ?? null) === parentId &&
-        i.status !== "CANCELLED" &&
-        i.id !== excludeId,
+      (i) => (i.parentId ?? null) === parentId && i.status !== "CANCELLED" && i.id !== excludeId,
     )
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
 }
@@ -62,17 +59,13 @@ export function suggestPlacementForWbs(
   wbsNodeId: string,
 ): SchedulePlacement | null {
   const linked = items.filter(
-    (i) =>
-      i.status !== "CANCELLED" &&
-      (i.wbsNodeIds ?? []).includes(wbsNodeId),
+    (i) => i.status !== "CANCELLED" && (i.wbsNodeIds ?? []).includes(wbsNodeId),
   );
   if (linked.length === 0) return null;
 
   // Prefer a leaf (no active children) that has this WBS; stable order by sortOrder.
   const leaves = linked
-    .filter(
-      (i) => !items.some((c) => c.parentId === i.id && c.status !== "CANCELLED"),
-    )
+    .filter((i) => !items.some((c) => c.parentId === i.id && c.status !== "CANCELLED"))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id));
   const anchor =
     leaves[0] ??
@@ -91,9 +84,12 @@ export function wouldCreateCycle(
   if (newParentId === null) return false;
   if (newParentId === itemId) return true;
   const byId = new Map(items.map((i) => [i.id, i]));
+  const visited = new Set<string>();
   let current: ScheduleTreeNode | undefined = byId.get(newParentId);
   while (current) {
     if (current.id === itemId) return true;
+    if (visited.has(current.id)) return true;
+    visited.add(current.id);
     current = current.parentId ? byId.get(current.parentId) : undefined;
   }
   return false;
@@ -126,18 +122,18 @@ export function applyMoveSibling(
   if (!item || item.status === "CANCELLED") return null;
 
   if (action.kind === "place") {
+    if (
+      action.parentId &&
+      !items.some((node) => node.id === action.parentId && node.status !== "CANCELLED")
+    )
+      return null;
     if (wouldCreateCycle(items, itemId, action.parentId)) return null;
     const siblings = activeSiblings(items, action.parentId, itemId);
     const parentId = action.parentId;
     const alreadyUnderParent = (item.parentId ?? null) === parentId;
     const parentHasOtherChildren =
       parentId != null &&
-      items.some(
-        (c) =>
-          c.parentId === parentId &&
-          c.status !== "CANCELLED" &&
-          c.id !== itemId,
-      );
+      items.some((c) => c.parentId === parentId && c.status !== "CANCELLED" && c.id !== itemId);
     const promotesLeafToContainer =
       parentId != null && !alreadyUnderParent && !parentHasOtherChildren;
 
@@ -181,9 +177,7 @@ export function applyMoveSibling(
     if (idx <= 0) return null;
     const newParent = siblings[idx - 1]!;
     if (wouldCreateCycle(items, itemId, newParent.id)) return null;
-    const wasLeaf = !items.some(
-      (c) => c.parentId === newParent.id && c.status !== "CANCELLED",
-    );
+    const wasLeaf = !items.some((c) => c.parentId === newParent.id && c.status !== "CANCELLED");
     const newSiblings = activeSiblings(items, newParent.id, itemId);
     const ordered = [...newSiblings.map((s) => s.id), itemId];
     return {

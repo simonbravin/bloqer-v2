@@ -24,6 +24,7 @@ type Props = {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
 };
 
 export function PurchaseRequestCreateComposer({
@@ -35,6 +36,7 @@ export function PurchaseRequestCreateComposer({
   variant = "plain",
   onCancel,
   onSuccess,
+  onPendingChange,
 }: Props) {
   const evidence = usePendingEntityEvidence({
     projectId,
@@ -52,6 +54,16 @@ export function PurchaseRequestCreateComposer({
     ? `/proyectos/${projectId}/solicitudes-compra/${evidence.createdId}`
     : `/proyectos/${projectId}/solicitudes-compra`;
 
+  async function retryEvidence(clientId?: string) {
+    onPendingChange?.(true);
+    try {
+      if (clientId) await evidence.retryOne(clientId);
+      else await evidence.retryFailed();
+    } finally {
+      onPendingChange?.(false);
+    }
+  }
+
   if (evidence.retryVisible) {
     const n = evidence.failedCount;
     return (
@@ -66,8 +78,8 @@ export function PurchaseRequestCreateComposer({
         retrying={evidence.retrying}
         detailHref={detailHref}
         detailLabel="Ver solicitud"
-        onRetryAll={() => void evidence.retryFailed()}
-        onRetryOne={(clientId) => void evidence.retryOne(clientId)}
+        onRetryAll={() => void retryEvidence()}
+        onRetryOne={(clientId) => void retryEvidence(clientId)}
       />
     );
   }
@@ -82,6 +94,7 @@ export function PurchaseRequestCreateComposer({
       variant={variant}
       onCancel={onCancel}
       onSuccess={onSuccess}
+      onPendingChange={onPendingChange}
       onCreated={evidence.handleCreated}
       extraSections={
         <PendingEvidencePicker

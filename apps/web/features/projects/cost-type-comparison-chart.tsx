@@ -18,13 +18,14 @@ import { formatChartMoney } from "@/lib/format-money";
 
 type Props = {
   comparison: CostTypeComparisonReport;
+  currency?: string;
 };
 
 /**
  * Grouped horizontal bars per CostCategory, showing planned budget vs accrued
  * cost vs expected exposure ([D-099]). Complements the APU composition pie.
  */
-export function CostTypeComparisonChart({ comparison }: Props) {
+export function CostTypeComparisonChart({ comparison, currency }: Props) {
   const chartData = useMemo(
     () =>
       comparison.rows.map((r) => ({
@@ -68,7 +69,7 @@ export function CostTypeComparisonChart({ comparison }: Props) {
               <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-muted" />
               <XAxis
                 type="number"
-                tickFormatter={(v: number) => formatChartMoney(v)}
+                tickFormatter={(v: number) => formatChartMoney(v, currency)}
                 tick={{ fontSize: 10 }}
               />
               <YAxis
@@ -77,7 +78,7 @@ export function CostTypeComparisonChart({ comparison }: Props) {
                 width={100}
                 tick={{ fontSize: 11 }}
               />
-              <Tooltip formatter={(v: number) => formatChartMoney(v)} />
+              <Tooltip formatter={(v: number) => formatChartMoney(v, currency)} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="Presupuesto" fill="#94a3b8" radius={[0, 2, 2, 0]} />
               <Bar dataKey="Devengado" fill="#16a34a" radius={[0, 2, 2, 0]} />

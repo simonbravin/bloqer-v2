@@ -3,12 +3,13 @@ import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
+import { compareDecimal } from "@bloqer/utils";
 import {
   canEditPurchaseRequests,
   canViewPurchaseRequests,
   getMaterialLinesWithoutProduct,
   getMaterialVarianceReport,
-  getProjectCostControl,
+  listApprovedBudgetsForProject,
   getProjectMaterialsBoard,
   getProjectShellInfo,
   getTenantModuleGate,
@@ -29,8 +30,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { formatDecimalArFromString, formatMoneyAmount } from "@/lib/format-money";
+import { formatDecimalArFromString, formatMoneyAmount, formatMoneyDisplay } from "@/lib/format-money";
 import { isMaterialsFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
+
+import { planningReadError } from "@/features/cost-control/lib/planning-read-error";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -57,17 +60,6 @@ function windowLabel(w: MaterialsBoardWindow): string {
     default:
       return "Todo";
   }
-}
-
-function fmtQtyKpi(raw: string): string {
-  const t = raw.trim();
-  if (!/^-?\d+(\.\d+)?$/.test(t)) return raw;
-  const sign = t.startsWith("-") ? "-" : "";
-  const abs = sign ? t.slice(1) : t;
-  const [intPart, decPart = ""] = abs.split(".");
-  const withThousands = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-  const trimmedDec = decPart.replace(/0+$/, "").slice(0, 4);
-  return trimmedDec ? `${sign}${withThousands},${trimmedDec}` : `${sign}${withThousands}`;
 }
 
 function materialsQuery(opts: {
@@ -134,8 +126,9 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
     roles: current.tenantCtx.roles,
   };
 
+  let project: Awaited<ReturnType<typeof getProjectShellInfo>>;
   try {
-    await getProjectShellInfo(projectId, ctx);
+    project = await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
@@ -146,7 +139,7 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
   const loadField = isMaterialsFieldViewport(hint);
 
   const gate = await getTenantModuleGate(ctx);
-  const canRequest = gate.isEnabled("PROCUREMENT") && canEditPurchaseRequests(ctx.roles);
+  const canRequest = project.status === "ACTIVE" && gate.isEnabled("PROCUREMENT") && canEditPurchaseRequests(ctx.roles);
   const showCompras =
     gate.isEnabled("PROCUREMENT") &&
     (canViewPurchaseRequests(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
@@ -159,7 +152,7 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
       board = await getProjectMaterialsBoard(projectId, { window: "all", budgetId: sp.budgetId }, ctx);
     } catch (err) {
       if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-      throw err;
+      return <PageShell className="space-y-6"><ProjectPageHeader title="Materiales" />{planningReadError(err, `/proyectos/${projectId}/materiales`)}</PageShell>;
     }
     const queryMs = Date.now() - started;
     const rows = board.type === "REPORT" ? board.rows.map(toMaterialsFieldRow) : [];
@@ -193,14 +186,10 @@ export default async function ProyectoMaterialesPage({ params, searchParams }: P
     );
   }
 
-  const budgetProbe = await getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx).catch(
-    (err) => {
-      if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-      throw err;
-    },
-  );
-  const availableBudgets =
-    budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
+  const availableBudgets = await listApprovedBudgetsForProject(projectId, ctx).catch((err) => {
+    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    throw err;
+  });
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -275,11 +264,9 @@ async function OperativoTab({
   canRequest: boolean;
   ctx: ServiceContext;
 }) {
-  const board = await getProjectMaterialsBoard(
-    projectId,
-    { window, budgetId, wbsNodeId },
-    ctx,
-  );
+  let board;
+  try { board = await getProjectMaterialsBoard(projectId, { window, budgetId, wbsNodeId }, ctx); }
+  catch (error) { return planningReadError(error, `/proyectos/${projectId}/materiales`); }
 
   if (board.type === "NO_APPROVED_BUDGETS") {
     return (
@@ -328,7 +315,7 @@ async function OperativoTab({
       ))}
 
       <p className="text-xs text-muted-foreground">
-        Presupuesto: {board.budgetName}
+        Presupuesto: {board.budgetName} · Moneda: {board.currency}
         {board.windowStart && board.windowEnd
           ? ` · Ventana ${board.windowStart} → ${board.windowEnd}`
           : null}
@@ -337,12 +324,12 @@ async function OperativoTab({
 
       <KpiStatGrid title={null} columns={4}>
         <KpiStatCard
-          label="Presupuesto MAT"
+          label={`Presupuesto MAT (${board.currency})`}
           value={formatMoneyAmount(board.totals.needCost, board.currency)}
         />
         <KpiStatCard label="Filas con faltante" value={String(board.totals.shortfallRows)} />
-        <KpiStatCard label="Cant. recibida" value={fmtQtyKpi(board.totals.receivedQty)} />
-        <KpiStatCard label="Cant. consumida" value={fmtQtyKpi(board.totals.consumedQty)} />
+        <KpiStatCard label="Filas con recepción" value={String(board.rows.filter((row) => compareDecimal(row.receivedQty, "0") > 0).length)} />
+        <KpiStatCard label="Filas con consumo" value={String(board.rows.filter((row) => compareDecimal(row.consumedQty, "0") > 0).length)} />
       </KpiStatGrid>
 
       <Card data-testid="materials-desktop-view">
@@ -352,6 +339,7 @@ async function OperativoTab({
         <CardContent>
           <MaterialsBoardTable
             rows={board.rows}
+            currency={board.currency}
             projectId={projectId}
             canRequest={canRequest}
             budgetId={board.budgetId}
@@ -373,14 +361,13 @@ async function VarianzaTab({
   availableBudgets: AvailableBudget[];
   ctx: ServiceContext;
 }) {
-  const report = await getMaterialVarianceReport(
-    projectId,
-    { budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo },
-    ctx,
-  );
+  let report;
+  try { report = await getMaterialVarianceReport(projectId, { budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo }, ctx); }
+  catch (error) { return planningReadError(error, `/proyectos/${projectId}/materiales?tab=varianza`); }
   let withoutProduct: Awaited<ReturnType<typeof getMaterialLinesWithoutProduct>> = [];
   if (report.type === "REPORT") {
-    withoutProduct = await getMaterialLinesWithoutProduct(projectId, report.budgetId, ctx);
+    try { withoutProduct = await getMaterialLinesWithoutProduct(projectId, report.budgetId, ctx); }
+    catch (error) { return planningReadError(error, `/proyectos/${projectId}/materiales?tab=varianza`); }
   }
 
   if (report.type === "NO_APPROVED_BUDGETS") {
@@ -407,16 +394,18 @@ async function VarianzaTab({
       ))}
       <KpiStatGrid title={null} columns={3}>
         <KpiStatCard
-          label="Presupuesto material"
-          value={formatMoneyAmount(report.totals.budgetMaterial, "ARS")}
+          label={`Presupuesto material (${report.currency})`}
+          value={formatMoneyAmount(report.totals.budgetMaterial, report.currency)}
         />
         <KpiStatCard
           label="Consumo de inventario"
-          value={formatMoneyAmount(report.totals.consumedCost, "ARS")}
+          value={formatMoneyDisplay(report.totals.consumedCost, report.currency)}
+          subtitle={report.totals.consumedCost == null ? "Sin valuación" : undefined}
         />
         <KpiStatCard
           label="Variación"
-          value={formatMoneyAmount(report.totals.variance, "ARS")}
+          value={formatMoneyDisplay(report.totals.variance, report.currency)}
+          subtitle={report.totals.variance == null ? "No calculable sin valuación del consumo" : undefined}
         />
       </KpiStatGrid>
       <Card>
@@ -424,7 +413,7 @@ async function VarianzaTab({
           <CardTitle className="text-base">Por partida EDT</CardTitle>
         </CardHeader>
         <CardContent>
-          <MaterialWbsTable rows={report.byWbs} />
+          <MaterialWbsTable rows={report.byWbs} currency={report.currency} />
         </CardContent>
       </Card>
       {withoutProduct.length > 0 ? (

@@ -15,7 +15,7 @@ const inputSchema = z.object({
 export const getProjectMaterialShortagesTool = defineBloqerAiTool({
   name: "get_project_material_shortages",
   description:
-    "Materiales con faltante (need − ordered) del Materials Board. No inventa stock de depósito.",
+    "Materiales con faltante (necesidad − pedido) por recurso y unidad del tablero de Materiales. Conservar warnings: una fuente restringida no equivale a cero compras/consumo. No sumar unidades distintas ni inventar stock de depósito.",
   risk: "READ",
   requiredModules: ["PROJECTS", "BUDGETS"],
   policy: {
@@ -70,6 +70,7 @@ export const getProjectMaterialShortagesTool = defineBloqerAiTool({
         currency: board.currency,
         shortfallRows: board.totals.shortfallRows,
         shortages,
+        warnings: board.warnings,
       },
       provenance: { sourceType: "bloqer_data", entityType: "Project", entityId: projectId, route: href, asOf: nowIso() },
       truncation: { total: board.totals.shortfallRows, returned: shortages.length },

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useScheduleAction } from "../lib/use-schedule-action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ScheduleWorkspaceDto, ScheduleWorkspaceItemDto } from "@bloqer/services";
@@ -29,7 +30,7 @@ import {
   scheduleItemBarColor,
 } from "../adapters/schedule-view-types";
 import { formatProgressPctDisplay } from "../adapters/schedule-field-labels";
-import { scheduleProgressValues } from "./schedule-progress-dimensions";
+import { scheduleProgressValues } from "../adapters/schedule-progress-values";
 import {
   rollupScheduleContainersAction,
   updateScheduleItemDatesAction,
@@ -101,6 +102,7 @@ function ScheduleGanttSidebarRow({
   onOpenDeps,
   projectId,
   canEdit,
+  showBudgetContext,
   isContainer,
   collapsed,
   onToggleCollapse,
@@ -113,6 +115,7 @@ function ScheduleGanttSidebarRow({
   onOpenDeps: (id: string) => void;
   projectId: string;
   canEdit: boolean;
+  showBudgetContext: boolean;
   isContainer: boolean;
   collapsed: boolean;
   onToggleCollapse: (id: string) => void;
@@ -124,7 +127,7 @@ function ScheduleGanttSidebarRow({
     item.predecessorDependencies.length > 0 || item.successorIds.length > 0;
 
   const showMissingEdt =
-    item.status !== "CANCELLED" && item.isLeaf && !hasPrimaryWbsLink(item);
+    showBudgetContext && item.status !== "CANCELLED" && item.isLeaf && !hasPrimaryWbsLink(item);
   const showOverBudget = Boolean(item.metrics?.overBudget);
   const nameEnd =
     showMissingEdt || showOverBudget ? (
@@ -281,8 +284,8 @@ export function ScheduleGanttView({
   unfilteredActiveCount?: number;
 }) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [rollupPending, startRollupTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useScheduleAction();
+  const { pending: rollupPending, run: startRollupTransition, isRunning: isRollupRunning } = useScheduleAction();
   const [range, setRange] = useState<Range>("monthly");
   const [zoom, setZoom] = useState(100);
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -351,7 +354,7 @@ export function ScheduleGanttView({
 
   const handleMove = useCallback(
     (id: string, startAt: Date, endAt: Date | null) => {
-      if (!workspace.canEdit) return;
+      if (!workspace.canEdit || isRunning() || isRollupRunning()) return;
       const item = itemById.get(id);
       if (!item || !item.isLeaf) return;
       const end = endAt ?? (item.type === "MILESTONE" ? startAt : null);
@@ -376,9 +379,9 @@ export function ScheduleGanttView({
           }
           router.refresh();
         }
-      });
+      }, () => router.refresh());
     },
-    [projectId, router, workspace.canEdit, itemById],
+    [projectId, router, workspace.canEdit, itemById, isRunning, isRollupRunning, startTransition],
   );
 
   const handleSelect = useCallback(
@@ -400,6 +403,7 @@ export function ScheduleGanttView({
   );
 
   const handleRecalculate = useCallback(() => {
+    if (isRunning() || isRollupRunning()) return;
     startRollupTransition(async () => {
       const res = await rollupScheduleContainersAction(projectId);
       if ("error" in res) toast.error(res.error);
@@ -408,13 +412,14 @@ export function ScheduleGanttView({
         router.refresh();
       }
     });
-  }, [projectId, router]);
+  }, [projectId, router, isRunning, isRollupRunning, startRollupTransition]);
 
   if (items.length === 0) {
     return (
       <ScheduleViewEmptyMessage
         filtersExcludeAll={filtersExcludeAll}
         unfilteredActiveCount={unfilteredActiveCount}
+        canEdit={workspace.canEdit}
       />
     );
   }
@@ -485,6 +490,7 @@ export function ScheduleGanttView({
                   onOpenDeps={handleOpenDeps}
                   projectId={projectId}
                   canEdit={workspace.canEdit}
+                  showBudgetContext={workspace.budgetId != null}
                   isContainer={!item.isLeaf}
                   collapsed={collapsedIds.has(item.id)}
                   onToggleCollapse={toggleCollapse}
@@ -543,7 +549,7 @@ export function ScheduleGanttView({
                             !isSummary &&
                             "ring-1 ring-inset ring-amber-400/80",
                         )}
-                        style={{ backgroundColor: barColor }}
+                        style={{ backgroundColor: barColor, containerType: "inline-size", containerName: "schedule-progress-bar" }}
                       >
                         {!isMilestone && !isSummary && (
                           <>
@@ -559,7 +565,7 @@ export function ScheduleGanttView({
                             )}
                           </>
                         )}
-                        <span className="relative z-10 truncate">
+                        <span className={cn("relative z-10 truncate", !isMilestone && !isSummary && "schedule-gantt-progress-label")}>
                           {isMilestone
                             ? item.status === "COMPLETED"
                               ? "◆✓"

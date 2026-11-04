@@ -24,7 +24,8 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { Button } from "@/components/ui/button";
 import { WbsItemDrilldownDialog } from "@/features/cost-control";
 import { controlCostosItemHref } from "@/lib/control-costos-href";
-import { formatDecimalArFromString, formatQtyFromString } from "@/lib/format-money";
+import { budgetUnitLabel } from "@/lib/budget-units";
+import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
 
 type OpenWbs = { wbsNodeId: string; wbsCode: string; wbsName: string };
 
@@ -40,6 +41,7 @@ type Props = {
   canRequest?: boolean;
   canInvoice?: boolean;
   budgetId?: string;
+  currency?: string;
 };
 
 export function ResourceBoardTable({
@@ -49,6 +51,7 @@ export function ResourceBoardTable({
   canRequest = true,
   canInvoice = true,
   budgetId,
+  currency,
 }: Props) {
   const [openItem, setOpenItem] = useState<OpenWbs | null>(null);
 
@@ -76,10 +79,10 @@ export function ResourceBoardTable({
                 className="text-right"
                 title="Costo APU presupuestado de la línea (total). No baja con lo ya pedido."
               >
-                $ Presup.
+                Presup.{currency ? ` (${currency})` : ""}
               </TableHead>
               <TableHead className="text-right">Pedido</TableHead>
-              <TableHead className="text-right">Facturado</TableHead>
+              <TableHead className="text-right" title="Cantidad facturada neta: factura + nota de débito − nota de crédito. No representa avance físico.">Facturado neto</TableHead>
               <TableHead className="text-right">Faltante</TableHead>
               {showActions ? (
                 <TableHead className="w-40">
@@ -124,6 +127,9 @@ export function ResourceBoardTable({
                     <span className="block truncate" title={row.description}>
                       {row.description}
                     </span>
+                    <span className="block text-[10px] text-muted-foreground">
+                      Unidad: {row.unit ? budgetUnitLabel(row.unit) : "—"}
+                    </span>
                     {row.overCommitted ? (
                       <span className="block text-[10px] text-destructive">Sobrecomprometido</span>
                     ) : null}
@@ -165,7 +171,7 @@ export function ResourceBoardTable({
                     {formatQtyFromString(row.needQty)}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
-                    {formatDecimalArFromString(row.needCost)}
+                    {formatMoneyAmount(row.needCost, currency)}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
                     {formatQtyFromString(row.orderedQty)}

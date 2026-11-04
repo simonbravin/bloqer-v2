@@ -1,4 +1,8 @@
 import { prisma, type ScheduleItemStatus } from "@bloqer/database";
+import { canViewBudgetsArea } from "../project/project-nav-guards";
+import { companyScopeFilter } from "../company-scope";
+import { requireProjectAccess } from "../security/access";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { canEditScheduleArea, canViewScheduleArea } from "./schedule-access";
@@ -11,10 +15,7 @@ import {
 } from "./schedule-helpers";
 import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
-import {
-  summarizeScheduleFieldKpis,
-  type ScheduleFieldKpis,
-} from "./schedule-field";
+import { summarizeScheduleFieldKpis, type ScheduleFieldKpis } from "./schedule-field";
 
 export type ScheduleFieldWbsLinkDto = {
   wbsNodeId: string;
@@ -80,8 +81,13 @@ export async function getProjectScheduleFieldWorkspace(
   }
 
   let t = Date.now();
+  const project = await requireProjectAccess(projectId, ctx);
+  const canEdit =
+    canEditScheduleArea(ctx.roles) && (project.status === "DRAFT" || project.status === "ACTIVE");
+  const gate = await getTenantModuleGate(ctx);
+  const canReadWbs = gate.isEnabled("BUDGETS") && canViewBudgetsArea(ctx.roles);
   const existingSchedule = await findScheduleForProject(projectId, ctx);
-  if (!existingSchedule && !canEditScheduleArea(ctx.roles)) {
+  if (!existingSchedule && !canEdit) {
     const emptyKpis = summarizeScheduleFieldKpis([]);
     const queryBreakdown: ScheduleFieldWorkspaceQueryTimings = {
       ensureScheduleMs: Date.now() - t,
@@ -118,9 +124,23 @@ export async function getProjectScheduleFieldWorkspace(
       endDate: true,
       progressPct: true,
       wbsLinks: {
+        where: canReadWbs
+          ? {
+              tenantId: ctx.tenantId,
+              wbsNode: {
+                budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) },
+              },
+            }
+          : { id: { in: [] } },
         include: { wbsNode: { select: { id: true, code: true, name: true } } },
       },
-      predecessors: { select: { predecessorId: true } },
+      predecessors: {
+        where: {
+          tenantId: ctx.tenantId,
+          predecessor: { scheduleId: schedule.id, tenantId: ctx.tenantId },
+        },
+        select: { predecessorId: true },
+      },
     },
   });
   const itemsMs = Date.now() - t;
@@ -184,7 +204,7 @@ export async function getProjectScheduleFieldWorkspace(
     type: "FIELD",
     projectId,
     scheduleId: schedule.id,
-    canEdit: canEditScheduleArea(ctx.roles),
+    canEdit,
     items,
     summary: { ...kpis, leafCount: items.length },
     queryBreakdown,

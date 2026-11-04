@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useScheduleAction } from "../lib/use-schedule-action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,9 +31,10 @@ export function ScheduleImportDialog({
   const [open, setOpen] = useState(false);
   const [budgetId, setBudgetId] = useState(defaultBudgetId ?? budgets[0]?.id ?? "");
   const [placeholderDates, setPlaceholderDates] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useScheduleAction();
 
   function onImport() {
+    if (isRunning()) return;
     if (!budgetId) {
       toast.error("Seleccioná un presupuesto");
       return;
@@ -54,7 +56,7 @@ export function ScheduleImportDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(next) => { if (!isRunning()) setOpen(next); }}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
           Importar desde presupuesto
@@ -68,7 +70,7 @@ export function ScheduleImportDialog({
             estructura, sin fechas. Podés agregar hitos y tareas sin EDT después.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
+        <fieldset disabled={pending} className="min-w-0 space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium" htmlFor="import-budget">
               Presupuesto base
@@ -101,9 +103,9 @@ export function ScheduleImportDialog({
               </span>
             </span>
           </label>
-        </div>
+        </fieldset>
         <DialogFooter>
-          <Button variant="ghost" onClick={() => setOpen(false)}>
+          <Button variant="ghost" disabled={pending} onClick={() => setOpen(false)}>
             Cancelar
           </Button>
           <Button disabled={pending} onClick={onImport}>

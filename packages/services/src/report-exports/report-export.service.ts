@@ -755,10 +755,10 @@ export async function exportProjectCostControlCsv(
     x.receivedCost,
     x.accruedCost,
     x.paidCost,
-    x.inventoryConsumedCost,
-    x.qtyCommitted,
-    x.qtyReceived,
-    x.qtyConsumed,
+    x.inventoryConsumedCost ?? "",
+    x.qtyCommitted ?? "",
+    x.qtyReceived ?? "",
+    x.qtyConsumed ?? "",
     x.pctPurchased ?? "",
     x.pctReceived ?? "",
     x.pctPhysicalProgress ?? "",
@@ -790,7 +790,7 @@ export async function exportProjectCostControlCsv(
     r.totals.receivedCost,
     r.totals.accruedCost,
     r.totals.paidCost,
-    r.totals.inventoryConsumedCost,
+    r.totals.inventoryConsumedCost ?? "",
     "", // qtyCommitted
     "", // qtyReceived
     "", // qtyConsumed
@@ -827,7 +827,7 @@ export async function exportProjectCostControlCsv(
         r.unallocatedReceivedCost,
         r.unallocatedAccruedCost,
         r.unallocatedPaidCost,
-        r.unallocatedInventoryConsumedCost,
+        r.unallocatedInventoryConsumedCost ?? "",
       ],
       headers.length,
     ),
@@ -938,10 +938,13 @@ export async function exportProjectCostControlCsv(
     }
   }
 
+  for (const warning of r.warnings) {
+    rows.push(padCsvRow(["__AVISO__", warning], headers.length));
+  }
   const typeSuffix = filters.costType ? `_${filters.costType.toLowerCase()}` : "";
   const fname = `control_costos_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}${typeSuffix}`;
   return {
-    content: buildCsv(headers, rows),
+    content: buildCsv([...headers, "Moneda"], rows.map((row) => [...row, r.currency])),
     filename: safeReportFilename(fname, "csv"),
   };
 }
@@ -1302,20 +1305,23 @@ export async function exportMaterialVarianceCsv(
     r.wbsCode,
     r.wbsName,
     r.budgetMaterial,
-    r.consumedCost,
-    r.variance,
+    r.consumedCost ?? "",
+    r.variance ?? "",
     r.variancePct ?? "",
   ]);
   rows.push([
     "TOTAL",
     "",
     result.totals.budgetMaterial,
-    result.totals.consumedCost,
-    result.totals.variance,
+    result.totals.consumedCost ?? "",
+    result.totals.variance ?? "",
     "",
   ]);
+  for (const warning of result.warnings) {
+    rows.push(padCsvRow(["__AVISO__", warning], headers.length));
+  }
   const fname = `materiales_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
-  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+  return { content: buildCsv([...headers, "Moneda"], rows.map((row) => [...row, result.currency])), filename: safeReportFilename(fname, "csv") };
 }
 
 export async function exportResourceVarianceCsv(
@@ -1356,8 +1362,11 @@ export async function exportResourceVarianceCsv(
     "",
   ]);
   const segment = RESOURCE_BOARD_ROUTE_SEGMENT[costCategory];
+  for (const warning of result.warnings) {
+    rows.push(padCsvRow(["__AVISO__", warning], headers.length));
+  }
   const fname = `${segment}_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
-  return { content: buildCsv(headers, rows), filename: safeReportFilename(fname, "csv") };
+  return { content: buildCsv([...headers, "Moneda"], rows.map((row) => [...row, result.currency])), filename: safeReportFilename(fname, "csv") };
 }
 
 export async function exportProjectIncomeExpenseCsv(

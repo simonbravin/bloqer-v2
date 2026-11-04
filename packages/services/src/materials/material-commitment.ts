@@ -1,4 +1,10 @@
 import { Prisma, prisma, type CostCategory } from "@bloqer/database";
+import { companyScopeFilter } from "../company-scope";
+import { requireProjectAccess } from "../security/access";
+import { canViewBudgetsArea } from "../project/project-nav-guards";
+import { canViewProcurementProjectArea, canViewPurchaseRequests } from "../procurement/procurement-access";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { ServiceError, type ServiceContext } from "../types";
 import { serializeMoneyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import {
   applyOrderedToApuMap,
@@ -6,7 +12,7 @@ import {
   buildFallbackIndex,
   MATERIAL_ORDERED_PO_STATUSES,
   MATERIAL_ORDERED_PR_STATUSES,
-  needQtyFromApuLine,
+  needQtyFromApuLineExact,
   serializeApuCommitment,
   type MaterialApuCommitmentView,
   type MaterialNeedSeed,
@@ -38,11 +44,11 @@ export type LoadMaterialApuCommitmentsOpts = {
 
 async function resolveBudgetIds(
   projectId: string,
-  tenantId: string,
+  ctx: ServiceContext,
   budgetId?: string,
 ): Promise<string[]> {
   const budgets = await prisma.budget.findMany({
-    where: { projectId, tenantId, status: { in: ["APPROVED", "CLOSED"] } },
+    where: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
     select: { id: true },
     orderBy: { updatedAt: "desc" },
   });
@@ -60,10 +66,18 @@ async function resolveBudgetIds(
  */
 export async function loadMaterialApuCommitments(
   projectId: string,
-  tenantId: string,
+  ctx: ServiceContext,
   opts: LoadMaterialApuCommitmentsOpts = {},
 ): Promise<MaterialApuCommitmentView[]> {
-  const budgetIds = await resolveBudgetIds(projectId, tenantId, opts.budgetId);
+  if (!canViewBudgetsArea(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver necesidades APU");
+  }
+  const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("PROJECTS") || !gate.isEnabled("BUDGETS")) {
+    throw new ServiceError("FORBIDDEN", "Proyectos o presupuestos deshabilitados");
+  }
+  await requireProjectAccess(projectId, ctx);
+  const budgetIds = await resolveBudgetIds(projectId, ctx, opts.budgetId);
   if (budgetIds.length === 0) return [];
 
   const categories =
@@ -75,6 +89,7 @@ export async function loadMaterialApuCommitments(
     where: {
       budgetId: { in: budgetIds },
       wbsNode: {
+        budgetId: { in: budgetIds },
         type: "ITEM",
         ...(opts.wbsNodeIds?.length ? { id: { in: opts.wbsNodeIds } } : {}),
       },
@@ -83,7 +98,7 @@ export async function loadMaterialApuCommitments(
       wbsNodeId: true,
       quantity: true,
       analysisLines: {
-        where: { category: { in: categories }, isLumpSum: false },
+        where: { budgetId: { in: budgetIds }, category: { in: categories }, isLumpSum: false },
         select: {
           id: true,
           productId: true,
@@ -101,17 +116,15 @@ export async function loadMaterialApuCommitments(
 
   const seeds: MaterialNeedSeed[] = [];
   for (const item of costItems) {
-    const itemQty = Number(item.quantity.toString());
     for (const line of item.analysisLines) {
-      const need = needQtyFromApuLine({
-        partidaQuantity:
-          line.partidaQuantity != null ? Number(line.partidaQuantity.toString()) : null,
-        coefficient: Number(line.coefficient.toString()),
-        itemQuantity: itemQty,
+      const need = needQtyFromApuLineExact({
+        partidaQuantity: line.partidaQuantity,
+        coefficient: line.coefficient,
+        itemQuantity: item.quantity,
         isLumpSum: line.isLumpSum,
         unit: line.unit,
       });
-      if (!(need > 0)) continue;
+      if (!need.greaterThan(0)) continue;
       const needCost = new Prisma.Decimal(line.totalCost).mul(item.quantity);
       seeds.push({
         wbsNodeId: item.wbsNodeId,
@@ -129,22 +142,27 @@ export async function loadMaterialApuCommitments(
   const map = buildApuCommitmentMap(seeds);
   if (map.size === 0) return [];
   const fallbackIndex = buildFallbackIndex(map);
+  const canReadRequests = gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(ctx.roles);
+  const canReadOrders = gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(ctx.roles);
 
   const [prLines, poLines] = await Promise.all([
-    prisma.purchaseRequestLine.findMany({
+    canReadRequests ? prisma.purchaseRequestLine.findMany({
       where: {
         purchaseRequest: {
           projectId,
-          tenantId,
+          tenantId: ctx.tenantId,
+          // PurchaseRequest.companyId is NOT NULL.
+          ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
           status: { in: [...MATERIAL_ORDERED_PR_STATUSES] },
         },
         awardedPurchaseOrderId: null,
+        wbsNode: { budgetId: { in: budgetIds } },
         wbsNodeId: opts.wbsNodeIds?.length
           ? { in: opts.wbsNodeIds }
           : { not: null },
         OR: [
           { costType: { in: categories } },
-          { costAnalysisLine: { category: { in: categories } } },
+          { costType: null, costAnalysisLine: { category: { in: categories } } },
           // Legacy free-text (no type, no APU) — same attribution as materials board.
           { AND: [{ costType: null }, { costAnalysisLineId: null }] },
         ],
@@ -154,19 +172,23 @@ export async function loadMaterialApuCommitments(
         costAnalysisLineId: true,
         productId: true,
         description: true,
+        unit: true,
         quantity: true,
       },
-    }),
-    prisma.purchaseOrderLine.findMany({
+    }) : Promise.resolve([]),
+    canReadOrders ? prisma.purchaseOrderLine.findMany({
       where: {
         purchaseOrder: {
           projectId,
-          tenantId,
+          tenantId: ctx.tenantId,
+          // PurchaseOrder.companyId is NOT NULL.
+          ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
           status: { not: "CANCELLED" },
         },
         wbsNodeId: opts.wbsNodeIds?.length
           ? { in: opts.wbsNodeIds }
           : { not: null },
+        wbsNode: { budgetId: { in: budgetIds } },
         OR: [
           { purchaseOrder: { status: { in: [...MATERIAL_ORDERED_PO_STATUSES] } } },
           {
@@ -180,7 +202,7 @@ export async function loadMaterialApuCommitments(
           {
             OR: [
               { costType: { in: categories } },
-              { costAnalysisLine: { category: { in: categories } } },
+              { costType: null, costAnalysisLine: { category: { in: categories } } },
               { AND: [{ costType: null }, { costAnalysisLineId: null }] },
             ],
           },
@@ -191,10 +213,11 @@ export async function loadMaterialApuCommitments(
         costAnalysisLineId: true,
         productId: true,
         description: true,
+        unit: true,
         quantity: true,
         receivedQuantity: true,
       },
-    }),
+    }) : Promise.resolve([]),
   ]);
 
   for (const line of prLines) {
@@ -204,6 +227,7 @@ export async function loadMaterialApuCommitments(
       costAnalysisLineId: line.costAnalysisLineId,
       productId: line.productId,
       description: line.description,
+      unit: line.unit,
       quantity: line.quantity,
     });
   }
@@ -214,6 +238,7 @@ export async function loadMaterialApuCommitments(
       costAnalysisLineId: line.costAnalysisLineId,
       productId: line.productId,
       description: line.description,
+      unit: line.unit,
       quantity: line.quantity,
       receivedQuantity: line.receivedQuantity,
     });
@@ -233,9 +258,9 @@ export async function loadMaterialApuCommitments(
  */
 export async function loadMaterialApuCommitmentByLineId(
   projectId: string,
-  tenantId: string,
+  ctx: ServiceContext,
   opts: LoadMaterialApuCommitmentsOpts = {},
 ): Promise<Map<string, MaterialApuCommitmentView>> {
-  const rows = await loadMaterialApuCommitments(projectId, tenantId, opts);
+  const rows = await loadMaterialApuCommitments(projectId, ctx, opts);
   return new Map(rows.map((r) => [r.costAnalysisLineId, r]));
 }

@@ -42,6 +42,7 @@ Fugas de materiales, compras duplicadas y costos de obra mal imputados.
 - **BR-INV-002**: saldo no negativo salvo ajuste autorizado ([BR-INV-002]).
 - **BR-INV-004**: cambio método valuación con restricciones ([BR-INV-004]).
 - **BR-INV-007**: anulación de movimiento confirmado con trazabilidad ([BR-INV-007]).
+- **Lecturas actuales de consumo (D-124):** conservar cantidades; costo/varianza de consumo son no calculables cuando no hay valor y moneda trazables. Un precio guardado no demuestra moneda ni una capa asignada al consumo. No inferir ARS ni implementar FIFO/promedio para llenar el dato; la valuación completa mantiene el diferimiento D-083. No se modifican movimientos históricos.
 
 ## 11. Validaciones
 - Cantidades > 0 en movimientos normales.

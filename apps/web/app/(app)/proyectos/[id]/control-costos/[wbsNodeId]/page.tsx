@@ -4,6 +4,8 @@ import { getWbsItemCostDetail, ServiceError } from "@bloqer/services";
 import { WbsItemDrilldown } from "@/features/cost-control";
 import { PageShell } from "@/components/layout/page-shell";
 
+import { planningReadError } from "@/features/cost-control/lib/planning-read-error";
+
 interface PageProps {
   params: Promise<{ id: string; wbsNodeId: string }>;
   searchParams: Promise<{ budgetId?: string; dateFrom?: string; dateTo?: string }>;
@@ -30,7 +32,7 @@ export default async function WbsItemDetailPage({ params, searchParams }: PagePr
     detail = await getWbsItemCostDetail(wbsNodeId, projectId, filters, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    throw err;
+    return <PageShell className="space-y-6">{planningReadError(err, `/proyectos/${projectId}/control-costos/${wbsNodeId}`)}</PageShell>;
   }
 
   return (

@@ -2599,6 +2599,8 @@ model PurchaseReceipt {
   id                String                @id @default(uuid())
   tenantId          String
   companyId         String
+  /// D-127: company sequence for new receipts. Historical documents retain NULL and their UUID.
+  number            Int?
   projectId         String
   purchaseOrderId   String
   supplierContactId String
@@ -2622,6 +2624,7 @@ model PurchaseReceipt {
   lines           PurchaseReceiptLine[]
   stockMovements  StockMovement[]
 
+  @@unique([tenantId, companyId, number])
   @@index([tenantId, projectId])
   @@index([tenantId, purchaseOrderId])
   @@index([tenantId, status])

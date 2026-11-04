@@ -1,5 +1,5 @@
 import { Prisma } from "@bloqer/database";
-import { physicalNeedQty } from "@bloqer/domain";
+import { isGlobalUnit, physicalNeedQty } from "@bloqer/domain";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 
 /** PO statuses that count as committed demand (materials board / SC-OC prefill). */
@@ -34,7 +34,7 @@ export type MaterialNeedSeed = {
   description: string;
   unit: string;
   unitCost: string;
-  needQty: number;
+  needQty: number | string | Prisma.Decimal;
   /** Serialized money (2 dp). Never IEEE `number`. */
   needCost: string;
 };
@@ -57,6 +57,7 @@ export type MaterialOrderedInput = {
   costAnalysisLineId: string | null;
   productId: string | null;
   description: string;
+  unit?: string | null;
   quantity: number | string | Prisma.Decimal;
   receivedQuantity?: number | string | Prisma.Decimal;
 };
@@ -77,7 +78,7 @@ export function buildApuCommitmentMap(
 ): Map<string, MaterialCommitmentAgg> {
   const map = new Map<string, MaterialCommitmentAgg>();
   for (const s of seeds) {
-    if (!(s.needQty > 0)) continue;
+    if (!toDec(s.needQty).greaterThan(0)) continue;
     map.set(s.costAnalysisLineId, {
       wbsNodeId: s.wbsNodeId,
       costAnalysisLineId: s.costAnalysisLineId,
@@ -85,7 +86,7 @@ export function buildApuCommitmentMap(
       description: s.description,
       unit: s.unit,
       unitCost: s.unitCost,
-      needQty: new Prisma.Decimal(s.needQty),
+      needQty: toDec(s.needQty),
       needCost: new Prisma.Decimal(s.needCost.toString()),
       orderedQty: ZERO,
       receivedQty: ZERO,
@@ -123,14 +124,15 @@ export function applyOrderedToApuMap(
   line: MaterialOrderedInput,
 ): boolean {
   let apuId: string | null = line.costAnalysisLineId;
-  if (apuId && !map.has(apuId)) apuId = null;
+  if (apuId && !map.has(apuId)) return false;
   if (!apuId) {
     const key = materialFallbackRowKey(line.wbsNodeId, line.productId, line.description);
     apuId = fallbackIndex.get(key) ?? null;
   }
   if (!apuId) return false;
   const row = map.get(apuId);
-  if (!row) return false;
+  if (!row || row.wbsNodeId !== line.wbsNodeId) return false;
+  if (line.unit?.trim() && normalizeMaterialDesc(line.unit) !== normalizeMaterialDesc(row.unit)) return false;
   row.orderedQty = row.orderedQty.add(toDec(line.quantity));
   if (line.receivedQuantity != null) {
     row.receivedQty = row.receivedQty.add(toDec(line.receivedQuantity));
@@ -187,4 +189,17 @@ export function needQtyFromApuLine(input: {
     isLumpSum: input.isLumpSum,
     unit: input.unit,
   });
+}
+
+/** Same D-047 quantity rule at server precision, without an IEEE-number round trip. */
+export function needQtyFromApuLineExact(input: {
+  partidaQuantity: string | Prisma.Decimal | null;
+  coefficient: string | Prisma.Decimal;
+  itemQuantity: string | Prisma.Decimal;
+  isLumpSum: boolean;
+  unit: string | null;
+}): Prisma.Decimal {
+  if (input.isLumpSum || isGlobalUnit(input.unit)) return ZERO;
+  if (input.partidaQuantity != null) return toDec(input.partidaQuantity);
+  return toDec(input.coefficient).mul(toDec(input.itemQuantity));
 }

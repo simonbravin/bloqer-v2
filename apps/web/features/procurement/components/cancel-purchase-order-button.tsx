@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
 import { cancelPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 export function CancelPurchaseOrderButton({
   poId,
@@ -18,7 +19,7 @@ export function CancelPurchaseOrderButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction();
   const [error, setError] = useState<string | null>(null);
 
   return (
@@ -27,13 +28,14 @@ export function CancelPurchaseOrderButton({
         type="button"
         variant="destructive"
         className={className}
+        disabled={pending}
         onClick={() => setOpen(true)}
       >
         Anular
       </Button>
       <ConfirmAlertDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => { if (!isRunning()) setOpen(next); }}
         title="Anular orden de compra"
         description={
           <div className="space-y-2">

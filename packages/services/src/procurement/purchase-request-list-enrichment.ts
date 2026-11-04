@@ -13,11 +13,13 @@ export type PurchaseRequestLineForList = {
   budgetUnitCostSnapshot: string | null;
   /** Live APU unit cost when snapshot not yet captured (DRAFT). */
   apuUnitCost: string | null;
+  /** Currency of the owning budget; never infer ARS for a native APU value. */
+  budgetCurrency?: string | null;
 };
 
-function resolveApuLineUnitCost(line: PurchaseRequestLineForList): string | null {
+function resolveApuLineUnitCost(line: PurchaseRequestLineForList, draft: boolean): string | null {
   if (line.budgetUnitCostSnapshot != null) return line.budgetUnitCostSnapshot;
-  if (line.costAnalysisLineId && line.apuUnitCost != null) return line.apuUnitCost;
+  if (draft && line.costAnalysisLineId && line.apuUnitCost != null) return line.apuUnitCost;
   return null;
 }
 
@@ -84,24 +86,27 @@ export function computeEstimatedAmount(
 
   // Only APU-bound lines count — not the aggregated WBS item cost ([D-068]).
   const apuLines = lines.filter((l) => l.costAnalysisLineId);
-  if (apuLines.length === 0) {
+  if (apuLines.length !== lines.length) {
     return { estimatedAmount: null, estimatedAmountCurrency: null, estimatedAmountSource: null };
   }
 
-  const allHaveUnitCost = apuLines.every((l) => resolveApuLineUnitCost(l) != null);
-  if (!allHaveUnitCost) {
+  const currencies = new Set(apuLines.map((line) => line.budgetCurrency));
+  const currency = apuLines[0]?.budgetCurrency;
+  const draft = pr.status === "DRAFT";
+  const allHaveUnitCost = apuLines.every((l) => resolveApuLineUnitCost(l, draft) != null);
+  if (!allHaveUnitCost || !currency || currencies.size !== 1) {
     return { estimatedAmount: null, estimatedAmountCurrency: null, estimatedAmountSource: null };
   }
 
   let total = "0";
   for (const line of apuLines) {
-    const unit = resolveApuLineUnitCost(line)!;
+    const unit = resolveApuLineUnitCost(line, draft)!;
     total = addDecimal(total, multiplyDecimal(line.quantity, unit));
   }
 
   return {
     estimatedAmount: serializeMoneyDecimal(total),
-    estimatedAmountCurrency: "ARS",
+    estimatedAmountCurrency: currency,
     estimatedAmountSource: "budget",
   };
 }

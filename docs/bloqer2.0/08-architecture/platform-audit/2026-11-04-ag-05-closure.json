@@ -1,0 +1,703 @@
+{
+  "phase": "AG-05",
+  "status": "corrected_verified_locally_with_approved_scope",
+  "recordedAt": "2026-11-04T15:27:21.207Z",
+  "report": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-closure.md",
+  "predecessor": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+  "branch": "codex/pruebas",
+  "head": "3407c023eb00dec9d6361e4842af016480b1c813",
+  "finalRevision": "local uncommitted working tree after the published AG00-04 base",
+  "approval": {
+    "explicitUserApproval": true,
+    "date": "2026-11-04",
+    "decisions": [
+      "D-122",
+      "D-123",
+      "D-124"
+    ],
+    "questionsResolved": [
+      "Q-069",
+      "Q-070",
+      "Q-071"
+    ]
+  },
+  "findings": [
+    {
+      "id": "GA-AG-05-001",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "entradas de cronograma/contexto/historial omitían permisos, gates o pertenencia. Guards reales en `schedule-helpers`, `schedule.service` y consumidores; SQL de acceso directo y negativos.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-002",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "mutaciones leían antes de la serialización y podían guardar estado/auditoría incoherentes. Lock Project, relectura y auditoría atómica; rollback y carreras SQL.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-003",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "árbol, dependencias y orden admitían referencias inconsistentes o carrera de ciclo. Validación del conjunto, extremos y jerarquía dentro del lock; batch SQL, ciclos opuestos e idempotencia comprobados.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-004",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "fechas/datos inválidos y serialización de días alteraban recorridos. Validator de calendario real, rangos/progreso/motivos y fecha SQL sin desplazamiento por zona. No se inventó un bug horario en stock `@db.Date`.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-005",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "una base económica ausente, inaccesible o fallada impedía planificar, contrario a D-039. Workspace temporal independiente, sin metadatos ajenos/sustituidos; advertencia económica opcional, fechas y exportaciones disponibles.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-006",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "D-045 podía usar parte previo y omitir un cero físico explícito. Escritores coordinados/relectura y sincronización de cero; acumulación compartida estable entre empresas verificada.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-007",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "D-104 podía confirmar con fuentes/líneas obsoletas o incompatibles. Lock/relectura/validación/auditoría antes de efectos; no se cambió la semántica de AP postcommit.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-008",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "exportaciones presuponían base económica y podían construir ejes de duración no acotada. Nullable real en DTO/PDF/XLSX y máximo técnico de 120 meses calendario inclusivos para Gantt; tabla sola mantiene rango sin ese eje.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-009",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "tableros y commitments podían consultar fuentes/presupuestos fuera de empresa/ACL o capacidad específica. `ServiceContext` completo, filtros por entidad y permisos de cada fuente; consumidores OC y CC adaptados.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-010",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "adjudicación parcial eliminaba toda la SC o duplicaba cobertura. Sustitución por línea adjudicada, conservando libres y distinguiendo cobertura de compromiso financiero; SQL de adjudicación parcial.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-011",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "redondeo intermedio/unidades mezcladas distorsionaban necesidad y cobertura. Decimal, agrupación por unidad y vinculación inequívoca; unidades incompatibles separadas, sin conversiones nuevas.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-012",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "varianza monetaria de recursos sumaba NC como positiva. Signos D-115 y permisos/fechas coherentes; la cantidad de notas sigue en Q-070.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-013",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "costos/detalle/selectores confundían empresa de obra compartida con empresa de presupuesto y podían omitir ACL. Guard independiente antes de lecturas; agrega control canónico a selector y acumulado mensual sin retirar capacidades legítimas.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-014",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "relaciones secundarias podían introducir datos de otro presupuesto/documento. Guard Budget/CostItem/APU bidireccional y validación de cabecera/línea/parent/payable/recepción/subcontrato; CONFLICT genérico sin identificadores ajenos.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-015",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "piso de compromiso agregado compensaba en exceso otras OC/tipos. Mapa por compromiso, imputación real y piso antes de agrupar; tests puros y SQL con sobreconsumo/tipificación diferente.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-016",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "no imputado/mensual mezclaba bruto con neto y referencias de otro presupuesto. Neto D-095, signos D-115, company scope y selección de WBS correcta; SQL con impuestos y adenda.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-017",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "cantidades de recurso se comparaban con unidad de partida distinta. DTO nullable/UI/CSV coherentes; importes sin conversión de unidades.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-018",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "documentos filtrados y resumen de detalle podían describir períodos distintos. Mismo rango de fechas, `periodFiltered`, rótulos de período y ocultación de saldos globales; SQL y revisión independiente.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-019",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "consultas financieras auxiliares se usaban como condición de entrada a tableros de cantidades. Selector accesible de presupuestos, sin probe económico redundante; D-039 preservado.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-020",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "fuentes restringidas podían aparentar costo completo y tool AI omitía advertencias. Gate/permiso antes de leer cada fuente y warnings conservados en consumidores/AI; fuentes omitidas no se confunden con ausencia probada.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-021",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "actions no vinculaban siempre entidad/obra ni normalizaban errores/refresh de todos los consumidores. Binding service, Zod/error funcional e invalidación coherente de cronograma/materiales/recursos/costos/avances.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-022",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "doble envío, cierre pendiente y respuesta tardía podían perder contexto/datos de usuario. Mutex síncrono, recuperación de red, campos preservados y descarte de requests anteriores; evidencia focal y navegador de importación pendiente.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-023",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "filtros Field y búsqueda diferida podían quedar desalineados al navegar/limpiar. Sincronización URL/estado y cancelación explícita del debounce; consumidores compartidos preservan API compatible.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-024",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "helper puro importado desde frontera `use client` impedía su uso servidor. Extraído a adapter puro; regresión RSC y tipos/build verifican esa frontera.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-025",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "KPI sumaban unidades heterogéneas, faltaban unidades/moneda explícitas y una barra corta cortaba el porcentaje. Conteos de filas, unidad por fila, ISO de presupuesto, null visible, controles accesibles y porcentaje solo con espacio, manteniendo tooltip. `CalendarBody` además omitía keys estables en sus features: Fragment por ID elimina la advertencia real de React; el contador adicional usa «más». Sin nuevas fórmulas. Las últimas correcciones de presentación se verificaron con captura/recarga, tipos, lint y build, sin inventar tests cosméticos.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-026",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "resumen de MONEY_MODEL describía OC APPROVED como compromiso, contradiciendo D-044/estados reales. Se conservan estados CONFIRMED/PARTIALLY_RECEIVED/RECEIVED, piso por compromiso y fallback D-066 en fórmulas; `## Hallazgo` registra la contradicción resuelta.",
+      "continuation": "Prior implementation preserved; current general regression and proportionate integration evidence apply, not a new full module audit"
+    },
+    {
+      "id": "GA-AG-05-027",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "importes originales de monedas distintas no son comparables por declarar una moneda. [Propuesta](./2026-11-04-ag-05-comparability-scope-proposal.md): base nativa del presupuesto y error funcional al detectar otra moneda; sin FX implícito ni omisión silenciosa. Guard financiero aún no aplicado.",
+      "decision": "D-122",
+      "question": "Q-069",
+      "resolution": "native selected-budget currency; reject mismatching contributing sources after scope/gates; quantities and temporal scheduling remain usable"
+    },
+    {
+      "id": "GA-AG-05-028",
+      "priority": "P2",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "cantidades de NC/ND se suman positivas en cobertura de recursos. D-115 solo resuelve dinero. [Propuesta](./2026-11-04-ag-05-resource-notes-proposal.md): cantidades netas por recurso/unidad, o alternativa INVOICE-only. No se adoptó una fórmula sin aprobación.",
+      "decision": "D-123",
+      "question": "Q-070",
+      "resolution": "signed net invoiced resource quantities with explicit compatible identity/unit; negative net retained"
+    },
+    {
+      "id": "GA-AG-05-029",
+      "priority": "P1",
+      "status": "resolved_locally_verified",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "consumos sin costo/moneda trazables aparecen como cero, pudiendo afirmar ahorro no demostrado. [Propuesta](./2026-11-04-ag-05-stock-valuation-proposal.md): Sin valuación/— y varianza no calculable; sin FIFO, FX ni backfill. D-083 difiere la valuación completa; no se inventó costo de stock.",
+      "decision": "D-124",
+      "question": "Q-071",
+      "resolution": "unknown consumption valuation/currency and unavailable source stay null through DTO, totals, UI, CSV, PDF and informational measurement sheet"
+    },
+    {
+      "id": "GA-AG-05-030",
+      "priority": "P2",
+      "status": "scope_approved_future_development_deferred",
+      "initialEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-05-planning-costs.json",
+      "initialDetails": "RFIs no implementadas; no se confunden con partes de obra/adendas económicas. Se propone diferir desarrollo formal con definición propia mediante Q-069; Q-006 y Q-057 mantienen su estado. No se presenta ausencia de módulo como bug de una implementación existente.",
+      "decision": "D-122",
+      "resolution": "implemented-capability audit scope approved; formal RFI development deferred, Q006/Q057 not resolved by this audit"
+    }
+  ],
+  "verification": {
+    "generatedAt": "2026-11-04T15:04:37.703Z",
+    "general": {
+      "log": "verification-final-test.log",
+      "pass": 2197,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "liveSuitesSkipped": 26,
+      "skippedSuites": [
+        "D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)",
+        "Bloqer AI live isolation (Neon DEV)",
+        "AP integrity (isolated database)",
+        "AG-04 budgets: lifecycle, isolation, rollback and policy locks",
+        "AG-04 WBS/APU: SQL graph, import volume and atomic integrity",
+        "certification → invoice → receivable → collection (isolated DB)",
+        "AG-03 CLIENT/project concurrency on isolated SQL",
+        "AG-03 directory on an explicitly isolated SQL database",
+        "AG-05 cost control: real scopes, allocation and comparability",
+        "AG-05 closure: native currency, payment origins and unknown stock valuation",
+        "AG-05 cost sources: SQL relations, APU identity and document scope",
+        "AG-05 planning boards: isolated SQL scope, coverage and date-only values",
+        "AG-01 first workspace SQL lifecycle",
+        "procurement regression baseline (isolated database)",
+        "D-118 quote coverage and historical preservation (isolated database)",
+        "AG-03 Projects functional SQL audit",
+        "D-111 Phase C membership admin (Neon DEV)",
+        "AG-03 project row locks, FK checks and ACL administration",
+        "AG-05 D-122 resource currency on isolated SQL",
+        "AG-05 schedule SQL integrity",
+        "AG-04 budget to schedule SQL atomicity",
+        "AG-01 project/company/notification SQL isolation",
+        "AG-01 tenant administration (isolated audit database)",
+        "AG-01 context and settings on an isolated SQL database",
+        "user service PostgreSQL profile and owner safeguards",
+        "credentials PostgreSQL lifecycle"
+      ],
+      "pdfIncluded": 13,
+      "pdfTsxIncluded": 5
+    },
+    "sql": {
+      "distinctPassedThisContinuation": 97,
+      "newCases": 55,
+      "previousCasesRerun": 42,
+      "selections": [
+        {
+          "scope": "prior-cost-regressions",
+          "file": "cost-closure-sql.log",
+          "tests": 61,
+          "pass": 31,
+          "fail": 0,
+          "cancelled": 30,
+          "skipped": 0,
+          "passedCasesSelected": 31,
+          "cases": [
+            "checks project ACL before detail, selectors and accrued queries",
+            "filters budget company independently of a shared project",
+            "does not offset over-invoicing against a different order or cost type",
+            "a credit without direct PO links consumes the same unique commitment as its invoice",
+            "keeps unassigned accrual net of IVA",
+            "does not label a different budget's spend as unassigned",
+            "does not equate resource quantities in kg with the WBS unit",
+            "monthly accrual uses net cost and the same company scope",
+            "material variance rejects an APU child with a contradictory budget",
+            "material and resource CSV exports identify the budget currency",
+            "material variance rejects a CostItem declared in A but linked to WBS B",
+            "material variance rejects an APU declared in A but linked to CostItem B",
+            "applies the document period to the drilldown and rejects impossible dates",
+            "excludes AP and order details for an assigned foreman without those source permissions",
+            "preserves restricted-source warnings in the AI materials interface",
+            "rejects CostItem budget/WBS contradictions before reporting monetary values",
+            "rejects APU budget/CostItem contradictions instead of silently excluding the child",
+            "rejects an own invoice pointing to another tenant's PO header",
+            "rejects an own invoice pointing to a PO from another company on the shared project",
+            "rejects a PO-line FK from a different project even without a header link",
+            "rejects a line from another PO of the same project when the invoice has a header",
+            "checks the related PO of a note's older parent even when the parent is outside the period",
+            "rejects a note whose parent belongs to another tenant",
+            "rejects an own payment whose payable belongs to another tenant",
+            "rejects distinct payment and payable invoice IDs even within the same scope",
+            "rejects a foreign APU hint reached only through a PO line",
+            "preserves shared budgets and classifies retagged invoice/payment by their own APU",
+            "rejects a receipt line whose receipt header belongs to a different PO",
+            "keeps a valid receipt in net received cost after relation validation",
+            "rejects a certification line taken from a different subcontract",
+            "keeps a valid subcontract certification and its precise exposure"
+          ],
+          "sha256": "bdb9a0d4793af9893a8e11b936c6e7a0f695acf2a3b4605d7b1e45ac5ca17a54",
+          "intermediateCancellation": {
+            "cancelled": 30,
+            "reason": "before fixture treasuryAccount tenant/name collision; 31 prior cases passed; closure30 rerun separately"
+          }
+        },
+        {
+          "scope": "resource-notes",
+          "file": "resource-notes-sql-final.log",
+          "tests": 18,
+          "pass": 18,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "passedCasesSelected": 18,
+          "cases": [
+            "rejects unassigned and other-company projects before material/resource data",
+            "does not expose another company's budget under the shared project",
+            "keeps different material units separate and excludes another company's requests",
+            "preserves SQL DATE labels and flags a linked task without dates as unscheduled",
+            "counts active draft awards once and retains the other unawarded request lines",
+            "nets invoice, credit and debit quantities by explicit resource without another company's invoice",
+            "preserves a negative net fiscal quantity at four decimals while ordered quantity covers the need",
+            "nets a note through an explicit compatible PO APU reference",
+            "keeps generic notes separate even when their description exactly matches the resource",
+            "keeps incompatible invoice and note units separate from APU coverage and from each other",
+            "applies the same net fiscal coverage to equipment with compatible resource references",
+            "keeps the invoice's own APU category ahead of its linked PO category",
+            "subtracts credit notes from net monetary resource variance without mixing company sources",
+            "does not return purchase/AP IDs or figures without their source permissions",
+            "honors disabled source modules while preserving budget needs",
+            "never covers an APU need with a different physical unit in its request",
+            "rejects a disabled root module instead of querying its planning data",
+            "does not expose contradictory legacy APU children and rejects their monetary variance"
+          ],
+          "sha256": "1ff52c25b5cd27c25cbb73625c4d05292be25bda0fe830d424bd8a2cc7d0fdd0"
+        },
+        {
+          "scope": "resource-currency-final",
+          "file": "currency-sql-final.log",
+          "tests": 16,
+          "pass": 16,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "passedCasesSelected": 16,
+          "cases": [
+            "keeps USD budget/invoice/NC/ND in original currency and preserves net signs",
+            "rejects a contributing INVOICE in a different currency even with stored FX",
+            "rejects a contributing CREDIT_NOTE in a different currency even with stored FX",
+            "rejects a contributing DEBIT_NOTE in a different currency even with stored FX",
+            "applies the same comparison rule to equipment",
+            "does not inspect another company's currency under a shared project and budget",
+            "does not let a document assigned only to another budget block this budget",
+            "applies the requested issue-date period before checking currency",
+            "does not read a disabled AP source to perform a currency check",
+            "does not read AP without its source permission",
+            "does not expose another company's selected budget through a currency error",
+            "rejects a contributing document with an empty legacy currency",
+            "rejects the inverted baseline APU graph before returning monetary values",
+            "uses the invoice's own APU category before its PO fallback and currency check",
+            "rejects an invoice's APU hint from another budget before comparing its money",
+            "rejects an invoice's own APU hint from another WBS within the same budget"
+          ],
+          "sha256": "3b3c7ee9a881dc8b83161252281d79b6283f9517ccee2af37ab8d7ab525d1dfa"
+        },
+        {
+          "scope": "new-cost-closure",
+          "file": "cost-closure-sql-final.log",
+          "tests": 30,
+          "pass": 30,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "passedCasesSelected": 30,
+          "cases": [
+            "keeps USD budget, order, invoice and payment values native without applying their ARS snapshots",
+            "rejects a contributing purchase order in another currency in both grid and detail",
+            "rejects a contributing direct invoice in another currency",
+            "rejects NC and ND currencies with valid same-currency older invoice parents",
+            "checks currency for invoice line links and the documented PO-header fallback",
+            "rejects an active contributing subcontract in another currency",
+            "inherits the currency of an approved certification's completed subcontract",
+            "rejects an assigned payment's own currency even when its invoice predates the report",
+            "rejects an unassigned payment's currency even when its invoice predates the report",
+            "shows a November payment in grid and detail when its invoice was issued in October",
+            "does not block or allocate sources from another company or another selected budget",
+            "does not block on mismatched orders, invoices or payments outside the selected period",
+            "checks contributing WBS search results before comparing source currencies",
+            "keeps exact detail layers calculable despite another WBS and unassigned USD cost in the same budget",
+            "does not read or reject AP currency when that source module is disabled",
+            "does not read AP amounts or identifiers for a project viewer",
+            "routes an older Budget B USD subcert payment to its true parent instead of unassigned Budget A ARS",
+            "keeps AP-origin subcert payments visible outside accrual dates and without the subcontract source",
+            "reports zero only after confirming that no consumption exists in the accessible scope",
+            "preserves quantities and null costs, variance and percentages for an unvalued consumption",
+            "does not treat legacy zero or positive prices as currency and valuation lineage",
+            "keeps a mixed known-zero and unknown consumption total unknown",
+            "does not mark consumption unknown because of another company, budget or date",
+            "keeps unavailable inventory unknown instead of claiming a zero consumption",
+            "keeps project-viewer consumption costs unknown when the inventory source is not readable",
+            "preserves an unassigned consumption as unknown and warns without assigning it to a WBS",
+            "keeps documentary exposure and its variance independent of unvalued stock consumption",
+            "propagates nullable informational consumed cost into the certification measurement sheet",
+            "keeps D-123 net resource quantities available while D-122 blocks money and D-124 keeps stock valuation unknown",
+            "keeps temporal planning and a real XLSX usable when contributing currency blocks cost control"
+          ],
+          "sha256": "97bb43e282e083d6aa303a51705d1e23ba9bebf8f719d2e7d39f4d19eb55c0c3"
+        },
+        {
+          "scope": "detail-scope-residuals",
+          "file": "cost-detail-scope-sql-final.log",
+          "tests": 2,
+          "pass": 2,
+          "fail": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "passedCasesSelected": 2,
+          "cases": [
+            "honors invoice line attribution ahead of a mixed PO header in WBS detail",
+            "ignores a foreign budget's zero-net PO header before the unassigned accrual fallback"
+          ],
+          "sha256": "e77fd9e43e2858988c9883da12f50f78674d6ba3d74d3f88fa2e0e8abea3da25"
+        }
+      ]
+    },
+    "historicalAg05": {
+      "distinctSqlPreviouslyPassed": 81,
+      "additionalNewSql": 55,
+      "totalDistinctAcrossBothRuns": 136,
+      "notAllRepeatedInContinuation": true
+    },
+    "typecheck": {
+      "job": "typecheck",
+      "startedAt": "2026-11-04T14:53:46.230Z",
+      "finishedAt": "2026-11-04T14:57:50.472Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": "verification-final-typecheck.log",
+      "databaseDisabled": true,
+      "externalProviderKeysShadowed": true,
+      "allLiveFlagsShadowed": true
+    },
+    "lint": {
+      "job": "lint",
+      "startedAt": "2026-11-04T14:53:46.241Z",
+      "finishedAt": "2026-11-04T14:56:39.618Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": "verification-final-lint.log",
+      "databaseDisabled": true,
+      "externalProviderKeysShadowed": true,
+      "allLiveFlagsShadowed": true
+    },
+    "build": {
+      "job": "final web build including plain-language permission warnings, materials explanation and refreshed help index",
+      "startedAt": "2026-11-04T15:14:07.650Z",
+      "finishedAt": "2026-11-04T15:16:48.067Z",
+      "exitCode": 0,
+      "signal": null,
+      "log": "verification-build-display-final.log",
+      "databaseDisabled": true,
+      "externalProviderKeysShadowed": true,
+      "vercelUnset": true,
+      "prismaGenerationAlreadyPassed": true,
+      "sources": [
+        {
+          "file": "packages/services/src/cost-control/cost-control.service.ts",
+          "sha256": "4b8dbed838e4f94bf67af31ff2cf650260ed3cd9c86766c2358b0fc73d0c42d4"
+        },
+        {
+          "file": "packages/services/src/resources/resource-variance.service.ts",
+          "sha256": "fc85940a16685caf9d02fdb832a5103210931c7276ce1f497e8d5d7f9fc907fe"
+        },
+        {
+          "file": "packages/services/src/resources/project-resource-board.service.ts",
+          "sha256": "8fc296aec8c2c9cc40fb6a73fa24f898bc4deb7d4bf1a90c487ecac516c2712c"
+        },
+        {
+          "file": "packages/services/src/reports/material-variance.service.ts",
+          "sha256": "4910a14c42929c947d0a5fbd74690efabda3575619c34336b5091fe2aedec151"
+        }
+      ]
+    },
+    "visual": {
+      "completed": true,
+      "recordedAt": "2026-11-04T15:27:21.207Z",
+      "environment": "compiled localhost; explicitly authorized isolated synthetic database",
+      "finalBuild": "2026-11-04T15:16:48.067Z",
+      "roles": [
+        "OWNER",
+        "PROJECT_VIEWER"
+      ],
+      "otherAccessOnly": [
+        "VIEWER sign-in and sign-out"
+      ],
+      "routes": [
+        "/proyectos/:id/materiales?tab=varianza",
+        "/proyectos/:id/control-costos",
+        "WBS cost detail dialog"
+      ],
+      "themes": [
+        "dark",
+        "light"
+      ],
+      "viewports": [
+        {
+          "width": 1280,
+          "height": 720
+        },
+        {
+          "width": 390,
+          "height": 844,
+          "documentWidth": 390,
+          "bodyWidth": 390
+        }
+      ],
+      "observed": [
+        "proven absence retains zero",
+        "unreadable inventory shows unknown consumption, variance and affected totals",
+        "cost documentary exposure is identified separately",
+        "WBS detail preserves source warnings",
+        "final Spanish source names",
+        "mobile unknown KPI, card and unallocated consumption"
+      ],
+      "limitations": [
+        "No positive consumption in visual projects; positive consumption and quantity notes verified in SQL",
+        "No browser currency-conflict fixture; actual service/XLSX tested in SQL",
+        "Full-page screenshot unavailable; viewport screenshots saved",
+        "Not a full WCAG or physical-device test"
+      ],
+      "assets": [
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-materials-owner-zero-dark.png",
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-costs-owner-dark.png",
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-materials-restricted-dark.png",
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-materials-restricted-light.png",
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-costs-restricted-final-dark.png",
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-costs-restricted-final-mobile.png",
+        "docs/bloqer2.0/08-architecture/platform-audit/assets/ag05/closure-costs-restricted-final-mobile-card.png"
+      ],
+      "cleanup": {
+        "signedOut": true,
+        "temporaryTabsClosed": true,
+        "darkThemeRestored": true,
+        "viewportOverrideReset": true,
+        "ownServerStopped": true,
+        "port3100Free": true
+      }
+    },
+    "fixtureCleanup": {
+      "at": "2026-11-04T15:16:03.985Z",
+      "database": "bloqer_audit_ag01_20261103",
+      "readOnly": true,
+      "tenantCounts": {
+        "audit-boards-": 0,
+        "audit-resource-currency-": 0,
+        "audit-closure-": 0,
+        "audit-cost-graph-": 0,
+        "audit-cost-": 0
+      },
+      "initialAttempt": {
+        "result": "ESM/CJS import rejected before connecting; rerun with the repository CommonJS loader succeeded",
+        "databaseWrites": false
+      }
+    },
+    "wordingOnlyAfterLastGeneral": "Source-display labels, materials explanation and accompanying help/guide/index only; focal lint, final Next build/type validation and real browser checked after those text edits",
+    "focalLintLogs": [
+      "wording-lint.log",
+      "source-labels-lint.log"
+    ],
+    "knowledge": {
+      "chunks": 533,
+      "log": "knowledge-index-final.log",
+      "freshnessPassed": true
+    }
+  },
+  "independentReview": {
+    "agent": "ag05_closure_review",
+    "readOnly": true,
+    "codeVerdict": "approved within D122/123/124 scope after three residual fixes",
+    "evidenceVerdict": "2197 general, 97 distinct SQL, source boundaries and build hashes validated; visual performed by coordinator",
+    "residualsResolved": [
+      "own APU from another WBS within same budget",
+      "foreign-WBS FK invoice incorrectly selected via mixed-PO header",
+      "zero-net foreign-budget PO incorrectly routed to unallocated accrual"
+    ],
+    "reviewerDidNotExecute": [
+      "SQL",
+      "browser",
+      "deployment"
+    ]
+  },
+  "sourceManifest": "output/platform-audit/ag-05-close-2026-11-04/final-manifest.json",
+  "scopeExclusions": [
+    "Full neighboring-module audits",
+    "Formal RFI/Contract/ChangeOrder development",
+    "Complete stock valuation/FX/backfill",
+    "External providers",
+    "Authenticated Production workflows",
+    "Browser download transport verification"
+  ],
+  "openObservations": [
+    {
+      "id": "P-AG05-01",
+      "status": "unconfirmed_product_cause_observation",
+      "details": "Long-running dev/HMR memory exhaustion retained for later diagnosis; short fresh compiled smoke does not resolve it"
+    }
+  ],
+  "publication": {
+    "ag05Committed": false,
+    "ag05Pushed": false,
+    "ag05Deployed": false,
+    "lastVerifiedEarlierRelease": "3407c023eb00dec9d6361e4842af016480b1c813",
+    "earlierReleaseEvidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-04-ag-00-ag-04-publication.md",
+    "productionNotRecheckedThisContinuation": true
+  },
+  "unchanged": {
+    "schema": true,
+    "migrations": true,
+    "dependencies": true,
+    "environmentFiles": true,
+    "roles": true
+  },
+  "nextPhase": {
+    "id": "AG-06",
+    "status": "not_started_waiting_for_user_instruction"
+  },
+  "canvas": {
+    "path": "C:/Users/bravi/.cursor/projects/c-Dev-bloqer-v2/canvases/bloqer-platform-audit.canvas.tsx",
+    "typecheckErrors": 0
+  },
+  "documentationVerification": {
+    "localLinks": {
+      "at": "2026-11-04T15:29:00.995Z",
+      "markdownFiles": 20,
+      "localTargetsChecked": 905,
+      "broken": []
+    },
+    "knowledgeFreshnessLog": "output/platform-audit/ag-05-close-2026-11-04/knowledge-final-freshness.log",
+    "canvasTypecheckErrors": 0,
+    "diffCheckPassed": true
+  },
+  "finalVerificationRecordedAt": "2026-11-04T15:29:59.072Z"
+}

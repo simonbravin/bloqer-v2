@@ -24,15 +24,17 @@ export function PurchaseOrderVarianceReadout({
   justification,
   refKind,
   compact = false,
+  currencyComparable,
 }: {
   variancePct?: string | null;
   varianceTier?: string | null;
   justification?: string | null;
   refKind?: string | null;
   compact?: boolean;
+  currencyComparable?: boolean;
 }) {
-  const hint = extraHint(varianceTier, refKind);
-  const hasPct = variancePct != null && variancePct !== "" && !isZeroRatePct(variancePct);
+  const hint = currencyComparable === false ? "Referencia en otra moneda o sin identificar: desvío no calculable" : extraHint(varianceTier, refKind);
+  const hasPct = currencyComparable !== false && variancePct != null && variancePct !== "" && !isZeroRatePct(variancePct);
   const note = justification?.trim() || null;
   if (!hasPct && !hint && !note) {
     if (compact) return null;

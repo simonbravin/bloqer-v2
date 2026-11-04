@@ -1,11 +1,12 @@
 "use client";
 
-import { useRef, useState, useTransition, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
 import {
   Table,
   TableBody,
@@ -31,6 +32,7 @@ import { DecimalInput } from "@/components/ui/decimal-input";
 import { formatQtyFromString, isPositiveQty, compareQty } from "@/lib/format-money";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 function todayLocalInputDate(): string {
   return toIsoDateInTimeZone();
@@ -138,9 +140,10 @@ export function ReceiptForm(props: ReceiptFormProps) {
 
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, run: startTransition, isRunning } = useProcurementAction();
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [warehouseId, setWarehouseId] = useState<string>(
     isEdit && props.initialWarehouseId ? props.initialWarehouseId : "__none__",
   );
@@ -157,18 +160,15 @@ export function ReceiptForm(props: ReceiptFormProps) {
 
   function validateActiveLines(): ReceiptLine[] | null {
     const activeLines = lines.filter((l) => isPositiveQty(l.quantityReceived));
+    if (lines.some((line) => line.quantityReceived.trim() && compareQty(line.quantityReceived, "0") < 0)) {
+      setError("Las cantidades recibidas no pueden ser negativas");
+      return null;
+    }
     if (activeLines.length === 0) {
       setError("Debe ingresar al menos una cantidad mayor a cero");
       return null;
     }
-    for (const l of activeLines) {
-      if (compareQty(l.quantityReceived, l.remaining) > 0) {
-        setError(
-          `La cantidad de "${l.description}" excede la cantidad pendiente (${formatQtyFromString(l.remaining)})`,
-        );
-        return null;
-      }
-    }
+    // The service applies the company's tolerance against the current OC quantities.
     return activeLines;
   }
 
@@ -191,6 +191,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
 
   function handleCreateSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isRunning()) return;
     setError(null);
     const activeLines = validateActiveLines();
     if (!activeLines) return;
@@ -234,6 +235,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
 
   function handleSaveDraft(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isRunning()) return;
     if (!isEdit) return;
     setError(null);
     const activeLines = validateActiveLines();
@@ -263,6 +265,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
   }
 
   function handleConfirm() {
+    if (isRunning()) return;
     if (!isEdit) return;
     const form = formRef.current;
     if (!form) return;
@@ -304,9 +307,9 @@ export function ReceiptForm(props: ReceiptFormProps) {
   }
 
   function handleAnular() {
+    if (isRunning()) return;
     if (!isEdit) return;
     const { receiptId } = props;
-    if (!window.confirm("¿Anular esta recepción en borrador?")) return;
     setError(null);
     setPendingAction("cancel");
     startTransition(async () => {
@@ -317,6 +320,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
           return;
         }
         toast.success("Recepción anulada");
+        setCancelOpen(false);
         router.push(`/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}`);
         router.refresh();
       } finally {
@@ -346,6 +350,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
         onSubmit={isEdit ? handleSaveDraft : handleCreateSubmit}
         className="space-y-5"
       >
+<fieldset disabled={isPending} className="min-w-0 space-y-5">
         {error && (
           <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">
             {error}
@@ -354,10 +359,10 @@ export function ReceiptForm(props: ReceiptFormProps) {
 
         {warehouseOptions.length > 0 && (
           <div className="space-y-1">
-            <Label>Depósito destino (opcional)</Label>
+            <Label htmlFor="receipt-warehouse">Depósito destino</Label>
             <Select value={warehouseId} onValueChange={setWarehouseId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Sin depósito — no genera stock" />
+              <SelectTrigger id="receipt-warehouse">
+                <SelectValue placeholder="Seleccionar depósito" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">Sin depósito</SelectItem>
@@ -366,11 +371,11 @@ export function ReceiptForm(props: ReceiptFormProps) {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-muted-foreground">
-              Al seleccionar un depósito se generarán movimientos de stock para líneas con producto asociado.
-            </p>
           </div>
         )}
+        <p className="text-xs text-muted-foreground">
+          Las líneas sin producto asociado no generan stock. Para recibir productos de inventario necesitás un depósito autorizado; si no aparece ninguno, revisá Inventario o pedí acceso.
+        </p>
 
         <div className="space-y-1">
           <Label htmlFor="receiptDate">Fecha de recepción</Label>
@@ -471,7 +476,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
                 variant="destructive"
                 className={actionBtn}
                 disabled={isPending}
-                onClick={handleAnular}
+                onClick={() => setCancelOpen(true)}
               >
                 {pendingAction === "cancel" ? "Anulando…" : "Anular recepción"}
               </Button>
@@ -504,7 +509,13 @@ export function ReceiptForm(props: ReceiptFormProps) {
             </>
           )}
         </div>
-      </form>
+      </fieldset>
+</form>
+      <ConfirmAlertDialog open={cancelOpen} onOpenChange={(open) => { if (!isRunning()) setCancelOpen(open); }}
+        title="Anular recepción en borrador" confirmLabel="Anular recepción" variant="destructive" pending={isPending}
+        description={<div className="space-y-2"><p>La recepción quedará anulada. Podés crear otra si necesitás corregir el registro.</p>{error ? <p className="text-destructive" role="alert">{error}</p> : null}</div>}
+        onConfirm={handleAnular}
+      />
     </div>
   );
 }

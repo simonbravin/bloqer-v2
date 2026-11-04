@@ -4,11 +4,13 @@ import {
   buildGanttPeriods,
   buildScheduleExportFilterLine,
   chooseGanttScale,
+  computeExportDateRange,
   excelSerialFromIsoDateOnly,
   filterScheduleItemsForExport,
   formatScheduleExportDate,
   ganttBarFraction,
   indentScheduleExportName,
+  isScheduleExportRangeSupported,
   keepScheduleItemsOverlappingRange,
   parseScheduleExportIsoDate,
   parseScheduleExportView,
@@ -18,6 +20,25 @@ import {
   splitGanttPdfWindows,
   todayMarkerFraction,
 } from "./schedule-export-pure";
+
+test("Gantt generation permits 120 inclusive calendar months and rejects 121", () => {
+  assert.equal(
+    isScheduleExportRangeSupported("gantt", { startIso: "2026-01-01", endIso: "2035-12-31" }),
+    true,
+  );
+  assert.equal(
+    isScheduleExportRangeSupported("both", { startIso: "2026-01-31", endIso: "2036-01-01" }),
+    false,
+  );
+});
+
+test("the effective automatic range is bounded without generating a huge PDF or spreadsheet", () => {
+  const range = computeExportDateRange([{ startDate: "1000-01-01", endDate: "9999-12-31" }], 0);
+  assert.equal(isScheduleExportRangeSupported("gantt", range), false);
+  assert.equal(isScheduleExportRangeSupported("table", range), true);
+  const clipped = resolveExportGanttRange(range, "2026-01-01", "2026-12-31");
+  assert.equal(isScheduleExportRangeSupported("both", clipped), true);
+});
 
 test("formatScheduleExportDate is dd/MM/yyyy without TZ shift", () => {
   assert.equal(formatScheduleExportDate("2026-01-05"), "05/01/2026");

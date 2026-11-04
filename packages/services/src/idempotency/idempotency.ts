@@ -541,12 +541,11 @@ export function documentReplayMatches(
 }
 
 function linesFingerprint(
-  lines: Array<{ purchaseOrderLineId: string; quantityReceived: { toString(): string } | string }>,
+  lines: Array<{ purchaseOrderLineId: string; quantityReceived: { toString(): string } | string; notes?: string | null }>,
 ): string {
-  return lines
-    .map((l) => `${l.purchaseOrderLineId}:${qtyFingerprint(l.quantityReceived)}`)
-    .sort()
-    .join("|");
+  return JSON.stringify(lines
+    .map((line) => JSON.stringify([line.purchaseOrderLineId, qtyFingerprint(line.quantityReceived), line.notes ?? null]))
+    .sort());
 }
 
 export function purchaseReceiptReplayMatches(
@@ -555,14 +554,14 @@ export function purchaseReceiptReplayMatches(
     warehouseId: string | null;
     receiptDate: Date;
     notes: string | null;
-    lines: Array<{ purchaseOrderLineId: string; quantityReceived: { toString(): string } }>;
+    lines: Array<{ purchaseOrderLineId: string; quantityReceived: { toString(): string }; notes?: string | null }>;
   },
   input: {
     purchaseOrderId: string;
     warehouseId?: string | null;
     receiptDate: string;
     notes?: string | null;
-    lines: Array<{ purchaseOrderLineId: string; quantityReceived: string }>;
+    lines: Array<{ purchaseOrderLineId: string; quantityReceived: string; notes?: string | null }>;
   },
 ): boolean {
   if (existing.purchaseOrderId !== input.purchaseOrderId) return false;

@@ -100,6 +100,8 @@ export default async function OrdenesCompraPage({ params, searchParams }: PagePr
         name: n.name,
         budgetName: n.budgetName,
         budgetUnitCost: n.budgetUnitCost,
+      budgetCurrency: n.budgetCurrency,
+      budgetWarning: n.budgetWarning,
         budgetUnit: n.budgetUnit,
         availableSaldo: n.availableSaldo,
         wouldExceedBudget: n.wouldExceedBudget,

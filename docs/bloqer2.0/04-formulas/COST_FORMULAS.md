@@ -6,7 +6,7 @@
 
 ## 1. Definiciones canónicas (reporting de costo)
 
-Todas las magnitudes siguientes se expresan en **moneda funcional del reporte** (típicamente ARS consolidado) con la misma regla FX que el resto del módulo financiero.
+Todas las magnitudes siguientes se expresan en **moneda funcional del reporte** (típicamente ARS consolidado) con la misma regla FX que el resto del módulo financiero. En EDT y costos y varianza monetaria de recursos, D-122 fija la moneda original del presupuesto: una fuente contribuyente de otra moneda impide el resultado, sin FX implícito ni omisión silenciosa. Esto no convierte esos tableros en consolidados ARS.
 
 ### 1.1 `committed_amount` (Comprometido)
 
@@ -55,6 +55,8 @@ Monto de costo **efectivamente salido de tesorería** (caja ejecutada) imputable
 
 Parte de `accrued_amount` que está **atada** al mismo compromiso (p. ej. factura con `po_id`, certificación/payable ligada al subcontrato). Se calcula por **vínculos explícitos** línea-documento, no por prorrateo arbitrario.
 
+D-066 conserva un fallback explícito para facturas manuales/legacy sin FK a línea: pesos netos de las líneas de su propia OC. No autoriza repartir notas fiscales entre compromisos ambiguos. El piso de comprometido abierto se aplica a cada compromiso de origen antes de sumar por partida/tipo; un exceso de facturación no consume otra OC.
+
 ### 1.5 `open_committed_amount` (Comprometido abierto)
 
 \[
@@ -73,7 +75,7 @@ Interpretación: lo que **sigue vigente** como compromiso firme **sin** haberse 
 
 ### 1.7 Ejemplo numérico ([BR-COS-002])
 
-OC aprobada/confirmada: **10.000**  
+OC confirmada al proveedor: **10.000**
 Factura registrada contra esa OC: **4.000**  
 Pago realizado (caja): **2.000**
 
@@ -144,7 +146,7 @@ Positivo = **ahorro**; negativo = **sobrecosto**. La vista debe etiquetarse: *co
 
 ### 4.1 Varianza unitaria en líneas de OC ([D-044] / [D-093])
 
-Al enviar una OC, por cada línea con baseline APU (`budgetUnitCostSnapshot`):
+Al enviar o aprobar una OC, por cada línea con baseline APU (`budgetUnitCostSnapshot`), moneda demostrable coincidente y unidad compatible (D-125):
 
 \[
 grossSubtotal = round(qty \times unitPrice)
@@ -161,11 +163,36 @@ descuento = round(grossSubtotal \times discountPct / 100)
 
 (`unitPrice` es list net; el descuento % baja el PU efectivo comparado con el APU.)
 
-Si la partida no tiene insumo MATERIAL comprable, el referencial es `CostItem.unitCostDirect` (costo dir. /u de la partida, incluye MO/equipos/subcontrato) **solo cuando esa unidad es comparable** a la de la línea. Si la partida está en `gl` (global) y la línea en unidad física, no hay referencial unitario: no se compara el total de la partida contra el PU ni se pide justificación de desvío. `NO_BUDGET_BASELINE` aplica solo cuando no hay CostItem o el costo dir. /u comparable es 0.
+El insumo APU explícito de la misma partida prevalece, incluso si es LABOR/EQUIPMENT (D-068/D-109). Sin ese vínculo se mantiene la búsqueda de insumo MATERIAL y, si no hay uno comprable, el fallback `CostItem.unitCostDirect` **solo con unidad comparable**. En todos los casos se comprueba moneda antes de comparar: si difiere o falta, un precio efectivo positivo tiene porcentaje `null`, tier existente `NO_BUDGET_BASELINE` y justificación vigente. No se deriva un FX presupuestario de la compra. Un precio efectivo cero/bonificado conserva su tratamiento previo.
+
+Con moneda comparable, si la partida está en `gl` y la línea en unidad física, no se compara el total de la partida contra el PU ni se pide justificación de desvío unitario. Esta excepción no neutraliza una moneda incompatible. `NO_BUDGET_BASELINE` también aplica al faltar base unitariamente comparable o positiva conforme a BR-PUR-009.
+
+El saldo monetario de partida es `null` con advertencia si para construirlo deben sumarse compromisos de monedas diferentes. No se usa el subtotal comparable como saldo completo. Los umbrales de aprobación continúan en ARS a partir del importe/FX de la compra; la moneda incompatible por sí sola no fuerza alto nivel.
 
 Tiers sobre **desvío con signo** (umbrales en `CompanyProcurementSettings`): ahorro (`variance_pct` &lt; soft, incluido negativo) = `NONE`; `NOTE_REQUIRED` entre soft y extra % de **sobrecosto**; `EXTRA_APPROVAL` ≥ extra % de sobrecosto; casos especiales `UNIT_MISMATCH` y `NO_BUDGET_BASELINE`. La justificación se pide cuando el PU **supera** el referencial, no cuando está por debajo.
 
 ---
+
+## 5. Cobertura neta de recursos — D-123
+
+**Propósito:** medir cobertura facturada de un recurso APU en una unidad compatible, sin inferir avance físico.
+
+`facturado_neto = qty_invoice + qty_debit_note - qty_credit_note`
+
+`faltante = max(0, necesidad - max(pedido, facturado_neto))`
+
+Se incluyen solo líneas con recurso/unidad compatibles; no se convierten unidades ni se atribuye una nota genérica. Decimal conserva precisión de qty de negocio, 4 dp; UI 2 dp. Ejemplo: 10 h + ND 1 h − NC 2 h = 9 h netas. Con necesidad 12 h y pedido 8 h, faltan 3 h. Si el neto fiscal es negativo, se conserva; el mayor con pedido y el piso de faltante mantienen su definición D-109. No modifica importes, stock ni documentos.
+
+## 6. Consumo sin valuación trazable — D-124
+
+**Propósito:** impedir que un costo desconocido aparente ahorro.
+
+- `costo_consumido = null` si existe consumo sin origen/moneda/valor trazables, o la fuente no puede comprobarse por acceso/gate.
+- `costo_consumido = 0` cuando se comprobó ausencia de consumos en el alcance autorizado.
+- `varianza_consumo = presupuesto_material - costo_consumido` solo cuando el costo es calculable; en caso contrario, `null`, igual que su porcentaje.
+- Un total de consumo o varianza que agrega una fila desconocida es `null`; no se usa el subtotal conocido como total completo. Presupuesto y cantidades siguen disponibles.
+
+Ejemplo: presupuesto 1.000 y consumo de 10 un sin valuación → consumo/varianza `null`, no ahorro 1.000. Sin movimientos comprobados → consumo 0 y varianza 1.000. Montos conocidos usan el kernel half-up de 2 dp. Este tratamiento no suma consumo a exposición documental ni implementa valuación FIFO/promedio de D-083.
 
 ## Referencias
 

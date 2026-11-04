@@ -1,10 +1,18 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { can } from "@bloqer/domain";
+import { canViewBudgetsArea } from "../project/project-nav-guards";
 import { canViewScheduleArea } from "./schedule-access";
 import { requireProjectAccess } from "../security/access";
 import { ServiceError } from "../types";
 import type { ServiceContext } from "../types";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
+import { companyScopeFilter } from "../company-scope";
+import { canViewJobsiteLogArea } from "../jobsite-log/jobsite-log-access";
+import {
+  getTenantModuleGate,
+  assertTenantModuleEnabledWithGate,
+} from "../tenant-modules/tenant-module.service";
 
 export type ScheduleItemJobsiteEntry = {
   jobsiteLogId: string;
@@ -31,7 +39,7 @@ export type ScheduleItemContextDto = {
 };
 
 async function getWbsIncrementalPhysicalPctSum(
-  tenantId: string,
+  ctx: ServiceContext,
   projectId: string,
   wbsNodeId: string,
 ): Promise<string | null> {
@@ -39,7 +47,12 @@ async function getWbsIncrementalPhysicalPctSum(
     where: {
       wbsNodeId,
       physicalPct: { not: null },
-      jobsiteLog: { tenantId, projectId, status: "APPROVED" },
+      jobsiteLog: {
+        tenantId: ctx.tenantId,
+        projectId,
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+        status: "APPROVED",
+      },
     },
     select: { physicalPct: true },
   });
@@ -62,48 +75,80 @@ export async function getScheduleItemContext(
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   await requireProjectAccess(projectId, ctx);
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
+  assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
+  const includeJobsite = gate.isEnabled("JOBSITE_LOG") && canViewJobsiteLogArea(ctx.roles);
+  const includeCertifications =
+    gate.isEnabled("CERTIFICATIONS") && can(ctx.roles, "VIEW", "CERTIFICATIONS");
 
   const item = await prisma.scheduleItem.findFirst({
-    where: { id: scheduleItemId, schedule: { projectId, tenantId: ctx.tenantId } },
-    include: { wbsLinks: { where: { isPrimary: true }, take: 1, orderBy: { createdAt: "asc" } } },
+    where: {
+      id: scheduleItemId,
+      tenantId: ctx.tenantId,
+      schedule: { projectId, tenantId: ctx.tenantId },
+    },
+    include: {
+      wbsLinks: {
+        where: {
+          isPrimary: true,
+          tenantId: ctx.tenantId,
+          wbsNode: { budget: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx) } },
+        },
+        take: 1,
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
   if (!item) throw new ServiceError("NOT_FOUND", "Ítem no encontrado");
 
   const primaryWbsId = item.wbsLinks[0]?.wbsNodeId;
-  if (!primaryWbsId) {
+  if (!primaryWbsId || !gate.isEnabled("BUDGETS") || !canViewBudgetsArea(ctx.roles)) {
     return { jobsiteEntries: [], certificationEntries: [], jobsitePhysicalPctCumulative: null };
   }
 
   const base = `/proyectos/${projectId}`;
 
   const [progressRows, certLines, jobsitePhysicalPctCumulative] = await Promise.all([
-    prisma.jobsiteLogProgress.findMany({
-      where: {
-        wbsNodeId: primaryWbsId,
-        jobsiteLog: { tenantId: ctx.tenantId, projectId, status: "APPROVED" },
-      },
-      include: {
-        jobsiteLog: { select: { id: true, logDate: true, status: true } },
-      },
-      orderBy: { jobsiteLog: { logDate: "desc" } },
-      take: 10,
-    }),
-    prisma.certificationLine.findMany({
-      where: {
-        wbsNodeId: primaryWbsId,
-        certification: {
-          tenantId: ctx.tenantId,
-          projectId,
-          status: { in: ["ISSUED", "APPROVED"] },
-        },
-      },
-      include: {
-        certification: { select: { id: true, number: true, status: true } },
-      },
-      orderBy: { certification: { issueDate: "desc" } },
-      take: 10,
-    }),
-    getWbsIncrementalPhysicalPctSum(ctx.tenantId, projectId, primaryWbsId),
+    includeJobsite
+      ? prisma.jobsiteLogProgress.findMany({
+          where: {
+            wbsNodeId: primaryWbsId,
+            jobsiteLog: {
+              tenantId: ctx.tenantId,
+              projectId,
+              ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+              status: "APPROVED",
+            },
+          },
+          include: {
+            jobsiteLog: { select: { id: true, logDate: true, status: true } },
+          },
+          orderBy: { jobsiteLog: { logDate: "desc" } },
+          take: 10,
+        })
+      : Promise.resolve([]),
+    includeCertifications
+      ? prisma.certificationLine.findMany({
+          where: {
+            wbsNodeId: primaryWbsId,
+            certification: {
+              tenantId: ctx.tenantId,
+              projectId,
+              ...companyScopeFilter(ctx),
+              status: { in: ["ISSUED", "APPROVED"] },
+            },
+          },
+          include: {
+            certification: { select: { id: true, number: true, status: true } },
+          },
+          orderBy: { certification: { issueDate: "desc" } },
+          take: 10,
+        })
+      : Promise.resolve([]),
+    includeJobsite
+      ? getWbsIncrementalPhysicalPctSum(ctx, projectId, primaryWbsId)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -111,9 +156,7 @@ export async function getScheduleItemContext(
       jobsiteLogId: p.jobsiteLog.id,
       logDate: p.jobsiteLog.logDate.toISOString().slice(0, 10),
       status: p.jobsiteLog.status,
-      quantityCompleted: p.quantityCompleted
-        ? serializeQtyDecimal(p.quantityCompleted)
-        : null,
+      quantityCompleted: p.quantityCompleted ? serializeQtyDecimal(p.quantityCompleted) : null,
       physicalPct: p.physicalPct != null ? serializeProgressPct(p.physicalPct.toString()) : null,
       href: `${base}/libro-obra/${p.jobsiteLog.id}`,
     })),

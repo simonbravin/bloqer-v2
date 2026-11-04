@@ -6,17 +6,14 @@ import { Prisma } from "@bloqer/database";
 import type { ScheduleItemStatus } from "@bloqer/database";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
-import {
-  SCHEDULE_ITEM_ENTITY,
-  auditSchedule,
-  scheduleItemSnapshot,
-} from "./schedule-audit";
+import { SCHEDULE_ITEM_ENTITY, auditSchedule, scheduleItemSnapshot } from "./schedule-audit";
 import {
   assertScheduleStatusTransition,
   formatDateOnly,
   isScheduleLeafItem,
 } from "./schedule-helpers";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
+import { companyScopeFilter } from "../company-scope";
 
 /** Pure guard: PLANNED → COMPLETED only for MILESTONE (button/receipt). */
 export function canCompleteScheduleItemDirectly(
@@ -162,10 +159,28 @@ export async function completeMilestonesFromPurchaseReceipt(args: {
   ctx: ServiceContext;
   tx: Prisma.TransactionClient;
 }): Promise<string[]> {
-  const { projectId, wbsNodeIds, receiptId, receiptDate, ctx, tx } = args;
+  const { projectId, wbsNodeIds, receiptId, ctx, tx } = args;
   if (!projectId || wbsNodeIds.length === 0) return [];
 
-  const uniqueWbs = [...new Set(wbsNodeIds.filter(Boolean))];
+  const source = await tx.purchaseReceipt.findFirst({
+    where: {
+      id: receiptId,
+      projectId,
+      tenantId: ctx.tenantId,
+      status: "CONFIRMED",
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    },
+    select: {
+      receiptDate: true,
+      lines: {
+        where: { quantityReceived: { gt: 0 } },
+        select: { purchaseOrderLine: { select: { wbsNodeId: true } } },
+      },
+    },
+  });
+  if (!source) return [];
+  const receivedWbs = new Set(source.lines.map((line) => line.purchaseOrderLine.wbsNodeId));
+  const uniqueWbs = [...new Set(wbsNodeIds.filter((id) => receivedWbs.has(id)))];
   if (uniqueWbs.length === 0) return [];
 
   const schedule = await tx.schedule.findFirst({
@@ -180,7 +195,13 @@ export async function completeMilestonesFromPurchaseReceipt(args: {
       tenantId: ctx.tenantId,
       type: "MILESTONE",
       status: { in: ["PLANNED", "IN_PROGRESS"] },
-      wbsLinks: { some: { wbsNodeId: { in: uniqueWbs } } },
+      wbsLinks: {
+        some: {
+          tenantId: ctx.tenantId,
+          wbsNodeId: { in: uniqueWbs },
+          wbsNode: { budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) } },
+        },
+      },
     },
   });
 
@@ -220,7 +241,7 @@ export async function completeMilestonesFromPurchaseReceipt(args: {
         ...scheduleItemSnapshot(updated),
         source: "purchase_receipt",
         receiptId,
-        receiptDate: formatDateOnly(receiptDate),
+        receiptDate: formatDateOnly(source.receiptDate),
         progressPct: serializeProgressPct(updated.progressPct.toString()),
       },
       tx,

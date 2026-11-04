@@ -2,6 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Short Gantt bars keep their full progress in the tooltip instead of a clipped digit. */
+.schedule-gantt-progress-label {
+  display: none;
+}
+
+@container schedule-progress-bar (min-width: 40px) {
+  .schedule-gantt-progress-label {
+    display: block;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

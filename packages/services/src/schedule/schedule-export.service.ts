@@ -18,6 +18,7 @@ import {
   formatScheduleExportDate,
   formatScheduleExportPct,
   indentScheduleExportName,
+  isScheduleExportRangeSupported,
   keepScheduleItemsOverlappingRange,
   parseScheduleExportIsoDate,
   parseScheduleExportView,
@@ -49,7 +50,11 @@ export type ScheduleExportFilters = ScheduleWorkspaceFilters & {
   to?: string;
 };
 
-export type { ScheduleExportGantt, ScheduleExportPayload, ScheduleExportRow } from "./schedule-export-pure";
+export type {
+  ScheduleExportGantt,
+  ScheduleExportPayload,
+  ScheduleExportRow,
+} from "./schedule-export-pure";
 
 export function parseScheduleExportFilters(
   sp: Record<string, string | undefined>,
@@ -69,8 +74,8 @@ export function parseScheduleExportFilters(
   };
 }
 
-function moneyLabel(raw: string | null | undefined, currency: string): string {
-  if (raw == null || raw === "") return "—";
+function moneyLabel(raw: string | null | undefined, currency: string | null): string {
+  if (raw == null || raw === "" || !currency) return "—";
   try {
     return `${formatGroupedDecimal(raw)} ${currency}`;
   } catch {
@@ -103,7 +108,7 @@ function progressRatio(raw: string): number {
   return Math.min(1, n / 100);
 }
 
-function mapRow(item: ScheduleWorkspaceItemDto, currency: string): ScheduleExportRow {
+function mapRow(item: ScheduleWorkspaceItemDto, currency: string | null): ScheduleExportRow {
   const isMilestone = item.type === "MILESTONE";
   return {
     id: item.id,
@@ -151,9 +156,7 @@ async function resolveOrgMeta(
       : Promise.resolve(null),
   ]);
   const tenantName = tenantRow?.name ?? "Organización";
-  const companyDisplayName = companyRow
-    ? companyRow.legalName?.trim() || companyRow.name
-    : null;
+  const companyDisplayName = companyRow ? companyRow.legalName?.trim() || companyRow.name : null;
   const orgLine =
     companyDisplayName && companyDisplayName !== tenantName
       ? `${companyDisplayName} · ${tenantName}`
@@ -180,7 +183,10 @@ export async function buildScheduleExportPayload(
     ctx,
   );
   if (workspace.type === "NO_APPROVED_BUDGETS") {
-    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado o cerrado para exportar el cronograma");
+    throw new ServiceError(
+      "CONFLICT",
+      "No hay presupuesto aprobado o cerrado para exportar el cronograma",
+    );
   }
   if (workspace.type === "BUDGET_SELECTION_REQUIRED") {
     throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar el cronograma");
@@ -195,6 +201,12 @@ export async function buildScheduleExportPayload(
 
   const autoRange = computeExportDateRange(items, hasCustomRange ? 0 : 7);
   const range = resolveExportGanttRange(autoRange, customFrom, customTo);
+  if (!isScheduleExportRangeSupported(view, range)) {
+    throw new ServiceError(
+      "VALIDATION",
+      "El Gantt admite hasta 120 meses calendario por exportación. Acotá el lapso o elegí Tabla para exportar todas las fechas.",
+    );
+  }
   const scopedItems =
     hasCustomRange && range
       ? keepScheduleItemsOverlappingRange(items, range.startIso, range.endIso)
@@ -202,7 +214,7 @@ export async function buildScheduleExportPayload(
   const rows = scopedItems.map((item) => mapRow(item, currency));
 
   const filterLine = buildScheduleExportFilterLine({
-    budgetName: workspace.budgetName,
+    budgetName: workspace.budgetName ?? undefined,
     status: filters.status,
     delayedOnly: filters.delayedOnly,
     itemType: filters.itemType,
@@ -234,11 +246,12 @@ export async function buildScheduleExportPayload(
       ? `Avance ponderado ${formatScheduleExportPct(workspace.summary.scheduleProgressPct)}`
       : null,
     delayedCount > 0 ? `${delayedCount} atrasado${delayedCount === 1 ? "" : "s"}` : null,
+    workspace.metricsWarning,
   ].filter(Boolean);
 
   return {
     projectId,
-    budgetName: workspace.budgetName,
+    budgetName: workspace.budgetName ?? "Sin presupuesto vinculado",
     budgetCurrency: currency,
     filterLine,
     view,

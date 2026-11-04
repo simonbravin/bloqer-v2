@@ -9,6 +9,7 @@ Definir cómo Bloqer representa **montos monetarios** de forma consistente, sin 
 3. **ARS como base**: todo reporte consolidado puede expresarse en ARS ([D-008]).
 4. **FX por movimiento**: tipo de cambio capturado en el momento del hecho económico ([D-008]).
 5. **Inmutabilidad**: una vez `CONFIRMED` (p. ej. movimiento de tesorería confirmado), el monto y FX no cambian salvo anulación/reversión auditada.
+6. **OC aprobada y FX de confirmación (D-129):** cambiar el FX manual antes de confirmar exige que el mismo actor pueda aprobar el nuevo importe en ARS, con los umbrales/varianza y segregación vigentes. Se renueva la aprobación auditada en la misma transacción que confirma. Si no puede, la OC APPROVED queda intacta para un aprobador habilitado. Sin cambio de FX conserva el permiso actual de confirmación.
 
 ## Campos conceptuales por entidad con dinero
 
@@ -45,6 +46,10 @@ Definir cómo Bloqer representa **montos monetarios** de forma consistente, sin 
 - `amount_ars = roundMoney(amount × fx_rate)` a **2** dp; `fx_rate` a **6** dp.
 - **Pagar/cobrar todo:** aplicar saldo **almacenado** en servidor; display siempre 2 dp.
 
+## Lecturas de planificación — D-122/D-124
+
+Las comparaciones de EDT y costos y varianza de recursos conservan la moneda original del presupuesto y rechazan fuentes contribuyentes de otra moneda, sin FX implícito. Un consumo sin moneda/valuación trazables es `null` en costo y varianza de consumo; no se serializa como cero. La ausencia comprobada de consumos sí admite cero. Presupuesto y exposición documental conservan sus capas; no se agrega consumo para duplicarlas.
+
 ## Conservación al editar — D-117
 
 Los componentes guardados de una línea se conservan si cantidad, precio neto, IVA y descuento siguen numéricamente iguales. El servidor compara contra las líneas del propio documento dentro de la transacción. Cambiar un dato monetario o reinterpretar el precio como bruto recalcula. El navegador nunca decide los importes históricos a persistir.
@@ -63,7 +68,7 @@ No son campos obligatorios de cada fila de `amount`; son **capas de agregación*
 
 | Concepto canónico | Resumen |
 |---|---|
-| `committed_amount` | Compromisos firmes (OC `APPROVED`/`CONFIRMED`, subcontrato `ACTIVE`, otros firmes aprobados) |
+| `committed_amount` | Compromisos firmes (OC `CONFIRMED`/`PARTIALLY_RECEIVED`/`RECEIVED`, subcontrato `ACTIVE`, otros firmes aprobados); OC solo `APPROVED` todavía no compromete, D-044 |
 | `accrued_amount` | Obligación reconocida (facturas compra emitidas/aprobadas, certif. subcontrato que genera AP, gastos como payable) |
 | `open_committed_amount` | `committed_amount` menos devengado **vinculado** a ese compromiso |
 | `expected_cost_exposure` | `accrued_amount + open_committed_amount` (**anti doble conteo**, [BR-COS-002]) |
@@ -74,6 +79,10 @@ No son campos obligatorios de cada fila de `amount`; son **capas de agregación*
 - **Reporting de costo** (comprometido / devengado / pagado / exposición esperada): [`../04-formulas/COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md) §1–2.
 - **Cashflow real:** solo movimientos de caja confirmados — [`CASHFLOW.md`](./CASHFLOW.md).
 - **Proyección de caja:** AR/AP y vencimientos — [`CASHFLOW_PROJECTION.md`](./CASHFLOW_PROJECTION.md).
+
+## Hallazgo — AG-05: resumen de compromiso reconciliado con D-044
+
+El resumen anterior incluía OC `APPROVED`, contradiciendo D-044 y COST_FORMULAS. Se corrigió la descripción: el compromiso nace al confirmar al proveedor. No cambia la decisión ni los estados persistidos.
 
 ## Relación con otros documentos
 - [`MULTI_CURRENCY_RULES.md`](./MULTI_CURRENCY_RULES.md)

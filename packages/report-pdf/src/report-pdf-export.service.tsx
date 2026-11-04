@@ -443,8 +443,8 @@ export async function exportMaterialVariancePdf(
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Materiales del proyecto"
-      subtitle={result.budgetName}
-      totalsLine={`Presupuesto: ${result.totals.budgetMaterial} · Consumo: ${result.totals.consumedCost} · Var.: ${result.totals.variance}`}
+      subtitle={`${result.budgetName} · Moneda: ${result.currency}`}
+      totalsLine={`Presupuesto: ${result.totals.budgetMaterial} · Consumo: ${result.totals.consumedCost ?? "Sin valuación"} · Var.: ${result.totals.variance ?? "No calculable"}`}
       columns={[
         { key: "code", label: "Partida", flex: 0.8 },
         { key: "name", label: "Ítem", flex: 1.4 },
@@ -456,8 +456,8 @@ export async function exportMaterialVariancePdf(
         code: r.wbsCode,
         name: r.wbsName,
         budget: r.budgetMaterial,
-        actual: r.consumedCost,
-        variance: r.variance,
+        actual: r.consumedCost ?? "Sin valuación",
+        variance: r.variance ?? "—",
       }))}
       warnings={result.warnings}
     />

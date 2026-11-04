@@ -15,10 +15,10 @@ describe("serializeProgressPct", () => {
 });
 
 describe("capSyncProgressPct", () => {
-  it("returns null for non-positive", () => {
-    assert.equal(capSyncProgressPct(0), null);
+  it("keeps an explicit zero measurement and rejects negative progress", () => {
+    assert.equal(capSyncProgressPct(0), "0.00");
     assert.equal(capSyncProgressPct(-1), null);
-    assert.equal(capSyncProgressPct("0.00"), null);
+    assert.equal(capSyncProgressPct("0.00"), "0.00");
   });
 
   it("clamps over 100 to 100.00", () => {

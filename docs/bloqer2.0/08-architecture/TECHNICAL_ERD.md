@@ -5,6 +5,8 @@
 
 ## Decisión
 
+**D-127 — identificación de recepciones:** `PurchaseReceipt.number` es entero nullable con índice único `(tenantId, companyId, number)`. El service layer asigna correlativo por empresa bajo bloqueo de Company dentro de la transacción; no se reutiliza al anular. Los registros anteriores mantienen NULL/UUID, sin backfill. Migración aditiva `20261104183000_purchase_receipt_company_number`; aplicar antes del cliente nuevo. No cambia el modelo de aislamiento ni introduce una entidad.
+
 **D-118 — renglones de cotización:** `procurement_quote_lines.offerKind` es nullable, enum `QuoteLineOfferKind` (`QUOTED`, `NOT_QUOTED`, `BONIFIED`), sin default/backfill. Conserva PK/FK y la unicidad cotización/ítem; no agrega una entidad operativa. Históricos quedan null. Aplicar la migración aditiva antes del cliente nuevo; un rollback de código conserva columna/enum. Revisar ceros pendientes en el servicio, sin revalidar adjudicaciones existentes.
 
 Representar el dominio como **modelo relacional multitenant** con **UUIDs**, **decimales para dinero**, **polimorfismos** como `(entity_type, entity_id)`, y **ledger** (`account_movement`) como núcleo de tesorería. El ERD técnico **respeta** modular monolith, service layer y aislamiento por `tenant_id` ([`ARCHITECTURE_OVERVIEW.md`](./ARCHITECTURE_OVERVIEW.md), [`MULTITENANCY_ARCHITECTURE.md`](./MULTITENANCY_ARCHITECTURE.md)).

@@ -1,24 +1,23 @@
 import { z } from "zod";
+import { compareDecimal } from "@bloqer/utils";
+import { moneyAmountString, ratePctString } from "./money";
 
-const decimalOptional = z
-  .string()
-  .regex(/^\d+(\.\d+)?$/, "Monto inválido")
+const decimalOptional = moneyAmountString
+  .refine((value) => compareDecimal(value, "0") >= 0 && compareDecimal(value, "99999999999999.99") <= 0,
+    "El monto debe ser no negativo y respetar la precisión permitida")
   .optional()
   .nullable();
 
-const pct = z.string().regex(/^\d+(\.\d+)?$/, "Porcentaje inválido");
+const pct = ratePctString.refine((value) => compareDecimal(value, "0") >= 0 && compareDecimal(value, "9999.9999") <= 0,
+  "El porcentaje debe ser no negativo y respetar la precisión permitida");
 
-const overReceiptPct = z
-  .string()
-  .regex(/^\d+(\.\d+)?$/, "Porcentaje inválido")
-  .refine((v) => Number(v) >= 0 && Number(v) <= 5, {
+const overReceiptPct = pct
+  .refine((v) => compareDecimal(v, "5") <= 0, {
     message: "La tolerancia de sobrecantidad debe estar entre 0 y 5%",
   });
 
-const invoiceMatchPct = z
-  .string()
-  .regex(/^\d+(\.\d+)?$/, "Porcentaje inválido")
-  .refine((v) => Number(v) >= 0 && Number(v) <= 25, {
+const invoiceMatchPct = pct
+  .refine((v) => compareDecimal(v, "25") <= 0, {
     message: "La tolerancia de matching factura debe estar entre 0 y 25%",
   });
 
@@ -28,19 +27,20 @@ export const upsertCompanyProcurementSettingsSchema = z
     purchaseRequestRequiredAboveArs: decimalOptional,
     minQuotesRequired: z.coerce.number().int().min(1).max(10).optional(),
     maxQuotesAllowed: z.coerce.number().int().min(1).max(20).optional(),
-    allowDirectPo: z.coerce.boolean().optional(),
-    allowSelfApproval: z.coerce.boolean().optional(),
-    allowAuthorizeAndCommit: z.coerce.boolean().optional(),
-    autoConfirmOnApprove: z.coerce.boolean().optional(),
-    autoDraftApInvoiceOnReceipt: z.coerce.boolean().optional(),
-    allowEmergencyDirectPo: z.coerce.boolean().optional(),
+    quoteRequiredCategories: z.array(z.string()).nullable().optional(),
+    allowDirectPo: z.boolean().optional(),
+    allowSelfApproval: z.boolean().optional(),
+    allowAuthorizeAndCommit: z.boolean().optional(),
+    autoConfirmOnApprove: z.boolean().optional(),
+    autoDraftApInvoiceOnReceipt: z.boolean().optional(),
+    allowEmergencyDirectPo: z.boolean().optional(),
     approvalSlaHours: z.coerce.number().int().min(1).max(720).optional(),
     deliveryOverdueGraceDays: z.coerce.number().int().min(0).max(60).optional(),
     neededByOverdueGraceDays: z.coerce.number().int().min(0).max(60).optional(),
     receiptToInvoiceSlaDays: z.coerce.number().int().min(0).max(60).optional(),
-    deliveryAlertsEnabled: z.coerce.boolean().optional(),
-    neededByAlertsEnabled: z.coerce.boolean().optional(),
-    receiptToInvoiceAlertsEnabled: z.coerce.boolean().optional(),
+    deliveryAlertsEnabled: z.boolean().optional(),
+    neededByAlertsEnabled: z.boolean().optional(),
+    receiptToInvoiceAlertsEnabled: z.boolean().optional(),
     varianceSoftAlertPct: pct.optional(),
     varianceNoteRequiredPct: pct.optional(),
     varianceExtraApprovalPct: pct.optional(),
@@ -63,7 +63,7 @@ export const upsertCompanyProcurementSettingsSchema = z
     if (
       data.varianceSoftAlertPct != null &&
       data.varianceNoteRequiredPct != null &&
-      Number(data.varianceSoftAlertPct) > Number(data.varianceNoteRequiredPct)
+      compareDecimal(data.varianceSoftAlertPct, data.varianceNoteRequiredPct) > 0
     ) {
       ctx.addIssue({
         code: "custom",
@@ -74,7 +74,7 @@ export const upsertCompanyProcurementSettingsSchema = z
     if (
       data.varianceSoftAlertPct != null &&
       data.varianceExtraApprovalPct != null &&
-      Number(data.varianceSoftAlertPct) >= Number(data.varianceExtraApprovalPct)
+      compareDecimal(data.varianceSoftAlertPct, data.varianceExtraApprovalPct) >= 0
     ) {
       ctx.addIssue({
         code: "custom",

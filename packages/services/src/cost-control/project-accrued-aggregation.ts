@@ -1,6 +1,9 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { can } from "@bloqer/domain";
+import { requireProjectAccess } from "../security/access";
+import { assertTenantModuleEnabledWithGate } from "../tenant-modules/tenant-module.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
-import type { ServiceContext } from "../types";
+import { ServiceError, type ServiceContext } from "../types";
 import { monthKey, parseFilterDate } from "../reports/report-month";
 
 const ZERO = new Prisma.Decimal(0);
@@ -53,8 +56,13 @@ export async function getProjectAccruedByMonth(
   filters: ProjectAccruedFilters,
   ctx: ServiceContext,
 ): Promise<ProjectAccruedAggregation> {
+  if (!can(ctx.roles, "VIEW", "AP")) throw new ServiceError("FORBIDDEN", "Sin permisos para consultar costos devengados.");
+  await requireProjectAccess(projectId, ctx);
+  // Subcontract certifications and supplier invoices have companyId NOT NULL.
+  const companyWhere = ctx.companyId ? { companyId: ctx.companyId } : {};
   const warnings: string[] = [];
   const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   if (!gate.isEnabled("AP")) {
     return { series: [], total: ZERO, warnings };
   }
@@ -64,12 +72,13 @@ export async function getProjectAccruedByMonth(
   const dateFilter = dateWhere(dateFrom, dateTo);
 
   const [subCertLines, poLinkedInvoices, unallocatedInvoices] = await Promise.all([
-    gate.isEnabled("SUBCONTRACTS")
+    gate.isEnabled("SUBCONTRACTS") && (can(ctx.roles, "VIEW", "SUBCONTRACTS") || can(ctx.roles, "VIEW", "PROJECTS"))
       ? prisma.subcontractCertificationLine.findMany({
           where: {
             certification: {
               projectId,
               tenantId: ctx.tenantId,
+              ...companyWhere,
               status: "APPROVED",
               ...(dateFilter ? { certificationDate: dateFilter } : {}),
             },
@@ -84,6 +93,7 @@ export async function getProjectAccruedByMonth(
       where: {
         projectId,
         tenantId: ctx.tenantId,
+        ...companyWhere,
         status: "ISSUED",
         // [D-115] Factura + ND suman accrued; NC se resta (puede venir sin OC).
         documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
@@ -91,19 +101,20 @@ export async function getProjectAccruedByMonth(
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, totalAmount: true, documentKind: true },
+      select: { issueDate: true, subtotal: true, documentKind: true },
     }),
     prisma.supplierInvoice.findMany({
       where: {
         projectId,
         tenantId: ctx.tenantId,
+        ...companyWhere,
         status: "ISSUED",
         documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
         purchaseOrderId: null,
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, totalAmount: true, documentKind: true },
+      select: { issueDate: true, subtotal: true, documentKind: true },
     }),
   ]);
 
@@ -121,20 +132,20 @@ export async function getProjectAccruedByMonth(
       amount: new Prisma.Decimal(cl.lineTotal),
     });
   }
-  // Use document currency totals (same as getProjectCostControl) so control-costos
-  // and ingresos-gastos stay aligned. ARS consolidation belongs to currencyView, not here.
+  // D-095: net subtotals (same as getProjectCostControl), not gross IVA/IIBB.
+  // Currency is explicit; ARS consolidation belongs to the report consumer.
   for (const inv of poLinkedInvoices) {
     const signed =
       inv.documentKind === "CREDIT_NOTE"
-        ? new Prisma.Decimal(inv.totalAmount).negated()
-        : new Prisma.Decimal(inv.totalAmount);
+        ? new Prisma.Decimal(inv.subtotal).negated()
+        : new Prisma.Decimal(inv.subtotal);
     entries.push({ date: inv.issueDate, amount: signed });
   }
   for (const inv of unallocatedInvoices) {
     const signed =
       inv.documentKind === "CREDIT_NOTE"
-        ? new Prisma.Decimal(inv.totalAmount).negated()
-        : new Prisma.Decimal(inv.totalAmount);
+        ? new Prisma.Decimal(inv.subtotal).negated()
+        : new Prisma.Decimal(inv.subtotal);
     entries.push({ date: inv.issueDate, amount: signed });
   }
 

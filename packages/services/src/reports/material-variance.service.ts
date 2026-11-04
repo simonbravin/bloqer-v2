@@ -7,6 +7,14 @@ import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { resolveApprovedBudgetForProject } from "./report-budget-resolve";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { validateResourceVarianceDates } from "../resources/resource-variance-filters";
+import { assertBudgetCostGraph } from "../budget/budget-cost-graph";
+import { parseFilterDate } from "./report-month";
+import {
+  STOCK_CONSUMPTION_UNAVAILABLE_WARNING,
+  STOCK_CONSUMPTION_UNVALUED_WARNING,
+} from "../inventory/stock-consumption-warnings";
 
 export type MaterialReportFilters = {
   budgetId?: string;
@@ -19,21 +27,22 @@ export type MaterialWbsRow = {
   wbsCode: string;
   wbsName: string;
   budgetMaterial: string;
-  consumedCost: string;
-  variance: string;
+  consumedCost: string | null;
+  variance: string | null;
   variancePct: string | null;
 };
 
 export type MaterialVarianceReport = {
   type: "REPORT";
+  currency: string;
   projectId: string;
   budgetId: string;
   budgetName: string;
   byWbs: MaterialWbsRow[];
   totals: {
     budgetMaterial: string;
-    consumedCost: string;
-    variance: string;
+    consumedCost: string | null;
+    variance: string | null;
   };
   warnings: string[];
   sectionsExcluded: TenantModuleSectionExcludedWarning[];
@@ -46,9 +55,20 @@ export type MaterialReportResult = MaterialVarianceReport | MaterialReportEmpty;
 function dateWhere(from?: string, to?: string) {
   if (!from && !to) return undefined;
   return {
-    ...(from ? { gte: new Date(from) } : {}),
-    ...(to ? { lte: new Date(to) } : {}),
+    ...(from ? { gte: parseFilterDate(from, false) } : {}),
+    ...(to ? { lte: parseFilterDate(to, true) } : {}),
   };
+}
+
+async function materialWbsNodes(budgetId: string) {
+  await assertBudgetCostGraph(budgetId);
+  const rows = await prisma.wbsNode.findMany({
+    where: { budgetId, type: "ITEM" },
+    select: {
+      id: true, code: true, name: true,
+    },
+  });
+  return sortByWbsCode(rows);
 }
 
 export async function getMaterialVarianceReport(
@@ -59,6 +79,7 @@ export async function getMaterialVarianceReport(
   if (!canViewProjectCostControlReport(ctx.roles) && !can(ctx.roles, "VIEW", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reporte de materiales");
   }
+  validateResourceVarianceDates(filters);
 
   await requireProjectAccess(projectId, ctx);
 
@@ -67,7 +88,7 @@ export async function getMaterialVarianceReport(
 
   const gate = await getTenantModuleGate(ctx);
   const warnings: string[] = [
-    "R-MAT-01: consumo de stock (movimientos OUT CONSUMPTION) vs baseline MATERIAL del APU.",
+    "Compara el costo de los materiales consumidos con el presupuesto de materiales del APU.",
   ];
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
 
@@ -75,20 +96,15 @@ export async function getMaterialVarianceReport(
     throw new ServiceError("FORBIDDEN", "Presupuestos deshabilitado");
   }
 
-  const wbsLeaves = sortByWbsCode(
-    await prisma.wbsNode.findMany({
-      where: { budgetId: budget.id, type: "ITEM" },
-      select: { id: true, code: true, name: true },
-    }),
-  );
+  const wbsLeaves = await materialWbsNodes(budget.id);
 
   const costItems = await prisma.costItem.findMany({
-    where: { budgetId: budget.id, wbsNode: { type: "ITEM" } },
+    where: { budgetId: budget.id, wbsNode: { budgetId: budget.id, type: "ITEM" } },
     select: {
       wbsNodeId: true,
       quantity: true,
       analysisLines: {
-        where: { category: "MATERIAL" },
+        where: { budgetId: budget.id, category: "MATERIAL" },
         select: { totalCost: true },
       },
     },
@@ -103,73 +119,74 @@ export async function getMaterialVarianceReport(
     budgetMatMap.set(item.wbsNodeId, unitMat.times(item.quantity));
   }
 
-  const consumedByWbs = new Map<string, Prisma.Decimal>();
+  const consumptionAvailable = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
+  const unvaluedWbs = new Set<string>();
 
-  if (gate.isEnabled("INVENTORY")) {
+  if (consumptionAvailable) {
     const movements = await prisma.stockMovement.findMany({
       where: {
         projectId,
         tenantId: ctx.tenantId,
+        // StockMovement.companyId is NOT NULL.
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
         status: "CONFIRMED",
         type: "OUT",
         sourceType: "CONSUMPTION",
-        wbsNodeId: { not: null },
+        wbsNodeId: { in: wbsLeaves.map((row) => row.id) },
         ...(dateWhere(filters.dateFrom, filters.dateTo)
           ? { movementDate: dateWhere(filters.dateFrom, filters.dateTo) }
           : {}),
       },
-      select: { wbsNodeId: true, quantity: true, unitCost: true, totalCost: true },
+      select: { wbsNodeId: true },
     });
 
     for (const m of movements) {
-      const wbsId = m.wbsNodeId!;
-      const total = m.totalCost ?? new Prisma.Decimal(0);
-      const unit = m.unitCost ?? new Prisma.Decimal(0);
-      const cost = total.isZero()
-        ? new Prisma.Decimal(m.quantity).mul(unit)
-        : new Prisma.Decimal(total);
-      consumedByWbs.set(wbsId, (consumedByWbs.get(wbsId) ?? new Prisma.Decimal(0)).plus(cost));
+      // D-124: no currency or valuation-layer lineage exists on CONSUMPTION.
+      // Even a recorded monetary value cannot be assumed to be budget currency.
+      unvaluedWbs.add(m.wbsNodeId!);
     }
-  } else {
+  } else if (!gate.isEnabled("INVENTORY")) {
     sectionsExcluded.push({
       module: "INVENTORY",
       section: "consumption",
       reason: "TENANT_MODULE_DISABLED",
     });
-    warnings.push("Inventario deshabilitado: consumo en cero.");
   }
+  if (!consumptionAvailable) warnings.push(STOCK_CONSUMPTION_UNAVAILABLE_WARNING);
+  else if (unvaluedWbs.size > 0) warnings.push(STOCK_CONSUMPTION_UNVALUED_WARNING);
 
   let totBudget = new Prisma.Decimal(0);
-  let totConsumed = new Prisma.Decimal(0);
+  let totConsumed: Prisma.Decimal | null = consumptionAvailable ? new Prisma.Decimal(0) : null;
 
   const byWbs: MaterialWbsRow[] = wbsLeaves.map((w) => {
     const budgetMat = budgetMatMap.get(w.id) ?? new Prisma.Decimal(0);
-    const consumed = consumedByWbs.get(w.id) ?? new Prisma.Decimal(0);
-    const variance = budgetMat.minus(consumed);
-    const pct = budgetMat.isZero() ? null : variance.div(budgetMat).times(100).toFixed(2);
+    const consumed = !consumptionAvailable || unvaluedWbs.has(w.id) ? null : new Prisma.Decimal(0);
+    const variance = consumed === null ? null : budgetMat.minus(consumed);
+    const pct = variance === null || budgetMat.isZero() ? null : variance.div(budgetMat).times(100).toFixed(2);
     totBudget = totBudget.plus(budgetMat);
-    totConsumed = totConsumed.plus(consumed);
+    totConsumed = totConsumed === null || consumed === null ? null : totConsumed.plus(consumed);
     return {
       wbsNodeId: w.id,
       wbsCode: w.code,
       wbsName: w.name,
-      budgetMaterial: budgetMat.toFixed(2),
-      consumedCost: consumed.toFixed(2),
-      variance: variance.toFixed(2),
+      budgetMaterial: serializeMoneyDecimal(budgetMat),
+      consumedCost: consumed === null ? null : serializeMoneyDecimal(consumed),
+      variance: variance === null ? null : serializeMoneyDecimal(variance),
       variancePct: pct,
     };
   });
 
   return {
     type: "REPORT",
+    currency: budget.currency,
     projectId,
     budgetId: budget.id,
     budgetName: budget.name,
     byWbs,
     totals: {
-      budgetMaterial: totBudget.toFixed(2),
-      consumedCost: totConsumed.toFixed(2),
-      variance: totBudget.minus(totConsumed).toFixed(2),
+      budgetMaterial: serializeMoneyDecimal(totBudget),
+      consumedCost: totConsumed === null ? null : serializeMoneyDecimal(totConsumed),
+      variance: totConsumed === null ? null : serializeMoneyDecimal(totBudget.minus(totConsumed)),
     },
     warnings,
     sectionsExcluded,
@@ -193,12 +210,14 @@ export async function getMaterialLinesWithoutProduct(
 ): Promise<MaterialLineWithoutProduct[]> {
   const budget = await resolveApprovedBudgetForProject(projectId, budgetId, ctx);
   if (!budget) return [];
+  await materialWbsNodes(budget.id);
 
   const lines = await prisma.costAnalysisLine.findMany({
     where: {
       budgetId: budget.id,
       category: "MATERIAL",
       productId: null,
+      costItem: { budgetId: budget.id, wbsNode: { budgetId: budget.id, type: "ITEM" } },
       budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
     },
     select: {

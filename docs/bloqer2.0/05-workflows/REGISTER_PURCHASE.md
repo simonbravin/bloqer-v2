@@ -15,7 +15,7 @@ Registrar una compra de proyecto con trazabilidad presupuesto ↔ compromiso ↔
 - Proyecto `ACTIVE`.
 - Proveedor con rol SUPPLIER activo (para OC/cotización/factura).
 - Presupuesto del proyecto en `APPROVED` o `CLOSED` con nodos WBS `ITEM` (incluye partida(s) de **gastos generales / indirectos de obra** si aplica).
-- Periodo contable abierto para mutaciones con impacto ([BR-PUR-014]).
+- Cierre contable según D-078: bloqueo de tesorería y asientos; control transversal de documentos operativos diferido ([BR-PUR-014]).
 - Política de empresa cargada (`CompanyProcurementSettings`).
 
 ## 4. Pasos
@@ -47,7 +47,7 @@ Registrar una compra de proyecto con trazabilidad presupuesto ↔ compromiso ↔
 ### 4.4 Recepción, factura y pago
 
 1. WAREHOUSE/PROCUREMENT registra **Receipt**(s) parciales o totales sobre OC `CONFIRMED+` ([BR-PUR-004], [BR-PUR-005]).
-2. Si hay saldo que no se recibirá: **cierre parcial** ([BR-PUR-013]), no anulación si ya hay recepciones/facturas.
+2. Si hay saldo que no se recibirá: el **cierre parcial** ([BR-PUR-013]) todavía requiere desarrollo separado (D-128). No hay una acción actual para simularlo; la anulación sigue bloqueada si hay recepciones/facturas que lo impiden.
 3. FINANCE/PROCUREMENT registra **factura de proveedor** vinculada a OC (matching 3 vías vs OC y cantidades recibidas, [BR-PUR-012]).
 4. Emitir factura → **Payable**; aprobar para pago; registrar **Payment** (ver [`PURCHASE_TO_PAY.md`](./PURCHASE_TO_PAY.md)).
 
@@ -74,8 +74,8 @@ Registrar una compra de proyecto con trazabilidad presupuesto ↔ compromiso ↔
 | OC directa sobre umbral sin SC | Bloqueo, salvo emergencia documentada ([BR-PUR-008]). |
 | Desvío vs presupuesto | Justificación y/o aprobación alta ([BR-PUR-009]); alerta de saldo de partida ([BR-PUR-011]). |
 | Aprobador rechaza | Vuelve a `DRAFT` con motivo; reenvío ([BR-PUR-016]). |
-| Periodo cerrado | Bloqueo de confirmar OC / recepción / factura con impacto ([BR-PUR-014]). |
-| Anular OC con recepciones/facturas | Bloqueado; usar cierre parcial o anular documentos hijos primero. |
+| Periodo cerrado | Se controla tesorería/asientos según D-078. Bloqueo transversal de documentos operativos diferido ([BR-PUR-014]). |
+| Anular OC con recepciones/facturas | Bloqueado. Solo anular hijos cuando corresponda corregirlos; no anular documentos reales para simular el cierre parcial pendiente D-128. |
 | Self-approval del solicitante | Bloqueado salvo settings y sin alto nivel ([BR-APR-004]). |
 
 ## 8. Diagrama
@@ -126,8 +126,16 @@ Estas reglas **ya están definidas** en [D-050] y [BR-PUR-007]–[BR-PUR-016]. L
 | Sin rechazo formal de OC | [BR-PUR-016] + evento `returned_for_changes` | Documentado |
 | Email automático + SLA | [BR-PUR-015], [D-050], Q-009 parcial | Documentado |
 | Matching 3 vías / tolerancias factura | [BR-PUR-012] | Documentado |
-| Cierre parcial formal | [BR-PUR-013] | Documentado |
-| Guard de periodo cerrado en mutaciones compra | [BR-PUR-014] | Documentado |
+| Cierre parcial formal | [BR-PUR-013], D-128 | Desarrollo separado pendiente; sin acción disponible |
+| Cierre de período | [BR-PUR-014], D-078 | Tesorería y asientos implementados; bloqueo transversal operativo diferido |
+
+## Hallazgo — AG-06: alcance de período
+
+Las precondiciones anteriores describían un bloqueo operativo más amplio que D-078 y PERIOD_CLOSE_AND_LOCKS. Se armonizan con esa decisión posterior sin agregar controles nuevos.
+
+## Confirmación con FX actualizado — D-129
+
+Al confirmar una OC aprobada se conserva la carga manual del FX. Si cambia, el actor debe poder aprobar el nuevo importe en ARS y su varianza, con segregación vigente: se renueva la aprobación auditada antes de confirmar dentro de la misma transacción. Un rechazo deja la OC APPROVED sin cambios y permite que otro aprobador habilitado revise ese FX. Con FX sin cambio permanece el permiso habitual EDIT de confirmación. No hay estados ni eventos nuevos ni edición de monto/FX después de CONFIRMED.
 
 ## Referencias
 - [`PROCUREMENT.md`](../02-modules/PROCUREMENT.md)

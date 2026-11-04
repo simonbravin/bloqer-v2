@@ -44,6 +44,7 @@ export function ScheduleFieldExperience({
       params.delete("view");
       params.delete("status");
       params.delete("delayedOnly");
+      params.delete("type");
     });
   }
 
@@ -69,7 +70,11 @@ export function ScheduleFieldExperience({
 
   const itemIdParam = searchParams.get("itemId");
   useEffect(() => {
-    if (!itemIdParam) return;
+    if (!itemIdParam) {
+      setSelectedId(null);
+      setSheetOpen(false);
+      return;
+    }
     const exists = workspace.items.some((i) => i.id === itemIdParam);
     if (exists) {
       setSelectedId(itemIdParam);
@@ -84,7 +89,11 @@ export function ScheduleFieldExperience({
   }, [itemIdParam, workspace.items]);
 
   useEffect(() => {
-    if (parseScheduleFieldFilter(fieldParam)) return;
+    const next = parseScheduleFieldFilter(fieldParam);
+    if (next) {
+      setFieldFilterState(next);
+      return;
+    }
     setFieldFilterState("today");
     replaceParamsShallow((params) => {
       params.set("field", "today");

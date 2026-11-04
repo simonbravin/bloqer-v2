@@ -126,3 +126,40 @@ test("SchedulePdfDocument renders table + gantt PDF", async () => {
   assert.ok(buffer.length > 500);
   assert.equal(buffer.subarray(0, 4).toString("utf8"), "%PDF");
 });
+
+test("SchedulePdfDocument renders independent temporal planning without a budget or currency", async () => {
+  const independentPayload: ScheduleExportPayload = {
+    ...payload,
+    budgetName: "Sin presupuesto vinculado",
+    budgetCurrency: null,
+    filterLine: "Sin presupuesto vinculado · Estado: Activos (sin canceladas)",
+    view: "table",
+    gantt: null,
+    rows: payload.rows.map((row) => ({
+      ...row,
+      wbsCode: "—",
+      qtyPct: "—",
+      certPct: "—",
+      budgetLabel: "—",
+      committedLabel: "—",
+    })),
+  };
+  const buffer = await renderReportPdfToBuffer(
+    <SchedulePdfDocument payload={independentPayload} branding={branding} />,
+  );
+  assert.ok(buffer.length > 500);
+  assert.equal(buffer.subarray(0, 4).toString("utf8"), "%PDF");
+});
+
+test("SchedulePdfDocument renders temporal rows with an optional financial warning", async () => {
+  const warningPayload: ScheduleExportPayload = {
+    ...payload,
+    summaryLine: "3 ítems · Métricas económicas no disponibles: revisar trazabilidad",
+    rows: payload.rows.map((row) => ({ ...row, budgetLabel: "—", committedLabel: "—" })),
+  };
+  const buffer = await renderReportPdfToBuffer(
+    <SchedulePdfDocument payload={warningPayload} branding={branding} />,
+  );
+  assert.ok(buffer.length > 500);
+  assert.equal(buffer.subarray(0, 4).toString("utf8"), "%PDF");
+});

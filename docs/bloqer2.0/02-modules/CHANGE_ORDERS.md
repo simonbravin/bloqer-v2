@@ -21,6 +21,10 @@ Cambios de obra frecuentes (replanteos, extras) sin documentarlos generan presup
 ## 6. Entidades principales
 - **ChangeOrder**, líneas de impacto.
 
+## Hallazgo — Implementación formal diferida
+
+AG-05 revalida la ausencia de `ChangeOrder` como entidad, servicio y ruta operativa. Q-057 mantiene diferidos contratos, adendas legales y órdenes de cambio formales; el límite de AG-05 fue aprobado en D-122. Los presupuestos complementarios existentes son adendas económicas; no sustituyen este ciclo ni modifican un contrato legal automáticamente.
+
 ## 7. Estados y transiciones
 Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § ChangeOrder.
 

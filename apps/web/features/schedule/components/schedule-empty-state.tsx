@@ -3,9 +3,11 @@
 export function ScheduleViewEmptyMessage({
   filtersExcludeAll,
   unfilteredActiveCount,
+  canEdit = false,
 }: {
   filtersExcludeAll: boolean;
   unfilteredActiveCount: number;
+  canEdit?: boolean;
 }) {
   if (filtersExcludeAll) {
     return (
@@ -17,7 +19,7 @@ export function ScheduleViewEmptyMessage({
   if (unfilteredActiveCount === 0) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        No hay ítems en el cronograma. Importá desde el presupuesto o creá una tarea.
+        No hay ítems en el cronograma.{canEdit ? " Importá desde el presupuesto o creá una tarea." : ""}
       </p>
     );
   }

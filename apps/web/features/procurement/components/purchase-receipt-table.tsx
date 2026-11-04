@@ -31,7 +31,8 @@ export function PurchaseReceiptTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Orden de compra</TableHead>
+            <TableHead>Recepción</TableHead>
+            <TableHead>OC de origen</TableHead>
             <TableHead>Proveedor</TableHead>
             <TableHead>Fecha</TableHead>
             <TableHead>Recibido por</TableHead>
@@ -41,13 +42,21 @@ export function PurchaseReceiptTable({
         <TableBody>
           {receipts.map((r) => (
             <TableRow key={r.id}>
-              <TableCell className="font-mono text-sm">
+              <TableCell className="max-w-64 break-words font-mono text-sm [overflow-wrap:anywhere]">
                 <Link
                   href={`/proyectos/${projectId}/recepciones/${r.id}`}
                   className="text-primary hover:underline"
+                  title={r.code}
                 >
-                  {r.purchaseOrderCode}
+                  {r.code}
                 </Link>
+              </TableCell>
+              <TableCell className="font-mono text-sm">
+                {r.purchaseOrderId ? (
+                  <Link href={`/proyectos/${projectId}/ordenes-compra/${r.purchaseOrderId}`} className="text-primary hover:underline">
+                    {r.purchaseOrderCode}
+                  </Link>
+                ) : r.purchaseOrderCode}
               </TableCell>
               <TableCell className={cn(tableNameCellClass, "font-medium")} title={r.supplierName}>
                 {r.supplierName}

@@ -14,6 +14,7 @@ import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import * as lineMoney from "../finance/invoice-line-money";
 import * as money from "../finance/money-decimal";
 import { coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
+import { companyScopeFilter, isCrossCompany } from "../company-scope";
 
 type ServiceModule = Record<string, (...args: unknown[]) => Promise<unknown>>;
 const ctx: ServiceContext = { actorUserId: "actor", tenantId: "tenant", companyId: "company", roles: ["OWNER"] };
@@ -33,7 +34,7 @@ function setup(options: { cancelBeforeFirstLock?: boolean; status?: string; allo
   let cancelled = false;
   const project = { id: "project", tenantId: "tenant", companyId: "company", country: "AR", status: "ACTIVE" };
   const request = { id: "request", tenantId: "tenant", companyId: "company", projectId: "project", status: options.status ?? "DRAFT", lines: [line] };
-  const order = { ...request, id: "order", supplierContactId: "supplier", currency: "ARS", purchaseRequestId: null, totalAmount: decimal("10"), iibbPerceptionRate: decimal("0") };
+  const order = { ...request, id: "order", supplierContactId: "supplier", currency: "ARS", purchaseRequestId: null, totalAmount: decimal("10"), iibbPerceptionRate: decimal("0"), updatedAt: new Date("2026-11-04T00:00:00Z") };
   const subcontract = { ...request, id: "subcontract", number: 1, subcontractorContact: { legalName: "Synthetic", fantasyName: null } };
   const quote = { id: "quote", tenantId: "tenant", purchaseRequestId: "request", purchaseRequest: request, status: "RECEIVED", lines: [], currency: "ARS" };
   function beforeLock() {
@@ -66,10 +67,12 @@ function setup(options: { cancelBeforeFirstLock?: boolean; status?: string; allo
       throw stop;
     },
     project: { findFirst: async () => ({ ...project }) },
+    company: { findFirst: async () => ({ id: "company" }) },
     purchaseRequest: { findUnique: async () => request },
     procurementQuote: { findUnique: async () => quote },
     purchaseOrder: {
       aggregate: async () => ({ _max: { number: 1 } }),
+      findUnique: async () => order,
       findUniqueOrThrow: async () => order,
       update: async () => write("PO"),
       updateMany: async () => write("PO"),
@@ -97,6 +100,7 @@ function setup(options: { cancelBeforeFirstLock?: boolean; status?: string; allo
   const db = {
     $transaction: async (run: (tx: typeof transaction) => Promise<unknown>) => run(transaction),
     project: { findFirst: async () => project, findUnique: async () => project },
+    company: { findFirst: async () => ({ id: "company" }) },
     purchaseRequest: { findUnique: async () => request },
     purchaseRequestLine: { findMany: async () => [line] },
     procurementQuote: { findUnique: async () => quote, count: async () => 0 },
@@ -121,7 +125,7 @@ function setup(options: { cancelBeforeFirstLock?: boolean; status?: string; allo
     "./procurement-access": { canEditPurchaseOrders: () => true, canApprovePurchaseOrders: () => true, canEditPurchaseRequests: () => true },
     "./subcontract-access": { canEditSubcontractsArea: () => true },
     "../finance/optimistic-lock": { assertOptimisticRowUpdate: (count: number) => assert.equal(count, 1) },
-    "./procurement-wbs": { assertCompanyMatchesProject: noop, assertWbsLineForProject: noop },
+    "./procurement-wbs": { assertCompanyMatchesProject: noop, assertWbsLineForProject: noop, assertCostAnalysisLineForWbs: noop, lockProcurementCompanyForNumbering: noop, assertPurchaseOrderRelations: () => undefined, procurementOrderLineScopeInclude: {}, procurementOrderParentScopeInclude: {} },
     "../procurement/procurement-wbs": { assertCompanyMatchesProject: noop, assertWbsLineForProject: noop },
     "../contact/assert-contact-role": { assertContactRoleInTenant: noop },
     "./procurement-budget-baseline": { assertWbsRequiredOnLines: () => undefined },
@@ -141,6 +145,7 @@ function setup(options: { cancelBeforeFirstLock?: boolean; status?: string; allo
     "./purchase-request-list-enrichment": {}, "./procurement-notifications.service": {}, "./procurement-constants": {},
     "./purchase-variance.service": {}, "../materials/material-commitment": {}, "./purchase-order-workflow.service": {},
     "./quote-validity": {}, "../company/company.service": {},
+    "../company-scope": { companyScopeFilter, isCrossCompany },
   };
   function load(filename: string): ServiceModule {
     const compiled = ts.transpileModule(readFileSync(new URL(filename, import.meta.url), "utf8"), {
@@ -164,7 +169,8 @@ const cases = [
   { file: "./purchase-request.service.ts", name: "updatePurchaseRequest", args: ["request", { lines: [inputLine] }] },
   { file: "./purchase-request.service.ts", name: "submitPurchaseRequest", args: ["request"] },
   { file: "./purchase-request.service.ts", name: "returnPurchaseRequest", args: ["request", "Synthetic return"], status: "SUBMITTED" },
-  { file: "./purchase-order.service.ts", name: "createPurchaseOrder", args: [{ projectId: "project", supplierContactId: "supplier", lines: [inputLine] }] },
+  { file: "./purchase-request.service.ts", name: "cancelPurchaseRequest", args: ["request"], status: "SUBMITTED" },
+  { file: "./purchase-order.service.ts", name: "createPurchaseOrder", args: [{ projectId: "project", supplierContactId: "supplier", lines: [{ ...inputLine, purchaseRequestLineId: null }] }] },
   { file: "./purchase-order.service.ts", name: "updatePurchaseOrder", args: ["order", {}] },
   { file: "./purchase-order-workflow.service.ts", name: "authorizeAndCommitPurchaseOrder", args: ["order"] },
   { file: "./purchase-order-workflow.service.ts", name: "submitPurchaseOrder", args: ["order"] },

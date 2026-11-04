@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { compareDecimal } from "@bloqer/utils";
@@ -8,6 +8,8 @@ import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CurrencySelect } from "@/components/ui/currency-select";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
@@ -20,6 +22,7 @@ import {
   type WbsOption,
 } from "./purchase-order-lines-editor";
 import { createPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 export type SupplierOption = { id: string; label: string; searchValue?: string };
 
@@ -34,6 +37,7 @@ interface Props {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
 export function PurchaseOrderForm({
@@ -46,12 +50,15 @@ export function PurchaseOrderForm({
   variant = "card",
   onCancel,
   onSuccess,
+  onPendingChange,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  const { pending: isPending, run: startTransition, isRunning } = useProcurementAction(onPendingChange);
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement>(null);
   const [supplierContactId, setSupplierContactId] = useState("");
+  const [currency, setCurrency] = useState("ARS");
+  const [fxRate, setFxRate] = useState("");
   const [lines, setLines] = useState<PurchaseOrderLine[]>([{ ...DEFAULT_PURCHASE_ORDER_LINE }]);
   const [iibbPerceptionRate, setIibbPerceptionRate] = useState(DEFAULT_IIBB_PERCEPTION_RATE_PCT);
 
@@ -61,6 +68,7 @@ export function PurchaseOrderForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isRunning()) return;
     setError(null);
     if (!supplierContactId) {
       setError("Debe seleccionar un proveedor");
@@ -93,7 +101,8 @@ export function PurchaseOrderForm({
         supplierContactId,
         issueDate: fd.get("issueDate") as string,
         expectedDeliveryDate: (fd.get("expectedDeliveryDate") as string) || null,
-        currency: "ARS",
+        currency,
+        fxRate: currency === "ARS" ? undefined : fxRate,
         notes: (fd.get("notes") as string) || null,
         internalNotes: null,
         emergencyReason,
@@ -116,6 +125,7 @@ export function PurchaseOrderForm({
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-5">
+<fieldset disabled={isPending} className="min-w-0 space-y-5">
         {error && (
           <p
             ref={errorRef}
@@ -155,12 +165,23 @@ export function PurchaseOrderForm({
             <Label htmlFor="expectedDeliveryDate">Fecha de entrega esperada</Label>
             <Input id="expectedDeliveryDate" name="expectedDeliveryDate" type="date" className="min-h-11 md:min-h-9" />
           </div>
+          <div className="space-y-1">
+            <Label htmlFor="po-currency">Moneda de la OC</Label>
+            <CurrencySelect id="po-currency" value={currency} disabled={isPending} onValueChange={(next) => {
+              if (next === currency) return;
+              setCurrency(next); setFxRate("");
+              setLines((current) => current.map((line) => line.costAnalysisLineId ? { ...line, unitPrice: "" } : line));
+            }} />
+            <p className="text-xs text-muted-foreground">Los precios no se convierten automáticamente. Si cambiás la moneda, completá de nuevo los precios tomados del APU.</p>
+          </div>
+          <ManualFxField id="po-fx-rate" currency={currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
         </div>
 
         <hr />
 
         <PurchaseOrderLinesEditor
           lines={lines}
+          currency={currency}
           onChange={setLines}
           wbsOptions={wbsOptions}
           productOptions={productOptions}
@@ -204,7 +225,8 @@ export function PurchaseOrderForm({
             {isPending ? "Guardando…" : "Crear orden de compra"}
           </Button>
         </div>
-      </form>
+      </fieldset>
+</form>
     </div>
   );
 }

@@ -8,9 +8,10 @@ import {
 export function purchaseOrderProcessSteps(input: {
   status: string;
   hasReceivedQuantity: boolean;
-  /** pendingToInvoice is zero (received covered by issued+draft). */
+  /** Canonical received amount covered by ISSUED invoices; draft reservations do not count. */
   invoiceSettled: boolean;
   hasIssuedInvoice: boolean;
+  /** Canonical issued-payables settlement; may include credit notes rather than cash payment. */
   fullyPaid: boolean;
   approvedAt?: string | Date | null;
   confirmedAt?: string | Date | null;

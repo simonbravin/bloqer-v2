@@ -38,10 +38,12 @@ export type CostControlRow = {
   receivedCost: string;
   accruedCost: string;
   paidCost: string;
-  inventoryConsumedCost: string;
-  qtyCommitted: string;
-  qtyReceived: string;
-  qtyConsumed: string;
+  /** D-124: null when consumption value/currency cannot be demonstrated. */
+  inventoryConsumedCost: string | null;
+  /** Null when document resource units cannot be compared with the WBS item unit. */
+  qtyCommitted: string | null;
+  qtyReceived: string | null;
+  qtyConsumed: string | null;
   operationalProgressQty: string;
   submittedProgressQty: string;
   openCommittedCost: string;
@@ -66,7 +68,7 @@ export type CostTypeBucket = {
   committedCost: string;
   accruedCost: string;
   paidCost: string;
-  inventoryConsumedCost: string;
+  inventoryConsumedCost: string | null;
   openCommittedCost: string;
   expectedCostExposure: string;
   costVariance: string;
@@ -81,7 +83,7 @@ export type CostControlTotals = {
   receivedCost: string;
   accruedCost: string;
   paidCost: string;
-  inventoryConsumedCost: string;
+  inventoryConsumedCost: string | null;
   operationalProgressQty: string;
   openCommittedCost: string;
   expectedCostExposure: string;
@@ -100,6 +102,7 @@ export type AvailableBudget = {
 
 export type ProjectCostControlReport = {
   type: "REPORT";
+  currency: string;
   projectId: string;
   budgetId: string;
   budgetName: string;
@@ -111,7 +114,7 @@ export type ProjectCostControlReport = {
   unallocatedReceivedCost: string;
   unallocatedAccruedCost: string;
   unallocatedPaidCost: string;
-  unallocatedInventoryConsumedCost: string;
+  unallocatedInventoryConsumedCost: string | null;
   warnings: string[];
   sectionsExcluded: TenantModuleSectionExcludedWarning[];
 };

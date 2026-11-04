@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { can } from "@bloqer/domain";
 import { canViewProjectCostControlReport } from "../cost-control/cost-control.service";
 import { getProjectAccruedByMonth } from "../cost-control/project-accrued-aggregation";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
@@ -149,9 +150,11 @@ export async function getProjectIncomeExpenseReport(
     }
   }
 
-  const apEnabled = gate.isEnabled("AP");
-  if (!apEnabled) {
+  const apEnabled = gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP");
+  if (!gate.isEnabled("AP")) {
     sectionsExcluded.push({ module: "AP", section: "cost_series", reason: "TENANT_MODULE_DISABLED" });
+  } else if (!apEnabled) {
+    warnings.push("Sin permiso para Cuentas por pagar: se excluyen devengado y pagos; no representan un costo cero de la obra.");
   } else if (canViewProjectCashFlowReport(ctx.roles) || canViewProjectCostControlReport(ctx.roles)) {
     const [payments, accrued] = await Promise.all([
       prisma.payment.findMany({

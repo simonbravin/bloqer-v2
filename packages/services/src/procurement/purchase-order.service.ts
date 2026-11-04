@@ -5,6 +5,7 @@ import { auditProcurement } from "./procurement-audit";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { companyScopeFilter, isCrossCompany } from "../company-scope";
 import { calcLine, recalcPurchaseOrderTotals } from "./purchase-order-calc.service";
 import { headerTotalsWithIibbPerception } from "../finance/document-header-tax";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
@@ -15,7 +16,7 @@ import {
 import { PO_INVOICE_LINKABLE_STATUSES } from "./procurement-constants";
 import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
-import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject } from "./procurement-wbs";
+import { assertCompanyMatchesProject, assertCostAnalysisLineForWbs, assertWbsLineForProject, assertPurchaseOrderRelations, procurementOrderLineScopeInclude, procurementOrderParentScopeInclude, lockProcurementCompanyForNumbering } from "./procurement-wbs";
 import {
   computeDominantCostTypeFromApuLines,
   loadWbsDominantCostTypes,
@@ -90,6 +91,9 @@ export type PurchaseOrderLineView = {
   remainingQuantity: string;
   sortOrder: number;
   budgetUnitCostSnapshot: string | null;
+  budgetCurrency: string | null;
+  currencyComparable: boolean;
+  budgetWarning: string | null;
   budgetUnit: string | null;
   budgetRefKind: BudgetRefKind;
   suggestedApu: { description: string; unit: string; unitCost: string } | null;
@@ -140,10 +144,14 @@ function serializeLine(
     varianceTier: string;
     variancePct: Prisma.Decimal | null;
     varianceJustification: string | null;
-    wbsNode: { code: string; name: string } | null;
+    wbsNode: { code: string; name: string; budget: { currency: string } } | null;
   },
+  purchaseCurrency: string,
 ): PurchaseOrderLineView {
   const remaining = l.quantity.minus(l.receivedQuantity);
+  const budgetCurrency = l.wbsNode?.budget.currency ?? null;
+  const currencyComparable = Boolean(budgetCurrency && purchaseCurrency && budgetCurrency === purchaseCurrency);
+  const priced = l.unitPrice.mul(new Prisma.Decimal(1).minus(l.discountPct.div(100))).gt(0);
   return {
     id:                l.id,
     purchaseOrderId:   l.purchaseOrderId,
@@ -166,12 +174,15 @@ function serializeLine(
     receivedQuantity:  serializeQtyDecimal(l.receivedQuantity),
     remainingQuantity: remaining.lessThan(0) ? serializeQtyDecimal(0) : serializeQtyDecimal(remaining),
     sortOrder:         l.sortOrder,
-    budgetUnitCostSnapshot: l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
+    budgetUnitCostSnapshot: currencyComparable && l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
+    budgetCurrency,
+    currencyComparable,
+    budgetWarning: currencyComparable ? null : "La referencia presupuestaria y la compra no tienen una moneda comparable. No se calcula desvío ni se convierte el precio.",
     budgetUnit:        null,
     budgetRefKind:     l.budgetUnitCostSnapshot != null ? "UNIT_PRICE" : "NONE",
     suggestedApu:      null,
-    varianceTier:      l.varianceTier,
-    variancePct:       l.variancePct != null ? serializeRatePctDecimal(l.variancePct) : null,
+    varianceTier:      currencyComparable ? l.varianceTier : priced ? "NO_BUDGET_BASELINE" : "NONE",
+    variancePct:       currencyComparable && l.variancePct != null ? serializeRatePctDecimal(l.variancePct) : null,
     varianceJustification: l.varianceJustification,
   };
 }
@@ -179,6 +190,8 @@ function serializeLine(
 function serializePO(
   po: PurchaseOrder & {
     supplierContact: { legalName: string; fantasyName: string | null };
+    purchaseRequest?: { requestedByUserId: string | null } | null;
+    selectedProcurementQuote?: unknown;
     lines: Array<Parameters<typeof serializeLine>[0]>;
   },
   names: {
@@ -188,8 +201,12 @@ function serializePO(
   } = { approvedByName: null, createdByName: null, originRequestedByName: null },
 ): PurchaseOrderView {
   const supplierName = po.supplierContact.fantasyName ?? po.supplierContact.legalName;
+  const { supplierContact, lines, purchaseRequest, selectedProcurementQuote, ...header } = po;
+  void supplierContact;
+  void selectedProcurementQuote;
   return {
-    ...po,
+    ...header,
+    originRequestedByUserId: po.originRequestedByUserId ?? purchaseRequest?.requestedByUserId ?? null,
     subtotal:    serializeMoneyDecimal(po.subtotal),
     taxAmount:   serializeMoneyDecimal(po.taxAmount),
     iibbPerceptionRate: serializeRatePctDecimal(po.iibbPerceptionRate),
@@ -202,17 +219,19 @@ function serializePO(
     originRequestedByName: names.originRequestedByName,
     code:        `OC-${String(po.number).padStart(3, "0")}`,
     supplierName,
-    lines:       po.lines.map(serializeLine),
+    lines:       lines.map((line) => serializeLine(line, po.currency)),
   };
 }
 
 const lineInclude = {
   orderBy: { sortOrder: "asc" as const },
-  include: { wbsNode: { select: { code: true, name: true } } },
+  include: procurementOrderLineScopeInclude,
 };
 
 const poInclude = {
-  supplierContact: { select: { legalName: true, fantasyName: true } },
+  ...procurementOrderParentScopeInclude,
+  supplierContact: { select: { legalName: true, fantasyName: true, tenantId: true } },
+  purchaseRequest: { select: { requestedByUserId: true, tenantId: true, companyId: true, projectId: true } },
   lines: lineInclude,
 };
 
@@ -264,6 +283,7 @@ export async function listLinkablePurchaseOrders(
     where: {
       projectId,
       tenantId: ctx.tenantId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
       OR: [
         { status: { in: [...PO_INVOICE_LINKABLE_STATUSES] } },
         ...(includeIds.length > 0 ? [{ id: { in: includeIds } }] : []),
@@ -310,11 +330,13 @@ export type ProcurementWbsOption = {
   code: string;
   name: string;
   budgetName: string;
+  budgetCurrency: string;
+  budgetWarning: string | null;
   budgetUnitCost: string | null;
   budgetUnit: string | null;
   availableSaldo: string | null;
   wouldExceedBudget: boolean;
-  /** MATERIAL APU hints under this ITEM ([D-068]). */
+  /** Purchasable MATERIAL / LABOR / EQUIPMENT APU hints under this ITEM ([D-068], [D-109]). */
   apuLines: ProcurementApuOption[];
   /**
    * APU sole CostCategory for this ITEM ([D-099] amend 2026-09).
@@ -341,15 +363,17 @@ export async function listProcurementWbsOptions(
   const nodes = await prisma.wbsNode.findMany({
     where: {
       type: "ITEM",
-      budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
+      budget: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
     },
     select: {
       id: true,
       code: true,
       name: true,
-      budget: { select: { name: true, versionNumber: true } },
+      budgetId: true,
+      budget: { select: { name: true, versionNumber: true, currency: true } },
       costItem: {
         select: {
+          budgetId: true,
           // We fetch all analysisLines (all categories) so we can compute the
           // dominant CostCategory for the ITEM ([D-099]). Purchasable natures
           // (MATERIAL / LABOR / EQUIPMENT, non lump-sum) are exposed as `apuLines`
@@ -358,6 +382,7 @@ export async function listProcurementWbsOptions(
             orderBy: { sortOrder: "asc" },
             select: {
               id: true,
+              budgetId: true,
               description: true,
               unit: true,
               unitCost: true,
@@ -378,11 +403,15 @@ export async function listProcurementWbsOptions(
       a.budget.name.localeCompare(b.budget.name, "es") ||
       a.budget.versionNumber - b.budget.versionNumber,
   );
-  const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx.tenantId, {
+  if (ordered.some((node) => node.costItem && (node.costItem.budgetId !== node.budgetId ||
+      node.costItem.analysisLines.some((line) => line.budgetId !== node.budgetId)))) {
+    throw new ServiceError("CONFLICT", "La partida y su análisis de costo tienen relaciones presupuestarias inconsistentes");
+  }
+  const commitments = await loadMaterialApuCommitmentByLineId(projectId, ctx, {
     categories: ["MATERIAL", "LABOR", "EQUIPMENT"],
   });
 
-  const refs = await Promise.all(ordered.map((n) => getWbsBudgetReference(n.id, ctx.tenantId)));
+  const refs = await Promise.all(ordered.map((n) => getWbsBudgetReference(n.id, ctx.tenantId, { ctx })));
 
   const result: ProcurementWbsOption[] = [];
   for (let i = 0; i < ordered.length; i++) {
@@ -400,6 +429,8 @@ export async function listProcurementWbsOptions(
       code: n.code,
       name: n.name,
       budgetName: `${n.budget.name} v${n.budget.versionNumber}`,
+      budgetCurrency: n.budget.currency,
+      budgetWarning: ref.currencyWarning,
       budgetUnitCost: ref.budgetUnitCost,
       budgetUnit: ref.budgetUnit,
       availableSaldo: ref.availableSaldo,
@@ -437,20 +468,19 @@ function assertDraft(po: PurchaseOrder): void {
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 async function toPurchaseOrderView(
-  po: PurchaseOrder & {
-    supplierContact: { legalName: string; fantasyName: string | null };
-    lines: Array<Parameters<typeof serializeLine>[0]>;
-  },
+  po: Prisma.PurchaseOrderGetPayload<{ include: typeof poInclude }>,
 ): Promise<PurchaseOrderView> {
+  // Relation checks run before looking up actor names or exposing joined labels.
+  assertPurchaseOrderRelations(po);
   const nameById = await resolveUserDisplayNames([
     po.approvedByUserId,
     po.createdBy,
-    po.originRequestedByUserId,
+    po.originRequestedByUserId ?? po.purchaseRequest?.requestedByUserId,
   ]);
   return serializePO(po, {
     approvedByName: userDisplayNameFromMap(nameById, po.approvedByUserId),
     createdByName: userDisplayNameFromMap(nameById, po.createdBy),
-    originRequestedByName: userDisplayNameFromMap(nameById, po.originRequestedByUserId),
+    originRequestedByName: userDisplayNameFromMap(nameById, po.originRequestedByUserId ?? po.purchaseRequest?.requestedByUserId),
   });
 }
 
@@ -462,6 +492,7 @@ export async function getPurchaseOrderById(id: string, ctx: ServiceContext): Pro
   const po = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
   if (!po) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (po.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(po.companyId, ctx)) throw new ServiceError("FORBIDDEN", "La orden no pertenece a la empresa activa");
   await requireProjectAccessIfPresent(po.projectId, ctx);
   return hydrateLiveBudgetRefs(await toPurchaseOrderView(po), ctx);
 }
@@ -473,7 +504,7 @@ async function hydrateLiveBudgetRefs(
 ): Promise<PurchaseOrderView> {
   const isDraft = view.status === "DRAFT";
   const settings = isDraft
-    ? await getCompanyProcurementSettingsForProject(view.projectId, ctx)
+    ? await getCompanyProcurementSettingsForProject(view.projectId, { ...ctx, companyId: view.companyId })
     : null;
   const lines = await Promise.all(
     view.lines.map(async (line) => {
@@ -485,21 +516,25 @@ async function hydrateLiveBudgetRefs(
         costAnalysisLineId: line.costAnalysisLineId,
       });
       const comparable = isComparablePurchaseBaseline(line.unit, baseline.unit);
+      const budgetCurrency = baseline.currency ?? line.budgetCurrency;
+      const currencyComparable = Boolean(budgetCurrency && view.currency && budgetCurrency === view.currency);
       const liveCost =
-        comparable && baseline.unitCost ? serializeUnitPriceDecimal(baseline.unitCost) : null;
+        comparable && currencyComparable && baseline.unitCost ? serializeUnitPriceDecimal(baseline.unitCost) : null;
       const snapshot = isDraft
         ? liveCost
-        : comparable
+        : comparable && currencyComparable
           ? line.budgetUnitCostSnapshot ?? liveCost
           : null;
       const budgetRefKind = resolveBudgetRefKind(line.unit, baseline.unit, snapshot);
       const suggestedApu =
-        budgetRefKind === "UNIT_PRICE" ? null : (baseline.suggestedApu ?? null);
+        !currencyComparable || budgetRefKind === "UNIT_PRICE" ? null : (baseline.suggestedApu ?? null);
 
       if (!isDraft || !settings) {
         return {
           ...line,
           budgetUnitCostSnapshot: snapshot,
+          budgetCurrency,
+          currencyComparable,
           budgetUnit: baseline.unit,
           budgetRefKind,
           suggestedApu,
@@ -508,6 +543,8 @@ async function hydrateLiveBudgetRefs(
 
       const result = evaluateLineVarianceLenient(
         {
+          budgetCurrency,
+          purchaseCurrency: view.currency,
           unit: line.unit,
           unitPrice: line.unitPrice,
           discountPct: line.discountPct,
@@ -520,6 +557,8 @@ async function hydrateLiveBudgetRefs(
       return {
         ...line,
         budgetUnitCostSnapshot: snapshot,
+        budgetCurrency,
+        currencyComparable,
         budgetUnit: baseline.unit,
         budgetRefKind,
         suggestedApu,
@@ -543,18 +582,19 @@ export async function listPurchaseOrdersByProject(
   await requireProjectAccess(projectId, ctx);
 
   const orders = await prisma.purchaseOrder.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
+    where: { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) }, // companyId NOT NULL
     include: poInclude,
     orderBy: { number: "asc" },
   });
+  for (const order of orders) assertPurchaseOrderRelations(order);
   const nameById = await resolveUserDisplayNames(
-    orders.flatMap((o) => [o.approvedByUserId, o.createdBy, o.originRequestedByUserId]),
+    orders.flatMap((o) => [o.approvedByUserId, o.createdBy, o.originRequestedByUserId ?? o.purchaseRequest?.requestedByUserId]),
   );
   return orders.map((o) =>
     serializePO(o, {
       approvedByName: userDisplayNameFromMap(nameById, o.approvedByUserId),
       createdByName: userDisplayNameFromMap(nameById, o.createdBy),
-      originRequestedByName: userDisplayNameFromMap(nameById, o.originRequestedByUserId),
+      originRequestedByName: userDisplayNameFromMap(nameById, o.originRequestedByUserId ?? o.purchaseRequest?.requestedByUserId),
     }),
   );
 }
@@ -571,29 +611,24 @@ export async function createPurchaseOrder(
   }
 
   await assertProjectAllowsOperationalMutation(input.projectId, ctx);
+  if (input.lines.some((line) => line.purchaseRequestLineId)) {
+    throw new ServiceError("CONFLICT", "Una orden directa no puede adjudicar líneas de una solicitud de compra");
+  }
+
+  const companyId = await resolveCompanyId(input.projectId, ctx);
+  await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
+  const documentCtx = { ...ctx, companyId };
 
   await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
 
   assertWbsRequiredOnLines(input.lines);
-  const apuCategoryByIdx = new Map<number, CostCategory>();
   for (let i = 0; i < input.lines.length; i++) {
     const line = input.lines[i]!;
-    await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId);
+    await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId, { ctx: documentCtx });
     if (line.costAnalysisLineId) {
-      apuCategoryByIdx.set(
-        i,
-        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId),
-      );
+      await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: documentCtx });
     }
   }
-  const wbsIdsForDominant = Array.from(
-    new Set(input.lines.map((l) => l.wbsNodeId).filter((v): v is string => Boolean(v))),
-  );
-  const wbsDominantByCreate = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
-
-  const companyId = await resolveCompanyId(input.projectId, ctx);
-  await assertCompanyMatchesProject(companyId, input.projectId, ctx.tenantId);
-
   let estimatedSubtotal = new Prisma.Decimal(0);
   let estimatedTax = new Prisma.Decimal(0);
   for (const line of input.lines) {
@@ -612,14 +647,25 @@ export async function createPurchaseOrder(
     ),
   });
   const estimatedTotal = estimatedHeader.totalAmount;
-  const settings = await getCompanyProcurementSettingsForProject(input.projectId, ctx);
-  const fx = computeDocumentFxAmounts(input.currency ?? "ARS", estimatedTotal, null);
+  const settings = await getCompanyProcurementSettingsForProject(input.projectId, documentCtx);
+  const fx = computeDocumentFxAmounts(input.currency ?? "ARS", estimatedTotal, input.fxRate ? new Prisma.Decimal(input.fxRate) : null);
   assertDirectPoAllowed(settings, fx.amountArs, ctx, {
     emergencyReason: input.emergencyReason,
   });
 
-  const po = await prisma.$transaction(async (tx) => {
+  const purchaseOrderId = await prisma.$transaction(async (tx) => {
     await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+    await lockProcurementCompanyForNumbering(tx, companyId, ctx.tenantId);
+    await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
+    const apuCategoryByIdx = new Map<number, CostCategory>();
+    for (const [i, line] of input.lines.entries()) {
+      await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId, { ctx: documentCtx, db: tx });
+      if (line.costAnalysisLineId) apuCategoryByIdx.set(i, await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: documentCtx, db: tx }));
+      if (line.productId && !await tx.product.findFirst({ where: { id: line.productId, tenantId: ctx.tenantId, ...companyScopeFilter(documentCtx) }, select: { id: true } })) {
+        throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la orden");
+      }
+    }
+    const wbsDominantByCreate = await loadWbsDominantCostTypes([...new Set(input.lines.map((line) => line.wbsNodeId))], ctx.tenantId, tx);
     const maxNum = await tx.purchaseOrder.aggregate({
       where: { tenantId: ctx.tenantId, companyId },
       _max: { number: true },
@@ -638,6 +684,8 @@ export async function createPurchaseOrder(
           ? new Date(input.expectedDeliveryDate)
           : null,
         currency: input.currency ?? "ARS",
+        fxRate: fx.fxRate,
+        totalAmountArs: fx.amountArs,
         iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
         notes: input.notes ?? null,
         internalNotes: input.internalNotes ?? null,
@@ -690,7 +738,7 @@ export async function createPurchaseOrder(
           lineSubtotal,
           lineTax,
           lineTotal,
-          budgetUnitCostSnapshot: isComparablePurchaseBaseline(line.unit ?? "", baseline.unit)
+          budgetUnitCostSnapshot: isComparablePurchaseBaseline(line.unit ?? "", baseline.unit) && Boolean(baseline.currency) && baseline.currency === (input.currency ?? "ARS")
             ? baseline.unitCost
             : null,
           varianceJustification: line.varianceJustification?.trim() || null,
@@ -701,21 +749,19 @@ export async function createPurchaseOrder(
 
     await recalcPurchaseOrderTotals(tx, created.id);
 
-    const po = await tx.purchaseOrder.findUniqueOrThrow({
-      where: { id: created.id },
-      include: poInclude,
-    });
     await auditProcurement(
       ctx,
       "purchase_order.created",
       "PurchaseOrder",
-      po.id,
-      { projectId: po.projectId, companyId: po.companyId },
-      { after: { number: po.number }, tx },
+      created.id,
+      { projectId: created.projectId, companyId: created.companyId },
+      { after: { number: created.number }, tx },
     );
-    return po;
-  });
+    return created.id;
+  }, { maxWait: 10_000, timeout: 30_000 });
 
+  // The display graph is read after commit, without holding the numbering/project locks.
+  const po = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: purchaseOrderId }, include: poInclude });
   return toPurchaseOrderView(po);
 }
 
@@ -729,11 +775,16 @@ export async function updatePurchaseOrder(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar órdenes de compra");
   }
 
-  const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
+  const existing = await prisma.purchaseOrder.findUnique({ where: { id }, include: poInclude });
   if (!existing) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(existing.companyId, ctx)) throw new ServiceError("FORBIDDEN", "La orden no pertenece a la empresa activa");
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
+  assertPurchaseOrderRelations(existing);
   assertDraft(existing);
+  if (!existing.purchaseRequestId && input.lines?.some((line) => line.purchaseRequestLineId)) {
+    throw new ServiceError("CONFLICT", "Una orden directa no puede adjudicar líneas de una solicitud de compra");
+  }
 
   if (input.supplierContactId) {
     await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId);
@@ -748,24 +799,15 @@ export async function updatePurchaseOrder(
     }
   }
 
-  const apuCategoryByIdx = new Map<number, CostCategory>();
-  let wbsDominantByUpdate = new Map<string, CostCategory | null>();
   if (input.lines) {
     assertWbsRequiredOnLines(input.lines);
     for (let i = 0; i < input.lines.length; i++) {
       const line = input.lines[i]!;
-      await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId);
+      await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId, { ctx: { ...ctx, companyId: existing.companyId } });
       if (line.costAnalysisLineId) {
-        apuCategoryByIdx.set(
-          i,
-          await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId),
-        );
+        await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: { ...ctx, companyId: existing.companyId } });
       }
     }
-    const wbsIdsForDominant = Array.from(
-      new Set(input.lines.map((l) => l.wbsNodeId).filter((v): v is string => Boolean(v))),
-    );
-    wbsDominantByUpdate = await loadWbsDominantCostTypes(wbsIdsForDominant, ctx.tenantId);
     await assertPoLinesWithinSelectedQuote(
       id,
       input.lines.map((l, i) => ({
@@ -781,8 +823,27 @@ export async function updatePurchaseOrder(
     );
   }
 
-  const po = await prisma.$transaction(async (tx) => {
+  const purchaseOrderId = await prisma.$transaction(async (tx) => {
     await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    const current = await tx.purchaseOrder.findFirst({ where: { id, tenantId: ctx.tenantId, companyId: existing.companyId, projectId: existing.projectId }, include: poInclude });
+    if (!current || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+      throw new ServiceError("CONFLICT", "La orden cambió durante la edición. Recargá e intentá de nuevo.");
+    }
+    assertPurchaseOrderRelations(current);
+    if (input.supplierContactId) await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
+    const apuCategoryByIdx = new Map<number, CostCategory>();
+    let wbsDominantByUpdate = new Map<string, CostCategory | null>();
+    if (input.lines) {
+      for (const [i, line] of input.lines.entries()) {
+        const documentCtx = { ...ctx, companyId: existing.companyId };
+        await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId, { ctx: documentCtx, db: tx });
+        if (line.costAnalysisLineId) apuCategoryByIdx.set(i, await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: documentCtx, db: tx }));
+        if (line.productId && !await tx.product.findFirst({ where: { id: line.productId, tenantId: ctx.tenantId, ...companyScopeFilter(documentCtx) }, select: { id: true } })) {
+          throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la orden");
+        }
+      }
+      wbsDominantByUpdate = await loadWbsDominantCostTypes([...new Set(input.lines.map((line) => line.wbsNodeId))], ctx.tenantId, tx);
+    }
     // Claim DRAFT so concurrent submit cannot leave a submitted PO with rewritten lines.
     const headerClaim = await tx.purchaseOrder.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
@@ -843,7 +904,7 @@ export async function updatePurchaseOrder(
           tx,
         );
         const comparable = isComparablePurchaseBaseline(line.unit ?? "", baseline.unit);
-        const budgetSnapshot = comparable ? baseline.unitCost : null;
+        const budgetSnapshot = comparable && Boolean(baseline.currency) && baseline.currency === existing.currency ? baseline.unitCost : null;
         const costType = resolveLineCostType({
           costType: line.costType ?? null,
           apuCategory: apuCategoryByIdx.get(i) ?? null,
@@ -886,18 +947,22 @@ export async function updatePurchaseOrder(
       await recalcPurchaseOrderTotals(tx, id);
     }
 
-    const po = await tx.purchaseOrder.findUniqueOrThrow({ where: { id }, include: poInclude });
+    const header = await tx.purchaseOrder.findUniqueOrThrow({ where: { id } });
+    const fx = computeDocumentFxAmounts(header.currency, header.totalAmount, input.fxRate ? new Prisma.Decimal(input.fxRate) : header.fxRate);
+    await tx.purchaseOrder.update({ where: { id }, data: { fxRate: fx.fxRate, totalAmountArs: fx.amountArs } });
+
     await auditProcurement(
       ctx,
       "purchase_order.updated",
       "PurchaseOrder",
       id,
-      { projectId: po.projectId, companyId: po.companyId },
-      { after: { number: po.number }, tx },
+      { projectId: header.projectId, companyId: header.companyId },
+      { after: { number: header.number }, tx },
     );
-    return po;
-  });
+    return id;
+  }, { maxWait: 10_000, timeout: 30_000 });
 
+  const po = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: purchaseOrderId }, include: poInclude });
   return toPurchaseOrderView(po);
 }
 
@@ -910,6 +975,8 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
   const existing = await prisma.purchaseOrder.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
   if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (isCrossCompany(existing.companyId, ctx)) throw new ServiceError("FORBIDDEN", "La orden no pertenece a la empresa activa");
+  await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
 
   if (existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "La orden de compra ya está anulada");
@@ -928,7 +995,7 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
 
   // Block if any non-CANCELLED supplier invoices are linked
   const linkedInvoices = await prisma.supplierInvoice.count({
-    where: { purchaseOrderId: id, status: { not: "CANCELLED" } },
+    where: { OR: [{ purchaseOrderId: id }, { lines: { some: { purchaseOrderLine: { purchaseOrderId: id } } } }], status: { not: "CANCELLED" } },
   });
   if (linkedInvoices > 0) {
     throw new ServiceError("CONFLICT", "No se puede anular: hay facturas de proveedor vinculadas activas");
@@ -937,14 +1004,27 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
   const wasDraft = existing.status === "DRAFT";
 
   const po = await prisma.$transaction(async (tx) => {
+    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM purchase_orders WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const current = await tx.purchaseOrder.findFirst({ where: { id, tenantId: ctx.tenantId, companyId: existing.companyId, projectId: existing.projectId }, include: poInclude });
+    if (!current || ["CANCELLED", "PARTIALLY_RECEIVED", "RECEIVED"].includes(current.status)) {
+      throw new ServiceError("CONFLICT", "La orden ya no se puede anular (estado cambió)");
+    }
+    assertPurchaseOrderRelations(current);
+    if (await tx.purchaseReceipt.count({ where: { purchaseOrderId: id, status: "CONFIRMED" } })) {
+      throw new ServiceError("CONFLICT", "No se puede anular: la orden tiene recepciones confirmadas");
+    }
+    if (await tx.supplierInvoice.count({ where: { OR: [{ purchaseOrderId: id }, { lines: { some: { purchaseOrderLine: { purchaseOrderId: id } } } }], status: { not: "CANCELLED" } } })) {
+      throw new ServiceError("CONFLICT", "No se puede anular: hay facturas de proveedor vinculadas activas");
+    }
     const draftReceipts = await tx.purchaseReceipt.findMany({
-      where: { purchaseOrderId: id, status: "DRAFT" },
+      where: { purchaseOrderId: id, tenantId: ctx.tenantId, projectId: current.projectId, companyId: current.companyId, status: "DRAFT" },
       select: { id: true, projectId: true, companyId: true },
     });
 
     if (draftReceipts.length > 0) {
       await tx.purchaseReceipt.updateMany({
-        where: { purchaseOrderId: id, status: "DRAFT" },
+        where: { purchaseOrderId: id, tenantId: ctx.tenantId, projectId: current.projectId, companyId: current.companyId, status: "DRAFT" },
         data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
       });
       for (const receipt of draftReceipts) {
@@ -969,6 +1049,7 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
     const cancelledResult = await tx.purchaseOrder.updateMany({
       where: {
         id,
+        tenantId: ctx.tenantId,
         status: { notIn: ["CANCELLED", "PARTIALLY_RECEIVED", "RECEIVED"] },
       },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
@@ -1004,7 +1085,7 @@ export async function cancelPurchaseOrder(id: string, ctx: ServiceContext): Prom
     );
 
     return cancelled;
-  }, existing.purchaseRequestId ? { maxWait: 10_000, timeout: 30_000 } : undefined);
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return toPurchaseOrderView(po);
 }

@@ -24,7 +24,7 @@ export function ScheduleCancelDialog({
   onConfirm: () => void;
 }) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(next) => { if (!pending) onOpenChange(next); }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Cancelar tarea</DialogTitle>

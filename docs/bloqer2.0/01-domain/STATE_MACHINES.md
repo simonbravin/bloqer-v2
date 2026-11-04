@@ -263,7 +263,7 @@ stateDiagram-v2
   CONFIRMED --> RECEIVED : recepcion completa
   CONFIRMED --> CANCELLED : cancelar (sin recepciones/facturas)
   PARTIALLY_RECEIVED --> RECEIVED : recepcion completa
-  PARTIALLY_RECEIVED --> CANCELLED : no permitido si hay recepcion confirmada; usar cierre parcial
+  %% Con recepción confirmada no hay transición a CANCELLED; cierre parcial pendiente D-128.
   RECEIVED --> [*]
   CANCELLED --> [*]
 ```
@@ -281,10 +281,10 @@ stateDiagram-v2
 | `SUBMITTED` | `APPROVED` | Aprobar (sin auto-confirm) | Estándar: PROCUREMENT/ADMIN/OWNER; alto monto o `EXTRA_APPROVAL`: solo OWNER/ADMIN |
 | `SUBMITTED` | `CONFIRMED` | Aprobar con `autoConfirmOnApprove` ([D-107], no alto nivel) o atajo D-105 | Según política / roles |
 | `SUBMITTED` | `DRAFT` | Rechazar / devolver con motivo ([BR-PUR-016]) | Mismos roles que pueden aprobar |
-| `APPROVED` | `CONFIRMED` | Confirmar al proveedor → compromiso ([BR-PUR-001]) | PROCUREMENT / ADMIN / OWNER |
+| `APPROVED` | `CONFIRMED` | Confirmar al proveedor → compromiso ([BR-PUR-001]); con cambio de FX, renovar aprobación en la misma TX (D-129) | EDIT OC; si cambia FX, también aprobación habilitada para nuevo importe/varianza + segregación |
 | `CONFIRMED`+ | `PARTIALLY_RECEIVED` / `RECEIVED` | Por recepciones | WAREHOUSE / PROCUREMENT |
 | `*` (sin recepciones/facturas activas) | `CANCELLED` | Anular | Según permisos EDIT |
-| `PARTIALLY_RECEIVED` | (cierre) | Cierre parcial de saldo ([BR-PUR-013]) | PROCUREMENT / ADMIN / OWNER |
+| `PARTIALLY_RECEIVED` | (objetivo futuro, sin estado persistido) | Cierre parcial de saldo ([BR-PUR-013]) **no disponible**, desarrollo separado D-128 | Permisos a especificar en ese desarrollo |
 
 ### Reglas
 
@@ -294,8 +294,8 @@ stateDiagram-v2
 - Atajo [D-105]/[D-106]: bajo umbral = EDIT OC; alto nivel (umbral o `EXTRA_APPROVAL`) = OWNER/ADMIN. Persistencia: un write a `CONFIRMED` (con `approvedAt`/`confirmedAt`), no queda en `APPROVED`. Auto-approve al Enviar respeta `autoConfirmOnApprove` ([D-107]).
 - [D-107] `autoConfirmOnApprove`: aprobar (o auto-aprobar al Enviar) OC no alto nivel → `CONFIRMED` + notificación de confirmado (nunca “pendiente confirmar”).
 - Recepciones avanzan el estado; factura y pago son documentos separados ([D-020]). [D-108] puede crear borrador CxP post-recepción (no emite / no crea deuda hasta ISSUED).
-- Cancelación con recepción confirmada o factura activa: bloqueada; usar cierre parcial ([BR-PUR-013]).
-- Periodo cerrado bloquea confirmar OC / recepción / factura con impacto ([BR-PUR-014]).
+- Cancelación con recepción confirmada o factura activa: bloqueada. El cierre parcial ([BR-PUR-013]) permanece como desarrollo separado D-128; no hay acción ni estado disponible para simularlo.
+- El cierre financiero vigente bloquea los efectos de tesorería/GL por fecha (D-078); el bloqueo cruzado de documentos operativos sigue diferido ([BR-PUR-014]).
 
 ---
 
@@ -327,7 +327,7 @@ stateDiagram-v2
 |---|---|---|---|
 | `DRAFT` | `SUBMITTED` | Enviar (snapshot presupuesto) | `EDIT PURCHASE_REQUESTS` |
 | `DRAFT` | `CANCELLED` | Anular | `EDIT PURCHASE_REQUESTS` |
-| `SUBMITTED` | `DRAFT` | Devolver a borrador con motivo ([BR-PUR-025]): **0 cotizaciones**, **0 OC no anuladas**, sin líneas adjudicadas | `EDIT PURCHASE_REQUESTS` |
+| `SUBMITTED` | `DRAFT` | Devolver a borrador con motivo ([BR-PUR-025]): **0 cotizaciones de cualquier estado**, **0 OC no anuladas**, sin líneas adjudicadas | `EDIT PURCHASE_REQUESTS` |
 | `SUBMITTED` | `QUOTE_SELECTED` | Cobertura 100 % de líneas | Adjudicación |
 | `SUBMITTED` / `QUOTE_SELECTED` | `CANCELLED` | Anular (sin OC activas) | `EDIT PURCHASE_REQUESTS` |
 

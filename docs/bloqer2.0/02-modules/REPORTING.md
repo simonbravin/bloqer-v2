@@ -36,6 +36,7 @@ _No aplica._
 ## 10. Reglas de negocio
 - Toggle **Comprometido / Pagado** en presupuesto vs real ([D-021]).
 - Datos sensibles filtrados por rol ([D-013]).
+- EDT y costos y varianza de recursos: base en moneda original del presupuesto y error funcional ante fuente contribuyente incompatible (D-122), sin convertir ni omitir silenciosamente. Costo/varianza basados en consumo desconocido y sus totales afectados quedan no calculables (D-124), con la misma advertencia en UI/CSV/PDF; exposición documental y cantidades se conservan.
 - R-002: físico por libro ponderado por costo directo presupuestado de partidas hoja del alcance vigente (principal y adendas APPROVED/CLOSED); avance observado y cobertura explícitos. Fuentes ambiguas o faltantes no equivalen a cero validado; plan comparable con igual alcance/pesos. Corte de ejecución y estado actual identificados. Ver D-120 y `PROGRESS_FORMULAS.md`.
 
 ## 11. Validaciones

@@ -15,9 +15,23 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString } from "@/lib/format-money";
 
-function fmt(v: string) {
-  return formatMoneyAmount(v);
+function documentStatusLabel(status: string, feminine = false): string {
+  const labels: Record<string, string> = {
+    DRAFT: "Borrador",
+    SUBMITTED: feminine ? "Enviada" : "Enviado",
+    ISSUED: feminine ? "Emitida" : "Emitido",
+    APPROVED: feminine ? "Aprobada" : "Aprobado",
+    CONFIRMED: feminine ? "Confirmada" : "Confirmado",
+    ACTIVE: "Activo",
+    COMPLETED: "Completado",
+    PARTIALLY_RECEIVED: "Recepción parcial",
+    RECEIVED: "Recibida",
+    CANCELLED: feminine ? "Anulada" : "Anulado",
+    REJECTED: feminine ? "Rechazada" : "Rechazado",
+  };
+  return labels[status] ?? status;
 }
+
 function fmtQty(v: string) {
   return formatQtyFromString(v);
 }
@@ -32,11 +46,17 @@ function fmtDate(d: Date) {
 type Props = { detail: WbsItemCostDetail; projectId: string };
 
 export function WbsItemDrilldown({ detail, projectId }: Props) {
+  const fmt = (value: string) => formatMoneyAmount(value, detail.currency);
   const ps = detail.progressSummary;
   const unit = detail.budgetItem?.unit;
+  const periodFiltered = detail.periodFiltered === true;
 
   return (
     <div className="space-y-6">
+      <p className="text-xs text-muted-foreground">Moneda del presupuesto: {detail.currency}</p>
+      {detail.warnings?.map((warning, index) => (
+        <p key={index} role="status" className="text-xs text-amber-700 dark:text-amber-400">{warning}</p>
+      ))}
       <Section
         title="Avance de la partida"
         action={
@@ -70,20 +90,20 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
       >
         <div className="grid gap-4 sm:grid-cols-3 text-sm">
           <ProgressCol
-            title="Físico (libro)"
+            title={periodFiltered ? "Físico del período (libro)" : "Físico (libro)"}
             rows={[
-              { label: "% acum.", value: fmtPct(ps.physicalPctAcum) },
+              { label: periodFiltered ? "% período" : "% acum.", value: fmtPct(ps.physicalPctAcum) },
               {
-                label: "Qty acum.",
+                label: periodFiltered ? "Qty período" : "Qty acum.",
                 value: unit
                   ? `${fmtQty(ps.physicalQtyAcum)} ${budgetUnitLabel(unit) || unit}`
                   : fmtQty(ps.physicalQtyAcum),
               },
-              { label: "Restante", value: fmtPct(ps.physicalRemainingPct) },
+              ...(periodFiltered ? [] : [{ label: "Restante", value: fmtPct(ps.physicalRemainingPct) }]),
             ]}
           />
           <ProgressCol
-            title="Económico (certificación)"
+            title={periodFiltered ? "Económico del período (certificación)" : "Económico (certificación)"}
             rows={[
               {
                 label: "Certificado",
@@ -96,16 +116,16 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
                 label: "% venta",
                 value: fmtPct(ps.economicPctOfSale),
               },
-              {
+              ...(periodFiltered ? [] : [{
                 label: "Saldo qty",
                 value: unit
                   ? `${fmtQty(ps.remainingCertQty)} ${budgetUnitLabel(unit) || unit}`
                   : fmtQty(ps.remainingCertQty),
-              },
+              }]),
             ]}
           />
           <ProgressCol
-            title="Costo (capas)"
+            title={periodFiltered ? "Costo del período (capas)" : "Costo (capas)"}
             rows={[
               {
                 label: "% comprometido",
@@ -234,7 +254,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
           </p>
         ) : (
           <SimpleTable
-            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Facturado", "Faltante"]}
+            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Facturado neto", "Faltante"]}
             rows={detail.laborCommitments.map((m) => [
               m.description,
               budgetUnitLabel(m.unit) || m.unit,
@@ -274,7 +294,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
           </p>
         ) : (
           <SimpleTable
-            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Facturado", "Faltante"]}
+            headers={["Insumo", "Un.", "Necesidad", "Pedido", "Facturado neto", "Faltante"]}
             rows={detail.equipmentCommitments.map((m) => [
               m.description,
               budgetUnitLabel(m.unit) || m.unit,
@@ -303,7 +323,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             headers={["N°", "Estado", "Período", "Importe"]}
             rows={detail.certificationLines.map((cl) => [
               String(cl.certNumber),
-              cl.certStatus,
+              documentStatusLabel(cl.certStatus, true),
               `${fmtDate(cl.periodStart)} – ${fmtDate(cl.periodEnd)}`,
               fmt(cl.periodAmount),
             ])}
@@ -323,7 +343,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               >
                 {String(pol.poNumber)}
               </Link>,
-              pol.poStatus,
+              pol.poStatus === "SUBMITTED" ? "Pend. aprobación" : documentStatusLabel(pol.poStatus, true),
               pol.costType
                 ? ({
                     MATERIAL: "Materiales",
@@ -355,7 +375,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               >
                 {`SC-${String(sl.subcontractNumber).padStart(3, "0")}`}
               </Link>,
-              sl.subcontractStatus,
+              documentStatusLabel(sl.subcontractStatus),
               sl.description,
               fmtQty(sl.quantity),
               fmt(sl.unitPrice),
@@ -378,7 +398,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               >
                 {String(scl.certNumber)}
               </Link>,
-              scl.certStatus,
+              documentStatusLabel(scl.certStatus, true),
               fmtDate(scl.certificationDate),
               fmtQty(scl.currentQty),
               fmt(scl.lineTotal),
@@ -399,7 +419,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               >
                 {`FP-${String(inv.invoiceNumber).padStart(5, "0")}`}
               </Link>,
-              inv.status,
+              documentStatusLabel(inv.status, true),
               inv.costTypeLabel ?? "—",
               fmtDate(inv.issueDate),
               fmt(inv.totalAmount),
@@ -433,7 +453,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
               </Link>,
               fmtDate(p.paymentDate),
               fmt(p.amount),
-              p.status,
+              documentStatusLabel(p.status),
               <Link
                 key={`inv-${p.paymentId}`}
                 href={`/proyectos/${projectId}/facturas-proveedor/${p.invoiceId}`}
@@ -453,8 +473,8 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             rows={detail.stockMovements.map((sm) => [
               fmtDate(sm.movementDate),
               fmtQty(sm.quantity),
-              sm.unitCost ? fmt(sm.unitCost) : "—",
-              sm.totalCost ? fmt(sm.totalCost) : "—",
+              sm.unitCost != null ? fmt(sm.unitCost) : "Sin valuación",
+              sm.totalCost != null ? fmt(sm.totalCost) : "Sin valuación",
             ])}
           />
         </Section>
@@ -466,7 +486,7 @@ export function WbsItemDrilldown({ detail, projectId }: Props) {
             headers={["Fecha", "Estado", "Cant. completada", "% físico"]}
             rows={detail.jobsiteProgress.map((jp) => [
               fmtDate(jp.logDate),
-              jp.logStatus,
+              documentStatusLabel(jp.logStatus),
               fmtQty(jp.quantityCompleted),
               jp.physicalPct != null ? `${formatRatePctFromString(jp.physicalPct)}%` : "—",
             ])}

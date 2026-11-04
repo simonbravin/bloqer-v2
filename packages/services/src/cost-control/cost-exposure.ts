@@ -23,3 +23,14 @@ export function computeCostExposureLayers(input: {
   const expectedCostExposure = input.accrued.add(openCommitted);
   return { openCommitted, expectedCostExposure };
 }
+
+/** Apply the floor to each actual commitment before aggregating a WBS/type. */
+export function computeCostExposureByCommitment(input: {
+  accrued: Prisma.Decimal;
+  commitments: ReadonlyArray<{ committed: Prisma.Decimal; accruedLinked: Prisma.Decimal }>;
+}): { openCommitted: Prisma.Decimal; expectedCostExposure: Prisma.Decimal } {
+  const openCommitted = input.commitments.reduce((sum, commitment) => sum.add(
+    computeCostExposureLayers({ ...commitment, accrued: ZERO }).openCommitted,
+  ), ZERO);
+  return { openCommitted, expectedCostExposure: input.accrued.add(openCommitted) };
+}

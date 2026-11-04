@@ -13,7 +13,7 @@ import {
 } from "../notifications/notification-email-context";
 import { formatNotificationTitle } from "../notifications/notification-copy";
 import { getCompanyProcurementSettings } from "./company-procurement-settings.service";
-import { filterUserIdsByProjectAccess } from "../security/access";
+import { filterProcurementNotificationRecipients } from "./procurement-notification-audience";
 import type { ServiceContext } from "../types";
 
 type ProcurementNotifyType =
@@ -65,11 +65,10 @@ async function notifyRecipients(params: {
     excludeUserId: params.excludeUserId,
     alwaysCcOwnerAdmin: params.alwaysCcOwnerAdmin ?? true,
   });
-  const scoped = await filterUserIdsByProjectAccess(
-    params.ctx.tenantId,
-    params.projectId,
-    unique,
-  );
+  const scoped = await filterProcurementNotificationRecipients({
+    tenantId: params.ctx.tenantId, companyId: params.companyId,
+    projectId: params.projectId, candidateUserIds: unique,
+  });
   let created = 0;
   for (const recipientUserId of scoped) {
     try {
@@ -416,7 +415,7 @@ export async function runProcurementSlaReminders(
   let skippedCount = 0;
 
   const companies = await prisma.company.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: { tenantId: ctx.tenantId, status: "ACTIVE", ...(ctx.companyId ? { id: ctx.companyId } : {}) },
     select: { id: true },
   });
 

@@ -35,6 +35,8 @@ export async function updateCompanyProcurementSettingsAction(
   try {
     await upsertCompanyProcurementSettings(companyId, parsed.data, ctx);
     revalidatePath("/configuracion/politicas");
+    revalidatePath("/proyectos", "layout");
+    revalidatePath("/pendientes");
     return { ok: true };
   } catch (err) {
     if (err instanceof ServiceError) return { error: err.message };

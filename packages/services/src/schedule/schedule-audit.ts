@@ -7,6 +7,10 @@ import { ServiceError } from "../types";
 import { canViewScheduleArea } from "./schedule-access";
 import { formatDateOnly } from "./schedule-helpers";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
+import {
+  assertTenantModuleEnabledWithGate,
+  getTenantModuleGate,
+} from "../tenant-modules/tenant-module.service";
 
 export const SCHEDULE_ITEM_ENTITY = "ScheduleItem";
 export const SCHEDULE_ENTITY = "Schedule";
@@ -191,13 +195,13 @@ export async function listScheduleItemAuditHistory(
   });
   if (!item) throw new ServiceError("NOT_FOUND", "Ítem no encontrado");
   await requireProjectAccess(item.schedule.projectId, ctx);
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
+  assertTenantModuleEnabledWithGate(gate, "SCHEDULE");
 
-  const rows = await listEntityAuditLogs(
-    ctx.tenantId,
-    SCHEDULE_ITEM_ENTITY,
-    scheduleItemId,
-    [...SCHEDULE_AUDIT_ACTIONS],
-  );
+  const rows = await listEntityAuditLogs(ctx.tenantId, SCHEDULE_ITEM_ENTITY, scheduleItemId, [
+    ...SCHEDULE_AUDIT_ACTIONS,
+  ]);
   return rows.map((r) => ({
     id: r.id,
     action: r.action,

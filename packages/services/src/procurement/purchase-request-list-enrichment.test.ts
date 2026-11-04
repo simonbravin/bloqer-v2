@@ -17,6 +17,7 @@ function line(
     quantity: "1.0000",
     budgetUnitCostSnapshot: null,
     apuUnitCost: null,
+    budgetCurrency: "ARS",
     ...partial,
   };
 }
@@ -62,7 +63,7 @@ test("computeEstimatedAmount uses live APU unit cost on DRAFT lines", () => {
   assert.equal(r.estimatedAmount, "600000.00");
 });
 
-test("computeEstimatedAmount ignores lines without APU binding", () => {
+test("computeEstimatedAmount does not present a partial APU subtotal as the entire request estimate", () => {
   const r = computeEstimatedAmount(
     { status: "SUBMITTED" },
     [
@@ -80,7 +81,7 @@ test("computeEstimatedAmount ignores lines without APU binding", () => {
     ],
     null,
   );
-  assert.equal(r.estimatedAmount, "100.00");
+  assert.equal(r.estimatedAmount, null);
 });
 
 test("computeEstimatedAmount returns null when APU line lacks unit cost", () => {
@@ -139,6 +140,32 @@ test("computeEstimatedAmount uses quote for COMPLETED status", () => {
   );
   assert.equal(r.estimatedAmountSource, "quote");
   assert.equal(r.estimatedAmountCurrency, "USD");
+});
+
+test("computeEstimatedAmount preserves native budget currency without implied FX", () => {
+  const r = computeEstimatedAmount({ status: "SUBMITTED" }, [line({
+    description: "USD resource", costAnalysisLineId: "apu-usd", budgetUnitCostSnapshot: "12.50", quantity: "2", budgetCurrency: "USD",
+  })], null);
+  assert.equal(r.estimatedAmount, "25.00");
+  assert.equal(r.estimatedAmountCurrency, "USD");
+});
+
+test("computeEstimatedAmount stays unknown for mixed or missing budget currency", () => {
+  for (const currency of ["USD", null]) {
+    const r = computeEstimatedAmount({ status: "SUBMITTED" }, [
+      line({ description: "ARS", costAnalysisLineId: "apu-ars", budgetUnitCostSnapshot: "10" }),
+      line({ description: "other", costAnalysisLineId: "apu-other", budgetUnitCostSnapshot: "20", budgetCurrency: currency }),
+    ], null);
+    assert.equal(r.estimatedAmount, null);
+    assert.equal(r.estimatedAmountCurrency, null);
+  }
+});
+
+test("submitted estimates do not substitute a live APU value for a missing historical snapshot", () => {
+  const r = computeEstimatedAmount({ status: "SUBMITTED" }, [line({
+    description: "Snapshot missing", costAnalysisLineId: "apu", apuUnitCost: "900.00",
+  })], null);
+  assert.equal(r.estimatedAmount, null);
 });
 
 test("computeLineSummaries flags multiple WBS and picks primary from first line with WBS", () => {

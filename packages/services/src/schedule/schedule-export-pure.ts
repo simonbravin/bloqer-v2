@@ -189,11 +189,7 @@ export function scheduleItemOverlapsRange(
   rangeStartIso: string,
   rangeEndIso: string,
 ): boolean {
-  return periodOverlapsItem(
-    { startIso: rangeStartIso, endIso: rangeEndIso },
-    startIso,
-    endIso,
-  );
+  return periodOverlapsItem({ startIso: rangeStartIso, endIso: rangeEndIso }, startIso, endIso);
 }
 
 /**
@@ -201,7 +197,12 @@ export function scheduleItemOverlapsRange(
  * exported tree still has container context (parents without dates stay in).
  */
 export function keepScheduleItemsOverlappingRange<
-  T extends { id: string; parentId: string | null; startDate: string | null; endDate: string | null },
+  T extends {
+    id: string;
+    parentId: string | null;
+    startDate: string | null;
+    endDate: string | null;
+  },
 >(items: T[], rangeStartIso: string, rangeEndIso: string): T[] {
   const byId = new Map(items.map((item) => [item.id, item]));
   const keep = new Set<string>();
@@ -231,8 +232,16 @@ export function ganttBarFraction(
   rangeStartIso: string,
   rangeEndIso: string,
 ): GanttBarFraction | null {
-  const start = startIso ? utcDateFromIsoDateOnly(startIso) : endIso ? utcDateFromIsoDateOnly(endIso) : null;
-  const end = endIso ? utcDateFromIsoDateOnly(endIso) : startIso ? utcDateFromIsoDateOnly(startIso) : null;
+  const start = startIso
+    ? utcDateFromIsoDateOnly(startIso)
+    : endIso
+      ? utcDateFromIsoDateOnly(endIso)
+      : null;
+  const end = endIso
+    ? utcDateFromIsoDateOnly(endIso)
+    : startIso
+      ? utcDateFromIsoDateOnly(startIso)
+      : null;
   const rangeStart = utcDateFromIsoDateOnly(rangeStartIso);
   const rangeEnd = utcDateFromIsoDateOnly(rangeEndIso);
   if (!start || !end || !rangeStart || !rangeEnd) return null;
@@ -250,6 +259,27 @@ export function ganttBarFraction(
 }
 
 export type DateWindow = { startIso: string; endIso: string };
+
+/** Generation bound, not a limit on persisted task dates or table-only exports. */
+export const MAX_SCHEDULE_GANTT_MONTHS = 120;
+
+export function isScheduleExportRangeSupported(
+  view: ScheduleExportView,
+  range: DateWindow | null,
+): boolean {
+  if (view === "table" || !range) return true;
+  const startIso = parseScheduleExportIsoDate(range.startIso);
+  const endIso = parseScheduleExportIsoDate(range.endIso);
+  if (!startIso || !endIso || startIso > endIso) return false;
+  const start = utcDateFromIsoDateOnly(startIso)!;
+  const end = utcDateFromIsoDateOnly(endIso)!;
+  const months =
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    end.getUTCMonth() -
+    start.getUTCMonth() +
+    1;
+  return months <= MAX_SCHEDULE_GANTT_MONTHS;
+}
 
 /** Horizontal PDF pages: keep a readable number of periods per landscape sheet. */
 export function splitGanttPdfWindows(
@@ -284,7 +314,11 @@ export function excelSerialFromIsoDateOnly(iso: string | null | undefined): numb
   return Math.round((d.getTime() - epoch) / 86_400_000);
 }
 
-export function todayMarkerFraction(rangeStartIso: string, rangeEndIso: string, todayIso: string): number | null {
+export function todayMarkerFraction(
+  rangeStartIso: string,
+  rangeEndIso: string,
+  todayIso: string,
+): number | null {
   const rangeStart = utcDateFromIsoDateOnly(rangeStartIso);
   const rangeEnd = utcDateFromIsoDateOnly(rangeEndIso);
   const today = utcDateFromIsoDateOnly(todayIso);
@@ -301,7 +335,10 @@ export type ScheduleAxisTick = {
   left: number;
 };
 
-export function buildGanttAxisTicks(rangeStartIso: string, rangeEndIso: string): ScheduleAxisTick[] {
+export function buildGanttAxisTicks(
+  rangeStartIso: string,
+  rangeEndIso: string,
+): ScheduleAxisTick[] {
   const rangeStart = utcDateFromIsoDateOnly(rangeStartIso);
   const rangeEnd = utcDateFromIsoDateOnly(rangeEndIso);
   if (!rangeStart || !rangeEnd) return [];
@@ -315,7 +352,10 @@ export function buildGanttAxisTicks(rangeStartIso: string, rangeEndIso: string):
   }
   while (cursor <= rangeEnd) {
     const iso = isoDateOnlyFromUtc(cursor);
-    const left = Math.min(1, Math.max(0, diffUtcDays(rangeStart, cursor) / Math.max(1, spanDays - 1)));
+    const left = Math.min(
+      1,
+      Math.max(0, diffUtcDays(rangeStart, cursor) / Math.max(1, spanDays - 1)),
+    );
     ticks.push({
       iso,
       label: `${MONTHS_SHORT_ES[cursor.getUTCMonth()]} ${cursor.getUTCFullYear()}`,
@@ -333,7 +373,11 @@ export function buildGanttAxisTicks(rangeStartIso: string, rangeEndIso: string):
   return ticks;
 }
 
-export function chooseGanttScale(rangeStartIso: string, rangeEndIso: string, maxPeriods = 52): ScheduleGanttScale {
+export function chooseGanttScale(
+  rangeStartIso: string,
+  rangeEndIso: string,
+  maxPeriods = 52,
+): ScheduleGanttScale {
   const start = utcDateFromIsoDateOnly(rangeStartIso);
   const end = utcDateFromIsoDateOnly(rangeEndIso);
   if (!start || !end) return "monthly";
@@ -388,7 +432,10 @@ export function buildGanttPeriods(
   if (scale === "quarterly") {
     let cursor = startOfUtcQuarter(rangeStart);
     while (cursor <= rangeEnd) {
-      const end = addUtcDays(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 3, 1)), -1);
+      const end = addUtcDays(
+        new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 3, 1)),
+        -1,
+      );
       const q = Math.floor(cursor.getUTCMonth() / 3) + 1;
       periods.push({
         key: `${cursor.getUTCFullYear()}-Q${q}`,
@@ -403,7 +450,10 @@ export function buildGanttPeriods(
 
   let cursor = new Date(Date.UTC(rangeStart.getUTCFullYear(), rangeStart.getUTCMonth(), 1));
   while (cursor <= rangeEnd) {
-    const end = addUtcDays(new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)), -1);
+    const end = addUtcDays(
+      new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1)),
+      -1,
+    );
     periods.push({
       key: isoDateOnlyFromUtc(cursor).slice(0, 7),
       label: `${MONTHS_SHORT_ES[cursor.getUTCMonth()]} ${cursor.getUTCFullYear()}`,
@@ -420,8 +470,16 @@ export function periodOverlapsItem(
   startIso: string | null,
   endIso: string | null,
 ): boolean {
-  const itemStart = startIso ? utcDateFromIsoDateOnly(startIso) : endIso ? utcDateFromIsoDateOnly(endIso) : null;
-  const itemEnd = endIso ? utcDateFromIsoDateOnly(endIso) : startIso ? utcDateFromIsoDateOnly(startIso) : null;
+  const itemStart = startIso
+    ? utcDateFromIsoDateOnly(startIso)
+    : endIso
+      ? utcDateFromIsoDateOnly(endIso)
+      : null;
+  const itemEnd = endIso
+    ? utcDateFromIsoDateOnly(endIso)
+    : startIso
+      ? utcDateFromIsoDateOnly(startIso)
+      : null;
   const pStart = utcDateFromIsoDateOnly(period.startIso);
   const pEnd = utcDateFromIsoDateOnly(period.endIso);
   if (!itemStart || !itemEnd || !pStart || !pEnd) return false;
@@ -497,7 +555,7 @@ export type ScheduleExportGantt = {
 export type ScheduleExportPayload = {
   projectId: string;
   budgetName: string;
-  budgetCurrency: string;
+  budgetCurrency: string | null;
   filterLine: string;
   view: ScheduleExportView;
   orgLine: string;
@@ -507,4 +565,3 @@ export type ScheduleExportPayload = {
   rows: ScheduleExportRow[];
   gantt: ScheduleExportGantt | null;
 };
-

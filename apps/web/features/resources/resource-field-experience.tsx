@@ -17,6 +17,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { WbsItemDrilldownDialog } from "@/features/cost-control";
 import { controlCostosItemHref } from "@/lib/control-costos-href";
 import { formatQtyFromString } from "@/lib/format-money";
+import { budgetUnitLabel } from "@/lib/budget-units";
 
 type OpenWbs = { wbsNodeId: string; wbsCode: string; wbsName: string };
 
@@ -96,6 +97,7 @@ export function ResourceFieldExperience({
                         {row.description}
                       </p>
                       <p className="text-xs text-muted-foreground truncate">{row.wbsName}</p>
+                      <p className="text-xs text-muted-foreground">Unidad: {row.unit ? budgetUnitLabel(row.unit) || row.unit : "Sin unidad"}</p>
                     </div>
                     {isResourceFieldShortage(row) ? (
                       <span className="shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
@@ -113,7 +115,7 @@ export function ResourceFieldExperience({
                       <p className="font-mono tabular-nums">{formatQtyFromString(row.orderedQty)}</p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground">Facturado</p>
+                      <p className="text-muted-foreground">Facturado neto</p>
                       <p className="font-mono tabular-nums">{formatQtyFromString(row.invoicedQty)}</p>
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { CompanyProcurementSettingsView } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator";
 import { SwitchField } from "@/components/ui/switch-field";
 import { updateCompanyProcurementSettingsAction } from "@/app/(app)/configuracion/politicas/actions";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 interface Props {
   companyId: string;
@@ -46,7 +47,7 @@ export function CompanyProcurementSettingsForm({
   canEdit,
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition } = useProcurementAction();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [allowDirectPo, setAllowDirectPo] = useState(settings.allowDirectPo);
@@ -82,7 +83,9 @@ export function CompanyProcurementSettingsForm({
       <CardContent className="pt-6">
         <form
           className="space-y-8"
-          action={(fd) => {
+          onSubmit={(event) => {
+            event.preventDefault();
+            const fd = new FormData(event.currentTarget);
             if (!canEdit) return;
             startTransition(async () => {
               setError(null);

@@ -182,6 +182,8 @@ export function ScheduleWorkspace({
   const itemIdParam = searchParams.get("itemId");
   useEffect(() => {
     if (!itemIdParam) {
+      setSelectedId(null);
+      setDialogOpen(false);
       return;
     }
     const exists = workspace.items.some((i) => i.id === itemIdParam);
@@ -231,9 +233,18 @@ export function ScheduleWorkspace({
   const selectedFieldItem = selectedId
     ? fieldWorkspace.items.find((i) => i.id === selectedId) ?? null
     : null;
+  const canLinkWbs =
+    workspace.baselineBudgetId != null &&
+    workspace.budgetId != null &&
+    (workspace.budgetStatus === "APPROVED" || workspace.budgetStatus === "CLOSED");
 
   return (
     <div className="space-y-6" data-schedule-source="desktop">
+      {workspace.metricsWarning ? (
+        <div role="status" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
+          {workspace.metricsWarning}
+        </div>
+      ) : null}
       {!hasMounted ? (
         <>
           <div className="lg:hidden">
@@ -289,18 +300,19 @@ export function ScheduleWorkspace({
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm text-muted-foreground">
-              Base: {workspace.budgetName}
+              {workspace.budgetName ? `Base: ${workspace.budgetName}` : "Planificación independiente · Sin presupuesto base"}
             </span>
             {workspace.canEdit && (
               <>
-                <ScheduleImportDialog
+                {workspace.availableBudgets.length > 0 ? <ScheduleImportDialog
                   projectId={projectId}
                   budgets={workspace.availableBudgets}
-                  defaultBudgetId={workspace.budgetId}
-                />
+                  defaultBudgetId={workspace.budgetId ?? undefined}
+                /> : null}
                 <ScheduleCreateDialog
                   projectId={projectId}
                   treeItems={workspace.treeItems}
+                  canLinkWbs={canLinkWbs}
                 />
               </>
             )}
@@ -308,7 +320,7 @@ export function ScheduleWorkspace({
               projectId={projectId}
               defaultView={view}
               filters={{
-                budgetId: workspace.budgetId,
+                budgetId: workspace.budgetId ?? undefined,
                 status: searchParams.get("status") ?? undefined,
                 delayedOnly: searchParams.get("delayedOnly") === "1" ? "1" : undefined,
                 type: searchParams.get("type") ?? undefined,
@@ -320,6 +332,7 @@ export function ScheduleWorkspace({
                   key={v.id}
                   size="sm"
                   variant={view === v.id ? "secondary" : "ghost"}
+                  aria-pressed={view === v.id}
                   onClick={() => setView(v.id)}
                 >
                   {v.label}
@@ -363,6 +376,7 @@ export function ScheduleWorkspace({
           )}
           {view === "calendar" && (
             <ScheduleCalendarView
+              canEdit={workspace.canEdit}
               items={items}
               onSelect={(item) => selectItem(item)}
               filtersExcludeAll={filtersExcludeAll}

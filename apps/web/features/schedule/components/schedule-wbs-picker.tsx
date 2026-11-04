@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { toSearchableOptions } from "@/lib/searchable-options";
 import { Label } from "@/components/ui/label";
@@ -27,20 +28,28 @@ export function ScheduleWbsPicker({
 }) {
   const [options, setOptions] = useState<ScheduleWbsOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const inputId = useId();
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setError(null);
+    setOptions([]);
     void listScheduleLinkableWbsOptionsAction(projectId).then((res) => {
       if (cancelled) return;
       if ("options" in res) setOptions(res.options);
-      else setOptions([]);
-      setLoading(false);
+      else setError(res.error);
+    }).catch(() => {
+      if (!cancelled) setError("No se pudieron cargar las partidas EDT.");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [projectId, attempt]);
 
   const filtered = useMemo(
     () => options.filter((o) => !excludeIds.includes(o.id)),
@@ -57,8 +66,10 @@ export function ScheduleWbsPicker({
 
   return (
     <div className="space-y-1">
-      {label ? <Label className="text-xs">{label}</Label> : null}
+      {label ? <Label htmlFor={inputId} className="text-xs">{label}</Label> : null}
       <SearchableCombobox
+        id={inputId}
+        aria-label={label || placeholder}
         className="h-8 text-xs"
         options={searchable}
         value={value}
@@ -68,7 +79,8 @@ export function ScheduleWbsPicker({
         disabled={disabled || loading || filtered.length === 0}
         allowClear
       />
-      {!loading && filtered.length === 0 && (
+      {error ? <div role="alert" className="text-xs text-destructive"><p>{error}</p><Button type="button" variant="link" size="sm" disabled={disabled || loading} onClick={() => setAttempt((value) => value + 1)}>Reintentar carga de EDT</Button></div> : null}
+      {!loading && !error && filtered.length === 0 && (
         <p className="text-[10px] text-muted-foreground">
           No hay partidas hoja en el presupuesto base del cronograma.
         </p>

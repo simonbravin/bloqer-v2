@@ -14,7 +14,11 @@ export const scheduleItemTypeSchema = z.enum(["TASK", "MILESTONE"]);
 export const scheduleWorkspaceFiltersSchema = z.object({
   budgetId: z.string().uuid().optional(),
   status: scheduleItemStatusSchema.optional(),
-  delayedOnly: z.coerce.boolean().optional(),
+  delayedOnly: z.preprocess(
+    (value) =>
+      value === "1" || value === "true" ? true : value === "0" || value === "false" ? false : value,
+    z.boolean().optional(),
+  ),
   /** D-103 — filter by TASK | MILESTONE */
   itemType: scheduleItemTypeSchema.optional(),
 });
@@ -28,11 +32,11 @@ export const importScheduleFromBudgetSchema = z.object({
 export const createScheduleItemSchema = z.object({
   parentId: z.string().uuid().nullable().optional(),
   afterItemId: z.string().uuid().nullable().optional(),
-  name: z.string().min(1).max(500),
+  name: z.string().trim().min(1, "El nombre es obligatorio").max(500),
   type: scheduleItemTypeSchema.optional().default("TASK"),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  sortOrder: z.number().int().min(0).optional(),
+  startDate: z.string().date("Ingresá una fecha válida").nullable().optional(),
+  endDate: z.string().date("Ingresá una fecha válida").nullable().optional(),
+  sortOrder: z.number().int().min(0).max(2_147_483_647).optional(),
   /** Optional leaf WBS (EDT) to link as primary after create. */
   wbsNodeId: z.string().uuid().optional(),
 });
@@ -53,14 +57,21 @@ export const moveScheduleItemSchema = z.object({
 });
 
 export const updateScheduleItemDatesSchema = z.object({
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+  startDate: z.string().date("Ingresá una fecha válida").nullable(),
+  endDate: z.string().date("Ingresá una fecha válida").nullable(),
 });
 
 /** Progress % — half-up to 2 dp (ScheduleItem.progressPct Decimal(5,2) / D-053). */
 export const updateScheduleItemProgressSchema = z.object({
   progressPct: z
-    .union([z.number(), z.string()])
+    .union([
+      z.number().finite().min(0).max(100),
+      z
+        .string()
+        .trim()
+        .regex(/^\d+(?:\.\d+)?$/, "Avance inválido (0–100)")
+        .refine((value) => Number(value) <= 100, "Avance inválido (0–100)"),
+    ])
     .transform((v) => roundToDecimals(v, 2))
     .refine((v) => {
       const n = Number(v);
@@ -70,7 +81,7 @@ export const updateScheduleItemProgressSchema = z.object({
 });
 
 export const blockScheduleItemSchema = z.object({
-  blockReason: z.string().min(1, "La causa es obligatoria").max(2000),
+  blockReason: z.string().trim().min(1, "La causa es obligatoria").max(2000),
 });
 
 export const linkWbsNodesSchema = z
@@ -110,7 +121,7 @@ export const scheduleItemIdSchema = z.object({
 });
 
 export const updateScheduleItemNameSchema = z.object({
-  name: z.string().min(1).max(500),
+  name: z.string().trim().min(1, "El nombre es obligatorio").max(500),
 });
 
 export const removeScheduleDependencySchema = z.object({

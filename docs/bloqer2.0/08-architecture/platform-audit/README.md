@@ -4,6 +4,8 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Corte inicial: 03/11/2026
 
+**Actualización de publicación, 04/11/2026:** AG-00 a AG-04 y los cambios previos pendientes se integraron en [PR #3](https://github.com/simonbravin/bloqer-v2/pull/3) y Vercel confirmó Production para `3407c023`. [Registro de publicación](./2026-11-04-ag-00-ag-04-publication.md): CI, build y 2.129 pruebas aprobadas; 70 migraciones productivas existentes verificadas solo en lectura, sin pendientes. Smoke público de acceso/recuperación aprobado; workflows autenticados del portal no ejecutados. Los cierres locales siguientes se conservan como evidencia de su momento.
+
 Se realizó una preparación por lectura de documentación, estructura, recursos de auditoría y configuración de pruebas. Se dejó organizado el kit de trabajo reutilizable por etapas.
 
 **Durante la preparación no se ejecutaron suites ni se auditó funcionalmente toda la plataforma.** Esa preparación es un antecedente; la primera corrida real se registra a continuación. La existencia de documentación o pruebas no acredita por sí sola que un módulo esté verificado en el despliegue actual.
@@ -62,7 +64,26 @@ Se realizó una preparación por lectura de documentación, estructura, recursos
 - La cancelación actual desde Borrador/En revisión/Con observaciones fue aprobada expresamente: Q-068 resuelta en D-121. Roles actuales conservados. Guía, ayuda e índice AI actualizados: 521 chunks.
 - Smoke OWNER con datos sintéticos, escritorio oscuro y APU móvil claro/oscuro; costos mostrados y guardados, revisión/devolución/reenvío/aprobación, adenda y teclado. La descarga del navegador quedó limitada por el transporte; CSV/XLSX reales se comprobaron alternativamente mediante su servicio y suite SQL mantenida.
 - Sin publicación, migración, nuevos campos/dependencias o efectos externos reales. Límites, evidencia y atribución por hashes en el informe.
-- **AG-05 espera indicación del usuario.** No se inicia automáticamente.
+- Al terminar AG-04 se esperó indicación del usuario. La continuación autorizada AG-05 se registra a continuación.
+
+## Corrida AG-05: 04/11/2026
+
+**Estado vigente: AG-05 corregida y verificada localmente, en el alcance aprobado.** [Informe de cierre](./2026-11-04-ag-05-closure.md) y [registro estructurado](./2026-11-04-ag-05-closure.json); [corte parcial histórico](./2026-11-04-ag-05-planning-costs.md). Comenzó después de publicar AG-00–04, sobre `3407c023` y árbol limpio. A los 26 grupos iniciales de cronograma/Gantt/Field, materiales/recursos, costos, exportaciones y escritores D-045/D-104 se sumó la resolución de las tres propuestas aprobadas: D-122 comparabilidad monetaria y alcance, D-123 cantidades netas y D-124 consumo sin valuación. Se conserva la numeración 001–030; RFIs se difieren explícitamente, sin construir entidades ni resolver Q-006/Q-057.
+
+- Pruebas generales finales: **2.197 aprobadas**, cero fallos/cancelados; **26 suites live omitidas**, sin contarlas como casos ejecutados. Tipos: **13/13** tareas; lint completo y compilación con DB deshabilitada aprobados. Los **13 PDF**, incluidos tres smoke de cronograma y dos de valuación `.tsx`, forman parte del contador general; se corrige la exclusión descrita en el corte histórico.
+- SQL aislado de la continuación: **97 casos distintos aprobados** (55 nuevos, 42 anteriores repetidos), con guard efectivo antes de fixtures y limpieza final comprobada en lectura. La selección inicial canceló 30 por un nombre duplicado del fixture: se corrigió y repitió 30/30; no se cuentan los cancelados como aprobados. El historial anterior tiene 81 casos, incluidos nueve de AG-04; el conjunto deduplicado es 136, sin afirmar que los 136 se repitieron ahora. XLSX público real generado y reabierto.
+- Guía, ayuda e índice AI actualizados: **533 chunks**. Muestra visual local autorizada de OWNER y PROJECT_VIEWER, escritorio claro/oscuro y móvil 390 px: cero comprobado frente a costo desconocido, advertencias y detalle. Consumo positivo, notas netas y conflicto de moneda tienen SQL real; no se les atribuye una navegación con esos datos. Límites y observación de memoria del entorno de desarrollo conservados en el cierre.
+- **AG-05 permanece local y no está en la publicación anterior. Al cerrar esa corrida, AG-06 esperaba indicación del Owner; su continuación autorizada se registra debajo.** En AG-05 no hubo cambios de schema, migraciones, dependencias, roles o `.env`, ni proveedores externos o workflows autenticados de Production.
+
+## Corrida AG-06: 04/11/2026
+
+**Estado vigente: corregida y verificada localmente, en el alcance aprobado.** [Informe de cierre](./2026-11-04-ag-06-procurement.md) y [registro estructurado](./2026-11-04-ag-06-procurement.json). Base `3407c023`, con 149 rutas previas de AG-05 preservadas; atribución por hashes desde el inicio de AG-06.
+
+- SC, cotizaciones, adjudicación por ítem, OC, aprobaciones, recepciones y fronteras con AP/stock, políticas, avisos, hub e invalidación. **35 grupos corregidos y verificados**. D-125: moneda comparable; D-126: historial de ofertas; D-127: correlativo propio de recepción; D-129: nueva aprobación si cambia el FX. D-128 deja el cierre parcial formal como desarrollo separado con diseño previo, registrado en P-AG06-01.
+- **2.335 pruebas generales aprobadas**, cero fallos; 29 suites live omitidas por separado. **100 casos SQL distintos aprobados**: SC 24, OC/recepciones 43, plataforma/frontera AP 30 y regresión recepción/cronograma 3. Tipos: **13 tareas**; lint completo y compilación raíz completa aprobados. Los 13 PDF y los subconjuntos del revisor ya están incluidos, sin duplicar contadores. Fallos iniciales corregidos y límites registrados en el informe.
+- Guía, ayuda e índice AI actualizados: **542 chunks** y siete pruebas de recuperación sobre el índice distribuido, sin LLM remoto. Revisión independiente cerrada. Muestra Owner sintética de escritorio/móvil y claro/oscuro: SC/cotización multimoneda, OC, aprobación y dos recepciones con códigos distintos; la build raíz final se comprobó confirmando RC-002 y leyendo las dos recepciones y etiquetas fiscales.
+- Migración D-127 aplicada únicamente a la DB aislada de auditoría, con históricos sin renumerar. Dev normal y producción no migrados; sin publicación, proveedores reales ni cambios de dependencias o `.env`. La instancia local y sesión temporal se cerraron al terminar.
+- **AG-05 y AG-06 permanecen locales. AG-07 no iniciada; esperar indicación del Owner.** Las etapas completas de Inventario/AP/reportes y servicios transversales conservan su alcance pendiente.
 
 ## Etapas y seguimiento
 
@@ -73,8 +94,8 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-02 — Corregida y verificada local/navegador aislado.** [Cierre](./2026-11-03-ag-02-navigation-visual-system.md): 21 grupos, 1.754 pruebas aprobadas y [criterios visuales de referencia](./AG02_VISUAL_REFERENCE.md). Publicación y cobertura completa de módulos separadas.
 - **AG-03 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-03-ag-03-directory-projects.md): 20 grupos resueltos, 1.972 pruebas generales y 45 casos SQL aprobados; contactos, perfiles, proyectos, equipo, fechas, acceso del creador aprobado (Q-067), filtros, disposición móvil y coordinación de lifecycle con consumidores. Simplificación general de roles propuesta por separado; publicación y auditoría completa de módulos vecinos no incluidas.
 - **AG-04 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-03-ag-04-budgets-wbs-apu.md): 28 grupos resueltos; presupuestos, EDT, APU, versiones, adendas operativas y vínculo con cronograma. Contratos/adendas legales requieren resolver Q-057, que sigue diferida.
-- **AG-05 — Planificación y costos. Pendiente.** Cronograma, recursos, materiales, vínculos con WBS y seguimiento de costos.
-- **AG-06 — Compras. Pendiente.** Solicitudes, cotizaciones, adjudicaciones, órdenes y recepciones, con sus conexiones a inventario y AP.
+- **AG-05 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-04-ag-05-closure.md): propuestas aprobadas implementadas en D-122/123/124; 2.197 pruebas generales, 97 casos SQL de la continuación y compilación aprobados. RFIs y contratos formales diferidos por alcance explícito. AG-05 continúa sin publicar; la continuación autorizada AG-06 tiene su propio cierre.
+- **AG-06 — Corregida y verificada local/SQL/navegador aislado, sin publicar.** [Cierre](./2026-11-04-ag-06-procurement.md): 35 grupos corregidos, 2.335 pruebas generales y 100 SQL distintos, tipos/lint/compilación raíz y muestra visual aprobados. D-125/126/127/129 implementadas; cierre parcial formal separado por D-128. Migración aplicada solo en DB sintética. AG-07 espera indicación.
 - **AG-07 — Inventario y depósitos. Pendiente.** Productos, existencias, movimientos, consumos y transferencias.
 - **AG-08 — Certificaciones y subcontratos. Pendiente.** Avance certificado, sucesión de documentos y vínculos con facturación y obligaciones.
 - **AG-09 — Ventas y obligaciones. Pendiente.** Ventas, AR, cobranzas, AP y pagos, en contexto de proyecto y empresa cuando corresponda.

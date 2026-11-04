@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -18,6 +18,7 @@ import {
   procurementActionBtnClass,
   procurementDialogBtnClass,
 } from "../lib/procurement-ui";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 type Props = {
   prId: string;
@@ -27,7 +28,7 @@ type Props = {
 /** Devolver SC SUBMITTED → DRAFT when no quotes/OC ([BR-PUR-025]). */
 export function PurchaseRequestReturnActions({ prId, projectId }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition, isRunning } = useProcurementAction();
   const [returnOpen, setReturnOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -67,6 +68,7 @@ export function PurchaseRequestReturnActions({ prId, projectId }: Props) {
       <Sheet
         open={returnOpen}
         onOpenChange={(open) => {
+          if (isRunning()) return;
           setReturnOpen(open);
           if (!open) {
             setReason("");
@@ -89,6 +91,7 @@ export function PurchaseRequestReturnActions({ prId, projectId }: Props) {
               id="pr-return-reason"
               data-testid="purchase-request-return-reason"
               value={reason}
+              disabled={pending}
               onChange={(e) => setReason(e.target.value)}
               required
               minLength={3}

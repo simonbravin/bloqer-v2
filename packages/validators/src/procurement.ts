@@ -9,6 +9,7 @@ import {
   ratePctString,
   unitPriceString,
   discountPctString,
+  optionalFxRateString,
 } from "./money";
 
 const purchaseOrderLineSchema = z.object({
@@ -21,11 +22,11 @@ const purchaseOrderLineSchema = z.object({
   costType: costCategorySchema.optional().nullable(),
   /** SC line link for award-sourced OCs ([BR-PUR-024]) — round-trip on edit. */
   purchaseRequestLineId: z.string().uuid().optional().nullable(),
-  description: z.string().min(1, "Descripción requerida"),
+  description: z.string().trim().min(1, "Descripción requerida"),
   unit: z.string().default(""),
   quantity: positiveQtyString,
   unitPrice: unitPriceString,
-  taxRate: z.string().regex(/^\d+(\.\d+)?$/).default("21"),
+  taxRate: ratePctString.refine((value) => !value.startsWith("-"), "El impuesto no puede ser negativo").default("21"),
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder: z.number().int().default(0),
   varianceJustification: z.string().max(2000).optional().nullable(),
@@ -34,9 +35,10 @@ const purchaseOrderLineSchema = z.object({
 export const createPurchaseOrderSchema = z.object({
   projectId: z.string().uuid(),
   supplierContactId: z.string().uuid(),
-  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  expectedDeliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  currency: z.string().length(3).default("ARS"),
+  issueDate: z.string().date("Ingresá una fecha de emisión válida"),
+  expectedDeliveryDate: z.string().date("Ingresá una fecha de entrega válida").optional().nullable(),
+  currency: z.string().trim().regex(/^[A-Z]{3}$/, "Moneda inválida").default("ARS"),
+  fxRate: optionalFxRateString,
   notes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
   emergencyReason: z.string().max(2000).optional().nullable(),
@@ -47,8 +49,9 @@ export const createPurchaseOrderSchema = z.object({
 
 export const updatePurchaseOrderSchema = z.object({
   supplierContactId: z.string().uuid().optional(),
-  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  expectedDeliveryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
+  issueDate: z.string().date("Ingresá una fecha de emisión válida").optional(),
+  expectedDeliveryDate: z.string().date("Ingresá una fecha de entrega válida").optional().nullable(),
+  fxRate: optionalFxRateString,
   notes: z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
   emergencyReason: z.string().max(2000).optional().nullable(),
@@ -57,7 +60,7 @@ export const updatePurchaseOrderSchema = z.object({
 });
 
 export const returnPurchaseOrderSchema = z.object({
-  reason: z.string().min(3, "Indicá el motivo de la devolución").max(2000),
+  reason: z.string().trim().min(3, "Indicá el motivo de la devolución").max(2000),
 });
 
 const receiptLineSchema = z.object({
@@ -72,7 +75,7 @@ const receiptLineSchema = z.object({
 export const createPurchaseReceiptSchema = z.object({
   purchaseOrderId: z.string().uuid(),
   warehouseId: z.string().uuid().optional().nullable(),
-  receiptDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  receiptDate: z.string().date("Ingresá una fecha de recepción válida"),
   notes: z.string().optional().nullable(),
   lines: z.array(receiptLineSchema).min(1, "Debe incluir al menos una línea"),
   idempotencyKey: idempotencyKeySchema,
@@ -81,7 +84,7 @@ export const createPurchaseReceiptSchema = z.object({
 /** Edit DRAFT receipt header + lines (no idempotency key). */
 export const updatePurchaseReceiptSchema = z.object({
   warehouseId: z.string().uuid().optional().nullable(),
-  receiptDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  receiptDate: z.string().date("Ingresá una fecha de recepción válida"),
   notes: z.string().optional().nullable(),
   lines: z.array(receiptLineSchema).min(1, "Debe incluir al menos una línea"),
 });

@@ -618,6 +618,74 @@
 - **Propuesta concreta:** [conservar los tres orígenes actuales y documentarlos](../08-architecture/platform-audit/2026-11-03-ag-04-budget-cancellation-proposal.md), preservando permisos y bloqueo en `APPROVED`/`CLOSED`. Alternativa: restringir el flujo a `DRAFT`.
 - **Límite:** no autoriza cancelar presupuestos aprobados/cerrados, eliminar datos ni rediseñar roles.
 
+### Q-069 — Comparabilidad monetaria y alcance pendiente de AG-05
+
+- **Fecha:** 2026-11-04.
+- **Categoría:** Planificación / control de costos.
+- **Estado:** RESUELTA → D-122, aprobación explícita del Owner el 04/11/2026. Implementación y verificación en el cierre AG-05.
+- **Hallazgo:** EDT y costos y varianza de recursos suman importes originales de distintas monedas contra una base presupuestaria sin FX contractual. No es válido interpretar esa suma como un resultado comparable (D-008/D-053).
+- **Propuesta concreta:** [moneda del presupuesto, rechazo explícito de fuentes incompatibles y RFIs fuera del lote correctivo](../08-architecture/platform-audit/2026-11-04-ag-05-comparability-scope-proposal.md). Sin conversión implícita, nuevos campos ni modificación de históricos.
+- **Alcance aprobado:** Q-057 mantiene diferidos contratos/change orders y RFIs queda para desarrollo posterior con definición propia. Q-006 no se resuelve por delimitar AG-05; partes/adendas económicas no sustituyen esas entidades.
+- **Continuación:** aplicar y verificar D-122 antes de cerrar AG-05; AG-06 espera indicación del usuario.
+
+### Q-070 — Cantidades de NC/ND en cobertura APU de recursos
+
+- **Fecha:** 2026-11-04.
+- **Categoría:** Mano de obra / equipos.
+- **Estado:** RESUELTA → D-123, misma aprobación explícita del Owner el 04/11/2026.
+- **Ambigüedad:** D-115 define signo de importes; D-109 no distingue cantidades de notas. Hoy el tablero suma todas las cantidades como positivas.
+- **Propuesta concreta:** [cantidad facturada neta por recurso/unidad compatible](../08-architecture/platform-audit/2026-11-04-ag-05-resource-notes-proposal.md), sin afectar stock, documentos ni pagos.
+- **Continuación:** cantidad facturada neta por recurso/unidad compatible; no cambiar stock ni documentos. Verificar antes de cerrar AG-05.
+
+### Q-071 — Consumos de stock sin valuación/moneda en tableros de costos
+
+- **Fecha:** 2026-11-04.
+- **Categoría:** Materiales / control de costos.
+- **Estado:** RESUELTA → D-124, misma aprobación explícita del Owner el 04/11/2026.
+- **Hallazgo:** consumos manuales y del parte dejan costos nulos y no tienen moneda/lote valorizado; MaterialVariance y CC los presentan como cero. D-083 difiere FIFO/valuación completa y no habilita asumir ARS.
+- **Propuesta concreta:** [Sin valuación, cantidades conservadas y varianza no calculable](../08-architecture/platform-audit/2026-11-04-ag-05-stock-valuation-proposal.md). Sin nuevas reglas de valuación ni cambios de datos.
+- **Continuación:** costos y varianzas basadas en consumo desconocido quedan no calculables; cantidades y capas documentales conservadas. Verificar DTO/UI/CSV/PDF/consumidores antes del cierre AG-05.
+
+### Q-072 — Moneda comparable en referencia y varianza de compras
+
+- **Fecha:** 2026-11-04.
+- **Estado:** RESUELTA → D-125, aprobación explícita del Owner de la propuesta recomendada el 04/11/2026.
+- **Hallazgo:** la referencia APU/WBS y el saldo de partida usan importes originales sin comprobar su moneda frente a la compra; D-122 no define esta mutación/varianza de compras.
+- **Propuesta concreta:** [NO_BUDGET_BASELINE y justificación ante moneda no comparable, conservando la compra y sus controles ARS](../08-architecture/platform-audit/2026-11-04-ag-06-purchase-comparability-proposal.md). Saldo no calculable con aviso si sus compromisos mezclan monedas. Sin FX presupuestario inferido ni cambios históricos.
+- **Continuación:** D-125 implementada y verificada en AG-06; no queda decisión pendiente para ese alcance. Se conservan las limitaciones de falta de FX presupuestario y datos históricos.
+
+### Q-073 — Devolver SC con cotizaciones rechazadas o sustituidas
+
+- **Fecha:** 2026-11-04.
+- **Estado:** RESUELTA → D-126, aprobación explícita del Owner de la propuesta recomendada el 04/11/2026.
+- **Hallazgo:** devolver con cotizaciones históricas y editar líneas rompe sus referencias o reescribe la cantidad que muestran esos antecedentes; D-118 exige conservarlos.
+- **Propuesta concreta:** [devolución solo si nunca hubo cotizaciones y protección de borradores históricos](../08-architecture/platform-audit/2026-11-04-ag-06-request-history-proposal.md). Alternativa: diseñar versionado/snapshots antes de persistir cambios nuevos.
+- **Continuación:** D-126 implementada y verificada en AG-06, incluidos borradores históricos con ofertas. No se incorpora versionado ni backfill.
+
+### Q-074 — Identificación propia de recepciones de compra
+
+- **Fecha:** 2026-11-04.
+- **Estado:** RESUELTA → D-127, aprobación explícita del Owner de la propuesta recomendada el 04/11/2026.
+- **Hallazgo:** D-050.8 prescribe correlativo por empresa, pero PurchaseReceipt solo tiene UUID y la interfaz repite el código de la OC.
+- **Propuesta:** [correlativo para altas nuevas, históricos con UUID conservado](../08-architecture/platform-audit/2026-11-04-ag-06-receipt-number-proposal.md). Requiere aprobar un campo persistido y su índice (AGENTS.md §5); sin renumeración histórica ni despliegue en producción.
+- **Continuación:** D-127 implementada y migrada/verificada únicamente en la base aislada de auditoría. Altas nuevas con correlativo; históricos sin renumerar. Publicación/migración en otros destinos no ejecutadas.
+
+### Q-075 — Aprobación vigente al cambiar el FX en la confirmación de OC
+
+- **Fecha:** 2026-11-04.
+- **Estado:** RESUELTA → D-129, aprobación explícita del Owner de la propuesta recomendada el 04/11/2026.
+- **Hallazgo:** el FX manual al confirmar puede elevar el nivel de aprobación ARS sin revalidarlo; D-008 y la inmutabilidad desde CONFIRMED no definen ese intervalo.
+- **Propuesta:** [revalidar aprobación y segregación dentro de la confirmación cuando cambia el FX](../08-architecture/platform-audit/2026-11-04-ag-06-confirmation-fx-proposal.md). Conservar la OC APPROVED intacta si el actor no puede aprobar y permitir revisión por otro aprobador habilitado. Sin estados ni eventos nuevos.
+- **Continuación:** D-129 implementada y verificada en AG-06 con ocho escenarios SQL, frontend y revisión independiente. No quedan decisiones pendientes en ese alcance.
+
+### Q-076 — Representación y alcance del cierre parcial formal de OC
+
+- **Fecha:** 2026-11-04.
+- **Estado:** RESUELTA en alcance → D-128, aprobación explícita del Owner el 04/11/2026. El diseño y desarrollo siguen pendientes por separado; no se declara implementada BR-PUR-013.
+- **Hallazgo:** BR-PUR-013 anuncia el cierre de saldo no recibido, pero no tiene acción implementada ni representación física/regla de compromiso completa. «Cierre» en el diagrama es conceptual, no enum persistido.
+- **Propuesta:** [desarrollo separado con especificación previa; sin simularlo modificando OC confirmadas](../08-architecture/platform-audit/2026-11-04-ag-06-partial-close-scope-proposal.md). Alternativa: mantener AG-06 abierta hasta diseñar/aprobar/implementar esa funcionalidad.
+- **Continuación:** D-128 delimita el cierre correctivo AG-06 y registra el desarrollo separado en PENDING_ARCHITECTURE_ITEMS. La funcionalidad de cierre parcial no está implementada ni aprobada en su diseño; su alcance ya no bloquea AG-06.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

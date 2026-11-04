@@ -87,6 +87,8 @@ export default async function SolicitudesCompraPage({ params, searchParams }: Pa
       name: n.name,
       budgetName: n.budgetName,
       budgetUnitCost: n.budgetUnitCost,
+      budgetCurrency: n.budgetCurrency,
+      budgetWarning: n.budgetWarning,
       budgetUnit: n.budgetUnit,
       availableSaldo: n.availableSaldo,
       wouldExceedBudget: n.wouldExceedBudget,

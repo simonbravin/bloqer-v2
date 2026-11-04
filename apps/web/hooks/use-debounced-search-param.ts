@@ -13,10 +13,16 @@ export function useDebouncedSearchParam(
   const searchParams = useSearchParams();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const cancelPending = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
+  }, []);
+
   const setDebounced = useCallback(
     (value: string) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      cancelPending();
       timerRef.current = setTimeout(() => {
+        timerRef.current = null;
         const params = new URLSearchParams(searchParams.toString());
         const trimmed = value.trim();
         const minLen = options?.minLength ?? 0;
@@ -27,17 +33,16 @@ export function useDebouncedSearchParam(
         router.replace(q ? `${pathname}?${q}` : pathname);
       }, delayMs);
     },
-    [router, pathname, searchParams, param, delayMs, options?.minLength],
+    [router, pathname, searchParams, param, delayMs, options?.minLength, cancelPending],
   );
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+    return cancelPending;
+  }, [cancelPending]);
 
   return {
     defaultValue: searchParams.get(param) ?? "",
     setDebounced,
+    cancelPending,
   };
 }

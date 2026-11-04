@@ -9,8 +9,10 @@ const NEXT_STEP = {
 } as const;
 
 /** Read-only explanation of existing states; never decides permissions or transitions. */
-export function PurchaseOrderNextStep({ status }: { status: string }) {
-  const message = NEXT_STEP[status as keyof typeof NEXT_STEP];
+export function PurchaseOrderNextStep({ status, paymentSettled = false }: { status: string; paymentSettled?: boolean }) {
+  const message = status === "RECEIVED" && paymentSettled
+    ? "Sin saldo pendiente de pago en las facturas y notas de débito emitidas vinculadas. La cancelación puede incluir pagos o notas de crédito."
+    : NEXT_STEP[status as keyof typeof NEXT_STEP];
   if (!message) return null;
   return (
     <p className="text-sm text-muted-foreground">

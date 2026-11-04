@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,11 +28,22 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const { defaultValue: wbsSearchDefault, setDebounced: setWbsSearchDebounced } =
+  const { defaultValue: wbsSearchDefault, setDebounced: setWbsSearchDebounced, cancelPending } =
     useDebouncedSearchParam("wbsSearch");
+  const searchInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const syncHistory = () => {
+      cancelPending();
+      if (searchInput.current) searchInput.current.value = new URLSearchParams(window.location.search).get("wbsSearch") ?? "";
+    };
+    window.addEventListener("popstate", syncHistory);
+    return () => window.removeEventListener("popstate", syncHistory);
+  }, [cancelPending]);
 
   function apply(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    cancelPending();
     const fd = new FormData(e.currentTarget);
     const sp = new URLSearchParams(params.toString());
     const bid = fd.get("budgetId") as string;
@@ -54,20 +66,22 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
   }
 
   function clear() {
+    cancelPending();
+    if (searchInput.current) searchInput.current.value = "";
     router.push(pathname);
   }
 
   return (
     <form onSubmit={apply} className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
       {budgets.length > 1 && (
-        <div className="space-y-1">
-          <Label className="text-xs">Presupuesto</Label>
+        <div className="w-full min-w-0 space-y-1 sm:w-auto">
+          <Label htmlFor="cost-filter-budget" className="text-xs">Presupuesto</Label>
           <Select
             key={currentBudgetId ?? "principal"}
             name="budgetId"
             defaultValue={defaultContractualBudgetId(budgets, currentBudgetId)}
           >
-            <SelectTrigger className="h-8 w-72 text-xs">
+            <SelectTrigger id="cost-filter-budget" className="h-8 w-full text-xs sm:w-72">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -81,8 +95,10 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
         </div>
       )}
       <div className="space-y-1">
-        <Label className="text-xs">Desde</Label>
+        <Label htmlFor="cost-filter-from" className="text-xs">Desde</Label>
         <Input
+          id="cost-filter-from"
+          key={params.get("dateFrom") ?? ""}
           name="dateFrom"
           type="date"
           className="h-8 w-36 text-xs"
@@ -90,8 +106,10 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Hasta</Label>
+        <Label htmlFor="cost-filter-to" className="text-xs">Hasta</Label>
         <Input
+          id="cost-filter-to"
+          key={params.get("dateTo") ?? ""}
           name="dateTo"
           type="date"
           className="h-8 w-36 text-xs"
@@ -99,8 +117,10 @@ export function CostControlFilters({ budgets, currentBudgetId }: Props) {
         />
       </div>
       <div className="min-w-56 flex-1 basis-72 space-y-1">
-        <Label className="text-xs">Buscar EDT</Label>
+        <Label htmlFor="cost-filter-search" className="text-xs">Buscar EDT</Label>
         <Input
+          id="cost-filter-search"
+          ref={searchInput}
           name="wbsSearch"
           className="h-8 w-full text-xs"
           placeholder="Código o nombre…"

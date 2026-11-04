@@ -52,9 +52,7 @@ function collectLeafDatesUnder(
   const node = items.find((i) => i.id === nodeId);
   if (!node || node.status === "CANCELLED") return [];
 
-  const activeChildren = items.filter(
-    (i) => i.parentId === nodeId && i.status !== "CANCELLED",
-  );
+  const activeChildren = items.filter((i) => i.parentId === nodeId && i.status !== "CANCELLED");
 
   if (activeChildren.length === 0) {
     if (node.startDate && node.endDate) {
@@ -77,8 +75,13 @@ export function computeContainerRollup(
 
   const depthOf = (id: string): number => {
     let depth = 0;
+    const visited = new Set<string>([id]);
     let current = items.find((i) => i.id === id);
     while (current?.parentId) {
+      if (visited.has(current.parentId)) {
+        throw new ServiceError("VALIDATION", "El árbol del cronograma contiene un ciclo");
+      }
+      visited.add(current.parentId);
       depth += 1;
       current = items.find((i) => i.id === current!.parentId);
     }
@@ -91,9 +94,7 @@ export function computeContainerRollup(
     const activeChildren = items.filter(
       (i) => i.parentId === containerId && i.status !== "CANCELLED",
     );
-    const leafDates = activeChildren.flatMap((child) =>
-      collectLeafDatesUnder(items, child.id),
-    );
+    const leafDates = activeChildren.flatMap((child) => collectLeafDatesUnder(items, child.id));
 
     if (leafDates.length === 0) {
       result.set(containerId, null);
@@ -138,10 +139,7 @@ export function mergeDerivedContainerDatesIntoDtos<
     durationDays: number | null;
     timePlanPct: string | null;
   },
->(
-  dtoItems: T[],
-  sourceItems: RollupScheduleItemInput[],
-): T[] {
+>(dtoItems: T[], sourceItems: RollupScheduleItemInput[]): T[] {
   const rollup = computeContainerRollup(sourceItems);
   const dtoById = new Map(dtoItems.map((d) => [d.id, d]));
 
@@ -177,7 +175,7 @@ export function mergeDerivedContainerDatesIntoDtos<
 
 export function parseDateOnly(iso: string): Date {
   const d = new Date(`${iso}T12:00:00.000Z`);
-  if (Number.isNaN(d.getTime())) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso) || Number.isNaN(d.getTime()) || formatDateOnly(d) !== iso) {
     throw new ServiceError("VALIDATION", "Fecha inválida");
   }
   return d;
@@ -347,20 +345,14 @@ export function checkFinishStartViolations(
 
   for (const succ of successors) {
     if (!itemEnd || !succ.startDate) continue;
-    const iEnd = Date.UTC(
-      itemEnd.getUTCFullYear(),
-      itemEnd.getUTCMonth(),
-      itemEnd.getUTCDate(),
-    );
+    const iEnd = Date.UTC(itemEnd.getUTCFullYear(), itemEnd.getUTCMonth(), itemEnd.getUTCDate());
     const sStart = Date.UTC(
       succ.startDate.getUTCFullYear(),
       succ.startDate.getUTCMonth(),
       succ.startDate.getUTCDate(),
     );
     if (sStart < iEnd) {
-      warnings.push(
-        `Dependencia FS: «${succ.name}» inicia antes del fin de esta tarea.`,
-      );
+      warnings.push(`Dependencia FS: «${succ.name}» inicia antes del fin de esta tarea.`);
     }
   }
 

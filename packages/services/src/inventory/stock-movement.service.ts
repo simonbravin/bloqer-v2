@@ -360,38 +360,62 @@ export async function cancelReceiptStockMovements(
   purchaseReceiptId: string,
   tenantId: string,
 ): Promise<void> {
+  const receipt = await tx.purchaseReceipt.findFirst({ where: { id: purchaseReceiptId, tenantId }, select: { companyId: true, projectId: true, warehouseId: true } });
+  if (!receipt) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
+  if (await tx.stockMovement.count({ where: { purchaseReceiptId, tenantId: { not: tenantId }, status: "CONFIRMED", type: "IN", sourceType: "PURCHASE_RECEIPT" } })) {
+    throw new ServiceError("CONFLICT", "Los movimientos de la recepción tienen relaciones inconsistentes");
+  }
   const movements = await tx.stockMovement.findMany({
-    where: { purchaseReceiptId, status: "CONFIRMED", type: "IN" },
+    where: { purchaseReceiptId, tenantId, status: "CONFIRMED", type: "IN", sourceType: "PURCHASE_RECEIPT" },
     select: {
       id: true,
       warehouseId: true,
       productId: true,
       quantity: true,
-      product: { select: { name: true, sku: true } },
+      companyId: true,
+      projectId: true,
+      warehouse: { select: { tenantId: true, companyId: true, projectId: true } },
+      product: { select: { tenantId: true, companyId: true } },
+      purchaseReceiptLine: { select: { purchaseReceiptId: true, purchaseOrderLine: { select: { productId: true } } } },
     },
   });
 
+  const byBalance = new Map<string, { warehouseId: string; productId: string; quantity: Prisma.Decimal }>();
   for (const m of movements) {
-    await lockStockBalanceKey(tx, m.warehouseId, m.productId);
+    if (!m.quantity.isFinite() || m.quantity.lte(0) || m.companyId !== receipt.companyId || (m.projectId && m.projectId !== receipt.projectId) ||
+        (receipt.warehouseId && m.warehouseId !== receipt.warehouseId) || m.warehouse.tenantId !== tenantId ||
+        m.warehouse.companyId !== receipt.companyId || (m.warehouse.projectId && m.warehouse.projectId !== receipt.projectId) ||
+        m.product.tenantId !== tenantId || (m.product.companyId && m.product.companyId !== receipt.companyId) ||
+        (m.purchaseReceiptLine && (m.purchaseReceiptLine.purchaseReceiptId !== purchaseReceiptId || m.purchaseReceiptLine.purchaseOrderLine.productId !== m.productId))) {
+      throw new ServiceError("CONFLICT", "Los movimientos de la recepción tienen relaciones inconsistentes");
+    }
+    const key = `${m.warehouseId}:${m.productId}`;
+    const group = byBalance.get(key);
+    if (group) group.quantity = group.quantity.plus(m.quantity);
+    else byBalance.set(key, { warehouseId: m.warehouseId, productId: m.productId, quantity: m.quantity });
+  }
+  for (const [, group] of [...byBalance].sort(([left], [right]) => left.localeCompare(right))) {
+    await lockStockBalanceKey(tx, group.warehouseId, group.productId);
     const balance = await getStockBalance(
       {
         tenantId,
-        warehouseId: m.warehouseId,
-        productId: m.productId,
+        warehouseId: group.warehouseId,
+        productId: group.productId,
       },
       tx,
     );
-    if (balance.lessThan(m.quantity)) {
-      const label = m.product?.sku ? `${m.product.sku} — ${m.product.name}` : m.productId;
+    if (balance.lessThan(group.quantity)) {
+      const product = await tx.product.findFirst({ where: { id: group.productId, tenantId }, select: { name: true, sku: true } });
+      const label = product?.sku ? `${product.sku} — ${product.name}` : "seleccionado";
       throw new ServiceError(
         "CONFLICT",
-        `No se puede anular la recepción: el stock de "${label}" ya fue consumido (disponible ${serializeQtyDecimal(balance)}, se revertiría ${serializeQtyDecimal(m.quantity)}).`,
+        `No se puede anular la recepción: el stock de "${label}" ya fue consumido (disponible ${serializeQtyDecimal(balance)}, se revertiría ${serializeQtyDecimal(group.quantity)}).`,
       );
     }
   }
 
   await tx.stockMovement.updateMany({
-    where: { purchaseReceiptId, tenantId, status: "CONFIRMED" },
+    where: { purchaseReceiptId, tenantId, status: "CONFIRMED", type: "IN", sourceType: "PURCHASE_RECEIPT" },
     data: { status: "CANCELLED" },
   });
 }

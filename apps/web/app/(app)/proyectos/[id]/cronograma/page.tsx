@@ -25,6 +25,8 @@ import {
   VIEWPORT_COOKIE,
 } from "@/lib/viewport-hint-cookie";
 
+import { planningReadError } from "@/features/cost-control/lib/planning-read-error";
+
 interface PageProps {
   params: Promise<{ id: string }>;
   searchParams: Promise<{
@@ -78,7 +80,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
       field = await getProjectScheduleFieldWorkspace(projectId, ctx);
     } catch (err) {
       if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-      throw err;
+      return <PageShell className="space-y-6"><ProjectPageHeader title="Cronograma" />{planningReadError(err, `/proyectos/${projectId}/cronograma`)}</PageShell>;
     }
     const queryMs = Date.now() - started;
     return (
@@ -115,7 +117,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
     );
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-    throw err;
+    return <PageShell className="space-y-6"><ProjectPageHeader title="Cronograma" />{planningReadError(err, `/proyectos/${projectId}/cronograma`)}</PageShell>;
   }
   const queryMs = Date.now() - started;
 
@@ -126,7 +128,7 @@ export default async function ProyectoCronogramaPage({ params, searchParams }: P
         actions={progressReportAction}
         subtitle={
           result.type === "WORKSPACE"
-            ? `Presupuesto base: ${result.budgetName}`
+            ? result.budgetName ? `Presupuesto base: ${result.budgetName}` : "Planificación independiente · Sin presupuesto base"
             : "Planificación temporal de la obra"
         }
       />

@@ -19,7 +19,8 @@ import { PurchaseRequestAwardMatrix } from "@/features/procurement/components/pu
 import type { SupplierOption } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate, formatDbDate } from "@/lib/format";
-import { formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { formatQtyFromString } from "@/lib/format-money";
+import { PoLineBudgetRef } from "@/features/procurement/components/po-line-budget-ref";
 import {
   submitPurchaseRequestAction,
   cancelPurchaseRequestAction,
@@ -28,7 +29,6 @@ import {
   canEditPurchaseRequests,
   canManageProcurementQuotes,
   getPurchaseRequestById,
-  isBlockingProcurementQuoteStatus,
   getPurchaseRequestPoLinks,
   listEntityDocuments,
   listProcurementQuotesDetailedForRequest,
@@ -43,6 +43,7 @@ import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { PageShell } from "@/components/layout/page-shell";
 import { toContactPickerOption } from "@/lib/searchable-options";
 import { Button } from "@/components/ui/button";
+import { ProcurementSubmitButton } from "@/features/procurement/components/procurement-submit-button";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ProcessStepper } from "@/components/ui/process-stepper";
 import { purchaseRequestProcessSteps } from "@/features/procurement/lib/purchase-request-process-steps";
@@ -121,14 +122,13 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
   }
 
   const isDraft = pr.status === "DRAFT";
-  const blockingQuoteCount = quotes.filter((q) => isBlockingProcurementQuoteStatus(q.status)).length;
   const canReturnToDraft =
     canEditPr &&
     pr.status === "SUBMITTED" &&
-    blockingQuoteCount === 0 &&
+    quotes.length === 0 &&
     linkedOrders.length === 0 &&
     awardedLineCount === 0;
-  const showQuotes = ["SUBMITTED", "QUOTE_SELECTED", "COMPLETED"].includes(pr.status);
+  const showQuotes = quotes.length > 0 || ["SUBMITTED", "QUOTE_SELECTED", "COMPLETED"].includes(pr.status);
   const storageConfigured = isStorageConfigured();
   const prAttachments = await listEntityDocuments("PURCHASE_REQUEST", prId, ctx, { projectId: id });
   const canEditAttachments =
@@ -168,9 +168,9 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                   redirect(prPath);
                 }}
               >
-                <Button type="submit" className={procurementActionBtnClass} data-testid="purchase-request-submit">
+                <ProcurementSubmitButton pendingLabel="Enviando…" className={procurementActionBtnClass} data-testid="purchase-request-submit">
                   Enviar solicitud
-                </Button>
+                </ProcurementSubmitButton>
               </form>
             </>
           )}
@@ -189,9 +189,9 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                 redirect(prPath);
               }}
             >
-              <Button type="submit" variant="destructive" className={procurementActionBtnClass}>
+              <ProcurementSubmitButton pendingLabel="Anulando…" variant="destructive" className={procurementActionBtnClass}>
                 Anular
-              </Button>
+              </ProcurementSubmitButton>
             </form>
           )}
         </div>
@@ -348,9 +348,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
                   <TableCell className="text-right tabular-nums">{formatQtyFromString(line.quantity)}</TableCell>
                   <TableCell className="text-right">{line.unit}</TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
-                    {line.budgetUnitCostSnapshot
-                      ? formatUnitPriceFromString(line.budgetUnitCostSnapshot)
-                      : "—"}
+                    <PoLineBudgetRef unitCost={line.budgetUnitCostSnapshot} currency={line.budgetCurrency} />
                   </TableCell>
                 </TableRow>
               ))}
@@ -377,7 +375,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
             prLines={pr.lines}
             suppliers={suppliers}
             quotes={quotes}
-            canQuote={canQuote && pr.status !== "COMPLETED"}
+            canQuote={canQuote && ["SUBMITTED", "QUOTE_SELECTED"].includes(pr.status)}
             allowCreateQuotes={pr.status === "SUBMITTED"}
             frozenQuoteIds={frozenQuoteIds}
           />

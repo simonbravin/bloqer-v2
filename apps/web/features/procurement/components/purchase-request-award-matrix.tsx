@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +20,7 @@ import {
 } from "@/lib/format-money";
 import { buildPurchaseRequestAwardGroups, canAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
 import type { QuoteLineOfferKind } from "@bloqer/domain";
+import { useProcurementAction } from "../lib/use-procurement-action";
 
 type PrLine = {
   id: string;
@@ -64,7 +65,7 @@ export function PurchaseRequestAwardMatrix({
   canAward,
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
+  const { pending, run: startTransition } = useProcurementAction();
   const [error, setError] = useState<string | null>(null);
 
   // RECEIVED + SELECTED: after cancelling one covering OC, the still-used quote stays SELECTED

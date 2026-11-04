@@ -10,6 +10,10 @@ Operaciones en **USD** u otras monedas habilitadas para el tenant; **ARS** siemp
 4. **Reportes consolidados** en ARS; opción de ver montos originales por columna.
 5. **Diferencias de cambio**: no calculadas automáticamente en Fase 1 ([Q-025]); Fase 2 opcional.
 
+## Comparación por presupuesto sin FX contractual — D-122
+
+EDT y costos y Varianza ($) de Mano de obra/Equipos usan la moneda original del presupuesto seleccionado. Si una fuente accesible que contribuye al alcance consultado tiene otra moneda, el resultado económico se bloquea con un mensaje funcional. No se convierte con FX 1/actual ni se oculta esa fuente; cantidades comparables y cronograma temporal siguen disponibles. Es una lectura por presupuesto, no un consolidado ARS ni un cambio a D-008. El costo de consumo sin moneda/valuación trazables conserva D-124: desconocido, nunca un ARS implícito.
+
 ## Convención de tipo de cambio
 `fx_rate` = **ARS por 1 unidad de moneda extranjera**.
 

@@ -52,7 +52,8 @@ export type CertificationMeasurementSuggestion = {
 
 export type CertificationMeasurementCost = {
   committedCost: string;
-  consumedCost: string;
+  /** Informational layer only; D-124 preserves unknown stock valuation. */
+  consumedCost: string | null;
   laborCost: string;
   equipmentCost: string;
   subcontractCost: string;

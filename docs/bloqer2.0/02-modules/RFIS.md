@@ -3,6 +3,10 @@
 ## 1. Objetivo
 Formalizar consultas del contratista al **cliente**, **dirección de obra** u otros actores durante la ejecución, con trazabilidad, respuesta y cierre ([`PRODUCT_SCOPE.md`](../00-product/PRODUCT_SCOPE.md)).
 
+## Hallazgo — Estado de implementación comprobado en AG-05
+
+Al 04/11/2026 no existe una entidad operativa `Rfi` en Prisma ni un servicio/ruta que ejecute este ciclo. Este documento describe el alcance funcional previsto; las incidencias del libro no implementan RFIs. El Owner aprobó su desarrollo posterior separado en D-122, mediante la [propuesta de alcance de AG-05](../08-architecture/platform-audit/2026-11-04-ag-05-comparability-scope-proposal.md). Q-006 sigue abierta: delimitar la auditoría no define SLA, tablas, permisos ni alertas. No se declara auditado un flujo inexistente.
+
 ## 2. Usuarios y roles que lo usan
 - **PM**, **SITE_FOREMAN**, **ADMIN**, **OWNER**; eventualmente **PROJECT_VIEWER** cliente (Fase 2).
 
