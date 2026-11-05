@@ -16,7 +16,11 @@ WAREHOUSE (+ PROCUREMENT en recepción desde OC).
 
 ## 5. Pasos — Egreso a obra
 1. Egreso con imputación a **project_id** y motivo.
-2. Actualiza costo obra según valuación.
+2. Actualiza las cantidades físicas. El costo de consumo solo es calculable con valor y moneda trazables; el motor FIFO/promedio sigue diferido por D-083 y no se infiere valuación a partir de un nominal (D-124).
+
+## Alcance operativo vigente
+
+La creación de transferencia confirma un par atómico de movimientos; su anulación conserva la trazabilidad y comprueba el stock necesario para revertirlo. Los consumos e ingresos de recepción revalidan sus padres y existencias dentro de la transacción. El saldo físico pertenece al producto/depósito, con independencia de la imputación de obra/EDT. Los formularios mantienen datos tras errores y los listados/reportes respetan empresa y acceso a la obra del depósito.
 
 ## 6. Eventos
 - `stock_movement.confirmed`

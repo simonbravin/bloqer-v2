@@ -4,6 +4,8 @@ import { auditProcurement } from "./procurement-audit";
 import { assertPoEligibleForReceipt, assertReceiptQtyWithinRemaining } from "./purchase-receipt-guards";
 import { getCompanyProcurementSettingsForProject } from "./company-procurement-settings.service";
 import { createReceiptStockMovement, cancelReceiptStockMovements } from "../inventory/stock-movement.service";
+import { lockStockBalanceKeys } from "../inventory/stock-balance.service";
+import { assertProductUnitCompatible } from "../inventory/product-unit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { isCrossCompany } from "../company-scope";
@@ -657,6 +659,7 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
   const receipt = await prisma.$transaction(async (tx) => {
     // Project lock comes before receipt, PO and stock locks; schedule edits use it too.
     await lockProjectForOperationalMutation(tx, snapshot.projectId, ctx);
+    await lockProcurementCompanyForNumbering(tx, snapshot.companyId, ctx.tenantId);
     // Claim DRAFT first so concurrent cancel cannot race after stock/PO mutations.
     await tx.$queryRaw`
       SELECT id FROM purchase_receipts
@@ -683,6 +686,24 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
       throw new ServiceError("VALIDATION", "Seleccioná un depósito antes de confirmar una recepción con productos");
     }
     if (existing.warehouseId) await assertWarehouseOkForPo(existing.warehouseId, currentOrder, ctx, tx);
+    if (existing.warehouseId) {
+      const productIds = [...new Set(existing.lines.flatMap((line) => line.purchaseOrderLine.productId ? [line.purchaseOrderLine.productId] : []))];
+      await lockStockBalanceKeys(tx, productIds.map((productId) => ({ warehouseId: existing.warehouseId!, productId })));
+      // Product.unit can only be trusted after its lock; compare before any quantity/status effect.
+      const products = await tx.product.findMany({
+        where: { id: { in: productIds }, tenantId: ctx.tenantId },
+        select: { id: true, companyId: true, unit: true },
+      });
+      for (const line of existing.lines) {
+        if (!line.purchaseOrderLine.productId) continue;
+        const product = products.find((row) => row.id === line.purchaseOrderLine.productId);
+        if (!product || isCrossCompany(product.companyId, { ...ctx, companyId: existing.companyId })) {
+          throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la recepción");
+        }
+        assertProductUnitCompatible(product.unit, line.purchaseOrderLine.unit);
+      }
+      await assertWarehouseOkForPo(existing.warehouseId, currentOrder, ctx, tx);
+    }
     const confirmed = await tx.purchaseReceipt.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
       data: { status: PurchaseReceiptStatus.CONFIRMED, updatedBy: ctx.actorUserId },

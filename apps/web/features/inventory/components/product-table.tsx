@@ -15,16 +15,24 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import type { ProductView } from "@bloqer/services";
 import { ProductStatusBadge } from "./product-status-badge";
 
-export function ProductTable({ products }: { products: ProductView[] }) {
+export function ProductTable({
+  products,
+  canCreate = false,
+}: {
+  products: ProductView[];
+  canCreate?: boolean;
+}) {
   if (products.length === 0) {
     return (
       <ListEmptyState
         title="Sin productos"
         description="Registrá el catálogo para controlar stock y consumos."
         action={
-          <Button asChild size="sm">
-            <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
-          </Button>
+          canCreate ? (
+            <Button asChild size="sm">
+              <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -46,7 +54,10 @@ export function ProductTable({ products }: { products: ProductView[] }) {
           {products.map((p) => (
             <TableRow key={p.id}>
               <TableCell className="font-mono text-sm">
-                <Link href={`/inventario/productos/${p.id}`} className="text-primary hover:underline">
+                <Link
+                  href={`/inventario/productos/${p.id}`}
+                  className="text-primary hover:underline"
+                >
                   {p.sku}
                 </Link>
               </TableCell>

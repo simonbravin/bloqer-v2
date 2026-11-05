@@ -37,6 +37,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § JobsiteLogEntry.
 ## 10. Reglas de negocio
 - **BR-JL-001**: recomendación una entrada por día; no obligatorio hard ([BR-JL-001]).
 - **BR-JL-003**: materiales con producto y depósito generan consumo de inventario al aprobar el parte ([BR-JL-003]).
+- **Unidad (D-130):** un material vinculado fija la unidad maestra del producto desde esa referencia, incluso en borrador. El material del parte no tiene un campo de unidad propio: su cantidad usa la del producto, que se revalida bajo bloqueo antes del consumo al aprobar. No se compara contra la unidad de la partida ni se convierten cantidades. Los históricos y reintentos ya realizados conservan sus efectos previos.
 - Partes aprobados son lectura para certificación como evidencia complementaria.
 - **BR-SCH-004 / [D-045]:** al aprobar, sincroniza `ScheduleItem.progressPct` en ítems de cronograma con WBS primario enlazado (ver [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md)).
 

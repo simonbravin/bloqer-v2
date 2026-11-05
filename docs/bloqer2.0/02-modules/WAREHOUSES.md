@@ -21,7 +21,7 @@ Sin depósitos no hay trazabilidad de dónde está cada material ni transferenci
 - **Warehouse**.
 
 ## 7. Estados y transiciones
-`ACTIVE` ↔ `INACTIVE`; cierre `CLOSED` si saldo cero ([STATE_MACHINES Account-like para Warehouse]).
+Flujo expuesto: `ACTIVE` ↔ `INACTIVE`. El enum técnico también incluye `CLOSED` y sus registros históricos conservan las restricciones de edición existentes; no hay acción de cierre formal expuesta. Desactivación y cierre formal son capacidades distintas.
 
 ## 8. Acciones disponibles
 - Crear/editar depósito.
@@ -29,7 +29,7 @@ Sin depósitos no hay trazabilidad de dónde está cada material ni transferenci
 - Archivar si sin saldo y sin movimientos pendientes.
 
 ## 9. Pantallas y vistas necesarias
-- Lista depósitos con totales valorizados ARS.
+- Lista y ficha de depósitos, edición de campos disponibles y detalle de existencias físicas. La valuación plena en ARS permanece diferida por D-083; un importe nominal sin moneda no se etiqueta como ARS.
 - Detalle existencias por depósito.
 
 ## 10. Reglas de negocio
@@ -37,7 +37,7 @@ Sin depósitos no hay trazabilidad de dónde está cada material ni transferenci
 - Depósito de obra opcionalmente ligado a `project_id` para reporting.
 
 ## 11. Validaciones
-- Código único por tenant.
+- Nombre único por tenant/empresa en la implementación actual (no existe un campo de código de depósito).
 - No cerrar con stock ≠ 0.
 
 ## 12. Fórmulas relacionadas
@@ -63,3 +63,7 @@ ADMIN crea; WAREHOUSE opera movimientos.
 
 ## 19. Preguntas abiertas
 - Valuación por depósito vs global ([Q-018]).
+
+## Hallazgo — Identidad y lifecycle real del depósito
+
+La especificación original anunciaba código de depósito, pero el modelo real usa nombre único por empresa. `CLOSED` sí existe en el enum técnico, con restricciones para históricos, aunque no hay una acción de cierre expuesta. AG-07 registra esa diferencia y conserva los tres estados, el flujo activo/inactivo y la edición sin retargetear empresa/obra. No se presenta desactivar como cierre formal ni se incorpora un campo persistido o nueva regla de cierre. La valuación por depósito y el proceso especial de cierre requieren su diseño posterior; D-083 sigue vigente.

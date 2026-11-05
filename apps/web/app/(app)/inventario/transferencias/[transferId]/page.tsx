@@ -1,4 +1,5 @@
 import { formatDate } from "@/lib/format";
+import { can } from "@bloqer/domain";
 import { notFound, redirect } from "next/navigation";
 import {
   Table,
@@ -14,9 +15,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseTransferById, ServiceError } from "@bloqer/services";
 import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { cancelWarehouseTransferAction } from "../actions";
-import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
+import { InventoryStatusAction } from "@/features/inventory/components/inventory-status-action";
 import { PageShell } from "@/components/layout/page-shell";
-import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import {
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatUnitPriceFromString,
+} from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ transferId: string }>;
@@ -28,6 +33,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const MOVEMENT_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Borrador",
   CONFIRMED: "Confirmado",
   CANCELLED: "Cancelado",
 };
@@ -52,13 +58,18 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
   try {
     transfer = await getWarehouseTransferById(transferId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={`TR-${String(transfer.number).padStart(3, "0")}`}>
-      <div className="flex items-center justify-between">
+    <PageShell
+      variant="detail"
+      className="space-y-6"
+      breadcrumbLabel={`TR-${String(transfer.number).padStart(3, "0")}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -72,17 +83,13 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
             </p>
           </div>
         </div>
-        {transfer.status === "CONFIRMED" && (
-          <ConfirmActionButton
+        {transfer.status === "CONFIRMED" && can(ctx.roles, "EDIT", "INVENTORY") ? (
+          <InventoryStatusAction
             label="Cancelar transferencia"
-            title="Cancelar transferencia de stock"
-            description="Se anulan los movimientos de salida y entrada asociados."
-            confirmLabel="Cancelar transferencia"
-            variant="outline"
-            successMessage="Transferencia cancelada"
+            description="Se anulan los movimientos de salida y entrada asociados si el stock de destino permite la reversa."
             action={cancelWarehouseTransferAction.bind(null, transferId)}
           />
-        )}
+        ) : null}
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -110,16 +117,22 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
           </div>
           {transfer.unitCost && (
             <div>
-              <dt className="text-muted-foreground">Costo unitario</dt>
+              <dt className="text-muted-foreground">Costo unitario informado</dt>
               <dd className="font-medium">{formatUnitPriceFromString(transfer.unitCost)}</dd>
             </div>
           )}
           {transfer.totalCost && (
             <div>
-              <dt className="text-muted-foreground">Costo total</dt>
+              <dt className="text-muted-foreground">Costo total informado</dt>
               <dd className="font-medium">{formatMoneyAmount(transfer.totalCost)}</dd>
             </div>
           )}
+          {transfer.unitCost != null || transfer.totalCost != null ? (
+            <p className="col-span-2 text-xs text-muted-foreground">
+              Moneda no registrada: estos importes informados no constituyen una valuación del
+              stock.
+            </p>
+          ) : null}
           {transfer.notes && (
             <div className="col-span-2">
               <dt className="text-muted-foreground">Notas</dt>
@@ -147,7 +160,9 @@ export default async function TransferenciaDetailPage({ params }: PageProps) {
                   <TableCell>{TYPE_LABELS[m.type] ?? m.type}</TableCell>
                   <TableCell>{m.warehouseName}</TableCell>
                   <TableCell>{fmtDate(m.movementDate)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatQtyFromString(m.quantity)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatQtyFromString(m.quantity)}
+                  </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {MOVEMENT_STATUS_LABELS[m.status] ?? m.status}
                   </TableCell>

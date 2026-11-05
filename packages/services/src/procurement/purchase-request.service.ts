@@ -1,16 +1,31 @@
 import { Prisma, prisma, type PurchaseRequest, type CostCategory } from "@bloqer/database";
+import {
+  assertProductUnitCompatible,
+  lockProductsForUnitReferences,
+} from "../inventory/product-unit";
 import type { CreatePurchaseRequestInput, UpdatePurchaseRequestInput } from "@bloqer/validators";
 import { auditProcurement } from "./procurement-audit";
 import { assertProcurementTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { canEditPurchaseRequests, canViewPurchaseRequests } from "./procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
-import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import {
+  assertProjectAllowsOperationalMutation,
+  lockProjectForOperationalMutation,
+} from "../project/project-operational-guard";
 import { requireProjectAccess } from "../security/access";
 import { isCrossCompany } from "../company-scope";
 import { assertPurchaseRequestScope } from "./purchase-request-scope";
-import { assertCostAnalysisLineForWbs, assertWbsLineForProject, lockProcurementCompanyForNumbering } from "./procurement-wbs";
-import { loadWbsDominantCostTypes, coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
+import {
+  assertCostAnalysisLineForWbs,
+  assertWbsLineForProject,
+  lockProcurementCompanyForNumbering,
+} from "./procurement-wbs";
+import {
+  loadWbsDominantCostTypes,
+  coerceFreeTextGoodsCostType,
+  resolveLineCostType,
+} from "../cost-control/cost-type";
 import {
   assertWbsRequiredOnLines,
   budgetBaselineForPurchaseLine,
@@ -33,9 +48,7 @@ import {
   resolveUserDisplayNames,
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
-import {
-  assertPurchaseRequestReturnable,
-} from "./purchase-request-return-guards";
+import { assertPurchaseRequestReturnable } from "./purchase-request-return-guards";
 
 export type PurchaseRequestLineView = {
   id: string;
@@ -77,7 +90,9 @@ export type PurchaseRequestView = Omit<PurchaseRequest, never> & {
 };
 
 async function resolveCompanyId(
-  projectId: string, ctx: ServiceContext, db: Prisma.TransactionClient = prisma,
+  projectId: string,
+  ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<string> {
   const project = await db.project.findFirst({
     where: { id: projectId, tenantId: ctx.tenantId },
@@ -89,9 +104,15 @@ async function resolveCompanyId(
   }
   const companyId = ctx.companyId ?? project.companyId;
   if (!companyId) {
-    throw new ServiceError("CONFLICT", "Esta obra compartida requiere un contexto de empresa para crear la solicitud");
+    throw new ServiceError(
+      "CONFLICT",
+      "Esta obra compartida requiere un contexto de empresa para crear la solicitud",
+    );
   }
-  const company = await db.company.findFirst({ where: { id: companyId, tenantId: ctx.tenantId }, select: { id: true } });
+  const company = await db.company.findFirst({
+    where: { id: companyId, tenantId: ctx.tenantId },
+    select: { id: true },
+  });
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
   return companyId;
 }
@@ -159,10 +180,29 @@ function serialize(
 const prLineInclude = {
   orderBy: { sortOrder: "asc" as const },
   include: {
-    wbsNode: { select: { id: true, budgetId: true, code: true, name: true, budget: { select: { id: true, tenantId: true, companyId: true, projectId: true, currency: true } } } },
-    costAnalysisLine: { select: { budgetId: true, unit: true, unitCost: true, costItem: { select: { budgetId: true, wbsNodeId: true } } } },
+    wbsNode: {
+      select: {
+        id: true,
+        budgetId: true,
+        code: true,
+        name: true,
+        budget: {
+          select: { id: true, tenantId: true, companyId: true, projectId: true, currency: true },
+        },
+      },
+    },
+    costAnalysisLine: {
+      select: {
+        budgetId: true,
+        unit: true,
+        unitCost: true,
+        costItem: { select: { budgetId: true, wbsNodeId: true } },
+      },
+    },
     product: { select: { tenantId: true, companyId: true } },
-    awardedPurchaseOrder: { select: { tenantId: true, companyId: true, projectId: true, purchaseRequestId: true } },
+    awardedPurchaseOrder: {
+      select: { tenantId: true, companyId: true, projectId: true, purchaseRequestId: true },
+    },
   },
 };
 
@@ -179,38 +219,79 @@ const selectedQuoteInclude = {
 const activePoForEstimateInclude = {
   where: { status: { not: "CANCELLED" as const } },
   select: {
-    tenantId: true, companyId: true, projectId: true,
+    tenantId: true,
+    companyId: true,
+    projectId: true,
     totalAmountArs: true,
     supplierContact: { select: { tenantId: true, legalName: true, fantasyName: true } },
   },
 };
 
 type RequestReadRow = Prisma.PurchaseRequestGetPayload<{
-  include: { lines: typeof prLineInclude; quotes: typeof selectedQuoteInclude; purchaseOrders: typeof activePoForEstimateInclude };
+  include: {
+    lines: typeof prLineInclude;
+    quotes: typeof selectedQuoteInclude;
+    purchaseOrders: typeof activePoForEstimateInclude;
+  };
 }>;
 
 /** Guard every joined source before exposing names, APU references or estimates. */
 function assertRequestReadRelations(request: RequestReadRow): void {
-  const inconsistent = () => { throw new ServiceError("CONFLICT", "La solicitud contiene relaciones inconsistentes; revisá sus documentos de origen"); };
+  const inconsistent = () => {
+    throw new ServiceError(
+      "CONFLICT",
+      "La solicitud contiene relaciones inconsistentes; revisá sus documentos de origen",
+    );
+  };
   for (const line of request.lines) {
     const budget = line.wbsNode?.budget;
-    if (line.wbsNodeId && (!budget || budget.tenantId !== request.tenantId || budget.projectId !== request.projectId ||
-      (budget.companyId != null && budget.companyId !== request.companyId))) inconsistent();
-    if (line.costAnalysisLineId && (!line.costAnalysisLine || !budget ||
-      line.costAnalysisLine.budgetId !== budget.id || line.costAnalysisLine.costItem.budgetId !== budget.id ||
-      line.costAnalysisLine.costItem.wbsNodeId !== line.wbsNodeId)) inconsistent();
-    if (line.productId && (!line.product || line.product.tenantId !== request.tenantId ||
-      (line.product.companyId != null && line.product.companyId !== request.companyId))) inconsistent();
+    if (
+      line.wbsNodeId &&
+      (!budget ||
+        budget.tenantId !== request.tenantId ||
+        budget.projectId !== request.projectId ||
+        (budget.companyId != null && budget.companyId !== request.companyId))
+    )
+      inconsistent();
+    if (
+      line.costAnalysisLineId &&
+      (!line.costAnalysisLine ||
+        !budget ||
+        line.costAnalysisLine.budgetId !== budget.id ||
+        line.costAnalysisLine.costItem.budgetId !== budget.id ||
+        line.costAnalysisLine.costItem.wbsNodeId !== line.wbsNodeId)
+    )
+      inconsistent();
+    if (
+      line.productId &&
+      (!line.product ||
+        line.product.tenantId !== request.tenantId ||
+        (line.product.companyId != null && line.product.companyId !== request.companyId))
+    )
+      inconsistent();
     const awarded = line.awardedPurchaseOrder;
-    if (line.awardedPurchaseOrderId && (!awarded || awarded.tenantId !== request.tenantId ||
-      awarded.companyId !== request.companyId || awarded.projectId !== request.projectId || awarded.purchaseRequestId !== request.id)) inconsistent();
+    if (
+      line.awardedPurchaseOrderId &&
+      (!awarded ||
+        awarded.tenantId !== request.tenantId ||
+        awarded.companyId !== request.companyId ||
+        awarded.projectId !== request.projectId ||
+        awarded.purchaseRequestId !== request.id)
+    )
+      inconsistent();
   }
   for (const quote of request.quotes) {
-    if (quote.tenantId !== request.tenantId || quote.supplierContact.tenantId !== request.tenantId) inconsistent();
+    if (quote.tenantId !== request.tenantId || quote.supplierContact.tenantId !== request.tenantId)
+      inconsistent();
   }
   for (const order of request.purchaseOrders) {
-    if (order.tenantId !== request.tenantId || order.companyId !== request.companyId ||
-      order.projectId !== request.projectId || order.supplierContact.tenantId !== request.tenantId) inconsistent();
+    if (
+      order.tenantId !== request.tenantId ||
+      order.companyId !== request.companyId ||
+      order.projectId !== request.projectId ||
+      order.supplierContact.tenantId !== request.tenantId
+    )
+      inconsistent();
   }
 }
 
@@ -232,7 +313,12 @@ function mapPrLines(
   }>,
 ): PurchaseRequestLineView[] {
   return lines.map((l) => {
-    const comparableApuUnit = !l.costAnalysisLineId || Boolean(l.unit.trim() && l.costAnalysisLine?.unit.trim().toLowerCase() === l.unit.trim().toLowerCase());
+    const comparableApuUnit =
+      !l.costAnalysisLineId ||
+      Boolean(
+        l.unit.trim() &&
+        l.costAnalysisLine?.unit.trim().toLowerCase() === l.unit.trim().toLowerCase(),
+      );
     return {
       id: l.id,
       wbsNodeId: l.wbsNodeId,
@@ -245,7 +331,10 @@ function mapPrLines(
       description: l.description,
       unit: l.unit,
       quantity: serializeQtyDecimal(l.quantity),
-      budgetUnitCostSnapshot: comparableApuUnit && l.budgetUnitCostSnapshot != null ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot) : null,
+      budgetUnitCostSnapshot:
+        comparableApuUnit && l.budgetUnitCostSnapshot != null
+          ? serializeUnitPriceDecimal(l.budgetUnitCostSnapshot)
+          : null,
       budgetCurrency: l.wbsNode?.budget.currency ?? null,
       apuUnitCost:
         comparableApuUnit && l.costAnalysisLine?.unitCost != null
@@ -268,9 +357,7 @@ function selectedQuoteFromRows(
 } | null {
   if (quotes.length === 0) return null;
   const names = [
-    ...new Set(
-      quotes.map((q) => q.supplierContact.fantasyName ?? q.supplierContact.legalName),
-    ),
+    ...new Set(quotes.map((q) => q.supplierContact.fantasyName ?? q.supplierContact.legalName)),
   ];
   // Multi-supplier award: full quote totals are not the awarded subset — prefer OC totals.
   if (quotes.length > 1) {
@@ -304,10 +391,16 @@ function assertDraftPr(status: string): void {
 }
 
 async function validateRequestLines(
-  lines: Array<{ wbsNodeId: string | null; costAnalysisLineId?: string | null; productId?: string | null }>,
+  lines: Array<{
+    wbsNodeId: string | null;
+    costAnalysisLineId?: string | null;
+    productId?: string | null;
+    unit?: string | null;
+  }>,
   projectId: string,
   ctx: ServiceContext,
   db: Prisma.TransactionClient,
+  checkProductUnits = true,
 ): Promise<Map<number, CostCategory>> {
   if (lines.length === 0) throw new ServiceError("VALIDATION", "Debe tener al menos una línea");
   assertWbsRequiredOnLines(lines);
@@ -316,7 +409,8 @@ async function validateRequestLines(
   const checkedApu = new Map<string, CostCategory>();
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (!line.wbsNodeId) throw new ServiceError("CONFLICT", "Cada línea debe tener una partida EDT");
+    if (!line.wbsNodeId)
+      throw new ServiceError("CONFLICT", "Cada línea debe tener una partida EDT");
     if (!checkedWbs.has(line.wbsNodeId)) {
       await assertWbsLineForProject(line.wbsNodeId, projectId, ctx.tenantId, { ctx, db });
       checkedWbs.add(line.wbsNodeId);
@@ -325,18 +419,42 @@ async function validateRequestLines(
       const key = `${line.wbsNodeId}:${line.costAnalysisLineId}`;
       let category = checkedApu.get(key);
       if (!category) {
-        category = await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx, db });
+        category = await assertCostAnalysisLineForWbs(
+          line.costAnalysisLineId,
+          line.wbsNodeId,
+          ctx.tenantId,
+          { ctx, db },
+        );
         checkedApu.set(key, category);
       }
       categories.set(i, category);
     }
   }
-  const productIds = [...new Set(lines.map((line) => line.productId).filter((id): id is string => Boolean(id)))];
+  const productIds = [
+    ...new Set(lines.map((line) => line.productId).filter((id): id is string => Boolean(id))),
+  ];
   if (productIds.length > 0) {
-    const products = await db.product.findMany({ where: { id: { in: productIds }, tenantId: ctx.tenantId }, select: { id: true, companyId: true } });
-    if (products.length !== productIds.length || products.some((product) => isCrossCompany(product.companyId, ctx))) {
-      throw new ServiceError("CONFLICT", "Uno o más productos no pertenecen al alcance de la solicitud");
+    if (ctx.companyId)
+      await db.$queryRaw`SELECT id FROM companies WHERE id = ${ctx.companyId} AND "tenantId" = ${ctx.tenantId} FOR KEY SHARE`;
+    await lockProductsForUnitReferences(db, productIds, ctx.tenantId);
+    const products = await db.product.findMany({
+      where: { id: { in: productIds }, tenantId: ctx.tenantId },
+      select: { id: true, companyId: true, unit: true },
+    });
+    if (
+      products.length !== productIds.length ||
+      products.some((product) => isCrossCompany(product.companyId, ctx))
+    ) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Uno o más productos no pertenecen al alcance de la solicitud",
+      );
     }
+    const byId = new Map(products.map((product) => [product.id, product]));
+    if (checkProductUnits)
+      for (const line of lines)
+        if (line.productId)
+          assertProductUnitCompatible(byId.get(line.productId)!.unit, line.unit ?? "");
   }
   return categories;
 }
@@ -350,11 +468,17 @@ function requestLinesUnchanged(
   const orderedInput = [...input].sort((left, right) => left.sortOrder - right.sortOrder);
   return orderedInput.every((line, index) => {
     const old = orderedSaved[index]!;
-    return line.wbsNodeId === old.wbsNodeId && (line.productId ?? null) === old.productId &&
+    return (
+      line.wbsNodeId === old.wbsNodeId &&
+      (line.productId ?? null) === old.productId &&
       (line.costAnalysisLineId ?? null) === old.costAnalysisLineId &&
       (line.costType === undefined ? old.costType : line.costType) === old.costType &&
-      line.lineType === old.lineType && line.description === old.description && line.unit === old.unit &&
-      line.sortOrder === old.sortOrder && serializeQtyDecimal(line.quantity) === serializeQtyDecimal(old.quantity);
+      line.lineType === old.lineType &&
+      line.description === old.description &&
+      line.unit === old.unit &&
+      line.sortOrder === old.sortOrder &&
+      serializeQtyDecimal(line.quantity) === serializeQtyDecimal(old.quantity)
+    );
   });
 }
 
@@ -368,7 +492,11 @@ export async function listPurchaseRequestsByProject(
   }
   await requireProjectAccess(projectId, ctx);
   const rows = await prisma.purchaseRequest.findMany({
-    where: { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) },
+    where: {
+      projectId,
+      tenantId: ctx.tenantId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    },
     include: {
       lines: prLineInclude,
       quotes: selectedQuoteInclude,
@@ -391,12 +519,19 @@ export async function listPurchaseRequestsByProject(
       fromOrders ?? selected?.supplierName ?? null,
       selected?.quote ?? null,
       purchaseOrders.map((po) => serializeMoneyDecimal(po.totalAmountArs)),
-      new Map(r.lines.flatMap((line) => line.wbsNode ? [[line.id, line.wbsNode.budget.currency] as const] : [])),
+      new Map(
+        r.lines.flatMap((line) =>
+          line.wbsNode ? [[line.id, line.wbsNode.budget.currency] as const] : [],
+        ),
+      ),
     );
   });
 }
 
-export async function getPurchaseRequestById(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
+export async function getPurchaseRequestById(
+  id: string,
+  ctx: ServiceContext,
+): Promise<PurchaseRequestView> {
   await assertProcurementTenantModule(ctx);
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
@@ -409,7 +544,8 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
       purchaseOrders: activePoForEstimateInclude,
     },
   });
-  if (!pr || pr.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  if (!pr || pr.tenantId !== ctx.tenantId)
+    throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   await assertPurchaseRequestScope(pr, ctx, "read");
   assertRequestReadRelations(pr);
   const nameById = await resolveUserDisplayNames([pr.requestedByUserId]);
@@ -425,7 +561,11 @@ export async function getPurchaseRequestById(id: string, ctx: ServiceContext): P
     fromOrders ?? selected?.supplierName ?? null,
     selected?.quote ?? null,
     purchaseOrders.map((po) => serializeMoneyDecimal(po.totalAmountArs)),
-    new Map(pr.lines.flatMap((line) => line.wbsNode ? [[line.id, line.wbsNode.budget.currency] as const] : [])),
+    new Map(
+      pr.lines.flatMap((line) =>
+        line.wbsNode ? [[line.id, line.wbsNode.budget.currency] as const] : [],
+      ),
+    ),
   );
 }
 
@@ -440,64 +580,77 @@ export async function createPurchaseRequest(
   await assertProjectAllowsOperationalMutation(input.projectId, ctx);
   const companyId = await resolveCompanyId(input.projectId, ctx);
 
-  const pr = await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, input.projectId, ctx);
-    if (await resolveCompanyId(input.projectId, ctx, tx) !== companyId) {
-      throw new ServiceError("CONFLICT", "La empresa de la obra cambió. Recargá e intentá de nuevo.");
-    }
-    const number = await nextDocumentNumber(tx, ctx.tenantId, companyId);
-    const lineCtx = { ...ctx, companyId };
-    const apuCategoryByIdx = await validateRequestLines(input.lines, input.projectId, lineCtx, tx);
-    const wbsIds = [...new Set(input.lines.map((line) => line.wbsNodeId))];
-    const wbsDominant = await loadWbsDominantCostTypes(wbsIds, ctx.tenantId, tx);
-    const created = await tx.purchaseRequest.create({
-      data: {
-        tenantId: ctx.tenantId,
-        companyId,
-        projectId: input.projectId,
-        number,
-        requestedByUserId: ctx.actorUserId,
-        neededByDate: new Date(input.neededByDate),
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-        lines: {
-          create: input.lines.map((line, i) => {
-            const costType = coerceFreeTextGoodsCostType(
-              line.lineType,
-              line.costAnalysisLineId,
-              resolveLineCostType({
-                costType: line.costType ?? null,
-                apuCategory: apuCategoryByIdx.get(i) ?? null,
-                wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
-              }),
-            );
-            return {
-              wbsNodeId: line.wbsNodeId,
-              productId: line.productId ?? null,
-              costAnalysisLineId: line.costAnalysisLineId ?? null,
-              costType,
-              lineType: line.lineType,
-              description: line.description,
-              unit: line.unit ?? "",
-              quantity: new Prisma.Decimal(line.quantity),
-              sortOrder: line.sortOrder ?? i,
-            };
-          }),
+  const pr = await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+      if ((await resolveCompanyId(input.projectId, ctx, tx)) !== companyId) {
+        throw new ServiceError(
+          "CONFLICT",
+          "La empresa de la obra cambió. Recargá e intentá de nuevo.",
+        );
+      }
+      const number = await nextDocumentNumber(tx, ctx.tenantId, companyId);
+      const lineCtx = { ...ctx, companyId };
+      const apuCategoryByIdx = await validateRequestLines(
+        input.lines,
+        input.projectId,
+        lineCtx,
+        tx,
+      );
+      const wbsIds = [...new Set(input.lines.map((line) => line.wbsNodeId))];
+      const wbsDominant = await loadWbsDominantCostTypes(wbsIds, ctx.tenantId, tx);
+      const created = await tx.purchaseRequest.create({
+        data: {
+          tenantId: ctx.tenantId,
+          companyId,
+          projectId: input.projectId,
+          number,
+          requestedByUserId: ctx.actorUserId,
+          neededByDate: new Date(input.neededByDate),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+          lines: {
+            create: input.lines.map((line, i) => {
+              const costType = coerceFreeTextGoodsCostType(
+                line.lineType,
+                line.costAnalysisLineId,
+                resolveLineCostType({
+                  costType: line.costType ?? null,
+                  apuCategory: apuCategoryByIdx.get(i) ?? null,
+                  wbsDominantCostType: line.wbsNodeId
+                    ? (wbsDominant.get(line.wbsNodeId) ?? null)
+                    : null,
+                }),
+              );
+              return {
+                wbsNodeId: line.wbsNodeId,
+                productId: line.productId ?? null,
+                costAnalysisLineId: line.costAnalysisLineId ?? null,
+                costType,
+                lineType: line.lineType,
+                description: line.description,
+                unit: line.unit ?? "",
+                quantity: new Prisma.Decimal(line.quantity),
+                sortOrder: line.sortOrder ?? i,
+              };
+            }),
+          },
         },
-      },
-      include: { lines: { orderBy: { sortOrder: "asc" } } },
-    });
-    await auditProcurement(
-      ctx,
-      "purchase_request.created",
-      "PurchaseRequest",
-      created.id,
-      { projectId: created.projectId, companyId: created.companyId },
-      { after: { number: created.number }, tx },
-    );
-    return created;
-  }, { maxWait: 10_000, timeout: 30_000 });
+        include: { lines: { orderBy: { sortOrder: "asc" } } },
+      });
+      await auditProcurement(
+        ctx,
+        "purchase_request.created",
+        "PurchaseRequest",
+        created.id,
+        { projectId: created.projectId, companyId: created.companyId },
+        { after: { number: created.number }, tx },
+      );
+      return created;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   return getPurchaseRequestById(pr.id, ctx);
 }
@@ -520,83 +673,108 @@ export async function updatePurchaseRequest(
   }
   await assertPurchaseRequestScope(existing, ctx, "mutate");
   assertDraftPr(existing.status);
-  if (input.lines?.length === 0) throw new ServiceError("VALIDATION", "Debe tener al menos una línea");
+  if (input.lines?.length === 0)
+    throw new ServiceError("VALIDATION", "Debe tener al menos una línea");
 
-  await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id }, include: { lines: { orderBy: { sortOrder: "asc" } } } });
-    await assertPurchaseRequestScope(current, ctx, "mutate");
-    assertDraftPr(current.status);
-    const lineCtx = { ...ctx, companyId: current.companyId };
-    const [quoteHistory, linkedOrderLines] = await Promise.all([
-      tx.procurementQuote.count({ where: { purchaseRequestId: id } }),
-      tx.purchaseOrderLine.count({ where: { purchaseRequestLine: { purchaseRequestId: id } } }),
-    ]);
-    const preserveHistoricalLines = quoteHistory > 0 || linkedOrderLines > 0;
-    if (input.lines && preserveHistoricalLines && !requestLinesUnchanged(input.lines, current.lines)) {
-      throw new ServiceError("CONFLICT", "Esta solicitud tiene antecedentes de cotización o compra. Solo podés editar la cabecera; para cambiar ítems, anulala y creá otra.");
-    }
-    const replaceLines = input.lines && !preserveHistoricalLines ? input.lines : null;
-    const apuCategoryByIdx = replaceLines ? await validateRequestLines(replaceLines, current.projectId, lineCtx, tx) : new Map<number, CostCategory>();
-    const wbsIds = replaceLines ? [...new Set(replaceLines.map((line) => line.wbsNodeId))] : [];
-    const wbsDominant = replaceLines ? await loadWbsDominantCostTypes(wbsIds, ctx.tenantId, tx) : new Map<string, CostCategory>();
-    const flipped = await tx.purchaseRequest.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-      data: {
-        ...(input.neededByDate !== undefined ? { neededByDate: new Date(input.neededByDate) } : {}),
-        ...(input.notes !== undefined ? { notes: input.notes } : {}),
-        updatedBy: ctx.actorUserId,
-      },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La solicitud ya no está en borrador. Recargá e intentá de nuevo.",
-    );
-
-    if (replaceLines) {
-      await tx.purchaseRequestLine.deleteMany({ where: { purchaseRequestId: id } });
-      await tx.purchaseRequestLine.createMany({
-      data: replaceLines.map((line, i) => {
-        const costType = coerceFreeTextGoodsCostType(
-          line.lineType,
-          line.costAnalysisLineId,
-          resolveLineCostType({
-            costType: line.costType ?? null,
-            apuCategory: apuCategoryByIdx.get(i) ?? null,
-            wbsDominantCostType: line.wbsNodeId ? wbsDominant.get(line.wbsNodeId) ?? null : null,
-          }),
+  await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.purchaseRequest.findUniqueOrThrow({
+        where: { id },
+        include: { lines: { orderBy: { sortOrder: "asc" } } },
+      });
+      await assertPurchaseRequestScope(current, ctx, "mutate");
+      assertDraftPr(current.status);
+      const lineCtx = { ...ctx, companyId: current.companyId };
+      const [quoteHistory, linkedOrderLines] = await Promise.all([
+        tx.procurementQuote.count({ where: { purchaseRequestId: id } }),
+        tx.purchaseOrderLine.count({ where: { purchaseRequestLine: { purchaseRequestId: id } } }),
+      ]);
+      const preserveHistoricalLines = quoteHistory > 0 || linkedOrderLines > 0;
+      if (
+        input.lines &&
+        preserveHistoricalLines &&
+        !requestLinesUnchanged(input.lines, current.lines)
+      ) {
+        throw new ServiceError(
+          "CONFLICT",
+          "Esta solicitud tiene antecedentes de cotización o compra. Solo podés editar la cabecera; para cambiar ítems, anulala y creá otra.",
         );
-        return {
-          purchaseRequestId: id,
-          wbsNodeId: line.wbsNodeId,
-          productId: line.productId ?? null,
-          costAnalysisLineId: line.costAnalysisLineId ?? null,
-          costType,
-          lineType: line.lineType,
-          description: line.description,
-          unit: line.unit ?? "",
-          quantity: new Prisma.Decimal(line.quantity),
-          sortOrder: line.sortOrder ?? i,
-        };
-      }),
-    });
-    }
+      }
+      const replaceLines = input.lines && !preserveHistoricalLines ? input.lines : null;
+      const apuCategoryByIdx = replaceLines
+        ? await validateRequestLines(replaceLines, current.projectId, lineCtx, tx)
+        : new Map<number, CostCategory>();
+      const wbsIds = replaceLines ? [...new Set(replaceLines.map((line) => line.wbsNodeId))] : [];
+      const wbsDominant = replaceLines
+        ? await loadWbsDominantCostTypes(wbsIds, ctx.tenantId, tx)
+        : new Map<string, CostCategory>();
+      const flipped = await tx.purchaseRequest.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+        data: {
+          ...(input.neededByDate !== undefined
+            ? { neededByDate: new Date(input.neededByDate) }
+            : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "La solicitud ya no está en borrador. Recargá e intentá de nuevo.",
+      );
 
-    await auditProcurement(
-      ctx,
-      "purchase_request.updated",
-      "PurchaseRequest",
-      id,
-      { projectId: existing.projectId, companyId: existing.companyId },
-      { after: { linesCount: replaceLines?.length ?? current.lines.length }, tx },
-    );
-  }, { maxWait: 10_000, timeout: 30_000 });
+      if (replaceLines) {
+        await tx.purchaseRequestLine.deleteMany({ where: { purchaseRequestId: id } });
+        await tx.purchaseRequestLine.createMany({
+          data: replaceLines.map((line, i) => {
+            const costType = coerceFreeTextGoodsCostType(
+              line.lineType,
+              line.costAnalysisLineId,
+              resolveLineCostType({
+                costType: line.costType ?? null,
+                apuCategory: apuCategoryByIdx.get(i) ?? null,
+                wbsDominantCostType: line.wbsNodeId
+                  ? (wbsDominant.get(line.wbsNodeId) ?? null)
+                  : null,
+              }),
+            );
+            return {
+              purchaseRequestId: id,
+              wbsNodeId: line.wbsNodeId,
+              productId: line.productId ?? null,
+              costAnalysisLineId: line.costAnalysisLineId ?? null,
+              costType,
+              lineType: line.lineType,
+              description: line.description,
+              unit: line.unit ?? "",
+              quantity: new Prisma.Decimal(line.quantity),
+              sortOrder: line.sortOrder ?? i,
+            };
+          }),
+        });
+      }
+
+      await auditProcurement(
+        ctx,
+        "purchase_request.updated",
+        "PurchaseRequest",
+        id,
+        { projectId: existing.projectId, companyId: existing.companyId },
+        { after: { linesCount: replaceLines?.length ?? current.lines.length }, tx },
+      );
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   return getPurchaseRequestById(id, ctx);
 }
 
-export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
+export async function submitPurchaseRequest(
+  id: string,
+  ctx: ServiceContext,
+): Promise<PurchaseRequestView> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
@@ -605,69 +783,83 @@ export async function submitPurchaseRequest(id: string, ctx: ServiceContext): Pr
     where: { id },
     include: { lines: true },
   });
-  if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  if (!existing || existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   await assertPurchaseRequestScope(existing, ctx, "mutate");
   assertDraftPr(existing.status);
 
-  await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id }, include: { lines: true } });
-    await assertPurchaseRequestScope(current, ctx, "mutate");
-    assertDraftPr(current.status);
-    await validateRequestLines(current.lines, current.projectId, { ...ctx, companyId: current.companyId }, tx);
-    // D-126: legacy drafts may already have offers tied to these same items.
-    // Re-sending keeps their historical reference, including unknown snapshots.
-    const hasQuoteHistory = await tx.procurementQuote.count({ where: { purchaseRequestId: id } }) > 0;
-    for (const line of hasQuoteHistory ? [] : current.lines) {
-      if (!line.wbsNodeId) {
-        throw new ServiceError(
-          "CONFLICT",
-          "Todas las líneas deben tener EDT antes de enviar la solicitud",
-        );
-      }
-      const baseline = await budgetBaselineForPurchaseLine(
-        line.wbsNodeId,
-        {
-          costAnalysisLineId: line.costAnalysisLineId,
-          productId: line.productId,
-          description: line.description,
-          unit: line.unit,
-        },
+  await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.purchaseRequest.findUniqueOrThrow({
+        where: { id },
+        include: { lines: true },
+      });
+      await assertPurchaseRequestScope(current, ctx, "mutate");
+      assertDraftPr(current.status);
+      await validateRequestLines(
+        current.lines,
+        current.projectId,
+        { ...ctx, companyId: current.companyId },
         tx,
+        false,
       );
-      await tx.purchaseRequestLine.update({
-        where: { id: line.id },
+      // D-126: legacy drafts may already have offers tied to these same items.
+      // Re-sending keeps their historical reference, including unknown snapshots.
+      const hasQuoteHistory =
+        (await tx.procurementQuote.count({ where: { purchaseRequestId: id } })) > 0;
+      for (const line of hasQuoteHistory ? [] : current.lines) {
+        if (!line.wbsNodeId) {
+          throw new ServiceError(
+            "CONFLICT",
+            "Todas las líneas deben tener EDT antes de enviar la solicitud",
+          );
+        }
+        const baseline = await budgetBaselineForPurchaseLine(
+          line.wbsNodeId,
+          {
+            costAnalysisLineId: line.costAnalysisLineId,
+            productId: line.productId,
+            description: line.description,
+            unit: line.unit,
+          },
+          tx,
+        );
+        await tx.purchaseRequestLine.update({
+          where: { id: line.id },
+          data: {
+            budgetUnitCostSnapshot: baseline.unitCost,
+            budgetQuantitySnapshot: baseline.quantity,
+          },
+        });
+      }
+      const flipped = await tx.purchaseRequest.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
         data: {
-          budgetUnitCostSnapshot: baseline.unitCost,
-          budgetQuantitySnapshot: baseline.quantity,
+          status: "SUBMITTED",
+          submittedAt: new Date(),
+          returnReason: null,
+          returnedAt: null,
+          returnedByUserId: null,
+          updatedBy: ctx.actorUserId,
         },
       });
-    }
-    const flipped = await tx.purchaseRequest.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-      data: {
-        status: "SUBMITTED",
-        submittedAt: new Date(),
-        returnReason: null,
-        returnedAt: null,
-        returnedByUserId: null,
-        updatedBy: ctx.actorUserId,
-      },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La solicitud ya no está en borrador. Recargá e intentá de nuevo.",
-    );
-    await auditProcurement(
-      ctx,
-      "purchase_request.submitted",
-      "PurchaseRequest",
-      id,
-      { projectId: existing.projectId, companyId: existing.companyId },
-      { after: { status: "SUBMITTED" }, tx },
-    );
-  }, { maxWait: 10_000, timeout: 30_000 });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "La solicitud ya no está en borrador. Recargá e intentá de nuevo.",
+      );
+      await auditProcurement(
+        ctx,
+        "purchase_request.submitted",
+        "PurchaseRequest",
+        id,
+        { projectId: existing.projectId, companyId: existing.companyId },
+        { after: { status: "SUBMITTED" }, tx },
+      );
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   const code = `SC-${String(existing.number).padStart(3, "0")}`;
   await notifyPurchaseRequestSubmitted({
@@ -731,52 +923,61 @@ export async function returnPurchaseRequest(
     awardedLineCount,
   });
 
-  await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id }, include: { lines: { select: { awardedPurchaseOrderId: true } } } });
-    await assertPurchaseRequestScope(current, ctx, "mutate");
-    const [quoteCount, orderCount] = await Promise.all([
-      tx.procurementQuote.count({ where: { purchaseRequestId: id } }),
-      tx.purchaseOrder.count({ where: { purchaseRequestId: id, status: { not: "CANCELLED" } } }),
-    ]);
-    assertPurchaseRequestReturnable({
-      status: current.status, quoteCount, activePoCount: orderCount,
-      awardedLineCount: current.lines.filter((line) => line.awardedPurchaseOrderId != null).length,
-    });
-    const flipped = await tx.purchaseRequest.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
-      data: {
-        status: "DRAFT",
-        submittedAt: null,
-        returnReason: trimmed,
-        returnedAt: new Date(),
-        returnedByUserId: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-      },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La solicitud cambió de estado. Recargá e intentá de nuevo.",
-    );
+  await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.purchaseRequest.findUniqueOrThrow({
+        where: { id },
+        include: { lines: { select: { awardedPurchaseOrderId: true } } },
+      });
+      await assertPurchaseRequestScope(current, ctx, "mutate");
+      const [quoteCount, orderCount] = await Promise.all([
+        tx.procurementQuote.count({ where: { purchaseRequestId: id } }),
+        tx.purchaseOrder.count({ where: { purchaseRequestId: id, status: { not: "CANCELLED" } } }),
+      ]);
+      assertPurchaseRequestReturnable({
+        status: current.status,
+        quoteCount,
+        activePoCount: orderCount,
+        awardedLineCount: current.lines.filter((line) => line.awardedPurchaseOrderId != null)
+          .length,
+      });
+      const flipped = await tx.purchaseRequest.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
+        data: {
+          status: "DRAFT",
+          submittedAt: null,
+          returnReason: trimmed,
+          returnedAt: new Date(),
+          returnedByUserId: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "La solicitud cambió de estado. Recargá e intentá de nuevo.",
+      );
 
-    await tx.purchaseRequestLine.updateMany({
-      where: { purchaseRequestId: id },
-      data: {
-        budgetUnitCostSnapshot: null,
-        budgetQuantitySnapshot: null,
-      },
-    });
+      await tx.purchaseRequestLine.updateMany({
+        where: { purchaseRequestId: id },
+        data: {
+          budgetUnitCostSnapshot: null,
+          budgetQuantitySnapshot: null,
+        },
+      });
 
-    await auditProcurement(
-      ctx,
-      "purchase_request.returned_for_changes",
-      "PurchaseRequest",
-      id,
-      { projectId: existing.projectId, companyId: existing.companyId },
-      { after: { returnReason: trimmed, status: "DRAFT" }, tx },
-    );
-  }, { maxWait: 10_000, timeout: 30_000 });
+      await auditProcurement(
+        ctx,
+        "purchase_request.returned_for_changes",
+        "PurchaseRequest",
+        id,
+        { projectId: existing.projectId, companyId: existing.companyId },
+        { after: { returnReason: trimmed, status: "DRAFT" }, tx },
+      );
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   const code = `SC-${String(existing.number).padStart(3, "0")}`;
   await notifyPurchaseRequestReturned({
@@ -837,7 +1038,12 @@ export async function getPurchaseRequestPoLinks(
     prisma.purchaseOrder.findMany({
       where: { purchaseRequestId },
       select: {
-        id: true, tenantId: true, companyId: true, number: true, status: true, projectId: true,
+        id: true,
+        tenantId: true,
+        companyId: true,
+        number: true,
+        status: true,
+        projectId: true,
         selectedProcurementQuoteId: true,
         selectedProcurementQuote: { select: { tenantId: true, purchaseRequestId: true } },
       },
@@ -848,14 +1054,24 @@ export async function getPurchaseRequestPoLinks(
       select: { awardedPurchaseOrderId: true },
     }),
   ]);
-  if (orders.some((order) => order.tenantId !== request.tenantId || order.companyId !== request.companyId ||
-    order.projectId !== request.projectId || (order.selectedProcurementQuoteId &&
-      (!order.selectedProcurementQuote || order.selectedProcurementQuote.tenantId !== request.tenantId ||
-        order.selectedProcurementQuote.purchaseRequestId !== request.id)))) {
+  if (
+    orders.some(
+      (order) =>
+        order.tenantId !== request.tenantId ||
+        order.companyId !== request.companyId ||
+        order.projectId !== request.projectId ||
+        (order.selectedProcurementQuoteId &&
+          (!order.selectedProcurementQuote ||
+            order.selectedProcurementQuote.tenantId !== request.tenantId ||
+            order.selectedProcurementQuote.purchaseRequestId !== request.id)),
+    )
+  ) {
     throw new ServiceError("CONFLICT", "La solicitud contiene vínculos de compra inconsistentes");
   }
   const orderIds = new Set(orders.map((order) => order.id));
-  if (lines.some((line) => line.awardedPurchaseOrderId && !orderIds.has(line.awardedPurchaseOrderId))) {
+  if (
+    lines.some((line) => line.awardedPurchaseOrderId && !orderIds.has(line.awardedPurchaseOrderId))
+  ) {
     throw new ServiceError("CONFLICT", "La solicitud contiene adjudicaciones inconsistentes");
   }
   const activeRows = orders.filter((order) => order.status !== "CANCELLED");
@@ -890,50 +1106,70 @@ export async function purchaseRequestHasAnyPurchaseOrder(
   return hasAny;
 }
 
-export async function cancelPurchaseRequest(id: string, ctx: ServiceContext): Promise<PurchaseRequestView> {
+export async function cancelPurchaseRequest(
+  id: string,
+  ctx: ServiceContext,
+): Promise<PurchaseRequestView> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   const existing = await prisma.purchaseRequest.findUnique({ where: { id } });
-  if (!existing || existing.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+  if (!existing || existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
   await assertPurchaseRequestScope(existing, ctx, "mutate");
   if (existing.status === "COMPLETED" || existing.status === "CANCELLED") {
     throw new ServiceError("CONFLICT", "La solicitud no puede anularse en este estado");
   }
 
-  await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id } });
-    await assertPurchaseRequestScope(current, ctx, "mutate");
-    const activePo = await tx.purchaseOrder.count({ where: { purchaseRequestId: id, status: { not: "CANCELLED" } } });
-    if (activePo > 0) {
-      throw new ServiceError("CONFLICT", "Hay órdenes de compra vinculadas a esta solicitud. Anulá la OC primero.");
-    }
-    const flipped = await tx.purchaseRequest.updateMany({
-      where: {
+  await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id } });
+      await assertPurchaseRequestScope(current, ctx, "mutate");
+      const activePo = await tx.purchaseOrder.count({
+        where: { purchaseRequestId: id, status: { not: "CANCELLED" } },
+      });
+      if (activePo > 0) {
+        throw new ServiceError(
+          "CONFLICT",
+          "Hay órdenes de compra vinculadas a esta solicitud. Anulá la OC primero.",
+        );
+      }
+      const flipped = await tx.purchaseRequest.updateMany({
+        where: {
+          id,
+          tenantId: ctx.tenantId,
+          status: { notIn: ["COMPLETED", "CANCELLED"] },
+        },
+        data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "La solicitud cambió de estado. Recargá e intentá de nuevo.",
+      );
+      await tx.procurementQuote.updateMany({
+        where: {
+          purchaseRequestId: id,
+          status: { in: ["DRAFT", "RECEIVED", "SELECTED"] },
+        },
+        data: { status: "REJECTED" },
+      });
+      await auditProcurement(
+        ctx,
+        "purchase_request.cancelled",
+        "PurchaseRequest",
         id,
-        tenantId: ctx.tenantId,
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-      },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La solicitud cambió de estado. Recargá e intentá de nuevo.",
-    );
-    await tx.procurementQuote.updateMany({
-      where: {
-        purchaseRequestId: id,
-        status: { in: ["DRAFT", "RECEIVED", "SELECTED"] },
-      },
-      data: { status: "REJECTED" },
-    });
-    await auditProcurement(ctx, "purchase_request.cancelled", "PurchaseRequest", id, {
-      projectId: current.projectId, companyId: current.companyId,
-    }, { after: { status: "CANCELLED" }, tx });
-  }, { maxWait: 10_000, timeout: 30_000 });
+        {
+          projectId: current.projectId,
+          companyId: current.companyId,
+        },
+        { after: { status: "CANCELLED" }, tx },
+      );
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   return getPurchaseRequestById(id, ctx);
 }

@@ -15,6 +15,7 @@ import * as lineMoney from "../finance/invoice-line-money";
 import * as money from "../finance/money-decimal";
 import { coerceFreeTextGoodsCostType, resolveLineCostType } from "../cost-control/cost-type";
 import { companyScopeFilter, isCrossCompany } from "../company-scope";
+import * as productUnit from "../inventory/product-unit";
 
 type ServiceModule = Record<string, (...args: unknown[]) => Promise<unknown>>;
 const ctx: ServiceContext = { actorUserId: "actor", tenantId: "tenant", companyId: "company", roles: ["OWNER"] };
@@ -146,6 +147,7 @@ function setup(options: { cancelBeforeFirstLock?: boolean; status?: string; allo
     "./purchase-variance.service": {}, "../materials/material-commitment": {}, "./purchase-order-workflow.service": {},
     "./quote-validity": {}, "../company/company.service": {},
     "../company-scope": { companyScopeFilter, isCrossCompany },
+    "../inventory/product-unit": productUnit,
   };
   function load(filename: string): ServiceModule {
     const compiled = ts.transpileModule(readFileSync(new URL(filename, import.meta.url), "utf8"), {

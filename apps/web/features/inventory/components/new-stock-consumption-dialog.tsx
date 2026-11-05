@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +46,7 @@ export function NewStockConsumptionDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const saving = useRef(false);
   const hasMounted = useHasMounted();
   const isMdUp = useIsMdUp();
   const useSheet = hasMounted && !isMdUp;
@@ -63,6 +64,7 @@ export function NewStockConsumptionDialog({
   }
 
   function closeDialog() {
+    if (saving.current) return;
     setOpen(false);
     clearCreateQueryParam();
   }
@@ -81,27 +83,26 @@ export function NewStockConsumptionDialog({
       variant="plain"
       onCancel={closeDialog}
       onSuccess={handleSuccess}
+      onPendingChange={(pending) => {
+        saving.current = pending;
+      }}
     />
   ) : null;
 
-  const trigger = (
-    <Button className="min-h-11 md:min-h-9">Registrar consumo</Button>
-  );
+  const trigger = <Button className="min-h-11 md:min-h-9">Registrar consumo</Button>;
 
   if (useSheet) {
     return (
       <Sheet
         open={open}
         onOpenChange={(next) => {
+          if (saving.current) return;
           setOpen(next);
           if (!next) clearCreateQueryParam();
         }}
       >
         <SheetTrigger asChild>{trigger}</SheetTrigger>
-        <SheetContent
-          side="bottom"
-          className="max-h-[92vh] overflow-y-auto rounded-t-xl"
-        >
+        <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-xl">
           <SheetHeader className="text-left">
             <SheetTitle>Registrar consumo</SheetTitle>
             <SheetDescription className="sr-only">
@@ -118,6 +119,7 @@ export function NewStockConsumptionDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (saving.current) return;
         setOpen(next);
         if (!next) clearCreateQueryParam();
       }}

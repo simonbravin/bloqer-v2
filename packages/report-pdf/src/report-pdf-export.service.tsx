@@ -783,7 +783,7 @@ export async function exportStockMovementsPdf(
         sku: r.productSku,
         product: r.productName,
         type: r.type,
-        qty: r.signedQuantity,
+        qty: r.signedQuantity ?? "Sin dirección definida",
         warehouse: r.warehouseName,
       }))}
     />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { can } from "@bloqer/domain";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
@@ -32,9 +33,11 @@ export default async function DepositosPage() {
             </p>
           </div>
         </div>
-        <Button asChild>
-          <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
-        </Button>
+        {can(ctx.roles, "EDIT", "INVENTORY") ? (
+          <Button asChild>
+            <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="flex justify-end">
@@ -44,7 +47,10 @@ export default async function DepositosPage() {
       </div>
 
       <Suspense fallback={null}>
-        <WarehouseListSection warehouses={warehouses} />
+        <WarehouseListSection
+          warehouses={warehouses}
+          canCreate={can(ctx.roles, "EDIT", "INVENTORY")}
+        />
       </Suspense>
     </PageShell>
   );

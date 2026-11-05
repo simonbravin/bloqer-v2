@@ -6,7 +6,12 @@ import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
-import { getProjectShellInfo, listStockMovements, ServiceError } from "@bloqer/services";
+import {
+  getProjectShellInfo,
+  getProjectOperationalMutationBlockReason,
+  listStockMovements,
+  ServiceError,
+} from "@bloqer/services";
 import { StockMovementList } from "@/features/inventory";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -26,10 +31,12 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  let project;
   try {
-    await getProjectShellInfo(id, ctx);
+    project = await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -38,11 +45,13 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
   try {
     movements = await listStockMovements({ projectId: id }, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
-  const canCreateConsumption = can(current.tenantCtx.roles, "EDIT", "INVENTORY");
+  const blockReason = getProjectOperationalMutationBlockReason(project.status);
+  const canCreateConsumption = !blockReason && can(current.tenantCtx.roles, "EDIT", "INVENTORY");
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -63,6 +72,14 @@ export default async function ProyectoInventarioPage({ params }: PageProps) {
         }
       />
 
+      {blockReason ? (
+        <p
+          role="status"
+          className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground"
+        >
+          {blockReason}
+        </p>
+      ) : null}
       <Suspense fallback={<ListSectionSkeleton />}>
         <StockMovementList movements={movements} />
       </Suspense>

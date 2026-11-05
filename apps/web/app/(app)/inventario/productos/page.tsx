@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { can } from "@bloqer/domain";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,13 @@ export default async function ProductosPage({
   };
 
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const parsedPage = Number(sp.page);
+  const page =
+    Number.isSafeInteger(parsedPage) &&
+    parsedPage >= 1 &&
+    Number.isSafeInteger((parsedPage - 1) * PAGE_SIZE)
+      ? parsedPage
+      : 1;
   const { data: products, total } = await listProducts({ page, pageSize: PAGE_SIZE }, ctx);
 
   return (
@@ -42,15 +49,17 @@ export default async function ProductosPage({
             <Suspense fallback={null}>
               <ListViewToggle storageKey="productos" />
             </Suspense>
-            <Button asChild>
-              <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
-            </Button>
+            {can(ctx.roles, "EDIT", "INVENTORY") ? (
+              <Button asChild>
+                <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
+              </Button>
+            ) : null}
           </>
         }
       />
 
       <Suspense fallback={<ListSectionSkeleton />}>
-        <ProductListSection products={products} />
+        <ProductListSection products={products} canCreate={can(ctx.roles, "EDIT", "INVENTORY")} />
       </Suspense>
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
     </PageShell>

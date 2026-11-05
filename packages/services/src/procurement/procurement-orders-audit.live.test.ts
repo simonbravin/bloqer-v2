@@ -9,10 +9,12 @@ import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { clearProjectAccessModeCache } from "../security/access";
 import { ServiceError, type ServiceContext } from "../types";
 import { getStockBalance } from "../inventory/stock-balance.service";
+import { updateProduct, getProductById } from "../inventory/product.service";
 import { budgetBaselineForPurchaseLine } from "./procurement-budget-baseline";
 import { createProcurementQuote } from "./procurement-quote.service";
 import { createPurchaseRequest, submitPurchaseRequest } from "./purchase-request.service";
 import { createPurchaseOrderFromQuoteLines } from "./purchase-request-to-po.service";
+import { createPurchaseOrdersFromAwards } from "./purchase-request-to-po.service";
 import { calcLine } from "./purchase-order-calc.service";
 import { approvePurchaseOrder, confirmPurchaseOrder, returnPurchaseOrder, submitPurchaseOrder } from "./purchase-order-workflow.service";
 import { cancelPurchaseOrder, createPurchaseOrder, getPurchaseOrderById, listLinkablePurchaseOrders, listProcurementWbsOptions, listPurchaseOrdersByProject, updatePurchaseOrder } from "./purchase-order.service";
@@ -105,12 +107,12 @@ describe("AG-06 OC and receipts: isolated SQL scope, currency and physical integ
     }, { timeout: 60_000 });
     return { projectId, budgetId, wbsId, materialId, laborId, companyId: company, currency };
   }
-  async function order(s: Scope, options: { status?: PurchaseOrderStatus; quantity?: string; product?: boolean; currency?: string } = {}) {
+  async function order(s: Scope, options: { status?: PurchaseOrderStatus; quantity?: string; product?: boolean; productId?: string; currency?: string } = {}) {
     const qty = new Prisma.Decimal(options.quantity ?? "10"), currency = options.currency ?? s.currency;
     const calculated = calcLine(qty, new Prisma.Decimal(10), new Prisma.Decimal(0));
     const money = { lineSubtotal: calculated.lineSubtotal, lineTax: calculated.lineTax, lineTotal: calculated.lineTotal };
     const max = await prisma.purchaseOrder.aggregate({ where: { tenantId, companyId: s.companyId }, _max: { number: true } });
-    return prisma.purchaseOrder.create({ data: { tenantId, companyId: s.companyId, projectId: s.projectId, supplierContactId: contactId, number: (max._max.number ?? 0) + 1, issueDate: day, status: options.status ?? "CONFIRMED", currency, fxRate: currency === "ARS" ? 1 : 100, subtotal: money.lineSubtotal, totalAmount: money.lineTotal, totalAmountArs: money.lineTotal.mul(currency === "ARS" ? 1 : 100), originRequestedByUserId: actorId, createdBy: actorId, lines: { create: { wbsNodeId: s.wbsId, costAnalysisLineId: s.materialId, productId: options.product ? productId : null, costType: "MATERIAL", description: "Synthetic order material", unit: "un", quantity: qty, unitPrice: 10, taxRate: 0, discountPct: 0, ...money } } }, include: { lines: true } });
+    return prisma.purchaseOrder.create({ data: { tenantId, companyId: s.companyId, projectId: s.projectId, supplierContactId: contactId, number: (max._max.number ?? 0) + 1, issueDate: day, status: options.status ?? "CONFIRMED", currency, fxRate: currency === "ARS" ? 1 : 100, subtotal: money.lineSubtotal, totalAmount: money.lineTotal, totalAmountArs: money.lineTotal.mul(currency === "ARS" ? 1 : 100), originRequestedByUserId: actorId, createdBy: actorId, lines: { create: { wbsNodeId: s.wbsId, costAnalysisLineId: s.materialId, productId: options.productId ?? (options.product ? productId : null), costType: "MATERIAL", description: "Synthetic order material", unit: "un", quantity: qty, unitPrice: 10, taxRate: 0, discountPct: 0, ...money } } }, include: { lines: true } });
   }
   type Order = Awaited<ReturnType<typeof order>>;
   const directInput = (s: Scope, options: { currency?: string; fxRate?: string; apu?: string; product?: string; unit?: string; justification?: string } = {}) => ({ projectId: s.projectId, supplierContactId: contactId, issueDate: date, currency: options.currency ?? s.currency, fxRate: options.fxRate, iibbPerceptionRate: "0", lines: [{ wbsNodeId: s.wbsId, costAnalysisLineId: options.apu ?? s.materialId, productId: options.product, description: "Synthetic direct material", unit: options.unit ?? "un", quantity: "1", unitPrice: "10", taxRate: "0", discountPct: "0", sortOrder: 0, varianceJustification: options.justification }] });
@@ -466,6 +468,117 @@ describe("AG-06 OC and receipts: isolated SQL scope, currency and physical integ
     await prisma.supplierInvoice.create({ data: { tenantId, companyId, projectId: s.projectId, supplierContactId: contactId, number: 1, issueDate: day, dueDate: day, currency: "ARS", subtotal: 10, totalAmount: 10, amountArs: 10, status: "DRAFT", lines: { create: { purchaseOrderLineId: po.lines[0]!.id, wbsNodeId: s.wbsId, costAnalysisLineId: s.materialId, description: "Synthetic legacy fiscal reference", quantity: 1, unitPrice: 10, lineSubtotal: 10, lineTotal: 10 } } } });
     await assert.rejects(() => cancelPurchaseOrder(po.id, ctx), isConflict);
     assert.equal((await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: po.id } })).status, "CONFIRMED");
+  });
+
+  async function unitProduct(unit = "kg") {
+    return prisma.product.create({ data: { tenantId, companyId: null, sku: randomUUID(), name: "Synthetic D130 product", unit } });
+  }
+
+  it("D130 accepts matching product units on new OC lines and rejects incompatible create or edit atomically", async () => {
+    const s = await scope(), product = await unitProduct();
+    const input = directInput(s, { product: product.id, unit: " KG " });
+    const po = await createPurchaseOrder(input, ctx);
+    assert.equal(po.lines[0]!.unit, " KG ");
+    const before = await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: po.id }, include: { lines: true } });
+    const auditCount = await prisma.auditLog.count({ where: { tenantId, entityId: po.id } });
+    await assert.rejects(() => createPurchaseOrder(directInput(s, { product: product.id, unit: "t" }), ctx), isConflict);
+    await assert.rejects(() => createPurchaseOrder(directInput(s, { product: product.id, unit: "" }), ctx), isConflict);
+    await assert.rejects(() => updatePurchaseOrder(po.id, { lines: [{ ...input.lines[0]!, id: po.lines[0]!.id, unit: "t" }] }, ctx), isConflict);
+    assert.deepEqual(await prisma.purchaseOrder.findUniqueOrThrow({ where: { id: po.id }, include: { lines: true } }), before);
+    assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: po.id } }), auditCount);
+    assert.equal(await prisma.purchaseOrder.count({ where: { tenantId, projectId: s.projectId } }), 1);
+  });
+
+  it("D130 blocks a legacy incompatible receipt before status quantity schedule or stock effects", async () => {
+    const s = await scope(), product = await unitProduct(), po = await order(s, { productId: product.id });
+    await prisma.purchaseOrderLine.update({ where: { id: po.lines[0]!.id }, data: { unit: "bolsa" } });
+    const receipt = await draft(po, ["2"], warehouseId);
+    const before = await prisma.purchaseOrderLine.findUniqueOrThrow({ where: { id: po.lines[0]!.id } });
+    const auditCount = await prisma.auditLog.count({ where: { tenantId, entityId: receipt.id } });
+    assert.equal((await getPurchaseOrderById(po.id, ctx)).lines[0]!.unit, "bolsa");
+    await assert.rejects(() => confirmPurchaseReceipt(receipt.id, ctx), isConflict);
+    assert.equal((await prisma.purchaseReceipt.findUniqueOrThrow({ where: { id: receipt.id } })).status, "DRAFT");
+    assert.deepEqual(await prisma.purchaseOrderLine.findUniqueOrThrow({ where: { id: before.id } }), before);
+    assert.equal(await prisma.stockMovement.count({ where: { purchaseReceiptId: receipt.id } }), 0);
+    assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: receipt.id } }), auditCount);
+    await cancelPurchaseReceipt(receipt.id, ctx);
+  });
+
+  it("D130 receives compatible quantities exactly and preserves an existing idempotent result after a legacy unit discrepancy", async () => {
+    const s = await scope(), product = await unitProduct(), po = await order(s, { productId: product.id });
+    await prisma.purchaseOrderLine.update({ where: { id: po.lines[0]!.id }, data: { unit: " KG " } });
+    const input = { purchaseOrderId: po.id, warehouseId, receiptDate: date, idempotencyKey: randomUUID(), lines: [{ purchaseOrderLineId: po.lines[0]!.id, quantityReceived: "1.2345" }] };
+    const receipt = await createPurchaseReceipt(input, ctx);
+    await confirmPurchaseReceipt(receipt.id, ctx);
+    const movements = await prisma.stockMovement.findMany({ where: { purchaseReceiptId: receipt.id } });
+    assert.equal(movements.length, 1);
+    assert.equal(movements[0]!.quantity.toFixed(4), "1.2345");
+    await prisma.product.update({ where: { id: product.id }, data: { unit: "t" } });
+    try {
+      const replay = await createPurchaseReceipt(input, ctx);
+      assert.equal(replay.id, receipt.id);
+      assert.equal(await prisma.stockMovement.count({ where: { purchaseReceiptId: receipt.id } }), 1);
+    } finally { await prisma.product.update({ where: { id: product.id }, data: { unit: "kg" } }); }
+  });
+
+  it("D130 validates new awarded OC units and rolls a multi-group award back without partial documents", async () => {
+    const s = await scope(), product = await unitProduct();
+    const pr = await createPurchaseRequest({ projectId: s.projectId, neededByDate: date, lines: [0, 1].map((sortOrder) => ({ wbsNodeId: s.wbsId, productId: product.id, description: `Synthetic D130 requested ${sortOrder}`, unit: "kg", quantity: "1", lineType: "MATERIAL" as const, sortOrder })) }, ctx);
+    await submitPurchaseRequest(pr.id, ctx);
+    const quote = await createProcurementQuote({ purchaseRequestId: pr.id, supplierContactId: contactId, currency: "ARS", iibbPerceptionRate: "0", validUntil: "2050-01-01", lines: pr.lines.map((line, sortOrder) => ({ purchaseRequestLineId: line.id, unitPrice: "10", taxRate: "0", discountPct: "0", offerKind: "QUOTED" as const, sortOrder })) }, ctx);
+    await prisma.purchaseRequestLine.update({ where: { id: pr.lines[1]!.id }, data: { unit: "bolsa" } });
+    await assert.rejects(() => createPurchaseOrderFromQuoteLines(quote.id, [pr.lines[1]!.id], ctx), isConflict);
+    await assert.rejects(() => createPurchaseOrdersFromAwards(pr.id, pr.lines.map((line) => ({ procurementQuoteId: quote.id, purchaseRequestLineIds: [line.id] })), ctx), isConflict);
+    assert.equal(await prisma.purchaseOrder.count({ where: { purchaseRequestId: pr.id } }), 0);
+    assert.ok((await prisma.purchaseRequestLine.findMany({ where: { purchaseRequestId: pr.id } })).every((line) => line.awardedPurchaseOrderId === null));
+    await prisma.purchaseRequestLine.update({ where: { id: pr.lines[1]!.id }, data: { unit: "kg" } });
+    const awarded = await createPurchaseOrderFromQuoteLines(quote.id, pr.lines.map((line) => line.id), ctx);
+    const po = await getPurchaseOrderById(awarded.purchaseOrderId, ctx);
+    assert.ok(po.lines.every((line) => line.unit === "kg" && line.productId === product.id));
+  });
+
+  it("D130 first OC reference wins against a previewed product unit edit and freezes the original unit", async () => {
+    const s = await scope(), product = await unitProduct();
+    await assert.rejects(() => interleaveAfterPreview(
+      () => updateProduct(product.id, { unit: "t" }, ctx),
+      () => createPurchaseOrder(directInput(s, { product: product.id, unit: "kg" }), ctx),
+    ), isConflict);
+    assert.equal((await getProductById(product.id, ctx)).unit, "kg");
+    assert.equal(await prisma.purchaseOrderLine.count({ where: { productId: product.id, unit: "kg" } }), 1);
+  });
+
+  it("D130 product unit edit wins before a new OC reference and rejects its stale explicit unit", async () => {
+    const s = await scope(), product = await unitProduct();
+    await assert.rejects(() => interleaveAfterPreview(
+      () => createPurchaseOrder(directInput(s, { product: product.id, unit: "kg" }), ctx),
+      () => updateProduct(product.id, { unit: "t" }, ctx),
+    ), isConflict);
+    assert.equal((await getProductById(product.id, ctx)).unit, "t");
+    assert.equal(await prisma.purchaseOrderLine.count({ where: { productId: product.id } }), 0);
+  });
+
+  it("D130 preserves historical OC reads header-only edits and cancellation without reinterpreting a unit", async () => {
+    const s = await scope(), product = await unitProduct(), po = await order(s, { status: "DRAFT", productId: product.id });
+    await prisma.purchaseOrderLine.update({ where: { id: po.lines[0]!.id }, data: { unit: "bolsa" } });
+    assert.equal((await getPurchaseOrderById(po.id, ctx)).lines[0]!.unit, "bolsa");
+    await updatePurchaseOrder(po.id, { notes: "Synthetic header correction only" }, ctx);
+    await cancelPurchaseOrder(po.id, ctx);
+    assert.equal((await prisma.purchaseOrderLine.findUniqueOrThrow({ where: { id: po.lines[0]!.id } })).unit, "bolsa");
+    await assert.rejects(() => updateProduct(product.id, { unit: "t" }, ctx), isConflict);
+  });
+
+  it("D130 rechecks the product unit after receipt preflight before creating any physical effect", async () => {
+    const s = await scope(), product = await unitProduct(), po = await order(s, { productId: product.id });
+    await prisma.purchaseOrderLine.update({ where: { id: po.lines[0]!.id }, data: { unit: "kg" } });
+    const receipt = await draft(po, ["2"], warehouseId);
+    await assert.rejects(() => interleaveAfterPreview(
+      () => confirmPurchaseReceipt(receipt.id, ctx),
+      () => prisma.product.update({ where: { id: product.id }, data: { unit: "t" } }),
+    ), isConflict);
+    assert.equal((await prisma.purchaseReceipt.findUniqueOrThrow({ where: { id: receipt.id } })).status, "DRAFT");
+    assert.equal((await prisma.purchaseOrderLine.findUniqueOrThrow({ where: { id: po.lines[0]!.id } })).receivedQuantity.toString(), "0");
+    assert.equal(await prisma.stockMovement.count({ where: { purchaseReceiptId: receipt.id } }), 0);
+    await prisma.product.update({ where: { id: product.id }, data: { unit: "kg" } });
   });
 
   async function withFxReviewPolicy(action: () => Promise<void>) {

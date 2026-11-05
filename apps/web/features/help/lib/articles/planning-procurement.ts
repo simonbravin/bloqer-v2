@@ -455,6 +455,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
     steps: [
       "Operación → Consumos (o el atajo Consumos en Materiales, o desde el flujo de libro de obra).",
       "Indicá material, cantidad y partida EDT si el parte toca varias partidas. Con adenda, la partida muestra el presupuesto (nombre vN).",
+      "La cantidad del material del parte usa la unidad del producto, sin un campo de unidad independiente. Vincular el producto fija esa unidad incluso en borrador; al aprobar se revalida antes de consumir, sin convertir ni usar la unidad de la partida como equivalencia.",
+      "Los productos, depósitos y subcontratos del parte respetan la empresa del documento; los contactos conservan el directorio compartido del tenant. Para consumo se ofrecen depósitos generales o de esa misma obra, dentro del alcance autorizado. Productos y depósitos requieren Inventario habilitado y permiso de consulta; si no aparecen, revisá ese acceso.",
     ],
     relatedSlugs: ["cargar-libro-de-obra", "pedir-material-desde-faltante", "tablero-materiales"],
     keywords: ["consumo", "consumos", "stock", "materiales"],
@@ -1142,6 +1144,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Desde Pendientes (botón Recibir), la campana (CTA Registrar recepción), la OC (Registrar / Continuar recepción) o Compras → Recepciones. Si ya hay borrador, se abre esa misma ficha.",
       "En borrador editá fecha, cantidades, notas y Depósito destino. El depósito es obligatorio para líneas con producto. Las líneas sin producto asociado no generan stock, aunque el tipo de costo sea Materiales. Si no aparece un depósito autorizado, revisá Inventario o pedí acceso; la ayuda también aparece sin depósitos disponibles. Se permite el excedente autorizado por la tolerancia de la empresa. Guardá el borrador o confirmá la recepción.",
       "Las altas nuevas tienen código RC-NNN por empresa y muestran separada su OC de origen. Las recepciones históricas mantienen su identificador actual. Anular y reintentar no cambia ni reutiliza el número.",
+      "Para ingresar stock, la unidad de la línea de OC debe coincidir con la del producto. Una diferencia bloquea el nuevo ingreso sin convertir cantidades ni alterar históricos; revisá el documento origen, sin modificar una OC confirmada para sortear el control.",
       "Al confirmar, el panel Facturación queda arriba. Si la política «Al recibir, crear borrador» está ON, ya hay borrador para Completar y emitir (no crea CxP sola la recepción).",
     ],
     effects: [

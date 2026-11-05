@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { getStockBalanceReport } from "@bloqer/services";
+import { getStockBalanceReport, parseStockBalanceFilters, ServiceError } from "@bloqer/services";
+import { InventoryReportError } from "@/features/inventory-reports/components/inventory-report-error";
 import { StockBalanceTable, StockReportFilters } from "@/features/inventory-reports";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -29,17 +30,16 @@ export default async function StockReportPage({ searchParams }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
-  const rows = await getStockBalanceReport(
-    {
-      warehouseId: sp.warehouseId || undefined,
-      productId: sp.productId || undefined,
-      companyId: sp.companyId || undefined,
-      projectId: sp.projectId || undefined,
-      includeZeroStock: sp.includeZeroStock === "true",
-    },
-    ctx,
-  );
-
+  let rows;
+  try {
+    rows = await getStockBalanceReport(parseStockBalanceFilters(sp), ctx);
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "VALIDATION")
+      return <InventoryReportError title="Stock actual" mode="balance" message={error.message} />;
+    if (error instanceof ServiceError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND"))
+      notFound();
+    throw error;
+  }
   const negative = rows.filter((r) => r.flags.negativeStock).length;
 
   return (

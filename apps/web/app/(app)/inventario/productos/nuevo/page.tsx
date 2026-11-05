@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { can } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
 import { ProductForm } from "@/features/inventory";
 import { PageShell } from "@/components/layout/page-shell";
@@ -6,6 +7,7 @@ import { PageShell } from "@/components/layout/page-shell";
 export default async function NuevoProductoPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!can(current.tenantCtx.roles, "EDIT", "INVENTORY")) redirect("/inventario/productos");
 
   return (
     <PageShell variant="default" className="space-y-6">

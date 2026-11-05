@@ -55,6 +55,7 @@ import {
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
 import { loadMaterialApuCommitmentByLineId } from "../materials/material-commitment";
+import { assertProductUnitCompatible, lockProductsForUnitReferences } from "../inventory/product-unit";
 
 export {
   submitPurchaseOrder,
@@ -656,13 +657,16 @@ export async function createPurchaseOrder(
   const purchaseOrderId = await prisma.$transaction(async (tx) => {
     await lockProjectForOperationalMutation(tx, input.projectId, ctx);
     await lockProcurementCompanyForNumbering(tx, companyId, ctx.tenantId);
+    await lockProductsForUnitReferences(tx, input.lines.flatMap((line) => line.productId ? [line.productId] : []), ctx.tenantId);
     await assertContactRoleInTenant(input.supplierContactId, "SUPPLIER", ctx.tenantId, { tx });
     const apuCategoryByIdx = new Map<number, CostCategory>();
     for (const [i, line] of input.lines.entries()) {
       await assertWbsLineForProject(line.wbsNodeId, input.projectId, ctx.tenantId, { ctx: documentCtx, db: tx });
       if (line.costAnalysisLineId) apuCategoryByIdx.set(i, await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: documentCtx, db: tx }));
-      if (line.productId && !await tx.product.findFirst({ where: { id: line.productId, tenantId: ctx.tenantId, ...companyScopeFilter(documentCtx) }, select: { id: true } })) {
-        throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la orden");
+      if (line.productId) {
+        const product = await tx.product.findFirst({ where: { id: line.productId, tenantId: ctx.tenantId, ...companyScopeFilter(documentCtx) }, select: { id: true, unit: true } });
+        if (!product) throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la orden");
+        assertProductUnitCompatible(product.unit, line.unit ?? "");
       }
     }
     const wbsDominantByCreate = await loadWbsDominantCostTypes([...new Set(input.lines.map((line) => line.wbsNodeId))], ctx.tenantId, tx);
@@ -825,6 +829,7 @@ export async function updatePurchaseOrder(
 
   const purchaseOrderId = await prisma.$transaction(async (tx) => {
     await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await lockProcurementCompanyForNumbering(tx, existing.companyId, ctx.tenantId);
     const current = await tx.purchaseOrder.findFirst({ where: { id, tenantId: ctx.tenantId, companyId: existing.companyId, projectId: existing.projectId }, include: poInclude });
     if (!current || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
       throw new ServiceError("CONFLICT", "La orden cambió durante la edición. Recargá e intentá de nuevo.");
@@ -834,12 +839,15 @@ export async function updatePurchaseOrder(
     const apuCategoryByIdx = new Map<number, CostCategory>();
     let wbsDominantByUpdate = new Map<string, CostCategory | null>();
     if (input.lines) {
+      await lockProductsForUnitReferences(tx, input.lines.flatMap((line) => line.productId ? [line.productId] : []), ctx.tenantId);
       for (const [i, line] of input.lines.entries()) {
         const documentCtx = { ...ctx, companyId: existing.companyId };
         await assertWbsLineForProject(line.wbsNodeId, existing.projectId, ctx.tenantId, { ctx: documentCtx, db: tx });
         if (line.costAnalysisLineId) apuCategoryByIdx.set(i, await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, ctx.tenantId, { ctx: documentCtx, db: tx }));
-        if (line.productId && !await tx.product.findFirst({ where: { id: line.productId, tenantId: ctx.tenantId, ...companyScopeFilter(documentCtx) }, select: { id: true } })) {
-          throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la orden");
+        if (line.productId) {
+          const product = await tx.product.findFirst({ where: { id: line.productId, tenantId: ctx.tenantId, ...companyScopeFilter(documentCtx) }, select: { id: true, unit: true } });
+          if (!product) throw new ServiceError("CONFLICT", "El producto no pertenece a la empresa de la orden");
+          assertProductUnitCompatible(product.unit, line.unit ?? "");
         }
       }
       wbsDominantByUpdate = await loadWbsDominantCostTypes([...new Set(input.lines.map((line) => line.wbsNodeId))], ctx.tenantId, tx);

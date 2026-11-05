@@ -4,16 +4,24 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { ProductView } from "@bloqer/services";
 import { ProductStatusBadge } from "./product-status-badge";
 
-export function ProductCards({ products }: { products: ProductView[] }) {
+export function ProductCards({
+  products,
+  canCreate = false,
+}: {
+  products: ProductView[];
+  canCreate?: boolean;
+}) {
   if (products.length === 0) {
     return (
       <ListEmptyState
         title="Sin productos"
         description="Registrá el catálogo para controlar stock y consumos."
         action={
-          <Button asChild size="sm">
-            <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
-          </Button>
+          canCreate ? (
+            <Button asChild size="sm">
+              <Link href="/inventario/productos/nuevo">Nuevo producto</Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -28,7 +36,9 @@ export function ProductCards({ products }: { products: ProductView[] }) {
           className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
         >
           <div className="flex items-start justify-between gap-2">
-            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">{p.sku}</span>
+            <span className="min-w-0 truncate font-mono text-xs text-muted-foreground">
+              {p.sku}
+            </span>
             <span className="shrink-0">
               <ProductStatusBadge status={p.status} />
             </span>

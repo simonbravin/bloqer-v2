@@ -70,6 +70,7 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 ## 11. Validaciones
 - Cantidades recepción ≤ pendiente OC ± tolerancia.
 - Depósito obligatorio si línea inventariable.
+- **Unidad del producto (D-130):** crear/editar una compra con producto exige que la unidad explícita coincida con la del catálogo, sin conversión. Confirmar una recepción vuelve a comprobarla antes de generar stock. Una OC histórica incompatible se conserva consultable; un nuevo ingreso incompatible se rechaza sin efectos parciales y requiere revisar el documento origen, sin editar una OC confirmada para eludir el control. Los replays ya confirmados no repiten efectos.
 - Período cerrado: controles D-078 sobre tesorería y asientos; el control transversal de OC/recepción/factura operativa sigue diferido ([BR-PUR-014]).
 - Sumar líneas repetidas de una recepción por ítem de OC antes de comprobar tolerancia. Para productos se requiere depósito destino; servicios sin producto no generan stock.
 - Alta y modificación, aprobación, recepción y vínculo OC→AP validan empresa/obra y el grafo de padres. Las comprobaciones se repiten dentro de la transacción antes de mutar.

@@ -21,16 +21,24 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Otro",
 };
 
-export function WarehouseTable({ warehouses }: { warehouses: WarehouseView[] }) {
+export function WarehouseTable({
+  warehouses,
+  canCreate = false,
+}: {
+  warehouses: WarehouseView[];
+  canCreate?: boolean;
+}) {
   if (warehouses.length === 0) {
     return (
       <ListEmptyState
         title="Sin depósitos"
         description="Creá un depósito para registrar ingresos, egresos y transferencias."
         action={
-          <Button asChild size="sm">
-            <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
-          </Button>
+          canCreate ? (
+            <Button asChild size="sm">
+              <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
+            </Button>
+          ) : undefined
         }
       />
     );

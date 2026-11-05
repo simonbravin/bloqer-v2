@@ -13,21 +13,21 @@ import {
 } from "@/components/ui/select";
 
 const TYPE_OPTIONS = [
-  { value: "_all",        label: "Todos los tipos" },
-  { value: "IN",          label: "Ingreso" },
-  { value: "OUT",         label: "Egreso" },
+  { value: "_all", label: "Todos los tipos" },
+  { value: "IN", label: "Ingreso" },
+  { value: "OUT", label: "Egreso" },
   { value: "TRANSFER_IN", label: "Transf. entrada" },
-  { value: "TRANSFER_OUT",label: "Transf. salida" },
-  { value: "ADJUSTMENT",  label: "Ajuste" },
+  { value: "TRANSFER_OUT", label: "Transf. salida" },
+  { value: "ADJUSTMENT", label: "Ajuste" },
 ];
 
 const SOURCE_OPTIONS = [
-  { value: "_all",             label: "Todos los orígenes" },
+  { value: "_all", label: "Todos los orígenes" },
   { value: "PURCHASE_RECEIPT", label: "Recepción de compra" },
-  { value: "CONSUMPTION",      label: "Consumo" },
-  { value: "TRANSFER",         label: "Transferencia" },
-  { value: "ADJUSTMENT",       label: "Ajuste" },
-  { value: "OPENING_BALANCE",  label: "Saldo inicial" },
+  { value: "CONSUMPTION", label: "Consumo" },
+  { value: "TRANSFER", label: "Transferencia" },
+  { value: "ADJUSTMENT", label: "Ajuste" },
+  { value: "OPENING_BALANCE", label: "Saldo inicial" },
 ];
 
 interface StockReportFiltersProps {
@@ -35,13 +35,14 @@ interface StockReportFiltersProps {
 }
 
 export function StockReportFilters({ mode }: StockReportFiltersProps) {
-  const router   = useRouter();
+  const router = useRouter();
   const pathname = usePathname();
-  const sp       = useSearchParams();
+  const sp = useSearchParams();
 
   function update(key: string, value: string) {
     const params = new URLSearchParams(sp.toString());
-    if (value) params.set(key, value); else params.delete(key);
+    if (value) params.set(key, value);
+    else params.delete(key);
     router.push(`${pathname}?${params.toString()}`);
   }
 
@@ -49,12 +50,16 @@ export function StockReportFilters({ mode }: StockReportFiltersProps) {
     return (
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Stock cero</Label>
+          <Label htmlFor="stock-zero" className="text-xs text-muted-foreground">
+            Stock cero
+          </Label>
           <Select
-            value={sp.get("includeZeroStock") ?? "_hide"}
+            value={sp.get("includeZeroStock") === "true" ? "true" : "_hide"}
             onValueChange={(v) => update("includeZeroStock", v === "_hide" ? "" : v)}
           >
-            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectTrigger id="stock-zero" className="w-40">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="_hide">Ocultar stock cero</SelectItem>
               <SelectItem value="true">Incluir stock cero</SelectItem>
@@ -76,47 +81,65 @@ export function StockReportFilters({ mode }: StockReportFiltersProps) {
   return (
     <div className="grid min-w-0 grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-5">
       <div className="min-w-0 space-y-1">
-        <Label className="text-xs text-muted-foreground">Desde</Label>
+        <Label htmlFor="stock-dateFrom" className="text-xs text-muted-foreground">
+          Desde
+        </Label>
         <Input
           type="date"
+          id="stock-dateFrom"
           value={sp.get("dateFrom") ?? ""}
           onChange={(e) => update("dateFrom", e.target.value)}
           className="w-full min-w-0"
         />
       </div>
       <div className="min-w-0 space-y-1">
-        <Label className="text-xs text-muted-foreground">Hasta</Label>
+        <Label htmlFor="stock-dateTo" className="text-xs text-muted-foreground">
+          Hasta
+        </Label>
         <Input
           type="date"
+          id="stock-dateTo"
           value={sp.get("dateTo") ?? ""}
           onChange={(e) => update("dateTo", e.target.value)}
           className="w-full min-w-0"
         />
       </div>
       <div className="min-w-0 space-y-1">
-        <Label className="text-xs text-muted-foreground">Tipo</Label>
+        <Label htmlFor="stock-movementType" className="text-xs text-muted-foreground">
+          Tipo
+        </Label>
         <Select
           value={sp.get("movementType") ?? "_all"}
           onValueChange={(v) => update("movementType", v === "_all" ? "" : v)}
         >
-          <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+          <SelectTrigger id="stock-movementType" className="w-full min-w-0">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             {TYPE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
       <div className="min-w-0 space-y-1">
-        <Label className="text-xs text-muted-foreground">Origen</Label>
+        <Label htmlFor="stock-sourceType" className="text-xs text-muted-foreground">
+          Origen
+        </Label>
         <Select
           value={sp.get("sourceType") ?? "_all"}
           onValueChange={(v) => update("sourceType", v === "_all" ? "" : v)}
         >
-          <SelectTrigger className="w-full min-w-0"><SelectValue /></SelectTrigger>
+          <SelectTrigger id="stock-sourceType" className="w-full min-w-0">
+            <SelectValue />
+          </SelectTrigger>
           <SelectContent>
             {SOURCE_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>

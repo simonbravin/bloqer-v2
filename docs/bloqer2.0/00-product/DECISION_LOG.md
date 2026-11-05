@@ -2006,6 +2006,17 @@
 - **Propuesta aprobada:** [FX de confirmación AG-06](../08-architecture/platform-audit/2026-11-04-ag-06-confirmation-fx-proposal.md).
 - **Documentos afectados:** MONEY_MODEL, APPROVAL_WORKFLOWS, STATE_MACHINES, PURCHASE_ORDERS_AND_RECEIPTS, REGISTER_PURCHASE, guía/ayuda y conocimiento AI.
 
+### D-130 — Unidad fija del producto y compatibilidad física sin conversiones
+
+- **Fecha:** 2026-11-05.
+- **Estado:** ACTIVA — aprobación explícita del Owner de ambas protecciones recomendadas de AG-07 (Q-077).
+- **Decisión:** `Product.unit` se puede cambiar únicamente mientras no existan referencias en SC, OC, APU, material de parte, transferencia o movimiento de stock, cualquiera sea su estado. Reenviar la misma unidad conserva el comportamiento de edición; nombre, descripción, categoría, notas y estado siguen sus reglas actuales. Para operar otra unidad con un producto ya usado, crear otro producto.
+- **Compatibilidad:** las operaciones nuevas con producto y unidad explícita comprueban que la unidad coincida al crear/editar la compra y antes de confirmar una recepción o consumo desde parte. Se admite la normalización existente de espacios exteriores y mayúsculas/minúsculas; no se infieren alias, equivalencias ni factores. Una diferencia se rechaza con explicación y sin efectos parciales.
+- **Atomicidad e históricos:** bloquear y revalidar el producto al crear referencias o cambiar su unidad. Los reintentos idempotentes ya realizados conservan su resultado; no se convierten, reetiquetan ni migran históricos. Una OC histórica incompatible no puede originar un nuevo ingreso; no se modifica una OC confirmada para sortear el control.
+- **Límites:** no agrega campos persistidos, estados, eventos, dependencias ni migraciones; no implementa conversiones, FIFO, reservas ni cierre parcial de OC.
+- **Propuesta aprobada:** [unidad y cantidades de stock AG-07](../08-architecture/platform-audit/2026-11-05-ag-07-stock-unit-proposal.md).
+- **Documentos afectados:** INVENTORY, MASTER_DATA, PURCHASE_ORDERS_AND_RECEIPTS, JOBSITE_LOG, guía, ayuda, conocimiento AI y evidencia AG-07.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

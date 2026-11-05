@@ -1,8 +1,5 @@
 ﻿import type { AgingBucket, AgingFilters } from "../aging/aging.service";
-import {
-  getReceivableAgingReport,
-  getPayableAgingReport,
-} from "../aging/aging.service";
+import { getReceivableAgingReport, getPayableAgingReport } from "../aging/aging.service";
 import type {
   CashFlowFilters,
   CashPositionFilters,
@@ -13,8 +10,14 @@ import {
   getCashPositionReport,
   getAccountMovementReport,
 } from "../treasury-reports/treasury-reports.service";
-import type { StockBalanceFilters, StockMovementReportFilters } from "../inventory-reports/inventory-reports.service";
-import { getStockBalanceReport, getStockMovementReport } from "../inventory-reports/inventory-reports.service";
+import type {
+  StockBalanceFilters,
+  StockMovementReportFilters,
+} from "../inventory-reports/inventory-reports.service";
+import {
+  getStockBalanceReport,
+  getStockMovementReport,
+} from "../inventory-reports/inventory-reports.service";
 import type { CostControlFilters } from "../cost-control/cost-control.service";
 import {
   getProjectCostControl,
@@ -81,7 +84,11 @@ function tableToXlsx(
   };
 }
 
-function csvTextToXlsx(content: string, filenameBase: string, sheetName: string): ReportXlsxPayload {
+function csvTextToXlsx(
+  content: string,
+  filenameBase: string,
+  sheetName: string,
+): ReportXlsxPayload {
   const { headers, rows } = parseBuiltCsv(content);
   return tableToXlsx(headers, rows, filenameBase, sheetName);
 }
@@ -110,14 +117,18 @@ export function parseAgingFilters(sp: Record<string, string | undefined>): Aging
   };
 }
 
-export function parseCashPositionFilters(sp: Record<string, string | undefined>): CashPositionFilters {
+export function parseCashPositionFilters(
+  sp: Record<string, string | undefined>,
+): CashPositionFilters {
   return {
     companyId: sp.companyId,
     currency: sp.currency,
   };
 }
 
-export function parseMovementReportFilters(sp: Record<string, string | undefined>): MovementReportFilters {
+export function parseMovementReportFilters(
+  sp: Record<string, string | undefined>,
+): MovementReportFilters {
   const scope = sp.scope;
   return {
     accountId: sp.accountId,
@@ -172,11 +183,7 @@ export function parseCompanySupplierInvoiceExportFilters(
   const issueDateFrom = sp.from ?? sp.issueDateFrom;
   const issueDateTo = sp.to ?? sp.issueDateTo;
   return {
-    ...(showAll
-      ? { includeCancelled: true }
-      : activeOnly
-        ? {}
-        : { status: status ?? "ISSUED" }),
+    ...(showAll ? { includeCancelled: true } : activeOnly ? {} : { status: status ?? "ISSUED" }),
     ...(issueDateFrom ? { issueDateFrom } : {}),
     ...(issueDateTo ? { issueDateTo } : {}),
     ...(sp.class ? { class: sp.class } : {}),
@@ -187,7 +194,8 @@ export function parseCompanySupplierInvoiceExportFilters(
 }
 
 export function parseCashFlowFilters(sp: Record<string, string | undefined>): CashFlowFilters {
-  const period = sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
+  const period =
+    sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
   return {
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
@@ -196,7 +204,9 @@ export function parseCashFlowFilters(sp: Record<string, string | undefined>): Ca
   };
 }
 
-export function parseStockBalanceFilters(sp: Record<string, string | undefined>): StockBalanceFilters {
+export function parseStockBalanceFilters(
+  sp: Record<string, string | undefined>,
+): StockBalanceFilters {
   return {
     warehouseId: sp.warehouseId,
     productId: sp.productId,
@@ -206,7 +216,9 @@ export function parseStockBalanceFilters(sp: Record<string, string | undefined>)
   };
 }
 
-export function parseStockMovementFilters(sp: Record<string, string | undefined>): StockMovementReportFilters {
+export function parseStockMovementFilters(
+  sp: Record<string, string | undefined>,
+): StockMovementReportFilters {
   return {
     warehouseId: sp.warehouseId,
     productId: sp.productId,
@@ -220,7 +232,9 @@ export function parseStockMovementFilters(sp: Record<string, string | undefined>
   };
 }
 
-export function parseCostControlFilters(sp: Record<string, string | undefined>): CostControlFilters {
+export function parseCostControlFilters(
+  sp: Record<string, string | undefined>,
+): CostControlFilters {
   return {
     budgetId: sp.budgetId,
     dateFrom: sp.dateFrom,
@@ -230,7 +244,9 @@ export function parseCostControlFilters(sp: Record<string, string | undefined>):
   };
 }
 
-export function parseBudgetVarianceFilters(sp: Record<string, string | undefined>): BudgetVarianceFilters {
+export function parseBudgetVarianceFilters(
+  sp: Record<string, string | undefined>,
+): BudgetVarianceFilters {
   return {
     ...parseCostControlFilters(sp),
     costLayer: parseCostVarianceLayer(sp.costLayer),
@@ -252,7 +268,9 @@ export function parseProjectReportDateFilters(sp: Record<string, string | undefi
 }
 
 /** Aligns with project report pages (`ingresos-gastos`, scheduled params). */
-export function parseIncomeExpenseFilters(sp: Record<string, string | undefined>): IncomeExpenseFilters {
+export function parseIncomeExpenseFilters(
+  sp: Record<string, string | undefined>,
+): IncomeExpenseFilters {
   const currencyViewRaw =
     sp.currencyView === "original" || sp.currencyView === "ARS"
       ? sp.currencyView
@@ -266,7 +284,9 @@ export function parseIncomeExpenseFilters(sp: Record<string, string | undefined>
 }
 
 /** Aligns with `rentabilidad` report routes and CSV export. */
-export function parseProfitabilityFilters(sp: Record<string, string | undefined>): ProfitabilityFilters {
+export function parseProfitabilityFilters(
+  sp: Record<string, string | undefined>,
+): ProfitabilityFilters {
   return {
     budgetId: sp.budgetId,
     costLayer: parseCostVarianceLayer(sp.costLayer),
@@ -296,8 +316,11 @@ export function parseSubcontractReportFilters(
   return parseProjectReportDateFilters(sp);
 }
 
-export function parseProjectCashFlowFilters(sp: Record<string, string | undefined>): ProjectCashFlowFilters {
-  const period = sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
+export function parseProjectCashFlowFilters(
+  sp: Record<string, string | undefined>,
+): ProjectCashFlowFilters {
+  const period =
+    sp.period === "day" || sp.period === "week" || sp.period === "month" ? sp.period : undefined;
   return {
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
@@ -354,7 +377,10 @@ export async function exportReceivableAgingCsv(
   };
 }
 
-export async function exportPayableAgingCsv(filters: AgingFilters, ctx: ServiceContext): Promise<ReportCsvPayload> {
+export async function exportPayableAgingCsv(
+  filters: AgingFilters,
+  ctx: ServiceContext,
+): Promise<ReportCsvPayload> {
   const report = await getPayableAgingReport(filters, ctx);
   const headers = [
     "Proveedor",
@@ -506,7 +532,9 @@ export async function exportCompanyPayablesCsv(
   const rows = data.map((p) => [
     p.supplierName,
     p.supplierInvoiceCode ?? "",
-    p.dueDate instanceof Date ? p.dueDate.toISOString().slice(0, 10) : String(p.dueDate).slice(0, 10),
+    p.dueDate instanceof Date
+      ? p.dueDate.toISOString().slice(0, 10)
+      : String(p.dueDate).slice(0, 10),
     p.status,
     p.currency,
     p.originalAmount,
@@ -554,8 +582,12 @@ export async function exportCompanySupplierInvoicesCsv(
         : "Factura",
     inv.supplierName,
     inv.classLabel,
-    inv.issueDate instanceof Date ? inv.issueDate.toISOString().slice(0, 10) : String(inv.issueDate).slice(0, 10),
-    inv.dueDate instanceof Date ? inv.dueDate.toISOString().slice(0, 10) : String(inv.dueDate).slice(0, 10),
+    inv.issueDate instanceof Date
+      ? inv.issueDate.toISOString().slice(0, 10)
+      : String(inv.issueDate).slice(0, 10),
+    inv.dueDate instanceof Date
+      ? inv.dueDate.toISOString().slice(0, 10)
+      : String(inv.dueDate).slice(0, 10),
     inv.status,
     inv.currency,
     inv.totalAmount,
@@ -667,6 +699,8 @@ export async function exportStockMovementsCsv(
     "CantidadSignada",
     "CostoUnitario",
     "CostoTotal",
+    "MonedaCosto",
+    "AdvertenciaCosto",
     "Notas",
   ];
   const rows = data.map((r) => [
@@ -681,9 +715,11 @@ export async function exportStockMovementsCsv(
     r.sourceType,
     r.sourceLabel,
     r.quantity,
-    r.signedQuantity,
+    r.signedQuantity ?? "",
     r.unitCost ?? "",
     r.totalCost ?? "",
+    r.costCurrency ?? "",
+    r.costWarning ?? "",
     r.notes ?? "",
   ]);
   return {
@@ -699,10 +735,16 @@ export async function exportProjectCostControlCsv(
 ): Promise<ReportCsvPayload> {
   const result = await getProjectCostControl(projectId, filters, ctx);
   if (result.type === "NO_APPROVED_BUDGETS") {
-    throw new ServiceError("CONFLICT", "No hay presupuesto aprobado o cerrado para exportar el control de costos");
+    throw new ServiceError(
+      "CONFLICT",
+      "No hay presupuesto aprobado o cerrado para exportar el control de costos",
+    );
   }
   if (result.type === "BUDGET_SELECTION_REQUIRED") {
-    throw new ServiceError("CONFLICT", "Seleccioná un presupuesto para exportar el control de costos");
+    throw new ServiceError(
+      "CONFLICT",
+      "Seleccioná un presupuesto para exportar el control de costos",
+    );
   }
   const r = filters.costType ? sliceCostControlReportByCostType(result, filters.costType) : result;
   const headers = [
@@ -944,7 +986,10 @@ export async function exportProjectCostControlCsv(
   const typeSuffix = filters.costType ? `_${filters.costType.toLowerCase()}` : "";
   const fname = `control_costos_${r.projectId}_${r.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}${typeSuffix}`;
   return {
-    content: buildCsv([...headers, "Moneda"], rows.map((row) => [...row, r.currency])),
+    content: buildCsv(
+      [...headers, "Moneda"],
+      rows.map((row) => [...row, r.currency]),
+    ),
     filename: safeReportFilename(fname, "csv"),
   };
 }
@@ -1321,7 +1366,13 @@ export async function exportMaterialVarianceCsv(
     rows.push(padCsvRow(["__AVISO__", warning], headers.length));
   }
   const fname = `materiales_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
-  return { content: buildCsv([...headers, "Moneda"], rows.map((row) => [...row, result.currency])), filename: safeReportFilename(fname, "csv") };
+  return {
+    content: buildCsv(
+      [...headers, "Moneda"],
+      rows.map((row) => [...row, result.currency]),
+    ),
+    filename: safeReportFilename(fname, "csv"),
+  };
 }
 
 export async function exportResourceVarianceCsv(
@@ -1366,7 +1417,13 @@ export async function exportResourceVarianceCsv(
     rows.push(padCsvRow(["__AVISO__", warning], headers.length));
   }
   const fname = `${segment}_${projectId}_${result.budgetName.replace(/[^a-zA-Z0-9._-]+/g, "_")}`;
-  return { content: buildCsv([...headers, "Moneda"], rows.map((row) => [...row, result.currency])), filename: safeReportFilename(fname, "csv") };
+  return {
+    content: buildCsv(
+      [...headers, "Moneda"],
+      rows.map((row) => [...row, result.currency]),
+    ),
+    filename: safeReportFilename(fname, "csv"),
+  };
 }
 
 export async function exportProjectIncomeExpenseCsv(
@@ -1454,11 +1511,29 @@ export async function exportProjectGgOverviewCsv(
     throw new ServiceError("CONFLICT", "Elegí un presupuesto para exportar GG de obra");
   }
   const s = report.summary;
-  const headers = ["Seccion", "Codigo", "Nombre", "TipoDoc", "Documento", "Proveedor", "Monto", "Moneda"];
+  const headers = [
+    "Seccion",
+    "Codigo",
+    "Nombre",
+    "TipoDoc",
+    "Documento",
+    "Proveedor",
+    "Monto",
+    "Moneda",
+  ];
   const rows: string[][] = [
     ["Resumen", "", "Presupuesto GG", "", "", "", s.budgetedGg, report.currency],
     ["Resumen", "", "Devengado partidas GG", "", "", "", s.accruedOnGgPartidas, report.currency],
-    ["Resumen", "", "Comprometido abierto partidas GG", "", "", "", s.openCommittedOnGgPartidas, report.currency],
+    [
+      "Resumen",
+      "",
+      "Comprometido abierto partidas GG",
+      "",
+      "",
+      "",
+      s.openCommittedOnGgPartidas,
+      report.currency,
+    ],
     ["Resumen", "", "Sin EDT comprometido", "", "", "", s.unallocatedCommitted, report.currency],
     ["Resumen", "", "Sin EDT devengado", "", "", "", s.unallocatedAccrued, report.currency],
     [
@@ -1496,19 +1571,37 @@ export async function exportProjectGgOverviewCsv(
     rows.push(["Aviso", "", w, "", "", "", "", ""]);
   }
   for (const p of report.ggPartidas) {
+    rows.push(["PartidaGG", p.wbsCode, p.wbsName, "", "", "", "", report.currency]);
     rows.push([
-      "PartidaGG",
+      "PartidaGG_presupuesto",
       p.wbsCode,
       p.wbsName,
       "",
       "",
       "",
-      "",
+      p.budgetTotalCost,
       report.currency,
     ]);
-    rows.push(["PartidaGG_presupuesto", p.wbsCode, p.wbsName, "", "", "", p.budgetTotalCost, report.currency]);
-    rows.push(["PartidaGG_devengado", p.wbsCode, p.wbsName, "", "", "", p.accruedCost, report.currency]);
-    rows.push(["PartidaGG_comprom_abierto", p.wbsCode, p.wbsName, "", "", "", p.openCommittedCost, report.currency]);
+    rows.push([
+      "PartidaGG_devengado",
+      p.wbsCode,
+      p.wbsName,
+      "",
+      "",
+      "",
+      p.accruedCost,
+      report.currency,
+    ]);
+    rows.push([
+      "PartidaGG_comprom_abierto",
+      p.wbsCode,
+      p.wbsName,
+      "",
+      "",
+      "",
+      p.openCommittedCost,
+      report.currency,
+    ]);
   }
   for (const d of report.unallocatedDocuments) {
     rows.push([
@@ -1655,14 +1748,32 @@ export async function exportProjectCashFlowCsv(
     for (const ex of excluded) {
       rows.push(
         padCsvRow(
-          ["", "TENANT_MODULE_EXCLUDED", ex.module, ex.section, "", "", "", "", "", "", "", "", "", ex.reason],
+          [
+            "",
+            "TENANT_MODULE_EXCLUDED",
+            ex.module,
+            ex.section,
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            ex.reason,
+          ],
           n,
         ),
       );
     }
   }
 
-  const slug = `${report.project.code}_${report.dateFrom}_${report.dateTo}`.replace(/[^a-zA-Z0-9._-]+/g, "_");
+  const slug = `${report.project.code}_${report.dateFrom}_${report.dateTo}`.replace(
+    /[^a-zA-Z0-9._-]+/g,
+    "_",
+  );
   return {
     content: buildCsv(headers, rows),
     filename: safeReportFilename(`flujo_caja_proyecto_${slug}`, "csv"),
@@ -1727,7 +1838,8 @@ export async function exportPortfolioProfitabilityCsv(
   ctx: ServiceContext,
   filters?: { costLayer?: string; revenueBasis?: string; status?: string },
 ): Promise<ReportCsvPayload> {
-  const { getPortfolioProfitabilityReport } = await import("../reports/project-profitability.service");
+  const { getPortfolioProfitabilityReport } =
+    await import("../reports/project-profitability.service");
   const parsedFilters = {
     costLayer: filters?.costLayer as "exposure" | "committed" | "accrued" | "paid" | undefined,
     revenueBasis: filters?.revenueBasis as "certified" | "invoiced" | undefined,
@@ -1796,14 +1908,7 @@ export async function exportOverheadByProjectCsv(
     periodFrom: filters?.periodFrom ?? filters?.dateFrom,
     periodTo: filters?.periodTo ?? filters?.dateTo,
   });
-  const headers = [
-    "Codigo proyecto",
-    "Proyecto",
-    "Periodo",
-    "Moneda",
-    "Monto",
-    "Notas",
-  ];
+  const headers = ["Codigo proyecto", "Proyecto", "Periodo", "Moneda", "Monto", "Notas"];
   const rows: string[][] = report.rows.map((r) => [
     r.projectCode,
     r.projectName,
@@ -1830,7 +1935,8 @@ export async function exportMultiProjectProcurementCsv(
   ctx: ServiceContext,
   filters?: { dateFrom?: string; dateTo?: string },
 ): Promise<ReportCsvPayload> {
-  const { getMultiProjectProcurementReport } = await import("../reports/procurement-deviation.service");
+  const { getMultiProjectProcurementReport } =
+    await import("../reports/procurement-deviation.service");
   const report = await getMultiProjectProcurementReport(ctx, filters);
   const headers = [
     "Seccion",

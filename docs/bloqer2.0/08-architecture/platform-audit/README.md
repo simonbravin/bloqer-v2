@@ -2,6 +2,10 @@
 
 Este registro permite retomar la auditoría global de Bloqer o revisar un área después de un cambio. El alcance y las dependencias están en el [plan de auditoría](../PLATFORM_AUDIT_PLAN.md); la ejecución y los criterios de cierre, en el [procedimiento](../PLATFORM_AUDIT_RUNBOOK.md). Cada corrida debe usar la [plantilla de informe](./REPORT_TEMPLATE.md).
 
+## Estado vigente al 05/11/2026
+
+**AG-00 a AG-06 publicadas. AG-07 cerrada localmente; AG-08 no iniciada.** [Publicación AG-05/06](./2026-11-04-ag-05-ag-06-publication.md) y [cierre AG-07](./2026-11-04-ag-07-inventory.md). D-130 aprobada e implementada, 38 grupos corregidos, 2.388 pruebas generales y 111 SQL distintos aprobados, tipos/lint/compilación y muestra visual. AG-07 permanece sin publicar.
+
 ## Corte inicial: 03/11/2026
 
 **Actualización de publicación, 04/11/2026:** AG-00 a AG-04 y los cambios previos pendientes se integraron en [PR #3](https://github.com/simonbravin/bloqer-v2/pull/3) y Vercel confirmó Production para `3407c023`. [Registro de publicación](./2026-11-04-ag-00-ag-04-publication.md): CI, build y 2.129 pruebas aprobadas; 70 migraciones productivas existentes verificadas solo en lectura, sin pendientes. Smoke público de acceso/recuperación aprobado; workflows autenticados del portal no ejecutados. Los cierres locales siguientes se conservan como evidencia de su momento.
@@ -73,7 +77,7 @@ Se realizó una preparación por lectura de documentación, estructura, recursos
 - Pruebas generales finales: **2.197 aprobadas**, cero fallos/cancelados; **26 suites live omitidas**, sin contarlas como casos ejecutados. Tipos: **13/13** tareas; lint completo y compilación con DB deshabilitada aprobados. Los **13 PDF**, incluidos tres smoke de cronograma y dos de valuación `.tsx`, forman parte del contador general; se corrige la exclusión descrita en el corte histórico.
 - SQL aislado de la continuación: **97 casos distintos aprobados** (55 nuevos, 42 anteriores repetidos), con guard efectivo antes de fixtures y limpieza final comprobada en lectura. La selección inicial canceló 30 por un nombre duplicado del fixture: se corrigió y repitió 30/30; no se cuentan los cancelados como aprobados. El historial anterior tiene 81 casos, incluidos nueve de AG-04; el conjunto deduplicado es 136, sin afirmar que los 136 se repitieron ahora. XLSX público real generado y reabierto.
 - Guía, ayuda e índice AI actualizados: **533 chunks**. Muestra visual local autorizada de OWNER y PROJECT_VIEWER, escritorio claro/oscuro y móvil 390 px: cero comprobado frente a costo desconocido, advertencias y detalle. Consumo positivo, notas netas y conflicto de moneda tienen SQL real; no se les atribuye una navegación con esos datos. Límites y observación de memoria del entorno de desarrollo conservados en el cierre.
-- **AG-05 permanece local y no está en la publicación anterior. Al cerrar esa corrida, AG-06 esperaba indicación del Owner; su continuación autorizada se registra debajo.** En AG-05 no hubo cambios de schema, migraciones, dependencias, roles o `.env`, ni proveedores externos o workflows autenticados de Production.
+- **AG-05 — Publicada tras corrección y verificación.** [Cierre](./2026-11-04-ag-05-closure.md) y [publicación PR4](./2026-11-04-ag-05-ag-06-publication.md). D-122/123/124 implementadas; RFIs y contratos formales conservan sus diferimientos.
 
 ## Corrida AG-06: 04/11/2026
 
@@ -85,6 +89,19 @@ Se realizó una preparación por lectura de documentación, estructura, recursos
 - Migración D-127 aplicada únicamente a la DB aislada de auditoría, con históricos sin renumerar. Dev normal y producción no migrados; sin publicación, proveedores reales ni cambios de dependencias o `.env`. La instancia local y sesión temporal se cerraron al terminar.
 - **AG-05 y AG-06 permanecen locales. AG-07 no iniciada; esperar indicación del Owner.** Las etapas completas de Inventario/AP/reportes y servicios transversales conservan su alcance pendiente.
 
+## Publicación AG-05/06: 04/11/2026
+
+[Registro de publicación](./2026-11-04-ag-05-ag-06-publication.md): PR4, commit de entrega4a9af281, merge Production74bb2c9d. CI PR/main verdes (2.335pruebas,13tipos,lint); E2E omitido. VercelProduction exitoso y SQLproductivo solo lectura verificó71migraciones, D-127/columna/índice/checksum. Acceso/recuperación públicos200; sin workflows autenticados productivos. No se incluyó AG-07. La aprobación explícita del destino público quedó registrada tras la revisión automática inicial.
+
+## Corrida AG-07: 04–05/11/2026
+
+**Cerrada: corregida y verificada localmente.** [Informe](./2026-11-04-ag-07-inventory.md) y [JSON](./2026-11-04-ag-07-inventory.json). 38 grupos resueltos, incluidos dos defectos transitorios de auditoría reparados. Q-077 resuelta en D-130: unidad protegida y compatibilidad sin conversiones. Selector de partes con alcance y gates corregidos.
+
+- 2.388 pruebas generales, cero fallos; 33 suites live omitidas. Tipos 13 tareas, lint y compilación raíz aprobados.
+- 111 SQL distintos: inventario26, reportes9, compras/recepciones51, recepción/cronograma3, unidades/partes/APU15 y selector7; replays/carreras/rollback/históricos verificados.
+- UI Owner aislada, escritorio/celular; unidad fija y edición de otros campos, aviso móvil legible. Guía/ayuda/549 chunks actualizados; revisión independiente sin hallazgos residuales.
+- AG-07 local, sin publicar ni migrar. Logout/viewport/servidor comprobados; pestaña temporal con autocierre al terminar. D-083/D-124 y D-128 conservados. AG-08 espera indicación.
+
 ## Etapas y seguimiento
 
 Los identificadores, las etapas y sus estados son convenciones de seguimiento documental. No agregan entidades, estados de negocio ni configuración persistida al producto.
@@ -95,8 +112,8 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-03 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-03-ag-03-directory-projects.md): 20 grupos resueltos, 1.972 pruebas generales y 45 casos SQL aprobados; contactos, perfiles, proyectos, equipo, fechas, acceso del creador aprobado (Q-067), filtros, disposición móvil y coordinación de lifecycle con consumidores. Simplificación general de roles propuesta por separado; publicación y auditoría completa de módulos vecinos no incluidas.
 - **AG-04 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-03-ag-04-budgets-wbs-apu.md): 28 grupos resueltos; presupuestos, EDT, APU, versiones, adendas operativas y vínculo con cronograma. Contratos/adendas legales requieren resolver Q-057, que sigue diferida.
 - **AG-05 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-04-ag-05-closure.md): propuestas aprobadas implementadas en D-122/123/124; 2.197 pruebas generales, 97 casos SQL de la continuación y compilación aprobados. RFIs y contratos formales diferidos por alcance explícito. AG-05 continúa sin publicar; la continuación autorizada AG-06 tiene su propio cierre.
-- **AG-06 — Corregida y verificada local/SQL/navegador aislado, sin publicar.** [Cierre](./2026-11-04-ag-06-procurement.md): 35 grupos corregidos, 2.335 pruebas generales y 100 SQL distintos, tipos/lint/compilación raíz y muestra visual aprobados. D-125/126/127/129 implementadas; cierre parcial formal separado por D-128. Migración aplicada solo en DB sintética. AG-07 espera indicación.
-- **AG-07 — Inventario y depósitos. Pendiente.** Productos, existencias, movimientos, consumos y transferencias.
+- **AG-06 — Publicada tras corrección y verificación.** [Cierre](./2026-11-04-ag-06-procurement.md) y [publicación PR4](./2026-11-04-ag-05-ag-06-publication.md). D-125/126/127/129 implementadas; cierre parcial formal separado D-128. D-127 productiva comprobada.
+- **AG-07 — Corregida y verificada localmente, sin publicar.** [Cierre](./2026-11-04-ag-07-inventory.md): 38 grupos, D-130 implementada, 2.388 pruebas/111 SQL, tipos/lint/compilación/visual. AG-08 espera indicación.
 - **AG-08 — Certificaciones y subcontratos. Pendiente.** Avance certificado, sucesión de documentos y vínculos con facturación y obligaciones.
 - **AG-09 — Ventas y obligaciones. Pendiente.** Ventas, AR, cobranzas, AP y pagos, en contexto de proyecto y empresa cuando corresponda.
 - **AG-10 — Tesorería y contabilidad. Pendiente.** Cuentas, movimientos, transferencias, conciliación, cierre de períodos y GL.

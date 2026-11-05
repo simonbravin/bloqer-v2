@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { can } from "@bloqer/domain";
+import { InventoryStatusAction } from "@/features/inventory/components/inventory-status-action";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getProductById, listStockMovements, ServiceError } from "@bloqer/services";
@@ -31,16 +33,21 @@ export default async function ProductoPage({ params }: PageProps) {
       listStockMovements({ productId }, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
   return (
-    <PageShell variant="detail" className="space-y-6" breadcrumbLabel={`[${product.sku}] ${product.name}`}>
-      <div className="flex items-center justify-between">
+    <PageShell
+      variant="detail"
+      className="space-y-6"
+      breadcrumbLabel={`[${product.sku}] ${product.name}`}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="break-words text-2xl font-bold tracking-tight">
               [{product.sku}] {product.name}
             </h1>
             <div className="flex items-center gap-2 mt-1">
@@ -54,33 +61,31 @@ export default async function ProductoPage({ params }: PageProps) {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={`/inventario/productos/${productId}/stock`}>Stock</Link>
           </Button>
-          {product.status === "ACTIVE" ? (
-            <form
-              action={async () => {
-                "use server";
-                await deactivateProductAction(productId);
-              }}
-            >
-              <Button variant="outline" size="sm" type="submit">
-                Desactivar
-              </Button>
-            </form>
-          ) : (
-            <form
-              action={async () => {
-                "use server";
-                await reactivateProductAction(productId);
-              }}
-            >
-              <Button variant="outline" size="sm" type="submit">
-                Reactivar
-              </Button>
-            </form>
-          )}
+          {can(ctx.roles, "EDIT", "INVENTORY") ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/inventario/productos/${productId}/editar`}>Editar</Link>
+            </Button>
+          ) : null}
+          {can(ctx.roles, "EDIT", "INVENTORY") &&
+          (product.status === "ACTIVE" || product.status === "INACTIVE") ? (
+            <InventoryStatusAction
+              label={product.status === "ACTIVE" ? "Desactivar" : "Reactivar"}
+              description={
+                product.status === "ACTIVE"
+                  ? "Dejará de estar disponible para nuevas operaciones. Se conserva el historial."
+                  : "Volverá a estar disponible para nuevas operaciones autorizadas."
+              }
+              action={
+                product.status === "ACTIVE"
+                  ? deactivateProductAction.bind(null, productId)
+                  : reactivateProductAction.bind(null, productId)
+              }
+            />
+          ) : null}
         </div>
       </div>
 

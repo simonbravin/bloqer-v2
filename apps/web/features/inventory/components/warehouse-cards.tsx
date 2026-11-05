@@ -11,16 +11,24 @@ const TYPE_LABELS: Record<string, string> = {
   OTHER: "Otro",
 };
 
-export function WarehouseCards({ warehouses }: { warehouses: WarehouseView[] }) {
+export function WarehouseCards({
+  warehouses,
+  canCreate = false,
+}: {
+  warehouses: WarehouseView[];
+  canCreate?: boolean;
+}) {
   if (warehouses.length === 0) {
     return (
       <ListEmptyState
         title="Sin depósitos"
         description="Creá un depósito para registrar ingresos, egresos y transferencias."
         action={
-          <Button asChild size="sm">
-            <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
-          </Button>
+          canCreate ? (
+            <Button asChild size="sm">
+              <Link href="/inventario/depositos/nuevo">Nuevo depósito</Link>
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -39,7 +47,9 @@ export function WarehouseCards({ warehouses }: { warehouses: WarehouseView[] }) 
             <WarehouseStatusBadge status={w.status} />
           </div>
           <p className="mt-2 text-sm text-muted-foreground">{TYPE_LABELS[w.type] ?? w.type}</p>
-          {w.address ? <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{w.address}</p> : null}
+          {w.address ? (
+            <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{w.address}</p>
+          ) : null}
         </Link>
       ))}
     </div>
