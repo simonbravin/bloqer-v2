@@ -19,6 +19,7 @@ export type ProjectPortfolioRow = {
   code: string;
   name: string;
   status: string;
+  currency: string | null;
   budgetTotalCost: string;
   committedCost: string;
   accruedCost: string;
@@ -77,6 +78,7 @@ export async function getProjectPortfolioReport(
       certifiedApproved: string;
     },
     warning: string | null,
+    currency: string | null = null,
   ): ProjectPortfolioRow {
     const budgetDec = new Prisma.Decimal(t.budgetTotalCost);
     return {
@@ -84,6 +86,7 @@ export async function getProjectPortfolioReport(
       code: project.code ?? "",
       name: project.name,
       status: project.status,
+      currency,
       budgetTotalCost: t.budgetTotalCost,
       committedCost: t.committedCost,
       accruedCost: t.accruedCost,
@@ -135,9 +138,14 @@ export async function getProjectPortfolioReport(
             "Requiere selección de presupuesto",
           );
         }
-        return rowFromTotals(project, ccRetry.totals, null);
+        return rowFromTotals(
+          project,
+          ccRetry.totals,
+          "Se muestra el presupuesto seleccionado como referencia; hay otros presupuestos aprobados.",
+          ccRetry.currency,
+        );
       }
-      return rowFromTotals(project, cc.totals, null);
+      return rowFromTotals(project, cc.totals, null, cc.currency);
     }),
   );
 

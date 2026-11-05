@@ -1,6 +1,6 @@
 import { AccountMovementSourceType, AccountMovementType, Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { isUuid, toIsoDateInTimeZone } from "@bloqer/utils";
+import { isUuid } from "@bloqer/utils";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
 import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, MAX_EXPORT_ROWS, resolvePagination } from "../finance/pagination";
@@ -8,6 +8,7 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import { serializeFxRateDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 import { getAccountBalanceAsOf } from "../treasury/balance.service";
 import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "../treasury/balance-affecting-statuses";
+import { defaultReportDateRange } from "../reports/report-month";
 import {
   accountMovementClassWhere,
   classFieldsForAccountMovement,
@@ -40,16 +41,6 @@ function periodKey(date: Date, period: "day" | "week" | "month"): string {
   const jan1 = new Date(Date.UTC(yr, 0, 1));
   const wk = Math.ceil(((tmp.getTime() - jan1.getTime()) / 86400000 + 1) / 7);
   return `${yr}-W${String(wk).padStart(2, "0")}`;
-}
-
-function defaultDateRange(): { dateFrom: string; dateTo: string } {
-  const dateTo = toIsoDateInTimeZone();
-  const from = new Date(`${dateTo}T00:00:00.000Z`);
-  from.setUTCFullYear(from.getUTCFullYear() - 1);
-  return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo,
-  };
 }
 
 function cashReportDate(value?: string): string | undefined {
@@ -241,7 +232,7 @@ export type CashFlowFilters = {
 };
 
 export function getCashFlowDateRange(filters: Pick<CashFlowFilters, "dateFrom" | "dateTo">) {
-  const fallback = defaultDateRange();
+  const fallback = defaultReportDateRange();
   return {
     dateFrom: cashReportDate(filters.dateFrom) ?? fallback.dateFrom,
     dateTo: cashReportDate(filters.dateTo) ?? fallback.dateTo,
@@ -250,7 +241,7 @@ export function getCashFlowDateRange(filters: Pick<CashFlowFilters, "dateFrom" |
 
 // ─── Cash Position ────────────────────────────────────────────────────────────
 
-function treasuryReportAccountScope(tenantId: string, companyId?: string): Prisma.TreasuryAccountWhereInput {
+export function treasuryReportAccountScope(tenantId: string, companyId?: string): Prisma.TreasuryAccountWhereInput {
   return {
     tenantId,
     OR: [{ companyId: null }, { company: { tenantId } }],
@@ -731,28 +722,39 @@ export async function getCashFlowReport(
   const period   = filters.period ?? "month";
   const startDate = new Date(dateFrom);
   const endDate   = new Date(dateTo);
+  const currencyFilter = filters.currency ? cashPositionCurrency(filters.currency) : undefined;
+  const allAccounts = (await prisma.treasuryAccount.findMany({
+    where: treasuryReportAccountScope(ctx.tenantId),
+    select: { currency: true, id: true },
+  }))
+    .map((account) => ({ ...account, currency: cashPositionCurrency(account.currency) }))
+    .filter((account) => !currencyFilter || account.currency === currencyFilter);
+  const currencyByAccount = new Map(allAccounts.map((account) => [account.id, account.currency]));
 
   const movements = await prisma.accountMovement.findMany({
     where: {
       tenantId: ctx.tenantId,
       status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
       account: treasuryReportAccountScope(ctx.tenantId),
-      ...(filters.currency ? { currency: filters.currency } : {}),
+      accountId: { in: [...currencyByAccount.keys()] },
       movementDate: { gte: startDate, lte: endDate },
     },
-    select: { type: true, amount: true, currency: true, movementDate: true },
+    select: { type: true, amount: true, currency: true, movementDate: true, accountId: true },
     orderBy: { movementDate: "asc" },
   });
 
-  const allAccounts = await prisma.treasuryAccount.findMany({
-    where: {
-      ...treasuryReportAccountScope(ctx.tenantId),
-      ...(filters.currency ? { currency: filters.currency } : {}),
-    },
-    select: { currency: true, id: true },
-  });
+  const movementsByCurrency = new Map<string, typeof movements>();
+  for (const movement of movements) {
+    const currency = cashPositionCurrency(movement.currency);
+    if (currencyByAccount.get(movement.accountId) !== currency) {
+      throw new ServiceError("CONFLICT", "Hay movimientos en moneda distinta a la de su cuenta. Revisá el extracto antes de calcular el flujo.");
+    }
+    const rows = movementsByCurrency.get(currency) ?? [];
+    rows.push(movement);
+    movementsByCurrency.set(currency, rows);
+  }
 
-  const currencies = [...new Set([...movements.map((m) => m.currency), ...allAccounts.map((account) => account.currency)])].sort();
+  const currencies = [...new Set(currencyByAccount.values())].sort();
 
   const result: CashFlowReport = [];
 
@@ -775,7 +777,7 @@ export async function getCashFlowReport(
     };
     const bucketMap = new Map<string, BucketAcc>();
 
-    for (const m of movements.filter((mv) => mv.currency === currency)) {
+    for (const m of movementsByCurrency.get(currency) ?? []) {
       const key = periodKey(m.movementDate, period);
       if (!bucketMap.has(key)) {
         bucketMap.set(key, {

@@ -1,6 +1,6 @@
 import { Prisma } from "@bloqer/database";
 import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
-import { computeCostExposureLayers } from "../cost-control/cost-exposure";
+import { computeCostExposureByCommitment } from "../cost-control/cost-exposure";
 
 export const PROJECT_SUPPLIER_LEADER_LIMIT = 5;
 
@@ -23,6 +23,7 @@ export type ProjectSupplierSourceInvoice = {
   netAmount: Prisma.Decimal;
   paidAmount: Prisma.Decimal;
   purchaseOrderId: string | null;
+  countsAsInvoice?: boolean;
 };
 
 export type ProjectSupplierSourcePayable = {
@@ -91,13 +92,12 @@ export type ProjectSupplierReportBuilt = {
 
 type Acc = {
   supplierName: string;
-  poIds: Set<string>;
+  orders: Map<string, { committed: Prisma.Decimal; accruedLinked: Prisma.Decimal }>;
   openPoIds: Set<string>;
   invoiceIds: Set<string>;
   receiptCount: number;
   committed: Prisma.Decimal;
   accrued: Prisma.Decimal;
-  accruedLinked: Prisma.Decimal;
   paid: Prisma.Decimal;
   payableBalance: Prisma.Decimal;
   overduePayable: Prisma.Decimal;
@@ -107,13 +107,12 @@ type Acc = {
 function emptyAcc(supplierName: string): Acc {
   return {
     supplierName,
-    poIds: new Set(),
+    orders: new Map(),
     openPoIds: new Set(),
     invoiceIds: new Set(),
     receiptCount: 0,
     committed: ZERO,
     accrued: ZERO,
-    accruedLinked: ZERO,
     paid: ZERO,
     payableBalance: ZERO,
     overduePayable: ZERO,
@@ -165,7 +164,7 @@ export function buildProjectSupplierReport(input: {
   for (const po of input.purchaseOrders) {
     const acc = accFor(po.supplierContactId, po.supplierName);
     touch(acc, po.supplierName, po.issueDate);
-    acc.poIds.add(po.id);
+    acc.orders.set(po.id, { committed: po.lineSubtotal, accruedLinked: ZERO });
     if (isOpenPurchaseOrderStatus(po.status)) acc.openPoIds.add(po.id);
     acc.committed = acc.committed.add(po.lineSubtotal);
   }
@@ -173,10 +172,11 @@ export function buildProjectSupplierReport(input: {
   for (const inv of input.invoices) {
     const acc = accFor(inv.supplierContactId, inv.supplierName);
     touch(acc, inv.supplierName, inv.issueDate);
-    acc.invoiceIds.add(inv.id);
+    if (inv.countsAsInvoice !== false) acc.invoiceIds.add(inv.id);
     acc.accrued = acc.accrued.add(inv.netAmount);
     acc.paid = acc.paid.add(inv.paidAmount);
-    if (inv.purchaseOrderId) acc.accruedLinked = acc.accruedLinked.add(inv.netAmount);
+    const order = inv.purchaseOrderId ? acc.orders.get(inv.purchaseOrderId) : undefined;
+    if (order) order.accruedLinked = order.accruedLinked.add(inv.netAmount);
   }
 
   for (const rec of input.receipts) {
@@ -204,10 +204,9 @@ export function buildProjectSupplierReport(input: {
   let totalReceipts = 0;
 
   const intermediate = [...byId.entries()].map(([supplierContactId, acc]) => {
-    const { openCommitted, expectedCostExposure } = computeCostExposureLayers({
-      committed: acc.committed,
+    const { openCommitted, expectedCostExposure } = computeCostExposureByCommitment({
       accrued: acc.accrued,
-      accruedLinked: acc.accruedLinked,
+      commitments: [...acc.orders.values()],
     });
     totalCommitted = totalCommitted.add(acc.committed);
     totalAccrued = totalAccrued.add(acc.accrued);
@@ -216,7 +215,7 @@ export function buildProjectSupplierReport(input: {
     totalExposure = totalExposure.add(expectedCostExposure);
     totalPayable = totalPayable.add(acc.payableBalance);
     totalOverdue = totalOverdue.add(acc.overduePayable);
-    totalPos += acc.poIds.size;
+    totalPos += acc.orders.size;
     totalInvoices += acc.invoiceIds.size;
     totalReceipts += acc.receiptCount;
     return {
@@ -231,7 +230,7 @@ export function buildProjectSupplierReport(input: {
     .map(({ supplierContactId, acc, openCommitted, expectedCostExposure }) => ({
       supplierContactId,
       supplierName: acc.supplierName,
-      poCount: acc.poIds.size,
+      poCount: acc.orders.size,
       openPoCount: acc.openPoIds.size,
       invoiceCount: acc.invoiceIds.size,
       receiptCount: acc.receiptCount,

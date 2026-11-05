@@ -5,7 +5,7 @@
 - **Neta:** bruta − GG asignados − costo financiero − impuestos a nivel proyecto según política ([D-013]).
 
 ## Ingresos
-Suma de **certificaciones facturadas** + ventas directas + ajustes, en ARS.
+En el reporte **Rentabilidad por presupuesto**, la base **Certificado** usa los certificados del presupuesto. La base **Facturado** usa el subtotal neto de las facturas emitidas vinculadas y suma las ND y resta las NC emitidas de esas facturas de origen (D-141). Las ventas directas se informan fuera de ese margen. Un agregado de toda la obra requiere cubrir tanto sus ingresos como sus costos y distinguir las monedas no comparables.
 
 ## Costos
 Vistas alineadas a [D-021], [BR-COS-001], [BR-COS-002] y [`COST_FORMULAS.md`](../04-formulas/COST_FORMULAS.md):
@@ -20,8 +20,8 @@ Vistas alineadas a [D-021], [BR-COS-001], [BR-COS-002] y [`COST_FORMULAS.md`](..
 El toggle de UI debe **rotular** la capa activa; KPIs comparan la misma capa en numerador y denominador del periodo.
 
 ## Visibilidad
-- Bruta: PM/ADMIN según matriz.
-- Neta: OWNER/ADMIN por defecto; PM solo si flag tenant ([D-013]).
+- Bruta: OWNER, ADMIN, FINANCE y PROJECT_MANAGER con acceso a la obra.
+- Neta: OWNER y ADMIN ([D-013]).
 
 ## Referencias
 - [`../04-formulas/PROFITABILITY_FORMULAS.md`](../04-formulas/PROFITABILITY_FORMULAS.md)

@@ -172,7 +172,7 @@ describe("AG-05 cost control: real scopes, allocation and comparability", { skip
     const s = await scope();
     await invoice(s, "100"); await invoice(s, "999", { company: otherCompanyId });
     const result = await getProjectAccruedByMonth(s.project.id, {}, ctx);
-    assert.equal(result.total.toFixed(2), "100.00");
+    assert.equal(result.total?.toFixed(2), "100.00");
     assert.equal(result.series[0]!.amount.toFixed(2), "100.00");
   });
 

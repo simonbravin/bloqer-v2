@@ -1,10 +1,14 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { ProjectStatus } from "@bloqer/database";
 import type { UserRole } from "@bloqer/domain";
-import {
-  getProjectCostControl,
-  canViewProjectCostControlReport,
-} from "../cost-control/cost-control.service";
+import { can } from "@bloqer/domain";
+import { compareDecimal } from "@bloqer/utils";
+import { canViewApProjectArea } from "../ap/ap-access";
+import { canViewArProjectArea } from "../ar/ar-access";
+import { companyScopeFilter } from "../company-scope";
+import { getProjectCostControl } from "../cost-control/cost-control.service";
+import { canViewProcurementProjectArea } from "../procurement/procurement-access";
+import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
 import {
   assertTenantModuleEnabledWithGate,
   getTenantModuleGate,
@@ -13,18 +17,17 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { ServiceContext, ServiceError } from "../types";
 import type { CostVarianceLayer } from "./budget-variance.service";
 import { parseCostVarianceLayer } from "./budget-variance.service";
+import { resolveApprovedBudgetForProject } from "./report-budget-resolve";
 import {
-  canConsolidateInvoicesToArs,
-  canConsolidateToArs,
   parseCurrencyView,
   type CurrencyView,
   type ProfitabilityCurrencySlice,
 } from "./report-currency-view";
 import { getProjectOverheadAmount } from "../finance/project-overhead.service";
 import { isPositiveMoneyDecimal } from "../finance/money-decimal";
-import { compareDecimal } from "@bloqer/utils";
 import {
   projectRowIdWhereForScope,
+  requireProjectAccess,
   resolveAccessibleProjectScope,
 } from "../security/access";
 
@@ -47,9 +50,9 @@ export type ProjectProfitabilityReport = {
   budgetCurrency: string;
   consolidationBlocked: boolean;
   byCurrency: ProfitabilityCurrencySlice[];
-  revenue: string;
-  directCost: string;
-  grossMargin: string;
+  revenue: string | null;
+  directCost: string | null;
+  grossMargin: string | null;
   grossMarginPct: string | null;
   projectedMargin: string;
   budgetTotalSale: string;
@@ -71,6 +74,11 @@ export type ProjectProfitabilityResult = ProjectProfitabilityReport | ProjectPro
 /** Net margin (R-004 / GG) — OWNER|ADMIN by default [D-013]. */
 function canViewNetMargin(roles: UserRole[]): boolean {
   return roles.includes("OWNER") || roles.includes("ADMIN");
+}
+
+/** Gross margin (R-003) is a separate ceiling from access to operational cost control. */
+export function canViewProjectProfitabilityReport(roles: UserRole[]): boolean {
+  return roles.some((role) => role === "OWNER" || role === "ADMIN" || role === "FINANCE" || role === "PROJECT_MANAGER");
 }
 
 function getDirectCost(
@@ -101,154 +109,181 @@ const LAYER_LABELS: Record<CostVarianceLayer, string> = {
   paid: "Pagado (caja)",
 };
 
+const LAYER_SOURCES = {
+  exposure: ["PROCUREMENT", "SUBCONTRACTS", "AP"],
+  committed: ["PROCUREMENT", "SUBCONTRACTS"],
+  accrued: ["SUBCONTRACTS", "AP"],
+  paid: ["AP"],
+} as const satisfies Record<CostVarianceLayer, readonly string[]>;
+
 export async function getProjectProfitabilityReport(
   projectId: string,
   filters: ProfitabilityFilters,
   ctx: ServiceContext,
 ): Promise<ProjectProfitabilityResult> {
-  if (!canViewProjectCostControlReport(ctx.roles)) {
+  if (!canViewProjectProfitabilityReport(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver rentabilidad del proyecto");
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { tenantId: true, companyId: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const project = await requireProjectAccess(projectId, ctx);
 
   const costLayer = parseCostVarianceLayer(filters.costLayer);
   const revenueBasis = filters.revenueBasis === "invoiced" ? "invoiced" : "certified";
   const currencyView = parseCurrencyView(filters.currencyView);
 
-  const cc = await getProjectCostControl(projectId, { budgetId: filters.budgetId }, ctx);
+  const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
+  if (!budget) {
+    if (filters.budgetId) throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado o no está aprobado/cerrado");
+    return { type: "NO_APPROVED_BUDGETS" };
+  }
+  const companyId = project.companyId ?? ctx.companyId ?? budget.companyId;
+  const scopeCtx = { ...ctx, companyId };
+  const cc = await getProjectCostControl(projectId, { budgetId: budget.id }, scopeCtx);
   if (cc.type === "NO_APPROVED_BUDGETS") return { type: "NO_APPROVED_BUDGETS" };
   if (cc.type === "BUDGET_SELECTION_REQUIRED") {
     throw new ServiceError("CONFLICT", "Seleccioná un presupuesto aprobado");
   }
 
-  const budgetRow = await prisma.budget.findUnique({
-    where: { id: cc.budgetId },
-    select: { currency: true },
-  });
-  const budgetCurrency = budgetRow?.currency ?? "ARS";
+  const budgetCurrency = cc.currency;
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   assertTenantModuleEnabledWithGate(gate, "BUDGETS");
   const warnings: string[] = [
-    `Margen bruto: ingresos (${revenueBasis === "certified" ? "certificado aprobado" : "facturado emitido"}) − costos directos (${LAYER_LABELS[costLayer]}). Costos en moneda del presupuesto (${budgetCurrency}).`,
+    `Margen bruto: ingresos (${revenueBasis === "certified" ? "certificado aprobado" : "facturado neto"}) − costos directos (${LAYER_LABELS[costLayer]}). Costos en moneda del presupuesto (${budgetCurrency}).`,
   ];
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
   warnings.push(...cc.warnings);
 
-  const directCost = new Prisma.Decimal(getDirectCost(cc.totals, costLayer));
+  const costPermissions = {
+    AP: canViewApProjectArea(ctx.roles),
+    PROCUREMENT: canViewProcurementProjectArea(ctx.roles),
+    SUBCONTRACTS: canViewSubcontractsArea(ctx.roles),
+  };
+  for (const module of LAYER_SOURCES[costLayer]) {
+    if (!gate.isEnabled(module) || !costPermissions[module]) {
+      sectionsExcluded.push({ module, section: "direct_cost", reason: gate.isEnabled(module) ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED" });
+    }
+  }
+  const directCost = sectionsExcluded.length === 0 ? new Prisma.Decimal(getDirectCost(cc.totals, costLayer)) : null;
+  if (directCost === null) warnings.push(`El costo ${LAYER_LABELS[costLayer].toLowerCase()} y el margen quedan sin calcular porque falta una fuente.`);
   const directCostAccrued = new Prisma.Decimal(cc.totals.accruedCost);
   const byCurrency: ProfitabilityCurrencySlice[] = [];
-  let revenue = new Prisma.Decimal(0);
-  const revenueCurrencies = new Set<string>([budgetCurrency]);
+  let revenue: Prisma.Decimal | null = null;
+  let incompatibleRevenue = false;
 
   if (revenueBasis === "certified") {
-    revenue = new Prisma.Decimal(cc.totals.certifiedApproved);
-    byCurrency.push({
-      currency: budgetCurrency,
-      revenue: revenue.toFixed(2),
-      directCost: directCost.toFixed(2),
-      grossMargin: revenue.minus(directCost).toFixed(2),
-      grossMarginPct: revenue.isZero()
-        ? null
-        : revenue.minus(directCost).div(revenue).times(100).toFixed(2),
-    });
-  } else if (!gate.isEnabled("AR")) {
+    if (gate.isEnabled("CERTIFICATIONS") && can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
+      revenue = new Prisma.Decimal(cc.totals.certifiedApproved);
+    } else {
+      sectionsExcluded.push({
+        module: "CERTIFICATIONS",
+        section: "certified_revenue",
+        reason: gate.isEnabled("CERTIFICATIONS") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
+      });
+      warnings.push("La fuente de ingresos certificados no está disponible.");
+    }
+  } else if (!gate.isEnabled("AR") || !canViewArProjectArea(ctx.roles)) {
     sectionsExcluded.push({
       module: "AR",
       section: "invoiced_revenue",
-      reason: "TENANT_MODULE_DISABLED",
+      reason: gate.isEnabled("AR") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
-    warnings.push("AR deshabilitado: ingresos facturados en cero.");
-    byCurrency.push({
-      currency: budgetCurrency,
-      revenue: "0.00",
-      directCost: directCost.toFixed(2),
-      grossMargin: directCost.negated().toFixed(2),
-      grossMarginPct: null,
-    });
+    warnings.push("La fuente de ingresos facturados no está disponible.");
   } else {
+    warnings.push(
+      "Facturado neto: subtotal sin IVA ni percepciones, más notas de débito y menos notas de crédito de la factura certificada. Las ventas directas quedan fuera de este presupuesto.",
+    );
+    const scope = {
+      tenantId: ctx.tenantId,
+      projectId,
+      ...(companyId ? { companyId } : {}), // SalesInvoice.companyId NOT NULL
+      status: "ISSUED" as const,
+    };
     const invoices = await prisma.salesInvoice.findMany({
       where: {
-        tenantId: ctx.tenantId,
-        projectId,
-        status: "ISSUED",
-        // [D-115] Revenue = facturas + ND; NC no tiene certificationId y no suma acá.
-        documentKind: { in: ["INVOICE", "DEBIT_NOTE"] },
-        certification: { budgetId: cc.budgetId },
+        ...scope,
+        documentKind: "INVOICE",
+        certification: {
+          tenantId: ctx.tenantId,
+          projectId,
+          budgetId: cc.budgetId,
+          ...companyScopeFilter(scopeCtx),
+        },
       },
-      select: { totalAmount: true, currency: true, amountArs: true, fxRate: true },
+      select: {
+        subtotal: true,
+        currency: true,
+        companyId: true,
+        clientContactId: true,
+        certification: { select: { companyId: true } },
+        creditDebitNotes: {
+          where: { ...scope, documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] } },
+          select: { subtotal: true, currency: true, documentKind: true, companyId: true, clientContactId: true },
+        },
+      },
     });
+    const zero = new Prisma.Decimal(0);
     const byCur = new Map<string, Prisma.Decimal>();
-    const useArsConsolidation =
-      currencyView === "ARS" && canConsolidateInvoicesToArs(invoices);
-    for (const inv of invoices) {
-      revenueCurrencies.add(inv.currency);
-      const rev = useArsConsolidation
-        ? new Prisma.Decimal(inv.amountArs)
-        : new Prisma.Decimal(inv.totalAmount);
-      const curKey = useArsConsolidation ? "ARS" : inv.currency;
-      byCur.set(curKey, (byCur.get(curKey) ?? new Prisma.Decimal(0)).plus(rev));
+    let inconsistentLink = false;
+    for (const invoice of invoices) {
+      if (!invoice.certification || (invoice.certification.companyId !== null && invoice.certification.companyId !== invoice.companyId)) {
+        inconsistentLink = true;
+        continue;
+      }
+      let net = invoice.subtotal;
+      for (const adjustment of invoice.creditDebitNotes) {
+        if (adjustment.companyId !== invoice.companyId || adjustment.clientContactId !== invoice.clientContactId || adjustment.currency !== invoice.currency) {
+          inconsistentLink = true;
+          continue;
+        }
+        net = adjustment.documentKind === "CREDIT_NOTE"
+          ? net.minus(adjustment.subtotal)
+          : net.plus(adjustment.subtotal);
+      }
+      byCur.set(invoice.currency, (byCur.get(invoice.currency) ?? zero).plus(net));
     }
-    for (const [cur, rev] of byCur) {
-      const dc = cur === budgetCurrency ? directCost : new Prisma.Decimal(0);
-      const gm = rev.minus(dc);
+    revenue = byCur.get(budgetCurrency) ?? zero;
+    for (const [currency, amount] of byCur) {
+      if (currency === budgetCurrency) continue;
       byCurrency.push({
-        currency: cur,
-        revenue: rev.toFixed(2),
-        directCost: dc.toFixed(2),
-        grossMargin: gm.toFixed(2),
-        grossMarginPct: rev.isZero() ? null : gm.div(rev).times(100).toFixed(2),
-      });
-      if (cur === budgetCurrency) revenue = rev;
-    }
-    if (byCur.size === 0) {
-      byCurrency.push({
-        currency: budgetCurrency,
-        revenue: "0.00",
-        directCost: directCost.toFixed(2),
-        grossMargin: directCost.negated().toFixed(2),
+        currency,
+        revenue: amount.toFixed(2),
+        directCost: null,
+        grossMargin: null,
         grossMarginPct: null,
       });
-    } else {
-      revenue = Array.from(byCur.values()).reduce((s, v) => s.plus(v), new Prisma.Decimal(0));
     }
-    if (byCur.size > 1) {
-      warnings.push(
-        "Ingresos facturados en varias monedas: usá vista «Por moneda» o consolidá solo si todos los comprobantes son ARS con FX cargado.",
-      );
+    incompatibleRevenue = byCurrency.length > 0 || inconsistentLink;
+    if (byCurrency.length > 0) {
+      warnings.push("Hay ingresos facturados en otra moneda que el costo del presupuesto. Los importes se muestran separados y el margen no es comparable.");
+    }
+    if (inconsistentLink) {
+      warnings.push("Hay comprobantes vinculados con datos inconsistentes. El margen no es calculable.");
     }
   }
 
-  const canArs = canConsolidateToArs(revenueCurrencies) && budgetCurrency === "ARS";
-  const consolidationBlocked = currencyView === "ARS" && !canArs;
-
+  const consolidationBlocked = currencyView === "ARS" && (budgetCurrency !== "ARS" || incompatibleRevenue);
   if (consolidationBlocked) {
     warnings.push(
-      "Vista ARS no disponible: hay monedas distintas o el presupuesto no está en ARS. Usá «Por moneda» o cargá FX en comprobantes (fase 3b).",
+      "Vista ARS no disponible sin una base comparable en pesos. Se conservan los importes en sus monedas originales.",
     );
   }
 
-  const displaySlice =
-    currencyView === "original" || consolidationBlocked
-      ? byCurrency.find((s) => s.currency === budgetCurrency) ?? byCurrency[0]
-      : byCurrency.find((s) => s.currency === "ARS") ?? byCurrency[0];
-
-  const grossMargin = displaySlice
-    ? new Prisma.Decimal(displaySlice.grossMargin)
-    : revenue.minus(directCost);
-  const grossMarginPct = displaySlice?.grossMarginPct ?? null;
-  const displayCurrency = consolidationBlocked
-    ? budgetCurrency
-    : currencyView === "ARS"
-      ? "ARS"
-      : (displaySlice?.currency ?? budgetCurrency);
+  const grossMargin = revenue !== null && directCost !== null && !incompatibleRevenue ? revenue.minus(directCost) : null;
+  const grossMarginPct = grossMargin !== null && revenue !== null && !revenue.isZero()
+    ? grossMargin.div(revenue).times(100).toFixed(2)
+    : null;
+  const displayCurrency = budgetCurrency;
+  if (revenue !== null) {
+    byCurrency.unshift({
+      currency: budgetCurrency,
+      revenue: revenue.toFixed(2),
+      directCost: directCost?.toFixed(2) ?? null,
+      grossMargin: grossMargin?.toFixed(2) ?? null,
+      grossMarginPct,
+    });
+  }
 
   const netAvailable = canViewNetMargin(ctx.roles);
   let netMargin: string | null = null;
@@ -261,7 +296,7 @@ export async function getProjectProfitabilityReport(
     : "Margen neto (y GG imputados) visible solo para OWNER o ADMIN [D-013].";
 
   let netMarginAvailableFlag = false;
-  if (netAvailable && project.companyId) {
+  if (netAvailable && project.companyId && LAYER_SOURCES.accrued.every((module) => gate.isEnabled(module) && costPermissions[module])) {
     const oh = await getProjectOverheadAmount(
       projectId,
       project.companyId,
@@ -273,7 +308,7 @@ export async function getProjectProfitabilityReport(
     if (oh.allocationMode === "AUTO_WEIGHT") {
       overheadCalculatedAmount = oh.autoWeightAmount;
       overheadCompanyPct = oh.autoWeightPct;
-      if (isPositiveMoneyDecimal(oh.autoWeightAmount)) {
+      if (oh.autoWeightAmount !== null && isPositiveMoneyDecimal(oh.autoWeightAmount)) {
         warnings.push(
           `GG prorrateados por peso del CD (suma de períodos con facturas corporativas, ARS): ${oh.autoWeightAmount} ARS.`,
         );
@@ -302,13 +337,10 @@ export async function getProjectProfitabilityReport(
       }
     }
     const overheadCurrency = oh.allocationMode === "AUTO_WEIGHT" ? "ARS" : oh.currency;
-    if (overheadCurrency === displayCurrency) {
-      const nm = new Prisma.Decimal(displaySlice?.grossMargin ?? grossMargin.toFixed(2)).minus(
-        oh.totalOverhead,
-      );
-      netMargin = nm.toFixed(2);
+    if (overheadCurrency === displayCurrency && grossMargin !== null && oh.totalOverhead !== null) {
+      netMargin = grossMargin.minus(oh.totalOverhead).toFixed(2);
       netMarginAvailableFlag = true;
-    } else {
+    } else if (overheadCurrency !== displayCurrency) {
       warnings.push(
         `Margen neto omitido: GG en ${overheadCurrency} no coincide con la moneda mostrada (${displayCurrency}).`,
       );
@@ -332,9 +364,9 @@ export async function getProjectProfitabilityReport(
     budgetCurrency,
     consolidationBlocked,
     byCurrency,
-    revenue: displaySlice?.revenue ?? revenue.toFixed(2),
-    directCost: displaySlice?.directCost ?? directCost.toFixed(2),
-    grossMargin: displaySlice?.grossMargin ?? grossMargin.toFixed(2),
+    revenue: revenue?.toFixed(2) ?? null,
+    directCost: directCost?.toFixed(2) ?? null,
+    grossMargin: grossMargin?.toFixed(2) ?? null,
     grossMarginPct,
     projectedMargin: cc.totals.projectedMargin,
     budgetTotalSale: cc.totals.budgetTotalSale,
@@ -363,19 +395,19 @@ export type PortfolioProfitabilityRow = {
   code: string;
   name: string;
   status: string;
-  currency: string;
-  revenue: string;
-  directCost: string;
-  grossMargin: string;
+  currency: string | null;
+  revenue: string | null;
+  directCost: string | null;
+  grossMargin: string | null;
   grossMarginPct: string | null;
   warning: string | null;
 };
 
 export type PortfolioProfitabilityReport = {
   rows: PortfolioProfitabilityRow[];
-  consolidatedRevenue: string;
-  consolidatedDirectCost: string;
-  consolidatedGrossMargin: string;
+  consolidatedRevenue: string | null;
+  consolidatedDirectCost: string | null;
+  consolidatedGrossMargin: string | null;
   consolidatedGrossMarginPct: string | null;
   /** Present when rows mix currencies — consolidated totals only sum the primary currency. */
   consolidatedCurrency: string | null;
@@ -386,7 +418,7 @@ export async function getPortfolioProfitabilityReport(
   ctx: ServiceContext,
   filters?: PortfolioProfitabilityFilters,
 ): Promise<PortfolioProfitabilityReport> {
-  if (!canViewProjectCostControlReport(ctx.roles)) {
+  if (!canViewProjectProfitabilityReport(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver rentabilidad multi-obra");
   }
 
@@ -438,10 +470,10 @@ export async function getPortfolioProfitabilityReport(
         code: project.code ?? "",
         name: project.name,
         status: project.status,
-        currency: "ARS",
-        revenue: "0.00",
-        directCost: "0.00",
-        grossMargin: "0.00",
+        currency: null,
+        revenue: null,
+        directCost: null,
+        grossMargin: null,
         grossMarginPct: null,
         warning: "Error al obtener datos",
       });
@@ -454,24 +486,24 @@ export async function getPortfolioProfitabilityReport(
         code: project.code ?? "",
         name: project.name,
         status: project.status,
-        currency: "ARS",
-        revenue: "0.00",
-        directCost: "0.00",
-        grossMargin: "0.00",
+        currency: null,
+        revenue: null,
+        directCost: null,
+        grossMargin: null,
         grossMarginPct: null,
         warning: "Sin presupuesto aprobado",
       });
       continue;
     }
-    const rev = new Prisma.Decimal(report.revenue);
-    const dc = new Prisma.Decimal(report.directCost);
-    const bucket = byCurrency.get(report.currency) ?? {
-      revenue: new Prisma.Decimal(0),
-      directCost: new Prisma.Decimal(0),
-    };
-    bucket.revenue = bucket.revenue.plus(rev);
-    bucket.directCost = bucket.directCost.plus(dc);
-    byCurrency.set(report.currency, bucket);
+    if (report.revenue !== null && report.directCost !== null && report.grossMargin !== null) {
+      const bucket = byCurrency.get(report.currency) ?? {
+        revenue: new Prisma.Decimal(0),
+        directCost: new Prisma.Decimal(0),
+      };
+      bucket.revenue = bucket.revenue.plus(report.revenue);
+      bucket.directCost = bucket.directCost.plus(report.directCost);
+      byCurrency.set(report.currency, bucket);
+    }
     rows.push({
       projectId: project.id,
       code: project.code ?? "",
@@ -482,7 +514,7 @@ export async function getPortfolioProfitabilityReport(
       directCost: report.directCost,
       grossMargin: report.grossMargin,
       grossMarginPct: report.grossMarginPct,
-      warning: null,
+      warning: report.grossMargin === null ? "Margen no calculable; obra fuera del consolidado" : null,
     });
   }
 
@@ -501,14 +533,10 @@ export async function getPortfolioProfitabilityReport(
     primaryCurrency = preferred;
     primaryRev = byCurrency.get(preferred)!.revenue;
     primaryDc = byCurrency.get(preferred)!.directCost;
-  } else {
-    for (const [ccy, bucket] of byCurrency) {
-      if (bucket.revenue.abs().greaterThan(primaryRev.abs()) || primaryCurrency == null) {
-        primaryCurrency = ccy;
-        primaryRev = bucket.revenue;
-        primaryDc = bucket.directCost;
-      }
-    }
+  } else if (byCurrency.size > 0) {
+    primaryCurrency = [...byCurrency.keys()].sort()[0]!;
+    primaryRev = byCurrency.get(primaryCurrency)!.revenue;
+    primaryDc = byCurrency.get(primaryCurrency)!.directCost;
   }
   if (byCurrency.size > 1) {
     warnings.push(
@@ -519,9 +547,9 @@ export async function getPortfolioProfitabilityReport(
   const consolidatedGrossMargin = primaryRev.minus(primaryDc);
   return {
     rows,
-    consolidatedRevenue: primaryRev.toFixed(2),
-    consolidatedDirectCost: primaryDc.toFixed(2),
-    consolidatedGrossMargin: consolidatedGrossMargin.toFixed(2),
+    consolidatedRevenue: primaryCurrency === null ? null : primaryRev.toFixed(2),
+    consolidatedDirectCost: primaryCurrency === null ? null : primaryDc.toFixed(2),
+    consolidatedGrossMargin: primaryCurrency === null ? null : consolidatedGrossMargin.toFixed(2),
     consolidatedGrossMarginPct: primaryRev.isZero()
       ? null
       : consolidatedGrossMargin.div(primaryRev).times(100).toFixed(2),
@@ -534,6 +562,7 @@ export async function getPortfolioProfitabilityReport(
 export async function getProjectProfitabilityKpi(
   projectId: string,
   ctx: ServiceContext,
+  budgetId?: string,
 ): Promise<{
   currency: string;
   grossMarginPct: string | null;
@@ -543,10 +572,10 @@ export async function getProjectProfitabilityKpi(
   try {
     const report = await getProjectProfitabilityReport(
       projectId,
-      { costLayer: "accrued", revenueBasis: "certified" },
+      { budgetId, costLayer: "accrued", revenueBasis: "certified", currencyView: "original" },
       ctx,
     );
-    if (report.type !== "REPORT") return null;
+    if (report.type !== "REPORT" || report.grossMargin === null) return null;
     return {
       currency: report.currency,
       grossMarginPct: report.grossMarginPct,

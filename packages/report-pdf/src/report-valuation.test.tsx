@@ -6,10 +6,17 @@ import type { ReactElement } from "react";
 import * as jsxRuntime from "react/jsx-runtime";
 import type { DocumentProps } from "@react-pdf/renderer";
 import ts from "typescript";
-import type { CostControlTotals, MaterialVarianceReport, ProjectCostControlReport, ServiceContext } from "@bloqer/services";
+import type {
+  CostControlTotals,
+  MaterialVarianceReport,
+  ProjectCashFlowReport,
+  ProjectCostControlReport,
+  ServiceContext,
+} from "@bloqer/services";
 import type { PdfReportBranding } from "./branding/pdf-branding.types";
 import { safeReportFilename } from "./filename.service";
 import { CostControlReportPdfDocument } from "./pdf/cost-control-pdf";
+import { buildPdfFilterLine } from "./pdf/pdf-filter-line";
 import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
 import { renderReportPdfToBuffer } from "./pdf/pdf-renderer.service";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
@@ -31,10 +38,27 @@ const report: ProjectCostControlReport = {
   unallocatedCommittedCost: "0.00", unallocatedReceivedCost: "0.00", unallocatedAccruedCost: "0.00", unallocatedPaidCost: "0.00", unallocatedInventoryConsumedCost: null,
   warnings: [warning], sectionsExcluded: [],
 };
+const cashFlow: ProjectCashFlowReport = {
+  project: { id: "project", code: "TEST", name: "Synthetic project", status: "ACTIVE" },
+  dateFrom: "2026-09-01",
+  dateTo: "2026-09-30",
+  period: "month",
+  warnings: {
+    noCollections: false,
+    noPayments: true,
+    multiCurrency: true,
+    sectionsExcluded: [{ module: "AP", section: "payments", reason: "MISSING_PERMISSION" }],
+  },
+  currencies: [
+    { currency: "ARS", totalInflows: "100.00", totalOutflows: "0.00", netCashFlow: "100.00", periods: [], collections: [], payments: [] },
+    { currency: "USD", totalInflows: "20.00", totalOutflows: "0.00", netCashFlow: "20.00", periods: [], collections: [], payments: [] },
+  ],
+};
 
 type Exporters = {
   exportMaterialVariancePdf: (id: string, filters: object, ctx: ServiceContext) => Promise<ReportPdfPayload>;
   exportProjectCostControlPdf: (id: string, filters: object, ctx: ServiceContext) => Promise<ReportPdfPayload>;
+  exportProjectCashFlowPdf: (id: string, filters: object, ctx: ServiceContext) => Promise<ReportPdfPayload>;
 };
 
 function exportsWithRealRenderer() {
@@ -43,11 +67,16 @@ function exportsWithRealRenderer() {
   const code = ts.transpileModule(readFileSync(new URL("./report-pdf-export.service.tsx", import.meta.url), "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX } }).outputText;
   const dependencies: Record<string, unknown> = {
     "react/jsx-runtime": jsxRuntime,
-    "@bloqer/services": { getMaterialVarianceReport: async () => material, getProjectCostControl: async () => report },
+    "@bloqer/services": {
+      getMaterialVarianceReport: async () => material,
+      getProjectCostControl: async () => report,
+      getProjectCashFlowReport: async () => cashFlow,
+    },
     "./branding/pdf-branding.service": { resolvePdfReportBranding: async () => branding },
     "./filename.service": { safeReportFilename },
     "./pdf/cost-control-pdf": { CostControlReportPdfDocument },
     "./pdf/project-simple-table-pdf": { ProjectSimpleTablePdfDocument },
+    "./pdf/pdf-filter-line": { buildPdfFilterLine },
     "./pdf/pdf-renderer.service": { renderReportPdfToBuffer: async (element: ReactElement<Record<string, unknown>>) => {
       document = element;
       return renderReportPdfToBuffer(element as ReactElement<DocumentProps>);
@@ -94,4 +123,36 @@ test("cost PDF preserves unvalued consumption beside valid documentary totals an
   assert.match(text, /Exposición esperada:.*100\.00/);
   assert.ok(text.includes(warning));
   assert.doesNotMatch(text, /\bnull\b|NaN/);
+});
+
+test("project cash flow PDF shows both currencies and distinguishes unavailable payments from zero", async () => {
+  const loaded = exportsWithRealRenderer();
+  const result = await loaded.exporters.exportProjectCashFlowPdf("project", {}, ctx);
+  assert.equal(result.buffer.subarray(0, 5).toString("ascii"), "%PDF-");
+  const props = loaded.document().props;
+  const rows = props.rows as Array<Record<string, string>>;
+  assert.deepEqual(Array.from(rows, ({ currency, inflows, outflows, net }) => [currency, inflows, outflows, net]), [
+    ["ARS", "100.00", "—", "100.00"],
+    ["USD", "20.00", "—", "20.00"],
+  ]);
+  assert.match(strings(props.columns).join(" "), /Saldo visible/);
+  assert.match(strings(props.warnings).join(" "), /Pagos omitidos · Sin permiso/);
+});
+
+test("secondary PDF table renders its own landscape page for line-item detail", async () => {
+  const document = ProjectSimpleTablePdfDocument({
+    branding,
+    title: "Análisis de compras",
+    columns: [{ key: "supplier", label: "Proveedor" }],
+    rows: [{ supplier: "Proveedor sintético" }],
+    additionalTable: {
+      title: "Desvíos en líneas de OC",
+      columns: [{ key: "code", label: "OC" }],
+      rows: [{ code: "OC-001" }],
+    },
+  });
+  assert.ok(Array.isArray(document.props.children));
+  assert.equal(document.props.children.length, 2);
+  const buffer = await renderReportPdfToBuffer(document as ReactElement<DocumentProps>);
+  assert.equal(buffer.subarray(0, 5).toString("ascii"), "%PDF-");
 });

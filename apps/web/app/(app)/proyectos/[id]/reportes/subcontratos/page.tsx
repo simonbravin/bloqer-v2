@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  getProjectCostControl,
+  listApprovedBudgetsForProject,
   getProjectShellInfo,
   getSubcontractVarianceReport,
   ServiceError,
@@ -50,31 +50,31 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
   const filters = { budgetId: sp.budgetId, dateFrom: sp.dateFrom, dateTo: sp.dateTo };
 
   let report;
-  let budgetProbe;
+  let availableBudgets: Awaited<ReturnType<typeof listApprovedBudgetsForProject>> = [];
+  let filterError: string | null = null;
   try {
-    [report, budgetProbe] = await Promise.all([
-      getSubcontractVarianceReport(projectId, filters, ctx),
-      getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx),
-    ]);
+    availableBudgets = await listApprovedBudgetsForProject(projectId, ctx);
+    report = await getSubcontractVarianceReport(projectId, filters, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-    throw err;
+    if (err instanceof ServiceError && (err.code === "VALIDATION" || err.code === "CONFLICT")) {
+      filterError = err.message;
+    } else {
+      throw err;
+    }
   }
-
-  const availableBudgets =
-    budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Subcontratos — varianza y certificaciones"
         subtitle={
-          report.type === "REPORT"
-            ? `${report.budgetName} · ${report.pendingContractCount} partida(s) sin contrato · ${report.withoutBaselineCount} sin baseline`
+          report?.type === "REPORT"
+            ? `${report.budgetName} · ${report.currency} · ${report.pendingContractCount} partida(s) sin contrato · ${report.withoutBaselineCount} sin línea base`
             : undefined
         }
         actions={
-          report.type === "REPORT" ? (
+          report?.type === "REPORT" ? (
             <div className="flex flex-wrap items-center gap-2">
               {report.pendingContractCount > 0 ? (
                 <Button size="sm" asChild>
@@ -85,7 +85,7 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
               ) : null}
               <ReportExportActions
                 exportPath={`/api/reports/proyectos/${projectId}/subcontratos.csv`}
-                params={sp}
+                params={{ ...filters, budgetId: report.budgetId }}
                 pdf
               />
             </div>
@@ -102,9 +102,11 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
         </Button>
       </ReportSubnav>
 
-      <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
+      <ReportDateFilters budgets={availableBudgets} currentBudgetId={report?.type === "REPORT" ? report.budgetId : filters.budgetId} />
 
-      {report.type === "NO_APPROVED_BUDGETS" ? (
+      {!report ? (
+        <p role="alert" className="rounded-lg border bg-card p-4 text-sm">{filterError}</p>
+      ) : report.type === "NO_APPROVED_BUDGETS" ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">No hay presupuesto aprobado o cerrado</p>
           <Button variant="outline" size="sm" asChild>
@@ -123,14 +125,14 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
             </div>
           )}
 
-          <SubcontractCertChart series={report.monthlyCertification} />
+          <SubcontractCertChart series={report.monthlyCertification} currency={report.currency} apAvailable={report.apAvailable} />
 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">SUB presupuestado vs contratado</CardTitle>
             </CardHeader>
             <CardContent>
-              <SubcontractWbsVarianceTable rows={report.byWbs} projectId={projectId} />
+              <SubcontractWbsVarianceTable rows={report.byWbs} projectId={projectId} currency={report.currency} />
             </CardContent>
           </Card>
 
@@ -139,7 +141,7 @@ export default async function ReporteSubcontratosPage({ params, searchParams }: 
               <CardTitle className="text-base">Contratos del proyecto</CardTitle>
             </CardHeader>
             <CardContent>
-              <SubcontractContractsTable rows={report.contracts} projectId={projectId} />
+              <SubcontractContractsTable rows={report.contracts} projectId={projectId} currency={report.currency} />
             </CardContent>
           </Card>
         </>

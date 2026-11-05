@@ -234,9 +234,8 @@ export async function getProjectGgOverviewReport(
     );
     const overheadCurrency = oh.allocationMode === "AUTO_WEIGHT" ? "ARS" : oh.currency;
     companyOverhead = oh.totalOverhead;
-    if (overheadCurrency === currency) {
-      includeCompanyInSpent = true;
-    } else {
+    includeCompanyInSpent = overheadCurrency === currency && companyOverhead !== null;
+    if (overheadCurrency !== currency) {
       warnings.push(
         `GG empresa en ${overheadCurrency} no se suma al Total gastado (presupuesto en ${currency}).`,
       );
@@ -273,7 +272,7 @@ export async function getProjectGgOverviewReport(
       openCommittedOnGgPartidas: serializeMoneyDecimal(openOnGg),
       unallocatedCommitted: serializeMoneyDecimal(unallocatedCommitted),
       unallocatedAccrued: serializeMoneyDecimal(unallocatedAccrued),
-      companyOverhead: companyOverheadVisible ? serializeMoneyDecimal(companyDec) : null,
+      companyOverhead: companyOverheadVisible ? companyOverhead : null,
       companyOverheadVisible,
       companyOverheadIncludedInSpent: includeCompanyInSpent,
       spentTotal: serializeMoneyDecimal(spentTotal),

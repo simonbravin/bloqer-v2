@@ -527,8 +527,14 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/finanzas/gastos-generales", label: "Imputación GG" }],
     steps: [
       "Finanzas → Imputación GG.",
-      "Imputá / cerrá según el flujo de la pantalla.",
-      "No es el cierre de período contable.",
+      "En Método de imputación a obra elegí Manual (% empresa + imputaciones) o Automático por peso del CD.",
+      "En Automático, elegí un mes abierto en Vista previa del período y pulsá Actualizar vista. El reparto usa el costo directo devengado neto en pesos.",
+      "En Resumen por período (imputación automática) elegí Cerrar período para fijar los montos cuando la base esté completa.",
+    ],
+    effects: ["Los meses cerrados conservan sus importes fijados. Si reabrís, se aplica el criterio vigente de cálculo."],
+    pitfalls: [
+      "Si aparece Cálculo suspendido, revisá la causa indicada, por ejemplo una cotización histórica sin comprobar. Los importes y pesos afectados figuran como —. El mes queda Abierto · Cierre suspendido hasta completar la base.",
+      "El cierre de GG fija el reparto de gastos generales. El cierre contable es un flujo separado.",
     ],
     relatedSlugs: [
       "cerrar-el-mes",
@@ -536,8 +542,8 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "ver-rentabilidad-de-obra",
       "gastos-generales-de-obra",
     ],
-    keywords: ["gastos generales", "gg", "overhead", "imputacion"],
-    guideRef: "§14 · §16",
+    keywords: ["gastos generales", "gg", "overhead", "imputacion", "prorrateo", "cotizacion faltante", "cierre suspendido"],
+    guideRef: "§14 · §16 · [D-142]",
   },
   {
     slug: "errores-operativos-frecuentes",

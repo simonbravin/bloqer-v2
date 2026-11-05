@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
-import { getProjectShellInfo, getProjectSupplierReport, ServiceError } from "@bloqer/services";
+import { getProjectShellInfo, getProjectSupplierReport, parseProjectSupplierReportFilters, ServiceError } from "@bloqer/services";
 import {
   ProjectSupplierLeaders,
   ProjectSupplierTable,
@@ -19,7 +19,7 @@ import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ dateFrom?: string; dateTo?: string }>;
+  searchParams: Promise<{ dateFrom?: string; dateTo?: string; currency?: string }>;
 }
 
 export default async function ReporteProveedoresProyectoPage({ params, searchParams }: PageProps) {
@@ -28,6 +28,7 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
 
   const { id: projectId } = await params;
   const sp = await searchParams;
+  const filters = parseProjectSupplierReportFilters(sp);
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -45,23 +46,32 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
 
   let report;
   try {
-    report = await getProjectSupplierReport(projectId, { dateFrom: sp.dateFrom, dateTo: sp.dateTo }, ctx);
+    report = await getProjectSupplierReport(projectId, filters, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
+    if (err instanceof ServiceError && err.code === "VALIDATION") {
+      return (
+        <PageShell variant="default" className="space-y-6">
+          <ProjectPageHeader title="Proveedores" />
+          <ReportDateFilters showBudget={false} />
+          <p role="alert" className="rounded-lg border bg-card p-4 text-sm">{err.message}</p>
+        </PageShell>
+      );
+    }
     throw err;
   }
 
-  const { totals } = report;
+  const { totals, currency, apAvailable } = report;
 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Proveedores"
-        subtitle="Quién concentra pedidos y gasto en la obra. Capas canónicas: comprometido, devengado, pagado y exposición."
+        subtitle={`Pedidos y gasto de proveedores en ${currency}. Capas de costo y exposición.`}
         actions={
           <ReportExportActions
             exportPath={`/api/reports/proyectos/${projectId}/proveedores.csv`}
-            params={sp}
+            params={{ ...filters, currency }}
             pdf
           />
         }
@@ -77,12 +87,18 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/ordenes-compra`}>Órdenes de compra</Link>
         </Button>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Cuentas por pagar</Link>
-        </Button>
+        {apAvailable ? (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Cuentas por pagar</Link>
+          </Button>
+        ) : null}
       </ReportSubnav>
 
-      <ReportDateFilters showBudget={false} />
+      <ReportDateFilters
+        showBudget={false}
+        currencies={[...new Set([currency, ...report.availableCurrencies])]}
+        currentCurrency={currency}
+      />
 
       {report.warnings.length > 0 ? (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 p-3 dark:bg-yellow-950/20">
@@ -98,38 +114,37 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
         <KpiStatCard
           label="Proveedores"
           value={String(totals.supplierCount)}
-          helper={`${totals.poCount} pedidos · ${totals.invoiceCount} facturas`}
+          helper={apAvailable ? `${totals.poCount} pedidos · ${totals.invoiceCount} facturas` : `${totals.poCount} pedidos`}
         />
         <KpiStatCard
           label="Comprometido"
-          value={formatMoneyAmount(totals.committedCost)}
-          helper={totals.avgPoAmount ? `Ticket medio ${formatMoneyAmount(totals.avgPoAmount)}` : "Sin OC confirmadas"}
+          value={formatMoneyAmount(totals.committedCost, currency)}
+          helper={totals.avgPoAmount ? `Ticket medio ${formatMoneyAmount(totals.avgPoAmount, currency)}` : "Sin OC confirmadas"}
         />
         <KpiStatCard
           label="Exposición"
-          value={formatMoneyAmount(totals.expectedExposure)}
-          helper={`Devengado ${formatMoneyAmount(totals.accruedCost)} · OC abierta ${formatMoneyAmount(totals.openCommitted)}`}
+          value={apAvailable ? formatMoneyAmount(totals.expectedExposure, currency) : "—"}
+          helper={apAvailable ? `Devengado ${formatMoneyAmount(totals.accruedCost, currency)} · OC abierta ${formatMoneyAmount(totals.openCommitted, currency)}` : "Facturas no disponibles"}
         />
         <KpiStatCard
           label="Pagado"
-          value={formatMoneyAmount(totals.paidCost)}
-          helper="Caja confirmada contra facturas de proveedor"
+          value={apAvailable ? formatMoneyAmount(totals.paidCost, currency) : "—"}
         />
         <KpiStatCard
           label="Saldo CxP"
-          value={formatMoneyAmount(totals.payableBalance)}
+          value={apAvailable ? formatMoneyAmount(totals.payableBalance, currency) : "—"}
           helper={
-            isPositiveMoneyAmount(totals.overduePayable)
-              ? `Vencido ${formatMoneyAmount(totals.overduePayable)}`
+            !apAvailable ? undefined : isPositiveMoneyAmount(totals.overduePayable)
+              ? `Vencido ${formatMoneyAmount(totals.overduePayable, currency)}`
               : "Snapshot de hoy (no filtra por fechas)"
           }
           tone={isPositiveMoneyAmount(totals.overduePayable) ? "warning" : "default"}
         />
         <KpiStatCard
           label="Concentración top 3"
-          value={totals.top3SharePct ? `${totals.top3SharePct}%` : "—"}
+          value={apAvailable && totals.top3SharePct ? `${totals.top3SharePct}%` : "—"}
           helper={
-            totals.top1SharePct
+            apAvailable && totals.top1SharePct
               ? `El primero concentra ${totals.top1SharePct}% de la exposición`
               : "Sin exposición para calcular"
           }
@@ -137,9 +152,9 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
       </KpiStatGrid>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <ProjectSupplierLeaders kind="amount" rows={report.leadersByAmount} />
-        <ProjectSupplierLeaders kind="orders" rows={report.leadersByOrders} />
-        <ProjectSupplierLeaders kind="payable" rows={report.leadersByPayable} />
+        {apAvailable ? <ProjectSupplierLeaders kind="amount" rows={report.leadersByAmount} currency={currency} /> : null}
+        <ProjectSupplierLeaders kind="orders" rows={report.leadersByOrders} currency={currency} />
+        {apAvailable ? <ProjectSupplierLeaders kind="payable" rows={report.leadersByPayable} currency={currency} /> : null}
       </div>
 
       <Card>
@@ -151,7 +166,7 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
           </p>
         </CardHeader>
         <CardContent>
-          <ProjectSupplierTable rows={report.rows} />
+          <ProjectSupplierTable rows={report.rows} currency={currency} apAvailable={apAvailable} />
         </CardContent>
       </Card>
     </PageShell>

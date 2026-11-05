@@ -2,10 +2,11 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  getProjectCostControl,
+  canViewProjectProfitabilityReport,
   getProjectIncomeExpenseReport,
   getProjectShellInfo,
-  parseCurrencyView,
+  listApprovedBudgetsForProject,
+  parseIncomeExpenseFilters,
   ServiceError,
 } from "@bloqer/services";
 import { IncomeExpenseChart, ReportDateFilters, ReportExportActions, ReportSubnav } from "@/features/reports";
@@ -14,7 +15,7 @@ import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, moneyAmountTone } from "@/lib/format-money";
 import { formatDateRange } from "@/lib/format";
 
 interface PageProps {
@@ -28,6 +29,7 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
 
   const { id: projectId } = await params;
   const sp = await searchParams;
+  const filters = parseIncomeExpenseFilters(sp);
 
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -45,63 +47,65 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
   }
 
   let report;
-  let budgetProbe;
+  let availableBudgets: Awaited<ReturnType<typeof listApprovedBudgetsForProject>> = [];
+  let filterError: string | null = null;
   try {
-    [report, budgetProbe] = await Promise.all([
-      getProjectIncomeExpenseReport(
-        projectId,
-        {
-          budgetId: sp.budgetId,
-          dateFrom: sp.dateFrom,
-          dateTo: sp.dateTo,
-          currencyView: parseCurrencyView(sp.currencyView),
-        },
-        ctx,
-      ),
-      getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx),
-    ]);
+    report = await getProjectIncomeExpenseReport(projectId, filters, ctx);
+    if (report.sourcesAvailable.certifications) {
+      availableBudgets = await listApprovedBudgetsForProject(projectId, ctx);
+    }
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-    throw err;
+    if (err instanceof ServiceError && (err.code === "VALIDATION" || err.code === "CONFLICT")) {
+      filterError = err.message;
+    } else {
+      throw err;
+    }
   }
-
-  const availableBudgets =
-    budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Ingresos vs gastos"
         subtitle={
-          report.budgetName
+          report?.budgetName
             ? `${report.budgetName} · ${formatDateRange(report.dateFrom, report.dateTo)}`
-            : formatDateRange(report.dateFrom, report.dateTo)
+            : report ? formatDateRange(report.dateFrom, report.dateTo) : undefined
         }
-        actions={
+        actions={report ? (
           <ReportExportActions
             exportPath={`/api/reports/proyectos/${projectId}/ingresos-gastos.csv`}
-            params={sp}
+            params={{
+              budgetId: report.budgetId ?? undefined,
+              dateFrom: report.dateFrom,
+              dateTo: report.dateTo,
+              currencyView: report.currencyView,
+            }}
             pdf
           />
-        }
+        ) : undefined}
       />
 
       <ReportSubnav>
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes`}>← Reportes</Link>
         </Button>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/reportes/rentabilidad`}>Rentabilidad</Link>
-        </Button>
+        {canViewProjectProfitabilityReport(ctx.roles) ? (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/proyectos/${projectId}/reportes/rentabilidad`}>Rentabilidad</Link>
+          </Button>
+        ) : null}
       </ReportSubnav>
 
       <ReportDateFilters
         budgets={availableBudgets}
-        currentBudgetId={sp.budgetId}
+        currentBudgetId={report?.budgetId ?? filters.budgetId}
         showCurrencyView
       />
 
-      {report.warnings.length > 0 && (
+      {!report ? <p role="alert" className="rounded-lg border bg-card p-4 text-sm">{filterError}</p> : null}
+
+      {report && report.warnings.length > 0 && (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 space-y-1">
           {report.warnings.map((w, i) => (
             <p key={i} className="text-xs text-yellow-700 dark:text-yellow-400">
@@ -111,33 +115,36 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         </div>
       )}
 
-      {report.consolidationBlocked ? (
+      {report?.consolidationBlocked ? (
         <p className="text-xs text-yellow-700 dark:text-yellow-400">
-          Consolidado ARS no disponible; KPIs en moneda del presupuesto ({report.displayCurrency}).
+          Consolidado ARS no disponible. Los resultados se muestran por moneda.
         </p>
       ) : null}
 
-      <KpiStatGrid title="Totales del período (devengado vs caja)" columns={4}>
+      {report?.byCurrency.map(({ currency, totals, series }) => (
+      <section key={currency} className="space-y-4">
+      <h2 className="text-sm font-semibold">Totales en {currency}</h2>
+      <KpiStatGrid title="Devengado del período" columns={4}>
         <KpiStatCard
           compact
           label="Certificado"
-          value={formatMoneyAmount(report.totals.certifiedAmount, report.displayCurrency)}
+          value={report.sourcesAvailable.certifications ? formatMoneyAmount(totals.certifiedAmount, currency) : "—"}
         />
         <KpiStatCard
           compact
           label="Costo devengado"
-          value={formatMoneyAmount(report.totals.costAccrued, report.displayCurrency)}
+          value={report.sourcesAvailable.ap ? formatMoneyAmount(totals.costAccrued, currency) : "—"}
         />
         <KpiStatCard
           compact
           label="MB devengado"
-          value={formatMoneyAmount(report.totals.grossMarginAccrued, report.displayCurrency)}
-          tone={isZeroMoneyAmount(report.totals.grossMarginAccrued) ? "muted" : isPositiveMoneyAmount(report.totals.grossMarginAccrued) ? "success" : "danger"}
+          value={totals.grossMarginAccrued == null ? "—" : formatMoneyAmount(totals.grossMarginAccrued, currency)}
+          tone={totals.grossMarginAccrued == null ? "muted" : moneyAmountTone(totals.grossMarginAccrued)}
         />
         <KpiStatCard
           compact
           label="MB devengado %"
-          value={report.totals.grossMarginAccruedPct ?? "—"}
+          value={totals.grossMarginAccruedPct == null ? "—" : `${totals.grossMarginAccruedPct}%`}
         />
       </KpiStatGrid>
 
@@ -145,22 +152,24 @@ export default async function ReporteIngresosGastosPage({ params, searchParams }
         <KpiStatCard
           compact
           label="Cobrado"
-          value={formatMoneyAmount(report.totals.collectedAmount, report.displayCurrency)}
+          value={report.sourcesAvailable.ar ? formatMoneyAmount(totals.collectedAmount, currency) : "—"}
         />
         <KpiStatCard
           compact
           label="Pagado"
-          value={formatMoneyAmount(report.totals.costPaid, report.displayCurrency)}
+          value={report.sourcesAvailable.ap ? formatMoneyAmount(totals.costPaid, currency) : "—"}
         />
         <KpiStatCard
           compact
           label="MB caja"
-          value={formatMoneyAmount(report.totals.grossMarginCash, report.displayCurrency)}
-          tone={isZeroMoneyAmount(report.totals.grossMarginCash) ? "muted" : isPositiveMoneyAmount(report.totals.grossMarginCash) ? "success" : "danger"}
+          value={totals.grossMarginCash == null ? "—" : formatMoneyAmount(totals.grossMarginCash, currency)}
+          tone={totals.grossMarginCash == null ? "muted" : moneyAmountTone(totals.grossMarginCash)}
         />
       </KpiStatGrid>
 
-      <IncomeExpenseChart series={report.series} />
+      <IncomeExpenseChart series={series} currency={currency} sourcesAvailable={report.sourcesAvailable} />
+      </section>
+      ))}
     </PageShell>
   );
 }

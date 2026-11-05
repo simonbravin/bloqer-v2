@@ -297,7 +297,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Sin saldo pendiente en una certificación no prueba que se haya cobrado efectivo: puede incluir NC aplicadas. Revisá las cobranzas confirmadas y las Notas vinculadas de la factura.",
       "Saldo no disponible indica una fuente que no se pudo comprobar; no confirma que la deuda sea cero.",
       "Saldada puede incluir crédito NC sin ingreso de dinero. Revisá por separado cobros confirmados, créditos y saldo.",
-      "La fecha de corte se muestra en el encabezado Al (día/mes/año). Los totales de antigüedad se muestran por moneda; no sumes ARS y USD. Sus filtros afectan ese bloque, separado del listado de obligaciones.",
+      "Fecha de referencia clasifica los vencimientos de los saldos actuales. El encabezado indica el día tomado para calcular la antigüedad. Los totales se presentan por moneda. Los filtros de ese bloque son independientes del listado de obligaciones.",
       "Consultar CxC no requiere tener Tesorería activa; registrar o cancelar caja sí exige el módulo y los permisos de la operación.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "ingreso-corporativo-con-factura"],
@@ -677,7 +677,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Si falta el borrador contable, revisá Contabilidad: una falla al generarlo no invalida el pago confirmado. No repitas el pago para generar el asiento.",
       "Consultar pagos de una CxP o cancelar pagos/cobranzas de obra exige acceso a esa obra además del permiso de la operación. PROJECT_FINANCE no habilita pagos corporativos.",
       "Saldada puede combinar pagos y créditos NC. El detalle y el CSV separan caja aplicada, crédito y saldo; las proyecciones usan ese saldo neto.",
-      "La fecha de corte aparece en el encabezado Al (día/mes/año). En CxP empresa, Exportar antigüedad descarga el informe. Los totales se presentan por moneda. Los filtros de ese bloque no reemplazan los filtros del listado de obligaciones.",
+      "Fecha de referencia clasifica los vencimientos de los saldos actuales. El importe abierto sigue reflejando los pagos y créditos aplicados hasta hoy. En CxP empresa, Exportar antigüedad descarga el informe con totales por moneda.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
@@ -712,12 +712,15 @@ export const AP_ARTICLES: HelpArticle[] = [
     hrefs: [
       { kind: "company", path: "/finanzas", label: "Tablero de finanzas (empresa)" },
       { kind: "project", suffix: "/finanzas", label: "Tablero de finanzas (obra)" },
+      { kind: "project", suffix: "/reportes/ingresos-gastos", label: "Ingresos vs gastos (obra)" },
     ],
     steps: [
       "Empresa: Finanzas → Tablero. Indicadores (4+4): egresos obra/corp, facturas borrador, pagos esperados 90d; luego C×P y C×C. Saldo e ingresos/egresos del mes están en Tesorería.",
       "Después de Indicadores está Tendencia mensual (todo el ancho).",
       "Obra: Finanzas del proyecto → Tablero de finanzas. El mismo gráfico va después de la visión rápida del mes.",
       "Rango: Este mes · 3 meses · 6 meses · 12 meses (queda en la URL como ?months=).",
+      "En obra, cada serie se muestra con su moneda. Si hay varias monedas, el margen queda sin calcular. El reporte permite descargar el desglose por moneda.",
+      "En empresa, la tendencia Económico indica su moneda y avisa si existen movimientos de otras monedas. Los importes de fuentes sin acceso se omiten.",
       "En empresa, Económico es ingresos vs gastos; Caja es tesorería. Contabilidad se abre desde el menú Contabilidad, no desde el tablero.",
     ],
     effects: [
@@ -727,6 +730,8 @@ export const AP_ARTICLES: HelpArticle[] = [
     keywords: [
       "tendencia mensual",
       "ingresos vs gastos",
+      "moneda de la tendencia",
+      "saldos actuales",
       "tablero finanzas",
       "indicadores finanzas",
       "pagos esperados",

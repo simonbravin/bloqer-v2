@@ -6,17 +6,23 @@ import { prisma } from "@bloqer/database";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { clearProjectAccessModeCache } from "../security/access";
 import { ServiceError, type ServiceContext } from "../types";
-import { getReceivableAgingReport } from "../aging/aging.service";
+import { getPayableAgingReport, getReceivableAgingReport } from "../aging/aging.service";
 import { exportReceivableAgingCsv } from "../report-exports/report-export.service";
 import { parseBuiltCsv } from "../report-exports/csv-export.service";
 import { getProjectCashPositionProjection } from "../project-cash-flow/project-cash-position-projection.service";
 import { getProjectCashProjectionReport } from "../reports/project-cash-projection.service";
 import { getProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
 import { getProjectAttributedCashBalance } from "../project-finance/project-attributed-cash.service";
+import { getProjectProfitabilityReport } from "../reports/project-profitability.service";
+import { getProjectIncomeExpenseReport } from "../reports/project-income-expense.service";
+import { getOverheadByProjectReport } from "../reports/overhead-by-project.service";
 import { createSalesInvoice, issueSalesInvoice } from "./sales-invoice.service";
 import { registerArIncome } from "./register-ar-income.service";
 import { createSalesCreditNoteFromInvoice, issueSalesCreditNote } from "./credit-debit-note.service";
 import { createCollection } from "../treasury/collection.service";
+import { getCashFlowReport } from "../treasury-reports/treasury-reports.service";
+import { getAutoWeightOverheadPreviewForPeriod, sumAutoWeightOverheadForProject } from "../finance/overhead-auto-weight.service";
+import { closeOverheadPeriod, reopenOverheadPeriod } from "../finance/overhead-period-freeze.service";
 import { buildAiExecutionContext } from "../ai/context";
 import { getReceivablesTool } from "../ai/tools/finance-tools";
 
@@ -51,6 +57,16 @@ describe("AG09 AR aging, exports and project cash consumers", { skip: process.en
         await tx.receivable.deleteMany({ where: { tenantId } });
         await tx.salesInvoiceLine.deleteMany({ where: { invoice: { tenantId } } });
         await tx.salesInvoice.deleteMany({ where: { tenantId } });
+        await tx.supplierInvoice.deleteMany({ where: { tenantId } });
+        await tx.subcontractCertificationLine.deleteMany({ where: { certification: { tenantId } } });
+        await tx.subcontractCertification.deleteMany({ where: { tenantId } });
+        await tx.subcontractLine.deleteMany({ where: { subcontract: { tenantId } } });
+        await tx.subcontract.deleteMany({ where: { tenantId } });
+        await tx.certification.deleteMany({ where: { tenantId } });
+        await tx.budget.deleteMany({ where: { tenantId } });
+        await tx.projectOverheadAllocation.deleteMany({ where: { tenantId } });
+        await tx.overheadAutoPeriodSnapshot.deleteMany({ where: { tenantId } });
+        await tx.overheadPeriodClose.deleteMany({ where: { tenantId } });
         await tx.auditLog.deleteMany({ where: { tenantId } });
         await tx.projectMembership.deleteMany({ where: { tenantId } });
         await tx.project.deleteMany({ where: { tenantId } });
@@ -94,6 +110,14 @@ describe("AG09 AR aging, exports and project cash consumers", { skip: process.en
     const report = await getReceivableAgingReport({ corporateOnly: true, contactId: s.client.id, asOfDate: date }, ctx);
     assert.equal(report.totals?.totalBalance, "100.00");
     assert.ok(report.rows.flatMap((row) => row.items).every((item) => item.projectId === null));
+  });
+  it("rejects combining project and corporate aging for an assigned project user", async () => {
+    const s = await scope();
+    await prisma.projectMembership.create({ data: { tenantId, projectId: s.project.id, userId: pmId } });
+    const filter = { projectId: s.project.id, corporateOnly: true };
+    const validation = (err: unknown) => err instanceof ServiceError && err.code === "VALIDATION";
+    await assert.rejects(() => getReceivableAgingReport(filter, pm), validation);
+    await assert.rejects(() => getPayableAgingReport(filter, pm), validation);
   });
   it("exports partial credits and separates ARS and USD instead of adding their totals", async () => {
     const s = await scope(), ars = await invoice(s); await credit(ars.salesInvoiceId, "30"); await invoice(s, ctx, "10", "USD");
@@ -146,5 +170,187 @@ describe("AG09 AR aging, exports and project cash consumers", { skip: process.en
     assert.equal(scoped.currencies[0]?.totalInflows, "20.00"); assert.equal(all.currencies[0]?.totalInflows, "60.00");
     assert.equal((await getProjectAttributedCashBalance(s.project.id, ctx)).byCurrency[0]?.netBalance, "20.00");
     assert.equal((await getProjectAttributedCashBalance(s.project.id, global)).byCurrency[0]?.netBalance, "60.00");
+  });
+  it("keeps AR amounts out of cash reports for a project member with AP only", async () => {
+    const s = await scope(), r = await invoice(s);
+    await cash(r.id);
+    await prisma.projectMembership.create({ data: { tenantId, projectId: s.project.id, userId: pmId } });
+    const apOnly: ServiceContext = { ...pm, roles: ["PROCUREMENT"] };
+    const actual = await getProjectCashFlowReport(s.project.id, { dateFrom: date, dateTo: date }, apOnly);
+    assert.ok(actual.warnings.sectionsExcluded?.some((section) => section.module === "AR" && section.reason === "MISSING_PERMISSION"));
+    assert.ok(actual.currencies.every((currency) => currency.collections.length === 0 && currency.totalInflows === "0.00"));
+    const position = await getProjectCashPositionProjection(s.project.id, { asOfDate: date }, apOnly);
+    assert.ok(position.currencies.every((currency) => currency.receivablesDue === "0.00" && currency.collectionsReceived === "0.00"));
+    const projection = await getProjectCashProjectionReport(s.project.id, { dateFrom: date, dateTo: date }, apOnly);
+    assert.ok(projection.currencies.every((currency) => currency.totalExpectedInflows === "0.00"));
+  });
+  it("uses the certified invoice net basis with issued notes and excludes direct and other-company sales", async () => {
+    const s = await scope();
+    const issueDate = new Date(date);
+    const budget = await prisma.budget.create({ data: { tenantId, projectId: s.project.id, versionNumber: 1, name: "Principal", status: "APPROVED", currency: "ARS", totalSalePrice: "1000" } });
+    const certification = await prisma.certification.create({ data: {
+      tenantId, companyId, projectId: s.project.id, budgetId: budget.id, number: 1, periodStart: issueDate, periodEnd: issueDate,
+      issueDate, status: "APPROVED", totalAmount: "100",
+    } });
+    const otherCertification = await prisma.certification.create({ data: {
+      tenantId, companyId: companyB, projectId: s.project.id, budgetId: budget.id, number: 2, periodStart: issueDate, periodEnd: issueDate,
+      issueDate, status: "APPROVED", totalAmount: "500",
+    } });
+    const base = { tenantId, companyId, projectId: s.project.id, clientContactId: s.client.id, issueDate, dueDate: issueDate, currency: "ARS", status: "ISSUED" as const };
+    const certified = await prisma.salesInvoice.create({ data: {
+      ...base, number: 90000, certificationId: certification.id, subtotal: "100", taxAmount: "21", iibbPerceptionAmount: "3", totalAmount: "124",
+    } });
+    await prisma.salesInvoice.createMany({ data: [
+      { ...base, number: 90000, documentKind: "DEBIT_NOTE", referencedSalesInvoiceId: certified.id, subtotal: "20", taxAmount: "4.2", totalAmount: "24.2" },
+      { ...base, number: 90000, documentKind: "CREDIT_NOTE", referencedSalesInvoiceId: certified.id, subtotal: "30", taxAmount: "6.3", totalAmount: "36.3" },
+      { ...base, number: 90001, status: "DRAFT", documentKind: "DEBIT_NOTE", referencedSalesInvoiceId: certified.id, subtotal: "900", totalAmount: "900" },
+      { ...base, number: 90001, subtotal: "250", totalAmount: "250" },
+      { ...base, companyId: companyB, number: 90000, certificationId: otherCertification.id, subtotal: "500", totalAmount: "500" },
+    ] });
+    const result = await getProjectProfitabilityReport(s.project.id, { revenueBasis: "invoiced" }, ctx);
+    assert.equal(result.type, "REPORT");
+    assert.equal(result.revenue, "90.00");
+    assert.equal(result.grossMargin, "90.00");
+    assert.equal(result.currency, "ARS");
+    const sharedCertification = await prisma.certification.create({ data: {
+      tenantId, projectId: s.project.id, budgetId: budget.id, number: 3, periodStart: issueDate, periodEnd: issueDate,
+      issueDate, status: "APPROVED", totalAmount: "700",
+    } });
+    await prisma.salesInvoice.create({ data: {
+      ...base, companyId: companyB, number: 90001, certificationId: sharedCertification.id, subtotal: "700", totalAmount: "700",
+    } });
+    await prisma.budget.update({ where: { id: budget.id }, data: { companyId } });
+    const unanchored = await getProjectProfitabilityReport(s.project.id, { revenueBasis: "invoiced" }, global);
+    assert.equal(unanchored.type, "REPORT");
+    assert.equal(unanchored.revenue, "90.00");
+    await assert.rejects(() => getProjectProfitabilityReport(s.project.id, { revenueBasis: "invoiced" }, { ...ctx, roles: ["PROCUREMENT"] }), denied);
+    const disabled = await prisma.tenantModuleSetting.create({ data: { tenantId, moduleKey: "AP", isEnabled: false } });
+    try {
+      const paid = await getProjectProfitabilityReport(s.project.id, { revenueBasis: "invoiced", costLayer: "paid" }, ctx);
+      assert.equal(paid.type, "REPORT");
+      assert.equal(paid.revenue, "90.00");
+      assert.equal(paid.directCost, null);
+      assert.equal(paid.grossMargin, null);
+      assert.ok(paid.sectionsExcluded.some((section) => section.module === "AP" && section.reason === "TENANT_MODULE_DISABLED"));
+    } finally {
+      await prisma.tenantModuleSetting.delete({ where: { id: disabled.id } });
+    }
+  });
+  it("reports accrued amounts by native currency and anchors shared-project AP to company", async () => {
+    const s = await scope();
+    const issueDate = new Date(date);
+    const supplier = await prisma.contact.create({ data: { tenantId, legalName: "Synthetic supplier", country: "AR" } });
+    const base = { tenantId, companyId, projectId: s.project.id, supplierContactId: supplier.id, issueDate, dueDate: issueDate, status: "ISSUED" as const };
+    await prisma.supplierInvoice.createMany({ data: [
+      { ...base, number: 90000, currency: "ARS", subtotal: "100", totalAmount: "121" },
+      { ...base, number: 90001, currency: "USD", subtotal: "10", totalAmount: "12.1" },
+      { ...base, number: 90000, currency: "ARS", subtotal: "200", totalAmount: "242", companyId: companyB },
+    ] });
+    const report = await getProjectIncomeExpenseReport(s.project.id, { dateFrom: date, dateTo: date }, ctx);
+    assert.equal(report.consolidationBlocked, true);
+    assert.equal(report.totals.costAccrued, "100.00");
+    assert.deepEqual(report.byCurrency.map((slice) => [slice.currency, slice.totals.costAccrued]), [["ARS", "100.00"], ["USD", "10.00"]]);
+    assert.equal(report.totals.grossMarginAccrued, null);
+    const budget = await prisma.budget.create({ data: { tenantId, projectId: s.project.id, versionNumber: 1, name: "Principal", status: "APPROVED", currency: "ARS" } });
+    await prisma.projectMembership.create({ data: { tenantId, projectId: s.project.id, userId: pmId } });
+    const apOnly = await getProjectIncomeExpenseReport(s.project.id, { budgetId: budget.id, dateFrom: date, dateTo: date }, { ...pm, roles: ["PROCUREMENT"] });
+    assert.equal(apOnly.sourcesAvailable.ar, false);
+    assert.equal(apOnly.totals.grossMarginCash, null);
+  });
+  it("reconciles cash flow when historical movement and account currency spellings differ", async () => {
+    const bank = await prisma.treasuryAccount.create({ data: { tenantId, companyId, name: "Synthetic legacy EUR bank", type: "BANK", currency: "eur", openingBalance: "5" } });
+    await prisma.accountMovement.create({ data: {
+      tenantId, companyId, accountId: bank.id, movementDate: new Date(date), amount: "10", currency: "EUR",
+      type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT", description: "Synthetic legacy spelling",
+    } });
+    const currencies = await getCashFlowReport({ dateFrom: date, dateTo: date, currency: "EUR" }, ctx);
+    assert.equal(currencies.length, 1);
+    assert.equal(currencies[0]?.currency, "EUR");
+    assert.equal(currencies[0]?.openingBalance, "5.00");
+    assert.equal(currencies[0]?.closingBalance, "15.00");
+  });
+  it("restricts the company overhead report to company finance and visible works", async () => {
+    const a = await scope(), hidden = await scope(), b = await scope();
+    await prisma.projectMembership.createMany({ data: [a, b].map((s) => ({ tenantId, projectId: s.project.id, userId: pmId })) });
+    await prisma.projectOverheadAllocation.createMany({ data: [
+      { tenantId, companyId, projectId: a.project.id, period: "2026-11", amount: "10" },
+      { tenantId, companyId, projectId: hidden.project.id, period: "2026-11", amount: "20" },
+      { tenantId, companyId: companyB, projectId: b.project.id, period: "2026-11", amount: "30" },
+    ] });
+    const scoped = await getOverheadByProjectReport({ ...pm, roles: ["FINANCE"] });
+    assert.deepEqual(scoped.rows.map((row) => [row.projectId, row.amount]), [[a.project.id, "10.00"]]);
+    const unanchored = await getOverheadByProjectReport(global);
+    assert.deepEqual(unanchored.rows.map((row) => row.amount).sort(), ["10.00", "20.00", "30.00"]);
+    await assert.rejects(() => getOverheadByProjectReport({ ...pm, roles: ["PROJECT_VIEWER"] }), denied);
+  });
+  it("weights net costs in verified ARS and preserves a frozen allocation when later evidence lacks FX", async () => {
+    const usd = await scope(), ars = await scope();
+    const period = "2026-11";
+    const issueDate = new Date(date);
+    await prisma.company.update({ where: { id: companyId }, data: { overheadAllocationMode: "AUTO_WEIGHT" } });
+    await prisma.project.updateMany({ where: { id: { in: [usd.project.id, ars.project.id] } }, data: { companyId } });
+    const supplier = await prisma.contact.create({ data: { tenantId, legalName: "Synthetic D-142 supplier", country: "AR" } });
+    const base = { tenantId, companyId, supplierContactId: supplier.id, issueDate, dueDate: issueDate, status: "ISSUED" as const };
+    const usdInvoice = await prisma.supplierInvoice.create({ data: {
+      ...base, projectId: usd.project.id, number: 92000, currency: "USD", subtotal: "100", totalAmount: "121", fxRate: "1250", amountArs: "151250",
+    } });
+    await prisma.supplierInvoice.createMany({ data: [
+      { ...base, projectId: usd.project.id, number: 92000, currency: "USD", documentKind: "DEBIT_NOTE", referencedSupplierInvoiceId: usdInvoice.id, subtotal: "20", totalAmount: "24.2", fxRate: "1250", amountArs: "30250" },
+      { ...base, projectId: usd.project.id, number: 92000, currency: "USD", documentKind: "CREDIT_NOTE", referencedSupplierInvoiceId: usdInvoice.id, subtotal: "20", totalAmount: "24.2", fxRate: "1250", amountArs: "30250" },
+      { ...base, projectId: ars.project.id, number: 92001, currency: "ARS", subtotal: "100", totalAmount: "121" },
+      { ...base, projectId: null, number: 92002, currency: "ARS", subtotal: "125100", totalAmount: "125100" },
+    ] });
+    const preview = await getAutoWeightOverheadPreviewForPeriod(companyId, period, ctx);
+    assert.equal(preview.calculationBlocked, false);
+    assert.equal(preview.totalAccruedCd, "125100.00");
+    assert.equal(preview.rows.find((row) => row.projectId === usd.project.id)?.allocatedAmount, "125000.00");
+    assert.equal(preview.rows.find((row) => row.projectId === ars.project.id)?.allocatedAmount, "100.00");
+    await prisma.projectMembership.create({ data: { tenantId, projectId: ars.project.id, userId: pmId } });
+    const finance: ServiceContext = { ...pm, roles: ["FINANCE"] };
+    const scoped = await getAutoWeightOverheadPreviewForPeriod(companyId, period, finance);
+    assert.equal(scoped.totalAccruedCd, "125100.00");
+    assert.deepEqual(scoped.rows.map((row) => [row.projectId, row.allocatedAmount]), [[ars.project.id, "100.00"]]);
+    await closeOverheadPeriod(companyId, period, finance);
+
+    const subcontract = await prisma.subcontract.create({ data: {
+      tenantId, companyId, projectId: usd.project.id, subcontractorContactId: supplier.id, number: 1,
+      title: "Synthetic D-142 foreign contract", contractDate: issueDate, currency: "USD", status: "ACTIVE",
+    } });
+    const line = await prisma.subcontractLine.create({ data: {
+      subcontractId: subcontract.id, description: "Synthetic line", unit: "u", quantity: "1", unitPrice: "10", lineTotal: "10",
+    } });
+    await prisma.subcontractCertification.create({ data: {
+      tenantId, companyId, projectId: usd.project.id, subcontractId: subcontract.id, subcontractorContactId: supplier.id,
+      number: 1, periodStart: issueDate, periodEnd: issueDate, certificationDate: issueDate, status: "APPROVED",
+      lines: { create: { subcontractLineId: line.id, previousQty: "0", currentQty: "1", cumulativeQty: "1", remainingQty: "0", unitPriceSnapshot: "10", lineTotal: "10" } },
+    } });
+    const frozen = await sumAutoWeightOverheadForProject(usd.project.id, companyId, undefined, ctx);
+    assert.equal(frozen.amount?.toFixed(2), "125000.00");
+    await reopenOverheadPeriod(companyId, period, ctx);
+
+    const blocked = await getAutoWeightOverheadPreviewForPeriod(companyId, period, ctx);
+    assert.equal(blocked.calculationBlocked, true);
+    assert.equal(blocked.totalAccruedCd, null);
+    assert.ok(blocked.rows.every((row) => row.weightPct === null && row.allocatedAmount === null));
+    assert.equal((await sumAutoWeightOverheadForProject(usd.project.id, companyId, undefined, ctx)).amount, null);
+    await assert.rejects(() => closeOverheadPeriod(companyId, period, ctx), (error: unknown) => error instanceof ServiceError && error.code === "CONFLICT");
+    const closed = await prisma.overheadPeriodClose.findUniqueOrThrow({ where: { tenantId_companyId_period: { tenantId, companyId, period } } });
+    assert.equal(closed.status, "OPEN");
+    assert.equal(await prisma.overheadAutoPeriodSnapshot.count({ where: { periodCloseId: closed.id } }), 0);
+
+    const originalDate = new Date("2026-09-25");
+    const creditDate = new Date("2026-10-01");
+    const corporateInvoice = await prisma.supplierInvoice.create({ data: {
+      ...base, projectId: null, number: 92003, issueDate: originalDate, dueDate: originalDate, subtotal: "100", totalAmount: "100",
+    } });
+    await prisma.supplierInvoice.create({ data: {
+      ...base, projectId: null, number: 92001, issueDate: creditDate, dueDate: creditDate,
+      documentKind: "CREDIT_NOTE", referencedSupplierInvoiceId: corporateInvoice.id, subtotal: "100", totalAmount: "100",
+    } });
+    const negativePool = await getAutoWeightOverheadPreviewForPeriod(companyId, "2026-10", ctx);
+    assert.equal(negativePool.poolArs, "-100.00");
+    assert.equal(negativePool.totalAccruedCd, "0.00");
+    assert.equal(negativePool.calculationBlocked, true);
+    await assert.rejects(() => closeOverheadPeriod(companyId, "2026-10", ctx), { code: "CONFLICT" });
   });
 });

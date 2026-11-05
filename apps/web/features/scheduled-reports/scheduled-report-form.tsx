@@ -23,6 +23,7 @@ import {
 import { isNextRedirectError } from "@/lib/next-errors";
 import { cn } from "@/lib/utils";
 import { JobsiteDailyScheduleHint } from "./scheduled-report-catalog-panel";
+import { buildScheduledReportFormParams } from "./scheduled-report-form-params";
 
 const WEEKDAY_LABELS: Record<number, string> = {
   1: "Lunes",
@@ -35,25 +36,6 @@ const WEEKDAY_LABELS: Record<number, string> = {
 };
 
 const MAX_JOBSITE_PROJECTS = 20;
-
-function buildReportParams(
-  dateFrom: string,
-  dateTo: string,
-  currency: string,
-  jobsiteProjectIds: string[],
-): Record<string, string> | undefined {
-  const params: Record<string, string> = {};
-  const from = dateFrom.trim();
-  const to = dateTo.trim();
-  const cur = currency.trim();
-  if (from) params.dateFrom = from;
-  if (to) params.dateTo = to;
-  if (cur) params.currency = cur;
-  if (jobsiteProjectIds.length > 0) {
-    params.jobsiteProjectIds = jobsiteProjectIds.join(",");
-  }
-  return Object.keys(params).length > 0 ? params : undefined;
-}
 
 export type ScheduledReportFormMember = {
   userId: string;
@@ -84,7 +66,7 @@ export type ScheduledReportFormInitial = {
   dayOfMonth?: number;
   timeOfDay: string;
   timezone: string;
-  reportKeys: ScheduledReportKey[];
+  reports: Pick<ScheduledReportCatalogOption, "reportKey" | "labelEs">[];
   recipientUserIds: string[];
   params?: Record<string, string> | null;
 };
@@ -130,7 +112,7 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   const [dateTo, setDateTo] = React.useState(props.initial?.params?.dateTo ?? "");
   const [currency, setCurrency] = React.useState(props.initial?.params?.currency ?? "");
   const [selectedKeys, setSelectedKeys] = React.useState<Set<ScheduledReportKey>>(
-    () => new Set(props.initial?.reportKeys ?? []),
+    () => new Set(props.initial?.reports.map((report) => report.reportKey)),
   );
   const [selectedJobsiteProjects, setSelectedJobsiteProjects] = React.useState<Set<string>>(() => {
     const raw = props.initial?.params?.jobsiteProjectIds ?? "";
@@ -151,6 +133,11 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   );
 
   const catalog = scope === "TENANT" ? props.tenantCatalog : props.projectCatalog;
+  const catalogKeys = React.useMemo(() => new Set(catalog.map((option) => option.reportKey)), [catalog]);
+  const originalReports = props.initial?.scope === scope ? props.initial.reports : undefined;
+  const retainedReports = originalReports?.filter(({ reportKey }) =>
+    !catalogKeys.has(reportKey) && selectedKeys.has(reportKey),
+  ) ?? [];
   const scopeLocked = Boolean(props.lockScope);
   const includesJobsiteDaily = selectedKeys.has("TENANT_JOBSITE_DAILY_LOGS");
   const activeProjectIdSet = React.useMemo(
@@ -165,14 +152,14 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
   const activeJobsiteSelectionCount = selectedJobsiteProjects.size - orphanJobsiteProjectIds.length;
 
   React.useEffect(() => {
-    if (scopeLocked) return;
-    const allowed = new Set(catalog.map((o) => o.reportKey));
+    const allowed = new Set(catalogKeys);
+    for (const report of originalReports ?? []) allowed.add(report.reportKey);
     setSelectedKeys((prev) => {
       const filtered = [...prev].filter((k) => allowed.has(k));
-      if (filtered.length === prev.size && filtered.every((k) => prev.has(k))) return prev;
+      if (filtered.length === prev.size) return prev;
       return new Set(filtered);
     });
-  }, [scope, scopeLocked, catalog]);
+  }, [catalogKeys, originalReports]);
 
   React.useEffect(() => {
     if (includesJobsiteDaily && format !== "PDF") {
@@ -240,20 +227,26 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
     setPending(true);
     const items = [...selectedKeys].map((reportKey, index) => ({ reportKey, sortOrder: index }));
     const effectiveScope = props.lockScope ?? scope;
+    const effectiveProjectId = effectiveScope === "PROJECT"
+      ? (props.lockProjectId ?? projectId) || undefined
+      : undefined;
     const effectiveFormat = includesJobsiteDaily ? "PDF" : format;
     const payload = {
       ...(props.initial?.id ? { id: props.initial.id } : {}),
       name: name.trim(),
       scope: effectiveScope,
-      projectId:
-        effectiveScope === "PROJECT" ? (props.lockProjectId ?? projectId) || undefined : undefined,
+      projectId: effectiveProjectId,
       format: effectiveFormat,
       frequency,
       dayOfWeek: frequency === "WEEKLY" ? Number(dayOfWeek) : undefined,
       dayOfMonth: frequency === "MONTHLY" ? Number(dayOfMonth) : undefined,
       timeOfDay: timeOfDay.slice(0, 5),
       timezone,
-      params: buildReportParams(dateFrom, dateTo, currency, jobsiteIdsForSave),
+      params: buildScheduledReportFormParams(
+        { scope: effectiveScope, projectId: effectiveProjectId },
+        { dateFrom, dateTo, currency, jobsiteProjectIds: jobsiteIdsForSave },
+        props.initial,
+      ),
       items,
       recipientUserIds: [...selectedRecipients],
     };
@@ -421,6 +414,29 @@ export function ScheduledReportForm(props: ScheduledReportFormProps) {
               );
             })
           )}
+          {retainedReports.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold tracking-tight">Reportes de esta configuración</p>
+              <p className="text-xs text-muted-foreground">
+                Estos reportes ya estaban seleccionados y no figuran en el catálogo actual.
+                Si su módulo está deshabilitado, quitalos para guardar.
+              </p>
+              {retainedReports.map(({ reportKey, labelEs }) => (
+                <div key={reportKey} className="flex flex-wrap items-center gap-2 text-sm">
+                  <span>{labelEs}</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Quitar ${labelEs}`}
+                    onClick={() => toggleKey(reportKey, false)}
+                  >
+                    Quitar
+                  </Button>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 

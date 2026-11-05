@@ -15,12 +15,13 @@ Enviar correos transaccionales con **Resend** cuando el proyecto tenga variables
 
 ## Phase 9C — Envío manual de reportes por email (implementado)
 
-- **Solo acción explícita del usuario** (“Enviar por email” en pantallas de reporte). **No** hay envío automático al exportar, **no** hay cron, **no** hay preferencias de frecuencia, **no** hay scheduler de reportes.
+- **Acción explícita del usuario** (“Enviar por email” en pantallas de reporte). Los envíos periódicos usan la configuración de [reportes programados](./SCHEDULED_REPORTS_ARCHITECTURE.md).
 - **`sendReportByEmail`** (`packages/report-pdf/src/report-email.service.ts`): valida input (Zod), genera CSV o PDF con los mismos builders que Phase 9A/9B, nombre de archivo con `safeReportFilename`, llama a `sendEmail` con adjunto. Si `isEmailConfigured()` es falso → devuelve `ok: true`, `provider: "disabled"`, `skippedReason: "email_not_configured"` (la UI indica envío simulado / correo deshabilitado).
 - **Sin** subir adjuntos a R2, **sin** `DocumentAttachment` para el flujo de reporte por email.
 - **Phase 9D:** cada intento de envío de reporte queda en **`EmailDeliveryLog`** (`REPORT_MANUAL`, `PENDING` → `SENT` \| `SKIPPED` \| `FAILED`).
-- **PDF** solo para AR aging, AP aging y control de costos (igual que 9B); el resto solo CSV por email.
+- **PDF o CSV** para Aging CxC/CxP, EDT y costos y Avances del proyecto. Los demás reportes con envío manual ofrecen CSV en este recorrido.
 - **Seguridad:** `recipientEmail` y `subject` validados/saneados en servidor; sin `tenantId` desde el cliente; mismos gates de permiso que las rutas `GET /api/reports/**`.
+- **D-140:** quien tiene permiso de exportar puede elegir la dirección en este envío puntual. La autorización por destinatario corresponde a los [envíos programados](./SCHEDULED_REPORTS_ARCHITECTURE.md).
 
 ## Phase 9D — EmailDeliveryLog (foundation)
 

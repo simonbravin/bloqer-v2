@@ -4,5 +4,5 @@ import type { PermissionModule } from "@bloqer/domain";
 export type TenantModuleSectionExcludedWarning = {
   module: PermissionModule;
   section: string;
-  reason: "TENANT_MODULE_DISABLED";
+  reason: "TENANT_MODULE_DISABLED" | "MISSING_PERMISSION";
 };

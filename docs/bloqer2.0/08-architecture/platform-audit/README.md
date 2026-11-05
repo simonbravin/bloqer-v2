@@ -4,7 +4,7 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Estado vigente al 05/11/2026
 
-**AG-00 a AG-10 publicadas.** [Publicación AG-10](./2026-11-05-ag-10-publication.md), PR #8 y Production 77c9596c. [AG-11 cerrada localmente](./2026-11-05-ag-11-field-jobsite.md) con 20 grupos corregidos, 2.706 pruebas generales, 49 casos SQL distintos y muestra en escritorio, tablet y teléfono. La revisión integral de UX/UI se mantiene como etapa posterior.
+**AG-00 a AG-11 publicadas.** [Publicación AG-11](./2026-11-05-ag-11-publication.md), PR #9 y Production `06963cfa`. [AG-12 cerrada localmente](./2026-11-05-ag-12-reporting.md). La revisión integral de UX/UI se mantiene como etapa posterior.
 
 ## Corte inicial: 03/11/2026
 
@@ -117,8 +117,8 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-08 — Corregida y verificada localmente, sin publicar.** [Cierre](./2026-11-05-ag-08-certifications-subcontracts.md), [JSON](./2026-11-05-ag-08-certifications-subcontracts.json): 30 grupos, D-131/D-132, 2.528 pruebas/90 SQL, tipos/lint/compilación/visual e independencia. AG-09 espera indicación.
 - **AG-09 — Ventas y obligaciones. Corregida y verificada localmente.** [Cierre](./2026-11-05-ag-09-ar-ap-payments.md), [JSON](./2026-11-05-ag-09-ar-ap-payments.json).
 - **AG-10 — Tesorería y contabilidad. Publicada.** [Cierre](./2026-11-05-ag-10-treasury-accounting.md) y [publicación](./2026-11-05-ag-10-publication.md).
-- **AG-11 — Operación de campo. Cerrada localmente.** [Informe](./2026-11-05-ag-11-field-jobsite.md) y [registro estructurado](./2026-11-05-ag-11-field-jobsite.json).
-- **AG-12 — Información y exportaciones. Pendiente.** Reportes, dashboards, filtros, agregados, exportaciones y PDF.
+- **AG-11 — Operación de campo. Publicada.** [Informe](./2026-11-05-ag-11-field-jobsite.md), [registro estructurado](./2026-11-05-ag-11-field-jobsite.json) y [publicación](./2026-11-05-ag-11-publication.md).
+- **AG-12 — Información y exportaciones. Cerrada localmente.** [Informe](./2026-11-05-ag-12-reporting.md) y [registro estructurado](./2026-11-05-ag-12-reporting.json).
 - **AG-13 — Servicios transversales e interfaces de ayuda. Pendiente.** Documentos, avisos, email, crons, centro de ayuda y Bloqer AI.
 - **AG-14 — Regresión y preparación de release. Pendiente.** Workflows cruzados, performance, seguridad, observabilidad y verificación del despliegue correspondiente.
 
@@ -192,4 +192,10 @@ Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08
 
 - [Informe](./2026-11-05-ag-11-field-jobsite.md) y [registro estructurado](./2026-11-05-ag-11-field-jobsite.json). 20 grupos corregidos en Libro de obra, Field, inventario, cronograma, evidencia, R-002 y reporte diario D-100.
 - 2.706 pruebas generales, 49 casos SQL distintos, tipos en 13 tareas, lint, compilación y revisión independiente. Guía, Ayuda e índice AI actualizados con 587 fragmentos.
-- Muestra aislada de OWNER y PROJECT_VIEWER en escritorio, tablet y teléfono. AG-11 queda local. AG-12 espera indicación del Owner.
+- Muestra aislada de OWNER y PROJECT_VIEWER en escritorio, tablet y teléfono. [AG-11 publicada](./2026-11-05-ag-11-publication.md) después del cierre local.
+
+## Corrida AG-12 del 05/11/2026
+
+- [Informe](./2026-11-05-ag-12-reporting.md) y [registro estructurado](./2026-11-05-ag-12-reporting.json). Once grupos corregidos en tableros, reportes de obra y empresa, exportaciones y entrega.
+- D-140 a D-142 aprobadas. Pasaron 2.733 pruebas generales, 32 casos SQL distintos, chequeo de tipos, lint, compilación y revisión independiente. Muestra aislada de escritorio, tablet y teléfono con PDF y CSV descargados.
+- Cierre local. AG-13 espera indicación del Owner.

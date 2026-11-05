@@ -24,6 +24,7 @@ const PATH_SEGMENT_LABELS: Record<string, string> = {
   cuentas: "Cuentas",
   transferencias: "Transferencias",
   reportes: "Reportes",
+  "compras-proveedores": "Análisis de compras",
   "flujo-caja": "Flujo de caja",
   movimientos: "Movimientos",
   stock: "Stock",

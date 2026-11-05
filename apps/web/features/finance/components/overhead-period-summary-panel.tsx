@@ -63,10 +63,10 @@ export function OverheadPeriodSummaryPanel({ companyId, periods, canEdit }: Prop
   return (
     <DataTableSection
       title="Resumen por período (imputación automática)"
-      description="El prorrateo a obra es por mes (sin proyectos en borrador). Cerrá el período para fijar montos en margen; un proyecto nuevo no altera períodos ya cerrados."
+      description="El prorrateo mensual usa el costo directo en pesos y excluye proyectos en borrador. Cerrá el período para fijar los importes de cada obra."
     >
       {error ? (
-        <p className="text-sm text-destructive mb-3">{error}</p>
+        <p className="text-sm text-destructive mb-3" role="alert">{error}</p>
       ) : null}
       <TableScroll>
         <Table>
@@ -95,13 +95,25 @@ export function OverheadPeriodSummaryPanel({ companyId, periods, canEdit }: Prop
                       ) : null}
                     </span>
                   ) : (
-                    <span className="text-xs font-medium text-amber-800 dark:text-amber-200">
-                      Abierto (vista previa)
-                    </span>
+                    <div className="space-y-1 text-xs">
+                      <p className="font-medium text-amber-800 dark:text-amber-200">
+                        {p.calculationBlocked ? "Abierto · Cierre suspendido" : "Abierto (vista previa)"}
+                      </p>
+                      {p.calculationBlocked ? (
+                        <ul className="max-w-72 list-disc space-y-1 pl-4 text-muted-foreground">
+                          {(p.warnings.length > 0 ? p.warnings : ["La base de cálculo está incompleta."]).map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatMoneyAmount(p.poolArs, "ARS")}
+                  {p.excludedNonArsCount > 0 ? (
+                    <span className="block text-xs text-muted-foreground">Parcial</span>
+                  ) : null}
                   {p.status === "OPEN" && p.invoiceCount > 0 ? (
                     <span className="block text-xs text-muted-foreground">
                       {p.invoiceCount} factura(s)
@@ -109,7 +121,7 @@ export function OverheadPeriodSummaryPanel({ companyId, periods, canEdit }: Prop
                   ) : null}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatMoneyAmount(p.totalCdArs, "ARS")}
+                  {p.totalCdArs === null ? "—" : formatMoneyAmount(p.totalCdArs, "ARS")}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{p.projectRowCount}</TableCell>
                 <TableCell className="text-right">
@@ -128,7 +140,7 @@ export function OverheadPeriodSummaryPanel({ companyId, periods, canEdit }: Prop
                       <Button
                         type="button"
                         size="sm"
-                        disabled={pending}
+                        disabled={pending || p.calculationBlocked}
                         onClick={() => runPeriodAction(p.period, "close")}
                       >
                         Cerrar período

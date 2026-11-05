@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  defaultReportDateRange,
   isDueOnOrBeforeHorizon,
   parseFilterDate,
   parseTrendMonths,
@@ -9,6 +10,13 @@ import {
   projectionBucketKey,
   trendDateRange,
 } from "./report-month";
+
+it("clamps the default start to the last day of a shorter month", () => {
+  assert.deepEqual(defaultReportDateRange(1, new Date("2026-03-31T18:00:00.000Z")), {
+    dateFrom: "2026-02-28",
+    dateTo: "2026-03-31",
+  });
+});
 
 describe("isDueOnOrBeforeHorizon", () => {
   it("includes overdue payables (due before today)", () => {

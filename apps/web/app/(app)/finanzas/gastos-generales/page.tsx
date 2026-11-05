@@ -10,6 +10,7 @@ import {
   getAutoWeightOverheadPreviewForPeriod,
   getCompanies,
   getCompanyOverheadSettings,
+  getOverheadPeriodCloseStatus,
   getTenantModuleGate,
   listActiveProjectsForOverhead,
   listCompanySupplierInvoices,
@@ -43,6 +44,7 @@ export default async function GastosGeneralesPage() {
   const canEditAp = canEditCompanyAp(current.tenantCtx.roles);
   const companies = await getCompanies(ctx);
   const companyId = ctx.companyId ?? companies[0]?.id;
+  const calendarPeriod = currentOverheadPeriod();
 
   let recentInvoices: SupplierInvoiceListItem[] = [];
   if (companyId) {
@@ -91,11 +93,15 @@ export default async function GastosGeneralesPage() {
         periodSummaries = await listOverheadPeriodSummaries(companyId, ctx, { limit: 12 });
       }
 
+      const initialPeriodClosed = settings.overheadAllocationMode === "AUTO_WEIGHT" && (
+        periodSummaries.find((summary) => summary.period === calendarPeriod)?.status ??
+        await getOverheadPeriodCloseStatus(companyId, calendarPeriod, ctx)
+      ) === "FROZEN";
       const initialAutoPreview =
-        settings.overheadAllocationMode === "AUTO_WEIGHT"
+        settings.overheadAllocationMode === "AUTO_WEIGHT" && !initialPeriodClosed
           ? await getAutoWeightOverheadPreviewForPeriod(
               companyId,
-              currentOverheadPeriod(),
+              calendarPeriod,
               ctx,
               AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
             )
@@ -109,7 +115,8 @@ export default async function GastosGeneralesPage() {
           projects={projects}
           canEdit={canEditAp}
           initialAutoPreview={initialAutoPreview}
-          calendarPeriod={currentOverheadPeriod()}
+          initialPeriodClosed={initialPeriodClosed}
+          calendarPeriod={calendarPeriod}
         />
       );
     } catch (err) {

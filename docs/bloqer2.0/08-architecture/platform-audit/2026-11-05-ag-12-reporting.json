@@ -1,0 +1,114 @@
+{
+  "phase": "AG-12",
+  "status": "closed_local",
+  "date": "2026-11-05",
+  "base": "86134c599cb6c28ad2a3961d9f034169c0c312a5",
+  "previousRelease": {
+    "phase": "AG-11",
+    "pr": 9,
+    "main": "06963cfaa3b02b211e9a0acf1439128a9e50c931",
+    "productionVerified": true
+  },
+  "findings": [
+    {
+      "id": "GA-AG-12-001",
+      "title": "Tableros y portafolio con alcance verificable",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-002",
+      "title": "Permisos de lecturas financieras y saldos de caja",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-003",
+      "title": "Rentabilidad por presupuesto",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-004",
+      "title": "Devengado y tendencia por moneda",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-005",
+      "title": "Fechas, moneda y compromisos de compras",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-006",
+      "title": "Evolución y cartera de certificaciones",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-007",
+      "title": "Fuentes y comparación de materiales y subcontratos",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-008",
+      "title": "Paridad CSV, Excel y PDF",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-009",
+      "title": "Permisos por destinatario, historial y reintentos",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-010",
+      "title": "Calendario y concurrencia de reportes programados",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-12-011",
+      "title": "Ponderación y empresa en gastos generales",
+      "state": "corrected_verified"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-140",
+      "question": "Q-087"
+    },
+    {
+      "id": "D-141",
+      "question": "Q-088"
+    },
+    {
+      "id": "D-142",
+      "question": "Q-089"
+    }
+  ],
+  "verification": {
+    "generalPassed": 2733,
+    "topLevelSuitesSkipped": 42,
+    "isolatedSqlDistinctPassed": 32,
+    "typecheckTasksPassed": 13,
+    "lint": "passed",
+    "build": "passed",
+    "buildSourceMatches": 128,
+    "docsIndexChunks": 593,
+    "browser": {
+      "widths": [
+        1440,
+        768,
+        390
+      ],
+      "captures": 5,
+      "downloadedFormats": [
+        "pdf",
+        "csv"
+      ],
+      "syntheticData": true,
+      "stage": "before_final_copy_and_overhead_changes"
+    },
+    "providers": "simulated_or_disabled",
+    "evidenceDirectory": "output/platform-audit/ag-12-2026-11-05"
+  },
+  "followUp": [
+    "P-AG13-01",
+    "Revisión integral UX/UI"
+  ],
+  "nextPhase": "AG-13"
+}

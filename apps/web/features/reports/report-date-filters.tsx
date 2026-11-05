@@ -30,6 +30,8 @@ type Props = {
   /** When false, hide Desde/Hasta (e.g. materials operativo board uses schedule window, not dates). */
   showDateRange?: boolean;
   showCurrencyView?: boolean;
+  currencies?: string[];
+  currentCurrency?: string;
 };
 
 export function ReportDateFilters({
@@ -38,18 +40,16 @@ export function ReportDateFilters({
   showBudget = true,
   showDateRange = true,
   showCurrencyView = false,
+  currencies = [],
+  currentCurrency,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const resolvedBudgetId = defaultContractualBudgetId(budgets, currentBudgetId);
-  const [budgetId, setBudgetId] = useState(resolvedBudgetId);
-  const [syncedBudgetId, setSyncedBudgetId] = useState(currentBudgetId);
-  if (syncedBudgetId !== currentBudgetId) {
-    setSyncedBudgetId(currentBudgetId);
-    setBudgetId(resolvedBudgetId);
-  }
-  const [currencyView, setCurrencyView] = useState(params.get("currencyView") ?? "ARS");
+  const currencyView = params.get("currencyView") === "original" ? "original" : "ARS";
+  const [resetVersion, setResetVersion] = useState(0);
+  const showCurrencySelect = !showCurrencyView && currencies.length > 1;
 
   /** Preserve page-specific query keys (e.g. materiales window/tab) across filter apply/clear. */
   function preservedParams(): URLSearchParams {
@@ -65,35 +65,43 @@ export function ReportDateFilters({
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     const sp = preservedParams();
-    const bid = (fd.get("budgetId") as string) || budgetId;
+    const bid = fd.get("budgetId");
     const from = fd.get("dateFrom") as string;
     const to = fd.get("dateTo") as string;
-    if (showBudget && bid && bid !== "__all__") sp.set("budgetId", bid);
+    if (showBudget && typeof bid === "string" && bid && bid !== "__all__") sp.set("budgetId", bid);
     if (showDateRange && from) sp.set("dateFrom", from);
     if (showDateRange && to) sp.set("dateTo", to);
-    if (showCurrencyView) sp.set("currencyView", currencyView);
+    if (showCurrencyView) sp.set("currencyView", String(fd.get("currencyView") ?? currencyView));
     else if (params.get("currencyView")) sp.set("currencyView", params.get("currencyView")!);
+    const currency = fd.get("currency");
+    if (showCurrencySelect && typeof currency === "string" && currencies.includes(currency)) {
+      sp.set("currency", currency);
+    }
     router.push(`${pathname}?${sp.toString()}`);
   }
 
   function clear() {
+    setResetVersion((version) => version + 1);
     const sp = preservedParams();
     const qs = sp.toString();
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
   const showBudgetSelect = showBudget && budgets.length > 1;
-  if (!showBudgetSelect && !showDateRange && !showCurrencyView) return null;
+  if (!showBudgetSelect && !showDateRange && !showCurrencyView && !showCurrencySelect) return null;
 
   return (
-    <form onSubmit={apply} className={REPORT_FILTER_FORM_CLASS}>
+    <form
+      key={JSON.stringify([params.toString(), resolvedBudgetId, currentCurrency, resetVersion])}
+      onSubmit={apply}
+      className={REPORT_FILTER_FORM_CLASS}
+    >
       {showBudgetSelect ? (
         <div className={REPORT_FILTER_FIELD_CLASS}>
           <Label className="text-xs" htmlFor="report-budget-filter">
             Presupuesto
           </Label>
-          <input type="hidden" name="budgetId" value={budgetId} />
-          <Select value={budgetId} onValueChange={setBudgetId}>
+          <Select name="budgetId" defaultValue={resolvedBudgetId}>
             <SelectTrigger id="report-budget-filter" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-72`}>
               <SelectValue />
             </SelectTrigger>
@@ -140,13 +148,30 @@ export function ReportDateFilters({
           <Label className="text-xs" htmlFor="report-currency-view">
             Moneda
           </Label>
-          <Select value={currencyView} onValueChange={setCurrencyView}>
+          <Select name="currencyView" defaultValue={currencyView}>
             <SelectTrigger id="report-currency-view" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-36`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ARS">Consolidado ARS</SelectItem>
               <SelectItem value="original">Por moneda</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+      {showCurrencySelect ? (
+        <div className={REPORT_FILTER_FIELD_CLASS}>
+          <Label className="text-xs" htmlFor="report-currency">
+            Moneda
+          </Label>
+          <Select name="currency" defaultValue={currentCurrency}>
+            <SelectTrigger id="report-currency" className={REPORT_FILTER_CONTROL_CLASS}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {currencies.map((currency) => (
+                <SelectItem key={currency} value={currency}>{currency}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

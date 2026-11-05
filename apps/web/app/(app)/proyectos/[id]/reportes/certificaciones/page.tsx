@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
   getCertificationEvolutionReport,
-  getProjectCostControl,
   getProjectShellInfo,
+  listApprovedBudgetsForProject,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -20,6 +20,7 @@ import { formatMoneyAmount } from "@/lib/format-money";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -45,7 +46,6 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
       notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
@@ -54,32 +54,29 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
   for (const [key, value] of Object.entries(filters)) if (value) progressQuery.set(key, value);
   const progressHref = `/proyectos/${projectId}/reportes/avances${progressQuery.size ? `?${progressQuery.toString()}` : ""}`;
 
-  let report;
-  let budgetProbe;
+  let report: Awaited<ReturnType<typeof getCertificationEvolutionReport>> | null = null;
+  let reportError: string | null = null;
+  let availableBudgets: Awaited<ReturnType<typeof listApprovedBudgetsForProject>> = [];
   try {
-    [report, budgetProbe] = await Promise.all([
-      getCertificationEvolutionReport(projectId, filters, ctx),
-      getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx),
-    ]);
+    availableBudgets = await listApprovedBudgetsForProject(projectId, ctx);
+    report = await getCertificationEvolutionReport(projectId, filters, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-    throw err;
+    if (!(err instanceof ServiceError) || !["VALIDATION", "CONFLICT"].includes(err.code)) throw err;
+    reportError = err.message;
   }
-
-  const availableBudgets =
-    budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Certificaciones — evolución y estado"
         subtitle={
-          report.type === "REPORT"
-            ? `${report.budgetName} · venta presup. ${formatMoneyAmount(report.budgetTotalSale)}`
+          report?.type === "REPORT"
+            ? `${report.budgetName} · venta presup. ${formatMoneyAmount(report.budgetTotalSale, report.currency)}`
             : undefined
         }
         actions={
-          report.type === "REPORT" ? (
+          report?.type === "REPORT" ? (
             <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/certificaciones.csv`}
               params={sp}
@@ -103,14 +100,19 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
 
       <ReportDateFilters budgets={availableBudgets} currentBudgetId={sp.budgetId} />
 
-      {report.type === "NO_APPROVED_BUDGETS" ? (
+      {reportError ? (
+        <ListEmptyState
+          message={reportError}
+          action={<Button variant="outline" asChild><Link href={`/proyectos/${projectId}/reportes/certificaciones`}>Restablecer filtros</Link></Button>}
+        />
+      ) : report?.type === "NO_APPROVED_BUDGETS" ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">No hay presupuesto aprobado o cerrado</p>
           <Button variant="outline" size="sm" asChild>
             <Link href={`/proyectos/${projectId}/presupuestos`}>Ir a presupuestos</Link>
           </Button>
         </div>
-      ) : (
+      ) : report?.type === "REPORT" ? (
         <>
           {report.warnings.length > 0 && (
             <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 space-y-1">
@@ -133,14 +135,14 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
             </Link>
             .
           </div>
-          <CertificationEvolutionChart series={report.monthlySeries} />
+          <CertificationEvolutionChart series={report.monthlySeries} currency={report.currency} arAvailable={report.arAvailable} />
 
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">Estado de certificaciones</CardTitle>
             </CardHeader>
             <CardContent>
-              <CertificationPortfolioTable rows={report.portfolio} projectId={projectId} />
+              <CertificationPortfolioTable rows={report.portfolio} projectId={projectId} currency={report.currency} />
             </CardContent>
           </Card>
 
@@ -149,11 +151,11 @@ export default async function ReporteCertificacionesPage({ params, searchParams 
               <CardTitle className="text-base">Certificado vs venta presupuestada</CardTitle>
             </CardHeader>
             <CardContent>
-              <CertificationVsBudgetTable rows={report.vsBudget} />
+              <CertificationVsBudgetTable rows={report.vsBudget} currency={report.currency} />
             </CardContent>
           </Card>
         </>
-      )}
+      ) : null}
     </PageShell>
   );
 }

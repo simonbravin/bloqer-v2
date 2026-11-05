@@ -6,6 +6,8 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { canViewArProjectArea } from "../ar/ar-access";
+import { canViewApProjectArea } from "../ap/ap-access";
 import { computeObligationBalanceDue, normalizeObligationBalanceDue } from "../finance/obligation-balance";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
@@ -56,7 +58,7 @@ const OPEN_OBLIGATION = ACTIVE_OBLIGATION_STATUSES;
 
 /**
  * Proyección puntual de caja del proyecto a una fecha:
- * cobros/pagos confirmados hasta la fecha + saldos CxC/CxP con vencimiento ≤ fecha.
+ * cobros/pagos confirmados hasta la fecha + saldos abiertos actuales con vencimiento ≤ fecha.
  */
 export async function getProjectCashPositionProjection(
   projectId: string,
@@ -71,11 +73,11 @@ export async function getProjectCashPositionProjection(
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
-  const includeAr = gate.isEnabled("AR");
-  const includeAp = gate.isEnabled("AP");
+  const includeAr = gate.isEnabled("AR") && canViewArProjectArea(ctx.roles);
+  const includeAp = gate.isEnabled("AP") && canViewApProjectArea(ctx.roles);
 
   const warnings: string[] = [
-    "Capital proyectado = cobros confirmados − pagos confirmados + saldo CxC (vto. ≤ fecha) − saldo CxP (vto. ≤ fecha). No incluye OC sin facturar.",
+    "Capital proyectado = cobros confirmados − pagos confirmados + saldo CxC actual − saldo CxP actual. Solo considera saldos con vencimiento hasta la fecha elegida y excluye OC sin facturar.",
   ];
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
 
@@ -83,17 +85,17 @@ export async function getProjectCashPositionProjection(
     sectionsExcluded.push({
       module: "AR",
       section: "collections_and_receivables",
-      reason: "TENANT_MODULE_DISABLED",
+      reason: gate.isEnabled("AR") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
-    warnings.push("AR deshabilitado: cobros y cuentas por cobrar en cero.");
+    warnings.push("Cuentas por cobrar no disponible. La proyección incluye solo las fuentes visibles.");
   }
   if (!includeAp) {
     sectionsExcluded.push({
       module: "AP",
       section: "payments_and_payables",
-      reason: "TENANT_MODULE_DISABLED",
+      reason: gate.isEnabled("AP") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
-    warnings.push("AP deshabilitado: pagos y cuentas por pagar en cero.");
+    warnings.push("Cuentas por pagar no disponible. La proyección incluye solo las fuentes visibles.");
   }
 
   const asOfDate = resolveProjectionAsOfDate(filters.asOfDate);

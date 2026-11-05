@@ -9,7 +9,9 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
-import { monthLabel, projectionBucketKey, projectionHorizon } from "./report-month";
+import { canViewArProjectArea } from "../ar/ar-access";
+import { canViewApProjectArea } from "../ap/ap-access";
+import { monthLabel, parseFilterDate, projectionBucketKey, projectionHorizon } from "./report-month";
 
 export type CashProjectionFilters = {
   dateFrom?: string;
@@ -60,8 +62,8 @@ export async function getProjectCashProjectionReport(
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
-  const includeAr = gate.isEnabled("AR");
-  const includeAp = gate.isEnabled("AP");
+  const includeAr = gate.isEnabled("AR") && canViewArProjectArea(ctx.roles);
+  const includeAp = gate.isEnabled("AP") && canViewApProjectArea(ctx.roles);
 
   const warnings: string[] = [];
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
@@ -69,17 +71,17 @@ export async function getProjectCashProjectionReport(
     sectionsExcluded.push({
       module: "AR",
       section: "expected_collections",
-      reason: "TENANT_MODULE_DISABLED",
+      reason: gate.isEnabled("AR") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
-    warnings.push("AR deshabilitado: cobros esperados en cero.");
+    warnings.push("Cuentas por cobrar no disponible. La proyección incluye solo las fuentes visibles.");
   }
   if (!includeAp) {
     sectionsExcluded.push({
       module: "AP",
       section: "expected_payments",
-      reason: "TENANT_MODULE_DISABLED",
+      reason: gate.isEnabled("AP") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
-    warnings.push("AP deshabilitado: pagos esperados en cero.");
+    warnings.push("Cuentas por pagar no disponible. La proyección incluye solo las fuentes visibles.");
   }
 
   const range =
@@ -90,6 +92,7 @@ export async function getProjectCashProjectionReport(
   warnings.push(
     "Proyección basada en saldos pendientes de AR/AP con vencimiento hasta el fin del horizonte (incluye vencidas); no incluye OC abiertas (R-006).",
   );
+  const dueDate = { lte: parseFilterDate(range.dateTo, true) };
 
   const [receivables, payables] = await Promise.all([
     includeAr
@@ -99,6 +102,7 @@ export async function getProjectCashProjectionReport(
             projectId,
             ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: { in: [...OPEN_OBLIGATION] },
+            dueDate,
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
           select: {
@@ -117,6 +121,7 @@ export async function getProjectCashProjectionReport(
             projectId,
             ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: { in: [...OPEN_OBLIGATION] },
+            dueDate,
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
           select: {

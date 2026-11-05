@@ -175,7 +175,7 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
         }
       />
 
-      <p className="text-xs text-muted-foreground">Al {formatDate(agingReport.asOfDate)}</p>
+      <p className="text-xs text-muted-foreground">Saldos actuales · vencimientos al {formatDate(agingReport.asOfDate)}</p>
 
       <h2 className="text-lg font-semibold">Antigüedad de saldos</h2>
       <p className="text-xs text-muted-foreground">Estos filtros se aplican al resumen y detalle de antigüedad. El listado de cuentas y las transacciones recientes conservan su alcance.</p>

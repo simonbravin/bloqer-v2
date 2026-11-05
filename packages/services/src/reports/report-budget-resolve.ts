@@ -6,20 +6,22 @@ import { requireProjectAccess } from "../security/access";
 import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 
-async function assertBudgetReportAccess(projectId: string, ctx: ServiceContext): Promise<void> {
+async function assertBudgetReportAccess(projectId: string, ctx: ServiceContext) {
   if (!canViewBudgetsArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver presupuestos.");
   }
-  await requireProjectAccess(projectId, ctx);
+  const project = await requireProjectAccess(projectId, ctx);
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   assertTenantModuleEnabledWithGate(gate, "BUDGETS");
+  return companyScopeFilter({ ...ctx, companyId: project.companyId ?? ctx.companyId });
 }
 
 export type ResolvedApprovedBudget = {
   id: string;
   name: string;
   status: string;
+  companyId: string | null;
   currency: string;
   versionNumber: number;
   parentBudgetId: string | null;
@@ -30,13 +32,14 @@ export async function resolveApprovedBudgetForProject(
   budgetId: string | undefined,
   ctx: ServiceContext,
 ): Promise<ResolvedApprovedBudget | null> {
-  await assertBudgetReportAccess(projectId, ctx);
+  const companyScope = await assertBudgetReportAccess(projectId, ctx);
   const budgets = await prisma.budget.findMany({
-    where: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
+    where: { projectId, tenantId: ctx.tenantId, ...companyScope, status: { in: ["APPROVED", "CLOSED"] } },
     select: {
       id: true,
       name: true,
       status: true,
+      companyId: true,
       currency: true,
       parentBudgetId: true,
       versionNumber: true,
@@ -52,6 +55,7 @@ export async function resolveApprovedBudgetForProject(
     id: picked.id,
     name: picked.name,
     status: picked.status,
+    companyId: picked.companyId,
     currency: picked.currency,
     versionNumber: picked.versionNumber,
     parentBudgetId: picked.parentBudgetId,
@@ -62,13 +66,14 @@ export async function listApprovedBudgetsForProject(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<ResolvedApprovedBudget[]> {
-  await assertBudgetReportAccess(projectId, ctx);
+  const companyScope = await assertBudgetReportAccess(projectId, ctx);
   return prisma.budget.findMany({
-    where: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
+    where: { projectId, tenantId: ctx.tenantId, ...companyScope, status: { in: ["APPROVED", "CLOSED"] } },
     select: {
       id: true,
       name: true,
       status: true,
+      companyId: true,
       currency: true,
       versionNumber: true,
       parentBudgetId: true,

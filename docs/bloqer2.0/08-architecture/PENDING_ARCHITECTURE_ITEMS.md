@@ -160,8 +160,13 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 
 ## P-AG12-01 — Alcance de los archivos que recibe cada destinatario
 
-- **Estado:** revisar en AG-12. AG-11 protege las configuraciones por empresa y obra y comprueba que los destinatarios programados conserven una membresía activa al momento del envío.
-- **Contrato por definir:** el envío programado construye un archivo con el alcance autorizado de la configuración y lo distribuye a sus destinatarios. Falta explicitar si cada archivo debe recortarse según los permisos del destinatario, y cómo se relaciona eso con el envío manual a una dirección ingresada por quien genera el reporte. La revisión de AG-12 debe contrastar D-120 y D-100 con el contrato general de envíos antes de cambiarlo.
+- **Estado:** contrato resuelto en D-140/Q-087 (05/11/2026).
+- **Contrato:** cada archivo programado usa el acceso vigente de su destinatario dentro del alcance autorizado de la configuración y de la sesión operadora cuando corresponde. El envío manual independiente conserva la posibilidad de compartir a una dirección elegida por quien puede exportar. Ver [propuesta aprobada](./platform-audit/2026-11-05-ag-12-report-delivery-proposal.md).
+
+## P-AG13-01 — Confirmación del proveedor y persistencia de la entrega
+
+- **Estado:** evidencia para AG-13, servicios transversales de correo. AG-12 protege la corrida y omite entregas con `SENT` confirmado para la ventana.
+- **Caso a reproducir:** el proveedor acepta el correo y se interrumpe la escritura del resultado local. El estado local no alcanza para asegurar la deduplicación de un intento posterior. Revisar la confirmación y las garantías del proveedor junto con los demás productores del canal.
 
 ## AG-00 — Aislamiento: reconciliación documental resuelta
 

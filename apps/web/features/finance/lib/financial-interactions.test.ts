@@ -153,6 +153,25 @@ test("aging summary renders separate currency groups instead of a mixed grand to
   assert.deepEqual(groups.map((node) => (node.props.totals as { totalBalance: string }).totalBalance), ["100", "5"]);
 });
 
+test("overhead summary disables close for an incomplete base and keeps the frozen-period action", () => {
+  const env = environment();
+  env.dependencies["@/app/(app)/finanzas/gastos-generales/actions"] = {};
+  const { OverheadPeriodSummaryPanel } = load<{ OverheadPeriodSummaryPanel: (props: Record<string, unknown>) => Element }>(
+    "../components/overhead-period-summary-panel.tsx", env.dependencies,
+  );
+  const base = { poolArs: "100", invoiceCount: 1, excludedNonArsCount: 0, projectRowCount: 2, frozenAt: null };
+  const tree = env.render(() => OverheadPeriodSummaryPanel({ companyId: "company", canEdit: true, periods: [
+    { ...base, period: "2026-11", status: "OPEN", totalCdArs: null, calculationBlocked: true, warnings: ["Obra 1 sin cotización"] },
+    { ...base, period: "2026-10", status: "OPEN", totalCdArs: "500", calculationBlocked: false, warnings: [] },
+    { ...base, period: "2026-09", status: "FROZEN", totalCdArs: "800", calculationBlocked: false, warnings: [] },
+  ] }));
+  assert.deepEqual(elements(tree, "Button").map(({ props }) => [props.children, props.disabled]), [
+    ["Cerrar período", true], ["Cerrar período", false], ["Reabrir", false],
+  ]);
+  assert.ok(elements(tree, "TableCell").some(({ props }) => props.children === "—"));
+  assert.ok(elements(tree, "li").some(({ props }) => props.children === "Obra 1 sin cotización"));
+});
+
 test("corporate receivable remains readable with Treasury disabled and does not load treasury accounts", async () => {
   const env = environment();
   const obligation = { id: "receivable", projectId: null, companyId: "company", salesInvoiceId: "invoice", salesInvoiceCode: "FAC", clientName: "Cliente", status: "OPEN", currency: "ARS", originalAmount: "100", paidAmount: "0", creditedAmount: "0", balanceDue: "100", issueDate: new Date("2026-11-05"), dueDate: new Date("2026-11-05") };

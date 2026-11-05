@@ -75,7 +75,7 @@ export function AgingFilters({ preserveParams = [] }: AgingFiltersProps) {
       </div>
 
       <div className="min-w-[160px]">
-        <Label htmlFor="aging-as-of" className="text-xs text-muted-foreground mb-1 block">Al día</Label>
+        <Label htmlFor="aging-as-of" className="text-xs text-muted-foreground mb-1 block">Fecha de referencia</Label>
         <Input
           id="aging-as-of"
           key={sp.get("asOfDate") ?? ""}

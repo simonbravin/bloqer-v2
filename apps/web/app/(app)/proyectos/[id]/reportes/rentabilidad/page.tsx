@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
-  getProjectCostControl,
+  listApprovedBudgetsForProject,
   getProjectProfitabilityReport,
   getProjectShellInfo,
   parseCostVarianceLayer,
@@ -42,7 +42,6 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
     await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 
@@ -54,29 +53,29 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
   };
 
   let report;
-  let budgetProbe;
+  let availableBudgets: Awaited<ReturnType<typeof listApprovedBudgetsForProject>> = [];
+  let filterError: string | null = null;
   try {
-    [report, budgetProbe] = await Promise.all([
-      getProjectProfitabilityReport(projectId, filters, ctx),
-      getProjectCostControl(projectId, { budgetId: sp.budgetId }, ctx),
-    ]);
+    availableBudgets = await listApprovedBudgetsForProject(projectId, ctx);
+    report = await getProjectProfitabilityReport(projectId, filters, ctx);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
-    throw err;
+    if (err instanceof ServiceError && (err.code === "VALIDATION" || err.code === "CONFLICT")) {
+      filterError = err.message;
+    } else {
+      throw err;
+    }
   }
-
-  const availableBudgets =
-    budgetProbe.type === "NO_APPROVED_BUDGETS" ? [] : budgetProbe.availableBudgets;
 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Rentabilidad del proyecto"
         actions={
-          report.type === "REPORT" ? (
+          report?.type === "REPORT" ? (
             <ReportExportActions
               exportPath={`/api/reports/proyectos/${projectId}/rentabilidad.csv`}
-              params={sp}
+              params={{ ...filters, budgetId: report.budgetId }}
               pdf
             />
           ) : undefined
@@ -93,17 +92,25 @@ export default async function ReporteRentabilidadPage({ params, searchParams }: 
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/reportes/ingresos-gastos`}>Ingresos vs gastos</Link>
         </Button>
+        {report?.type === "REPORT" && report.revenueBasis === "invoiced" &&
+          !report.sectionsExcluded.some(({ module }) => module === "AR") && (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/proyectos/${projectId}/facturas`}>Ver facturas de la obra</Link>
+          </Button>
+        )}
       </ReportSubnav>
 
       <ProfitabilityFilters
         budgets={availableBudgets}
-        currentBudgetId={sp.budgetId}
-        currentCostLayer={sp.costLayer}
-        currentRevenueBasis={sp.revenueBasis}
-        currentCurrencyView={sp.currencyView}
+        currentBudgetId={report?.type === "REPORT" ? report.budgetId : filters.budgetId}
+        currentCostLayer={filters.costLayer}
+        currentRevenueBasis={filters.revenueBasis}
+        currentCurrencyView={filters.currencyView}
       />
 
-      {report.type === "NO_APPROVED_BUDGETS" ? (
+      {!report ? (
+        <p role="alert" className="rounded-lg border bg-card p-4 text-sm">{filterError}</p>
+      ) : report.type === "NO_APPROVED_BUDGETS" ? (
         <div className="rounded-lg border bg-card p-8 text-center space-y-3">
           <p className="font-semibold">No hay presupuesto aprobado o cerrado</p>
           <Button variant="outline" size="sm" asChild>

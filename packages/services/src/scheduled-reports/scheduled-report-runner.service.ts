@@ -2,6 +2,13 @@ import { prisma } from "@bloqer/database";
 import type { ScheduledReportRunStatus } from "@bloqer/database";
 import type { ScheduledReportKey } from "@bloqer/validators";
 import { randomUUID } from "crypto";
+import {
+  hasTenantWideProjectAccess,
+  requireProjectAccess,
+  resolveAccessibleProjectScope,
+  type ProjectAccessScope,
+} from "../security/access";
+import { getTenantEnabledModules } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { calculateNextRunAt, calendarDateInTimezone } from "./scheduling";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
@@ -14,14 +21,21 @@ import type { BuildScheduledReportAttachmentFn } from "./scheduled-report-attach
 import { isPartialScheduledAttachmentsError } from "./scheduled-report-attachment.service";
 import {
   deliverScheduledReportBundle,
-  resolveScheduledJobsiteAttachmentAudience,
+  loadScheduledReportRecipientAccess,
   type ScheduledReportDeliveryKind,
+  type ScheduledReportRecipientAccess,
 } from "./scheduled-report-delivery.service";
-import { scheduledReportEmailCompanyScope } from "./scheduled-report-execution.service";
+import { listPendingScheduledReportRetries } from "./scheduled-report-execution.service";
 import { deriveScheduledReportRunStatus } from "./scheduled-report-run-status";
 
 const RUN_LOCK_MS = 10 * 60 * 1000;
 const DUE_BATCH_PER_TENANT = 25;
+const JOBSITE_DAILY_REPORT = "TENANT_JOBSITE_DAILY_LOGS";
+const TENANT_WIDE_TREASURY_REPORTS = new Set<string>([
+  "TENANT_TREASURY_CASH_POSITION",
+  "TENANT_TREASURY_MOVEMENTS",
+  "TENANT_TREASURY_CASH_FLOW",
+]);
 
 export type ScheduledReportRunSummary = {
   scheduleId: string;
@@ -88,23 +102,20 @@ const scheduleSelect = {
   },
 } as const;
 
-type RunOneOptions = {
-  runWindowOverride?: string;
-  advanceNextRunAt?: boolean;
-  deliveryKind?: ScheduledReportDeliveryKind;
-  recipientEmails?: Set<string> | null;
-  executionContext?: ServiceContext;
-  /** When set, overrides calendar date for TENANT_JOBSITE_DAILY_LOGS (retry of an older slot). */
-  jobsiteLogDateSource?: Date;
+type RunBatch = {
+  runWindow: string;
+  originalDate: Date;
+  recipients: ScheduleRow["recipients"];
 };
 
-/** Recover the original schedule slot from delivery metadata.runWindow (ISO or manual:/retry: prefix). */
-function instantFromStoredRunWindow(runWindow: unknown): Date | null {
-  if (typeof runWindow !== "string" || !runWindow.trim()) return null;
-  const prefixed = runWindow.match(/^(?:manual|retry):(.+)$/);
-  const iso = prefixed?.[1] ?? runWindow;
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? null : d;
+type RunOneOptions = {
+  deliveryKind?: ScheduledReportDeliveryKind;
+  executionContext?: ServiceContext;
+  retryBatches?: RunBatch[];
+};
+
+function emptyRunCounts() {
+  return { recipientsSent: 0, recipientsSkipped: 0, recipientsFailed: 0, recipientsDuplicate: 0 };
 }
 
 async function loadManualExecution(ctx: ServiceContext, scheduleId: string) {
@@ -132,7 +143,7 @@ export async function runDueScheduledReportsForTenant(
       tenantId,
       status: "ACTIVE",
       nextRunAt: { lte: now },
-      OR: [{ runLockUntil: null }, { runLockUntil: { lt: now } }],
+      OR: [{ runLockUntil: null }, { runLockUntil: { lte: now } }],
     },
     orderBy: { nextRunAt: "asc" },
     take: DUE_BATCH_PER_TENANT,
@@ -141,7 +152,17 @@ export async function runDueScheduledReportsForTenant(
 
   const summaries: ScheduledReportRunSummary[] = [];
   for (const row of due) {
-    summaries.push(await runOneScheduledReport(row as ScheduleRow, now, buildAttachment));
+    try {
+      summaries.push(await runOneScheduledReport(row, new Date(), buildAttachment));
+    } catch (error) {
+      summaries.push({
+        scheduleId: row.id,
+        ok: false,
+        runStatus: "FAILED",
+        ...emptyRunCounts(),
+        attachmentErrors: [error instanceof Error ? error.message : "Error al ejecutar el envío"],
+      });
+    }
   }
   return summaries;
 }
@@ -162,8 +183,6 @@ export async function runScheduledReportNow(
   const now = new Date();
   const summary = await runOneScheduledReport(row, now, buildAttachment, {
     executionContext,
-    runWindowOverride: `manual:${now.toISOString()}`,
-    advanceNextRunAt: false,
     deliveryKind: "manual",
   });
   if (summary.runStatus === "LOCKED") {
@@ -171,8 +190,6 @@ export async function runScheduledReportNow(
   }
   return summary;
 }
-
-const RETRY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function retryScheduledReportFailedDeliveries(
   ctx: ServiceContext,
@@ -185,56 +202,24 @@ export async function retryScheduledReportFailedDeliveries(
     throw new ServiceError("CONFLICT", "No se puede reintentar un envío eliminado");
   }
 
-  const since = new Date(Date.now() - RETRY_LOOKBACK_MS);
-  const failedLogs = await prisma.emailDeliveryLog.findMany({
-    where: {
-      tenantId: ctx.tenantId,
-      ...(await scheduledReportEmailCompanyScope(executionContext)),
-      emailType: "REPORT_SCHEDULED",
-      relatedEntityType: "SCHEDULED_REPORT",
-      relatedEntityId: scheduleId,
-      status: "FAILED",
-      createdAt: { gte: since },
-    },
-    orderBy: { createdAt: "desc" },
-    select: { recipientEmail: true, metadata: true },
-  });
-
-  const failedEmails = new Set(
-    failedLogs.map((l) => l.recipientEmail.trim().toLowerCase()).filter(Boolean),
+  const pending = await listPendingScheduledReportRetries(
+    executionContext,
+    scheduleId,
+    row.recipients.map(({ recipientUserId }) => recipientUserId),
   );
-  if (failedEmails.size === 0) {
+  if (pending.length === 0) {
     throw new ServiceError("VALIDATION", "No hay envíos fallidos recientes para reintentar");
-  }
-
-  // Prefer an original scheduled runWindow (plain ISO). Fallback to manual:/retry: timestamps.
-  let jobsiteLogDateSource: Date | undefined;
-  for (const preferPlain of [true, false]) {
-    for (const log of failedLogs) {
-      const meta = log.metadata;
-      if (!meta || typeof meta !== "object" || Array.isArray(meta)) continue;
-      const rw = (meta as Record<string, unknown>).runWindow;
-      if (typeof rw !== "string") continue;
-      const isPrefixed = /^(?:manual|retry):/.test(rw);
-      if (preferPlain && isPrefixed) continue;
-      if (!preferPlain && !isPrefixed) continue;
-      const slot = instantFromStoredRunWindow(rw);
-      if (slot) {
-        jobsiteLogDateSource = slot;
-        break;
-      }
-    }
-    if (jobsiteLogDateSource) break;
   }
 
   const now = new Date();
   const summary = await runOneScheduledReport(row, now, buildAttachment, {
     executionContext,
-    runWindowOverride: `retry:${now.toISOString()}`,
-    advanceNextRunAt: false,
     deliveryKind: "retry",
-    recipientEmails: failedEmails,
-    jobsiteLogDateSource,
+    retryBatches: pending.map(({ runWindow, originalDate, recipientIds }) => ({
+      runWindow,
+      originalDate,
+      recipients: row.recipients.filter(({ recipientUserId }) => recipientIds.has(recipientUserId)),
+    })),
   });
   if (summary.runStatus === "LOCKED") {
     throw new ServiceError("CONFLICT", "Hay otra ejecución en curso. Reintentá en unos minutos.");
@@ -249,18 +234,19 @@ async function runOneScheduledReport(
   options: RunOneOptions = {},
 ): Promise<ScheduledReportRunSummary> {
   const deliveryKind = options.deliveryKind ?? "scheduled";
-  const recipientFilter = options.recipientEmails;
   const lockStatuses =
-    deliveryKind === "scheduled" ? (["ACTIVE"] as const) : (["ACTIVE", "PAUSED"] as const);
+    deliveryKind === "retry" ? (["ACTIVE", "PAUSED"] as const) : (["ACTIVE"] as const);
 
   const lockUntil = new Date(now.getTime() + RUN_LOCK_MS);
+  const ownedLockWhere = { id: row.id, tenantId: row.tenantId, runLockUntil: lockUntil };
   const locked = await prisma.scheduledReport.updateMany({
     where: {
       id: row.id,
       tenantId: row.tenantId,
       updatedAt: row.updatedAt,
       status: { in: [...lockStatuses] },
-      OR: [{ runLockUntil: null }, { runLockUntil: { lt: now } }],
+      ...(deliveryKind === "scheduled" ? { nextRunAt: { lte: now } } : {}),
+      OR: [{ runLockUntil: null }, { runLockUntil: { lte: now } }],
     },
     data: { runLockUntil: lockUntil },
   });
@@ -270,175 +256,89 @@ async function runOneScheduledReport(
       scheduleId: row.id,
       ok: false,
       runStatus: "LOCKED",
-      recipientsSent: 0,
-      recipientsSkipped: 0,
-      recipientsFailed: 0,
-      recipientsDuplicate: 0,
+      ...emptyRunCounts(),
       attachmentErrors: [],
     };
   }
 
   let finalized = false;
   try {
-    const runWindow = options.runWindowOverride ?? row.nextRunAt.toISOString();
-    const runId = randomUUID();
     const ctx =
       options.executionContext ??
       buildScheduledReportsCronServiceContext(row.tenantId, row.companyId);
-    const params = paramsFromJson(row.params);
-    const attachmentErrors: string[] = [];
-    const attachments: Awaited<ReturnType<BuildScheduledReportAttachmentFn>> = [];
+    const batches = options.retryBatches ?? [{
+      runWindow: deliveryKind === "manual" ? `manual:${now.toISOString()}` : row.nextRunAt.toISOString(),
+      originalDate: deliveryKind === "manual" ? now : row.nextRunAt,
+      recipients: row.recipients,
+    }];
+    const counts = emptyRunCounts();
+    const attachmentErrors = new Set<string>();
+    const jobsiteItems = row.items.filter(({ reportKey }) => reportKey === JOBSITE_DAILY_REPORT);
+    const otherItems = row.items.filter(({ reportKey }) => reportKey !== JOBSITE_DAILY_REPORT);
+    let hasAttachments = false;
+    for (const batch of batches) {
+      assertRunLeaseActive(lockUntil);
+      const runId = randomUUID();
+      const generatedWithModules = await getTenantEnabledModules(ctx);
+      const jobsiteBundle = await buildRunBundle(row, jobsiteItems, batch.originalDate, ctx, buildAttachment);
+      for (const error of jobsiteBundle.attachmentErrors) attachmentErrors.add(error);
 
-    // Scheduled slot date (nextRunAt), not wall-clock `now` — a late cron must still attach that day's parts.
-    // Retry may pass jobsiteLogDateSource from the failed delivery's original runWindow.
-    const jobsiteLogDateSource =
-      options.jobsiteLogDateSource ??
-      (deliveryKind === "scheduled" && options.runWindowOverride == null ? row.nextRunAt : now);
-
-    for (const item of row.items) {
-      try {
-        const runParams =
-          item.reportKey === "TENANT_JOBSITE_DAILY_LOGS"
-            ? {
-                ...(params ?? {}),
-                runLogDate: calendarDateInTimezone(jobsiteLogDateSource, row.timezone),
-              }
-            : params;
-        const atts = await buildAttachment(
-          item.reportKey as ScheduledReportKey,
-          row.format,
-          row.projectId,
-          runParams,
+      for (const recipient of batch.recipients) {
+        assertRunLeaseActive(lockUntil);
+        const access = await loadScheduledReportRecipientAccess(ctx.tenantId, recipient.recipientUserId);
+        const recipientBundle: RecipientBundle = access?.roles.length && otherItems.length > 0
+          ? await buildRecipientBundle(row, otherItems, batch.originalDate, ctx, recipient.recipientUserId, access, buildAttachment)
+          : { attachments: [], attachmentErrors: [] };
+        for (const error of recipientBundle.attachmentErrors) attachmentErrors.add(error);
+        const attachments = [...jobsiteBundle.attachments, ...recipientBundle.attachments];
+        hasAttachments ||= attachments.length > 0;
+        assertRunLeaseActive(lockUntil);
+        const result = await deliverScheduledReportBundle(
+          {
+            scheduleId: row.id,
+            scheduleName: row.name,
+            runWindow: batch.runWindow,
+            runId,
+            recipientUserId: recipient.recipientUserId,
+            recipientEmail: recipient.recipient.email,
+            recipientAccess: access,
+            generatedWithModules,
+            generatedWithProjectScope: recipientBundle.generatedWithProjectScope,
+            reportCompanyId: recipientBundle.reportCompanyId,
+            attachments,
+            deliveryKind,
+            projectId: row.projectId,
+            timezone: row.timezone,
+          },
           ctx,
         );
-        attachments.push(...atts);
-      } catch (e) {
-        if (isPartialScheduledAttachmentsError(e)) {
-          attachments.push(...e.attachments);
-          attachmentErrors.push(...e.itemErrors);
-          continue;
+        switch (result.outcome) {
+          case "sent":
+            counts.recipientsSent += 1;
+            break;
+          case "skipped":
+            counts.recipientsSkipped += 1;
+            break;
+          case "failed":
+            counts.recipientsFailed += 1;
+            break;
+          case "duplicate":
+            counts.recipientsDuplicate += 1;
+            break;
         }
-        const msg =
-          e instanceof ServiceError
-            ? e.message
-            : e instanceof Error
-              ? e.message
-              : "Error al generar adjunto";
-        attachmentErrors.push(`${item.reportKey}: ${msg}`);
       }
     }
 
-    let recipientsSent = 0;
-    let recipientsSkipped = 0;
-    let recipientsFailed = 0;
-    let recipientsDuplicate = 0;
-
-    if (attachments.length === 0) {
-      const emptyStatus: ScheduledReportRunStatus =
-        attachmentErrors.length > 0 ? "FAILED" : "SKIPPED";
-      await finalizeScheduledReportRun(
-        row,
-        runWindow,
-        now,
-        emptyStatus,
-        {
-          recipientsSent,
-          recipientsSkipped,
-          recipientsFailed,
-          recipientsDuplicate,
-          attachmentErrors,
-        },
-        options.advanceNextRunAt !== false,
-      );
-      finalized = true;
-      return {
-        scheduleId: row.id,
-        ok: emptyStatus !== "FAILED",
-        runStatus: emptyStatus,
-        recipientsSent,
-        recipientsSkipped,
-        recipientsFailed,
-        recipientsDuplicate,
-        attachmentErrors,
-      };
-    }
-
-    const recipients = recipientFilter
-      ? row.recipients.filter(({ recipient }) =>
-          recipientFilter.has(recipient.email.trim().toLowerCase()),
-        )
-      : row.recipients;
-    const jobsiteAudience = await resolveScheduledJobsiteAttachmentAudience(
-      ctx.tenantId,
-      attachments,
-      recipients.map(({ recipientUserId }) => recipientUserId),
-    );
-
-    for (const rec of recipients) {
-      const result = await deliverScheduledReportBundle(
-        {
-          scheduleId: row.id,
-          scheduleName: row.name,
-          runWindow,
-          runId,
-          recipientUserId: rec.recipientUserId,
-          recipientEmail: rec.recipient.email,
-          attachments,
-          deliveryKind,
-          projectId: row.projectId,
-          timezone: row.timezone,
-        },
-        ctx,
-        jobsiteAudience,
-      );
-
-      switch (result.outcome) {
-        case "sent":
-          recipientsSent += 1;
-          break;
-        case "skipped":
-          recipientsSkipped += 1;
-          break;
-        case "failed":
-          recipientsFailed += 1;
-          break;
-        case "duplicate":
-          recipientsDuplicate += 1;
-          break;
-      }
-    }
-
-    if (recipientFilter) {
-      const attempted = recipientsSent + recipientsSkipped + recipientsFailed + recipientsDuplicate;
-      if (attempted === 0) {
-        throw new ServiceError(
-          "VALIDATION",
-          "Ningún destinatario fallido coincide con la configuración actual",
-        );
-      }
-    }
-
-    const runStatus = deriveScheduledReportRunStatus({
-      recipientsSent,
-      recipientsSkipped,
-      recipientsFailed,
-      recipientsDuplicate,
-      attachmentErrorCount: attachmentErrors.length,
-    });
+    const runStatus = !hasAttachments && attachmentErrors.size > 0
+      ? "FAILED"
+      : deriveScheduledReportRunStatus({ ...counts, attachmentErrorCount: attachmentErrors.size });
 
     await finalizeScheduledReportRun(
       row,
-      runWindow,
+      lockUntil,
       now,
       runStatus,
-      {
-        recipientsSent,
-        recipientsSkipped,
-        recipientsFailed,
-        recipientsDuplicate,
-        attachmentErrors,
-      },
-      options.advanceNextRunAt !== false,
+      deliveryKind === "scheduled",
     );
     finalized = true;
 
@@ -446,17 +346,14 @@ async function runOneScheduledReport(
       scheduleId: row.id,
       ok: runStatus !== "FAILED",
       runStatus,
-      recipientsSent,
-      recipientsSkipped,
-      recipientsFailed,
-      recipientsDuplicate,
-      attachmentErrors,
+      ...counts,
+      attachmentErrors: [...attachmentErrors],
     };
   } finally {
     if (!finalized) {
       await prisma.scheduledReport
-        .update({
-          where: { id: row.id, tenantId: row.tenantId },
+        .updateMany({
+          where: ownedLockWhere,
           data: { runLockUntil: null },
         })
         .catch(() => undefined);
@@ -464,18 +361,97 @@ async function runOneScheduledReport(
   }
 }
 
+function assertRunLeaseActive(lockUntil: Date): void {
+  if (Date.now() >= lockUntil.getTime()) {
+    throw new ServiceError("CONFLICT", "La ejecución perdió el bloqueo. Volvé a intentar.");
+  }
+}
+
+type RecipientBundle = Awaited<ReturnType<typeof buildRunBundle>> & {
+  generatedWithProjectScope?: ProjectAccessScope;
+  reportCompanyId?: string | null;
+};
+
+async function buildRecipientBundle(
+  row: ScheduleRow,
+  items: ScheduleRow["items"],
+  originalDate: Date,
+  executionContext: ServiceContext,
+  userId: string,
+  access: ScheduledReportRecipientAccess,
+  buildAttachment: BuildScheduledReportAttachmentFn,
+): Promise<RecipientBundle> {
+  const otherCompany = executionContext.companyId !== null && access.companyId !== null &&
+    executionContext.companyId !== access.companyId;
+  // Corporate Treasury is tenant-wide. Other reports must stay in the company
+  // authorized by both the schedule/operator and the recipient.
+  const allowedItems = otherCompany
+    ? items.filter(({ reportKey }) => TENANT_WIDE_TREASURY_REPORTS.has(reportKey))
+    : items;
+  const recipientContext: ServiceContext = {
+    tenantId: executionContext.tenantId,
+    actorUserId: userId,
+    companyId: otherCompany ? access.companyId : executionContext.companyId ?? access.companyId,
+    roles: access.roles,
+  };
+  if (row.projectId && allowedItems.length > 0) {
+    try {
+      await requireProjectAccess(row.projectId, recipientContext);
+    } catch (error) {
+      if (!(error instanceof ServiceError) || !["FORBIDDEN", "NOT_FOUND"].includes(error.code)) throw error;
+      return { attachments: [], attachmentErrors: [] };
+    }
+  }
+  const generatedWithProjectScope = !row.projectId &&
+    !hasTenantWideProjectAccess(recipientContext.roles) &&
+    allowedItems.some(({ reportKey }) => !TENANT_WIDE_TREASURY_REPORTS.has(reportKey))
+    ? await resolveAccessibleProjectScope(recipientContext)
+    : undefined;
+  return {
+    ...await buildRunBundle(row, allowedItems, originalDate, recipientContext, buildAttachment),
+    generatedWithProjectScope,
+    reportCompanyId: recipientContext.companyId,
+  };
+}
+
+async function buildRunBundle(
+  row: ScheduleRow,
+  items: ScheduleRow["items"],
+  originalDate: Date,
+  ctx: ServiceContext,
+  buildAttachment: BuildScheduledReportAttachmentFn,
+) {
+  const params = paramsFromJson(row.params);
+  const attachments: Awaited<ReturnType<BuildScheduledReportAttachmentFn>> = [];
+  const attachmentErrors: string[] = [];
+  for (const item of items) {
+    try {
+      const runParams = item.reportKey === JOBSITE_DAILY_REPORT
+        ? { ...(params ?? {}), runLogDate: calendarDateInTimezone(originalDate, row.timezone) }
+        : params;
+      attachments.push(...await buildAttachment(
+        item.reportKey as ScheduledReportKey, row.format, row.projectId, runParams, ctx,
+      ));
+    } catch (error) {
+      if (error instanceof ServiceError && error.code === "FORBIDDEN") {
+        continue;
+      } else if (isPartialScheduledAttachmentsError(error)) {
+        attachments.push(...error.attachments);
+        attachmentErrors.push(...error.itemErrors);
+      } else {
+        const message = error instanceof Error ? error.message : "Error al generar adjunto";
+        attachmentErrors.push(`${item.reportKey}: ${message}`);
+      }
+    }
+  }
+  return { attachments, attachmentErrors };
+}
+
 async function finalizeScheduledReportRun(
   row: ScheduleRow,
-  _runWindow: string,
+  lockUntil: Date,
   after: Date,
   runStatus: ScheduledReportRunStatus,
-  _stats: {
-    recipientsSent: number;
-    recipientsSkipped: number;
-    recipientsFailed: number;
-    recipientsDuplicate: number;
-    attachmentErrors: string[];
-  },
   advanceNextRunAt: boolean,
 ): Promise<void> {
   const nextRunAt = advanceNextRunAt
@@ -489,8 +465,8 @@ async function finalizeScheduledReportRun(
       })
     : undefined;
 
-  await prisma.scheduledReport.update({
-    where: { id: row.id, tenantId: row.tenantId },
+  const finished = await prisma.scheduledReport.updateMany({
+    where: { id: row.id, tenantId: row.tenantId, runLockUntil: { equals: lockUntil, gt: new Date() } },
     data: {
       runLockUntil: null,
       lastRunAt: after,
@@ -498,4 +474,7 @@ async function finalizeScheduledReportRun(
       ...(nextRunAt ? { nextRunAt } : {}),
     },
   });
+  if (finished.count !== 1) {
+    throw new ServiceError("CONFLICT", "La ejecución perdió el bloqueo. Volvé a intentar.");
+  }
 }

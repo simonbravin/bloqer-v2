@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { ProjectProfitabilityReport } from "@bloqer/services";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
-import { formatMoneyAmount, formatRatePctWithSymbol, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatMoneyDisplay, formatRatePctWithSymbol, isPositiveMoneyAmount, moneyAmountTone } from "@/lib/format-money";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 const LAYER_LABELS: Record<ProjectProfitabilityReport["costLayer"], string> = {
@@ -24,11 +24,8 @@ function ggDisplayCurrency(report: ProjectProfitabilityReport): string {
 }
 
 export function ProfitabilitySummary({ report }: Props) {
-  const gmTone = isZeroMoneyAmount(report.grossMargin)
-    ? "muted"
-    : isPositiveMoneyAmount(report.grossMargin)
-      ? "success"
-      : "danger";
+  const gmTone = report.grossMargin == null ? "muted" : moneyAmountTone(report.grossMargin);
+  const revenueLabel = report.revenueBasis === "certified" ? "Certificado" : "Facturado neto";
 
   const ggCurrency = ggDisplayCurrency(report);
   const isAutoWeight = report.overheadManualAmount == null && report.overheadCalculatedAmount != null;
@@ -36,25 +33,25 @@ export function ProfitabilitySummary({ report }: Props) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Presupuesto: {report.budgetName} · Ingresos ({report.revenueBasis === "certified" ? "certificado" : "facturado"}) −
+        Presupuesto: {report.budgetName} · {revenueLabel} −
         costos ({LAYER_LABELS[report.costLayer]})
       </p>
 
       <KpiStatGrid title={null} columns={4}>
         <KpiStatCard
           compact
-          label="Ingresos"
-          value={formatMoneyAmount(report.revenue, report.currency)}
+          label={revenueLabel}
+          value={report.revenue == null ? "—" : formatMoneyAmount(report.revenue, report.currency)}
         />
         <KpiStatCard
           compact
           label="Costos directos"
-          value={formatMoneyAmount(report.directCost, report.currency)}
+          value={formatMoneyDisplay(report.directCost, report.currency)}
         />
         <KpiStatCard
           compact
           label="Margen bruto"
-          value={formatMoneyAmount(report.grossMargin, report.currency)}
+          value={report.grossMargin == null ? "—" : formatMoneyAmount(report.grossMargin, report.currency)}
           tone={gmTone}
         />
         <KpiStatCard
@@ -78,12 +75,12 @@ export function ProfitabilitySummary({ report }: Props) {
         />
       </KpiStatGrid>
 
-      {report.currencyView === "original" && report.byCurrency.length > 1 ? (
+      {report.byCurrency.length > 1 ? (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">Desglose por moneda</CardTitle>
             <CardDescription>
-              Costos directos imputados solo en {report.budgetCurrency}; otras monedas muestran ingresos facturados.
+              Los costos directos corresponden a {report.budgetCurrency}. Los ingresos se muestran en la moneda de cada documento.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -91,7 +88,10 @@ export function ProfitabilitySummary({ report }: Props) {
               <div key={slice.currency} className="flex flex-wrap justify-between gap-2 border-b pb-2 last:border-0">
                 <span className="font-mono font-medium">{slice.currency}</span>
                 <span>
-                  MB {formatMoneyAmount(slice.grossMargin, slice.currency)}
+                  {revenueLabel}: {formatMoneyAmount(slice.revenue, slice.currency)}
+                </span>
+                <span>
+                  MB {slice.grossMargin == null ? "—" : formatMoneyAmount(slice.grossMargin, slice.currency)}
                   {slice.grossMarginPct != null ? ` (${formatRatePctWithSymbol(slice.grossMarginPct)})` : ""}
                 </span>
               </div>
@@ -142,7 +142,7 @@ export function ProfitabilitySummary({ report }: Props) {
                 </p>
               ) : (
                 <p className="text-muted-foreground">
-                  Margen neto no disponible en esta vista (la moneda de los GG no coincide con la del reporte).
+                  {report.netMarginNote}
                 </p>
               )}
               <p className="text-xs text-muted-foreground pt-1">

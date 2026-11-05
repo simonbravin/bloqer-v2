@@ -36,6 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { TableScroll } from "@/components/ui/table-scroll";
 import { formatMoneyAmount } from "@/lib/format-money";
 
 type ProjectOption = { id: string; code: string; name: string; currency: string };
@@ -47,6 +48,7 @@ type Props = {
   projects: ProjectOption[];
   canEdit: boolean;
   initialAutoPreview: AutoWeightPeriodPreview | null;
+  initialPeriodClosed: boolean;
   /** Período calendario actual (servidor) — evita hydration mismatch en inputs. */
   calendarPeriod: string;
 };
@@ -58,6 +60,7 @@ export function OverheadAllocationsPanel({
   projects,
   canEdit,
   initialAutoPreview,
+  initialPeriodClosed,
   calendarPeriod,
 }: Props) {
   const router = useRouter();
@@ -69,6 +72,7 @@ export function OverheadAllocationsPanel({
   const [period, setPeriod] = useState(calendarPeriod);
   const [previewPeriod, setPreviewPeriod] = useState(initialAutoPreview?.period ?? calendarPeriod);
   const [autoPreview, setAutoPreview] = useState<AutoWeightPeriodPreview | null>(initialAutoPreview);
+  const [closedPreviewPeriod, setClosedPreviewPeriod] = useState(initialPeriodClosed ? calendarPeriod : null);
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -94,11 +98,12 @@ export function OverheadAllocationsPanel({
   }, [settings.overheadAllocationMode, settings.overheadAllocationPct]);
 
   useEffect(() => {
-    if (settings.overheadAllocationMode === "AUTO_WEIGHT" && initialAutoPreview) {
+    if (settings.overheadAllocationMode === "AUTO_WEIGHT") {
       setAutoPreview(initialAutoPreview);
-      setPreviewPeriod(initialAutoPreview.period);
+      setClosedPreviewPeriod(initialPeriodClosed ? calendarPeriod : null);
+      setPreviewPeriod(initialAutoPreview?.period ?? calendarPeriod);
     }
-  }, [settings.overheadAllocationMode, initialAutoPreview]);
+  }, [settings.overheadAllocationMode, initialAutoPreview, initialPeriodClosed, calendarPeriod]);
 
   function refresh() {
     router.refresh();
@@ -109,7 +114,10 @@ export function OverheadAllocationsPanel({
       setError(null);
       const res = await fetchAutoWeightPreviewAction({ companyId, period: periodKey });
       if ("error" in res) setError(res.error);
-      else setAutoPreview(res.preview);
+      else {
+        setAutoPreview(res.preview);
+        setClosedPreviewPeriod(res.preview === null ? periodKey : null);
+      }
     });
   }
 
@@ -191,18 +199,28 @@ export function OverheadAllocationsPanel({
 
             {autoPreview ? (
               <>
+                <p className="text-sm text-muted-foreground">
+                  Período consultado <span className="font-mono">{autoPreview.period}</span>
+                </p>
+                {autoPreview.calculationBlocked ? (
+                  <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200" role="status">
+                    Cálculo suspendido. Revisá las causas indicadas para completar la base del reparto.
+                  </p>
+                ) : null}
                 <div className="grid gap-2 sm:grid-cols-3 text-sm">
                   <p>
-                    <span className="text-muted-foreground">Pool corporativo:</span>{" "}
+                    <span className="text-muted-foreground">
+                      {autoPreview.excludedNonArsCount > 0 ? "Pool corporativo parcial:" : "Pool corporativo:"}
+                    </span>{" "}
                     <span className="font-mono tabular-nums">
                       {formatMoneyAmount(autoPreview.poolArs, "ARS")}
                     </span>
                     <span className="text-muted-foreground text-xs"> ({autoPreview.invoiceCount} facturas)</span>
                   </p>
                   <p>
-                    <span className="text-muted-foreground">CD total empresa:</span>{" "}
+                    <span className="text-muted-foreground">CD total empresa (ARS):</span>{" "}
                     <span className="font-mono tabular-nums">
-                      {formatMoneyAmount(autoPreview.totalAccruedCd, "ARS")}
+                      {autoPreview.totalAccruedCd === null ? "—" : formatMoneyAmount(autoPreview.totalAccruedCd, "ARS")}
                     </span>
                   </p>
                 </div>
@@ -216,37 +234,43 @@ export function OverheadAllocationsPanel({
                 {autoPreview.rows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">No hay proyectos activos en esta empresa.</p>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Proyecto</TableHead>
-                        <TableHead className="text-right">CD devengado</TableHead>
-                        <TableHead className="text-right">Peso</TableHead>
-                        <TableHead className="text-right">GG asignado</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {autoPreview.rows.map((row) => (
-                        <TableRow key={row.projectId}>
-                          <TableCell>
-                            <span className="font-mono text-xs">{row.projectCode}</span>
-                            <span className="text-muted-foreground"> — {row.projectName}</span>
-                          </TableCell>
-                          <TableCell className="text-right font-mono tabular-nums text-xs">
-                            {formatMoneyAmount(row.accruedCd, "ARS")}
-                          </TableCell>
-                          <TableCell className="text-right font-mono tabular-nums text-xs">
-                            {row.weightPct}%
-                          </TableCell>
-                          <TableCell className="text-right font-mono tabular-nums">
-                            {formatMoneyAmount(row.allocatedAmount, "ARS")}
-                          </TableCell>
+                  <TableScroll>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Proyecto</TableHead>
+                          <TableHead className="text-right">CD devengado (ARS)</TableHead>
+                          <TableHead className="text-right">Peso</TableHead>
+                          <TableHead className="text-right">GG asignado</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {autoPreview.rows.map((row) => (
+                          <TableRow key={row.projectId}>
+                            <TableCell>
+                              <span className="font-mono text-xs">{row.projectCode}</span>
+                              <span className="text-muted-foreground"> — {row.projectName}</span>
+                            </TableCell>
+                            <TableCell className="text-right font-mono tabular-nums text-xs">
+                              {row.accruedCd === null ? "—" : formatMoneyAmount(row.accruedCd, "ARS")}
+                            </TableCell>
+                            <TableCell className="text-right font-mono tabular-nums text-xs">
+                              {row.weightPct === null ? "—" : `${row.weightPct}%`}
+                            </TableCell>
+                            <TableCell className="text-right font-mono tabular-nums">
+                              {row.allocatedAmount === null ? "—" : formatMoneyAmount(row.allocatedAmount, "ARS")}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableScroll>
                 )}
               </>
+            ) : closedPreviewPeriod ? (
+              <p className="text-sm text-muted-foreground" role="status">
+                El período {closedPreviewPeriod} está cerrado. Se conservan los importes fijados al cierre.
+              </p>
             ) : (
               <p className="text-sm text-muted-foreground">Elegí un período y actualizá la vista.</p>
             )}

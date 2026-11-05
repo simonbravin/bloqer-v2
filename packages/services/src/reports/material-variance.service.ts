@@ -81,7 +81,8 @@ export async function getMaterialVarianceReport(
   }
   validateResourceVarianceDates(filters);
 
-  await requireProjectAccess(projectId, ctx);
+  const project = await requireProjectAccess(projectId, ctx);
+  const companyId = project.companyId ?? ctx.companyId;
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };
@@ -128,7 +129,7 @@ export async function getMaterialVarianceReport(
         projectId,
         tenantId: ctx.tenantId,
         // StockMovement.companyId is NOT NULL.
-        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+        ...(companyId ? { companyId } : {}),
         status: "CONFIRMED",
         type: "OUT",
         sourceType: "CONSUMPTION",

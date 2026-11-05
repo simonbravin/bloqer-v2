@@ -127,6 +127,15 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
   }
 
   const projectionByCurrency = new Map(projection.currencies.map((c) => [c.currency, c] as const));
+  const actualByCurrency = new Map(report.currencies.map((c) => [c.currency, c] as const));
+  const currencyKeys = [...new Set([...actualByCurrency.keys(), ...projectionByCurrency.keys()])];
+  const cashCurrencies = (currencyKeys.length > 0 ? currencyKeys : [sp.currency ?? "ARS"]).map(
+    (currency) => actualByCurrency.get(currency) ?? emptyCashCurrency(currency),
+  );
+  const exclusions = report.warnings.sectionsExcluded ?? [];
+  const inflowsAvailable = !exclusions.some((entry) => entry.module === "AR");
+  const outflowsAvailable = !exclusions.some((entry) => entry.module === "AP");
+  const partial = !inflowsAvailable || !outflowsAvailable;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -156,22 +165,23 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         appliedAsOfDate={appliedProjectionDate}
       />
 
-      {report.warnings.multiCurrency && (
+      {cashCurrencies.length > 1 && (
         <div className="rounded-lg border border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10 px-4 py-3 text-sm text-yellow-700 dark:text-yellow-400">
           Este proyecto tiene movimientos en múltiples monedas. Cada moneda se muestra por separado;
           los totales no se consolidan.
         </div>
       )}
 
-      {report.warnings.sectionsExcluded && report.warnings.sectionsExcluded.length > 0 && (
+      {partial && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 px-4 py-3 text-sm text-amber-900 dark:text-amber-200 space-y-2">
           <p className="font-medium">
-            Partes del informe omitidas (módulo deshabilitado para el tenant)
+            Secciones no disponibles. Los saldos incluyen los movimientos visibles.
           </p>
           <ul className="list-disc list-inside space-y-1 text-xs">
-            {report.warnings.sectionsExcluded.map((s, i) => (
-              <li key={i}>
-                {s.module} — {s.section} ({s.reason})
+            {exclusions.map(({ module, reason }) => (
+              <li key={module}>
+                {module === "AR" ? "Cobranzas" : "Pagos"} ·{" "}
+                {reason === "MISSING_PERMISSION" ? "Sin permiso" : "Módulo deshabilitado"}
               </li>
             ))}
           </ul>
@@ -193,17 +203,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         {PERIOD_LABELS[report.period] ?? report.period}
       </p>
 
-      {(() => {
-        const fallbackCurrency =
-          sp.currency ??
-          projection.currencies.find((c) => c.currency === "ARS")?.currency ??
-          projection.currencies[0]?.currency ??
-          "ARS";
-        const current =
-          report.currencies.find((c) => c.currency === (sp.currency ?? "")) ??
-          report.currencies.find((c) => c.currency === "ARS") ??
-          report.currencies[0] ??
-          emptyCashCurrency(fallbackCurrency);
+      {cashCurrencies.map((current) => {
         const projectionCur = projectionByCurrency.get(current.currency);
         const last = current.periods[current.periods.length - 1];
         const prev = current.periods[current.periods.length - 2];
@@ -252,32 +252,35 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
 
         const avgBucketLabel =
           report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes";
+        const inflow = (amount: string) => inflowsAvailable ? formatMoneyAmount(amount, current.currency) : "—";
+        const outflow = (amount: string) => outflowsAvailable ? formatMoneyAmount(amount, current.currency) : "—";
 
         return (
-          <div className="space-y-4">
+          <section key={current.currency} className="space-y-4">
+            <h2 className="text-sm font-semibold">Movimientos en {current.currency}</h2>
             <KpiStatGrid title={null} columns={4}>
               <KpiStatCard
                 label="Total Ingresos (acum.)"
-                value={formatMoneyAmount(current.totalInflows, current.currency)}
-                helper={`${pendingHelperPrefix}: ${formatMoneyAmount(pendingInflows, current.currency)}`}
+                value={inflow(current.totalInflows)}
+                helper={inflowsAvailable ? `${pendingHelperPrefix}: ${inflow(pendingInflows)}` : undefined}
                 tone="success"
               />
               <KpiStatCard
                 label="Total Gastos (acum.)"
-                value={formatMoneyAmount(current.totalOutflows, current.currency)}
-                helper={`${pendingHelperPrefix}: ${formatMoneyAmount(pendingOutflows, current.currency)}`}
+                value={outflow(current.totalOutflows)}
+                helper={outflowsAvailable ? `${pendingHelperPrefix}: ${outflow(pendingOutflows)}` : undefined}
                 tone="danger"
               />
               <KpiStatCard
-                label="Balance total (acum.)"
+                label={partial ? "Saldo visible (acum.)" : "Balance total (acum.)"}
                 value={formatMoneyAmount(netPeriod, current.currency)}
-                helper="Ingresos - Gastos"
+                helper={partial ? undefined : "Ingresos - Gastos"}
                 tone={toneByAmount(netPeriod)}
               />
               <KpiStatCard
                 label={lastBucketLabel}
                 value={formatMoneyAmount(last?.netCashFlow ?? "0", current.currency)}
-                helper={`Ingresos: ${formatMoneyAmount(last?.inflows ?? "0", current.currency)} | Gastos: ${formatMoneyAmount(last?.outflows ?? "0", current.currency)}`}
+                helper={`Ingresos: ${inflow(last?.inflows ?? "0")} | Gastos: ${outflow(last?.outflows ?? "0")}`}
                 tone={toneByAmount(last?.netCashFlow ?? "0")}
               />
             </KpiStatGrid>
@@ -285,18 +288,18 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
             <KpiStatGrid title={null} columns={3}>
               <KpiStatCard
                 label={lastPeriodInflowsLabel}
-                value={formatMoneyAmount(last?.inflows ?? "0", current.currency)}
-                helper={`${pctDelta(last?.inflows ?? "0", prev?.inflows ?? "0")} vs ${report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes"} anterior`}
+                value={inflow(last?.inflows ?? "0")}
+                helper={inflowsAvailable ? `${pctDelta(last?.inflows ?? "0", prev?.inflows ?? "0")} vs ${avgBucketLabel} anterior` : undefined}
                 tone="success"
               />
               <KpiStatCard
                 label={lastPeriodOutflowsLabel}
-                value={formatMoneyAmount(last?.outflows ?? "0", current.currency)}
-                helper={`${pctDelta(last?.outflows ?? "0", prev?.outflows ?? "0")} vs ${report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes"} anterior`}
+                value={outflow(last?.outflows ?? "0")}
+                helper={outflowsAvailable ? `${pctDelta(last?.outflows ?? "0", prev?.outflows ?? "0")} vs ${avgBucketLabel} anterior` : undefined}
                 tone="danger"
               />
               <KpiStatCard
-                label={lastPeriodBalanceLabel}
+                label={partial ? "Saldo visible del último período" : lastPeriodBalanceLabel}
                 value={formatMoneyAmount(last?.netCashFlow ?? "0", current.currency)}
                 helper={`${pctDelta(last?.netCashFlow ?? "0", prev?.netCashFlow ?? "0")} vs ${report.period === "day" ? "día" : report.period === "week" ? "semana" : "mes"} anterior`}
                 tone={toneByAmount(last?.netCashFlow ?? "0")}
@@ -313,32 +316,32 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Total Ingresos</p>
                   <p className="text-lg font-semibold">
-                    {formatMoneyAmount(current.totalInflows, current.currency)}
+                    {inflow(current.totalInflows)}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Total Gastos</p>
                   <p className="text-lg font-semibold">
-                    {formatMoneyAmount(current.totalOutflows, current.currency)}
+                    {outflow(current.totalOutflows)}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Balance Período</p>
+                  <p className="text-xs text-muted-foreground">{partial ? "Saldo visible" : "Balance del período"}</p>
                   <p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
                     {formatMoneyAmount(netPeriod, current.currency)}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Promedio Ingresos/{avgBucketLabel}</p>
-                  <p className="text-lg font-semibold">{formatMoneyAmount(avgInflows, current.currency)}</p>
+                  <p className="text-lg font-semibold">{inflow(avgInflows)}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Promedio Gastos/{avgBucketLabel}</p>
-                  <p className="text-lg font-semibold">{formatMoneyAmount(avgOutflows, current.currency)}</p>
+                  <p className="text-lg font-semibold">{outflow(avgOutflows)}</p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground">Margen del Período</p>
-                  <p className="text-lg font-semibold">{marginPct}%</p>
+                  <p className="text-lg font-semibold">{partial ? "—" : `${marginPct}%`}</p>
                 </div>
               </CardContent>
             </Card>
@@ -349,7 +352,12 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
               </CardHeader>
               <CardContent>
                 {current.periods.length > 0 ? (
-                  <ProjectCashFlowChart periods={current.periods} currency={current.currency} />
+                  <ProjectCashFlowChart
+                    periods={current.periods}
+                    currency={current.currency}
+                    inflowsAvailable={inflowsAvailable}
+                    outflowsAvailable={outflowsAvailable}
+                  />
                 ) : (
                   <div className="rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
                     Sin cobranzas ni pagos confirmados para los filtros seleccionados.
@@ -357,9 +365,9 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
                 )}
               </CardContent>
             </Card>
-          </div>
+          </section>
         );
-      })()}
+      })}
     </PageShell>
   );
 }

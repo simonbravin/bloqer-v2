@@ -34,6 +34,7 @@ import {
   parseProjectCashFlowFilters,
   parseStockBalanceFilters,
   parseStockMovementFilters,
+  requireProjectAccess,
   ServiceError,
   type ServiceContext,
 } from "@bloqer/services";
@@ -208,6 +209,7 @@ export async function sendReportByEmail(
     throw new ServiceError("VALIDATION", msg);
   }
   const input = parsed.data;
+  if (input.projectId) await requireProjectAccess(input.projectId, ctx);
   const facts = await loadNotificationIdentityFacts({
     tenantId: ctx.tenantId,
     companyId: ctx.companyId,

@@ -35,7 +35,7 @@
 | ID | Nombre | Área | Descripción breve | Fase | Impl. |
 |---|---|---|---|---|---|
 | R-CERT-01 | Estado cartera certificaciones | PRJ | Certificaciones con `payment_status` derivado (AR/cobranzas) | 1 | Sí |
-| R-002 | Avances del proyecto | PRJ | Lectura ejecutiva con bases explícitas, alcance vigente principal/adendas y corte; detalle por partida y evidencia. Ruta `/reportes/avances` (D-120) | 1 | Disponible en código; sin publicación |
+| R-002 | Avances del proyecto | PRJ | Lectura ejecutiva con bases explícitas, alcance vigente principal/adendas y corte; detalle por partida y evidencia. Ruta `/reportes/avances` (D-120) | 1 | Publicado con AG-11 |
 | R-CERT-02 | Certificado vs venta presupuestada | OP | Por partida WBS: venta presup. vs acum. certificado | 1 | Sí |
 | R-CERT-03 | Pendiente de certificar | OP | Partidas con venta presup. y saldo pendiente | 1 | Sí |
 | R-AP-01 | Desvío compras por partida | OP | APU **MATERIAL** vs comprometido/devengado por `wbsNodeId` | 1 | Sí |

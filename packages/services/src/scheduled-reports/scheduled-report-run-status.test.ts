@@ -53,3 +53,16 @@ test("mixed sent and failed recipients produce a partial run", () => {
     "PARTIAL",
   );
 });
+
+test("mixed sent and omitted recipients produce a partial run", () => {
+  assert.equal(
+    deriveScheduledReportRunStatus({
+      recipientsSent: 1,
+      recipientsSkipped: 1,
+      recipientsFailed: 0,
+      recipientsDuplicate: 0,
+      attachmentErrorCount: 0,
+    }),
+    "PARTIAL",
+  );
+});

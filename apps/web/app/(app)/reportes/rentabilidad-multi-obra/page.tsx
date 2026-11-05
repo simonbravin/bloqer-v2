@@ -19,6 +19,12 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 
+const appliedFilters = { costLayer: "accrued", revenueBasis: "certified" } as const;
+
+function profitabilityAmount(amount: string | null, currency: string | null): string {
+  return amount == null || currency == null ? "—" : formatMoneyAmount(amount, currency);
+}
+
 export default async function RentabilidadMultiObraPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -32,10 +38,7 @@ export default async function RentabilidadMultiObraPage() {
 
   let report;
   try {
-    report = await getPortfolioProfitabilityReport(ctx, {
-      costLayer: "accrued",
-      revenueBasis: "certified",
-    });
+    report = await getPortfolioProfitabilityReport(ctx, appliedFilters);
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/reportes");
     throw err;
@@ -50,7 +53,7 @@ export default async function RentabilidadMultiObraPage() {
             Ingreso certificado vs costo devengado por obra. Consolidado al pie.
           </p>
         </div>
-        <ReportExportActions exportPath="/api/reports/rentabilidad-multi-obra.csv" params={{}} pdf xlsx />
+        <ReportExportActions exportPath="/api/reports/rentabilidad-multi-obra.csv" params={appliedFilters} pdf xlsx />
       </div>
 
       <ReportSubnav>
@@ -76,7 +79,7 @@ export default async function RentabilidadMultiObraPage() {
               ? `Ingresos consolidados (${report.consolidatedCurrency})`
               : "Ingresos consolidados"
           }
-          value={formatMoneyAmount(report.consolidatedRevenue)}
+          value={profitabilityAmount(report.consolidatedRevenue, report.consolidatedCurrency)}
         />
         <KpiStatCard
           label={
@@ -84,7 +87,7 @@ export default async function RentabilidadMultiObraPage() {
               ? `Costo directo (${report.consolidatedCurrency})`
               : "Costo directo"
           }
-          value={formatMoneyAmount(report.consolidatedDirectCost)}
+          value={profitabilityAmount(report.consolidatedDirectCost, report.consolidatedCurrency)}
         />
         <KpiStatCard
           label={
@@ -92,7 +95,7 @@ export default async function RentabilidadMultiObraPage() {
               ? `Margen bruto (${report.consolidatedCurrency})`
               : "Margen bruto"
           }
-          value={formatMoneyAmount(report.consolidatedGrossMargin)}
+          value={profitabilityAmount(report.consolidatedGrossMargin, report.consolidatedCurrency)}
         />
       </KpiStatGrid>
       {report.consolidatedGrossMarginPct != null ? (
@@ -132,16 +135,16 @@ export default async function RentabilidadMultiObraPage() {
                       <div className="text-[10px] text-amber-700 dark:text-amber-400">{row.warning}</div>
                     ) : null}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{row.currency}</TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.revenue)}</TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.directCost)}</TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.grossMargin)}</TableCell>
+                  <TableCell className="text-muted-foreground">{row.currency ?? "—"}</TableCell>
+                  <TableCell className="text-right">{profitabilityAmount(row.revenue, row.currency)}</TableCell>
+                  <TableCell className="text-right">{profitabilityAmount(row.directCost, row.currency)}</TableCell>
+                  <TableCell className="text-right">{profitabilityAmount(row.grossMargin, row.currency)}</TableCell>
                   <TableCell className="text-right">
                     {row.grossMarginPct != null ? `${row.grossMarginPct}%` : "—"}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild className="h-7 text-xs">
-                      <Link href={`/proyectos/${row.projectId}/reportes/rentabilidad`}>Detalle</Link>
+                      <Link href={`/proyectos/${row.projectId}/reportes/rentabilidad?${new URLSearchParams(appliedFilters)}`}>Detalle</Link>
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -153,13 +156,13 @@ export default async function RentabilidadMultiObraPage() {
                   Consolidado{report.consolidatedCurrency ? ` (${report.consolidatedCurrency})` : ""}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatMoneyAmount(report.consolidatedRevenue)}
+                  {profitabilityAmount(report.consolidatedRevenue, report.consolidatedCurrency)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatMoneyAmount(report.consolidatedDirectCost)}
+                  {profitabilityAmount(report.consolidatedDirectCost, report.consolidatedCurrency)}
                 </TableCell>
                 <TableCell className="text-right">
-                  {formatMoneyAmount(report.consolidatedGrossMargin)}
+                  {profitabilityAmount(report.consolidatedGrossMargin, report.consolidatedCurrency)}
                 </TableCell>
                 <TableCell className="text-right">
                   {report.consolidatedGrossMarginPct != null

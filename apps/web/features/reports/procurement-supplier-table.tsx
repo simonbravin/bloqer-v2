@@ -14,9 +14,12 @@ import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: ProcurementSupplierRow[];
+  apAvailable: boolean;
+  currency: string;
 };
 
-export function ProcurementSupplierTable({ rows }: Props) {
+export function ProcurementSupplierTable({ rows, apAvailable, currency }: Props) {
+  if (rows.length === 0) return <p className="text-sm text-muted-foreground">Sin compras para el período seleccionado.</p>;
   return (
     <TableScroll>
       <Table className="text-xs">
@@ -35,10 +38,10 @@ export function ProcurementSupplierTable({ rows }: Props) {
               <TableCell className="max-w-[min(14rem,30vw)] truncate" title={row.supplierName}>
                 {row.supplierName}
               </TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost)}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.accruedCost)}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.paidCost)}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.openCommitted)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost, currency)}</TableCell>
+              <TableCell className="text-right font-mono">{apAvailable ? formatMoneyAmount(row.accruedCost, currency) : "—"}</TableCell>
+              <TableCell className="text-right font-mono">{apAvailable ? formatMoneyAmount(row.paidCost, currency) : "—"}</TableCell>
+              <TableCell className="text-right font-mono">{apAvailable ? formatMoneyAmount(row.openCommitted, currency) : "—"}</TableCell>
             </TableRow>
           ))}
         </TableBody>

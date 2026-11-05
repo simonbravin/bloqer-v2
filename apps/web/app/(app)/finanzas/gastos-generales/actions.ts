@@ -6,6 +6,7 @@ import {
   deleteProjectOverheadAllocation,
   AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
   getAutoWeightOverheadPreviewForPeriod,
+  getOverheadPeriodCloseStatus,
   reopenOverheadPeriod,
   ServiceError,
   updateCompanyOverheadAllocationMode,
@@ -150,13 +151,15 @@ export async function reopenOverheadPeriodAction(
 export async function fetchAutoWeightPreviewAction(
   data: AutoWeightPreviewQueryInput,
 ): Promise<
-  | { ok: true; preview: Awaited<ReturnType<typeof getAutoWeightOverheadPreviewForPeriod>> }
+  | { ok: true; preview: Awaited<ReturnType<typeof getAutoWeightOverheadPreviewForPeriod>> | null }
   | { error: string }
 > {
   const ctx = await getCtx();
   const parsed = autoWeightPreviewQuerySchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
+    const status = await getOverheadPeriodCloseStatus(parsed.data.companyId, parsed.data.period, ctx);
+    if (status === "FROZEN") return { ok: true, preview: null };
     const preview = await getAutoWeightOverheadPreviewForPeriod(
       parsed.data.companyId,
       parsed.data.period,

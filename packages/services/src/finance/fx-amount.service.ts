@@ -25,3 +25,16 @@ export function computeDocumentFxAmounts(
     throw e;
   }
 }
+
+/** D-142: use a document's historical FX only if it reproduces its stored gross equivalent. */
+export function verifiedDocumentAmountArs(
+  doc: { currency: string; fxRate: Prisma.Decimal; amountArs: Prisma.Decimal; totalAmount: Prisma.Decimal },
+  amount: Prisma.Decimal,
+): Prisma.Decimal | null {
+  const currency = doc.currency.trim().toUpperCase();
+  if (currency === "ARS" || amount.isZero()) return new Prisma.Decimal(serializeMoneyDecimal(amount));
+  if (!/^[A-Z]{3}$/.test(currency) || !doc.fxRate.gt(0) || doc.totalAmount.isZero()) return null;
+  const expected = computeDocumentFxAmounts(currency, doc.totalAmount, doc.fxRate);
+  if (!expected.amountArs.eq(doc.amountArs)) return null;
+  return computeDocumentFxAmounts(currency, amount, expected.fxRate).amountArs;
+}

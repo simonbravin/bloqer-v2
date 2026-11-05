@@ -26,7 +26,7 @@ export function CertificationProgressChart({ series }: Props) {
       series.map((p) => ({
         name: p.periodLabel,
         "Avance económico %": parseFloat(p.economicPct),
-        "Avance financiero %": parseFloat(p.financialPct),
+        "Avance financiero %": p.financialPct === null ? null : Number(p.financialPct),
         "Avance físico %": parseFloat(p.physicalPct),
       })),
     [series],

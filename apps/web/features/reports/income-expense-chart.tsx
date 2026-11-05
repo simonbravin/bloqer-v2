@@ -12,7 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { IncomeExpensePoint } from "@bloqer/services";
+import type { IncomeExpensePoint, IncomeExpenseSources } from "@bloqer/services";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartAxis, formatChartMoney } from "@/lib/format-money";
@@ -20,6 +20,8 @@ import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-la
 
 type Props = {
   series: IncomeExpensePoint[];
+  currency?: string;
+  sourcesAvailable?: IncomeExpenseSources;
   /** composed = barras + líneas de caja; trend = solo líneas de tendencia económica */
   variant?: "composed" | "trend";
   title?: string;
@@ -30,6 +32,8 @@ type Props = {
 
 export function IncomeExpenseChart({
   series,
+  currency,
+  sourcesAvailable,
   variant = "composed",
   title,
   description,
@@ -39,14 +43,14 @@ export function IncomeExpenseChart({
     () =>
       series.map((p) => ({
         name: p.periodLabel,
-        Certificado: parseFloat(p.certifiedAmount),
-        "Costo devengado": parseFloat(p.costAccrued),
-        Cobrado: parseFloat(p.collectedAmount),
-        "Costo pagado": parseFloat(p.costPaid),
-        "MB devengado": parseFloat(p.grossMarginAccrued),
-        "MB caja": parseFloat(p.grossMarginCash),
+        Certificado: sourcesAvailable?.certifications === false ? null : Number(p.certifiedAmount),
+        "Costo devengado": sourcesAvailable?.ap === false ? null : Number(p.costAccrued),
+        Cobrado: sourcesAvailable?.ar === false ? null : Number(p.collectedAmount),
+        "Costo pagado": sourcesAvailable?.ap === false ? null : Number(p.costPaid),
+        "MB devengado": p.grossMarginAccrued === null ? null : Number(p.grossMarginAccrued),
+        "MB caja": p.grossMarginCash === null ? null : Number(p.grossMarginCash),
       })),
-    [series],
+    [series, sourcesAvailable],
   );
 
   const fewPoints = data.length <= 3;
@@ -75,7 +79,7 @@ export function IncomeExpenseChart({
               height={fewPoints ? 28 : 48}
             />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
-            <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
+            <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Line
               type="monotone"
@@ -116,7 +120,7 @@ export function IncomeExpenseChart({
               height={fewPoints ? 28 : 48}
             />
             <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
-            <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
+            <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="Certificado" fill={CHART_SERIES.certified} radius={[2, 2, 0, 0]} />
             <Bar dataKey="Costo devengado" fill={CHART_SERIES.costAccrued} radius={[2, 2, 0, 0]} />

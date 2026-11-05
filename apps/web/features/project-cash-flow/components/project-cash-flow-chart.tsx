@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useId } from "react";
 import type { ProjectCashFlowPeriod } from "@bloqer/services";
 import { formatChartMoney } from "@/lib/format-money";
 
@@ -21,9 +22,15 @@ interface Props {
   currency: string;
   /** Trend line for evolution over time. Bars for detailed comparison. */
   variant?: "trend" | "bars";
+  inflowsAvailable?: boolean;
+  outflowsAvailable?: boolean;
 }
 
-export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: Props) {
+export function ProjectCashFlowChart({
+  periods, currency, variant = "trend", inflowsAvailable = true, outflowsAvailable = true,
+}: Props) {
+  const gradientId = useId();
+  const netLabel = inflowsAvailable && outflowsAvailable ? "Neto" : "Saldo visible";
   if (periods.length === 0) return null;
 
   const data = periods.map((p) => ({
@@ -52,7 +59,7 @@ export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: P
             <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
             <YAxis tickFormatter={fmtAxis} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={52} />
             <Tooltip
-              formatter={(value) => [fmtTooltip(Number(value)), "Neto"]}
+              formatter={(value) => [fmtTooltip(Number(value)), netLabel]}
               contentStyle={{
                 fontSize: 12,
                 borderRadius: 8,
@@ -61,16 +68,16 @@ export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: P
               }}
             />
             <defs>
-              <linearGradient id="projectCashNetFill" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
                 <stop offset="100%" stopColor="#6366f1" stopOpacity={0.02} />
               </linearGradient>
             </defs>
-            <Area type="monotone" dataKey="Neto" stroke="none" fill="url(#projectCashNetFill)" legendType="none" />
+            <Area type="monotone" dataKey="Neto" stroke="none" fill={`url(#${gradientId})`} legendType="none" />
             <Line
               type="monotone"
               dataKey="Neto"
-              name="Neto"
+              name={netLabel}
               stroke="#6366f1"
               strokeWidth={2.5}
               dot={{ r: 3, fill: "#6366f1", strokeWidth: 0 }}
@@ -91,9 +98,9 @@ export function ProjectCashFlowChart({ periods, currency, variant = "trend" }: P
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip formatter={(value) => [fmtTooltip(Number(value))]} />
           <Legend />
-          <Bar dataKey="Ingresos" fill="#10b981" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="Egresos" fill="#ef4444" radius={[2, 2, 0, 0]} />
-          <Bar dataKey="Neto" fill="#6366f1" radius={[2, 2, 0, 0]} />
+          {inflowsAvailable ? <Bar dataKey="Ingresos" fill="#10b981" radius={[2, 2, 0, 0]} /> : null}
+          {outflowsAvailable ? <Bar dataKey="Egresos" fill="#ef4444" radius={[2, 2, 0, 0]} /> : null}
+          <Bar dataKey="Neto" name={netLabel} fill="#6366f1" radius={[2, 2, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>

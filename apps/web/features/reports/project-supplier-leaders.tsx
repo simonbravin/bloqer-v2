@@ -22,17 +22,19 @@ const KIND_META: Record<Kind, { title: string; helper: string; empty: string }> 
   },
 };
 
-function formatLeaderValue(kind: Kind, value: string) {
+function formatLeaderValue(kind: Kind, value: string, currency: string) {
   if (kind === "orders") return value;
-  return formatMoneyAmount(value);
+  return formatMoneyAmount(value, currency);
 }
 
 export function ProjectSupplierLeaders({
   kind,
   rows,
+  currency,
 }: {
   kind: Kind;
   rows: ProjectSupplierLeaderRow[];
+  currency: string;
 }) {
   const meta = KIND_META[kind];
   const max = rows.reduce((m, r) => Math.max(m, Number(r.value) || 0), 0);
@@ -58,7 +60,7 @@ export function ProjectSupplierLeaders({
                       {row.supplierName}
                     </span>
                     <span className="shrink-0 font-mono text-xs tabular-nums">
-                      {formatLeaderValue(kind, row.value)}
+                      {formatLeaderValue(kind, row.value, currency)}
                       {row.sharePct ? (
                         <span className="ml-1 text-muted-foreground">({row.sharePct}%)</span>
                       ) : null}

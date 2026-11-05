@@ -78,20 +78,24 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
     throw err;
   }
 
-  const projCur = projection.currencies.find((c) => c.currency === "ARS") ?? projection.currencies[0];
-  const cashCur = cashReport.currencies.find((c) => c.currency === "ARS") ?? cashReport.currencies[0];
+  const cashExclusions = cashReport.warnings.sectionsExcluded ?? [];
+  const inflowsAvailable = !cashExclusions.some((entry) => entry.module === "AR");
+  const outflowsAvailable = !cashExclusions.some((entry) => entry.module === "AP");
+  const projectionInflowsAvailable = !projection.sectionsExcluded.some((entry) => entry.module === "AR");
+  const projectionOutflowsAvailable = !projection.sectionsExcluded.some((entry) => entry.module === "AP");
 
   return (
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Caja — real y proyección"
-        actions={
+        actions={cashReport.currencies.length > 0 ? (
           <ReportExportActions
             exportPath={`/api/reports/proyectos/${projectId}/flujo-caja.csv`}
             params={sp}
             pdfOnly
+            label="Exportar flujo real (PDF)"
           />
-        }
+        ) : undefined}
       />
 
       <ReportSubnav>
@@ -101,9 +105,11 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/proyectos/${projectId}/flujo-caja`}>Flujo de caja (detalle)</Link>
         </Button>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Cuentas por pagar</Link>
-        </Button>
+        {outflowsAvailable ? (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Cuentas por pagar</Link>
+          </Button>
+        ) : null}
       </ReportSubnav>
 
       {projection.warnings.map((w, i) => (
@@ -111,6 +117,11 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
           {w}
         </p>
       ))}
+      {cashExclusions.length > 0 ? (
+        <p className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+          Flujo real parcial. Los saldos incluyen los movimientos disponibles.
+        </p>
+      ) : null}
 
       <div className="rounded-lg border bg-card p-4">
         <Suspense>
@@ -124,24 +135,25 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
 
       <section className="space-y-4">
         <h2 className="text-sm font-semibold">Flujo de caja real</h2>
-        {cashCur ? (
-          <>
+        {cashReport.currencies.length > 0 ? cashReport.currencies.map((cashCur) => (
+          <div key={cashCur.currency} className="space-y-3">
+            <h3 className="text-xs font-medium">{cashCur.currency}</h3>
             <KpiStatGrid title={null} columns={3}>
               <KpiStatCard
                 compact
                 label="Ingresos (caja)"
-                value={formatMoneyAmount(cashCur.totalInflows, cashCur.currency)}
+                value={inflowsAvailable ? formatMoneyAmount(cashCur.totalInflows, cashCur.currency) : "—"}
                 tone="success"
               />
               <KpiStatCard
                 compact
                 label="Egresos (caja)"
-                value={formatMoneyAmount(cashCur.totalOutflows, cashCur.currency)}
+                value={outflowsAvailable ? formatMoneyAmount(cashCur.totalOutflows, cashCur.currency) : "—"}
                 tone="danger"
               />
               <KpiStatCard
                 compact
-                label="Neto"
+                label={cashExclusions.length > 0 ? "Saldo visible" : "Neto"}
                 value={formatMoneyAmount(cashCur.netCashFlow, cashCur.currency)}
               />
             </KpiStatGrid>
@@ -150,11 +162,17 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
                 <CardTitle className="text-base">Evolución por período</CardTitle>
               </CardHeader>
               <CardContent>
-                <ProjectCashFlowChart periods={cashCur.periods} currency={cashCur.currency} variant="bars" />
+                <ProjectCashFlowChart
+                  periods={cashCur.periods}
+                  currency={cashCur.currency}
+                  variant="bars"
+                  inflowsAvailable={inflowsAvailable}
+                  outflowsAvailable={outflowsAvailable}
+                />
               </CardContent>
             </Card>
-          </>
-        ) : (
+          </div>
+        )) : (
           <p className="text-sm text-muted-foreground">Sin movimientos de caja en el rango.</p>
         )}
       </section>
@@ -164,34 +182,42 @@ export default async function ReporteCajaPage({ params, searchParams }: PageProp
         <p className="text-xs text-muted-foreground">
           Horizonte: {formatDateRange(projection.dateFrom, projection.dateTo)}
         </p>
-        {projCur ? (
-          <>
+        {projection.currencies.length > 0 ? projection.currencies.map((projCur) => (
+          <div key={projCur.currency} className="space-y-3">
+            <h3 className="text-xs font-medium">{projCur.currency}</h3>
             <KpiStatGrid title={null} columns={3}>
               <KpiStatCard
                 compact
                 label="Cobros esperados"
-                value={formatMoneyAmount(projCur.totalExpectedInflows, projCur.currency)}
+                value={projectionInflowsAvailable ? formatMoneyAmount(projCur.totalExpectedInflows, projCur.currency) : "—"}
                 tone="success"
               />
               <KpiStatCard
                 compact
                 label="Pagos esperados"
-                value={formatMoneyAmount(projCur.totalExpectedOutflows, projCur.currency)}
+                value={projectionOutflowsAvailable ? formatMoneyAmount(projCur.totalExpectedOutflows, projCur.currency) : "—"}
                 tone="danger"
               />
               <KpiStatCard
                 compact
-                label="Neto esperado"
+                label={projection.sectionsExcluded.length > 0 ? "Saldo esperado visible" : "Neto esperado"}
                 value={formatMoneyAmount(projCur.netExpected, projCur.currency)}
               />
             </KpiStatGrid>
-            <CashProjectionChart buckets={projCur.buckets} currency={projCur.currency} />
+            <CashProjectionChart
+              buckets={projCur.buckets}
+              currency={projCur.currency}
+              inflowsAvailable={projectionInflowsAvailable}
+              outflowsAvailable={projectionOutflowsAvailable}
+            />
             <p className="text-xs text-muted-foreground">
-              {projCur.receivableOpenCount} cuenta(s) por cobrar y {projCur.payableOpenCount} por pagar con saldo
-              en el horizonte.
+              {[
+                projectionInflowsAvailable ? `${projCur.receivableOpenCount} por cobrar` : null,
+                projectionOutflowsAvailable ? `${projCur.payableOpenCount} por pagar` : null,
+              ].filter(Boolean).join(" · ")} con saldo en el horizonte.
             </p>
-          </>
-        ) : (
+          </div>
+        )) : (
           <CashProjectionChart buckets={[]} currency="ARS" />
         )}
       </section>

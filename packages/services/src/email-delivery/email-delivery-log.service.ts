@@ -8,7 +8,10 @@ import type {
 import { prisma, type Prisma } from "@bloqer/database";
 import { canRunOperationalAlerts } from "../notifications/operational-alerts-runner.service";
 import { scheduledReportEmailCompanyScope } from "../scheduled-reports/scheduled-report-execution.service";
-import { canReadScheduledReport } from "../scheduled-reports/scheduled-report.service";
+import {
+  canReadScheduledReport,
+  listReadableScheduledReportIds,
+} from "../scheduled-reports/scheduled-report.service";
 import { ServiceContext, ServiceError } from "../types";
 
 const ERROR_MESSAGE_MAX = 512;
@@ -183,6 +186,16 @@ export async function getEmailDeliveryLogById(id: string, ctx: ServiceContext): 
   if (!row) {
     throw new ServiceError("NOT_FOUND", "Registro de envío no encontrado");
   }
+  if (row.emailType === "REPORT_SCHEDULED") {
+    const canReadParent =
+      row.relatedEntityType === "SCHEDULED_REPORT" && row.relatedEntityId != null &&
+      await canReadScheduledReport(row.relatedEntityId, ctx);
+    const allowed = canReadParent && await prisma.emailDeliveryLog.findFirst({
+      where: { id, tenantId: ctx.tenantId, ...await scheduledReportEmailCompanyScope(ctx) },
+      select: { id: true },
+    });
+    if (!allowed) throw new ServiceError("NOT_FOUND", "Registro de envío no encontrado");
+  }
   return row;
 }
 
@@ -230,11 +243,26 @@ export async function listEmailDeliveryLogs(
   }
   if (filters.relatedEntityType) where.relatedEntityType = filters.relatedEntityType;
   if (filters.relatedEntityId) where.relatedEntityId = filters.relatedEntityId;
-  if (filters.relatedEntityId && (
-    filters.relatedEntityType === "SCHEDULED_REPORT" || filters.emailType === "REPORT_SCHEDULED"
-  )) {
-    if (!(await canReadScheduledReport(filters.relatedEntityId, ctx))) return [];
-    Object.assign(where, await scheduledReportEmailCompanyScope(ctx));
+  const onlyScheduledReports =
+    filters.emailType === "REPORT_SCHEDULED" || filters.relatedEntityType === "SCHEDULED_REPORT";
+  if (!filters.emailType || onlyScheduledReports) {
+    const [readableIds, companyScope] = await Promise.all([
+      filters.relatedEntityId
+        ? canReadScheduledReport(filters.relatedEntityId, ctx).then(
+            (allowed) => allowed ? [filters.relatedEntityId!] : [],
+          )
+        : listReadableScheduledReportIds(ctx),
+      scheduledReportEmailCompanyScope(ctx),
+    ]);
+    const scheduledScope: Prisma.EmailDeliveryLogWhereInput = {
+      ...companyScope,
+      emailType: "REPORT_SCHEDULED",
+      relatedEntityType: "SCHEDULED_REPORT",
+      relatedEntityId: { in: readableIds },
+    };
+    where.AND = [onlyScheduledReports ? scheduledScope : {
+      OR: [{ emailType: { not: "REPORT_SCHEDULED" } }, scheduledScope],
+    }];
   }
   if (filters.dateFrom || filters.dateTo) {
     const createdAt: Prisma.DateTimeFilter = {};

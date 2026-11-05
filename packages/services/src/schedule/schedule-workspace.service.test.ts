@@ -3,7 +3,8 @@ import test from "node:test";
 
 import { Prisma, prisma } from "@bloqer/database";
 
-import { getProjectScheduleWorkspace } from "./schedule-workspace.service";
+import { getProjectScheduleSummary, getProjectScheduleWorkspace } from "./schedule-workspace.service";
+import type { ServiceContext } from "../types";
 
 test("schedule workspace omits stale former-container dates from its KPI", async (t) => {
   function mockQuery(target: object, method: string, result: unknown) {
@@ -13,6 +14,7 @@ test("schedule workspace omits stale former-container dates from its KPI", async
     t.after(() => {
       delegate[method] = original;
     });
+    return (replacement: unknown) => { result = replacement; };
   }
   const former = {
     id: "former-container",
@@ -52,7 +54,7 @@ test("schedule workspace omits stale former-container dates from its KPI", async
     status: "ACTIVE",
   });
   mockQuery(prisma.tenant, "findUnique", { projectAccessMode: "TENANT_WIDE" });
-  mockQuery(prisma.schedule, "findUnique", {
+  const setSchedule = mockQuery(prisma.schedule, "findUnique", {
     id: "schedule",
     tenantId: "tenant",
     baselineBudgetId: null,
@@ -60,19 +62,21 @@ test("schedule workspace omits stale former-container dates from its KPI", async
   mockQuery(prisma.scheduleItem, "count", 2);
   mockQuery(prisma.scheduleItem, "findMany", rows);
 
-  const result = await getProjectScheduleWorkspace(
-    "project",
-    {},
-    {
-      tenantId: "tenant",
-      companyId: "company",
-      actorUserId: "actor",
-      roles: ["OWNER"],
-    },
-  );
+  const ctx: ServiceContext = { tenantId: "tenant", companyId: "company", actorUserId: "actor", roles: ["OWNER"] };
+  const result = await getProjectScheduleWorkspace("project", {}, ctx);
 
   if (result.type !== "WORKSPACE") return assert.fail("Expected a workspace");
   assert.equal(result.items.find((item) => item.id === former.id)?.endDate, null);
   assert.equal(result.summary.delayedItems, 0);
   assert.equal(result.summary.scheduleProgressPct, "50.00");
+  assert.deepEqual(await getProjectScheduleSummary("project", ctx), {
+    delayedItems: 0, completedItems: 1, scheduleProgressPct: "50.00",
+  });
+  setSchedule(null);
+  const create = prisma.schedule.create;
+  prisma.schedule.create = () => assert.fail("Overview must not seed a schedule");
+  t.after(() => { prisma.schedule.create = create; });
+  assert.deepEqual(await getProjectScheduleSummary("project", ctx), {
+    delayedItems: 0, completedItems: 0, scheduleProgressPct: null,
+  });
 });

@@ -11,14 +11,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { SubcontractStatusBadge } from "@/features/subcontracts/components/subcontract-status-badge";
 import { formatMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: SubcontractContractRow[];
   projectId: string;
+  currency: string;
 };
 
-export function SubcontractContractsTable({ rows, projectId }: Props) {
+export function SubcontractContractsTable({ rows, projectId, currency }: Props) {
   return (
     <TableScroll>
       <Table className="text-xs">
@@ -50,9 +52,9 @@ export function SubcontractContractsTable({ rows, projectId }: Props) {
               <TableCell className="max-w-[min(12rem,24vw)] truncate" title={row.subcontractorName}>
                 {row.subcontractorName}
               </TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.totalValue)}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCost)}</TableCell>
-              <TableCell className="text-muted-foreground">{row.status}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.totalValue, currency)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCost, currency)}</TableCell>
+              <TableCell><SubcontractStatusBadge status={row.status} /></TableCell>
               <TableCell>{row.wbsLinked ? "Sí" : "—"}</TableCell>
             </TableRow>
           ))}

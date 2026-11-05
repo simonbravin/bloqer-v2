@@ -1,7 +1,11 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { getProjectAccruedByMonth } from "../cost-control/project-accrued-aggregation";
+import { loadCompanyAccruedForOverhead } from "../cost-control/project-accrued-aggregation";
 import { ServiceContext, ServiceError } from "../types";
-import { assertOverheadView } from "./overhead-access";
+import { assertOverheadCompanyScope, assertOverheadEdit, assertOverheadView } from "./overhead-access";
+import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { verifiedDocumentAmountArs } from "./fx-amount.service";
+import { serializeMoneyDecimal } from "./money-decimal";
+import { requireProjectAccess, resolveAccessibleProjectScope } from "../security/access";
 import {
   assertValidOverheadPeriod,
   computeWeightShare,
@@ -29,35 +33,35 @@ export async function getCorporateGgPoolForPeriod(
   companyId: string,
   period: string,
   ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<CorporateGgPoolResult> {
+  assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
   assertValidOverheadPeriod(period);
   const issueDate = periodToIssueDateBounds(period);
 
-  const invoices = await prisma.supplierInvoice.findMany({
+  const invoices = await db.supplierInvoice.findMany({
     where: {
       tenantId: ctx.tenantId,
       companyId,
+      company: { tenantId: ctx.tenantId },
       projectId: null,
       status: "ISSUED",
       issueDate,
     },
-    select: { totalAmount: true, amountArs: true, currency: true },
+    select: { totalAmount: true, amountArs: true, fxRate: true, currency: true, documentKind: true },
   });
 
   let pool = ZERO;
   let excludedNonArsCount = 0;
   for (const inv of invoices) {
-    if (inv.amountArs.greaterThan(0)) {
-      pool = pool.plus(inv.amountArs);
-    } else if (inv.currency === "ARS") {
-      pool = pool.plus(inv.totalAmount);
-    } else {
-      excludedNonArsCount += 1;
-    }
+    const equivalent = verifiedDocumentAmountArs(inv, inv.totalAmount);
+    if (equivalent === null) excludedNonArsCount += 1;
+    else pool = pool.plus(inv.documentKind === "CREDIT_NOTE" ? equivalent.negated() : equivalent);
   }
 
   return {
-    poolArs: pool.toFixed(2),
+    poolArs: serializeMoneyDecimal(pool),
     invoiceCount: invoices.length,
     excludedNonArsCount,
   };
@@ -69,14 +73,16 @@ async function listCompanyProjectsForAutoWeight(
   companyId: string,
   ctx: ServiceContext,
   opts?: AutoWeightProjectListOpts,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<{ id: string; code: string; name: string }[]> {
   const statuses = opts?.excludeDraftProjects
     ? (["ACTIVE", "ON_HOLD"] as const)
     : (["ACTIVE", "ON_HOLD", "DRAFT"] as const);
-  return prisma.project.findMany({
+  return db.project.findMany({
     where: {
       tenantId: ctx.tenantId,
       companyId,
+      company: { tenantId: ctx.tenantId },
       status: { in: [...statuses] },
     },
     select: { id: true, code: true, name: true },
@@ -89,10 +95,13 @@ export async function listCorporateGgPeriods(
   companyId: string,
   ctx: ServiceContext,
 ): Promise<string[]> {
+  assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
   const invoices = await prisma.supplierInvoice.findMany({
     where: {
       tenantId: ctx.tenantId,
       companyId,
+      company: { tenantId: ctx.tenantId },
       projectId: null,
       status: "ISSUED",
     },
@@ -119,9 +128,9 @@ export type AutoWeightProjectRow = {
   projectId: string;
   projectCode: string;
   projectName: string;
-  accruedCd: string;
-  weightPct: string;
-  allocatedAmount: string;
+  accruedCd: string | null;
+  weightPct: string | null;
+  allocatedAmount: string | null;
 };
 
 export type AutoWeightPeriodPreview = {
@@ -129,7 +138,9 @@ export type AutoWeightPeriodPreview = {
   poolArs: string;
   invoiceCount: number;
   excludedNonArsCount: number;
-  totalAccruedCd: string;
+  totalAccruedCd: string | null;
+  calculationBlocked: boolean;
+  projectCount: number;
   rows: AutoWeightProjectRow[];
   warnings: string[];
 };
@@ -140,21 +151,12 @@ type AutoWeightPeriodContext = {
   poolArs: string;
   invoiceCount: number;
   excludedNonArsCount: number;
-  totalCd: Prisma.Decimal;
-  cdsByProjectId: Map<string, Prisma.Decimal>;
+  totalCd: Prisma.Decimal | null;
+  calculationBlocked: boolean;
+  cdsByProjectId: Map<string, Prisma.Decimal | null>;
   projects: { id: string; code: string; name: string }[];
   warnings: string[];
 };
-
-async function projectAccruedCdForPeriod(
-  projectId: string,
-  period: string,
-  ctx: ServiceContext,
-): Promise<Prisma.Decimal> {
-  const { dateFrom, dateTo } = periodToDateRange(period);
-  const { total } = await getProjectAccruedByMonth(projectId, { dateFrom, dateTo }, ctx);
-  return total;
-}
 
 export type BuildAutoWeightContextOpts = AutoWeightProjectListOpts;
 
@@ -163,8 +165,10 @@ async function buildAutoWeightPeriodContext(
   period: string,
   ctx: ServiceContext,
   opts?: BuildAutoWeightContextOpts,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<AutoWeightPeriodContext> {
-  const company = await prisma.company.findUnique({
+  assertOverheadCompanyScope(companyId, ctx);
+  const company = await db.company.findUnique({
     where: { id: companyId },
     select: { tenantId: true },
   });
@@ -172,36 +176,47 @@ async function buildAutoWeightPeriodContext(
   if (company.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
   const [poolResult, projects] = await Promise.all([
-    getCorporateGgPoolForPeriod(companyId, period, ctx),
-    listCompanyProjectsForAutoWeight(companyId, ctx, opts),
+    getCorporateGgPoolForPeriod(companyId, period, ctx, db),
+    listCompanyProjectsForAutoWeight(companyId, ctx, opts, db),
   ]);
 
   const warnings: string[] = [];
   if (poolResult.excludedNonArsCount > 0) {
     warnings.push(
-      `${poolResult.excludedNonArsCount} factura(s) corporativa(s) en moneda extranjera sin amountArs — no sumadas al pool.`,
+      `${poolResult.excludedNonArsCount} comprobante(s) corporativo(s) sin equivalencia comprobable en ARS. El pool está incompleto.`,
     );
   }
 
   const pool = new Prisma.Decimal(poolResult.poolArs);
-  const cdsByProjectId = new Map<string, Prisma.Decimal>();
+  const cdsByProjectId = new Map<string, Prisma.Decimal | null>();
+  const range = periodToDateRange(period);
   const cdEntries = await Promise.all(
-    projects.map(async (p) => ({
-      projectId: p.id,
-      cd: await projectAccruedCdForPeriod(p.id, period, ctx),
-    })),
+    projects.map(async (project) => ({ project, accrued: await loadCompanyAccruedForOverhead(project.id, companyId, range, ctx, db) })),
   );
-  let totalCd = ZERO;
-  for (const { projectId, cd } of cdEntries) {
-    cdsByProjectId.set(projectId, cd);
-    totalCd = totalCd.plus(cd);
+  let totalCd: Prisma.Decimal | null = ZERO;
+  let incompleteProjects = 0;
+  let incompleteAmounts = 0;
+  for (const { project, accrued } of cdEntries) {
+    cdsByProjectId.set(project.id, accrued.totalArs);
+    if (accrued.totalArs === null) {
+      totalCd = null;
+      incompleteProjects += 1;
+      incompleteAmounts += accrued.missingArsCount;
+    } else if (totalCd !== null) {
+      totalCd = totalCd.plus(accrued.totalArs);
+    }
+  }
+  if (incompleteProjects > 0) {
+    warnings.push(`Costo directo incompleto en ${incompleteProjects} obra(s): ${incompleteAmounts} contribución(es) sin equivalencia comprobable en ARS.`);
   }
 
-  if (totalCd.isZero() && pool.greaterThan(0)) {
+  const withoutWeight = totalCd !== null && totalCd.lessThanOrEqualTo(0) && !pool.isZero();
+  if (withoutWeight) {
     warnings.push(
-      "Hay gastos corporativos en el período pero ningún proyecto con costo devengado — no se puede prorratear.",
+      "Hay un saldo de gastos generales en el período y falta un costo directo total positivo para repartirlo.",
     );
   }
+  const calculationBlocked = totalCd === null || poolResult.excludedNonArsCount > 0 || withoutWeight;
 
   return {
     period,
@@ -210,6 +225,7 @@ async function buildAutoWeightPeriodContext(
     invoiceCount: poolResult.invoiceCount,
     excludedNonArsCount: poolResult.excludedNonArsCount,
     totalCd,
+    calculationBlocked,
     cdsByProjectId,
     projects,
     warnings,
@@ -219,11 +235,12 @@ async function buildAutoWeightPeriodContext(
 function allocateProjectFromContext(
   context: AutoWeightPeriodContext,
   projectId: string,
-): { allocatedAmount: string; weightPct: string } {
+): { allocatedAmount: string | null; weightPct: string | null } {
+  if (context.calculationBlocked || context.totalCd === null) return { allocatedAmount: null, weightPct: null };
   const cd = context.cdsByProjectId.get(projectId) ?? ZERO;
   const weight = context.totalCd.isZero() ? ZERO : cd.div(context.totalCd);
   return {
-    allocatedAmount: context.pool.times(weight).toFixed(2),
+    allocatedAmount: serializeMoneyDecimal(context.pool.times(weight)),
     weightPct: computeWeightShare(cd.toFixed(2), context.totalCd.toFixed(2)),
   };
 }
@@ -235,17 +252,40 @@ export async function getAutoWeightOverheadPreviewForPeriod(
   opts?: BuildAutoWeightContextOpts,
 ): Promise<AutoWeightPeriodPreview> {
   assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   assertValidOverheadPeriod(period);
-  const context = await buildAutoWeightPeriodContext(companyId, period, ctx, opts);
+  const [context, scope] = await Promise.all([
+    buildAutoWeightPeriodContext(companyId, period, ctx, opts),
+    resolveAccessibleProjectScope(ctx),
+  ]);
+  const preview = toPeriodPreview(context);
+  if (scope === "ALL") return preview;
+  const accessible = new Set(scope.projectIds);
+  return { ...preview, rows: preview.rows.filter((row) => accessible.has(row.projectId)) };
+}
 
+/** D-043 close uses the full company denominator and persists all project snapshots in its transaction. */
+export async function getAutoWeightAmountsForClose(
+  companyId: string,
+  period: string,
+  ctx: ServiceContext,
+  db: Prisma.TransactionClient,
+): Promise<AutoWeightPeriodPreview> {
+  assertOverheadEdit(ctx);
+  const context = await buildAutoWeightPeriodContext(companyId, period, ctx, AUTO_WEIGHT_PERIOD_CLOSE_OPTS, db);
+  return toPeriodPreview(context);
+}
+
+function toPeriodPreview(context: AutoWeightPeriodContext): AutoWeightPeriodPreview {
   const rows: AutoWeightProjectRow[] = context.projects.map((p) => {
-    const cd = context.cdsByProjectId.get(p.id) ?? ZERO;
+    const cd = context.cdsByProjectId.get(p.id);
     const { allocatedAmount, weightPct } = allocateProjectFromContext(context, p.id);
     return {
       projectId: p.id,
       projectCode: p.code,
       projectName: p.name,
-      accruedCd: cd.toFixed(2),
+      accruedCd: cd == null ? null : serializeMoneyDecimal(cd),
       weightPct,
       allocatedAmount,
     };
@@ -256,7 +296,9 @@ export async function getAutoWeightOverheadPreviewForPeriod(
     poolArs: context.poolArs,
     invoiceCount: context.invoiceCount,
     excludedNonArsCount: context.excludedNonArsCount,
-    totalAccruedCd: context.totalCd.toFixed(2),
+    totalAccruedCd: context.totalCd === null ? null : serializeMoneyDecimal(context.totalCd),
+    calculationBlocked: context.calculationBlocked,
+    projectCount: context.projects.length,
     rows,
     warnings: context.warnings,
   };
@@ -270,8 +312,13 @@ async function resolveAutoWeightPeriodKeys(
   if (periodFilter?.periodFrom || periodFilter?.periodTo) {
     return resolvePeriodKeysForFilter(periodFilter);
   }
-  const corporate = await listCorporateGgPeriods(companyId, ctx);
-  return corporate.length > 0 ? corporate : [currentOverheadPeriod()];
+  const [corporate, frozen] = await Promise.all([
+    listCorporateGgPeriods(companyId, ctx),
+    prisma.overheadPeriodClose.findMany({ where: { tenantId: ctx.tenantId, companyId, status: "FROZEN" }, select: { period: true } }),
+  ]);
+  const periods = [...new Set([...corporate, ...frozen.map((row) => row.period)])].sort();
+  if (periods.length > MAX_CORPORATE_GG_PERIODS) throw new ServiceError("VALIDATION", "Demasiados períodos. Acotá el rango del reporte.");
+  return periods.length > 0 ? periods : [currentOverheadPeriod()];
 }
 
 export async function sumAutoWeightOverheadForProject(
@@ -280,14 +327,19 @@ export async function sumAutoWeightOverheadForProject(
   periodFilter: OverheadPeriodFilter | undefined,
   ctx: ServiceContext,
 ): Promise<{
-  amount: Prisma.Decimal;
+  amount: Prisma.Decimal | null;
   weightPctDisplay: string | null;
   poolArsTotal: string;
   periods: string[];
   warnings: string[];
 }> {
+  assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
+  const project = await requireProjectAccess(projectId, ctx);
+  if (project.companyId !== companyId) throw new ServiceError("FORBIDDEN", "La empresa no coincide con la obra.");
   const periods = await resolveAutoWeightPeriodKeys(companyId, periodFilter, ctx);
   let total = ZERO;
+  let incomplete = false;
   let poolSum = ZERO;
   const warnings: string[] = [];
   let lastWeight: string | null = null;
@@ -301,7 +353,7 @@ export async function sumAutoWeightOverheadForProject(
           period,
         },
       },
-      select: { status: true, poolArs: true },
+      select: { id: true, status: true, poolArs: true },
     });
 
     if (frozen?.status === "FROZEN") {
@@ -314,9 +366,10 @@ export async function sumAutoWeightOverheadForProject(
             projectId,
           },
         },
-        select: { allocatedAmount: true, weightPct: true },
+        select: { periodCloseId: true, allocatedAmount: true, weightPct: true },
       });
       if (snap) {
+        if (snap.periodCloseId !== frozen.id) throw new ServiceError("CONFLICT", "La imputación congelada no coincide con el cierre del período.");
         total = total.plus(snap.allocatedAmount);
         poolSum = poolSum.plus(frozen.poolArs);
         if (periods.length === 1) lastWeight = snap.weightPct.toFixed(2);
@@ -332,14 +385,15 @@ export async function sumAutoWeightOverheadForProject(
       AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
     );
     const { allocatedAmount, weightPct } = allocateProjectFromContext(context, projectId);
-    total = total.plus(new Prisma.Decimal(allocatedAmount));
+    if (allocatedAmount === null) incomplete = true;
+    else total = total.plus(new Prisma.Decimal(allocatedAmount));
     poolSum = poolSum.plus(context.pool);
     if (periods.length === 1) lastWeight = weightPct;
     warnings.push(...context.warnings);
   }
 
   return {
-    amount: total,
+    amount: incomplete ? null : total,
     weightPctDisplay: lastWeight,
     poolArsTotal: poolSum.toFixed(2),
     periods,

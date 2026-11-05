@@ -1,13 +1,16 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { Prisma, prisma, type SubcontractStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { assertBudgetCostGraph } from "../budget/budget-cost-graph";
+import { assertBudgetCurrency } from "../cost-control/comparison-currency";
 import { canViewSubcontractsArea } from "../subcontracts/subcontract-access";
-import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
+import { validateResourceVarianceDates } from "../resources/resource-variance-filters";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { listApprovedBudgetsForProject, resolveApprovedBudgetForProject } from "./report-budget-resolve";
-import { monthKey, monthLabel } from "./report-month";
+import { monthKey, monthLabel, parseFilterDate } from "./report-month";
 
 export type SubcontractReportFilters = {
   budgetId?: string;
@@ -32,7 +35,7 @@ export type SubcontractContractRow = {
   code: string;
   title: string;
   subcontractorName: string;
-  status: string;
+  status: SubcontractStatus;
   totalValue: string;
   certifiedCost: string;
   wbsLinked: boolean;
@@ -50,6 +53,8 @@ export type SubcontractVarianceReport = {
   projectId: string;
   budgetId: string;
   budgetName: string;
+  currency: string;
+  apAvailable: boolean;
   byWbs: SubcontractWbsVarianceRow[];
   contracts: SubcontractContractRow[];
   monthlyCertification: SubcontractCertEvolutionPoint[];
@@ -68,38 +73,40 @@ export async function getSubcontractVarianceReport(
   filters: SubcontractReportFilters,
   ctx: ServiceContext,
 ): Promise<SubcontractReportResult> {
-  if (!canViewSubcontractsArea(ctx.roles) && !can(ctx.roles, "VIEW", "PROJECTS")) {
+  if (!canViewSubcontractsArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de subcontratos");
   }
 
-  await requireProjectAccess(projectId, ctx);
+  validateResourceVarianceDates(filters);
+  const project = await requireProjectAccess(projectId, ctx);
+  const companyId = project.companyId ?? ctx.companyId;
+  const scope = { tenantId: ctx.tenantId, projectId, ...(companyId ? { companyId } : {}) };
+  const dates = {
+    ...(filters.dateFrom ? { gte: parseFilterDate(filters.dateFrom, false) } : {}),
+    ...(filters.dateTo ? { lte: parseFilterDate(filters.dateTo, true) } : {}),
+  };
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "SUBCONTRACTS");
 
   const budget = await resolveApprovedBudgetForProject(projectId, filters.budgetId, ctx);
   if (!budget) return { type: "NO_APPROVED_BUDGETS" };
+  await assertBudgetCostGraph(budget.id);
 
-  const gate = await getTenantModuleGate(ctx);
   const warnings: string[] = [];
+  if (filters.dateFrom || filters.dateTo) {
+    warnings.push("El contratado refleja los contratos activos. Las fechas filtran las certificaciones y los pagos.");
+  }
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
 
-  const subEnabled = gate.isEnabled("SUBCONTRACTS");
-  const apEnabled = gate.isEnabled("AP");
-
-  if (!subEnabled) {
-    sectionsExcluded.push({
-      module: "SUBCONTRACTS",
-      section: "Subcontratos",
-      reason: "TENANT_MODULE_DISABLED",
-    });
-    warnings.push("Subcontratos deshabilitados.");
-  }
-  if (!apEnabled) {
+  const apAvailable = gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP");
+  if (!gate.isEnabled("AP")) {
     sectionsExcluded.push({
       module: "AP",
       section: "Pagos subcontrato",
       reason: "TENANT_MODULE_DISABLED",
     });
-    warnings.push("AP deshabilitado: pagos de certificación en cero.");
   }
+  if (!apAvailable) warnings.push("Pagos de subcontrato no disponibles para este reporte.");
 
   const wbsLeaves = await prisma.wbsNode.findMany({
     where: { budgetId: budget.id, type: "ITEM" },
@@ -108,12 +115,12 @@ export async function getSubcontractVarianceReport(
   wbsLeaves.sort((a, b) => compareWbsCodes(a.code, b.code));
 
   const costItems = await prisma.costItem.findMany({
-    where: { budgetId: budget.id },
+    where: { budgetId: budget.id, wbsNode: { budgetId: budget.id, type: "ITEM" } },
     select: {
       wbsNodeId: true,
       quantity: true,
       analysisLines: {
-        where: { category: "SUBCONTRACT" },
+        where: { budgetId: budget.id, category: "SUBCONTRACT" },
         select: { totalCost: true },
       },
     },
@@ -133,29 +140,34 @@ export async function getSubcontractVarianceReport(
 
   const contracts: SubcontractContractRow[] = [];
 
-  if (subEnabled) {
+  {
     const activeSubs = await prisma.subcontract.findMany({
-      where: { projectId, tenantId: ctx.tenantId, status: "ACTIVE" },
+      where: { ...scope, status: "ACTIVE", subcontractorContact: { tenantId: ctx.tenantId } },
       select: {
         id: true,
+        companyId: true,
+        currency: true,
         number: true,
         title: true,
         status: true,
         subcontractorContact: { select: { legalName: true, fantasyName: true } },
         lines: { select: { wbsNodeId: true, lineTotal: true } },
         certifications: {
-          where: { status: "APPROVED" },
-          select: { lines: { select: { lineTotal: true } } },
+          where: { ...scope, status: "APPROVED", certificationDate: dates },
+          select: {
+            companyId: true,
+            lines: { select: { lineTotal: true, subcontractLine: { select: { subcontractId: true } } } },
+          },
         },
       },
     });
 
     for (const sc of activeSubs) {
+      assertBudgetCurrency(budget.currency, sc.currency);
       const total = sc.lines.reduce((s, l) => s.plus(l.lineTotal), new Prisma.Decimal(0));
-      const certTotal = sc.certifications.reduce(
-        (s, c) => s.plus(c.lines.reduce((ls, cl) => ls.plus(cl.lineTotal), new Prisma.Decimal(0))),
-        new Prisma.Decimal(0),
-      );
+      const certTotal = sc.certifications.filter((cert) => cert.companyId === sc.companyId)
+        .flatMap((cert) => cert.lines).filter((line) => line.subcontractLine.subcontractId === sc.id)
+        .reduce((sum, line) => sum.add(line.lineTotal), new Prisma.Decimal(0));
       contracts.push({
         subcontractId: sc.id,
         code: `SC-${String(sc.number).padStart(3, "0")}`,
@@ -181,19 +193,28 @@ export async function getSubcontractVarianceReport(
     const certLines = await prisma.subcontractCertificationLine.findMany({
       where: {
         certification: {
-          projectId,
-          tenantId: ctx.tenantId,
+          ...scope,
           status: "APPROVED",
+          certificationDate: dates,
+          subcontract: { ...scope },
         },
       },
       select: {
         lineTotal: true,
-        certification: { select: { certificationDate: true } },
-        subcontractLine: { select: { wbsNodeId: true } },
+        certification: {
+          select: {
+            certificationDate: true, subcontractId: true, companyId: true,
+            subcontract: { select: { currency: true, companyId: true } },
+          },
+        },
+        subcontractLine: { select: { subcontractId: true, wbsNodeId: true } },
       },
     });
 
     for (const cl of certLines) {
+      if (cl.subcontractLine.subcontractId !== cl.certification.subcontractId ||
+        cl.certification.companyId !== cl.certification.subcontract.companyId) continue;
+      assertBudgetCurrency(budget.currency, cl.certification.subcontract.currency);
       const wbsId = cl.subcontractLine.wbsNodeId;
       if (wbsId) {
         certifiedByWbs.set(
@@ -211,20 +232,29 @@ export async function getSubcontractVarianceReport(
     }
   }
 
-  if (apEnabled && subEnabled) {
+  if (apAvailable) {
     const payments = await prisma.payment.findMany({
       where: {
-        projectId,
-        tenantId: ctx.tenantId,
+        ...scope,
         status: "CONFIRMED",
-        supplierInvoice: { subcontractCertificationId: { not: null } },
+        paymentDate: dates,
+        supplierInvoice: { ...scope, subcontractCertification: { ...scope, subcontract: { ...scope } } },
       },
       select: {
         amount: true,
+        currency: true,
+        companyId: true,
         paymentDate: true,
+        supplierInvoice: {
+          select: { companyId: true, subcontractCertification: { select: { companyId: true, subcontract: { select: { companyId: true } } } } },
+        },
       },
     });
     for (const p of payments) {
+      const cert = p.supplierInvoice.subcontractCertification;
+      if (!cert || p.companyId !== p.supplierInvoice.companyId || p.companyId !== cert.companyId ||
+        p.companyId !== cert.subcontract.companyId) continue;
+      assertBudgetCurrency(budget.currency, p.currency);
       const key = monthKey(p.paymentDate);
       const bucket = monthlyMap.get(key) ?? {
         certified: new Prisma.Decimal(0),
@@ -285,6 +315,8 @@ export async function getSubcontractVarianceReport(
     projectId,
     budgetId: budget.id,
     budgetName: budget.name,
+    currency: budget.currency,
+    apAvailable,
     byWbs,
     contracts,
     monthlyCertification,
@@ -296,5 +328,6 @@ export async function getSubcontractVarianceReport(
 }
 
 export async function listSubcontractReportBudgets(projectId: string, ctx: ServiceContext) {
+  if (!canViewSubcontractsArea(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos");
   return listApprovedBudgetsForProject(projectId, ctx);
 }

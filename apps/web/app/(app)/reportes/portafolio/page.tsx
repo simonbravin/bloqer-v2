@@ -16,6 +16,10 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 
+function portfolioAmount(amount: string, currency: string | null): string {
+  return currency ? formatMoneyAmount(amount, currency) : "—";
+}
+
 export default async function PortafolioReportPage() {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -41,7 +45,7 @@ export default async function PortafolioReportPage() {
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Portafolio de proyectos</h1>
           <p className="text-sm text-muted-foreground">
-            Costos y exposición de todas las obras (sin canceladas). Drill a EDT de cada obra.
+            Costos y exposición de las obras disponibles, sin las canceladas. Acceso a la EDT de cada obra.
           </p>
         </div>
         <ReportExportActions exportPath="/api/reports/portafolio.csv" params={{}} pdf xlsx />
@@ -75,6 +79,7 @@ export default async function PortafolioReportPage() {
                 <TableHead>Código</TableHead>
                 <TableHead>Proyecto</TableHead>
                 <TableHead>Estado</TableHead>
+                <TableHead>Moneda</TableHead>
                 <TableHead className="text-right">Presupuesto</TableHead>
                 <TableHead className="text-right">Comprometido</TableHead>
                 <TableHead className="text-right">Devengado</TableHead>
@@ -95,13 +100,14 @@ export default async function PortafolioReportPage() {
                     ) : null}
                   </TableCell>
                   <TableCell>{row.status}</TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.budgetTotalCost)}</TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.committedCost)}</TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.accruedCost)}</TableCell>
+                  <TableCell>{row.currency ?? "—"}</TableCell>
+                  <TableCell className="text-right">{portfolioAmount(row.budgetTotalCost, row.currency)}</TableCell>
+                  <TableCell className="text-right">{portfolioAmount(row.committedCost, row.currency)}</TableCell>
+                  <TableCell className="text-right">{portfolioAmount(row.accruedCost, row.currency)}</TableCell>
                   <TableCell className="text-right font-medium">
-                    {formatMoneyAmount(row.expectedCostExposure)}
+                    {portfolioAmount(row.expectedCostExposure, row.currency)}
                   </TableCell>
-                  <TableCell className="text-right">{formatMoneyAmount(row.costVariance)}</TableCell>
+                  <TableCell className="text-right">{portfolioAmount(row.costVariance, row.currency)}</TableCell>
                   <TableCell className="text-right">
                     {row.pctExposure != null ? `${row.pctExposure}%` : "—"}
                   </TableCell>

@@ -25,9 +25,10 @@ const STATUS_LABELS: Record<SubcontractWbsVarianceRow["status"], string> = {
 type Props = {
   rows: SubcontractWbsVarianceRow[];
   projectId: string;
+  currency: string;
 };
 
-export function SubcontractWbsVarianceTable({ rows, projectId }: Props) {
+export function SubcontractWbsVarianceTable({ rows, projectId, currency }: Props) {
   return (
     <TableScroll>
       <Table className="text-xs">
@@ -53,13 +54,13 @@ export function SubcontractWbsVarianceTable({ rows, projectId }: Props) {
                 <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                   {row.wbsName}
                 </TableCell>
-                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSubcontract)}</TableCell>
-                <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost)}</TableCell>
-                <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCost)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSubcontract, currency)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.committedCost, currency)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCost, currency)}</TableCell>
                 <TableCell
                   className={`text-right font-mono ${zero ? "" : over ? "text-destructive" : "text-emerald-600"}`}
                 >
-                  {formatMoneyAmount(row.varianceCommitted)}
+                  {formatMoneyAmount(row.varianceCommitted, currency)}
                 </TableCell>
                 <TableCell className="text-muted-foreground">{STATUS_LABELS[row.status]}</TableCell>
                 <TableCell>

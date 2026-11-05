@@ -27,4 +27,4 @@ Motivo obligatorio + audit log ([BR-PER-003]).
 Ver [`../01-domain/APPROVAL_WORKFLOWS.md`](../01-domain/APPROVAL_WORKFLOWS.md) § Cierre de período y [`../05-workflows/CLOSE_PERIOD.md`](../05-workflows/CLOSE_PERIOD.md).
 
 ## No confundir
-El cierre de **gastos generales AUTO_WEIGHT** (`OverheadPeriodClose`, [D-043]) es independiente: congela prorrateo GG, no bloquea tesorería ni GL.
+El cierre de **gastos generales AUTO_WEIGHT** (`OverheadPeriodClose`, D-043) congela el prorrateo GG. Tesorería y GL conservan su cierre propio. D-142 exige una base completa de costo comparable en ARS para cerrar un período abierto. La lectura de cierres existentes conserva su snapshot.

@@ -520,6 +520,7 @@
 - **Decidido por:** Owner (plan Fase F)
 - **Decisión:** `Company.overheadAllocationMode` (`MANUAL` | `AUTO_WEIGHT`). En `AUTO_WEIGHT`, el pool mensual son facturas AP corporativas emitidas (ARS); cada obra recibe `pool × (CD obra / CD total empresa)` del período. Modos excluyentes: en automático no hay imputaciones manuales ni % empresa.
 - **Implicancias:** `overhead-auto-weight.service.ts`, UI en `/finanzas/gastos-generales`, margen neto R-004 en ARS.
+- **Moneda de los pesos:** D-142 define la equivalencia comprobable en ARS de los costos de períodos abiertos.
 - **Documentos afectados:** igual que D-040.
 
 ---
@@ -535,6 +536,7 @@
   2. **Cerrar período** persiste `overhead_period_closes` + `overhead_auto_period_snapshots` por proyecto; margen neto (R-004) usa snapshots en períodos FROZEN.
   3. **Reabrir período** (solo `EDIT AP`) elimina snapshots y vuelve a OPEN; no recálculo silencioso.
   4. Al cerrar, el denominador de CD **excluye proyectos DRAFT** (solo ACTIVE y ON_HOLD).
+  5. D-142 bloquea el nuevo cierre cuando la base comparable en ARS está incompleta.
 - **Implicancias:** `overhead-period-freeze.service.ts`, UI en `/finanzas/gastos-generales`; operación AP corporativa sigue en `/finanzas/facturas-proveedor`.
 - **Documentos afectados:** igual que D-040/D-041; [`PERMISSIONS_ROUTE_MATRIX.md`](../08-architecture/PERMISSIONS_ROUTE_MATRIX.md).
 
@@ -2091,6 +2093,29 @@
 - **Decisión:** si hay IVA y está disponible su cuenta, se conserva la línea de IVA aunque falte solo la cuenta de percepción IIBB. En ese caso la línea de neto identifica que incluye la percepción. Si hay IVA y falta su cuenta, o no hay importes fiscales para discriminar, se conserva el asiento de dos líneas por el total. Las cuentas fiscales disponibles permiten discriminar sus conceptos según D-085/D-112.
 - **Alcance:** se documenta el comportamiento ya implementado y probado. Los documentos, impuestos y asientos existentes conservan sus importes.
 - **Documentos afectados:** Q-086, D-112, TAXES_AND_WITHHOLDINGS, Guía y Ayuda.
+
+### D-140 — Alcance de los reportes programados por destinatario
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita de Q-087.
+- **Decisión:** programados, Enviar ahora y Reintentar fallidos generan los archivos con el alcance de la configuración y, cuando interviene, de la sesión operadora, limitado por el acceso vigente de cada destinatario. Se comprueban membresía, empresa, asignación a obra, permisos y módulos. Si quedan secciones autorizadas, se genera el archivo con esas secciones. Si ningún adjunto está autorizado o disponible, se registra la omisión.
+- **Envío manual:** quien puede exportar el reporte puede compartirlo puntualmente con una dirección que elija mediante la acción del reporte. Los destinatarios programados siguen requiriendo membresía activa. Se conservan formatos y frecuencias.
+- **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-12-report-delivery-proposal.md), SCHEDULED_REPORTS_ARCHITECTURE, EMAIL_NOTIFICATIONS_ARCHITECTURE, Guía y Ayuda.
+
+### D-141 — Base facturada neta del margen por presupuesto
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita de Q-088.
+- **Decisión:** en Rentabilidad por presupuesto, la base **Facturado** suma el subtotal neto de facturas emitidas de las certificaciones de ese presupuesto. Suma las notas de débito y resta las notas de crédito emitidas a través de su factura de origen (D-115). El subtotal excluye IVA y percepciones IIBB. Las ventas directas se identifican fuera del margen por presupuesto y pueden consultarse desde facturación según permisos. La base **Certificado** y las capas de costo conservan su definición.
+- **Moneda:** se preservan las monedas originales y los controles de comparabilidad. La lectura del margen no modifica documentos ni registros históricos.
+- **Propuesta aprobada:** [base facturada AG-12](../08-architecture/platform-audit/2026-11-05-ag-12-profitability-basis-proposal.md).
+- **Documentos afectados:** PROFITABILITY_BY_PROJECT, PROFITABILITY_FORMULAS, Guía y Ayuda.
+
+### D-142 — Equivalencia comprobable en el reparto automático de gastos generales
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita de Q-089.
+- **Decisión:** mantener la fórmula, el período y los estados de obras de D-041/D-043. En AUTO_WEIGHT el peso de cada obra es su costo directo devengado neto comparable en ARS. Si el documento AP emitido está en otra moneda, convertir el subtotal neto con el tipo de cambio histórico de ese comprobante cuando su equivalente bruto guardado permita verificarlo. Aplicar signos de NC/ND según D-115.
+- **Base incompleta:** si falta una equivalencia comprobable en un costo directo relevante o en el pool corporativo, suspender la vista de reparto, el margen neto que dependa de ese reparto y el cierre del período. Las certificaciones de subcontrato sin FX propio permanecen como costo en su moneda original. La factura posterior no sustituye la cotización de la certificación.
+- **Históricos:** conservar y leer las imputaciones congeladas. El criterio rige períodos abiertos y períodos reabiertos explícitamente. La imputación y el pool conservan su moneda ARS.
+- **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-12-overhead-weight-currency-proposal.md), PERIOD_CLOSE_AND_LOCKS, PROFITABILITY_FORMULAS, Guía y Ayuda.
 
 ## Decisiones SUPERSEDED
 

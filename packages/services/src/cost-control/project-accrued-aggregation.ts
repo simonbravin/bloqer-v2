@@ -1,5 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { verifiedDocumentAmountArs } from "../finance/fx-amount.service";
+import { assertOverheadCompanyScope, assertOverheadView } from "../finance/overhead-access";
 import { requireProjectAccess } from "../security/access";
 import { assertTenantModuleEnabledWithGate } from "../tenant-modules/tenant-module.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -20,7 +22,10 @@ export type ProjectAccruedByMonthPoint = {
 
 export type ProjectAccruedAggregation = {
   series: ProjectAccruedByMonthPoint[];
-  total: Prisma.Decimal;
+  total: Prisma.Decimal | null;
+  totalArs: Prisma.Decimal | null;
+  missingArsCount: number;
+  byCurrency: { currency: string; series: ProjectAccruedByMonthPoint[] }[];
   warnings: string[];
 };
 
@@ -57,14 +62,42 @@ export async function getProjectAccruedByMonth(
   ctx: ServiceContext,
 ): Promise<ProjectAccruedAggregation> {
   if (!can(ctx.roles, "VIEW", "AP")) throw new ServiceError("FORBIDDEN", "Sin permisos para consultar costos devengados.");
-  await requireProjectAccess(projectId, ctx);
+  const project = await requireProjectAccess(projectId, ctx);
+  return readProjectAccruedByMonth(projectId, filters, { ...ctx, companyId: project.companyId ?? ctx.companyId }, prisma);
+}
+
+/** Internal input to the full company denominator in D-043. Callers redact per-project results for preview. */
+export async function loadCompanyAccruedForOverhead(
+  projectId: string,
+  companyId: string,
+  filters: ProjectAccruedFilters,
+  ctx: ServiceContext,
+  db: Prisma.TransactionClient,
+): Promise<{ totalArs: Prisma.Decimal | null; missingArsCount: number }> {
+  assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
+  const { totalArs, missingArsCount } = await readProjectAccruedByMonth(projectId, filters, { ...ctx, companyId }, db, companyId);
+  return { totalArs, missingArsCount };
+}
+
+async function readProjectAccruedByMonth(
+  projectId: string,
+  filters: ProjectAccruedFilters,
+  ctx: ServiceContext,
+  db: Prisma.TransactionClient,
+  exactProjectCompanyId?: string,
+): Promise<ProjectAccruedAggregation> {
   // Subcontract certifications and supplier invoices have companyId NOT NULL.
   const companyWhere = ctx.companyId ? { companyId: ctx.companyId } : {};
+  const rootWhere = {
+    projectId, tenantId: ctx.tenantId, ...companyWhere,
+    project: { tenantId: ctx.tenantId, ...(exactProjectCompanyId ? { companyId: exactProjectCompanyId } : {}) },
+  };
   const warnings: string[] = [];
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   if (!gate.isEnabled("AP")) {
-    return { series: [], total: ZERO, warnings };
+    return { series: [], total: ZERO, totalArs: null, missingArsCount: 0, byCurrency: [], warnings };
   }
 
   const dateFrom = filters.dateFrom;
@@ -73,27 +106,25 @@ export async function getProjectAccruedByMonth(
 
   const [subCertLines, poLinkedInvoices, unallocatedInvoices] = await Promise.all([
     gate.isEnabled("SUBCONTRACTS") && (can(ctx.roles, "VIEW", "SUBCONTRACTS") || can(ctx.roles, "VIEW", "PROJECTS"))
-      ? prisma.subcontractCertificationLine.findMany({
+      ? db.subcontractCertificationLine.findMany({
           where: {
             certification: {
-              projectId,
-              tenantId: ctx.tenantId,
-              ...companyWhere,
+              ...rootWhere,
               status: "APPROVED",
+              subcontract: { tenantId: ctx.tenantId, projectId, ...companyWhere },
               ...(dateFilter ? { certificationDate: dateFilter } : {}),
             },
           },
           select: {
             lineTotal: true,
-            certification: { select: { certificationDate: true } },
+            certification: { select: { certificationDate: true, companyId: true, subcontractId: true, subcontract: { select: { companyId: true, currency: true } } } },
+            subcontractLine: { select: { subcontractId: true } },
           },
         })
       : Promise.resolve([]),
-    prisma.supplierInvoice.findMany({
+    db.supplierInvoice.findMany({
       where: {
-        projectId,
-        tenantId: ctx.tenantId,
-        ...companyWhere,
+        ...rootWhere,
         status: "ISSUED",
         // [D-115] Factura + ND suman accrued; NC se resta (puede venir sin OC).
         documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
@@ -101,20 +132,18 @@ export async function getProjectAccruedByMonth(
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, subtotal: true, documentKind: true },
+      select: { issueDate: true, subtotal: true, totalAmount: true, amountArs: true, fxRate: true, documentKind: true, currency: true },
     }),
-    prisma.supplierInvoice.findMany({
+    db.supplierInvoice.findMany({
       where: {
-        projectId,
-        tenantId: ctx.tenantId,
-        ...companyWhere,
+        ...rootWhere,
         status: "ISSUED",
         documentKind: { in: ["INVOICE", "DEBIT_NOTE", "CREDIT_NOTE"] },
         purchaseOrderId: null,
         subcontractCertificationId: null,
         ...(dateFilter ? { issueDate: dateFilter } : {}),
       },
-      select: { issueDate: true, subtotal: true, documentKind: true },
+      select: { issueDate: true, subtotal: true, totalAmount: true, amountArs: true, fxRate: true, documentKind: true, currency: true },
     }),
   ]);
 
@@ -124,35 +153,47 @@ export async function getProjectAccruedByMonth(
     );
   }
 
-  const entries: { date: Date; amount: Prisma.Decimal }[] = [];
+  const entries: { date: Date; amount: Prisma.Decimal; currency: string }[] = [];
+  let totalArs = ZERO;
+  let missingArsCount = 0;
 
   for (const cl of subCertLines) {
+    if (cl.certification.companyId !== cl.certification.subcontract.companyId || cl.certification.subcontractId !== cl.subcontractLine.subcontractId) {
+      throw new ServiceError("CONFLICT", "Hay certificaciones de subcontrato con vínculos inconsistentes en el costo devengado.");
+    }
+    const currency = cl.certification.subcontract.currency.trim().toUpperCase();
+    if (currency === "ARS") totalArs = totalArs.plus(cl.lineTotal);
+    else if (!cl.lineTotal.isZero()) missingArsCount += 1;
     entries.push({
       date: cl.certification.certificationDate,
-      amount: new Prisma.Decimal(cl.lineTotal),
+      amount: cl.lineTotal,
+      currency,
     });
   }
   // D-095: net subtotals (same as getProjectCostControl), not gross IVA/IIBB.
   // Currency is explicit; ARS consolidation belongs to the report consumer.
-  for (const inv of poLinkedInvoices) {
-    const signed =
-      inv.documentKind === "CREDIT_NOTE"
-        ? new Prisma.Decimal(inv.subtotal).negated()
-        : new Prisma.Decimal(inv.subtotal);
-    entries.push({ date: inv.issueDate, amount: signed });
-  }
-  for (const inv of unallocatedInvoices) {
-    const signed =
-      inv.documentKind === "CREDIT_NOTE"
-        ? new Prisma.Decimal(inv.subtotal).negated()
-        : new Prisma.Decimal(inv.subtotal);
-    entries.push({ date: inv.issueDate, amount: signed });
+  for (const inv of [...poLinkedInvoices, ...unallocatedInvoices]) {
+    const credit = inv.documentKind === "CREDIT_NOTE";
+    const equivalent = verifiedDocumentAmountArs(inv, inv.subtotal);
+    if (equivalent === null) missingArsCount += 1;
+    else totalArs = totalArs.plus(credit ? equivalent.negated() : equivalent);
+    entries.push({ date: inv.issueDate, amount: credit ? inv.subtotal.negated() : inv.subtotal, currency: inv.currency.trim().toUpperCase() });
   }
 
-  const series = groupAccruedAmountsByMonth(entries);
-  const total = series.reduce((s, p) => s.plus(p.amount), ZERO);
+  const entriesByCurrency = new Map<string, typeof entries>();
+  for (const entry of entries) {
+    const rows = entriesByCurrency.get(entry.currency) ?? [];
+    rows.push(entry);
+    entriesByCurrency.set(entry.currency, rows);
+  }
+  const byCurrency = [...entriesByCurrency].map(([currency, rows]) => ({
+    currency,
+    series: groupAccruedAmountsByMonth(rows),
+  }));
+  const series = byCurrency.length === 1 ? byCurrency[0]!.series : [];
+  const total = byCurrency.length <= 1 ? series.reduce((s, p) => s.plus(p.amount), ZERO) : null;
 
-  return { series, total, warnings };
+  return { series, total, totalArs: missingArsCount === 0 ? totalArs : null, missingArsCount, byCurrency, warnings };
 }
 
 export async function getProjectAccruedTotal(
@@ -161,5 +202,6 @@ export async function getProjectAccruedTotal(
   ctx: ServiceContext,
 ): Promise<Prisma.Decimal> {
   const { total } = await getProjectAccruedByMonth(projectId, filters, ctx);
+  if (total === null) throw new ServiceError("VALIDATION", "El costo devengado está en más de una moneda.");
   return total;
 }
