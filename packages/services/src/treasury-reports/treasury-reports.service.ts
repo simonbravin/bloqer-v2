@@ -1,11 +1,13 @@
-import { Prisma, prisma } from "@bloqer/database";
+import { AccountMovementSourceType, AccountMovementType, Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { isUuid, toIsoDateInTimeZone } from "@bloqer/utils";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, resolvePagination } from "../finance/pagination";
+import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, MAX_EXPORT_ROWS, resolvePagination } from "../finance/pagination";
 import { buildFinancialHref } from "../finance/financial-trace.service";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
-import { getAccountBalance, getAccountBalanceAsOf } from "../treasury/balance.service";
+import { serializeFxRateDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
+import { getAccountBalanceAsOf } from "../treasury/balance.service";
+import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "../treasury/balance-affecting-statuses";
 import {
   accountMovementClassWhere,
   classFieldsForAccountMovement,
@@ -19,13 +21,11 @@ import {
   loadCashSourceMeta,
 } from "./cash-source-meta";
 
+import { cashPositionAmounts, cashPositionCurrency, consolidateCashPositionArs, signedTreasuryAmount } from "./cash-position-amounts";
+
 export { displayMovementDescription } from "./movement-document-ref";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function signedAmount(type: string, amount: Prisma.Decimal): Prisma.Decimal {
-  return type === "INFLOW" || type === "TRANSFER_IN" ? amount : amount.negated();
-}
 
 function periodKey(date: Date, period: "day" | "week" | "month"): string {
   const y = date.getUTCFullYear();
@@ -43,13 +43,19 @@ function periodKey(date: Date, period: "day" | "week" | "month"): string {
 }
 
 function defaultDateRange(): { dateFrom: string; dateTo: string } {
-  const to   = new Date();
-  const from = new Date(to);
-  from.setFullYear(from.getFullYear() - 1);
+  const dateTo = toIsoDateInTimeZone();
+  const from = new Date(`${dateTo}T00:00:00.000Z`);
+  from.setUTCFullYear(from.getUTCFullYear() - 1);
   return {
     dateFrom: from.toISOString().slice(0, 10),
-    dateTo:   to.toISOString().slice(0, 10),
+    dateTo,
   };
+}
+
+function cashReportDate(value?: string): string | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value ? value : undefined;
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -112,6 +118,7 @@ export type CashPositionAccount = {
   companyId:   string | null;
   companyName: string | null;
   balance:     string;
+  balanceArs:  string | null;
 };
 
 export type CashPositionByCurrency = {
@@ -129,6 +136,8 @@ export type CashPositionReport = {
   accounts:   CashPositionAccount[];
   byCurrency: CashPositionByCurrency[];
   byCompany:  CashPositionByCompany[];
+  /** Historical ARS equivalents of all balance contributions. Not current FX valuation. */
+  consolidatedArs: string | null;
 };
 
 export type MovementReportRow = {
@@ -136,6 +145,7 @@ export type MovementReportRow = {
   accountId:          string;
   accountName:        string;
   movementDate:       string;
+  valueDate:          string | null;
   type:               string;
   status:             string;
   sourceType:         string;
@@ -144,6 +154,8 @@ export type MovementReportRow = {
   amount:             string;
   signedAmount:       string;
   currency:           string;
+  fxRate:             string | null;
+  amountArs:          string | null;
   description:        string;
   /** Deep-link to source document when available. */
   detailHref:         string | null;
@@ -212,6 +224,8 @@ export type MovementReportFilters = {
   pageSize?:                number;
   /** Sort by movementDate; default desc (recent first). */
   sortDir?:                 "asc" | "desc";
+  /** Extracts use the accounting date by default; legacy rows fall back when value date is missing. */
+  dateBasis?:               "accounting" | "value";
 };
 
 export type MovementReportResult = {
@@ -226,7 +240,23 @@ export type CashFlowFilters = {
   currency?:  string;
 };
 
+export function getCashFlowDateRange(filters: Pick<CashFlowFilters, "dateFrom" | "dateTo">) {
+  const fallback = defaultDateRange();
+  return {
+    dateFrom: cashReportDate(filters.dateFrom) ?? fallback.dateFrom,
+    dateTo: cashReportDate(filters.dateTo) ?? fallback.dateTo,
+  };
+}
+
 // ─── Cash Position ────────────────────────────────────────────────────────────
+
+function treasuryReportAccountScope(tenantId: string, companyId?: string): Prisma.TreasuryAccountWhereInput {
+  return {
+    tenantId,
+    OR: [{ companyId: null }, { company: { tenantId } }],
+    ...(companyId ? { companyId } : {}),
+  };
+}
 
 export async function getCashPositionReport(
   filters: CashPositionFilters,
@@ -236,31 +266,58 @@ export async function getCashPositionReport(
   if (!can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de tesorería");
   }
+  if (filters.companyId && !isUuid(filters.companyId)) {
+    throw new ServiceError("VALIDATION", "Empresa inválida");
+  }
 
-  const accounts = await prisma.treasuryAccount.findMany({
-    where: {
-      tenantId:  ctx.tenantId,
-      ...(filters.companyId ? { companyId: filters.companyId } : {}),
-      ...(filters.currency  ? { currency:  filters.currency  } : {}),
-    },
-    include: { company: { select: { name: true } } },
+  const scopedAccounts = await prisma.treasuryAccount.findMany({
+    where: treasuryReportAccountScope(ctx.tenantId, filters.companyId),
+    include: { company: { select: { tenantId: true, name: true } } },
     orderBy: [{ currency: "asc" }, { name: "asc" }],
   });
+  const currencyFilter = filters.currency ? cashPositionCurrency(filters.currency) : undefined;
+  // Filter and group legacy spellings on their canonical read value without rewriting history.
+  const accounts = scopedAccounts
+    .map((account) => ({ ...account, currency: cashPositionCurrency(account.currency) }))
+    .filter((account) => !currencyFilter || account.currency === currencyFilter);
 
-  const accountRows: CashPositionAccount[] = [];
-  for (const acc of accounts) {
-    const balance = await getAccountBalance(acc.id);
-    accountRows.push({
+  const accountIds = accounts.map(({ id }) => id);
+  const movements = await prisma.accountMovement.groupBy({
+    where: {
+      tenantId: ctx.tenantId,
+      accountId: { in: accountIds },
+      OR: [
+        { status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] } },
+        { sourceType: "OPENING_BALANCE" },
+      ],
+    },
+    by: ["accountId", "currency", "type", "status", "sourceType"],
+    _sum: { amount: true, amountArs: true },
+    _count: { _all: true, amountArs: true, fxRate: true },
+    _min: { fxRate: true },
+  });
+  const groupsByAccount = new Map<string, typeof movements>();
+  for (const group of movements) {
+    const groups = groupsByAccount.get(group.accountId) ?? [];
+    groups.push(group);
+    groupsByAccount.set(group.accountId, groups);
+  }
+
+  const amounts = accounts.map((account) => cashPositionAmounts(account, groupsByAccount.get(account.id) ?? []));
+  const accountRows: CashPositionAccount[] = accounts.map((acc, index) => {
+    const { balance, balanceArs } = amounts[index]!;
+    return {
       accountId:   acc.id,
       name:        acc.name,
       type:        acc.type as string,
       currency:    acc.currency,
       status:      acc.status as string,
       companyId:   acc.companyId,
-      companyName: acc.company?.name ?? null,
+      companyName: acc.company?.tenantId === ctx.tenantId ? acc.company.name : null,
       balance:     serializeMoneyDecimal(balance),
-    });
-  }
+      balanceArs:  balanceArs === null ? null : serializeMoneyDecimal(balanceArs),
+    };
+  });
 
   // Group by currency
   const currencyMap = new Map<string, Prisma.Decimal>();
@@ -294,18 +351,24 @@ export async function getCashPositionReport(
       .map(([currency, total]) => ({ currency, totalBalance: serializeMoneyDecimal(total) })),
   }));
 
-  return { accounts: accountRows, byCurrency, byCompany };
+  const totalArs = consolidateCashPositionArs(amounts);
+  const consolidatedArs = totalArs === null ? null : serializeMoneyDecimal(totalArs);
+  return { accounts: accountRows, byCurrency, byCompany, consolidatedArs };
 }
 
 type RawMovementRow = {
   id: string;
   accountId: string;
   movementDate: Date;
+  valueDate: Date | null;
+  createdAt: Date;
   type: string;
   status: string;
   sourceType: string;
   sourceId: string;
   amount: Prisma.Decimal;
+  fxRate: Prisma.Decimal | null;
+  amountArs: Prisma.Decimal | null;
   currency: string;
   description: string;
   transferId: string | null;
@@ -313,7 +376,7 @@ type RawMovementRow = {
   counterpartyContactId: string | null;
   externalInvoiceRef: string | null;
   account: { name: string };
-  counterparty: { fantasyName: string | null; legalName: string } | null;
+  counterparty: { fantasyName: string | null; legalName: string; tenantId: string } | null;
 };
 
 async function resolveMovementCashMeta(
@@ -420,23 +483,44 @@ async function movementProjectWhere(
 export async function getAccountMovementReport(
   filters: MovementReportFilters,
   ctx: ServiceContext,
+  mode?: "export",
 ): Promise<MovementReportResult> {
   await assertTreasuryTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "TREASURY")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos");
   }
+  for (const [id, label] of [[filters.accountId, "Cuenta inválida"], [filters.companyId, "Empresa inválida"], [filters.projectId, "Proyecto inválido"]] as const) {
+    if (id && !isUuid(id)) throw new ServiceError("VALIDATION", label);
+  }
+  if (filters.type && !Object.values(AccountMovementType).includes(filters.type as AccountMovementType)) {
+    throw new ServiceError("VALIDATION", "Tipo de movimiento inválido");
+  }
+  if (filters.sourceType && !Object.values(AccountMovementSourceType).includes(filters.sourceType as AccountMovementSourceType)) {
+    throw new ServiceError("VALIDATION", "Origen de movimiento inválido");
+  }
 
-  const paginated = filters.page !== undefined || filters.pageSize !== undefined;
+  const exporting = mode === "export";
+  const paginated = !exporting && (filters.page !== undefined || filters.pageSize !== undefined);
+  const byValue = filters.dateBasis === "value";
+  if (byValue && (paginated || !filters.accountId)) {
+    throw new ServiceError("VALIDATION", "Elegí una cuenta para consultar el extracto por fecha valor.");
+  }
   const { skip, take } = resolvePagination(
     paginated ? { page: filters.page, pageSize: filters.pageSize } : undefined,
   );
 
-  let dateFrom = filters.dateFrom;
-  let dateTo = filters.dateTo;
+  let dateFrom = cashReportDate(filters.dateFrom);
+  let dateTo = cashReportDate(filters.dateTo);
+  if (exporting && !filters.accountId && (!dateFrom || !dateTo)) {
+    throw new ServiceError("VALIDATION", "Exportar movimientos requiere fechas válidas cuando no hay una cuenta seleccionada.");
+  }
   if (paginated && (!dateFrom || !dateTo)) {
     const defaults = defaultDateRangeDays(DEFAULT_CASH_DATE_RANGE_DAYS);
     dateFrom = dateFrom ?? defaults.dateFrom;
     dateTo = dateTo ?? defaults.dateTo;
+  }
+  if (dateFrom && dateTo && dateFrom > dateTo) {
+    throw new ServiceError("VALIDATION", "La fecha desde no puede ser posterior a la fecha hasta.");
   }
 
   // Tesorería es tenant-wide: sólo acota un filtro de empresa explícito (URL), no ctx.companyId.
@@ -467,43 +551,45 @@ export async function getAccountMovementReport(
   }
 
   if (filters.accountId) {
-    const acc = await prisma.treasuryAccount.findUnique({
-      where: { id: filters.accountId },
-      select: { tenantId: true },
+    const acc = await prisma.treasuryAccount.findFirst({
+      where: { ...treasuryReportAccountScope(ctx.tenantId), id: filters.accountId },
+      select: { id: true },
     });
-    if (!acc || acc.tenantId !== ctx.tenantId) {
+    if (!acc) {
       throw new ServiceError("FORBIDDEN", "Cuenta no encontrada o sin acceso");
     }
   }
 
   const projectWhere = await movementProjectWhere(filters, ctx.tenantId);
   const classCode = parseMovementClassFilter(filters.class);
+  const range = dateFrom || dateTo ? {
+    ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
+    ...(dateTo ? { lte: new Date(dateTo) } : {}),
+  } : undefined;
 
   const where: Prisma.AccountMovementWhereInput = {
     tenantId: ctx.tenantId,
-    status: { in: ["CONFIRMED", "RECONCILED"] },
+    status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
+    account: treasuryReportAccountScope(ctx.tenantId, companyId),
     ...(filters.accountId ? { accountId: filters.accountId } : {}),
     ...(filters.currency ? { currency: filters.currency } : {}),
     ...(filters.type ? { type: filters.type as never } : {}),
     ...(filters.sourceType ? { sourceType: filters.sourceType as never } : {}),
-    ...(filters.corporateApPaymentsOnly
-      ? { sourceType: "PAYMENT", sourceId: { in: corporatePaymentIds! } }
-      : {}),
     ...(filters.includeInternalTransfers === false ? { transferId: null } : {}),
-    ...(dateFrom || dateTo
-      ? {
-          movementDate: {
-            ...(dateFrom ? { gte: new Date(dateFrom) } : {}),
-            ...(dateTo ? { lte: new Date(dateTo) } : {}),
-          },
-        }
-      : {}),
-    ...(companyId ? { account: { companyId } } : {}),
-    ...projectWhere,
-    ...(classCode ? accountMovementClassWhere(classCode) : {}),
+    AND: [
+      projectWhere,
+      ...(range ? [byValue
+        ? { OR: [{ valueDate: range }, { valueDate: null, movementDate: range }] }
+        : { movementDate: range }] : []),
+      ...(classCode ? [accountMovementClassWhere(classCode)] : []),
+      ...(filters.corporateApPaymentsOnly ? [{ sourceType: "PAYMENT" as const, sourceId: { in: corporatePaymentIds! } }] : []),
+    ],
   };
 
-  const needsRunningBalance = !paginated && Boolean(filters.accountId);
+  const needsRunningBalance = !paginated && Boolean(filters.accountId) &&
+    !filters.type && !filters.sourceType && !filters.currency && !filters.class &&
+    !filters.projectId && !filters.projectOnly && !filters.corporateOnly &&
+    !filters.corporateApPaymentsOnly && filters.includeInternalTransfers !== false;
   // Explicit URL dir wins; otherwise: running-balance extracts stay chronological (asc),
   // paginated ledgers default to recent-first (desc).
   const dateDir: "asc" | "desc" =
@@ -517,7 +603,7 @@ export async function getAccountMovementReport(
   const orderBy = paginated
     ? ([{ movementDate: fetchDir }, { id: fetchDir }] as const)
     : needsRunningBalance
-      ? ([{ movementDate: "asc" as const }, { createdAt: "asc" as const }] as const)
+      ? ([{ movementDate: "asc" as const }, { createdAt: "asc" as const }, { id: "asc" as const }] as const)
       : ([{ movementDate: fetchDir }, { id: fetchDir }] as const);
 
   const [rawRows, total] = await Promise.all([
@@ -525,25 +611,33 @@ export async function getAccountMovementReport(
       where,
       include: {
         account: { select: { name: true } },
-        counterparty: { select: { fantasyName: true, legalName: true } },
+        counterparty: { select: { fantasyName: true, legalName: true, tenantId: true } },
       },
       orderBy: [...orderBy],
-      ...(paginated ? { skip, take } : {}),
+      ...(exporting ? { take: MAX_EXPORT_ROWS } : paginated ? { skip, take } : {}),
     }),
-    paginated ? prisma.accountMovement.count({ where }) : Promise.resolve(0),
+    paginated || exporting ? prisma.accountMovement.count({ where }) : Promise.resolve(0),
   ]);
 
+  const effectiveDate = (movement: RawMovementRow) => byValue ? movement.valueDate ?? movement.movementDate : movement.movementDate;
+  const typedRawRows = rawRows as RawMovementRow[];
+  if (byValue) {
+    const sign = fetchDir === "asc" ? 1 : -1;
+    typedRawRows.sort((left, right) => sign * (
+      effectiveDate(left).getTime() - effectiveDate(right).getTime() ||
+      left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id)
+    ));
+  }
+
   let runningBalance: Prisma.Decimal | undefined;
-  if (needsRunningBalance) {
+  if (needsRunningBalance && typedRawRows[0]) {
     // Seed = balance *before* the first row in the result set.
-    // Without dateFrom, use epoch so we start from opening base only (not full balance),
-    // then accumulate each returned movement — otherwise the extracto double-counts.
     runningBalance = await getAccountBalanceAsOf(filters.accountId!, {
-      beforeDate: dateFrom ? new Date(dateFrom) : new Date(0),
+      beforeDate: dateFrom ? new Date(dateFrom) : effectiveDate(typedRawRows[0]),
+      dateBasis: byValue ? "value" : "accounting",
     });
   }
 
-  const typedRawRows = rawRows as RawMovementRow[];
   const { projectIdByMovement, documentRefByMovement } = await resolveMovementCashMeta(
     typedRawRows,
     ctx.tenantId,
@@ -557,16 +651,17 @@ export async function getAccountMovementReport(
 
   let rows: MovementReportRow[] = typedRawRows.map((m) => {
     // Same sign convention as balance.service (INFLOW/TRANSFER_IN +, else −).
-    const signed = signedAmount(m.type as string, m.amount);
+    const signed = signedTreasuryAmount(m.type as string, m.amount);
     if (runningBalance !== undefined) {
       runningBalance = runningBalance.plus(signed);
     }
     const resolvedProjectId = projectIdByMovement.get(m.id) ?? null;
     const documentRef = documentRefByMovement.get(m.id) ?? null;
-    const counterpartyName = m.counterparty
+    const counterpartyName = m.counterparty?.tenantId === ctx.tenantId
       ? (m.counterparty.fantasyName ?? m.counterparty.legalName)
       : null;
     const sourceType = m.sourceType as string;
+    const currency = cashPositionCurrency(m.currency);
     const classFields = classFieldsForAccountMovement({
       type: m.type as string,
       sourceType,
@@ -576,6 +671,7 @@ export async function getAccountMovementReport(
       accountId: m.accountId,
       accountName: m.account.name,
       movementDate: m.movementDate.toISOString().slice(0, 10),
+      valueDate: m.valueDate?.toISOString().slice(0, 10) ?? null,
       type: m.type as string,
       status: m.status as string,
       sourceType,
@@ -587,7 +683,9 @@ export async function getAccountMovementReport(
       ),
       amount: serializeMoneyDecimal(m.amount),
       signedAmount: serializeMoneyDecimal(signed),
-      currency: m.currency,
+      currency,
+      fxRate: m.fxRate?.gt(0) ? serializeFxRateDecimal(m.fxRate) : null,
+      amountArs: currency === "ARS" ? serializeMoneyDecimal(m.amount) : m.fxRate?.gt(0) && m.amountArs ? serializeMoneyDecimal(m.amountArs) : null,
       description: displayMovementDescription(m.description, sourceType, documentRef),
       detailHref: resolveMovementDetailHref({
         sourceType,
@@ -612,7 +710,7 @@ export async function getAccountMovementReport(
     rows = rows.slice().reverse();
   }
 
-  return { rows, total: paginated ? total : rows.length };
+  return { rows, total: paginated || exporting ? total : rows.length };
 }
 
 // ─── Cash Flow Report ─────────────────────────────────────────────────────────
@@ -626,9 +724,10 @@ export async function getCashFlowReport(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver flujo de caja");
   }
 
-  const range    = (filters.dateFrom && filters.dateTo) ? filters : defaultDateRange();
-  const dateFrom = range.dateFrom!;
-  const dateTo   = range.dateTo!;
+  const { dateFrom, dateTo } = getCashFlowDateRange(filters);
+  if (dateFrom > dateTo) {
+    throw new ServiceError("VALIDATION", "La fecha desde no puede ser posterior a la fecha hasta.");
+  }
   const period   = filters.period ?? "month";
   const startDate = new Date(dateFrom);
   const endDate   = new Date(dateTo);
@@ -636,7 +735,8 @@ export async function getCashFlowReport(
   const movements = await prisma.accountMovement.findMany({
     where: {
       tenantId: ctx.tenantId,
-      status:   { in: ["CONFIRMED", "RECONCILED"] },
+      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
+      account: treasuryReportAccountScope(ctx.tenantId),
       ...(filters.currency ? { currency: filters.currency } : {}),
       movementDate: { gte: startDate, lte: endDate },
     },
@@ -644,19 +744,15 @@ export async function getCashFlowReport(
     orderBy: { movementDate: "asc" },
   });
 
-  const currencies = filters.currency
-    ? [filters.currency]
-    : [...new Set(movements.map((m) => m.currency))].sort();
-
-  if (currencies.length === 0) return [];
-
   const allAccounts = await prisma.treasuryAccount.findMany({
     where: {
-      tenantId: ctx.tenantId,
+      ...treasuryReportAccountScope(ctx.tenantId),
       ...(filters.currency ? { currency: filters.currency } : {}),
     },
-    select: { openingBalance: true, currency: true, id: true },
+    select: { currency: true, id: true },
   });
+
+  const currencies = [...new Set([...movements.map((m) => m.currency), ...allAccounts.map((account) => account.currency)])].sort();
 
   const result: CashFlowReport = [];
 
@@ -704,8 +800,7 @@ export async function getCashFlowReport(
     const buckets: CashFlowBucket[] = [...bucketMap.keys()].sort().map((key) => {
       const b      = bucketMap.get(key)!;
       const netOp  = b.inflow.minus(b.outflow);
-      // ADJUSTMENT excluded — sign convention pending manual adjustment module
-      const netAll = netOp.plus(b.internalTransferIn).minus(b.internalTransferOut);
+      const netAll = netOp.plus(b.internalTransferIn).minus(b.internalTransferOut).plus(signedTreasuryAmount("ADJUSTMENT", b.adjustments));
       running = running.plus(netAll);
       return {
         period:               key,

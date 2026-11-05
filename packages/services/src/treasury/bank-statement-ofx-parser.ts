@@ -62,6 +62,7 @@ function parseTrnAmt(raw: string): {
   } catch {
     return null;
   }
+  if (amount === "0.00" || !/^\d{1,14}\.\d{2}$/.test(amount)) return null;
   return {
     amount,
     // Explicit sign wins; bare unsigned leaves direction unresolved until TRNTYPE.
@@ -83,7 +84,6 @@ function resolveOfxDirection(
           type === "CHECK" ||
           type === "ATM" ||
           type === "POS" ||
-          type === "XFER" ||
           type === "FEE" ||
           type === "SRVCHG"
         ? ("DEBIT" as const)
@@ -115,7 +115,7 @@ export function parseBankStatementOfx(text: string): ParseBankStatementOfxResult
   const blockMatches = [
     ...body.matchAll(/<STMTTRN>([\s\S]*?)(?=<STMTTRN>|<\/BANKTRANLIST>|<\/STMTRS>|$)/gi),
   ];
-  const blocks = blockMatches.map((m) => m[1] ?? "").filter((b) => /<TRNAMT>/i.test(b));
+  const blocks = blockMatches.map((m) => m[1] ?? "");
 
   if (blocks.length === 0) {
     return {
@@ -152,7 +152,14 @@ export function parseBankStatementOfx(text: string): ParseBankStatementOfxResult
     if (!money) {
       return { ok: false, error: `Transacción #${index}: monto inválido (${amtRaw})` };
     }
-    const direction = resolveOfxDirection(money, tagValue(block, "TRNTYPE"));
+    const transactionType = tagValue(block, "TRNTYPE");
+    if (transactionType?.toUpperCase() === "XFER" && !money.hasExplicitSign) {
+      return {
+        ok: false,
+        error: `Transacción #${index}: transferencia XFER sin signo explícito. Corregí el archivo o registrá la línea manualmente.`,
+      };
+    }
+    const direction = resolveOfxDirection(money, transactionType);
     if (!direction) {
       return {
         ok: false,

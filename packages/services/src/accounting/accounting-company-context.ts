@@ -1,6 +1,10 @@
-import { prisma } from "@bloqer/database";
+import { prisma, type Prisma } from "@bloqer/database";
 import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
+
+export async function lockAccountingCompany(tx: Prisma.TransactionClient, tenantId: string, companyId: string): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+}
 
 /**
  * Resolves the company scope for accounting reads/writes.
@@ -13,6 +17,9 @@ export async function resolveAccountingCompanyId(
   inputCompanyId?: string | null,
 ): Promise<string> {
   if (ctx.companyId) {
+    if (inputCompanyId && inputCompanyId !== ctx.companyId) {
+      throw new ServiceError("FORBIDDEN", "La empresa indicada está fuera del alcance de la sesión");
+    }
     const scoped = await prisma.company.findFirst({
       where: { id: ctx.companyId, tenantId: ctx.tenantId, status: "ACTIVE" },
     });
@@ -32,7 +39,7 @@ export async function resolveAccountingCompanyId(
   }
   const sole = await getSoleActiveCompanyIdForTenant(ctx.tenantId);
   if (!sole) {
-    throw new ServiceError("VALIDATION", "No hay empresa activa en el tenant");
+    throw new ServiceError("VALIDATION", "Seleccioná una empresa activa para continuar");
   }
   return sole;
 }

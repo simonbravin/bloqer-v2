@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { TreasuryHubView } from "@/features/treasury";
 import { canEditBankAccountsUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { getCurrentUser } from "@/lib/auth";
-import { getTreasuryHubOverview, ServiceError } from "@bloqer/services";
+import { getCashPositionReport, getTreasuryHubOverview, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
+import { CashPositionTable } from "@/features/treasury-reports";
 
 export default async function TesoreriaPage() {
   const current = await getCurrentUser();
@@ -22,8 +23,9 @@ export default async function TesoreriaPage() {
   };
 
   let overview;
+  let position;
   try {
-    overview = await getTreasuryHubOverview(ctx);
+    [overview, position] = await Promise.all([getTreasuryHubOverview(ctx), getCashPositionReport({}, ctx)]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND")) {
       redirect("/dashboard");
@@ -38,6 +40,12 @@ export default async function TesoreriaPage() {
       <h1 className="text-2xl font-bold tracking-tight">Tesorería</h1>
 
       <TreasuryHubView overview={overview} canCreateAccount={canCreateAccount} />
+      {position.accounts.length > 0 ? (
+        <section className="space-y-4" aria-labelledby="treasury-cash-position-title">
+          <h2 id="treasury-cash-position-title" className="text-lg font-semibold">Posición de caja</h2>
+          <CashPositionTable report={position} />
+        </section>
+      ) : null}
     </PageShell>
   );
 }

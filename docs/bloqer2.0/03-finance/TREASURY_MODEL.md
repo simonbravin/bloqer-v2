@@ -22,7 +22,7 @@ Todos los movimientos de dinero se persisten como **`AccountMovement`** (ledger 
 
 **Contenido:**
 - Saldo por **Account** en moneda nativa de la cuenta.
-- Total consolidado en **ARS** (suma de `amount_ars` de saldos).
+- Equivalente histórico en **ARS**, según cotizaciones de cada movimiento. Si falta el dato de una contribución extranjera, el consolidado queda incompleto y siguen disponibles los saldos por moneda ([D-134]).
 - Opcional: total por **proyecto** si movimiento lleva `project_id`.
 
 **Nota:** AR/AP **no** suman aquí; son obligaciones, no caja ([D-024]).

@@ -18,17 +18,18 @@ import {
 } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
 import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import {
   getJournalEntryById,
   getJournalEntrySourceLink,
   type JournalEntryView,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { formatDate } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
 import { DetailField, DetailFieldGrid } from "@/components/ui/detail-field-grid";
+import { journalEntrySourceLabel } from "@/features/accounting/lib/journal-entry-source-label";
 
 export default async function AsientoDetallePage({
   params,
@@ -43,8 +44,7 @@ export default async function AsientoDetallePage({
 
   const { journalEntryId } = await params;
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
 
   let entry: JournalEntryView;
   try {
@@ -59,6 +59,7 @@ export default async function AsientoDetallePage({
           sourceType: entry.sourceType,
           sourceId: entry.sourceId,
           companyId: entry.companyId,
+          reversesEntryId: entry.reversesEntryId,
         })
       : null;
 
@@ -86,7 +87,7 @@ export default async function AsientoDetallePage({
           <DetailField label="Fecha">
             <span className="font-mono">{formatDate(entry.entryDate)}</span>
           </DetailField>
-          <DetailField label="Origen">{entry.sourceType}</DetailField>
+          <DetailField label="Origen">{journalEntrySourceLabel(entry.sourceType, entry.reversesEntryId)}</DetailField>
           <DetailField label="Descripción" fullWidth>
             {entry.description}
           </DetailField>
@@ -143,6 +144,7 @@ export default async function AsientoDetallePage({
           <JournalEntryDetailActions
             entryId={entry.id}
             status={entry.status}
+            empresa={cf.companyId}
             canReverse={
               entry.status === "POSTED" && !entry.reversesEntryId && !entry.reversedByEntryId
             }

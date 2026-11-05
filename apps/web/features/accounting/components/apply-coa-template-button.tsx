@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
@@ -17,8 +18,8 @@ export function ApplyCoaTemplateButton({
 }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
+  const { pending, run } = useOperationalAction({ onError: setErr });
   const [msg, setMsg] = useState<string | null>(null);
-  const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
 
   return (
@@ -53,7 +54,7 @@ export function ApplyCoaTemplateButton({
         confirmLabel="Aplicar plantilla"
         pending={pending}
         onConfirm={() => {
-          start(async () => {
+          return run(async () => {
             setErr(null);
             setMsg(null);
             const res = await applyArgentineCoaTemplateAction({ companyId: companyId ?? null });

@@ -43,6 +43,7 @@ import { clientUploadDocument } from "@/features/documents/lib/client-upload-doc
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 
 export type SupplierOption = {
   id: string;
@@ -170,6 +171,8 @@ export function NewTransactionDialog({
   const [inflowAccountId, setInflowAccountId] = useState("");
   const [counterpartyContactId, setCounterpartyContactId] = useState<string | null>(null);
   const [inflowAmount, setInflowAmount] = useState("");
+  const [inflowFxRate, setInflowFxRate] = useState("");
+  const inflowCurrency = treasuryAccounts.find((account) => account.id === inflowAccountId)?.currency;
 
   useEffect(() => {
     rotateAttachmentKey();
@@ -285,6 +288,7 @@ export function NewTransactionDialog({
     setCollectMethod("");
     setInflowAccountId("");
     setInflowAmount("");
+    setInflowFxRate("");
     setCounterpartyContactId(null);
     setInflowMode(canAr ? "AR_INVOICE" : "CASH_ONLY");
   }
@@ -536,6 +540,7 @@ export function NewTransactionDialog({
         accountId: inflowAccountId,
         movementDate: fd.get("movementDate") as string,
         amount: fd.get("amount") as string,
+        fxRate: inflowCurrency && inflowCurrency !== "ARS" ? inflowFxRate : undefined,
         description: fd.get("description") as string,
         counterpartyContactId,
         externalInvoiceRef: ((fd.get("externalInvoiceRef") as string) || "").trim() || null,
@@ -938,7 +943,10 @@ export function NewTransactionDialog({
                     <SearchableCombobox
                       options={treasuryOptions}
                       value={inflowAccountId}
-                      onValueChange={setInflowAccountId}
+                      onValueChange={(accountId) => {
+                        if (accountId !== inflowAccountId) setInflowFxRate("");
+                        setInflowAccountId(accountId);
+                      }}
                       placeholder="Seleccionar cuenta..."
                       searchPlaceholder="Buscar cuenta..."
                     />
@@ -963,7 +971,7 @@ export function NewTransactionDialog({
                       <Input id="movementDate" name="movementDate" type="date" required />
                     </div>
                     <div className="space-y-1">
-                      <Label htmlFor="amount">Monto</Label>
+                      <Label htmlFor="amount">Monto{inflowCurrency ? ` (${inflowCurrency})` : ""}</Label>
                       <DecimalInput
                         id="amount"
                         name="amount"
@@ -974,6 +982,9 @@ export function NewTransactionDialog({
                       />
                     </div>
                   </div>
+                  {inflowCurrency ? (
+                    <ManualFxField currency={inflowCurrency} value={inflowFxRate} onValueChange={setInflowFxRate} id="inflow-fx-rate" disabled={isPending} />
+                  ) : null}
                   <div className="space-y-1">
                     <Label htmlFor="externalInvoiceRef">N° de comprobante externo (opcional)</Label>
                     <Input

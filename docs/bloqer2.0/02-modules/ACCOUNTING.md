@@ -49,6 +49,7 @@ Aplicar plantilla AR; CRUD cuentas/reglas/asientos; postear; anular borrador; re
 - No doble conteo Collection/Payment + Treasury del mismo efectivo.
 - Accrual = `totalAmount` del comprobante.
 - DRAFT **sourced** ([D-063](../00-product/DECISION_LOG.md#d-063--contabilidad-lock-de-montos-en-draft-con-origen--aviso-anti-spam)): montos/moneda/estructura inmutables; cuentas y textos editables. MANUAL libre.
+- D-135 aplica el cierre del período contable también a la anulación sincronizada del borrador. Si está cerrado, se bloquea la operación completa hasta su reapertura.
 - Aviso in-app `ACCOUNTING_DRAFTS_PENDING` a `EDIT ACCOUNTING` con dedupe 24h (soft).
 
 ## 11. Validaciones

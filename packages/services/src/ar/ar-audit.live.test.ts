@@ -222,8 +222,13 @@ describe("AG09 AR sales, notes and collection SQL integrity", { skip: process.en
     const id = result.traceChain.find((r) => r.entityType === "SalesInvoice")!.entityId;
     const invoice = await prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
     const c = await prisma.collection.findFirstOrThrow({ where: { salesInvoiceId: id } });
+    const movement = await prisma.accountMovement.findFirstOrThrow({
+      where: { tenantId, sourceType: "COLLECTION", sourceId: c.id },
+    });
     assert.equal(invoice.fxRate.toFixed(6), "1250.123456"); assert.equal(invoice.amountArs.toFixed(2), "12501.23");
     assert.equal(c.fxRate.toFixed(6), "1250.123456"); assert.equal(c.amountArs.toFixed(2), "12501.23"); assert.ok(invoice.invoiceLetter);
+    assert.equal(movement.fxRate?.toFixed(6), "1250.123456");
+    assert.equal(movement.amountArs?.toFixed(2), "12501.23");
   });
   it("rejects replay from another company or with changed IIBB and emits no second document", async () => {
     const payload = income(); const result = await registerArIncome(payload, ctx);
@@ -235,6 +240,14 @@ describe("AG09 AR sales, notes and collection SQL integrity", { skip: process.en
   it("uses one company/account lock order for standalone and composite collections", async () => {
     const p = await project(), { receivable } = await issued(p.id), bank = await account();
     await Promise.all([collect(receivable.id, bank.id, "10"), registerArIncome({ ...income(), collectNow: { accountId: bank.id, collectionDate: date, reference: null, amount: "10", idempotencyKey: key() } }, ctx)]);
+    const movements = await prisma.accountMovement.findMany({
+      where: { tenantId, accountId: bank.id, sourceType: "COLLECTION" },
+    });
+    assert.equal(movements.length, 2);
+    for (const movement of movements) {
+      assert.equal(movement.fxRate?.toFixed(6), "1.000000");
+      assert.equal(movement.amountArs?.toFixed(2), "10.00");
+    }
   });
   it("rolls invoice creation back with its audit entry", async () => {
     const p = await project(), beforeCount = await prisma.salesInvoice.count({ where: { tenantId } });

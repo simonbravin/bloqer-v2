@@ -1,0 +1,1160 @@
+{
+  "schemaVersion": 1,
+  "stage": "AG-10",
+  "status": "closed_local",
+  "base": "cae3e539ad5b05d265cedc09adbc62c6fd8758d5",
+  "previousPublication": "75ab172925497a33b5047ef09cafb83d8c3bbae6",
+  "title": "Tesorería, conciliación, períodos y contabilidad",
+  "date": "2026-11-05",
+  "decisions": [
+    "D-134",
+    "D-135",
+    "D-136",
+    "D-137",
+    "D-138",
+    "D-139"
+  ],
+  "openQuestions": [],
+  "findings": [
+    {
+      "id": "GA-AG-10-001",
+      "priority": "P1",
+      "title": "Empresa válida al crear y leer cuentas",
+      "observed": "Un alta podía enlazar una empresa de otro tenant. Algunas lecturas seguían esa relación inválida.",
+      "correction": "Validar tenant y empresa activa en el alta y filtrar relaciones incoherentes en cuentas, saldo, resumen y posición de caja.",
+      "files": "treasury-account.service.ts, balance.service.ts, treasury-hub.service.ts, treasury-reports.service.ts",
+      "evidence": "SQL Tesorería · ámbito de cuenta, focal Posición",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-002",
+      "priority": "P2",
+      "title": "Estados y edición de cuentas",
+      "observed": "Una cuenta terminal admitía mutaciones en algunos caminos. Campos opcionales no se limpiaban y los límites de lista eran inseguros.",
+      "correction": "Revalidar estado bajo control optimista, aceptar limpieza de campos opcionales y normalizar paginación.",
+      "files": "treasury-account.service.ts, treasury.ts",
+      "evidence": "SQL Tesorería · estado terminal",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-003",
+      "priority": "P1",
+      "title": "Cotización del movimiento de caja",
+      "observed": "Los escritores podían confirmar moneda extranjera sin conservar su cotización. El movimiento omitía incluso la cotización disponible de pago o cobro.",
+      "correction": "D-134 guarda FX y equivalente de cada movimiento nuevo, reutiliza la misma cotización en su hecho y mantiene la ausencia de dato histórico.",
+      "files": "schema.prisma, fx-amount.service.ts y escritores de AR/AP/Tesorería",
+      "evidence": "Migración D-134; SQL AR/AP FX y Tesorería",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-004",
+      "priority": "P1",
+      "title": "Saldo inicial negativo y saldo cero",
+      "observed": "El alta negativa quedaba fuera del ledger y el bloqueo mensual. El consolidado no podía recuperar la cotización de apertura.",
+      "correction": "D-136 registra egreso de apertura por magnitud, con período y FX. Cero no genera movimiento. Los saldos usan una sola apertura.",
+      "files": "treasury-account.service.ts, balance.service.ts",
+      "evidence": "SQL Tesorería D-136",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-005",
+      "priority": "P1",
+      "title": "Reintentos de ingresos, ajustes y transferencias",
+      "observed": "Una clave podía reutilizarse con diferencias de empresa, descripción, fecha o FX. Conciliar un movimiento podía invalidar un replay legítimo.",
+      "correction": "Comparar el mismo efecto con su alcance y snapshot, y aceptar replay igual de un movimiento conciliado.",
+      "files": "idempotency.ts, registros manuales e internal-transfer.service.ts",
+      "evidence": "SQL Tesorería · FX, par y replay",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-006",
+      "priority": "P1",
+      "title": "Dos piernas de transferencia y cierres por empresa",
+      "observed": "Se validaba un solo período aunque las dos piernas pertenecieran a empresas distintas. El par podía cancelarse sin verificar su forma completa.",
+      "correction": "Verificar la raíz, ambas cuentas y piernas, fechas, importes y moneda. Bloquear empresas y cuentas en orden y cancelar el par exacto.",
+      "files": "internal-transfer.service.ts, treasury-write-locks.ts",
+      "evidence": "SQL Tesorería · par y ambos períodos",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-007",
+      "priority": "P1",
+      "title": "Fecha contable y fecha valor",
+      "observed": "El ledger tenía una sola fecha aunque el banco acreditara en otra. Consultas y cierres no distinguían ambos hechos.",
+      "correction": "D-137 registra las dos fechas. Extracto, saldo corrido y conciliación usan la base elegida o su fallback identificado. GL y cierre siguen fecha contable.",
+      "files": "schema.prisma, internal-transfer.service.ts, balance.service.ts, treasury-reports.service.ts",
+      "evidence": "Migración D-137; SQL fechas y focales extracto",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-008",
+      "priority": "P1",
+      "title": "Cierres y reaperturas en entrada directa",
+      "observed": "Una reapertura podía quedar sin motivo desde servicio. Las fechas imposibles se podían normalizar a otro mes.",
+      "correction": "Validar motivo, fecha y límites. Revalidar empresa activa dentro de la misma exclusión de escrituras. Usar mes de Argentina en el listado.",
+      "files": "period-lock.service.ts",
+      "evidence": "5 focales de calendario y SQL reapertura",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-009",
+      "priority": "P1",
+      "title": "Relaciones de una conciliación",
+      "observed": "Raíces propias podían incluir relaciones ajenas o desactualizadas. Los datos cruzados podían llegar al detalle o al CSV.",
+      "correction": "Comprobar cuenta, sesión, líneas y matches en el mismo tenant. Preservar el alcance de Tesorería por tenant y las cuentas compartidas.",
+      "files": "bank-reconciliation.service.ts, bank-reconciliation-report.service.ts",
+      "evidence": "SQL y revisión del alcance R-020",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-010",
+      "priority": "P1",
+      "title": "Conciliar, deshacer y crear ajustes",
+      "observed": "La creación desde extracto tomaba cuenta antes que empresa. El deshacer podía saltar el cierre y repetir un movimiento que ya existía.",
+      "correction": "Ordenar bloqueos, releer sesión y cuenta, verificar períodos y reutilizar una correspondencia válida sin duplicar el ajuste.",
+      "files": "bank-reconciliation.service.ts",
+      "evidence": "SQL Tesorería · duplicación y período",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-011",
+      "priority": "P2",
+      "title": "Importación de extractos",
+      "observed": "Archivos incompletos o montos que redondean a cero podían aceptarse. OFX trataba XFER como débito fijo.",
+      "correction": "Validar antes de importar. D-138 usa signo explícito en XFER y muestra la fila ambigua. Mantener compatibilidad de tipos inequívocos.",
+      "files": "bank-statement-ofx-parser.ts, bank-statement-csv-parser.ts",
+      "evidence": "Focales CSV/OFX",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-012",
+      "priority": "P2",
+      "title": "Diferencia entre banco y libro",
+      "observed": "La conciliación podía presentar como alineado el saldo absoluto aunque solo hubiera emparejado el rango.",
+      "correction": "Mostrar saldo libro al cierre por fecha valor y diferencia banco menos sistema. Conservar criterios D-075 para cerrar.",
+      "files": "bank-reconciliation.service.ts, bank-reconciliation-workspace.tsx",
+      "evidence": "SQL fecha valor y muestra tablet",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-013",
+      "priority": "P1",
+      "title": "Cierre de cuenta con saldo cero",
+      "observed": "El estado terminal existía en el modelo y el contrato, pero faltaba el recorrido que verifica el saldo para cerrar.",
+      "correction": "Cerrar cuentas activas o inactivas con saldo cero y auditoría account.closed. Bloquear cambios posteriores de saldo y conservar extracto.",
+      "files": "treasury-account.service.ts, cierre de cuenta web",
+      "evidence": "SQL Tesorería · cierre y AP · reversión",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-014",
+      "priority": "P1",
+      "title": "Anulación de caja y sincronización contable",
+      "observed": "Caja podía quedar anulada con un asiento borrador o posteado todavía activo por una carrera o un fallo de auditoría.",
+      "correction": "Resolver guard y borrador contable dentro de la transacción de la operación y bajo el bloqueo de empresa.",
+      "files": "account-movement.service.ts, internal-transfer.service.ts, bank-reconciliation.service.ts, accounting-cancel-sync.service.ts",
+      "evidence": "SQL Tesorería, AR y AP · rollback y carrera",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-015",
+      "priority": "P1",
+      "title": "Cierre del mes del borrador vinculado",
+      "observed": "La sincronización del asiento omitía el bloqueo del período si el borrador tenía otra fecha.",
+      "correction": "D-135 valida también la fecha del borrador y deja todas las partes intactas ante cierre.",
+      "files": "accounting-cancel-sync.service.ts, journal-entry.service.ts",
+      "evidence": "SQL D-135 en Tesorería y AP",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-016",
+      "priority": "P1",
+      "title": "Pierna de pago al revertir",
+      "observed": "Una primera coincidencia podía ocultar una pierna duplicada o con fecha distinta. Anular podía alterar el saldo de una cuenta cerrada.",
+      "correction": "Revalidar cuenta y una sola pierna activa con fecha contable exacta bajo bloqueo. Conservar caja y deuda si falla.",
+      "files": "payment.service.ts",
+      "evidence": "SQL AP · pierna duplicada, fecha distinta y cuenta cerrada",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-017",
+      "priority": "P1",
+      "title": "Origen contable comprobado",
+      "observed": "El alta manual aceptaba origen y montos arbitrarios. Una fuente cancelada o adulterada podía alcanzar posteo.",
+      "correction": "Separar alta manual y sugerencia. Verificar fuente vigente, moneda, monto y proyecto, incluida transferencia con dos piernas.",
+      "files": "journal-entry.service.ts, accounting-auto-draft.service.ts, accounting-treasury-source.ts",
+      "evidence": "SQL borrador adulterado, posteo, reversa y Libro",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-018",
+      "priority": "P1",
+      "title": "Cabecera GL y cierres concurrentes",
+      "observed": "Un PATCH de cabecera podía ligar proyecto ajeno. Alta y edición consultaban período antes de la transacción.",
+      "correction": "Revalidar proyecto y empresa, fecha anterior y nueva, y registrar auditoría en la transacción bajo Company.",
+      "files": "journal-entry.service.ts, accounting-company-context.ts",
+      "evidence": "Focales GL, SQL D-135 y revisión independiente",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-019",
+      "priority": "P1",
+      "title": "Precisión y monedas de GL",
+      "observed": "Montos crudos podían balancear antes del redondeo. Distinto casing separaba saldos de la misma moneda.",
+      "correction": "Aplicar D-053 antes de persistir y balancear, validar calendario y moneda, agrupar históricos con moneda canónica sin reescritura.",
+      "files": "journal-entry.service.ts, accounting-reports.service.ts, validators/accounting.ts",
+      "evidence": "Focales GL y SQL Libro",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-020",
+      "priority": "P1",
+      "title": "Integridad histórica al leer y revertir GL",
+      "observed": "Una línea histórica con cuenta ajena podía exponer su nombre en detalle o copiarse a una reversa.",
+      "correction": "Validar relaciones de asiento y líneas bajo el alcance tenant/empresa, incluida la reversa. Preservar cuentas históricas válidas aunque estén inactivas.",
+      "files": "journal-entry.service.ts",
+      "evidence": "Revisión independiente y focal de lectura/reversa",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-021",
+      "priority": "P1",
+      "title": "Permisos de origen y enlaces GL",
+      "observed": "Sugerencias y enlaces podían revelar documentos fuera del permiso operativo o presentar una reversa como ajuste.",
+      "correction": "Verificar módulo y alcance del origen. La reversa enlaza al asiento original. Los costos sin moneda trazable no generan nuevo asiento.",
+      "files": "accounting-source-access.ts, journal-entry-source-link.service.ts",
+      "evidence": "Focales permisos, D-124 y SQL Libro",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-022",
+      "priority": "P2",
+      "title": "Plan de cuentas, jerarquía y plantilla",
+      "observed": "Ediciones concurrentes podían introducir ciclos o cambiar el tipo durante posteo. Reaplicar plantilla podía duplicar reglas.",
+      "correction": "Validar jerarquía y estado bajo bloqueo compartido con posteo y reusar plantilla por código y regla.",
+      "files": "accounting-account.service.ts, accounting-coa-template.service.ts",
+      "evidence": "Focales GL",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-023",
+      "priority": "P2",
+      "title": "Mapeo debe/haber y reglas inactivas",
+      "observed": "Actualizaciones simultáneas podían dejar la misma cuenta en ambos lados. No se podía desactivar una regla con cuenta inactiva.",
+      "correction": "Releer y validar el par de la regla bajo bloqueo, permitir desactivación del vínculo inactivo.",
+      "files": "accounting-mapping.service.ts",
+      "evidence": "Focales mapeo",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-024",
+      "priority": "P2",
+      "title": "Libro, Mayor y estados consistentes",
+      "observed": "Exportaciones podían presentar un Mayor truncado como completo. Lecturas separadas permitían mezclar cortes.",
+      "correction": "Usar una lectura consistente, validar rangos y evitar exportar como completo cuando se superó el límite.",
+      "files": "accounting-reports.service.ts, report-export.service.ts, report-pdf-export.service.tsx",
+      "evidence": "Focales reportes y SQL Libro",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-025",
+      "priority": "P2",
+      "title": "Duplicación de borrador automático y aviso",
+      "observed": "Dos operaciones concurrentes podían volver a auditar el mismo borrador o repetir aviso en la ventana de 24 h.",
+      "correction": "Distinguir creado de existente y deduplicar aviso por empresa bajo bloqueo, con alcance correcto de destinatarios.",
+      "files": "accounting-auto-draft.service.ts, accounting-draft-notifications.service.ts",
+      "evidence": "Focales GL",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-026",
+      "priority": "P2",
+      "title": "Navegación contable por empresa",
+      "observed": "Sin filtro explícito una pantalla podía elegir la primera empresa. Algunos enlaces perdían el contexto.",
+      "correction": "Usar el filtro Empresa ya contemplado por los servicios y conservarlo al navegar. Respetar empresa de sesión y sus permisos.",
+      "files": "apps/web/app/(app)/contabilidad y accounting-module-nav.tsx",
+      "evidence": "Tipos, revisión del contrato y muestra escritorio",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-027",
+      "priority": "P2",
+      "title": "Formularios y recuperación de acciones",
+      "observed": "Algunas operaciones ocultaban errores, repetían envío o perdían foco y contexto en diálogos.",
+      "correction": "Unificar confirmación, estado de envío, errores, invalidación, controles monetarios y permisos visibles del flujo.",
+      "files": "apps/web/features/treasury, accounting y acciones AG-10",
+      "evidence": "Focales web y muestra de escritorio, tablet y teléfono",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-028",
+      "priority": "P2",
+      "title": "Extracto, flujo, posición y exportaciones",
+      "observed": "El mes podía aparecer desplazado en zona argentina. Algunos CSV cortaban a 100 y la posición no explicaba una cotización histórica faltante.",
+      "correction": "Usar calendario local, exportar la selección completa dentro de límites y conservar totales por moneda con equivalente ARS disponible o incompleto.",
+      "files": "treasury-reports.service.ts, cash-position-amounts.ts y consumidores web/AI",
+      "evidence": "Focales export, FX y mes; muestra visual",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-029",
+      "priority": "P2",
+      "title": "Estados de movimiento y atribución de caja",
+      "observed": "La atribución omitía conciliados y la especificación aún anunciaba borrador de caja.",
+      "correction": "Incluir estados que afectan saldo y distinguir el movimiento confirmado del borrador de GL. Armonizar Guía, Ayuda e índice.",
+      "files": "treasury-attribution.service.ts, STATE_MACHINES.md, TREASURY.md",
+      "evidence": "Focales de saldo, prueba general e índice",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-030",
+      "priority": "P1",
+      "title": "Redirección interna de acciones contables",
+      "observed": "Una ruta con prefijo heredado podía convertirse en una URL externa al normalizarla y añadir el mensaje de la acción.",
+      "correction": "Validar el resultado de quitar el prefijo antes de redirigir. Conservar ruta, parámetros y ancla válidos.",
+      "files": "auth-callback-url.ts y source-draft-actions.ts",
+      "evidence": "Prueba del bypass de /es y revisión de consumidores",
+      "status": "fixed_verified"
+    },
+    {
+      "id": "GA-AG-10-031",
+      "priority": "P2",
+      "title": "Regla de IVA cuando falta solo la cuenta de IIBB",
+      "observed": "D-112 describía un fallback genérico de dos líneas que no reflejaba la discriminación de IVA probada.",
+      "correction": "D-139 documenta el comportamiento existente con aprobación del Owner. El IVA sigue separado y se identifica la percepción junto al neto.",
+      "files": "D-112/D-139, TAXES_AND_WITHHOLDINGS, Guía, Ayuda e índice de conocimiento",
+      "evidence": "Pruebas existentes de asiento fiscal y validación del índice",
+      "status": "fixed_verified"
+    }
+  ],
+  "closedAt": "2026-11-05T17:54:46.388Z",
+  "closure": {
+    "status": "closed_local",
+    "confirmedGroups": 31,
+    "confirmedPending": [],
+    "published": false,
+    "nextStageStarted": false
+  },
+  "verification": {
+    "general": {
+      "passed": 2678,
+      "failed": 0,
+      "workspaceTasks": 9,
+      "liveSuitesOmitted": 40,
+      "artifact": "output/platform-audit/ag-10-2026-11-05/workspace-test-summary.json"
+    },
+    "checks": [
+      {
+        "name": "workspace-test-source-final",
+        "exitCode": 0,
+        "artifact": "output/platform-audit/ag-10-2026-11-05/workspace-test-source-final.result.json"
+      },
+      {
+        "name": "workspace-types-source-final",
+        "exitCode": 0,
+        "artifact": "output/platform-audit/ag-10-2026-11-05/workspace-types-source-final.result.json"
+      },
+      {
+        "name": "workspace-lint-source-final",
+        "exitCode": 0,
+        "artifact": "output/platform-audit/ag-10-2026-11-05/workspace-lint-source-final.result.json"
+      },
+      {
+        "name": "ai-index-source-check",
+        "exitCode": 0,
+        "artifact": "output/platform-audit/ag-10-2026-11-05/ai-index-source-check.result.json"
+      },
+      {
+        "name": "workspace-build-final",
+        "exitCode": 0,
+        "artifact": "output/platform-audit/ag-10-2026-11-05/workspace-build-final.result.json"
+      }
+    ],
+    "sql": {
+      "passed": 21,
+      "failed": 0,
+      "treasury": 10,
+      "ar": 4,
+      "apAndGl": 7,
+      "artifact": "output/platform-audit/ag-10-2026-11-05/sql-deduplicated-results.json"
+    },
+    "migrations": [
+      {
+        "artifact": "output/platform-audit/ag-10-2026-11-05/d134-isolated-migration.json",
+        "at": "2026-11-05T17:01:07.820Z",
+        "database": "bloqer_audit_ag01_20261103",
+        "isolatedHostVerified": true,
+        "exitCode": 0,
+        "columns": [
+          {
+            "column_name": "amountArs",
+            "is_nullable": "YES",
+            "numeric_precision": 18,
+            "numeric_scale": 4
+          },
+          {
+            "column_name": "fxRate",
+            "is_nullable": "YES",
+            "numeric_precision": 18,
+            "numeric_scale": 6
+          }
+        ],
+        "migration": {
+          "migration_name": "20261105170000_d134_treasury_movement_fx",
+          "completed": true
+        },
+        "historicalRows": 24,
+        "historicalSnapshotsPopulated": 0
+      },
+      {
+        "artifact": "output/platform-audit/ag-10-2026-11-05/d137-isolated-migration.json",
+        "at": "2026-11-05T17:17:08.243Z",
+        "database": "bloqer_audit_ag01_20261103",
+        "isolatedHostVerified": true,
+        "exitCode": 0,
+        "columns": [
+          {
+            "table_name": "account_movements",
+            "column_name": "valueDate",
+            "is_nullable": "YES",
+            "data_type": "date"
+          },
+          {
+            "table_name": "internal_transfers",
+            "column_name": "valueDate",
+            "is_nullable": "YES",
+            "data_type": "date"
+          }
+        ],
+        "migration": {
+          "migration_name": "20261105173000_d137_treasury_transfer_value_date",
+          "completed": true
+        },
+        "historicalRows": {
+          "movements": 35,
+          "transfers": 2
+        },
+        "historicalDatesPopulated": 0
+      }
+    ],
+    "knowledge": {
+      "chunks": 586,
+      "artifact": "output/platform-audit/ag-10-2026-11-05/ai-index-source-check.result.json",
+      "externalEvaluationsRun": false
+    },
+    "independent": {
+      "at": "2026-11-05T17:40:23.360Z",
+      "reviewer": "/root/ag10_verify",
+      "base": "cae3e539ad5b05d265cedc09adbc62c6fd8758d5",
+      "freeze": "03",
+      "manifestSha256": "7f98ac3b7462d48730965982cc1f8e183c21605c9bbb2085964e4205fb3c8d0e",
+      "sourceCount": 132,
+      "removedCount": 1,
+      "pathsInDiff": 133,
+      "mismatches": [],
+      "extraPaths": [],
+      "diffCheckExit": 0,
+      "offline": {
+        "specs": 28,
+        "tests": 257,
+        "passed": 257,
+        "failed": 0,
+        "suites": 39,
+        "skipped": 0,
+        "cancelled": 0
+      },
+      "reviewReadOnly": true,
+      "confirmedPending": [],
+      "finalDelta": [
+        "journal-entry.service.ts explicit DTO preserves freeze02 contract",
+        "control.ts and AI knowledge index for D-139"
+      ],
+      "d139MatchesCurrentArApBehavior": true,
+      "artifact": "output/platform-audit/ag-10-2026-11-05/independent-freeze03-review.json",
+      "overlapsGeneral": true
+    },
+    "build": {
+      "at": "2026-11-05T17:43:31.213Z",
+      "head": "cae3e539ad5b05d265cedc09adbc62c6fd8758d5",
+      "matched": 132,
+      "mismatches": [],
+      "buildCount": 132,
+      "exitCode": 0,
+      "dbDisabled": true,
+      "providersDisabled": true,
+      "vercelUnset": true,
+      "artifact": "output/platform-audit/ag-10-2026-11-05/build-source-match-final.json"
+    },
+    "visual": {
+      "at": "2026-11-05T17:54:40.057Z",
+      "status": "passed",
+      "summary": "En escritorio (1440×1000) se verificó Posición de caja con ARS y USD separados y aviso de equivalente incompleto. En Contabilidad se aplicó la plantilla de la empresa sintética, se registró y contabilizó un asiento de ARS 10,25 y se comprobó en el Libro Diario. En tablet (768×1024) se inspeccionaron el saldo de libros, la diferencia banco − sistema, el criterio fecha valor y la ayuda OFX. En teléfono (390×844) se registró una transferencia de US$ 12,50 y se comprobó el orden del extracto por fecha valor. El detalle en escritorio mostró fecha contable 05/11, valor 06/11, FX 1.260,123456 y equivalente ARS 15.751,54. Se cubrieron temas claro y oscuro. Se cerraron sesión, pestaña y servidor local.",
+      "isolatedDatabase": true,
+      "providersDisabled": true,
+      "sourceFreeze": "03",
+      "viewports": [
+        [
+          1440,
+          1000
+        ],
+        [
+          768,
+          1024
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "operations": [
+        {
+          "device": "desktop",
+          "task": "Applied AR template in synthetic company (42 accounts, 10 rules), saved balanced manual draft for ARS 10.25, posted it and saw it in Libro Diario"
+        },
+        {
+          "device": "tablet",
+          "task": "Inspected USD reconciliation, book closing amount, bank difference and OFX sign guidance"
+        },
+        {
+          "device": "mobile",
+          "task": "Created USD 12.50 transfer with 05/11 accounting and 06/11 value date; switched extract date basis and verified row. Desktop detail shows FX 1260.123456 and ARS 15751.54."
+        }
+      ],
+      "negativeGateObserved": "Accounting-disabled synthetic tenant redirected to dashboard.",
+      "screenshots": [
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/posicion-escritorio.jpg",
+          "url": "http://localhost:3100/tesoreria",
+          "height": 1000,
+          "scrollWidth": 1440,
+          "theme": "light",
+          "width": 1440,
+          "check": "Saldos nativos y aviso de equivalente histórico incompleto."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/conciliacion-tablet.jpg",
+          "url": "http://localhost:3100/tesoreria/conciliacion/231094f4-fe88-41e4-be2d-64f793ee2b2d",
+          "height": 1024,
+          "scrollWidth": 768,
+          "theme": "light",
+          "width": 768,
+          "check": "Saldo del libro y diferencia banco-sistema separados, con criterio fecha valor, en una conciliación en progreso."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/transferencia-movil.jpg",
+          "url": "http://localhost:3100/tesoreria/transferencias/nueva?fromAccountId=eb7e1d22-928b-494b-9513-8bfdd1d68020",
+          "height": 844,
+          "scrollWidth": 390,
+          "theme": "dark",
+          "width": 390,
+          "check": "Formulario USD con fecha contable y valor distintas y cotización de seis decimales."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/extracto-valor-movil.jpg",
+          "url": "http://localhost:3100/tesoreria/cuentas/eb7e1d22-928b-494b-9513-8bfdd1d68020?dateBasis=value",
+          "height": 844,
+          "scrollWidth": 390,
+          "theme": "dark",
+          "width": 390,
+          "check": "Transferencia confirmada ordenada por 06/11 en Fecha valor; ajuste anterior indica Sin registrar. Saldo USD 97,51."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/movimiento-fx-escritorio.jpg",
+          "url": "http://localhost:3100/tesoreria/cuentas/eb7e1d22-928b-494b-9513-8bfdd1d68020?dateBasis=value",
+          "height": 1000,
+          "scrollWidth": 1440,
+          "theme": "dark",
+          "width": 1440,
+          "check": "Transferencia de US$12,50, fechas 05/11 y 06/11 y equivalente ARS 15.751,54."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/asiento-escritorio.jpg",
+          "url": "http://localhost:3100/contabilidad/asientos/nuevo?empresa=e0218c1f-7112-4dea-92a4-998663f537bb",
+          "height": 1000,
+          "scrollWidth": 1440,
+          "theme": "light",
+          "width": 1440,
+          "check": "Asiento de prueba con cuentas Caja y Capital y dos líneas balanceadas por ARS 10,25."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/asiento-contabilizado-escritorio.jpg",
+          "url": "http://localhost:3100/contabilidad/asientos/4e4204fb-c73d-48c4-891c-09c453c96594?empresa=e0218c1f-7112-4dea-92a4-998663f537bb",
+          "height": 1000,
+          "scrollWidth": 1440,
+          "theme": "light",
+          "width": 1440,
+          "check": "Asiento manual contabilizado en empresa de prueba, Debe/Haber ARS 10,25."
+        },
+        {
+          "path": "output/platform-audit/ag-10-2026-11-05/screenshots/libro-diario-escritorio.jpg",
+          "url": "http://localhost:3100/contabilidad/libro-diario?empresa=e0218c1f-7112-4dea-92a4-998663f537bb",
+          "height": 1000,
+          "scrollWidth": 1440,
+          "theme": "light",
+          "width": 1440,
+          "check": "El Libro Diario de la empresa muestra el asiento sintético contabilizado, Debe y Haber ARS 10,25."
+        }
+      ],
+      "cleanup": {
+        "logoutObserved": true,
+        "viewportReset": true,
+        "tabsClosed": 1,
+        "previewProcessEnded": true,
+        "port3100ListenerAbsent": true,
+        "syntheticDataRetained": true
+      },
+      "limit": "Muestra por recorrido. La revisión integral UX/UI queda prevista por separado.",
+      "artifact": "output/platform-audit/ag-10-2026-11-05/visual-checks.json"
+    },
+    "priorAttempts": [
+      {
+        "artifact": "output/platform-audit/ag-10-2026-11-05/workspace-lint-final.log",
+        "cause": "Dos relaciones Prisma desestructuradas solo para excluirlas se marcaban sin uso.",
+        "resolution": "El DTO enumera sus campos públicos explícitamente. Pruebas, tipos, lint y revisión final aprobados."
+      }
+    ],
+    "runtimeManifest": {
+      "sha256": "7f98ac3b7462d48730965982cc1f8e183c21605c9bbb2085964e4205fb3c8d0e",
+      "artifact": "output/platform-audit/ag-10-2026-11-05/source-freeze-03.json",
+      "count": 132,
+      "removed": [
+        "apps/web/features/treasury/components/deactivate-treasury-account-button.tsx"
+      ],
+      "files": [
+        {
+          "path": "apps/web/app/(app)/contabilidad/actions.ts",
+          "sha256": "87334112e7c80382bf440fb8325f1f526b6db2fcdaf248c71105d80ce754931a"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/asientos/[journalEntryId]/editar/page.tsx",
+          "sha256": "2fa2e9bf372ef1d921179fec773a3c6280790d560bf4ec96e77af2280982d835"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/asientos/[journalEntryId]/page.tsx",
+          "sha256": "aa24296be16747f97a1ff4f55efa5fb2bf282f9afa22e03c8ea039d6a911808e"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/asientos/nuevo/page.tsx",
+          "sha256": "940106815466526c19353cd34e7438acb022610556ce994aa0f28bf992631e63"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/asientos/page.tsx",
+          "sha256": "1877c5aa89c7af7c764766385389bac48ae6c5a70be225ffc757f7261952fb0f"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/cierres/page.tsx",
+          "sha256": "778b7a9d1f7fba26c7fd903f6403d4b834d3a1857ceecbcacaf8ad4735116225"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/cuentas/[accountId]/page.tsx",
+          "sha256": "0165fc361560648d98b1afc302f644566e3c7a07596834f4a3e1f1ceb6cbab37"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/cuentas/nueva/page.tsx",
+          "sha256": "725a9b4a4bf52772b1134f38e19f1140d621a1b19cae8d50d03b7260c49e62c8"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/cuentas/page.tsx",
+          "sha256": "da99c67eba2de7ef3702abbbb6e42948b6f9ffe692e8f8c4d80cfaf45e3ffe88"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/estado-resultados/page.tsx",
+          "sha256": "9722bbcf3018f40ae9cd77f1dd070adcc8a43ce37b154e00ac2a3ba5d17e1e69"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/layout.tsx",
+          "sha256": "07b98df1d811e4d9a08f8e592f6532f7218656dfbca4458da92775bb049e5531"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/libro-diario/page.tsx",
+          "sha256": "5778def4dfda2d9538321f436cad4dcd17b018e975cf2d1103254cab0c01ed43"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/page.tsx",
+          "sha256": "6ef8a371fec89e2f715144bb9532a48b7de272bcbdf1a12aab97bc99003827a5"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/reglas/[ruleId]/editar/page.tsx",
+          "sha256": "1bf29dc5d16f13118c9e44aef8b1d8c2226b76bd39c2961b0de6b42ce1039bbb"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/reglas/[ruleId]/page.tsx",
+          "sha256": "f2040b087d878b1f860e59d0e2d35bab229ca62d445f4687473d6af87d0012f7"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/reglas/nueva/page.tsx",
+          "sha256": "753e1ea67fe3251ab602c152d42467363cb355208e5c8085bc99eb67732f5723"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/reglas/page.tsx",
+          "sha256": "e6c18e95967b410eb9b72df6e3419726292a448106500cca3636bb117079166f"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/situacion-patrimonial/page.tsx",
+          "sha256": "7c877747f74420dc9319ecd7b144f7c8f557989d562a3c26b24c95d4c6c8d59b"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/source-draft-actions.ts",
+          "sha256": "5d61da0dc6785f95bd32fc5974dcc4ffe4cbf2ca8b13c6713d6cdd00bc9fb053"
+        },
+        {
+          "path": "apps/web/app/(app)/contabilidad/sumas-y-saldos/page.tsx",
+          "sha256": "30be20c4796a5f5a9a73e7557d9d2f457b859a1cc70b56061ea55fa9a1f74ba6"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/actions.ts",
+          "sha256": "c89cdc015cddbd25315d6600930e8f0c357d698950b4a49fff3dab99c3915afb"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/conciliacion/actions.ts",
+          "sha256": "22f98b4abd689c2d3f2cf79f6ba270ee5e9409e121f6dfb514942765db7e052a"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/conciliacion/nueva/page.tsx",
+          "sha256": "21e6f640b2b71477d1b34a46d23ad3578639ca87ea60ab78221aff19c0bc519d"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/conciliacion/page.tsx",
+          "sha256": "b8a5fd77b271ac37c6e27bbe88914ee57153ca785a1ee31697e79e05f4aec065"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/cuentas/[accountId]/page.tsx",
+          "sha256": "f51aae7e82a2a37aca8b9514d7997dd6eaeafd09c66ef514fb7c1c58aa2ddcc8"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/flujo-caja/page.tsx",
+          "sha256": "849d1934e67f2df1b3bed3a6291f927e0586f1e9cf523cad5f082f0ace90ddb7"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/layout.tsx",
+          "sha256": "a7967dc3215413c47ca76d38af61e6e30824849f5d10d5671a1b4fc8d919cff8"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/page.tsx",
+          "sha256": "b90f825380903d15b3a91b093d89fd0be0cbeb664ed60ee191d8b26669759df6"
+        },
+        {
+          "path": "apps/web/app/(app)/tesoreria/transferencias/page.tsx",
+          "sha256": "d7afdb36dc0c6dc15f25ebc7db6230c9d918815b4c70436955771159f095cebf"
+        },
+        {
+          "path": "apps/web/components/layout/module-subnav.tsx",
+          "sha256": "7058ada195b6d1e3912048538980d8d71a713f8b212f9f4b0da86b115da16ab3"
+        },
+        {
+          "path": "apps/web/components/ui/currency-select.tsx",
+          "sha256": "6ee131da4c3094b25343352fb5c81211f8bffb2240731523cbbd06b47e39cdb6"
+        },
+        {
+          "path": "apps/web/features/accounting/components/account-ledger-table.tsx",
+          "sha256": "8269beb9acdd5ee1fb1acd4f329c1457c073410efc559961898315b520f5644b"
+        },
+        {
+          "path": "apps/web/features/accounting/components/accounting-account-form.tsx",
+          "sha256": "b8e60a73edded723ae634195a0eed1032e0442ae74e72aff45b1f718cd9a756a"
+        },
+        {
+          "path": "apps/web/features/accounting/components/accounting-mapping-rule-form.tsx",
+          "sha256": "f868a0e1c0ebca698a949abc4923b517c3ab6f19ff8b79b31ae9895c09f2c2a6"
+        },
+        {
+          "path": "apps/web/features/accounting/components/accounting-module-nav.tsx",
+          "sha256": "b943fbe0cf8cf757753226e1d22c81c06dd50c177f8613ab578fbeaa727f8d73"
+        },
+        {
+          "path": "apps/web/features/accounting/components/accounting-report-range-error.tsx",
+          "sha256": "126f5d9e1fcd717ad7cd320147be1b843f8731d57f4946d522f4a93a6012dfcc"
+        },
+        {
+          "path": "apps/web/features/accounting/components/apply-coa-template-button.tsx",
+          "sha256": "e7fd04bb8c5803e68cdf09a1bf1afee763cc1f582efbdaaa1286f42d892d3508"
+        },
+        {
+          "path": "apps/web/features/accounting/components/deactivate-mapping-rule-button.tsx",
+          "sha256": "7c7fa2d9153769af6c24a03f996f99945d69eec63b3ca2d9c22e27bebe08c65f"
+        },
+        {
+          "path": "apps/web/features/accounting/components/financial-period-close-panel.tsx",
+          "sha256": "249190efb63ffd8957d0347f59a8f94ab52079060869aaebe03474fbecefefaa"
+        },
+        {
+          "path": "apps/web/features/accounting/components/journal-entry-detail-actions.tsx",
+          "sha256": "7bfb484f958a33bf9b445b874389b69aa2622b196f8456bf9a7d6af79becaf30"
+        },
+        {
+          "path": "apps/web/features/accounting/components/journal-entry-form.tsx",
+          "sha256": "533259fa4ef7ccb7cf4b985c92dbcdde30c5b31c4271d99b0d09f315faffe5ac"
+        },
+        {
+          "path": "apps/web/features/accounting/components/journal-entry-lines-editor.tsx",
+          "sha256": "fa46c2883f26877e6cc90918181eaa17fa86c3d18812964674da7a737e426744"
+        },
+        {
+          "path": "apps/web/features/accounting/lib/journal-entry-source-label.ts",
+          "sha256": "3d2020384d4b1d3bdee0f5b6c9407b381a1a20b0f8deab31a0cbe2e36c1d986c"
+        },
+        {
+          "path": "apps/web/features/finance/components/new-transaction-dialog.tsx",
+          "sha256": "67bfd96b77d461263cdf157a23aaaef35da3505a3394bae493871e4571e3aea8"
+        },
+        {
+          "path": "apps/web/features/help/lib/articles/control.ts",
+          "sha256": "90776fdace6fd747335cda1d796e471fe1f44bb2865824d11a8d591d737cd538"
+        },
+        {
+          "path": "apps/web/features/help/lib/articles/finance.ts",
+          "sha256": "de3c74333b5b4169f825189c28301f5bb30c62a2cd1c5b614415d6b3cb653611"
+        },
+        {
+          "path": "apps/web/features/help/lib/articles/setup-treasury.ts",
+          "sha256": "fb1806abcf0382d5681c8a6485e438e1f9d5dce836a07d6998b5a45d47cb986a"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/components/cash-flow-chart.tsx",
+          "sha256": "c2ab43ee802aeb6fa4005f69f5575c8f2659ee973dc16f3568b4092fddbcf50e"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/components/cash-flow-filters.tsx",
+          "sha256": "0908aad5c80156009f4fa3eca56a7ac803866cfe890d1889a525388253bedc75"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/components/cash-flow-table.tsx",
+          "sha256": "4470a88e6a54b0eb810e82b2d18a1df401320e7a78f3dcc7442dfcf8fb5083af"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/components/cash-position-table.tsx",
+          "sha256": "ae9a97017cbc777f1e9aab0904377c8a4dc776cad9be18dce25208907a2e8ad5"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/components/movement-detail-dialog.tsx",
+          "sha256": "bc14f8e4bf16a6976de048919b37c2a96410fb269e46e2b993bb6e4f14a44689"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/components/movement-ledger-table.tsx",
+          "sha256": "2f8521997263898507501043f8a65ad903ad638eba0872ba3cc33cd7746ef132"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/lib/cash-flow-period-label.test.ts",
+          "sha256": "be3a551de1f034df4112d1d05608e6e1f76a2beddb92ea8ff5988fc338dc1d34"
+        },
+        {
+          "path": "apps/web/features/treasury-reports/lib/cash-flow-period-label.ts",
+          "sha256": "440b3d02c5af54711eac96f04e4874396d26588733591c44273be2894a13f3e0"
+        },
+        {
+          "path": "apps/web/features/treasury/components/bank-reconciliation-form.tsx",
+          "sha256": "ec36b79b9e6f13bd65d9b03816d039773d914aa2ed4cdc322ec7bdc5a39b4eb0"
+        },
+        {
+          "path": "apps/web/features/treasury/components/bank-reconciliation-workspace.tsx",
+          "sha256": "f6f6a9e6f2984bff787bc31dd6cad6c2560aecdb9edd2034c1659ddd54d4d092"
+        },
+        {
+          "path": "apps/web/features/treasury/components/internal-transfer-cards.tsx",
+          "sha256": "6c389c556cadd6514e5447de193d24a5b0cd00f1a123a5d2057b73a7ca1376b8"
+        },
+        {
+          "path": "apps/web/features/treasury/components/internal-transfer-form.tsx",
+          "sha256": "3ca5bd8da4fbae32a1acd7c51031ac39e1ebe6b432e630ce98e4b54d091d91c8"
+        },
+        {
+          "path": "apps/web/features/treasury/components/internal-transfer-list-section.tsx",
+          "sha256": "f03cc62b9e9cd198175e606fc7401ac45e595b3d4a375aa474620778c4f6618b"
+        },
+        {
+          "path": "apps/web/features/treasury/components/internal-transfer-table.tsx",
+          "sha256": "0bcbf27b965da94d98f525fc914e6adfc433cb6fcc5dd3c93b85af8ea9b13bc0"
+        },
+        {
+          "path": "apps/web/features/treasury/components/manual-treasury-adjustment-form.tsx",
+          "sha256": "5233c1d420b2e8a224cbac54793b1ceb3baad28018b88e7214843a96d61fdadb"
+        },
+        {
+          "path": "apps/web/features/treasury/components/treasury-account-form.tsx",
+          "sha256": "67349eee90a8179b121197dad78743dd6e6dc6c14c9e8694a3482d282fab724b"
+        },
+        {
+          "path": "apps/web/features/treasury/components/treasury-account-status-button.tsx",
+          "sha256": "025d532fa03b9909dd12a388726604502f1dc3325c2a6f0f9b682a724e214d82"
+        },
+        {
+          "path": "apps/web/features/treasury/index.ts",
+          "sha256": "739480c00d3ae872dea4cd0090a2c96e3cfe34465b8910cac656afdbcd382028"
+        },
+        {
+          "path": "apps/web/lib/accounting-page-company.ts",
+          "sha256": "ad2a176969fc02d7af516a63bc62bebc413f320eea59476100cdd34eba81b2db"
+        },
+        {
+          "path": "apps/web/lib/auth-callback-url.test.ts",
+          "sha256": "4c05cfed953a8c9581733c235e9a296add2662c5b67fcd1240eab6f31242a3e7"
+        },
+        {
+          "path": "apps/web/lib/auth-callback-url.ts",
+          "sha256": "4183b194b912443f2e82c691589eb3a2c338ac43c707708b5a05a2e466543684"
+        },
+        {
+          "path": "packages/ai/evals/mvp-questions.json",
+          "sha256": "107444ee7fc51b4d0e904354860f06ed190430ebf431cb9a4ce22638f8fc30f1"
+        },
+        {
+          "path": "packages/ai/knowledge/generated/docs-index.json",
+          "sha256": "6c067af4e76e8fdf7dd96c88c2bdd24f7163b82ac47e71840696a1641dba2b3e"
+        },
+        {
+          "path": "packages/database/prisma/migrations/20261105170000_d134_treasury_movement_fx/migration.sql",
+          "sha256": "ba16c6ed43aeac6304e74936112feedd03bb628fc8c96b5aae344e618bf59e0c"
+        },
+        {
+          "path": "packages/database/prisma/migrations/20261105173000_d137_treasury_transfer_value_date/migration.sql",
+          "sha256": "c3f82fa4642146ec9a409f7928d6cf192e2b75353788c03dde75e7ae0f69b094"
+        },
+        {
+          "path": "packages/database/prisma/schema.prisma",
+          "sha256": "1429927bc977e80c1fcc1a1dd5d126d7f8e8231ade43f53885c1e4deff8aa6bd"
+        },
+        {
+          "path": "packages/report-pdf/src/report-pdf-export.service.tsx",
+          "sha256": "c1ce1e583bfbcaaffcc53cecf95716351e5e675e80a9aa3748871e65b7029eba"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-account.service.ts",
+          "sha256": "3e39540e51ea8cb484ea7a7afb409e7254a2b848c24649bd627d8b412c6bb24e"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-ar-ap-cancel-atomic.test.ts",
+          "sha256": "3bc442ef325700ca6b749e5b2e8993723347692a30e9a6a635dfea322188d335"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-auto-draft-failure.test.ts",
+          "sha256": "a4dbfd7e2ee0d4b19d00aa5c302e4660532a9b1d0a78dc6b7c4f6d5ccd77f8e8"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-auto-draft.service.ts",
+          "sha256": "8bddb229aaa701254d2ac532bf9895bb9e666ac1fe7cb9c54c4c2e6c7b16f75f"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-cancel-sync.service.ts",
+          "sha256": "8e69759fb34279a8f68871bd7bece1d3379c2f730e9ffada1968079a4d198cbc"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-coa-template.service.ts",
+          "sha256": "471e42d1eaca15fc2ab8b5801518244be892bede44992483f9c4aa472e3e0ef3"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-company-context.ts",
+          "sha256": "6e4a844b23ca7034a045407c4953014594b253a8d1c42f563deb6c83afaa91b2"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-draft-notifications.service.ts",
+          "sha256": "fd8ebd053379c81e05ef9bbec567a4a54dfd627643e1a8f3edad5ce17ded5cf6"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-mapping.service.ts",
+          "sha256": "e9972ad14dc2cf37e3399bfd3cb07b77e83b369ddeee170131af03738b6f38ae"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-platform-audit.test.ts",
+          "sha256": "37690dc680db44e0ab00b4bfe8b48168426d4e96a9eebcc1f96c277b612f05cc"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-report-export.service.ts",
+          "sha256": "018de398b7cfb6d9c3a97839c6861700b6a94b295d27c33e3d82f6e3c6ed9b44"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-reports.service.ts",
+          "sha256": "8d3d102690bbadfdecac0252e69fb34c51c0500ade22e929b91e0a79c829f8d5"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-source-access.ts",
+          "sha256": "5141e2a0015477a75883b16788f7eefe0765b20fff62335398caa0c77cbe5842"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-suggestions.service.ts",
+          "sha256": "3c6895b77c444ad683f70242aed668483ad7b318fc709cef860dff5c75482dcc"
+        },
+        {
+          "path": "packages/services/src/accounting/accounting-treasury-source.ts",
+          "sha256": "a6ef0e2efbfd0001179b4dd36ebc2261dc0af540b1f289a846634acee4dfa15e"
+        },
+        {
+          "path": "packages/services/src/accounting/ensure-iibb-coa-accounts.ts",
+          "sha256": "3581273b88d2cb2f05169dd9eefb453dee35401b3bba34bcbbfa951b11db02e1"
+        },
+        {
+          "path": "packages/services/src/accounting/journal-entry-source-link.service.ts",
+          "sha256": "56b4f489d84362982f68baa0032107ccaef611fcb5de37faa6f2f87f77dd777d"
+        },
+        {
+          "path": "packages/services/src/accounting/journal-entry.service.ts",
+          "sha256": "7e4a07d303cf69cb6ad925756cc9a2b70a6edeb179cfad9eeeab49f2db8a4ab6"
+        },
+        {
+          "path": "packages/services/src/ai/tools/finance-tools.ts",
+          "sha256": "be9fd4cc3117176b19a85e3bd6d1d0336a7d2b58112fc5bc1b8409502e31df17"
+        },
+        {
+          "path": "packages/services/src/ap/ap-platform-audit.live.test.ts",
+          "sha256": "1ba36a21fbade5d4a4f48726caaf07a45d3307361895dacaf72721de9fa3bfe4"
+        },
+        {
+          "path": "packages/services/src/ap/apply-payment-to-payable.ts",
+          "sha256": "e2bae7461fe1669791d1fa3d5cee9fe60e98ffc87a4c51170b7e9b08c54a7195"
+        },
+        {
+          "path": "packages/services/src/ap/payment.service.ts",
+          "sha256": "2f42485fd1b008dc4a7946e549554fa10d49594aaa21252afd4bc1a758049812"
+        },
+        {
+          "path": "packages/services/src/ar/ar-audit.live.test.ts",
+          "sha256": "deb9b18adaf279fbe900b689b6c702027234c73161f82e5f2fd2b5039d3c2cf7"
+        },
+        {
+          "path": "packages/services/src/ar/register-ar-income.service.ts",
+          "sha256": "801461abd59dd76da8479bc504218df876dc76335e972f484193e4491089df18"
+        },
+        {
+          "path": "packages/services/src/ar/register-ar-sale.service.ts",
+          "sha256": "ba2906e0e31c470158bf625697a4b6186a48be1d1cdfa7c1872688b82bf3c67b"
+        },
+        {
+          "path": "packages/services/src/finance/period-lock-assert.test.ts",
+          "sha256": "18e0865333a2310a6394bde80271e1191a4c503eb06dd2c7b2eea9f8d6ef8afa"
+        },
+        {
+          "path": "packages/services/src/finance/period-lock.service.ts",
+          "sha256": "726ef7479922321c92ff6db38000fc24439aa19672886a792c3ba14c99185031"
+        },
+        {
+          "path": "packages/services/src/idempotency/idempotency.ts",
+          "sha256": "dc468237fdf82c30f36bd0769209ef721af56d5b85b43836efefa84571699e40"
+        },
+        {
+          "path": "packages/services/src/notifications/notification.service.ts",
+          "sha256": "31f14e4db87bb10afa50c93820f352ef7ff403c27b2fd5fd8a09aad5c859db61"
+        },
+        {
+          "path": "packages/services/src/report-exports/report-export.service.ts",
+          "sha256": "2f89cf3c1ad1b473f68a4946a26a9ee4e6ed8496a1d40860d9fab0a919db19b8"
+        },
+        {
+          "path": "packages/services/src/treasury-reports/cash-position-amounts.test.ts",
+          "sha256": "acfbbfc172333428b981a944f8e15dc6bd4b2921d141317cce4adbb1f0243228"
+        },
+        {
+          "path": "packages/services/src/treasury-reports/cash-position-amounts.ts",
+          "sha256": "a24169a678db231179c1951e3e128905b3e0574e59dc92d9fe97763a96ddbaed"
+        },
+        {
+          "path": "packages/services/src/treasury-reports/cash-source-meta.ts",
+          "sha256": "1eb431cc6968a97c2a91614d77b9676ccb7580a0ccbe7cc21cb662da0f5021ca"
+        },
+        {
+          "path": "packages/services/src/treasury-reports/movement-report-audit.test.ts",
+          "sha256": "f900ce13071d8ea6d6639c79e6939b34efdd49d15bad34a7c112100082c5c89e"
+        },
+        {
+          "path": "packages/services/src/treasury-reports/treasury-reports.service.ts",
+          "sha256": "581c2e146a4272c2163951121921b13ee2c13b8200d76c075d5a3592fa39b4c0"
+        },
+        {
+          "path": "packages/services/src/treasury/account-movement.service.ts",
+          "sha256": "8b254ffc4170d0c06baf7de1491a573346ea1eff403fb94c662189ef3575cd09"
+        },
+        {
+          "path": "packages/services/src/treasury/balance.service.ts",
+          "sha256": "b928e3a775eef8d09db9e61fb82848f9146e3ae1077dd2ae21eb36b7d56523d2"
+        },
+        {
+          "path": "packages/services/src/treasury/bank-reconciliation-report.service.ts",
+          "sha256": "6dfd3631ea6191006e738dcdd4b84c22acc02b7051f5ff32780ff2fc863fe44d"
+        },
+        {
+          "path": "packages/services/src/treasury/bank-reconciliation.service.ts",
+          "sha256": "ca5cc5fcbe1b00f2c18aadce34880bee650fb4002d6c835662bbbdb6377f4465"
+        },
+        {
+          "path": "packages/services/src/treasury/bank-statement-csv-parser.test.ts",
+          "sha256": "13ac09470cad2d69b9a56d02e986278725a940ad249fa3dd66c6a46181603021"
+        },
+        {
+          "path": "packages/services/src/treasury/bank-statement-csv-parser.ts",
+          "sha256": "306e0006422d3ce254b003941701afe6213271ef6af2d4c0cc9378f6d26a78c1"
+        },
+        {
+          "path": "packages/services/src/treasury/bank-statement-ofx-parser.test.ts",
+          "sha256": "03c975ddbf4d0965dde94cec84f2bd85bb8955207444b2391fb3ad0c58afcc91"
+        },
+        {
+          "path": "packages/services/src/treasury/bank-statement-ofx-parser.ts",
+          "sha256": "68edf5677ad4187ff418b90af59a83a5adf9e4c47bd04c4baa021aea98f1e5e9"
+        },
+        {
+          "path": "packages/services/src/treasury/collection.service.ts",
+          "sha256": "4a2859073cf197c6ac81422736ecf9b65ae6ca7a06ad375c135723d992cb052f"
+        },
+        {
+          "path": "packages/services/src/treasury/internal-transfer.service.ts",
+          "sha256": "ab02047d2ecdd394be31c58f9ed49e74f4fdc9cf415d943a0785c118ac306ece"
+        },
+        {
+          "path": "packages/services/src/treasury/reconciliation-movement-date.ts",
+          "sha256": "d847f490fc6857d934edf5495d20a568ddc32158d831c45c78243822ca990d21"
+        },
+        {
+          "path": "packages/services/src/treasury/register-corporate-treasury-inflow.service.ts",
+          "sha256": "8e86f77186f3f1515478ea59c336b6ba2d7250465bf733ac224a5987ffea9a38"
+        },
+        {
+          "path": "packages/services/src/treasury/register-manual-treasury-adjustment.service.ts",
+          "sha256": "d5310424c23eecf6a2d6faaef898a938d66a5e7852bfced603eaa8db698af962"
+        },
+        {
+          "path": "packages/services/src/treasury/treasury-account.service.ts",
+          "sha256": "b5beb618166d79f9bf917250bfd31f6b299ae90cb06eb3c135a46fef35523c75"
+        },
+        {
+          "path": "packages/services/src/treasury/treasury-attribution.service.ts",
+          "sha256": "648295bda677b1a685654bfffc84666ca7a2f8597a6943fa116b5a8a9624fa80"
+        },
+        {
+          "path": "packages/services/src/treasury/treasury-fx.ts",
+          "sha256": "70cfb107a9ad390cb00d2240eea052ef1a1711093263fd049d2a70fa8fef23be"
+        },
+        {
+          "path": "packages/services/src/treasury/treasury-hub.service.ts",
+          "sha256": "d63000fe9d3046d26399302b24500d99bb54fa239596c9e4e54d799b6c3547b3"
+        },
+        {
+          "path": "packages/services/src/treasury/treasury-platform-audit.live.test.ts",
+          "sha256": "e41bb2f033bc368d19569bfd7d0de5ca5f2bf131d4edd3cb44fd65c9eb22791e"
+        },
+        {
+          "path": "packages/services/src/treasury/treasury-write-locks.ts",
+          "sha256": "71e1d48a31d74ac1d8d0b41d40754c0c07767e81aa2016a13ef420df59aaecac"
+        },
+        {
+          "path": "packages/validators/src/accounting-mapping.ts",
+          "sha256": "ecfaee79799489d9e09b7f7deabef243b92e4a51a9c08ba3762bca9f36b3599d"
+        },
+        {
+          "path": "packages/validators/src/accounting.ts",
+          "sha256": "5f947ac2cecd45480a86ec4917fd02ef1c83b8f366e68955ddaa0f7b92572310"
+        },
+        {
+          "path": "packages/validators/src/bank-reconciliation.ts",
+          "sha256": "49196c8bd6cba3209fc908337921e67ba44fd439ebd97fa0552aaf946f5a3bc4"
+        },
+        {
+          "path": "packages/validators/src/treasury.ts",
+          "sha256": "0c9906b8e9559847b98a0dc14e88f8663c1ba1da01851f921eaf8b676f365592"
+        }
+      ]
+    },
+    "releaseManifest": "output/platform-audit/ag-10-2026-11-05/final-source-manifest.json"
+  }
+}

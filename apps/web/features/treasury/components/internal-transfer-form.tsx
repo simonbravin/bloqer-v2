@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -11,6 +11,9 @@ import {
 } from "@/components/ui/select";
 import { createInternalTransferAction } from "@/app/(app)/tesoreria/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 
 interface AccountOption {
   id: string;
@@ -35,8 +38,8 @@ export function InternalTransferForm({
   successHref,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [sourceAccountId, setSourceAccountId] = useState(
     defaultSourceAccountId && accounts.some((a) => a.id === defaultSourceAccountId)
       ? defaultSourceAccountId
@@ -44,13 +47,10 @@ export function InternalTransferForm({
   );
   const [destinationAccountId, setDestinationAccountId] = useState("");
   const [amount, setAmount] = useState("");
-  const [transferDate, setTransferDate] = useState(() => {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  });
+  const [fxRate, setFxRate] = useState("");
+  const [transferDate, setTransferDate] = useState(() => toIsoDateInTimeZone());
+  const [customValueDate, setCustomValueDate] = useState<string | null>(null);
+  const valueDate = customValueDate ?? transferDate;
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   const sourceAccount = accounts.find((a) => a.id === sourceAccountId) ?? null;
@@ -61,6 +61,8 @@ export function InternalTransferForm({
       );
 
   function onSourceChange(id: string) {
+    const nextSource = accounts.find((account) => account.id === id);
+    if (nextSource?.currency !== sourceAccount?.currency) setFxRate("");
     setSourceAccountId(id);
     setDestinationAccountId((prev) => {
       const src = accounts.find((a) => a.id === id);
@@ -73,8 +75,9 @@ export function InternalTransferForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!sourceAccountId) { setError("Seleccione cuenta origen"); return; }
-    if (!destinationAccountId) { setError("Seleccione cuenta destino"); return; }
+    if (isBusy()) return;
+    if (!sourceAccountId) { setError("Seleccioná la cuenta de origen"); return; }
+    if (!destinationAccountId) { setError("Seleccioná la cuenta de destino"); return; }
     if (sourceAccountId === destinationAccountId) {
       setError("La cuenta origen y destino deben ser diferentes");
       return;
@@ -88,12 +91,15 @@ export function InternalTransferForm({
       return;
     }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       const res = await createInternalTransferAction({
         sourceAccountId,
         destinationAccountId,
         transferDate: fd.get("transferDate") as string,
+        valueDate:    fd.get("valueDate") as string,
         amount:       fd.get("amount") as string,
+        fxRate:       src && src.currency !== "ARS" ? fxRate : undefined,
         description:  (fd.get("description") as string) || null,
         idempotencyKey,
       });
@@ -118,14 +124,14 @@ export function InternalTransferForm({
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label>Cuenta origen</Label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="transfer-source">Cuenta origen</Label>
             <Select onValueChange={onSourceChange} value={sourceAccountId}>
-              <SelectTrigger>
+              <SelectTrigger id="transfer-source">
                 <SelectValue placeholder="Seleccionar cuenta…" />
               </SelectTrigger>
               <SelectContent>
@@ -138,14 +144,14 @@ export function InternalTransferForm({
             </Select>
           </div>
 
-          <div className="space-y-1">
-            <Label>Cuenta destino</Label>
+          <div className="min-w-0 space-y-1">
+            <Label htmlFor="transfer-destination">Cuenta destino</Label>
             <Select
               onValueChange={setDestinationAccountId}
               value={destinationAccountId}
               disabled={!sourceAccountId}
             >
-              <SelectTrigger>
+              <SelectTrigger id="transfer-destination">
                 <SelectValue
                   placeholder={
                     sourceAccountId
@@ -167,7 +173,7 @@ export function InternalTransferForm({
           </div>
 
           <div className="space-y-1">
-            <Label htmlFor="transferDate">Fecha</Label>
+            <Label htmlFor="transferDate">Fecha contable</Label>
             <Input
               id="transferDate"
               name="transferDate"
@@ -176,6 +182,19 @@ export function InternalTransferForm({
               value={transferDate}
               onChange={(e) => setTransferDate(e.target.value)}
             />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="valueDate">Fecha valor</Label>
+            <Input
+              id="valueDate"
+              name="valueDate"
+              type="date"
+              required
+              value={valueDate}
+              onChange={(e) => setCustomValueDate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Fecha efectiva en las cuentas. Podés cambiarla si difiere de la fecha contable.</p>
           </div>
 
           <div className="space-y-1">
@@ -190,14 +209,18 @@ export function InternalTransferForm({
             />
           </div>
 
-          <div className="col-span-2 space-y-1">
+          {sourceAccount ? (
+            <ManualFxField currency={sourceAccount.currency} value={fxRate} onValueChange={setFxRate} id="transfer-fx-rate" disabled={isPending} />
+          ) : null}
+
+          <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="description">Descripción (opcional)</Label>
             <Input id="description" name="description" />
           </div>
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => router.back()}>
             Cancelar
           </Button>
           <Button

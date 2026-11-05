@@ -80,5 +80,7 @@ También válido con `,` y encabezados en inglés (`date,description,amount,dire
 ### Formato OFX ([D-079])
 OFX 1.x / QFX (SGML): bloques `<STMTTRN>` con `DTPOSTED`, `TRNAMT` (signo), `NAME`/`MEMO`, `FITID` opcional.
 
+Para transferencias `XFER`, `+` identifica un crédito y `-` un débito. Una fila `XFER` sin signo se informa como ambigua antes de importar. Los tipos inequívocos conservan la compatibilidad con montos sin signo y se rechaza un tipo que contradiga el signo explícito ([D-138]).
+
 ## 19. Preguntas abiertas
 - Ninguna operativa para conciliación Phase 1–2. API bancaria → integraciones futuras.

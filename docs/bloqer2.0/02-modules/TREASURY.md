@@ -25,7 +25,7 @@ Confundir banco, contabilidad y obligaciones pendientes; necesidad de ver **caja
 Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § AccountMovement.
 
 ## 8. Acciones disponibles
-- Registrar ingreso/egreso manual (DRAFT→CONFIRMED).
+- Registrar ingreso/egreso manual confirmado. La generación de un borrador contable es un flujo distinto.
 - Confirmar cobranzas/pagos que generan movimiento.
 - Conciliar con extracto ([`BANK_RECONCILIATION.md`](./BANK_RECONCILIATION.md)).
 - Transferencias internas con doble fecha ([D-023]).

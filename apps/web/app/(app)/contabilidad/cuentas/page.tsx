@@ -8,10 +8,10 @@ import {
   ApplyCoaTemplateButton,
 } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { getCompanies, listAccountingAccounts } from "@bloqer/services";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
+import { listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
@@ -26,12 +26,8 @@ export default async function ContabilidadCuentasPage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
-  const [{ data: accounts }, companies] = await Promise.all([
-    listAccountingAccounts(ctx, cf),
-    getCompanies(ctx),
-  ]);
+  const { ctx, cf, company } = await requireAccountingPageCompany(sp);
+  const { data: accounts } = await listAccountingAccounts(ctx, cf);
 
   const empresa = cf.companyId;
   const q = empresa ? `?empresa=${encodeURIComponent(empresa)}` : "";
@@ -43,13 +39,6 @@ export default async function ContabilidadCuentasPage({
           a.code.toLowerCase().includes(search) || a.name.toLowerCase().includes(search),
       )
     : accounts;
-
-  // Same resolution order as services: query → membership → first ACTIVE by name.
-  const applyCompanyId =
-    empresa ?? current.tenantCtx.companyId ?? companies[0]?.id ?? null;
-  const applyCompany = companies.find((c) => c.id === applyCompanyId) ?? null;
-  const showCompanyHint =
-    !empresa && !current.tenantCtx.companyId && companies.length > 1 && !!applyCompany;
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -64,8 +53,8 @@ export default async function ContabilidadCuentasPage({
           {canEdit && (
             <>
               <ApplyCoaTemplateButton
-                companyId={applyCompanyId}
-                companyLabel={showCompanyHint ? applyCompany?.name : null}
+                companyId={company.id}
+                companyLabel={company.name}
               />
               <Button asChild>
                 <Link href={`/contabilidad/cuentas/nueva${q}`}>+ Nueva cuenta</Link>

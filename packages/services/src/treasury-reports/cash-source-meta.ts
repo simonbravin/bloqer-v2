@@ -35,8 +35,9 @@ export async function loadCashSourceMeta(
           where: { tenantId, id: { in: uniquePayments } },
           select: {
             id: true,
+            companyId: true,
             projectId: true,
-            supplierInvoice: { select: { number: true } },
+            supplierInvoice: { select: { number: true, tenantId: true, companyId: true } },
           },
         })
       : Promise.resolve([]),
@@ -45,8 +46,9 @@ export async function loadCashSourceMeta(
           where: { tenantId, id: { in: uniqueCollections } },
           select: {
             id: true,
+            companyId: true,
             projectId: true,
-            salesInvoice: { select: { number: true } },
+            salesInvoice: { select: { number: true, tenantId: true, companyId: true } },
           },
         })
       : Promise.resolve([]),
@@ -55,10 +57,10 @@ export async function loadCashSourceMeta(
   return {
     documentRefs: {
       byPaymentId: new Map(
-        payments.map((p) => [p.id, supplierInvoiceDocumentRef(p.supplierInvoice?.number)]),
+        payments.map((p) => [p.id, p.supplierInvoice?.tenantId === tenantId && p.supplierInvoice.companyId === p.companyId ? supplierInvoiceDocumentRef(p.supplierInvoice.number) : null]),
       ),
       byCollectionId: new Map(
-        collections.map((c) => [c.id, salesInvoiceDocumentRef(c.salesInvoice?.number)]),
+        collections.map((c) => [c.id, c.salesInvoice?.tenantId === tenantId && c.salesInvoice.companyId === c.companyId ? salesInvoiceDocumentRef(c.salesInvoice.number) : null]),
       ),
     },
     projects: {

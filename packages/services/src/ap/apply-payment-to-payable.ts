@@ -195,6 +195,8 @@ export async function applyPaymentToPayable(
       sourceId: payment.id,
       currency: payable.currency,
       amount: amountToApply,
+      fxRate: fx.fxRate,
+      amountArs: fx.amountArs,
       description: `Pago factura proveedor ${invoiceCode}`,
       status: "CONFIRMED",
       createdBy: ctx.actorUserId,

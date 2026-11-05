@@ -2,25 +2,22 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { JournalEntryForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { getCompanies, listAccountingAccounts } from "@bloqer/services";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
+import { listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
-export default async function NuevoAsientoPage() {
+export default async function NuevoAsientoPage({ searchParams }: { searchParams: Promise<EmpresaSearch> }) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
   if (!can(current.tenantCtx.roles, "EDIT", "ACCOUNTING")) redirect("/dashboard");
 
-  const ctx = (await buildTenantServiceContext())!;
-  const [companies, accountsResult] = await Promise.all([
-    getCompanies(ctx),
-    listAccountingAccounts(ctx, {}),
-  ]);
-  const accounts = accountsResult.data;
+  const { ctx, cf } = await requireAccountingPageCompany(await searchParams);
+  const { data: accounts } = await listAccountingAccounts(ctx, cf);
 
-  const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
+  const picks = accounts.filter((a) => a.isActive).map(({ id, code, name }) => ({ id, code, name }));
 
   if (picks.length === 0) {
     return (
@@ -32,7 +29,7 @@ export default async function NuevoAsientoPage() {
           Creá al menos una cuenta contable antes de cargar asientos.
         </p>
         <Button asChild>
-          <Link href="/contabilidad/cuentas/nueva">Nueva cuenta</Link>
+          <Link href={`/contabilidad/cuentas/nueva?empresa=${encodeURIComponent(cf.companyId)}`}>Nueva cuenta</Link>
         </Button>
       </PageShell>
     );
@@ -46,8 +43,7 @@ export default async function NuevoAsientoPage() {
       <JournalEntryForm
         mode="create"
         accounts={picks}
-        companies={companies.map((c) => ({ id: c.id, name: c.name }))}
-        defaultCompanyId={current.tenantCtx.companyId}
+        defaultCompanyId={cf.companyId}
       />
     </PageShell>
   );

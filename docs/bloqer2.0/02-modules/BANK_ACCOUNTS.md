@@ -12,6 +12,7 @@ Sin maestro de cuentas no hay extractos ni saldos por entidad financiera.
 ## 4. Datos que consume (inputs)
 - Catálogo **Bank**, moneda, CBU, alias CBU.
 - Saldo inicial opcional al alta.
+- La apertura positiva o negativa distinta de cero queda en el extracto como `OPENING_BALANCE`, con período abierto y cotización manual para moneda extranjera. El saldo cero no crea movimiento ([D-134], [D-136]).
 
 ## 5. Datos que produce (outputs)
 - **Account** tipo `BANK` | `CASH` | `WALLET`.

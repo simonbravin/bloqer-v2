@@ -6,7 +6,7 @@ Operaciones en **USD** u otras monedas habilitadas para el tenant; **ARS** siemp
 ## Reglas lockeadas
 1. **FX manual**: el usuario ingresa `fx_rate` al confirmar el movimiento/comprobante ([D-008]).
 2. **Sin proveedor FX externo** en Fase 1.
-3. **Todo movimiento** guarda `amount`, `currency`, `fx_rate`, `amount_ars`.
+3. **Todo movimiento nuevo** guarda `amount`, `currency`, `fxRate`, `amountArs` ([D-134](../00-product/DECISION_LOG.md#d-134--tipo-de-cambio-persistido-en-movimientos-nuevos-de-tesorería)).
 4. **Reportes consolidados** en ARS; opción de ver montos originales por columna.
 5. **Diferencias de cambio**: no calculadas automáticamente en Fase 1 ([Q-025]); Fase 2 opcional.
 
@@ -33,9 +33,9 @@ El flujo actual de transferencias propias admite cuentas de la misma moneda. Un 
 
 Aging AR/AP, sus resúmenes y herramientas AI separan totales por moneda; el campo de total único no representa una suma de monedas diferentes. Esto no convierte un snapshot de deuda en un consolidado ARS ni modifica D-008.
 
-## Hallazgo — AG-09: regla FX y representación física pendientes
+## Hallazgo — AG-09: representación del tipo de cambio
 
-Las frases anteriores de cobro/pago o transferencia entre monedas describían un circuito no implementado. Se aclara la limitación vigente, sin habilitar conversiones. La exigencia D-008 de snapshots se conserva; `AccountMovement` e `InternalTransfer` todavía no tienen columnas de snapshot FX. Esa brecha física se registra en [P-AG10-01](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md) para diseño y aprobación específicos, sin migrar históricos ni declarar completada AG-10.
+AG-09 registró la brecha en [P-AG10-01](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md). D-134 guarda la cotización de cada movimiento nuevo. Las transferencias propias de una misma moneda comparten el equivalente de ambas piernas. Si falta cotización en una contribución extranjera histórica, la posición consolidada en ARS queda incompleta y se mantienen los saldos nativos por moneda.
 
 ## Validaciones
 - `fx_rate > 0`.

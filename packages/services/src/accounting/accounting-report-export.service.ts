@@ -11,6 +11,7 @@ import {
   listPostedJournalBookForExport,
   type AccountingReportDateRange,
 } from "./accounting-reports.service";
+import { MAX_ACCOUNT_LEDGER_ROWS } from "./journal-entry.service";
 
 const MAX_JOURNAL_EXPORT = 5000;
 
@@ -174,7 +175,10 @@ export async function exportAccountLedgerCsv(
   input: AccountingReportDateRange & { accountId: string },
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
-  const report = await getAccountLedgerReport(ctx, { ...input, limit: 5000 });
+  const report = await getAccountLedgerReport(ctx, { ...input, limit: MAX_ACCOUNT_LEDGER_ROWS });
+  if (report.truncated) {
+    throw new ServiceError("VALIDATION", `El mayor supera ${MAX_ACCOUNT_LEDGER_ROWS} movimientos. Acotá el rango de fechas.`);
+  }
   const headers = [
     "Fecha",
     "AsientoId",

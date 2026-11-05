@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { PeriodSummary } from "@bloqer/services";
 import {
@@ -41,13 +42,13 @@ export function FinancialPeriodClosePanel({
   canOperate,
 }: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending, run } = useOperationalAction({ onError: setError });
   const [closeKey, setCloseKey] = useState<string | null>(null);
   const [reopenKey, setReopenKey] = useState<string | null>(null);
 
   function runClose(periodKey: string) {
-    startTransition(async () => {
+    return run(async () => {
       setError(null);
       const res = await closeFinancialPeriodAction({ companyId, periodKey });
       if ("error" in res) {
@@ -62,7 +63,7 @@ export function FinancialPeriodClosePanel({
   }
 
   function runReopen(periodKey: string, reason: string) {
-    startTransition(async () => {
+    return run(async () => {
       setError(null);
       const res = await reopenFinancialPeriodAction({
         companyId,
@@ -142,7 +143,7 @@ export function FinancialPeriodClosePanel({
                           variant="outline"
                           size="sm"
                           disabled={pending}
-                          onClick={() => setReopenKey(p.periodKey)}
+                          onClick={() => { setError(null); setReopenKey(p.periodKey); }}
                         >
                           Reabrir
                         </Button>
@@ -151,7 +152,7 @@ export function FinancialPeriodClosePanel({
                           type="button"
                           size="sm"
                           disabled={pending}
-                          onClick={() => setCloseKey(p.periodKey)}
+                          onClick={() => { setError(null); setCloseKey(p.periodKey); }}
                         >
                           Cerrar
                         </Button>
@@ -171,22 +172,32 @@ export function FinancialPeriodClosePanel({
         open={closeKey != null}
         onOpenChange={(open) => !open && setCloseKey(null)}
         title={`Cerrar período ${closeKey ?? ""}`}
-        description={`¿Cerrar el período ${closeKey}${companyHint}? No se podrán crear, editar ni anular movimientos de tesorería ni asientos contables con fecha en ese mes.`}
+        description={
+          <>
+            <p>¿Cerrar el período {closeKey}{companyHint}? No se podrán crear, editar ni anular movimientos de tesorería ni asientos contables con fecha en ese mes.</p>
+            {error ? <p className="text-destructive" role="alert">{error}</p> : null}
+          </>
+        }
         confirmLabel="Cerrar período"
         pending={pending}
         onConfirm={() => {
-          if (closeKey) runClose(closeKey);
+          if (closeKey) return runClose(closeKey);
         }}
       />
       <ReasonAlertDialog
         open={reopenKey != null}
         onOpenChange={(open) => !open && setReopenKey(null)}
         title={`Reabrir período ${reopenKey ?? ""}`}
-        description={`Motivo de reapertura del período ${reopenKey} (obligatorio). Queda auditado.`}
+        description={
+          <>
+            <p>Motivo de reapertura del período {reopenKey} (obligatorio). Queda auditado.</p>
+            {error ? <p className="text-destructive" role="alert">{error}</p> : null}
+          </>
+        }
         confirmLabel="Reabrir"
         pending={pending}
         onConfirm={(reason) => {
-          if (reopenKey) runReopen(reopenKey, reason);
+          if (reopenKey) return runReopen(reopenKey, reason);
         }}
       />
     </DataTableSection>

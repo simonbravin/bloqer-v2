@@ -2,11 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import { getStatementOfFinancialPosition } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatDbDate } from "@/lib/format";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import {
@@ -89,8 +90,7 @@ export default async function SituacionPatrimonialPage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
   const report = await getStatementOfFinancialPosition(ctx, {
     companyId: cf.companyId ?? null,
     asOfDate: sp.asOfDate,
@@ -111,7 +111,7 @@ export default async function SituacionPatrimonialPage({
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Situación patrimonial</h1>
-          <p className="text-sm text-muted-foreground mt-1">Al {report.asOfDate}</p>
+          <p className="text-sm text-muted-foreground mt-1">Al {formatDbDate(report.asOfDate)}</p>
         </div>
         <ReportExportActions
           exportPath="/api/reports/contabilidad/estado-situacion"

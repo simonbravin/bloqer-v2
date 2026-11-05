@@ -5,13 +5,16 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { AccountLedgerRowView } from "@bloqer/services";
 import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatDbDate } from "@/lib/format";
 
 export function AccountLedgerTable({
   rows,
   truncated,
+  empresa,
 }: {
   rows: AccountLedgerRowView[];
   truncated?: boolean;
+  empresa: string;
 }) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">Sin movimientos contabilizados en esta cuenta.</p>;
@@ -20,7 +23,7 @@ export function AccountLedgerTable({
     <div className="space-y-2">
       {truncated ? (
         <p className="text-xs text-amber-700 dark:text-amber-400">
-          Se muestran las primeras filas del período. Exportá CSV/PDF para el detalle completo o acotá el rango.
+          Se muestran las primeras filas del período. Acotá el rango para ver todas las filas. La exportación también tiene un límite.
         </p>
       ) : null}
       <TableScroll>
@@ -39,13 +42,13 @@ export function AccountLedgerTable({
           <TableBody>
             {rows.map((r) => (
               <TableRow key={r.id} className={r.isOpening ? "bg-muted/40" : undefined}>
-                <TableCell className="font-mono text-sm whitespace-nowrap">{r.entryDate}</TableCell>
+                <TableCell className="font-mono text-sm whitespace-nowrap">{formatDbDate(r.entryDate)}</TableCell>
                 <TableCell className="font-mono text-xs">
                   {r.isOpening || !r.entryId ? (
                     <span className="text-muted-foreground">—</span>
                   ) : (
                     <Link
-                      href={`/contabilidad/asientos/${r.entryId}`}
+                      href={`/contabilidad/asientos/${r.entryId}?empresa=${encodeURIComponent(empresa)}`}
                       className="text-primary underline-offset-4 hover:underline"
                     >
                       {r.entryReference ?? `${r.entryId.slice(0, 8)}…`}

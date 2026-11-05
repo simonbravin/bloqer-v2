@@ -406,6 +406,13 @@
     "expectTools": ["get_cash_position"]
   },
   {
+    "id": "single-cash-equivalent-historical-1",
+    "category": "single_tool",
+    "question": "¿Cuál es el equivalente histórico de todas las cuentas en pesos? Si falta alguna cotización, indicame si se puede calcular.",
+    "expectTools": ["get_cash_position"],
+    "notes": "No confundir un total incompleto con saldo cero, ni presentarlo como valuación a la cotización actual."
+  },
+  {
     "id": "single-cxp-overdue-1",
     "category": "single_tool",
     "question": "Solo vencidos de CxP, por favor",

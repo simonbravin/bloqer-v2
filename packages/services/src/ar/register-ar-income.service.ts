@@ -536,6 +536,8 @@ export async function registerArIncome(
               sourceId: collection.id,
               currency: receivable.currency,
               amount: collectAmount,
+              fxRate: collectionFx.fxRate,
+              amountArs: collectionFx.amountArs,
               description: `Cobranza factura ${formatSalesInvoiceCode(number)}`,
               status: "CONFIRMED",
               createdBy: ctx.actorUserId,

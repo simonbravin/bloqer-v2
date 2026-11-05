@@ -3,6 +3,7 @@ import {
   COA_IIBB_PERCEPTION_CREDIT,
   COA_IIBB_PERCEPTION_DEBIT,
 } from "./accounting-invoice-journal-lines";
+import { lockAccountingCompany } from "./accounting-company-context";
 
 const IIBB_COA_SEED: Array<{ code: string; name: string; type: AccountType }> = [
   {
@@ -25,14 +26,20 @@ export async function ensureIibbPerceptionCoaAccounts(
   tenantId: string,
   companyId: string,
 ): Promise<void> {
-  for (const acc of IIBB_COA_SEED) {
-    const existing = await prisma.accountingAccount.findFirst({
-      where: { tenantId, companyId, code: acc.code },
-      select: { id: true, isActive: true },
+  const where = { tenantId, companyId, code: { in: IIBB_COA_SEED.map(account => account.code) } };
+  const active = await prisma.accountingAccount.count({ where: { ...where, isActive: true } });
+  if (active === IIBB_COA_SEED.length) return;
+  await prisma.$transaction(async (tx) => {
+    await lockAccountingCompany(tx, tenantId, companyId);
+    const existing = await tx.accountingAccount.findMany({
+      where,
+      select: { code: true, isActive: true },
     });
-    if (!existing) {
-      await prisma.accountingAccount.create({
-        data: {
+    for (const acc of IIBB_COA_SEED) {
+      if (existing.some(account => account.code === acc.code && account.isActive)) continue;
+      await tx.accountingAccount.upsert({
+        where: { tenantId_companyId_code: { tenantId, companyId, code: acc.code } },
+        create: {
           tenantId,
           companyId,
           code: acc.code,
@@ -40,14 +47,8 @@ export async function ensureIibbPerceptionCoaAccounts(
           type: acc.type,
           isActive: true,
         },
-      });
-      continue;
-    }
-    if (!existing.isActive) {
-      await prisma.accountingAccount.update({
-        where: { id: existing.id },
-        data: { isActive: true },
+        update: { isActive: true },
       });
     }
-  }
+  }, { maxWait: 10_000, timeout: 30_000 });
 }

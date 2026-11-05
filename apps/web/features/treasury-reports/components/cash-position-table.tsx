@@ -16,6 +16,7 @@ import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { ReportExportActions } from "@/features/reports";
 
 const TYPE_LABELS: Record<string, string> = {
   BANK: "Banco",
@@ -50,9 +51,18 @@ export function CashPositionTable({ report }: Props) {
             subtitle={formatCurrencyDisplay(c.currency)}
           />
         ))}
+        <KpiStatCard
+          label="Equivalente histórico ARS"
+          value={report.consolidatedArs == null ? "No disponible" : formatMoneyAmount(report.consolidatedArs, "ARS")}
+          helper={report.consolidatedArs == null ? "Hay movimientos o saldos iniciales sin cotización registrada." : "Usa el tipo de cambio registrado en cada operación."}
+        />
       </KpiStatGrid>
 
-      <DataTableSection title="Saldos por cuenta">
+      <DataTableSection
+        title="Saldos por cuenta"
+        description="Incluye cuentas activas, inactivas y cerradas. El equivalente histórico no es una valuación a la cotización de hoy."
+        actions={<ReportExportActions exportPath="/api/reports/tesoreria/posicion-caja.csv" params={{}} pdf />}
+      >
         <TableScroll>
           <Table>
             <TableHeader>
@@ -63,6 +73,7 @@ export function CashPositionTable({ report }: Props) {
                 <TableHead>Moneda</TableHead>
                 <TableHead>Estado</TableHead>
                 <TableHead className="text-right">Saldo</TableHead>
+                <TableHead className="text-right">Equivalente histórico ARS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -86,6 +97,9 @@ export function CashPositionTable({ report }: Props) {
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-mono">
                     {formatMoneyAmount(acc.balance)} {acc.currency}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-mono">
+                    {acc.balanceArs == null ? "No disponible" : formatMoneyAmount(acc.balanceArs, "ARS")}
                   </TableCell>
                 </TableRow>
               ))}

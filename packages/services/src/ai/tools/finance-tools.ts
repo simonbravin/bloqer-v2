@@ -4,6 +4,7 @@ import { getReceivableAgingReport } from "../../aging/aging.service";
 import { summarizePayablesByProject } from "../../ap/payable.service";
 import { summarizeReceivablesByProject } from "../../ar/receivable.service";
 import { getTreasuryHubOverview } from "../../treasury/treasury-hub.service";
+import { getCashPositionReport } from "../../treasury-reports/treasury-reports.service";
 import { canViewCompanyAp } from "../../ap/ap-access";
 import { canViewCompanyAr } from "../../ar/ar-access";
 import { resolveAiProjectId } from "../context";
@@ -222,22 +223,29 @@ export const getReceivablesTool = defineBloqerAiTool({
 export const getCashPositionTool = defineBloqerAiTool({
   name: "get_cash_position",
   description:
-    "Posición de caja desde el hub de tesorería existente (saldos por moneda). No inventa proyecciones.",
+    "Posición de caja del tenant. Incluye saldos por moneda de cuentas activas y el equivalente histórico en ARS de todas las cuentas si cada contribución tiene cotización trazable. Null significa que falta información; no es cero ni una valuación al cambio de hoy.",
   risk: "READ",
   requiredModules: ["TREASURY"],
   policy: {
     dataClass: AI_DATA_CLASS.TREASURY,
-    scope: "COMPANY",
+    scope: "TENANT",
     accessKind: "treasury",
   },
   inputSchema: z.object({}).strict(),
   jsonSchema: { type: "object", properties: {}, additionalProperties: false },
   statusLabel: "Consultando tesorería…",
   async execute(ctx) {
-    const hub = await getTreasuryHubOverview(ctx.service);
+    const [hub, position] = await Promise.all([
+      getTreasuryHubOverview(ctx.service),
+      getCashPositionReport({}, ctx.service),
+    ]);
     const href = "/tesoreria";
     return {
-      data: minimizeCashPosition(hub),
+      data: {
+        ...minimizeCashPosition(hub),
+        historicalEquivalentAllAccountsArs: position.consolidatedArs,
+        historicalEquivalentStatus: position.consolidatedArs === null ? "INCOMPLETE" : "AVAILABLE",
+      },
       provenance: { sourceType: "bloqer_data", route: href, asOf: nowIso() },
       ui: { links: [{ label: "Abrir tesorería", href }], summaryLabel: "Consultando tesorería…" },
     };

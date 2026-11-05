@@ -487,7 +487,7 @@ Configurar tesorería **antes** de operar cobranzas y pagos.
 
 | Etiqueta | Ruta | Para qué |
 |----------|------|----------|
-| Resumen | `/tesoreria` | Saldos por cuenta/moneda y atajos |
+| Resumen | `/tesoreria` | Saldos por cuenta y moneda, posición de caja y atajos |
 | Cuentas | `/tesoreria/cuentas` · `/nueva` · `/[id]` | Alta de banco/caja/billetera; **extracto** (ledger con saldo corrido) en el detalle; CTAs **Transferir entre cuentas** e historial |
 | Flujo de caja | `/tesoreria/flujo-caja` | Ingresos y egresos por período |
 | **Conciliación** | `/tesoreria/conciliacion` | Emparejar extracto bancario vs movimientos del sistema (§4.2) |
@@ -502,6 +502,9 @@ Rutas auxiliares (sin ítem de menú; se llegan desde Cuentas):
 
 - **Extracto = detalle de cuenta:** abrí **Tesorería → Cuentas → [cuenta]**. Ahí ves el ledger (Confirmado / Conciliado), export CSV/PDF y atajos a transferir / conciliar / ajuste manual. Columnas compactas: **Clase** (badge), estado, factura interna (`FP-#####` / `FAC-#####`) y descripción. Tipo y origen quedan en el **detalle** al clic en la descripción (también importe, proyecto, contraparte).
 - **Transferencia ≠ pago:** **Transferir entre cuentas** mueve plata entre **cuentas propias** (banco ↔ caja ↔ otro banco). Un **pago a un proveedor** (aunque el método diga «Transferencia», [D-074]) se registra en Finanzas → **Transacciones** / CxP — no es una transferencia interna.
+- **Fechas de transferencia:** completá **Fecha contable** y **Fecha valor**. La primera define el período contable. La segunda indica la acreditación y se usa al conciliar. En el extracto elegí el criterio de fecha para filtros y saldo corrido. Si un movimiento histórico no tiene fecha valor, el sistema indica que usa la fecha contable como referencia ([D-137]).
+- **Apertura de cuenta:** un saldo inicial positivo o negativo queda en el extracto. Requiere un período abierto. Si es en moneda extranjera, ingresá la cotización de apertura. Un saldo inicial de cero no genera movimiento ([D-136]).
+- **Cerrar cuenta:** en el detalle, con permiso de edición y saldo cero, elegí **Cerrar cuenta**. El cierre es definitivo. La cuenta queda **Cerrada** y podés consultar su extracto histórico.
 - **Movimientos operativos:** se generan **automáticamente** al cobrar (`INFLOW`) y pagar (`OUTFLOW`); se pueden **anular** con traza (nunca se borran), salvo que estén **conciliados** (hay que desemparejar antes).
 - **Transacciones vs extracto:** Finanzas → **Transacciones** es la caja operativa con **terceros** (sin transferencias internas, [D-048]) más el alta (**Registrar transacción**). Tesorería → **Cuentas → detalle** es el extracto por cuenta (incluye internas, saldo corrido, asiento, conciliación).
 - En cobranzas y pagos podés indicar **método de liquidación** (Efectivo, Transferencia, Cheque, Tarjeta, Otro) y referencia opcional ([D-074]). Eso **no** crea un `InternalTransfer`.
@@ -519,7 +522,7 @@ Rutas auxiliares (sin ítem de menú; se llegan desde Cuentas):
 
 > **Terminología correcta:** tipos de movimiento = `INFLOW` (ingreso), `OUTFLOW` (egreso), `TRANSFER_IN`, `TRANSFER_OUT`, `ADJUSTMENT` (ajuste). Estados de movimiento relevantes: **Confirmado** (`CONFIRMED`) y **Conciliado** (`RECONCILED`). Un movimiento conciliado **no** se anula ni se edita hasta desemparejarlo.
 
-> **Limitación actual (importante):** cobros, pagos y transferencias internas operan en **una sola moneda por operación**. **No hay conversión de moneda dentro de tesorería.** Cada documento guarda su moneda, tipo de cambio y monto en pesos, pero el movimiento de caja no convierte.
+> **Tipo de cambio en Tesorería ([D-134]).** Cada cobro, pago o transferencia opera en una sola moneda. Para saldos iniciales, ingresos, ajustes y transferencias en moneda extranjera, ingresá **Tipo de cambio · ARS por 1 [moneda]** al registrar el movimiento. El saldo de la cuenta sigue en su moneda. El equivalente de la operación queda guardado para la posición en pesos. Si falta una cotización histórica, consultá los saldos por moneda y el aviso de total en pesos incompleto.
 
 ---
 
@@ -565,11 +568,11 @@ Cuadrá el extracto del banco (o archivo CSV/OFX) con los movimientos que Bloqer
 3. Abrir la sesión (`/tesoreria/conciliacion/[id]`). Si está en borrador, **Iniciar** (pasa a En progreso).
 4. Cargar el extracto de una de estas formas:
    - **Importar CSV de extracto** (columnas típicas: fecha, descripción, monto, dirección CREDIT/DEBIT, referencia).
-   - **Importar OFX / QFX** (archivo del home banking).
+   - **Importar OFX / QFX** (archivo del home banking). Si una transferencia `XFER` llega sin `+` o `-` explícito, corregí esa fila en el archivo o cargala manualmente con su dirección ([D-138]).
    - Agregar **líneas manuales** una a una.
 5. En el workspace de dos columnas: seleccionar una línea de extracto + un movimiento candidato del sistema → **Emparejar seleccionados**. El movimiento pasa a estado **Conciliado**.
-6. Si hay una línea de extracto sin movimiento en Bloqer: **Crear movimiento** desde la línea (ajuste operativo + empareje).
-7. Cuando el resumen cuadra (saldo extracto = saldo sistema en el rango): **Cerrar conciliación**.
+6. Si hay una línea de extracto sin movimiento en Bloqer: **Crear movimiento** desde la línea (ajuste operativo + empareje). En una cuenta extranjera se pide el tipo de cambio de la operación. Emparejar un movimiento que ya existe conserva su cotización.
+7. Revisá **Saldo de libros al cierre** y **Diferencia banco − sistema**. Se calculan por fecha valor y se usa la fecha contable cuando falta. **Cerrar conciliación** comprueba que el extracto cuadra con los saldos declarados y que se emparejaron las líneas y los movimientos del período.
 8. Si hace falta corregir después del cierre: **Reabrir sesión** (motivo obligatorio, queda auditado) → vuelve a En progreso; los matches se conservan.
 9. Export CSV del listado: desde la pantalla de conciliación / reporte asociado.
 
@@ -1605,6 +1608,10 @@ Contabilidad **gerencial interna** (libro mayor). No sustituye estados oficiales
 
 Exports CSV/PDF (y XLSX en sumas, diario, ESP y EERR) desde `/api/reports/contabilidad/*`.
 
+Si tu membresía abarca varias empresas, elegí el filtro **Empresa** para consultar o editar sus datos contables. Los enlaces de Contabilidad conservan el filtro. Si tu membresía está asignada a una empresa, se usa esa empresa.
+
+En **Mayor**, acotá el rango si la pantalla advierte que la consulta supera el límite. Las exportaciones solicitan un rango más corto para entregar los movimientos completos.
+
 ### 15.2 Procedimiento — Día a día (auto-DRAFT + posteo)
 
 ```mermaid
@@ -1621,6 +1628,7 @@ flowchart LR
 2. Abrir `/contabilidad` y revisar card **Borradores pendientes**, o ir a **Asientos** filtrando borradores.
 3. Abrir el asiento:
    - Si tiene **origen operativo** (sourced): montos/moneda/estructura **bloqueados** (D-063); sí se pueden ajustar **cuentas** y textos.
+   - Si falta solo la cuenta de percepción IIBB, el borrador conserva el IVA separado y describe la percepción junto al neto ([D-139]).
    - Si es **manual**: editable al 100%.
 4. Pulsar **Contabilizar** → `POSTED`. **Nunca** se auto-posta.
 5. Quienes editan contabilidad reciben aviso in-app (máx. uno cada 24 h por empresa) cuando hay borradores nuevos.
@@ -1666,6 +1674,8 @@ Congela **movimientos de tesorería** y **asientos contables** cuya fecha cae en
 3. En la tabla **Períodos mensuales**, ubicar el mes (`YYYY-MM`) en estado **Abierto**.
 4. Pulsar **Cerrar** → confirmar en el diálogo **Cerrar período**.
 5. El período pasa a **Cerrado**. A partir de ahí, crear/editar/anular/postear/revertir con fecha en ese mes → error `PERIOD_CLOSED` (mensaje en español en pantalla).
+
+Si al anular una operación el mensaje indica que su borrador contable está en otro período cerrado, un **Owner** o **Admin** debe reabrir ese mes. Después podés anular la operación y su borrador juntos ([D-135]).
 
 #### Pasos — Reabrir
 

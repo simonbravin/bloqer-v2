@@ -123,6 +123,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Tras emitir factura / pagar / cobrar, revisá Borradores pendientes en el hub.",
       "Abrí el asiento → Contabilizar (POSTED). Nunca se auto-posta.",
       "Si el asiento tiene origen operativo: montos bloqueados; sí podés ajustar cuentas y textos.",
+      "Si falta solo la cuenta de percepción IIBB, el borrador conserva el IVA separado e identifica la percepción junto al neto.",
       "Corrección: Revertir un POSTED (crea asiento de reversa). Anular borrador: Anular borrador.",
       "Libro diario / sumas y saldos / ESP / resultados solo usan POSTED.",
     ],
@@ -204,8 +205,10 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/contabilidad/cierres", label: "Cierres" }],
     steps: [
       "Antes: cobros/pagos OK → borradores contabilizados → conciliaciones cerradas.",
+      "Si ves varias empresas, seleccioná Empresa para mantener el alcance al navegar por Contabilidad.",
       "Contabilidad → Cierres → Cerrar período.",
       "Para corregir: Reabrir con motivo auditado (OWNER/ADMIN).",
+      "Si la anulación de una operación está bloqueada por la fecha de su borrador contable, reabrí el mes que indica el aviso. El origen y el borrador se anulan juntos.",
     ],
     figure: {
       src: "/help/mapa-cerrar-el-mes.png",

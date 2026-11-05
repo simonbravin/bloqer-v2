@@ -2,6 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { parseBankStatementCsv } from "./bank-statement-csv-parser";
 
+it("rejects an extract credit that rounds to zero or exceeds the stored amount capacity", () => {
+  for (const amount of ["0,004", "100000000000000,00"]) {
+    const csv = `fecha;descripcion;monto;direccion\n05/11/2026;Crédito;${amount};CREDIT`;
+    assert.equal(parseBankStatementCsv(csv).ok, false);
+  }
+});
+
 describe("parseBankStatementCsv [D-076]", () => {
   it("parses English comma CSV", () => {
     const csv = [

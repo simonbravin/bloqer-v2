@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { AccountingMappingRuleForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import { listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default async function NuevaReglaContablePage({
@@ -17,8 +17,7 @@ export default async function NuevaReglaContablePage({
   if (!can(current.tenantCtx.roles, "EDIT", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
   const { data: accounts } = await listAccountingAccounts(ctx, cf);
   const picks = accounts.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 

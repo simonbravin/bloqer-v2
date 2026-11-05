@@ -24,8 +24,8 @@ export function safeCallbackUrl(raw: string | null | undefined): string {
     const parsed = new URL(trimmed, "http://bloqer.local");
     if (parsed.origin !== "http://bloqer.local") return "/dashboard";
     const pathname = stripLegacyEsLocalePrefix(parsed.pathname) ?? parsed.pathname;
-    const path = `${pathname}${parsed.search}${parsed.hash}`;
-    return path.startsWith("/") ? path : "/dashboard";
+    if (!pathname.startsWith("/") || pathname.startsWith("//")) return "/dashboard";
+    return `${pathname}${parsed.search}${parsed.hash}`;
   } catch {
     return "/dashboard";
   }

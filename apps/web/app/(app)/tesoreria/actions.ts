@@ -2,6 +2,7 @@
 
 import {
   createTreasuryAccount,
+  closeTreasuryAccount,
   updateTreasuryAccount,
   deactivateTreasuryAccount,
   reactivateTreasuryAccount,
@@ -24,6 +25,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { serverLog } from "@/lib/server-log";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
 import { headers } from "next/headers";
 
 async function getCtx(action?: string) {
@@ -60,7 +62,8 @@ export async function createTreasuryAccountAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const acc = await createTreasuryAccount(parsed.data, ctx);
-    revalidatePath("/tesoreria");
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { id: acc.id };
   } catch (err) {
     return handle(err);
@@ -76,7 +79,8 @@ export async function updateTreasuryAccountAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateTreasuryAccount(id, parsed.data, ctx);
-    revalidatePath("/tesoreria");
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -89,7 +93,8 @@ export async function deactivateTreasuryAccountAction(
   const ctx = await getCtx("deactivateTreasuryAccount");
   try {
     await deactivateTreasuryAccount(id, ctx);
-    revalidatePath("/tesoreria");
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -102,7 +107,20 @@ export async function reactivateTreasuryAccountAction(
   const ctx = await getCtx("reactivateTreasuryAccount");
   try {
     await reactivateTreasuryAccount(id, ctx);
-    revalidatePath("/tesoreria");
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function closeTreasuryAccountAction(id: string): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx("closeTreasuryAccount");
+  try {
+    await closeTreasuryAccount(id, ctx);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -117,10 +135,8 @@ export async function createInternalTransferAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const transfer = await createInternalTransfer(parsed.data, ctx);
-    revalidatePath("/tesoreria");
-    revalidatePath("/tesoreria/transferencias");
-    revalidatePath(`/tesoreria/cuentas/${parsed.data.sourceAccountId}`);
-    revalidatePath(`/tesoreria/cuentas/${parsed.data.destinationAccountId}`);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { id: transfer.id };
   } catch (err) {
     return handle(err);
@@ -135,8 +151,8 @@ export async function registerManualTreasuryAdjustmentAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const result = await registerManualTreasuryAdjustment(parsed.data, ctx);
-    revalidatePath("/tesoreria");
-    revalidatePath(`/tesoreria/cuentas/${parsed.data.accountId}`);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { id: result.id };
   } catch (err) {
     return handle(err);
@@ -148,11 +164,9 @@ export async function cancelInternalTransferAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx("cancelInternalTransfer");
   try {
-    const cancelled = await cancelInternalTransfer(id, ctx);
-    revalidatePath("/tesoreria");
-    revalidatePath("/tesoreria/transferencias");
-    revalidatePath(`/tesoreria/cuentas/${cancelled.sourceAccountId}`);
-    revalidatePath(`/tesoreria/cuentas/${cancelled.destinationAccountId}`);
+    await cancelInternalTransfer(id, ctx);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);

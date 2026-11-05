@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatDate } from "@/lib/format";
@@ -30,6 +30,8 @@ import {
 } from "@/app/(app)/tesoreria/conciliacion/actions";
 import type { BankReconciliationView } from "@bloqer/services";
 import { toast } from "sonner";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import {
   ConfirmAlertDialog,
   ReasonAlertDialog,
@@ -38,6 +40,7 @@ import {
 type Candidate = {
   id: string;
   movementDate: Date | string;
+  valueDate: Date | string | null;
   type: string;
   amount: string;
   description: string;
@@ -69,12 +72,14 @@ type PendingDialog =
 
 export function BankReconciliationWorkspace({ session, candidates, canEdit }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run: runOperation, isBusy } = useOperationalAction({ onError: setError });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
   const [direction, setDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
   const [lineAmount, setLineAmount] = useState("");
+  const [movementFxRate, setMovementFxRate] = useState("");
+  const [movementFxError, setMovementFxError] = useState<string | null>(null);
   const [dialog, setDialog] = useState<PendingDialog | null>(null);
 
   const editable = canEdit && (session.status === "DRAFT" || session.status === "IN_PROGRESS");
@@ -99,8 +104,9 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
     action: () => Promise<{ ok: true } | { error: string }>,
     successToast?: string,
   ) {
+    if (isBusy()) return Promise.resolve();
     setError(null);
-    startTransition(async () => {
+    return runOperation(async () => {
       const res = await action();
       if ("error" in res) {
         setError(res.error);
@@ -137,13 +143,13 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
   }
 
   function handleCsvFile(file: File | null) {
-    if (!file) return;
+    if (!file || isBusy()) return;
     if (!file.name.toLowerCase().endsWith(".csv")) {
       setError("Solo se admite archivo .csv");
       return;
     }
     setError(null);
-    startTransition(async () => {
+    void runOperation(async () => {
       try {
         const csvText = await file.text();
         const res = await importBankStatementCsvAction({
@@ -167,14 +173,14 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
   }
 
   function handleOfxFile(file: File | null) {
-    if (!file) return;
+    if (!file || isBusy()) return;
     const lower = file.name.toLowerCase();
     if (!lower.endsWith(".ofx") && !lower.endsWith(".qfx")) {
       setError("Solo se admite archivo .ofx o .qfx");
       return;
     }
     setError(null);
-    startTransition(async () => {
+    void runOperation(async () => {
       try {
         const ofxText = await file.text();
         const res = await importBankStatementOfxAction({
@@ -218,7 +224,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         </p>
       ) : null}
 
-      <div className="grid gap-4 rounded-lg border bg-card p-4 text-sm sm:grid-cols-4">
+      <div className="grid gap-4 rounded-lg border bg-card p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <p className="text-muted-foreground">Saldo inicial</p>
           <p className="font-mono font-medium">
@@ -238,11 +244,20 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
           </p>
         </div>
         <div>
+          <p className="text-muted-foreground">Saldo de libros al cierre</p>
+          <p className="font-mono font-medium">{formatMoneyAmount(session.systemClosingBalance, session.currency)}</p>
+          <p className="text-xs text-muted-foreground">Por fecha valor, con fecha contable cuando falta.</p>
+        </div>
+        <div>
+          <p className="text-muted-foreground">Diferencia banco − sistema</p>
+          <p className="font-mono font-medium">{formatMoneyAmount(session.bankClosingDifference, session.currency)}</p>
+        </div>
+        <div>
           <p className="text-muted-foreground">Cuadre / pendientes</p>
           <p className="font-medium">
             {session.statementBalances ? "Extracto cuadra" : "Extracto no cuadra"}
             {" · "}
-            {session.unmatchedLines} sin match
+            {session.unmatchedLines} sin emparejar
           </p>
         </div>
       </div>
@@ -366,7 +381,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
             <div>
               <h3 className="font-semibold">Importar OFX / QFX</h3>
               <p className="text-xs text-muted-foreground">
-                OFX 1.x (SGML): transacciones STMTTRN con DTPOSTED y TRNAMT. Máx. 500 líneas.
+                OFX 1.x (SGML): transacciones STMTTRN con DTPOSTED y TRNAMT. Máx. 500 líneas. Para XFER, el monto necesita signo explícito: + para crédito o − para débito.
               </p>
             </div>
             <div>
@@ -458,6 +473,8 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
                   <button
                     type="button"
                     className="w-full text-left"
+                    aria-pressed={active}
+                    disabled={isPending}
                     onClick={() => {
                       setSelectedLineId(line.id);
                       setSelectedMovementId(null);
@@ -473,7 +490,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
                         </p>
                         {line.match && (
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Match: {line.match.movement.description}
+                            Emparejado: {line.match.movement.description} · {formatDate(line.match.movement.valueDate ?? line.match.movement.movementDate)}
                           </p>
                         )}
                       </div>
@@ -503,15 +520,17 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
                             size="sm"
                             variant="outline"
                             disabled={isPending}
-                            onClick={() =>
+                            onClick={() => {
+                              setMovementFxRate("");
+                              setMovementFxError(null);
                               setDialog({
                                 kind: "create-movement",
                                 lineId: line.id,
                                 dirLabel:
                                   line.direction === "CREDIT" ? "ingreso" : "egreso",
                                 amount: line.amount,
-                              })
-                            }
+                              });
+                            }}
                           >
                             Crear movimiento
                           </Button>
@@ -555,14 +574,16 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
                   <button
                     type="button"
                     className="w-full text-left"
+                    aria-pressed={active}
                     onClick={() => setSelectedMovementId(m.id)}
-                    disabled={!editable || !selectedLine || Boolean(selectedLine.match)}
+                    disabled={isPending || !editable || !selectedLine || Boolean(selectedLine.match)}
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="font-medium">{m.description}</p>
                         <p className="text-xs text-muted-foreground">
-                          {formatDate(m.movementDate)} · {TYPE_LABEL[m.type] ?? m.type}
+                          {formatDate(m.valueDate ?? m.movementDate)} · {TYPE_LABEL[m.type] ?? m.type}
+                          {m.valueDate ? " · Fecha valor" : " · Fecha contable"}
                         </p>
                       </div>
                       <p className="font-mono tabular-nums">
@@ -657,24 +678,45 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         title="Crear movimiento desde extracto"
         description={
           dialog?.kind === "create-movement" ? (
-            <p>
-              ¿Crear un movimiento de {dialog.dirLabel} por{" "}
-              {formatMoneyAmount(dialog.amount, session.currency)} en «{session.accountName}» y
-              emparejarlo con esta línea?
-            </p>
+            <div className="space-y-3">
+              <p>
+                ¿Crear un movimiento de {dialog.dirLabel} por{" "}
+                {formatMoneyAmount(dialog.amount, session.currency)} en «{session.accountName}» y
+                emparejarlo con esta línea?
+              </p>
+              <ManualFxField
+                currency={session.currency}
+                value={movementFxRate}
+                onValueChange={(value) => {
+                  setMovementFxRate(value);
+                  setMovementFxError(null);
+                }}
+                id="reconciliation-movement-fx-rate"
+                disabled={isPending}
+              />
+              {movementFxError ? <p role="alert" className="text-destructive">{movementFxError}</p> : null}
+            </div>
           ) : null
         }
         confirmLabel="Crear y emparejar"
         pending={isPending}
         onConfirm={() => {
           if (dialog?.kind !== "create-movement") return;
+          if (session.currency !== "ARS" && !movementFxRate) {
+            setMovementFxError("Ingresá el tipo de cambio para este movimiento.");
+            return;
+          }
           const lineId = dialog.lineId;
-          run(
-            () =>
-              createMovementFromStatementLineAction({
+          return run(
+            async () => {
+              const result = await createMovementFromStatementLineAction({
                 reconciliationId: session.id,
                 statementLineId: lineId,
-              }),
+                fxRate: session.currency !== "ARS" ? movementFxRate : undefined,
+              });
+              if ("error" in result) setMovementFxError(result.error);
+              return result;
+            },
             "Movimiento creado y emparejado",
           );
         }}

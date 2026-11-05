@@ -12,9 +12,9 @@
 | `account_id` | Cuenta afectada |
 | `type` | `INFLOW` \| `OUTFLOW` \| `TRANSFER_IN` \| `TRANSFER_OUT` \| `ADJUSTMENT` |
 | `amount`, `currency` | Importe y moneda originales; ver [`MONEY_MODEL.md`](./MONEY_MODEL.md) |
-| `fx_rate`, `amount_ars` | Exigencia conceptual D-008; no son columnas actuales de `AccountMovement` (ver hallazgo al pie) |
-| `date_accounting` | Imputación contable |
-| `date_value` | Acreditación bancaria |
+| `fxRate`, `amountArs` | Cotización manual (ARS por 1 unidad) y equivalente al confirmar, según D-008/D-134. Vacíos en históricos sin dato registrado. |
+| `movementDate` | Fecha contable de la operación. Define el bloqueo del período y el asiento. |
+| `valueDate` | Fecha valor de las piernas de transferencias nuevas según D-137. Opcional para movimientos históricos o sin fecha valor registrada. |
 | `status` | `CONFIRMED` \| `RECONCILED` \| `CANCELLED`; el movimiento nace confirmado, no hay borrador persistido |
 | `counterparty_id` / `counterpartyContactId` | Contact opcional (ingresos corporativos manuales — [D-049](../00-product/DECISION_LOG.md); no sustituye Collection/Payment) |
 | `externalInvoiceRef` | Referencia opcional al comprobante oficial emitido fuera de Bloqer (p. ej. ARCA) |
@@ -26,6 +26,7 @@
 ## Reglas
 - **Solo `CONFIRMED` y `RECONCILED`** impactan saldos reportados.
 - **Transferencia interna:** dos movimientos con mismo `transfer_id` ([BR-TRZ-004]).
+- **Apertura:** un saldo inicial no nulo crea un `OPENING_BALANCE` por su magnitud, ingreso para saldo positivo y egreso para negativo. El saldo inicial entra una sola vez en el saldo de cuenta ([D-136]).
 - **Anulación:** estado `CANCELLED` + movimiento espejo o reversión explícita.
 - **UX Finanzas vs Tesorería:** `/finanzas/transacciones` es el ledger de **caja operativa** (cobros/pagos/ingresos/egresos con terceros) y **nunca** lista transferencias internas. Esas viven en `/tesoreria/transferencias` (historial del par) y en el **extracto de cuenta** `/tesoreria/cuentas/[accountId]` ([D-048](../00-product/DECISION_LOG.md)). La ruta legacy `/tesoreria/movimientos` redirige al extracto/listado de cuentas. La columna Contraparte no se muestra en el ledger UI; el campo sigue disponible en el alta de ingreso manual ([D-049](../00-product/DECISION_LOG.md)).
 
@@ -44,4 +45,4 @@ Los matches de **`BankReconciliation`** (sesión `DRAFT` → `IN_PROGRESS` → `
 
 ## Hallazgo — AG-09: términos y snapshot de moneda
 
-Se armonizan los enums físicos `INFLOW/OUTFLOW` y la ausencia de `DRAFT` del movimiento, distinguiéndolo del borrador contable. La tabla mantiene campos conceptuales futuros; no afirma que todos estén implementados. En particular, `AccountMovement` no conserva `fxRate/amountArs`, mientras las facturas, `Collection` y `Payment` sí guardan sus snapshots. [P-AG10-01](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md) registra la brecha respecto de D-008 para diseño de todos los escritores/lectores e históricos desconocidos. AG-09 no agrega columnas, no infiere FX 1 para movimientos extranjeros ni declara cerrada esa revisión de tesorería.
+AG-09 identificó la brecha física de `fxRate` y `amountArs`. AG-10 implementa D-134 con dos columnas opcionales, utilizadas en los movimientos nuevos. Facturas, `Collection` y `Payment` conservan sus propios snapshots. Los cobros y pagos copian el de la operación de caja al movimiento. Los históricos conservan su moneda e importe original. La posición en ARS señala faltantes de cotización cuando corresponda.

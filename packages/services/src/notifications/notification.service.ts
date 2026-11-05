@@ -42,8 +42,8 @@ export type NotificationListItem = {
   archivedAt: string | null;
 };
 
-async function assertRecipientInTenant(recipientUserId: string, tenantId: string): Promise<void> {
-  const m = await prisma.userMembership.findFirst({
+async function assertRecipientInTenant(recipientUserId: string, tenantId: string, db: Prisma.TransactionClient): Promise<void> {
+  const m = await db.userMembership.findFirst({
     where: { userId: recipientUserId, tenantId, status: "ACTIVE" },
     select: { id: true },
   });
@@ -62,9 +62,9 @@ function normalizeActionUrl(actionUrl: string | null | undefined): string | null
   return u;
 }
 
-async function assertProjectInTenant(projectId: string | null | undefined, tenantId: string): Promise<void> {
+async function assertProjectInTenant(projectId: string | null | undefined, tenantId: string, db: Prisma.TransactionClient): Promise<void> {
   if (!projectId) return;
-  const p = await prisma.project.findFirst({
+  const p = await db.project.findFirst({
     where: { id: projectId, tenantId },
     select: { id: true },
   });
@@ -116,7 +116,7 @@ export async function createNotification(input: CreateNotificationInput, ctx: Se
 /**
  * Server-only: other services call this with an explicit tenant and a validated recipient.
  */
-export async function createSystemNotification(input: CreateSystemNotificationInput): Promise<{ id: string }> {
+export async function createSystemNotification(input: CreateSystemNotificationInput, db: Prisma.TransactionClient = prisma): Promise<{ id: string }> {
   const { tenantId, recipientUserId, companyId, type, title, body, severity, linkedEntityType, linkedEntityId, projectId, actionUrl, metadata } =
     input;
 
@@ -124,11 +124,11 @@ export async function createSystemNotification(input: CreateSystemNotificationIn
     throw new ServiceError("VALIDATION", "recipientUserId es obligatorio");
   }
 
-  await assertRecipientInTenant(recipientUserId, tenantId);
-  await assertProjectInTenant(projectId ?? null, tenantId);
+  await assertRecipientInTenant(recipientUserId, tenantId, db);
+  await assertProjectInTenant(projectId ?? null, tenantId, db);
   const safeActionUrl = normalizeActionUrl(actionUrl);
 
-  const row = await prisma.notification.create({
+  const row = await db.notification.create({
     data: {
       tenantId,
       companyId: companyId ?? null,

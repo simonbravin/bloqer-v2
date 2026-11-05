@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { listTreasuryAccounts } from "@bloqer/services";
+import { getTenantModuleGate, listSelectableTreasuryAccounts } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
 import { getCurrentUser } from "@/lib/auth";
 import { BankReconciliationForm } from "@/features/treasury/components/bank-reconciliation-form";
@@ -20,10 +20,11 @@ export default async function NuevaConciliacionPage() {
     redirect("/tesoreria/conciliacion");
   }
 
-  const { data: accounts } = await listTreasuryAccounts(ctx);
-  const active = accounts
-    .filter((a) => a.status === "ACTIVE")
-    .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
+  const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("BANK_RECONCILIATION")) redirect("/tesoreria/conciliacion");
+  const active = (await listSelectableTreasuryAccounts(ctx)).map(({ id, name, currency }) => ({
+    id, name, currency,
+  }));
 
   return (
     <PageShell variant="default" className="space-y-6">

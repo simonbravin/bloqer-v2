@@ -9,7 +9,7 @@ import { log } from "../audit/audit.service";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { resolveAccountingCompanyId } from "./accounting-company-context";
+import { lockAccountingCompany, resolveAccountingCompanyId } from "./accounting-company-context";
 
 /** Ensures tenant-wide users cannot mutate a rule while scoped to another company (`?empresa=` / payload). */
 async function assertRuleMutationCompany(
@@ -55,7 +55,11 @@ export async function findActiveMappingRule(
   eventType: AccountingMappingEventType,
 ): Promise<AccountingMappingRule | null> {
   return prisma.accountingMappingRule.findFirst({
-    where: { tenantId, companyId, eventType, isActive: true },
+    where: {
+      tenantId, companyId, eventType, isActive: true,
+      debitAccount: { tenantId, companyId, isActive: true },
+      creditAccount: { tenantId, companyId, isActive: true },
+    },
     orderBy: [{ priority: "asc" }, { id: "asc" }],
   });
 }
@@ -104,16 +108,18 @@ async function validateDebitCreditAccounts(
   companyId: string,
   debitAccountId: string,
   creditAccountId: string,
+  db: Prisma.TransactionClient,
+  requireActive = true,
 ): Promise<void> {
   if (debitAccountId === creditAccountId) {
     throw new ServiceError("VALIDATION", "La cuenta del debe y del haber deben ser distintas");
   }
-  const accounts = await prisma.accountingAccount.findMany({
+  const accounts = await db.accountingAccount.findMany({
     where: {
       id: { in: [debitAccountId, creditAccountId] },
       tenantId,
       companyId,
-      isActive: true,
+      ...(requireActive ? { isActive: true } : {}),
     },
   });
   if (accounts.length !== 2) {
@@ -127,38 +133,43 @@ export async function createAccountingMappingRule(
 ): Promise<AccountingMappingRuleView> {
   await assertEdit(ctx);
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
-  await validateDebitCreditAccounts(ctx.tenantId, companyId, input.debitAccountId, input.creditAccountId);
+  const name = input.name.trim();
+  if (!name) throw new ServiceError("VALIDATION", "Completá el nombre de la regla");
 
-  const created = await prisma.accountingMappingRule.create({
-    data: {
-      tenantId:        ctx.tenantId,
-      companyId,
-      eventType:       input.eventType,
-      name:            input.name.trim(),
-      description:     input.description?.trim() ?? null,
-      debitAccountId:  input.debitAccountId,
-      creditAccountId: input.creditAccountId,
-      priority:        input.priority ?? 100,
-      isActive:        true,
-      metadata:
-        input.metadata === undefined || input.metadata === null
-          ? undefined
-          : (input.metadata as Prisma.InputJsonValue),
-    },
-    include: { debitAccount: true, creditAccount: true },
-  });
+  return prisma.$transaction(async (tx) => {
+    await lockAccountingCompany(tx, ctx.tenantId, companyId);
+    await validateDebitCreditAccounts(ctx.tenantId, companyId, input.debitAccountId, input.creditAccountId, tx);
+    const created = await tx.accountingMappingRule.create({
+      data: {
+        tenantId:        ctx.tenantId,
+        companyId,
+        eventType:       input.eventType,
+        name,
+        description:     input.description?.trim() ?? null,
+        debitAccountId:  input.debitAccountId,
+        creditAccountId: input.creditAccountId,
+        priority:        input.priority ?? 100,
+        isActive:        true,
+        metadata:
+          input.metadata === undefined || input.metadata === null
+            ? undefined
+            : (input.metadata as Prisma.InputJsonValue),
+      },
+      include: { debitAccount: true, creditAccount: true },
+    });
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "accounting_mapping_rule.created",
-    entityType:  "AccountingMappingRule",
-    entityId:    created.id,
-    after:       { eventType: created.eventType, name: created.name },
-    ipAddress:   ctx.ipAddress,
-  });
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "accounting_mapping_rule.created",
+      entityType:  "AccountingMappingRule",
+      entityId:    created.id,
+      after:       { eventType: created.eventType, name: created.name },
+      ipAddress:   ctx.ipAddress,
+    }, tx);
 
-  return serializeRule(created);
+    return serializeRule(created);
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function updateAccountingMappingRule(
@@ -175,49 +186,60 @@ export async function updateAccountingMappingRule(
   await assertRuleMutationCompany(ctx, existing.companyId, input.companyId ?? null);
   await resolveAccountingCompanyId(ctx, existing.companyId);
 
-  const debitId = input.debitAccountId ?? existing.debitAccountId;
-  const creditId = input.creditAccountId ?? existing.creditAccountId;
-  await validateDebitCreditAccounts(ctx.tenantId, existing.companyId, debitId, creditId);
+  const name = input.name?.trim();
+  if (name === "") throw new ServiceError("VALIDATION", "Completá el nombre de la regla");
+  const companyId = existing.companyId;
+  return prisma.$transaction(async (tx) => {
+    await lockAccountingCompany(tx, ctx.tenantId, companyId);
+    const fresh = await tx.accountingMappingRule.findFirst({ where: { id, tenantId: ctx.tenantId, companyId } });
+    if (!fresh) throw new ServiceError("NOT_FOUND", "Regla no encontrada");
+    const debitId = input.debitAccountId ?? fresh.debitAccountId;
+    const creditId = input.creditAccountId ?? fresh.creditAccountId;
+    const isActive = input.isActive ?? fresh.isActive;
+    if (isActive || input.debitAccountId !== undefined || input.creditAccountId !== undefined) {
+      await validateDebitCreditAccounts(ctx.tenantId, companyId, debitId, creditId, tx, isActive);
+    }
 
-  const updated = await prisma.accountingMappingRule.update({
-    where: { id },
-    data: {
-      eventType:       input.eventType ?? undefined,
-      name:            input.name?.trim() ?? undefined,
-      description:     input.description === undefined ? undefined : input.description?.trim() ?? null,
-      debitAccountId:  input.debitAccountId ?? undefined,
-      creditAccountId: input.creditAccountId ?? undefined,
-      priority:        input.priority ?? undefined,
-      isActive:        input.isActive ?? undefined,
-      metadata:
-        input.metadata === undefined
-          ? undefined
-          : input.metadata === null
-            ? Prisma.JsonNull
-            : (input.metadata as Prisma.InputJsonValue),
-    },
-    include: { debitAccount: true, creditAccount: true },
-  });
+    const updated = await tx.accountingMappingRule.update({
+      where: { id },
+      data: {
+        eventType:       input.eventType ?? undefined,
+        name,
+        description:     input.description === undefined ? undefined : input.description?.trim() ?? null,
+        debitAccountId:  input.debitAccountId ?? undefined,
+        creditAccountId: input.creditAccountId ?? undefined,
+        priority:        input.priority ?? undefined,
+        isActive:        input.isActive ?? undefined,
+        metadata:
+          input.metadata === undefined
+            ? undefined
+            : input.metadata === null
+              ? Prisma.JsonNull
+              : (input.metadata as Prisma.InputJsonValue),
+      },
+      include: { debitAccount: true, creditAccount: true },
+    });
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "accounting_mapping_rule.updated",
-    entityType:  "AccountingMappingRule",
-    entityId:    id,
-    after: {
-      name:            input.name,
-      eventType:       input.eventType,
-      description:     input.description,
-      debitAccountId:  input.debitAccountId,
-      creditAccountId: input.creditAccountId,
-      priority:        input.priority,
-      isActive:        input.isActive,
-    },
-    ipAddress:   ctx.ipAddress,
-  });
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "accounting_mapping_rule.updated",
+      entityType:  "AccountingMappingRule",
+      entityId:    id,
+      after: {
+        name:            input.name,
+        eventType:       input.eventType,
+        description:     input.description,
+        debitAccountId:  input.debitAccountId,
+        creditAccountId: input.creditAccountId,
+        priority:        input.priority,
+        isActive:        input.isActive,
+      },
+      ipAddress:   ctx.ipAddress,
+    }, tx);
 
-  return serializeRule(updated);
+    return serializeRule(updated);
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function deactivateAccountingMappingRule(

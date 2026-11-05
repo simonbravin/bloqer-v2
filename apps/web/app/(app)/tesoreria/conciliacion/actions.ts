@@ -35,6 +35,7 @@ import {
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
+import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 
 const uuidIdSchema = z.string().uuid("Id inválido");
@@ -167,6 +168,8 @@ export async function createMovementFromStatementLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await createMovementFromStatementLine(parsed.data, ctx);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     revalidateSession(parsed.data.reconciliationId);
     return { ok: true };
   } catch (err) {
@@ -183,6 +186,8 @@ export async function removeBankStatementLineAction(
   const ctx = await getCtx();
   try {
     await removeBankStatementLine(parsed.data.lineId, ctx);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     revalidateSession(parsed.data.reconciliationId);
     return { ok: true };
   } catch (err) {
@@ -198,6 +203,8 @@ export async function matchBankReconciliationLineAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await matchBankReconciliationLine(parsed.data, ctx);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     revalidateSession(parsed.data.reconciliationId);
     return { ok: true };
   } catch (err) {
@@ -214,6 +221,8 @@ export async function unmatchBankReconciliationLineAction(
   const ctx = await getCtx();
   try {
     await unmatchBankReconciliationLine(parsed.data.matchId, ctx);
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     revalidateSession(parsed.data.reconciliationId);
     return { ok: true };
   } catch (err) {
@@ -267,6 +276,8 @@ export async function cancelBankReconciliationAction(
     await cancelBankReconciliation(parsed.data.reconciliationId, ctx, {
       reason: parsed.data.reason,
     });
+    revalidateOperationalFinancePaths();
+    revalidatePath("/dashboard");
     revalidateSession(parsed.data.reconciliationId);
     return { ok: true };
   } catch (err) {

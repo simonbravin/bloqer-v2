@@ -31,6 +31,7 @@ import {
   listCompanyPayables,
   listCompanySupplierInvoices,
   listPostedJournalBookForExport,
+  MAX_ACCOUNT_LEDGER_ROWS,
   MAX_EXPORT_ROWS,
   ServiceError,
   type AccountingReportDateRange,
@@ -70,7 +71,7 @@ import {
   getOverheadByProjectReport,
   getMultiProjectProcurementReport,
 } from "@bloqer/services";
-import { formatDateTime, formatTimezoneOptionLabel } from "@bloqer/utils";
+import { formatDateTime, formatDbDate, formatTimezoneOptionLabel } from "@bloqer/utils";
 import { resolvePdfReportBranding } from "./branding/pdf-branding.service";
 import type { PdfReportBranding } from "./branding/pdf-branding.types";
 import { safeReportFilename } from "./filename.service";
@@ -645,8 +646,9 @@ export async function exportTreasuryMovementsPdf(
     );
   }
   const { rows, total } = await getAccountMovementReport(
-    { ...filters, page: 1, pageSize: MAX_EXPORT_ROWS },
+    filters,
     ctx,
+    "export",
   );
   if (total > MAX_EXPORT_ROWS) {
     throw new ServiceError(
@@ -658,14 +660,18 @@ export async function exportTreasuryMovementsPdf(
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title={labels.title}
-      filterLine={buildPdfFilterLine({
-        accountId: filters.accountId,
-        dateFrom: filters.dateFrom,
-        dateTo: filters.dateTo,
-        currency: filters.currency,
-      })}
+      filterLine={[
+        buildPdfFilterLine({
+          accountId: filters.accountId,
+          dateFrom: filters.dateFrom,
+          dateTo: filters.dateTo,
+          currency: filters.currency,
+        }),
+        filters.dateBasis === "value" ? "Fecha valor (contable si falta)" : "Fecha contable",
+      ].filter(Boolean).join(" · ")}
       columns={[
-        { key: "date", label: "Fecha", flex: 0.8 },
+        { key: "date", label: "Fecha contable", flex: 0.8 },
+        { key: "valueDate", label: "Fecha valor", flex: 0.8 },
         { key: "account", label: "Cuenta", flex: 0.95 },
         { key: "class", label: "Clase", flex: 0.9 },
         { key: "invoice", label: "Factura", flex: 0.7 },
@@ -675,7 +681,8 @@ export async function exportTreasuryMovementsPdf(
         { key: "desc", label: "Descripción", flex: 1.1 },
       ]}
       rows={rows.map((r) => ({
-        date: r.movementDate,
+        date: formatDbDate(r.movementDate),
+        valueDate: r.valueDate == null ? "Sin registrar" : formatDbDate(r.valueDate),
         account: r.accountName,
         class: r.classLabel || "",
         invoice: r.documentRef ?? "",
@@ -707,7 +714,10 @@ export async function exportTreasuryCashPositionPdf(
       })}
       totalsLine={
         report.byCurrency.length > 0
-          ? report.byCurrency.map((c) => `${c.currency}: ${c.totalBalance}`).join(" · ")
+          ? [
+              ...report.byCurrency.map((c) => `${c.currency}: ${c.totalBalance}`),
+              report.consolidatedArs == null ? "Equivalencia histórica ARS incompleta" : `Equivalente histórico ARS: ${report.consolidatedArs}`,
+            ].join(" · ")
           : undefined
       }
       columns={[
@@ -1009,7 +1019,10 @@ export async function exportAccountLedgerPdf(
   input: AccountingReportDateRange & { accountId: string },
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
-  const report = await getAccountLedgerReport(ctx, { ...input, limit: MAX_EXPORT_ROWS });
+  const report = await getAccountLedgerReport(ctx, { ...input, limit: MAX_ACCOUNT_LEDGER_ROWS });
+  if (report.truncated) {
+    throw new ServiceError("VALIDATION", `El mayor supera ${MAX_ACCOUNT_LEDGER_ROWS} movimientos. Acotá el rango de fechas.`);
+  }
   return exportPdfDocument(
     ctx,
     {},

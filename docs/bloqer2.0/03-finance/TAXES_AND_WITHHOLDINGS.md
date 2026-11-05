@@ -68,7 +68,7 @@ Al emitir factura con IVA y/o Percepción IIBB y cuentas CoA activas:
 - **Venta:** Debe Clientes (total) / Haber Ingresos (neto) + Haber IVA Débito (`2.1.10`) + Haber Perc. IIBB a depositar (`2.1.12`) cuando aplique.
 - **Compra:** Debe Gasto (neto) + Debe IVA Crédito (`1.1.20`) + Debe Perc. IIBB crédito (`1.1.22`) / Haber Proveedores (total).
 
-Sin las cuentas necesarias o sin montos de impuesto/percepción → asiento de 2 líneas por total (comportamiento previo).
+Si hay IVA y falta su cuenta, o no hay importes fiscales para discriminar, el borrador queda en dos líneas por el total. Cuando falta solo la cuenta de percepción IIBB y existe la de IVA, se conserva la línea de IVA y se identifica la percepción junto al neto ([D-139]).
 
 ## Aplicación típica
 - En **factura venta**: discrimina IVA en líneas.

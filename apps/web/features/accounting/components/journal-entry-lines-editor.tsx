@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -76,10 +77,11 @@ export function JournalEntryLinesEditor({
       ) : null}
       <div className="space-y-4 rounded-md border p-4">
         {lines.map((line, idx) => (
-          <div key={line.key} className="grid gap-3 border-b pb-4 last:border-0 last:pb-0 sm:grid-cols-12">
-            <div className="sm:col-span-4 space-y-1">
-              <Label className="text-xs text-muted-foreground">Cuenta</Label>
+          <div key={line.key} className="grid gap-3 border-b pb-4 last:border-0 last:pb-0 sm:grid-cols-2 xl:grid-cols-12" role="group" aria-label={`Línea ${idx + 1}`}>
+            <div className="space-y-1 sm:col-span-2 xl:col-span-4">
+              <Label htmlFor={`journal-account-${idx}`} className="text-xs text-muted-foreground">Cuenta</Label>
               <SearchableCombobox
+                id={`journal-account-${idx}`}
                 options={accountOptions}
                 value={line.accountId}
                 onValueChange={(v) => update(idx, { accountId: v })}
@@ -89,38 +91,41 @@ export function JournalEntryLinesEditor({
                 className="h-9"
               />
             </div>
-            <div className="sm:col-span-2 space-y-1">
-              <Label className="text-xs text-muted-foreground">Debe</Label>
-              <Input
+            <div className="space-y-1 xl:col-span-2">
+              <Label htmlFor={`journal-debit-${idx}`} className="text-xs text-muted-foreground">Debe</Label>
+              <DecimalInput
+                id={`journal-debit-${idx}`}
                 className="font-mono"
                 value={line.debit}
-                onChange={(e) => update(idx, { debit: e.target.value })}
+                onValueChange={(debit) => update(idx, { debit })}
                 placeholder="0"
                 disabled={sourcedLock}
                 readOnly={sourcedLock}
               />
             </div>
-            <div className="sm:col-span-2 space-y-1">
-              <Label className="text-xs text-muted-foreground">Haber</Label>
-              <Input
+            <div className="space-y-1 xl:col-span-2">
+              <Label htmlFor={`journal-credit-${idx}`} className="text-xs text-muted-foreground">Haber</Label>
+              <DecimalInput
+                id={`journal-credit-${idx}`}
                 className="font-mono"
                 value={line.credit}
-                onChange={(e) => update(idx, { credit: e.target.value })}
+                onValueChange={(credit) => update(idx, { credit })}
                 placeholder="0"
                 disabled={sourcedLock}
                 readOnly={sourcedLock}
               />
             </div>
-            <div className="sm:col-span-2 space-y-1">
-              <Label className="text-xs text-muted-foreground">Moneda</Label>
+            <div className="min-w-0 space-y-1 xl:col-span-3">
+              <Label htmlFor={`journal-currency-${idx}`} className="text-xs text-muted-foreground">Moneda</Label>
               <CurrencySelect
+                id={`journal-currency-${idx}`}
                 value={line.currency || "ARS"}
                 onValueChange={(currency) => update(idx, { currency })}
-                triggerClassName="h-9"
+                triggerClassName="h-9 min-w-0"
                 disabled={sourcedLock}
               />
             </div>
-            <div className="sm:col-span-1 flex items-end">
+            <div className="flex items-end xl:col-span-1">
               {!sourcedLock ? (
                 <Button
                   type="button"
@@ -128,14 +133,16 @@ export function JournalEntryLinesEditor({
                   size="sm"
                   onClick={() => removeRow(idx)}
                   disabled={lines.length <= 2}
+                  aria-label={`Quitar línea ${idx + 1}`}
                 >
                   Quitar
                 </Button>
               ) : null}
             </div>
-            <div className="sm:col-span-12 space-y-1">
-              <Label className="text-xs text-muted-foreground">Detalle línea (opcional)</Label>
+            <div className="space-y-1 sm:col-span-2 xl:col-span-12">
+              <Label htmlFor={`journal-description-${idx}`} className="text-xs text-muted-foreground">Detalle línea (opcional)</Label>
               <Input
+                id={`journal-description-${idx}`}
                 value={line.description}
                 onChange={(e) => update(idx, { description: e.target.value })}
                 maxLength={512}

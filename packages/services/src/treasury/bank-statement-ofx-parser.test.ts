@@ -64,6 +64,35 @@ describe("parseBankStatementOfx (D-079)", () => {
     assert.equal(parseBankStatementOfx("<OFX></OFX>").ok, false);
   });
 
+  it("rejects an incomplete movement even when the rest of the statement is valid", () => {
+    const incomplete = SAMPLE.replace("<TRNAMT>-250.00", "");
+    assert.deepEqual(parseBankStatementOfx(incomplete), {
+      ok: false,
+      error: "Transacción #2: falta TRNAMT",
+    });
+  });
+
+  it("rejects a debit that rounds to zero", () => {
+    assert.equal(parseBankStatementOfx(SAMPLE.replace("<TRNAMT>-250.00", "<TRNAMT>-0.004")).ok, false);
+  });
+
+  it("D-138 accepts explicitly signed transfers in either direction and rejects a bare XFER amount", () => {
+    const statement = (amount: string) => `<OFX><BANKTRANLIST><STMTTRN>
+      <TRNTYPE>XFER
+      <DTPOSTED>20261105
+      <TRNAMT>${amount}
+      <NAME>Transferencia
+      </STMTTRN></BANKTRANLIST></OFX>`;
+    for (const [amount, direction] of [["+15.00", "CREDIT"], ["-15.00", "DEBIT"]]) {
+      const parsed = parseBankStatementOfx(statement(amount!));
+      assert.ok(parsed.ok);
+      assert.equal(parsed.lines[0]?.direction, direction);
+    }
+    const ambiguous = parseBankStatementOfx(statement("15.00"));
+    assert.equal(ambiguous.ok, false);
+    if (!ambiguous.ok) assert.match(ambiguous.error, /XFER sin signo explícito/);
+  });
+
   it("uses TRNTYPE when TRNAMT is unsigned", () => {
     const r = parseBankStatementOfx(`
 <OFX><BANKTRANLIST>

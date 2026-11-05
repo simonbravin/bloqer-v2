@@ -4,7 +4,7 @@ import { accountingMappingEventTypeSchema } from "./accounting";
 export const createAccountingMappingRuleSchema = z.object({
   companyId:        z.string().uuid().optional().nullable(),
   eventType:        accountingMappingEventTypeSchema,
-  name:             z.string().min(1).max(256),
+  name:             z.string().trim().min(1).max(256),
   description:      z.string().max(1024).optional().nullable(),
   debitAccountId:   z.string().uuid(),
   creditAccountId:  z.string().uuid(),
@@ -16,7 +16,7 @@ export const updateAccountingMappingRuleSchema = z.object({
   /** When set, must match the rule’s company (tenant-wide users: pass rule `companyId` / `?empresa=` scope). Not applied as a field change on the rule. */
   companyId:        z.string().uuid().optional().nullable(),
   eventType:        accountingMappingEventTypeSchema.optional(),
-  name:             z.string().min(1).max(256).optional(),
+  name:             z.string().trim().min(1).max(256).optional(),
   description:      z.string().max(1024).optional().nullable(),
   debitAccountId:   z.string().uuid().optional(),
   creditAccountId:  z.string().uuid().optional(),

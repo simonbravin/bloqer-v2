@@ -1,10 +1,10 @@
-import { Prisma, prisma, type AccountType, type AccountingMappingEventType } from "@bloqer/database";
+import { prisma, type AccountType, type AccountingMappingEventType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import type { ApplyArgentineCoaTemplateInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { resolveAccountingCompanyId } from "./accounting-company-context";
+import { lockAccountingCompany, resolveAccountingCompanyId } from "./accounting-company-context";
 
 /** Bumped when the seed list grows; apply remains idempotent by account `code` per company. */
 export const ARGENTINE_COA_TEMPLATE_KEY = "ar_construction_v3";
@@ -185,6 +185,7 @@ export async function applyArgentineChartOfAccountsTemplate(
 
   const result = await prisma.$transaction(
     async (tx) => {
+      await lockAccountingCompany(tx, ctx.tenantId, companyId);
       let accountsCreated = 0;
       let accountsSkipped = 0;
       let accountsReactivated = 0;
@@ -212,44 +213,20 @@ export async function applyArgentineChartOfAccountsTemplate(
           }
           continue;
         }
-        try {
-          const created = await tx.accountingAccount.create({
-            data: {
-              tenantId: ctx.tenantId,
-              companyId,
-              code: acc.code,
-              name: acc.name,
-              type: acc.type,
-              isActive: true,
-              description: `Plantilla AR (${ARGENTINE_COA_TEMPLATE_KEY})`,
-            },
-          });
-          codeToId.set(acc.code, created.id);
-          existingAccounts.push({ id: created.id, code: acc.code, isActive: true });
-          accountsCreated += 1;
-        } catch (e) {
-          // Unique (tenantId, companyId, code) — concurrent/re-apply race: treat as skip.
-          if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-            const raced = await tx.accountingAccount.findFirst({
-              where: { tenantId: ctx.tenantId, companyId, code: acc.code },
-              select: { id: true, isActive: true },
-            });
-            if (raced) {
-              codeToId.set(acc.code, raced.id);
-              if (!raced.isActive) {
-                await tx.accountingAccount.update({
-                  where: { id: raced.id },
-                  data: { isActive: true },
-                });
-                accountsReactivated += 1;
-              } else {
-                accountsSkipped += 1;
-              }
-              continue;
-            }
-          }
-          throw e;
-        }
+        const created = await tx.accountingAccount.create({
+          data: {
+            tenantId: ctx.tenantId,
+            companyId,
+            code: acc.code,
+            name: acc.name,
+            type: acc.type,
+            isActive: true,
+            description: `Plantilla AR (${ARGENTINE_COA_TEMPLATE_KEY})`,
+          },
+          select: { id: true },
+        });
+        codeToId.set(acc.code, created.id);
+        accountsCreated += 1;
       }
 
       let rulesCreated = 0;
@@ -297,26 +274,26 @@ export async function applyArgentineChartOfAccountsTemplate(
         rulesCreated += 1;
       }
 
-      return {
+      const counts = {
         accountsCreated,
         accountsSkipped,
         accountsReactivated,
         rulesCreated,
         rulesSkipped,
       };
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "accounting_coa_template.applied",
+        entityType: "Company",
+        entityId: companyId,
+        after: { templateKey: ARGENTINE_COA_TEMPLATE_KEY, ...counts },
+        ipAddress: ctx.ipAddress,
+      }, tx);
+      return counts;
     },
-    { timeout: 60_000 },
+    { maxWait: 10_000, timeout: 60_000 },
   );
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "accounting_coa_template.applied",
-    entityType: "Company",
-    entityId: companyId,
-    after: { templateKey: ARGENTINE_COA_TEMPLATE_KEY, ...result },
-    ipAddress: ctx.ipAddress,
-  });
 
   return {
     companyId,

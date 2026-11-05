@@ -4,7 +4,7 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Estado vigente al 05/11/2026
 
-**AG-00 a AG-08 publicadas; AG-09 cerrada localmente.** [Publicación AG-08](./2026-11-05-ag-08-publication.md): PR #6, Production e817d82f, CI PR/main y acceso público comprobados. [Cierre AG-08](./2026-11-05-ag-08-certifications-subcontracts.md): 30 grupos corregidos, D-131/D-132 implementadas, 2.528 pruebas generales y 90 SQL distintos aprobados, tipos/lint/compilación y muestra visual aislada. [Cierre AG-09](./2026-11-05-ag-09-ar-ap-payments.md): 30 grupos corregidos, 2.650 pruebas generales y 75 casos SQL distintos, tipos/lint, compilación y muestra visual. AG-10 no iniciada.
+**AG-00 a AG-09 publicadas.** [Publicación AG-09](./2026-11-05-ag-09-publication.md), PR #7 y Production 75ab1729. [AG-10 cerrada localmente](./2026-11-05-ag-10-treasury-accounting.md) con 31 grupos corregidos, 2.678 pruebas generales y 21 casos SQL aislados. Revisión integral de UX/UI prevista después.
 
 ## Corte inicial: 03/11/2026
 
@@ -180,3 +180,9 @@ Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08
 - [Informe](./2026-11-05-ag-09-ar-ap-payments.md) y [registro estructurado](./2026-11-05-ag-09-ar-ap-payments.json). 30 grupos corregidos en ventas, CxC, cobranzas, CxP y pagos.
 - 2.650 pruebas generales y 75 casos SQL distintos aprobados: 49 propios y 26 regresiones AG-08. Tipos, lint, compilación, muestra visual aislada y revisión independiente aprobadas.
 - Cierre local, sin publicación ni migraciones. AG-10 espera indicación del Owner.
+
+## Corrida AG-10 del 05/11/2026
+
+- [Informe](./2026-11-05-ag-10-treasury-accounting.md) y [registro estructurado](./2026-11-05-ag-10-treasury-accounting.json). 31 grupos en Tesorería, conciliación, períodos y Contabilidad.
+- D-134 a D-139 aprobadas. Dos migraciones aditivas probadas en base aislada. 2.678 pruebas generales y 21 casos SQL distintos aprobados, tipos, lint, compilación y revisión independiente.
+- Muestra de escritorio, tablet y teléfono. Cierre local. AG-11 espera indicación del Owner.

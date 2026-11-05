@@ -141,7 +141,8 @@ function parseAmount(raw: string): string | null {
   if (!/^\d+(\.\d+)?$/.test(s)) return null;
   if (s === "0" || /^0+(\.0+)?$/.test(s)) return null;
   try {
-    return roundMoney(s);
+    const amount = roundMoney(s);
+    return amount !== "0.00" && /^\d{1,14}\.\d{2}$/.test(amount) ? amount : null;
   } catch {
     return null;
   }

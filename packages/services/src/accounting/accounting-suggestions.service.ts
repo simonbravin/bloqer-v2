@@ -13,12 +13,11 @@ import { STOCK_CONSUMPTION_UNVALUED_WARNING } from "../inventory/stock-consumpti
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { findActiveMappingRule } from "./accounting-mapping.service";
 import {
-  createJournalEntry,
+  createJournalEntryAsAutomation,
   getJournalEntryBySourceIfNotCancelled,
   type JournalEntryView,
 } from "./journal-entry.service";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
-import { treasuryMovementSupportsAccountingDraft } from "./accounting-treasury-gl-eligibility";
 import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
 import {
   buildSalesInvoiceJournalInput,
@@ -29,6 +28,8 @@ import {
   COA_IIBB_PERCEPTION_DEBIT,
 } from "./accounting-invoice-journal-lines";
 import { ensureIibbPerceptionCoaAccounts } from "./ensure-iibb-coa-accounts";
+import { assertCanViewJournalSource } from "./accounting-source-access";
+import { loadTreasuryJournalMovement, loadTreasuryJournalTransfer } from "./accounting-treasury-source";
 
 async function resolveActiveGlAccountId(
   tenantId: string,
@@ -154,13 +155,14 @@ export async function suggestJournalFromCollection(
     include: { account: { select: { type: true, currency: true } } },
   });
   if (!col) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
+  assertCompanyScope(ctx, col.companyId);
+  await assertCanViewJournalSource(ctx, "AR", col.projectId);
   if (col.status !== "CONFIRMED") {
     throw new ServiceError(
       "CONFLICT",
       "Solo se pueden sugerir asientos para cobranzas confirmadas",
     );
   }
-  assertCompanyScope(ctx, col.companyId);
   await resolveAccountingCompanyId(ctx, col.companyId);
 
   const existingCol = await getJournalEntryBySourceIfNotCancelled(ctx, {
@@ -193,7 +195,7 @@ export async function suggestJournalFromCollection(
     sourceType: "COLLECTION",
     sourceId: col.id,
   });
-  return createJournalEntry(input, ctx);
+  return createJournalEntryAsAutomation(input, ctx, col.companyId);
 }
 
 export async function suggestJournalFromPayment(
@@ -206,10 +208,11 @@ export async function suggestJournalFromPayment(
     include: { account: { select: { type: true, currency: true } } },
   });
   if (!pay) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
+  assertCompanyScope(ctx, pay.companyId);
+  await assertCanViewJournalSource(ctx, "AP", pay.projectId);
   if (pay.status !== "CONFIRMED") {
     throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para pagos confirmados");
   }
-  assertCompanyScope(ctx, pay.companyId);
   await resolveAccountingCompanyId(ctx, pay.companyId);
 
   const existingPay = await getJournalEntryBySourceIfNotCancelled(ctx, {
@@ -246,7 +249,7 @@ export async function suggestJournalFromPayment(
     sourceType: "PAYMENT",
     sourceId: pay.id,
   });
-  return createJournalEntry(input, ctx);
+  return createJournalEntryAsAutomation(input, ctx, pay.companyId);
 }
 
 export async function suggestJournalFromTreasuryMovement(
@@ -254,25 +257,24 @@ export async function suggestJournalFromTreasuryMovement(
   ctx: ServiceContext,
 ): Promise<JournalEntryView> {
   await assertEdit(ctx);
-  const mov = await prisma.accountMovement.findFirst({
-    where: { id: accountMovementId, tenantId: ctx.tenantId },
-    include: { account: true },
-  });
-  if (!mov) throw new ServiceError("NOT_FOUND", "Movimiento de tesorería no encontrado");
-  if (mov.status !== "CONFIRMED" && mov.status !== "RECONCILED") {
+  await assertCanViewJournalSource(ctx, "TREASURY", null);
+  const mov = await loadTreasuryJournalMovement(prisma, ctx.tenantId, accountMovementId);
+  if (!mov) {
     throw new ServiceError(
       "CONFLICT",
-      "Solo se pueden sugerir asientos para movimientos confirmados o conciliados",
+      "El movimiento no está disponible como origen contable. Revisá su estado o generá el asiento desde su documento origen.",
     );
   }
-  if (!treasuryMovementSupportsAccountingDraft({ type: mov.type, sourceType: mov.sourceType })) {
-    throw new ServiceError(
-      "CONFLICT",
-      "Este movimiento ya está cubierto por el asiento de cobranza/pago (o es saldo inicial). Generá el asiento desde el documento origen.",
-    );
+  if (mov.projectId) await assertCanViewJournalSource(ctx, "TREASURY", mov.projectId);
+
+  const isTransfer = mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT";
+  const transferId = mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null;
+  const transfer = isTransfer && transferId ? await loadTreasuryJournalTransfer(prisma, ctx.tenantId, transferId) : null;
+  if (isTransfer && (!transfer || (mov.id !== transfer.out.id && mov.id !== transfer.incoming.id))) {
+    throw new ServiceError("CONFLICT", "La transferencia no tiene ambos movimientos vigentes y consistentes");
   }
 
-  const companyId = mov.companyId ?? mov.account.companyId ?? null;
+  const companyId = transfer?.transfer.companyId ?? mov.companyId ?? mov.account.companyId;
   if (!companyId) {
     throw new ServiceError(
       "CONFLICT",
@@ -284,16 +286,7 @@ export async function suggestJournalFromTreasuryMovement(
 
   const eventType = movementToEventType(mov);
   const sourceType = movementToJournalSourceType(mov);
-  // Canonical INTERNAL_TRANSFER sourceId is InternalTransfer.id (same as auto-draft / cancel-sync).
-  const transferId =
-    mov.transferId ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
-  if ((mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT") && !transferId) {
-    throw new ServiceError(
-      "CONFLICT",
-      "El movimiento de transferencia no tiene id de transferencia; no se puede generar el asiento",
-    );
-  }
-  const sourceId = transferId ?? mov.id;
+  const sourceId = transfer?.transfer.id ?? mov.id;
 
   const existingMov = await getJournalEntryBySourceIfNotCancelled(ctx, {
     companyId,
@@ -310,42 +303,13 @@ export async function suggestJournalFromTreasuryMovement(
   let lineDescriptionDebit = `Debe — ${mov.type}`;
   let lineDescriptionCredit = `Haber — ${mov.type}`;
 
-  if (transferId && (mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT")) {
-    const legs = await prisma.accountMovement.findMany({
-      where: {
-        tenantId: ctx.tenantId,
-        status: { in: ["CONFIRMED", "RECONCILED"] },
-        OR: [{ transferId }, { sourceType: "INTERNAL_TRANSFER", sourceId: transferId }],
-      },
-      include: { account: true },
-      orderBy: { id: "asc" },
-    });
-    const outLeg = legs.find((l) => l.type === "TRANSFER_OUT");
-    const inLeg = legs.find((l) => l.type === "TRANSFER_IN");
-    if (inLeg) {
-      const debitGl = await resolveActiveGlAccountId(
-        ctx.tenantId,
-        companyId,
-        suggestTreasuryGlAccountCode({
-          type: inLeg.account.type,
-          currency: inLeg.account.currency,
-        }),
-      );
-      if (debitGl) debitAccountId = debitGl;
-      lineDescriptionDebit = "Debe — cuenta destino";
-    }
-    if (outLeg) {
-      const creditGl = await resolveActiveGlAccountId(
-        ctx.tenantId,
-        companyId,
-        suggestTreasuryGlAccountCode({
-          type: outLeg.account.type,
-          currency: outLeg.account.currency,
-        }),
-      );
-      if (creditGl) creditAccountId = creditGl;
-      lineDescriptionCredit = "Haber — cuenta origen";
-    }
+  if (transfer) {
+    const debitGl = await resolveActiveGlAccountId(ctx.tenantId, companyId, suggestTreasuryGlAccountCode(transfer.transfer.destinationAccount));
+    const creditGl = await resolveActiveGlAccountId(ctx.tenantId, companyId, suggestTreasuryGlAccountCode(transfer.transfer.sourceAccount));
+    if (debitGl) debitAccountId = debitGl;
+    if (creditGl) creditAccountId = creditGl;
+    lineDescriptionDebit = "Debe — cuenta destino";
+    lineDescriptionCredit = "Haber — cuenta origen";
   } else {
     const treasuryGlId = await resolveActiveGlAccountId(
       ctx.tenantId,
@@ -379,7 +343,7 @@ export async function suggestJournalFromTreasuryMovement(
     sourceType,
     sourceId,
   });
-  return createJournalEntry(input, ctx);
+  return createJournalEntryAsAutomation(input, ctx, companyId);
 }
 
 export async function suggestJournalFromStockMovement(
@@ -392,6 +356,8 @@ export async function suggestJournalFromStockMovement(
     include: inventoryMovementParentInclude,
   });
   if (!sm) throw new ServiceError("NOT_FOUND", "Movimiento de stock no encontrado");
+  assertCompanyScope(ctx, sm.companyId);
+  await assertCanViewJournalSource(ctx, "INVENTORY", sm.projectId);
   await assertInventoryMovementRelations(sm, ctx);
   if (sm.status !== "CONFIRMED") {
     throw new ServiceError(
@@ -406,7 +372,6 @@ export async function suggestJournalFromStockMovement(
     );
   }
 
-  assertCompanyScope(ctx, sm.companyId);
   await resolveAccountingCompanyId(ctx, sm.companyId);
 
   const existingSm = await getJournalEntryBySourceIfNotCancelled(ctx, {
@@ -430,10 +395,11 @@ export async function suggestJournalFromSalesInvoice(
     where: { id: salesInvoiceId, tenantId: ctx.tenantId },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
-  if (inv.status !== "ISSUED") {
+  assertCompanyScope(ctx, inv.companyId);
+  await assertCanViewJournalSource(ctx, "AR", inv.projectId);
+  if (inv.status !== "ISSUED" || inv.documentKind !== "INVOICE") {
     throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para facturas emitidas");
   }
-  assertCompanyScope(ctx, inv.companyId);
   await resolveAccountingCompanyId(ctx, inv.companyId);
 
   const existing = await getJournalEntryBySourceIfNotCancelled(ctx, {
@@ -474,7 +440,7 @@ export async function suggestJournalFromSalesInvoice(
     iibbPerceptionDebitAccountId,
     sourceId: inv.id,
   });
-  return createJournalEntry(input, ctx);
+  return createJournalEntryAsAutomation(input, ctx, inv.companyId);
 }
 
 export async function suggestJournalFromSupplierInvoice(
@@ -486,10 +452,11 @@ export async function suggestJournalFromSupplierInvoice(
     where: { id: supplierInvoiceId, tenantId: ctx.tenantId },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
-  if (inv.status !== "ISSUED") {
+  assertCompanyScope(ctx, inv.companyId);
+  await assertCanViewJournalSource(ctx, "AP", inv.projectId);
+  if (inv.status !== "ISSUED" || inv.documentKind !== "INVOICE") {
     throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para facturas emitidas");
   }
-  assertCompanyScope(ctx, inv.companyId);
   await resolveAccountingCompanyId(ctx, inv.companyId);
 
   const existing = await getJournalEntryBySourceIfNotCancelled(ctx, {
@@ -530,7 +497,7 @@ export async function suggestJournalFromSupplierInvoice(
     iibbPerceptionCreditAccountId,
     sourceId: inv.id,
   });
-  return createJournalEntry(input, ctx);
+  return createJournalEntryAsAutomation(input, ctx, inv.companyId);
 }
 
 /** Router for optional tooling / future UI; validates treasury event vs movement type. */
@@ -538,6 +505,7 @@ export async function generateDraftJournalFromSuggestion(
   input: GenerateJournalSuggestionInput,
   ctx: ServiceContext,
 ): Promise<JournalEntryView> {
+  await assertEdit(ctx);
   switch (input.eventType) {
     case "COLLECTION_CONFIRMED": {
       const col = await prisma.collection.findFirst({
@@ -609,8 +577,11 @@ export async function generateDraftJournalFromSuggestion(
           "El tipo de evento no coincide con el movimiento de tesorería seleccionado",
         );
       }
-      const movCompanyId = mov.companyId ?? mov.account.companyId ?? null;
-      if (movCompanyId) await assertOptionalCompanyFilter(ctx, input.companyId, movCompanyId);
+      const root = mov.sourceType === "INTERNAL_TRANSFER" && mov.sourceId
+        ? await loadTreasuryJournalTransfer(prisma, ctx.tenantId, mov.sourceId)
+        : null;
+      if (!root) throw new ServiceError("CONFLICT", "La transferencia no tiene ambos movimientos vigentes y consistentes");
+      await assertOptionalCompanyFilter(ctx, input.companyId, root.transfer.companyId);
       return suggestJournalFromTreasuryMovement(input.sourceId, ctx);
     }
     case "STOCK_CONSUMPTION": {

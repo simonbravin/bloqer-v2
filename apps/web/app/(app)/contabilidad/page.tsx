@@ -2,10 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { accountingPageCompany } from "@/lib/accounting-page-company";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import {
   defaultAccountingMonthRange,
-  getCompanies,
   getIncomeStatement,
   getStatementOfFinancialPosition,
   listJournalEntries,
@@ -15,43 +15,48 @@ import { PageShell } from "@/components/layout/page-shell";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
+import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
 import { formatDate } from "@/lib/format";
 
-export default async function ContabilidadPage() {
+export default async function ContabilidadPage({ searchParams }: { searchParams: Promise<EmpresaSearch> }) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
-  const ctx = await buildTenantServiceContext();
-  const companies = ctx ? await getCompanies(ctx) : [];
+  const { ctx, companies, company } = await accountingPageCompany(await searchParams);
+  if (!company) {
+    return (
+      <PageShell variant="default" className="space-y-6">
+        <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
+        <ListEmptyState
+          title={companies.length ? "Elegí una empresa" : "No hay una empresa activa"}
+          description={companies.length ? "Elegí una empresa arriba para consultar su libro contable." : "Configurá una empresa activa para consultar su libro contable."}
+          action={companies.length === 1 ? <Button asChild><Link href="/contabilidad">Ver empresa activa</Link></Button> : undefined}
+        />
+      </PageShell>
+    );
+  }
+  const companyId = company.id;
   const month = defaultAccountingMonthRange();
 
-  const emptyList = { data: [] as Awaited<ReturnType<typeof listJournalEntries>>["data"], total: 0 };
-  let drafts = emptyList;
-  let postedMonth = emptyList;
-  let income: Awaited<ReturnType<typeof getIncomeStatement>> | null = null;
-  let esp: Awaited<ReturnType<typeof getStatementOfFinancialPosition>> | null = null;
-
-  if (ctx) {
-    [drafts, postedMonth] = await Promise.all([
-      listJournalEntries(ctx, { status: "DRAFT", page: 1, pageSize: 5 }),
+  const [drafts, postedMonth] = await Promise.all([
+      listJournalEntries(ctx, { companyId, status: "DRAFT", page: 1, pageSize: 5 }),
       listJournalEntries(ctx, {
+        companyId,
         status: "POSTED",
         fromDate: month.dateFrom,
         toDate: month.dateTo,
         page: 1,
         pageSize: 1,
       }),
-    ]);
-    // Soft KPIs: hub must still render if a report fails.
-    const [incomeRes, espRes] = await Promise.allSettled([
-      getIncomeStatement(ctx, { dateFrom: month.dateFrom, dateTo: month.dateTo }),
-      getStatementOfFinancialPosition(ctx, {}),
-    ]);
-    income = incomeRes.status === "fulfilled" ? incomeRes.value : null;
-    esp = espRes.status === "fulfilled" ? espRes.value : null;
-  }
+  ]);
+  const [incomeRes, espRes] = await Promise.allSettled([
+    getIncomeStatement(ctx, { companyId, dateFrom: month.dateFrom, dateTo: month.dateTo }),
+    getStatementOfFinancialPosition(ctx, { companyId }),
+  ]);
+  const income = incomeRes.status === "fulfilled" ? incomeRes.value : null;
+  const esp = espRes.status === "fulfilled" ? espRes.value : null;
 
   const primaryCurrency =
     income?.currencies[0] ?? esp?.currencies[0] ?? "ARS";
@@ -61,25 +66,28 @@ export default async function ContabilidadPage() {
     monthResult !== "—" && monthResult.trimStart().startsWith("-") ? "danger" : "default";
 
   const base = "/contabilidad";
-  const q = (id: string) => (current.tenantCtx!.companyId ? "" : `?empresa=${encodeURIComponent(id)}`);
+  const href = (path: string, filters: Record<string, string> = {}) => {
+    const query = new URLSearchParams({ ...filters, empresa: companyId });
+    return `${base}${path}?${query.toString()}`;
+  };
 
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Contabilidad</h1>
-          <p className="text-sm text-muted-foreground mt-1">Libro interno gerencial por empresa</p>
+          <p className="text-sm text-muted-foreground mt-1">Libro interno gerencial · {company.name}</p>
         </div>
         {can(current.tenantCtx.roles, "EDIT", "ACCOUNTING") ? (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`${base}/cuentas/nueva`}>Nueva cuenta</Link>
+              <Link href={href("/cuentas/nueva")}>Nueva cuenta</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={`${base}/asientos/nuevo`}>Nuevo asiento</Link>
+              <Link href={href("/asientos/nuevo")}>Nuevo asiento</Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href={`${base}/reglas/nueva`}>Nueva regla</Link>
+              <Link href={href("/reglas/nueva")}>Nueva regla</Link>
             </Button>
           </div>
         ) : null}
@@ -91,23 +99,23 @@ export default async function ContabilidadPage() {
         <KpiStatCard
           label="Borradores"
           value={String(drafts.total)}
-          href={`${base}/asientos?status=DRAFT`}
+          href={href("/asientos", { status: "DRAFT" })}
           iconKey="gl_drafts"
           tone={drafts.total > 0 ? "warning" : "muted"}
-          helper="Asientos pendientes de postear"
+          helper="Asientos pendientes de contabilizar"
         />
         <KpiStatCard
           label="Contabilizados del mes"
           value={String(postedMonth.total)}
-          href={`${base}/libro-diario?dateFrom=${month.dateFrom}&dateTo=${month.dateTo}`}
+          href={href("/libro-diario", month)}
           iconKey="gl_posted_month"
-          helper="Asientos POSTED del mes en curso"
+          helper="Asientos contabilizados del mes en curso"
         />
         <KpiStatCard
           label="Resultado del mes"
           value={monthResult}
           subtitle={primaryCurrency}
-          href={`${base}/estado-resultados?dateFrom=${month.dateFrom}&dateTo=${month.dateTo}`}
+          href={href("/estado-resultados", month)}
           iconKey="gl_month_result"
           tone={monthResultTone}
           helper="Estado de resultados del mes"
@@ -116,7 +124,7 @@ export default async function ContabilidadPage() {
           label="Activo a hoy"
           value={assetsToday}
           subtitle={primaryCurrency}
-          href={`${base}/situacion-patrimonial`}
+          href={href("/situacion-patrimonial")}
           iconKey="gl_assets"
           helper="Situación patrimonial"
         />
@@ -134,7 +142,7 @@ export default async function ContabilidadPage() {
               {drafts.data.map((e) => (
                 <li key={e.id} className="py-2.5 first:pt-0 last:pb-0">
                   <Link
-                    href={`${base}/asientos/${e.id}`}
+                    href={href(`/asientos/${e.id}`)}
                     className="group flex items-baseline justify-between gap-3"
                   >
                     <div className="min-w-0">
@@ -158,37 +166,11 @@ export default async function ContabilidadPage() {
         </CardContent>
         <CardFooter>
           <Button asChild variant="outline" size="sm">
-            <Link href={`${base}/asientos?status=DRAFT`}>Ver todos ({drafts.total})</Link>
+            <Link href={href("/asientos", { status: "DRAFT" })}>Ver todos ({drafts.total})</Link>
           </Button>
         </CardFooter>
       </Card>
 
-      {!current.tenantCtx.companyId && companies.length > 1 ? (
-        <div className="rounded-xl border border-border/80 bg-muted/30 px-4 py-3 text-sm">
-          <p className="font-medium text-foreground">Varias empresas</p>
-          <p className="mt-1 text-muted-foreground">Elegí empresa para enlaces con contexto:</p>
-          <ul className="mt-2 space-y-1">
-            {companies.map((c) => (
-              <li key={c.id}>
-                <span className="text-muted-foreground">{c.name}:</span>{" "}
-                <Link
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                  href={`${base}/cuentas${q(c.id)}`}
-                >
-                  Cuentas
-                </Link>
-                {" · "}
-                <Link
-                  className="font-medium text-foreground underline-offset-4 hover:underline"
-                  href={`${base}/reglas${q(c.id)}`}
-                >
-                  Reglas
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </PageShell>
   );
 }

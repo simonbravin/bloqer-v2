@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,18 +37,20 @@ export function AccountingMappingRuleForm({
   defaultCompanyId,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [eventType, setEventType] = useState<AccountingMappingEventType | "">(
     () => initial?.eventType ?? "",
   );
   const [debitId, setDebitId] = useState(initial?.debitAccountId ?? "");
   const [creditId, setCreditId] = useState(initial?.creditAccountId ?? "");
   const companyId = initial?.companyId ?? defaultCompanyId ?? "";
+  const companyQuery = companyId ? `?empresa=${encodeURIComponent(companyId)}` : "";
   const accountOptions = useMemo(() => chartAccountsToSearchableOptions(accounts), [accounts]);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     if (!eventType) {
       setError("Seleccioná el tipo de evento");
       return;
@@ -57,7 +60,8 @@ export function AccountingMappingRuleForm({
       return;
     }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       const priority = Number(fd.get("priority") ?? 100);
       if (mode === "create") {
         const res = await createAccountingMappingRuleAction({
@@ -71,7 +75,7 @@ export function AccountingMappingRuleForm({
           metadata:        null,
         });
         if ("error" in res) setError(res.error);
-        else router.push(`/contabilidad/reglas/${res.id}`);
+        else router.push(`/contabilidad/reglas/${res.id}${companyQuery}`);
       } else if (ruleId) {
         const res = await updateAccountingMappingRuleAction(ruleId, {
           eventType:       eventType as AccountingMappingEventType,
@@ -83,7 +87,7 @@ export function AccountingMappingRuleForm({
           companyId:       initial?.companyId ?? null,
         });
         if ("error" in res) setError(res.error);
-        else router.push(`/contabilidad/reglas/${ruleId}`);
+        else router.push(`/contabilidad/reglas/${ruleId}${companyQuery}`);
       }
     });
   }
@@ -92,7 +96,7 @@ export function AccountingMappingRuleForm({
     <div className="rounded-lg border bg-card p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>
         )}
 
         <div className="space-y-1">
@@ -146,7 +150,7 @@ export function AccountingMappingRuleForm({
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => router.back()}>Cancelar</Button>
           <Button type="submit" disabled={isPending}>
             {isPending ? "Guardando…" : mode === "create" ? "Crear regla" : "Guardar"}
           </Button>

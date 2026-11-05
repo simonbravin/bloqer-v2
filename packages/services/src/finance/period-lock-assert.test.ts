@@ -27,6 +27,18 @@ describe("assertFinancialPeriodOpen (Phase 3 acceptance)", () => {
     assert.equal(called, true);
   });
 
+  it("rejects an impossible calendar date before looking up its period", async () => {
+    let called = false;
+    await assert.rejects(
+      () => assertFinancialPeriodOpen(
+        { tenantId: "t1", companyId: "c1", date: "2026-02-30" },
+        { period: { findFirst: async () => { called = true; return null; } } } as never,
+      ),
+      (error: unknown) => error instanceof ServiceError && error.code === "VALIDATION",
+    );
+    assert.equal(called, false);
+  });
+
   it("blocks mutation when date falls in a CLOSED period", async () => {
     await assert.rejects(
       () =>

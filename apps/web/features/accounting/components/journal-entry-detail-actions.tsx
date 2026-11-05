@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
@@ -15,22 +16,24 @@ import type { JournalEntryStatus } from "@bloqer/database";
 export function JournalEntryDetailActions({
   entryId,
   status,
+  empresa,
   canReverse = false,
 }: {
   entryId: string;
   status: JournalEntryStatus;
+  empresa: string;
   canReverse?: boolean;
 }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const { pending, run } = useOperationalAction({ onError: setErr });
   const [confirm, setConfirm] = useState<"cancel" | "reverse" | null>(null);
 
   if (status !== "DRAFT" && !(status === "POSTED" && canReverse)) return null;
 
   function runPost() {
     setErr(null);
-    start(async () => {
+    return run(async () => {
       const res = await postJournalEntryAction({ id: entryId });
       if ("error" in res) {
         setErr(res.error);
@@ -44,11 +47,11 @@ export function JournalEntryDetailActions({
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {err && <p className="text-sm text-destructive">{err}</p>}
+      {err && <p className="text-sm text-destructive" role="alert">{err}</p>}
       {status === "DRAFT" ? (
         <>
           <Button type="button" disabled={pending} onClick={runPost}>
-            Contabilizar
+            {pending && confirm === null ? "Contabilizando…" : "Contabilizar"}
           </Button>
           <Button
             type="button"
@@ -97,7 +100,7 @@ export function JournalEntryDetailActions({
         variant="destructive"
         pending={pending}
         onConfirm={() => {
-          start(async () => {
+          return run(async () => {
             setErr(null);
             const res = await cancelJournalEntryAction({ id: entryId });
             if ("error" in res) {
@@ -132,7 +135,7 @@ export function JournalEntryDetailActions({
         variant="destructive"
         pending={pending}
         onConfirm={() => {
-          start(async () => {
+          return run(async () => {
             setErr(null);
             const res = await reverseJournalEntryAction({ id: entryId });
             if ("error" in res) {
@@ -143,7 +146,7 @@ export function JournalEntryDetailActions({
             setConfirm(null);
             if ("reverseId" in res) {
               toast.success("Asiento revertido");
-              router.push(`/contabilidad/asientos/${res.reverseId}`);
+              router.push(`/contabilidad/asientos/${res.reverseId}?empresa=${encodeURIComponent(empresa)}`);
             }
           });
         }}
