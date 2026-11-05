@@ -25,6 +25,7 @@ const contactId = "00000000-0000-0000-0000-000000000004";
 const wbsId = "00000000-0000-0000-0000-000000000005";
 const documentId = "00000000-0000-0000-0000-000000000006";
 const idempotencyKey = "00000000-0000-4000-8000-000000000007";
+const budgetId = "00000000-0000-0000-0000-000000000008";
 const ctx: ServiceContext = { tenantId, companyId, actorUserId: "actor", roles: ["OWNER"] };
 const date = "2026-11-03";
 const line = { description: "Synthetic line", quantity: "1", unitPrice: "10", wbsNodeId: wbsId };
@@ -85,8 +86,16 @@ function setup(t: TestContext, lockedStatus: ProjectStatus = "CANCELLED") {
   stub(t, prisma.journalEntry, "findFirst", async () => null);
   stub(t, prisma.accountMovement, "findFirst", async () => null);
   stub(t, prisma.certification, "findUnique", async () => ({
-    id: documentId, tenantId, projectId, status: "APPROVED", totalAmount: new Prisma.Decimal(10),
-    project: project(), budget: { currency: "ARS" }, lines: [{ id: "cert-line" }],
+    id: documentId, tenantId, companyId, projectId, budgetId, status: "APPROVED",
+    updatedAt: new Date(date), totalAmount: new Prisma.Decimal(10),
+    company: { id: companyId, tenantId },
+    project: { ...project(), company: { id: companyId, tenantId } },
+    budget: { id: budgetId, tenantId, companyId, projectId, currency: "ARS", status: "APPROVED", company: { id: companyId, tenantId } },
+    lines: [{
+      id: "cert-line", certificationId: documentId, wbsNodeId: wbsId,
+      currentQty: new Prisma.Decimal(1), unitSalePriceSnapshot: new Prisma.Decimal(10), periodAmount: new Prisma.Decimal(10),
+      wbsNode: { id: wbsId, budgetId, type: "ITEM", code: "1", name: "Synthetic line", costItem: { budgetId, wbsNodeId: wbsId } },
+    }],
   }));
 
   const reachDocument = () => {

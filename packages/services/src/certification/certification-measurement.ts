@@ -1,6 +1,9 @@
 import { Prisma, prisma, type CostCategory } from "@bloqer/database";
-import { can } from "@bloqer/domain";
-import type { SaveCertificationMeasurementInput } from "@bloqer/validators";
+
+import {
+  saveCertificationMeasurementSchema,
+  type SaveCertificationMeasurementInput,
+} from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { canViewArProjectArea } from "../ar/ar-access";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -15,14 +18,21 @@ import {
   toMoneyDecimal,
 } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectAccess } from "../security/access";
+import { isCrossCompany } from "../company-scope";
+import { canViewJobsiteLogArea } from "../jobsite-log/jobsite-log-access";
+import { canViewProcurementProjectArea } from "../procurement/procurement-access";
 import { ServiceContext, ServiceError } from "../types";
 import {
   _validateCertificationMeasurement,
   _lockEditableCertification,
   _recalcCertificationTotals,
 } from "./certification-calc.service";
-import { assertCertificationEditable } from "./certification.service";
+import { assertCertificationStatusEditable } from "./certification-guards";
+import {
+  authorizeCertification,
+  assertCertificationNode,
+  requireCertificationAccess,
+} from "./certification-scope";
 import {
   aggregateJobsiteProgress,
   emptyJobsiteProgress,
@@ -72,10 +82,10 @@ export type CertificationMeasurementRow = {
   currentAmount: string | null;
   remainingQty: string;
   unitSalePrice: string;
-  logQtyAcum: string;
-  logPctAcum: string;
-  logQtyPeriod: string;
-  logPctPeriod: string;
+  logQtyAcum: string | null;
+  logPctAcum: string | null;
+  logQtyPeriod: string | null;
+  logPctPeriod: string | null;
   /** Cumulative approved physical progress minus previously certified quantity. */
   suggestedQty: string | null;
   /** Pending physical percentage after subtracting previous certificates. */
@@ -95,6 +105,8 @@ export type CertificationMeasurementSheet = {
   /** Changes on every save so the planilla can soltar el bloqueo de refresco. */
   revision: string;
   costAvailable: boolean;
+  progressAvailable: boolean;
+  sourceWarnings: string[];
   groups: CertificationMeasurementGroup[];
   rows: CertificationMeasurementRow[];
 };
@@ -132,40 +144,24 @@ export async function getCertificationMeasurementSheet(
   certificationId: string,
   ctx: ServiceContext,
 ): Promise<CertificationMeasurementSheet> {
-  if (!can(ctx.roles, "VIEW", "CERTIFICATIONS") && !can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver la planilla de certificación");
-  }
+  await authorizeCertification(ctx, "VIEW");
 
-  const cert = await prisma.certification.findUnique({
-    where: { id: certificationId },
-    select: {
-      id: true,
-      tenantId: true,
-      projectId: true,
-      budgetId: true,
-      periodStart: true,
-      periodEnd: true,
-      updatedAt: true,
-      status: true,
-      budget: { select: { currency: true } },
-      lines: {
-        select: {
-          id: true,
-          wbsNodeId: true,
-          currentQty: true,
-          previousQty: true,
-          budgetQty: true,
-          physicalPct: true,
-          unitSalePriceSnapshot: true,
-          periodAmount: true,
-        },
-      },
-    },
-  });
-  if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  if (cert.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await requireProjectAccess(cert.projectId, ctx);
+  const cert = await requireCertificationAccess(certificationId, ctx);
+  const documentCtx = {
+    ...ctx,
+    companyId: cert.companyId ?? cert.budget.companyId ?? cert.project.companyId ?? ctx.companyId,
+  };
+  const gate = await getTenantModuleGate(ctx);
+  const progressAvailable = gate.isEnabled("JOBSITE_LOG") && canViewJobsiteLogArea(ctx.roles);
+  const sourceWarnings: string[] = [];
+  if (!progressAvailable)
+    sourceWarnings.push(
+      "Libro de obra no disponible para esta consulta; no se muestra como avance cero.",
+    );
+  if (!gate.isEnabled("PROCUREMENT") || !canViewProcurementProjectArea(ctx.roles))
+    sourceWarnings.push(
+      "Compras y recepciones no disponibles para esta consulta; no se calculan sus sugerencias.",
+    );
 
   const periodStart = utcDateKey(cert.periodStart);
   const periodEnd = utcDateKey(cert.periodEnd);
@@ -175,17 +171,26 @@ export async function getCertificationMeasurementSheet(
       where: { budgetId: cert.budgetId, budget: { tenantId: ctx.tenantId } },
       select: {
         id: true,
+        budgetId: true,
         parentId: true,
         type: true,
         code: true,
         name: true,
         costItem: {
-          select: { unit: true, quantity: true, unitSalePrice: true, totalCostDirect: true },
+          select: {
+            budgetId: true,
+            wbsNodeId: true,
+            unit: true,
+            quantity: true,
+            unitSalePrice: true,
+            totalCostDirect: true,
+          },
         },
       },
     }),
   );
   const nodes = allNodes.filter((node) => node.type === "ITEM" && node.costItem);
+  for (const node of nodes) assertCertificationNode(node, cert.budgetId);
   const nodeIds = nodes.map((n) => n.id);
 
   const previousRows =
@@ -214,13 +219,14 @@ export async function getCertificationMeasurementSheet(
   }
 
   const progressRows =
-    nodeIds.length > 0
+    progressAvailable && nodeIds.length > 0
       ? await prisma.jobsiteLogProgress.findMany({
           where: {
             wbsNodeId: { in: nodeIds },
             jobsiteLog: {
               projectId: cert.projectId,
               tenantId: ctx.tenantId,
+              ...(documentCtx.companyId ? { companyId: documentCtx.companyId } : {}),
               status: "APPROVED",
               logDate: { lte: cert.periodEnd },
             },
@@ -229,10 +235,25 @@ export async function getCertificationMeasurementSheet(
             wbsNodeId: true,
             quantityCompleted: true,
             physicalPct: true,
-            jobsiteLog: { select: { logDate: true } },
+            jobsiteLog: {
+              select: { tenantId: true, companyId: true, projectId: true, logDate: true },
+            },
+            wbsNode: { select: { budgetId: true } },
           },
         })
       : [];
+  for (const row of progressRows) {
+    if (
+      row.jobsiteLog.tenantId !== ctx.tenantId ||
+      row.jobsiteLog.projectId !== cert.projectId ||
+      isCrossCompany(row.jobsiteLog.companyId, documentCtx) ||
+      row.wbsNode.budgetId !== cert.budgetId
+    )
+      throw new ServiceError(
+        "CONFLICT",
+        "El avance del libro de obra tiene relaciones inconsistentes",
+      );
+  }
   const progressByWbs = aggregateJobsiteProgress(
     progressRows.map((p) => ({
       wbsNodeId: p.wbsNodeId,
@@ -251,15 +272,17 @@ export async function getCertificationMeasurementSheet(
       const report = await getProjectCostControl(
         cert.projectId,
         { budgetId: cert.budgetId, dateFrom: periodStart, dateTo: periodEnd },
-        ctx,
+        documentCtx,
       );
       if (report.type === "REPORT") {
         costAvailable = true;
+        sourceWarnings.push(...report.warnings);
         for (const row of report.rows) costByWbs.set(row.wbsNodeId, costFromRow(row));
       }
     } catch (err) {
       // The certificate must open even when the cost report cannot. Cost stays blank.
-      if (!(err instanceof ServiceError)) throw err;
+      if (!(err instanceof ServiceError) || err.code !== "FORBIDDEN") throw err;
+      sourceWarnings.push("Control de costos no disponible para esta consulta.");
     }
 
   const ownByWbs = new Map(cert.lines.map((l) => [l.wbsNodeId, l]));
@@ -275,7 +298,7 @@ export async function getCertificationMeasurementSheet(
               budgetCost: node.costItem!.totalCostDirect,
             })),
           },
-          ctx,
+          documentCtx,
         )
       : new Map<string, { purchasedPct: string | null; receivedPct: string | null }>();
   const rows: CertificationMeasurementRow[] = [];
@@ -329,10 +352,10 @@ export async function getCertificationMeasurementSheet(
       currentAmount: own ? serializeMoneyDecimal(own.periodAmount) : null,
       remainingQty,
       unitSalePrice,
-      logQtyAcum: progress.qtyAcum,
-      logPctAcum: progress.pctAcum,
-      logQtyPeriod: progress.qtyPeriod,
-      logPctPeriod: progress.pctPeriod,
+      logQtyAcum: progressAvailable ? progress.qtyAcum : null,
+      logPctAcum: progressAvailable ? progress.pctAcum : null,
+      logQtyPeriod: progressAvailable ? progress.qtyPeriod : null,
+      logPctPeriod: progressAvailable ? progress.pctPeriod : null,
       suggestedQty: suggestions[0]!.quantity,
       suggestedPhysicalPct: suggestPendingPhysicalPct(physicalProgressPct, previousPhysicalPct),
       suggestions,
@@ -358,6 +381,8 @@ export async function getCertificationMeasurementSheet(
     currency: cert.budget.currency,
     revision: cert.updatedAt.toISOString(),
     costAvailable,
+    progressAvailable,
+    sourceWarnings,
     groups: allNodes
       .filter((node) => node.type !== "ITEM")
       .map(({ id, parentId, code, name }) => ({ id, parentId, code, name })),
@@ -374,10 +399,12 @@ export async function saveCertificationMeasurement(
   input: SaveCertificationMeasurementInput,
   ctx: ServiceContext,
 ): Promise<void> {
-  if (!can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar la planilla de certificación");
-  }
+  await authorizeCertification(ctx, "EDIT");
 
+  const parsed = saveCertificationMeasurementSchema.safeParse(input);
+  if (!parsed.success)
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Datos inválidos");
+  input = parsed.data;
   const seen = new Set<string>();
   for (const row of input.rows) {
     if (seen.has(row.wbsNodeId)) {
@@ -396,16 +423,13 @@ export async function saveCertificationMeasurement(
     }
   }
 
-  const cert = await prisma.certification.findUnique({ where: { id: input.certificationId } });
-  if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  if (cert.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const cert = await requireCertificationAccess(input.certificationId, ctx);
   await assertProjectAllowsOperationalMutation(cert.projectId, ctx);
-  assertCertificationEditable(cert);
+  assertCertificationStatusEditable(cert.status);
 
   await prisma.$transaction(
     async (tx) => {
-      await _lockEditableCertification(tx, cert.id, ctx.tenantId, input.expectedRevision);
+      const current = await _lockEditableCertification(tx, cert.id, ctx, input.expectedRevision);
       const existing = await tx.certificationLine.findMany({
         where: { certificationId: cert.id },
       });
@@ -466,24 +490,24 @@ export async function saveCertificationMeasurement(
         });
       }
 
-      await _recalcCertificationTotals(tx as never, cert.id);
-      await tx.certification.update({
-        where: { id: cert.id },
-        data: { updatedBy: ctx.actorUserId },
-      });
+      await _recalcCertificationTotals(tx, cert.id, ctx.actorUserId);
+      await log(
+        {
+          tenantId: ctx.tenantId,
+          companyId: current.companyId,
+          projectId: current.projectId,
+          actorUserId: ctx.actorUserId,
+          action: "certification.measurement_saved",
+          entityType: "Certification",
+          entityId: cert.id,
+          after: { rows: input.rows.length },
+          ipAddress: ctx.ipAddress,
+        },
+        tx,
+      );
     },
     { timeout: 30_000, maxWait: 10_000 },
   );
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "certification.measurement_saved",
-    entityType: "Certification",
-    entityId: cert.id,
-    after: { rows: input.rows.length },
-    ipAddress: ctx.ipAddress,
-  });
 }
 
 /** Confirmed collections of the active sales invoice, for the read-only money trail. */
@@ -491,35 +515,84 @@ export async function listCertificationCollectionAccounts(
   certificationId: string,
   ctx: ServiceContext,
 ): Promise<CertificationCollectionAccount[]> {
-  if (!can(ctx.roles, "VIEW", "CERTIFICATIONS") && !can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver la certificación");
-  }
+  await authorizeCertification(ctx, "VIEW");
   if (!canViewArProjectArea(ctx.roles)) return [];
   if (!(await getTenantModuleGate(ctx)).isEnabled("AR")) return [];
 
-  const cert = await prisma.certification.findUnique({
-    where: { id: certificationId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  if (cert.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await requireProjectAccess(cert.projectId, ctx);
+  const cert = await requireCertificationAccess(certificationId, ctx);
+  const documentCtx = {
+    ...ctx,
+    companyId: cert.companyId ?? cert.budget.companyId ?? cert.project.companyId ?? ctx.companyId,
+  };
 
   const collections = await prisma.collection.findMany({
     where: {
       tenantId: ctx.tenantId,
       status: "CONFIRMED",
-      salesInvoice: { certificationId, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
+      ...(documentCtx.companyId ? { companyId: documentCtx.companyId } : {}),
+      projectId: cert.projectId,
+      salesInvoice: {
+        certificationId,
+        tenantId: ctx.tenantId,
+        projectId: cert.projectId,
+        ...(documentCtx.companyId ? { companyId: documentCtx.companyId } : {}),
+        status: { not: "CANCELLED" },
+      },
     },
     select: {
       id: true,
       amount: true,
-      account: { select: { name: true } },
+      currency: true,
+      salesInvoiceId: true,
+      companyId: true,
+      tenantId: true,
+      projectId: true,
+      salesInvoice: {
+        select: {
+          tenantId: true,
+          companyId: true,
+          projectId: true,
+          certificationId: true,
+          currency: true,
+        },
+      },
+      receivable: {
+        select: {
+          tenantId: true,
+          companyId: true,
+          projectId: true,
+          salesInvoiceId: true,
+          currency: true,
+        },
+      },
+      account: { select: { name: true, tenantId: true, companyId: true, currency: true } },
     },
     orderBy: { collectionDate: "asc" },
   });
 
+  for (const collection of collections) {
+    if (
+      collection.account.tenantId !== ctx.tenantId ||
+      collection.salesInvoice?.tenantId !== ctx.tenantId ||
+      collection.salesInvoice.projectId !== cert.projectId ||
+      collection.salesInvoice.companyId !== collection.companyId ||
+      collection.salesInvoice.certificationId !== cert.id ||
+      collection.receivable.tenantId !== ctx.tenantId ||
+      collection.receivable.companyId !== collection.companyId ||
+      collection.receivable.projectId !== cert.projectId ||
+      collection.receivable.salesInvoiceId !== collection.salesInvoiceId ||
+      (collection.account.companyId !== null &&
+        collection.account.companyId !== collection.companyId) ||
+      collection.account.currency !== collection.currency ||
+      collection.salesInvoice.currency !== collection.currency ||
+      collection.salesInvoice.currency !== cert.budget.currency ||
+      collection.receivable.currency !== collection.currency
+    )
+      throw new ServiceError(
+        "CONFLICT",
+        "La cobranza vinculada contiene relaciones inconsistentes",
+      );
+  }
   return collections.map((c) => ({
     id: c.id,
     accountName: c.account.name,

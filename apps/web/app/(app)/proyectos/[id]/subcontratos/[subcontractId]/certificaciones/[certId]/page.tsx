@@ -20,6 +20,7 @@ import {
   getSubcontractCertificationById,
   listEntityDocuments,
   ServiceError,
+  getTenantModuleGate,
 } from "@bloqer/services";
 import { SupplierInvoiceStatusBadge } from "@/features/ap";
 import { SubcontractCertificationStatusBadge } from "@/features/subcontracts";
@@ -32,9 +33,14 @@ import {
 } from "../../../actions";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
+import { SubcontractActionButton } from "@/features/subcontracts/components/subcontract-action-button";
 import { Button } from "@/components/ui/button";
-import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import {
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatUnitPriceFromString,
+} from "@/lib/format-money";
 
 interface PageProps {
   params: Promise<{ id: string; subcontractId: string; certId: string }>;
@@ -47,7 +53,6 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
 
   const { id: projectId, subcontractId, certId } = await params;
   const sp = await searchParams;
-  const returnPath = `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -59,7 +64,8 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
   try {
     cert = await getSubcontractCertificationById(certId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
@@ -72,7 +78,9 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
   const storageConfigured = isStorageConfigured();
   const canEditSubcontracts = can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS");
   const canEditAttachments = canEditSubcontracts;
-  const canEditAp = can(current.tenantCtx.roles, "EDIT", "AP");
+  const moduleGate = await getTenantModuleGate(ctx);
+  const canViewAp = moduleGate.isEnabled("AP") && can(current.tenantCtx.roles, "VIEW", "AP");
+  const canEditAp = moduleGate.isEnabled("AP") && can(current.tenantCtx.roles, "EDIT", "AP");
 
   return (
     <PageShell
@@ -81,17 +89,17 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
       breadcrumbLabel={cert.code}
       breadcrumbSegmentLabels={{ [subcontractId]: cert.subcontractCode }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{cert.code}</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <SubcontractCertificationStatusBadge status={cert.status} />
               <span className="text-sm text-muted-foreground">{cert.subcontractorName}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canEditSubcontracts && cert.status === "DRAFT" && (
             <>
               <Button variant="outline" size="sm" asChild>
@@ -101,42 +109,28 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
                   Editar
                 </Link>
               </Button>
-              <form
-                action={async () => {
-                  "use server";
-                  const res = await issueSubcontractCertificationAction(
-                    certId,
-                    subcontractId,
-                    projectId,
-                  );
-                  if ("error" in res) redirectWithActionError(returnPath, res.error);
-                  redirect(returnPath);
-                }}
-              >
-                <Button size="sm" type="submit">
-                  Emitir
-                </Button>
-              </form>
+              <SubcontractActionButton
+                label="Emitir"
+                action={issueSubcontractCertificationAction.bind(
+                  null,
+                  certId,
+                  subcontractId,
+                  projectId,
+                )}
+              />
             </>
           )}
           {canEditSubcontracts && cert.status === "ISSUED" && (
             <>
-              <form
-                action={async () => {
-                  "use server";
-                  const res = await approveSubcontractCertificationAction(
-                    certId,
-                    subcontractId,
-                    projectId,
-                  );
-                  if ("error" in res) redirectWithActionError(returnPath, res.error);
-                  redirect(returnPath);
-                }}
-              >
-                <Button size="sm" type="submit">
-                  Aprobar
-                </Button>
-              </form>
+              <SubcontractActionButton
+                label="Aprobar"
+                action={approveSubcontractCertificationAction.bind(
+                  null,
+                  certId,
+                  subcontractId,
+                  projectId,
+                )}
+              />
               <ConfirmActionButton
                 label="Rechazar"
                 title="Rechazar certificación"
@@ -156,28 +150,33 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
           )}
           {canEditSubcontracts &&
             (cert.status === "DRAFT" || cert.status === "ISSUED" || cert.status === "APPROVED") && (
-            <ConfirmActionButton
-              label="Anular"
-              title="Anular certificación"
-              description="La certificación de subcontrato se anulará."
-              confirmLabel="Anular"
-              variant="outline"
-              className="text-destructive"
-              successMessage="Certificación anulada"
-              action={cancelSubcontractCertificationAction.bind(
-                null,
-                certId,
-                subcontractId,
-                projectId,
-              )}
-            />
-          )}
+              <ReasonActionButton
+                requiresReason={cert.status !== "DRAFT"}
+                label="Anular"
+                title="Anular certificación"
+                description="La certificación de subcontrato se anulará."
+                confirmLabel="Anular"
+                variant="outline"
+                className="text-destructive"
+                successMessage="Certificación anulada"
+                action={cancelSubcontractCertificationAction.bind(
+                  null,
+                  certId,
+                  subcontractId,
+                  projectId,
+                )}
+              />
+            )}
           {canEditSubcontracts && cert.status === "REJECTED" && (
             <Button size="sm" asChild>
               <Link
-                href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/nueva?replaces=${certId}`}
+                href={
+                  cert.successorCertificationId
+                    ? `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${cert.successorCertificationId}`
+                    : `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/nueva?replaces=${certId}`
+                }
               >
-                Nueva versión
+                {cert.successorCertificationId ? "Ver nueva versión" : "Nueva versión"}
               </Link>
             </Button>
           )}
@@ -192,9 +191,8 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
         </p>
       )}
 
-
       {/* Info grid */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground uppercase">Período</p>
           <p className="text-sm font-medium mt-1">
@@ -207,11 +205,32 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
         </div>
         <div className="rounded-lg border bg-card p-4">
           <p className="text-xs text-muted-foreground uppercase">Total certificado</p>
-          <p className="text-xl font-semibold mt-1">{formatMoneyAmount(cert.totalAmount)}</p>
+          <p className="text-xl font-semibold mt-1">
+            {formatMoneyAmount(cert.totalAmount, cert.currency)}
+          </p>
         </div>
       </div>
 
-      {cert.status === "APPROVED" && cert.supplierInvoiceId && (
+      {cert.status === "APPROVED" && (
+        <div role="status" className="rounded-lg border bg-card p-4 text-sm">
+          <p className="font-medium">
+            Liquidación:{" "}
+            {cert.settlementStatus
+              ? {
+                  UNSETTLED: "Sin liquidar",
+                  PARTIALLY_SETTLED: "Liquidado parcialmente",
+                  SETTLED: "Sin saldo pendiente",
+                  OVERDUE: "Vencido",
+                }[cert.settlementStatus]
+              : "No disponible"}
+          </p>
+          {cert.settlementUnavailableReason && (
+            <p className="mt-1 text-muted-foreground">{cert.settlementUnavailableReason}</p>
+          )}
+        </div>
+      )}
+
+      {canViewAp && cert.status === "APPROVED" && cert.supplierInvoiceId && (
         <div className="rounded-lg border bg-card p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
@@ -244,7 +263,7 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
         </div>
       )}
 
-      {cert.status === "APPROVED" && !cert.supplierInvoiceId && (
+      {canViewAp && cert.status === "APPROVED" && !cert.supplierInvoiceId && (
         <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">
           Certificación aprobada sin factura proveedor vinculada. Revisá el log de aprobación o
           contactá a administración antes de crear documentos manuales.
@@ -274,19 +293,23 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
                   <TableCell className="text-right text-muted-foreground">
                     {l.subcontractLine.unit || "—"}
                   </TableCell>
-                  <TableCell className="text-right">{formatUnitPriceFromString(l.unitPriceSnapshot)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatUnitPriceFromString(l.unitPriceSnapshot)}
+                  </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {formatQtyFromString(l.previousQty)}
                   </TableCell>
                   <TableCell className="text-right font-medium">
                     {formatQtyFromString(l.currentQty)}
                   </TableCell>
-                  <TableCell className="text-right">{formatQtyFromString(l.cumulativeQty)}</TableCell>
+                  <TableCell className="text-right">
+                    {formatQtyFromString(l.cumulativeQty)}
+                  </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {formatQtyFromString(l.remainingQty)}
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {formatMoneyAmount(l.lineTotal)}
+                    {formatMoneyAmount(l.lineTotal, cert.currency)}
                   </TableCell>
                 </TableRow>
               ))}
@@ -297,7 +320,7 @@ export default async function CertificacionPage({ params, searchParams }: PagePr
                   Total:
                 </TableCell>
                 <TableCell className="text-right font-bold">
-                  {formatMoneyAmount(cert.totalAmount)}
+                  {formatMoneyAmount(cert.totalAmount, cert.currency)}
                 </TableCell>
               </TableRow>
             </TableFooter>

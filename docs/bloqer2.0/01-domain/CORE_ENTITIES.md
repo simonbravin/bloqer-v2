@@ -264,7 +264,7 @@
 ### SubcontractCertification
 - **Propósito:** certificación de avance del subcontratista.
 - **Atributos clave:** subcontract_id, period_start, period_end, lines[], total, `status`, **`settlement_status`** (derivado desde `Payable` / pagos; `UNSETTLED` \| `PARTIALLY_SETTLED` \| `SETTLED` \| `OVERDUE`), `replaces_certification_id` (opcional, en nueva versión tras `REJECTED` — [BR-SUB-005]).
-- **`status`:** `DRAFT | SUBMITTED | APPROVED | REJECTED | CANCELLED` — ver [`STATE_MACHINES.md`](./STATE_MACHINES.md) §19 ([BR-SUB-003], [BR-SUB-004]).
+- **`status`:** `DRAFT | ISSUED | APPROVED | REJECTED | CANCELLED` — ver [`STATE_MACHINES.md`](./STATE_MACHINES.md) §19 ([BR-SUB-003], [BR-SUB-004]).
 
 ---
 

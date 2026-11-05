@@ -1193,11 +1193,23 @@ En el **detalle** de la OC, debajo del título, hay una **pista de proceso** (Bo
 
 ### 10.1 Procedimiento
 
-1. **Nuevo subcontrato** (`/proyectos/[id]/subcontratos/nuevo`): subcontratista del directorio (rol **Subcontratista**; buscador: razón social o nombre fantasía), alcance e imputación a partidas con categoría **SUB** en APU cuando corresponda. **Cada línea del subcontrato debe tener partida EDT** antes de aprobar certificaciones (requerido para emitir la factura AP, [D-055]). En el alta, **Adjuntos (opcional)** usa la misma zona que facturas: arrastrar, **Seleccionar archivo** o **Tomar foto** (máx. 8 archivos y 45 MB en total). Si un adjunto falla, el subcontrato igual se crea y se reintenta desde el detalle → **Adjuntos**. En **Editar** no se suben archivos: usá el panel del detalle.
-2. Crear **certificación de subcontrato** del período.
-3. Ciclo (enum `SubcontractCertificationStatus`): `DRAFT` → emitir (`ISSUED`) → **Aprobar** (`APPROVED`) (o `REJECTED` / `CANCELLED`). Si falta partida EDT en alguna línea del subcontrato, **Aprobar** se rechaza con error de validación (no se crea factura incompleta).
-4. Al **aprobar**, el sistema genera una **factura de proveedor en borrador** con las partidas EDT copiadas de las líneas del subcontrato (el payee es el subcontratista); hay que **emitirla** para crear la CxP y poder pagar. **No** se paga el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico.
-5. En el detalle: badge de estado de factura + **Revisar y emitir** o **Ver factura**.
+1. **Nuevo subcontrato** (`/proyectos/[id]/subcontratos/nuevo`): elegí subcontratista del directorio (rol **Subcontratista**; buscador por razón social o nombre fantasía), moneda, alcance e imputación a partidas con categoría **SUB** en APU cuando corresponda. **Cada línea del subcontrato debe tener partida EDT** antes de aprobar certificaciones (requerido para la factura AP, [D-055]). Cantidad y precio unitario admiten hasta cuatro decimales; el importe se redondea a dos después de multiplicarlos. **Crear subcontrato** abre su detalle en borrador. **Nuevo subcontrato** y **Editar** requieren permiso de edición.
+2. Si aparecen **Ítems con subcontrato en presupuesto**, revisá la moneda de la referencia. **Usar** completa una línea sólo cuando coincide con la moneda del subcontrato. **Moneda no comparable con…** deshabilita esa aplicación: no convierte precios. Podés completar manualmente la línea con el precio pactado en la moneda elegida. En **Editar**, subcontratista y moneda conservan los valores originales y se muestran bloqueados.
+3. En el detalle del borrador, **Activar** habilita **+ Certificación**. Completá período, fecha de certificación y cantidades de este período; dejá en cero las líneas que no se certifican. Las cantidades admiten cuatro decimales y el total se muestra en la moneda del subcontrato. Al guardar o editar se abre el detalle de esa certificación (`/proyectos/[id]/subcontratos/[subcontractId]/certificaciones/[certId]`).
+4. Ciclo de la certificación: **Borrador** (`DRAFT`) → **Emitir** → **Emitida** (`ISSUED`) → **Aprobar** → **Aprobada** (`APPROVED`), o **Rechazar** → **Rechazada** (`REJECTED`). Se conserva **Emitir**, no hay un paso “Enviar” distinto ([D-131]). Si falta partida EDT en alguna línea del subcontrato, **Aprobar** se rechaza sin crear una factura incompleta. Emitir el certificado todavía no genera deuda.
+5. Al **Aprobar**, se genera una **factura de proveedor en borrador**, con las partidas EDT del subcontrato y el subcontratista como destinatario del pago. En el detalle aparece **Revisar y emitir factura** si podés editar AP, o **Ver factura** para consulta. Hay que **emitir esa factura** para crear la CxP y poder pagar. **No** se paga el subcontrato creando una OC ni eligiendo al subcontratista en el gasto genérico. La disponibilidad de factura y CxP depende de permisos y del módulo Cuentas por pagar.
+6. Para corregir una certificación **Rechazada**, abrí **Nueva versión**. El nuevo documento conserva la referencia a la rechazada; completá sus datos y cantidades. Si ya tiene una sucesora vigente, aparece **Ver nueva versión** y se abre la existente. La rechazada se conserva como historial.
+7. **Anular** pide confirmación. En una certificación **Emitida** o **Aprobada** también exige **Motivo**; en **Borrador** no lo exige. Si la factura vinculada ya fue emitida, primero debe anularse por su circuito financiero. El error se muestra sin dar por anulada la certificación. La anulación del subcontrato también respeta sus certificaciones aprobadas vinculadas.
+
+**Adjuntos:** en el alta, **Adjuntos (opcional)** permite arrastrar, **Seleccionar archivo** o **Tomar foto** (máx. 8 archivos y 45 MB en total). Si falla un adjunto, el subcontrato igual queda creado: reintentá desde el detalle → **Adjuntos**. En **Editar** usá el panel del detalle.
+
+**Guardado y errores:** esperá el resultado mientras aparece **Guardando...** en el formulario o **Procesando…** en una acción. Los formularios conservan los datos ante un error. Si no se pudo comprobar el resultado por una falla de conexión, revisá el documento antes de volver a intentar; no supongas que se guardó ni que se anuló.
+
+### 10.2 Leer la liquidación de la certificación
+
+Una certificación aprobada muestra **Liquidación**: **Sin liquidar**, **Liquidado parcialmente**, **Sin saldo pendiente** o **Vencido**, según sus documentos financieros. **Sin saldo pendiente** también puede resultar de notas de crédito aplicadas; no confirma que haya salido dinero de caja. El pago efectivo se consulta en la factura y Cuentas por pagar.
+
+**No disponible** muestra el motivo cuando no se puede consultar la fuente financiera. No significa saldo cero ni factura ausente. Revisá tus permisos y la disponibilidad de Cuentas por pagar antes de intentar continuar.
 
 ![Bloqer — Subcontrato: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-subcontrato-si-no.png)
 
@@ -1241,21 +1253,26 @@ stateDiagram-v2
    - **Compras** y **Recepciones** permiten aplicar otras referencias explícitamente: costo neto comprado/recibido dividido por presupuesto de costo, valorizado al precio de venta. No son avance físico. Sin base, permisos o moneda comparable no se propone un valor.
    - Ajustá **Cantidad de este período** y **% físico de este período** de forma independiente. El diálogo muestra **Monto a certificar**, **Certificado acumulado**, **Físico acumulado** y **Saldo luego de guardar**. **Guardar medición** incluye sólo esa partida; **Cancelar** no guarda. **Editar** conserva la medición y su precio de venta guardado. **Quitar partida** está disponible para una línea ya guardada.
    - **Físico período** muestra el porcentaje guardado, incluso en certificados emitidos; **Avance real** muestra la referencia del libro. Son datos distintos y pueden diferir.
+   - Si Libro de obra, Compras, Recepciones o Costos no están disponibles por permisos o módulos, la planilla muestra un aviso y la referencia omitida aparece como **—** o sin sugerencia. No equivale a avance cero. Las mediciones ya guardadas mantienen su propia lectura.
+   - Cantidad y porcentaje admiten hasta cuatro decimales; los importes se muestran a dos. Las cantidades son no negativas: no hay un flujo habilitado de certificaciones negativas ni de rectificación física mediante una NC ([D-132]).
    - **Ver libro y costos de referencia** despliega el detalle complementario. **Editar encabezado** abre período y notas sin cambiar de página. Si otro usuario cambió el certificado, recargá para revisar los valores vigentes.
 3. Validar techos: en obra **Pública y Privada** cantidad y físico acumulados no pueden superar 100%, considerando todos los certificados emitidos/aprobados de la partida. Se controla al guardar y al emitir. No cuentan borradores, rechazados ni cancelados. Una nota no permite exceder el techo; el alcance adicional se tramita por adenda.
 4. **Emitir** → `ISSUED` (inmutable). Quien emite no elige cuenta.
 5. Según respuesta del mandante: marcar **Aprobar** (`APPROVED`) o rechazar (`REJECTED`). Aprobar reconoce el avance y no elige caja, banco ni cuenta contable.
 6. El detalle muestra el **recorrido** hasta la factura y la cobranza y una explicación desplegable **Cómo sigue hasta el cobro**. La deuda nace al emitir la factura (debe Clientes, haber Ingresos por obras, asiento en borrador). La caja se mueve al confirmar la cobranza, en la cuenta de tesorería elegida. Factura, CxC, cobranza y movimiento conservan el proyecto: cobrar en un banco de la empresa no convierte el ingreso de obra en ingreso corporativo.
+7. **Cancelar certificación** pide confirmación; si está **Emitida** o **Aprobada**, exige **Motivo**. En **Borrador** no hay motivo obligatorio. El sistema verifica los documentos vinculados antes de cancelar. Durante el guardado o la confirmación, esperá el resultado: el diálogo permanece abierto y los errores conservan los datos. Si falla la conexión, revisá el estado del documento antes de reintentar.
 
 ### 11.3 Procedimiento — De la certificación a la factura de venta
 
 1. Con certificación `APPROVED`, en el detalle usar **Crear borrador de factura** (o ver factura ya vinculada). Los vínculos al certificado se crean desde este flujo; una venta manual no permite asignarlos. Si Cuentas por cobrar está deshabilitado, se puede consultar la medición pero no aparecen acciones de facturación.
 2. **Crear borrador de factura** conserva la moneda y los precios del certificado. En moneda extranjera, ingresá **Tipo de cambio · ARS por 1 [moneda]**. **Emitir** la factura genera la **cuenta por cobrar (Receivable)**; el borrador todavía no genera deuda.
 3. Cobrar desde **Cuentas por cobrar** del proyecto (no hay “Cobrar ahora” en el alta de factura de obra).
-4. **No** existe estado `INVOICED` en la certificación: el cobro se deriva de las cobranzas.
+4. **No** existe estado `INVOICED` ni “pagada” en el estado de la certificación: su saldo se deriva de AR, cobranzas y notas vinculadas, sin cambiar el estado operativo.
 5. La emisión de factura es **manual**; aprobar la certificación **no** crea la factura sola.
 6. Al cobrar en moneda extranjera, elegí una cuenta de esa misma moneda e ingresá el tipo de cambio de **ese cobro**. El monto original, su equivalente en pesos y la imputación al proyecto se conservan; no se convierte dinero entre cuentas ni se calcula automáticamente diferencia de cambio.
-7. El recorrido distingue **con saldo pendiente** y **sin saldo pendiente de cobro**. Una factura emitida queda congelada, también si otra persona intentaba editarla al mismo tiempo.
+7. El recorrido distingue **Cobrar**, **Saldo pendiente**, **Sin saldo pendiente** y **Saldo no disponible**. Una NC aplicada puede dejarlo sin saldo sin haber cobrado efectivo; una ND vinculada puede mantener saldo pendiente aunque la factura original esté saldada. Revisá la factura y **Notas vinculadas**. Un cobro parcial no demuestra que el recorrido esté terminado. Las referencias conservan su moneda original, sin conversiones implícitas. Una factura emitida queda congelada, también si otra persona intentaba editarla al mismo tiempo.
+8. Si falta acceso o está deshabilitado AR, aparece **Facturación y cobranza no disponibles**: no confirma ausencia de factura ni de saldo. Si la factura se puede consultar pero no se puede comprobar su liquidación, aparece **Saldo no disponible**. Consultá Cuentas por cobrar o pedí acceso según corresponda.
+9. Al crear la factura, **Creando borrador…** bloquea un segundo envío y **Cancelar** mientras espera el resultado. Si falla, el formulario muestra el error y conserva los datos y el tipo de cambio. Si la conexión no permitió comprobar el resultado, revisá **Facturas emitidas** antes de repetir el alta.
 
 **Certificación, factura y cobro (D-072)**
 
@@ -1692,7 +1709,7 @@ Congela **movimientos de tesorería** y **asientos contables** cuya fecha cae en
 | Emparejar en conciliación | — | Movimiento → estado **Conciliado** | — |
 | Cerrar conciliación | — | Sesión `CLOSED`; matches congelados | — |
 | Cerrar período contable | Bloquea mutaciones del mes | No crea movimientos; **impide** crear/anular en fechas cerradas | Impide postear/anular/revertir asientos del mes |
-| Aprobar cert. de subcontrato | **Devengado** (factura proveedor DRAFT) | — | Al **emitir** la factura → Auto-DRAFT |
+| Aprobar cert. de subcontrato | Certificación aprobada + factura proveedor **en borrador**; la CxP nace al emitir la factura | — | Al **emitir** la factura → Auto-DRAFT |
 | Imputar / cerrar GG (overhead) | Afecta rentabilidad neta | Según pago | Independiente del cierre de período GL |
 
 ### Diferencias entre estados económicos

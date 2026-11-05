@@ -12,7 +12,11 @@ import { addDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
 import { EntityDocumentsPanel } from "@/features/documents";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { formatMoneyAmount, formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import {
+  formatMoneyAmount,
+  formatQtyFromString,
+  formatUnitPriceFromString,
+} from "@/lib/format-money";
 import {
   SubcontractStatusBadge,
   SubcontractCertificationStatusBadge,
@@ -37,8 +41,8 @@ import {
   cancelSubcontractAction,
 } from "../actions";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
-import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
+import { SubcontractActionButton } from "@/features/subcontracts/components/subcontract-action-button";
 import { Button } from "@/components/ui/button";
 
 interface PageProps {
@@ -52,7 +56,6 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
 
   const { id: projectId, subcontractId } = await params;
   const sp = await searchParams;
-  const returnPath = `/proyectos/${projectId}/subcontratos/${subcontractId}`;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -67,7 +70,8 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
       listSubcontractCertificationsBySubcontract(subcontractId, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
@@ -86,20 +90,20 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={subcontract.code}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="break-words text-2xl font-bold tracking-tight">
               {subcontract.code} — {subcontract.title}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <SubcontractStatusBadge status={subcontract.status} />
               <span className="text-sm text-muted-foreground">{subcontract.subcontractorName}</span>
               <span className="text-sm text-muted-foreground">· {subcontract.currency}</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canEditSubcontracts && subcontract.status === "DRAFT" && (
             <>
               <Button variant="outline" size="sm" asChild>
@@ -107,18 +111,10 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
                   Editar
                 </Link>
               </Button>
-              <form
-                action={async () => {
-                  "use server";
-                  const res = await activateSubcontractAction(subcontractId, projectId);
-                  if ("error" in res) redirectWithActionError(returnPath, res.error);
-                  redirect(returnPath);
-                }}
-              >
-                <Button size="sm" type="submit">
-                  Activar
-                </Button>
-              </form>
+              <SubcontractActionButton
+                label="Activar"
+                action={activateSubcontractAction.bind(null, subcontractId, projectId)}
+              />
             </>
           )}
           {canEditSubcontracts && subcontract.status === "ACTIVE" && (
@@ -130,33 +126,27 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
                   + Certificación
                 </Link>
               </Button>
-              <form
-                action={async () => {
-                  "use server";
-                  const res = await completeSubcontractAction(subcontractId, projectId);
-                  if ("error" in res) redirectWithActionError(returnPath, res.error);
-                  redirect(returnPath);
-                }}
-              >
-                <Button variant="outline" size="sm" type="submit">
-                  Finalizar
-                </Button>
-              </form>
+              <SubcontractActionButton
+                label="Finalizar"
+                variant="outline"
+                action={completeSubcontractAction.bind(null, subcontractId, projectId)}
+              />
             </>
           )}
           {canEditSubcontracts &&
             (subcontract.status === "DRAFT" || subcontract.status === "ACTIVE") && (
-            <ConfirmActionButton
-              label="Anular"
-              title="Anular subcontrato"
-              description="El subcontrato pasará a anulado. No se podrán emitir nuevas certificaciones."
-              confirmLabel="Anular"
-              variant="outline"
-              className="text-destructive"
-              successMessage="Subcontrato anulado"
-              action={cancelSubcontractAction.bind(null, subcontractId, projectId)}
-            />
-          )}
+              <ReasonActionButton
+                requiresReason={false}
+                label="Anular"
+                title="Anular subcontrato"
+                description="El subcontrato pasará a anulado. No se podrán emitir nuevas certificaciones."
+                confirmLabel="Anular"
+                variant="outline"
+                className="text-destructive"
+                successMessage="Subcontrato anulado"
+                action={cancelSubcontractAction.bind(null, subcontractId, projectId)}
+              />
+            )}
         </div>
       </div>
 
@@ -213,15 +203,21 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
                   <TableCell className="text-right text-muted-foreground">
                     {l.unit || "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatQtyFromString(l.quantity)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatUnitPriceFromString(l.unitPrice)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatQtyFromString(l.quantity)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatUnitPriceFromString(l.unitPrice)}
+                  </TableCell>
                   <TableCell className="text-right font-medium tabular-nums">
                     {formatMoneyAmount(l.lineTotal, subcontract.currency)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {formatQtyFromString(l.certifiedQuantity)}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatQtyFromString(l.remainingQty)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatQtyFromString(l.remainingQty)}
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -248,54 +244,54 @@ export default async function SubcontratoPage({ params, searchParams }: PageProp
           <ListEmptyState message="Sin certificaciones." />
         ) : (
           <TableScroll>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Período</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Factura</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {certifications.map((c) => (
-                <TableRow key={c.id}>
-                  <TableCell>
-                    <Link
-                      href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${c.id}`}
-                      className="font-mono text-xs text-primary hover:underline"
-                    >
-                      {c.code}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {formatDate(c.periodStart)} – {formatDate(c.periodEnd)}
-                  </TableCell>
-                  <TableCell className="text-xs">{formatDate(c.certificationDate)}</TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatMoneyAmount(c.totalAmount, subcontract.currency)}
-                  </TableCell>
-                  <TableCell>
-                    <SubcontractCertificationStatusBadge status={c.status} />
-                  </TableCell>
-                  <TableCell>
-                    {c.supplierInvoiceId ? (
-                      <Link
-                        href={`/proyectos/${projectId}/facturas-proveedor/${c.supplierInvoiceId}`}
-                        className="text-xs text-primary hover:underline"
-                      >
-                        Ver factura →
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Período</TableHead>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Factura</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {certifications.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <Link
+                        href={`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${c.id}`}
+                        className="font-mono text-xs text-primary hover:underline"
+                      >
+                        {c.code}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {formatDate(c.periodStart)} – {formatDate(c.periodEnd)}
+                    </TableCell>
+                    <TableCell className="text-xs">{formatDate(c.certificationDate)}</TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatMoneyAmount(c.totalAmount, subcontract.currency)}
+                    </TableCell>
+                    <TableCell>
+                      <SubcontractCertificationStatusBadge status={c.status} />
+                    </TableCell>
+                    <TableCell>
+                      {c.supplierInvoiceId ? (
+                        <Link
+                          href={`/proyectos/${projectId}/facturas-proveedor/${c.supplierInvoiceId}`}
+                          className="text-xs text-primary hover:underline"
+                        >
+                          Ver factura →
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </TableScroll>
         )}
       </DataTableSection>

@@ -4,7 +4,7 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Estado vigente al 05/11/2026
 
-**AG-00 a AG-06 publicadas. AG-07 cerrada localmente; AG-08 no iniciada.** [Publicación AG-05/06](./2026-11-04-ag-05-ag-06-publication.md) y [cierre AG-07](./2026-11-04-ag-07-inventory.md). D-130 aprobada e implementada, 38 grupos corregidos, 2.388 pruebas generales y 111 SQL distintos aprobados, tipos/lint/compilación y muestra visual. AG-07 permanece sin publicar.
+**AG-00 a AG-07 publicadas; AG-08 cerrada localmente.** [Publicación AG-07](./2026-11-05-ag-07-publication.md): PR #5, Production d897aa7f, CI y acceso público comprobados. [Cierre AG-08](./2026-11-05-ag-08-certifications-subcontracts.md): 30 grupos corregidos, D-131/D-132 implementadas, 2.528 pruebas generales y 90 SQL distintos aprobados, tipos/lint/compilación y muestra visual aislada. AG-08 sin publicar; AG-09 no iniciada.
 
 ## Corte inicial: 03/11/2026
 
@@ -113,8 +113,8 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-04 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-03-ag-04-budgets-wbs-apu.md): 28 grupos resueltos; presupuestos, EDT, APU, versiones, adendas operativas y vínculo con cronograma. Contratos/adendas legales requieren resolver Q-057, que sigue diferida.
 - **AG-05 — Corregida y verificada local/SQL/navegador aislado.** [Cierre](./2026-11-04-ag-05-closure.md): propuestas aprobadas implementadas en D-122/123/124; 2.197 pruebas generales, 97 casos SQL de la continuación y compilación aprobados. RFIs y contratos formales diferidos por alcance explícito. AG-05 continúa sin publicar; la continuación autorizada AG-06 tiene su propio cierre.
 - **AG-06 — Publicada tras corrección y verificación.** [Cierre](./2026-11-04-ag-06-procurement.md) y [publicación PR4](./2026-11-04-ag-05-ag-06-publication.md). D-125/126/127/129 implementadas; cierre parcial formal separado D-128. D-127 productiva comprobada.
-- **AG-07 — Corregida y verificada localmente, sin publicar.** [Cierre](./2026-11-04-ag-07-inventory.md): 38 grupos, D-130 implementada, 2.388 pruebas/111 SQL, tipos/lint/compilación/visual. AG-08 espera indicación.
-- **AG-08 — Certificaciones y subcontratos. Pendiente.** Avance certificado, sucesión de documentos y vínculos con facturación y obligaciones.
+- **AG-07 — Publicada.** [Cierre](./2026-11-04-ag-07-inventory.md), [publicación](./2026-11-05-ag-07-publication.md): PR #5, Production d897aa7f, CI y acceso público comprobados.
+- **AG-08 — Corregida y verificada localmente, sin publicar.** [Cierre](./2026-11-05-ag-08-certifications-subcontracts.md), [JSON](./2026-11-05-ag-08-certifications-subcontracts.json): 30 grupos, D-131/D-132, 2.528 pruebas/90 SQL, tipos/lint/compilación/visual e independencia. AG-09 espera indicación.
 - **AG-09 — Ventas y obligaciones. Pendiente.** Ventas, AR, cobranzas, AP y pagos, en contexto de proyecto y empresa cuando corresponda.
 - **AG-10 — Tesorería y contabilidad. Pendiente.** Cuentas, movimientos, transferencias, conciliación, cierre de períodos y GL.
 - **AG-11 — Operación de campo. Pendiente.** Field, libro de obra, captura de evidencias y avance físico conectado con los demás módulos.
@@ -165,3 +165,12 @@ Al incorporar cada informe:
 Una conclusión vale para la base y el entorno registrados en su informe. Al cambiar código, schema, permisos, componentes compartidos o contratos que sostienen esa conclusión, marcar como pendiente de revalidación el alcance afectado y sus consumidores según el procedimiento. Conservar el informe anterior como historial; no sobrescribir su resultado como si correspondiera a la nueva base.
 
 La auditoría global se cierra con cobertura y evidencia de las etapas aplicables y sus regresiones. Este registro inicial organiza ese trabajo; no declara a la plataforma libre de errores.
+
+## Corrida AG-08: 05/11/2026
+
+Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08-certifications-subcontracts.md) y [registro estructurado](./2026-11-05-ag-08-certifications-subcontracts.json).
+
+- 30 grupos corregidos, cero hallazgos confirmados pendientes en el alcance; D-131 conserva Emitido y AP borrador antes de CxP, D-132 mantiene no negativos.
+- 2.528 pruebas generales aprobadas y 90 SQL distintos aislados; 36 suites live omitidas en el runner general se distinguen de esa selección. Tipos/lint/compilación final correctos, índice/5 recuperaciones sin LLM.
+- Revisión independiente y adendas, estados/fuentes/saldos/numeración, dos temas y viewports 1280×720/390×844. Capturas y fixtures sintéticos identificados; logout/tema/viewport/pestaña/servidor comprobados.
+- AG-08 permanece sin publicar. AG-09 no iniciada; esperar indicación del Owner. La rectificación eventual conserva diseño previo separado.

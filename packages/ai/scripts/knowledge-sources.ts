@@ -19,6 +19,7 @@ export const KNOWLEDGE_DOC_INCLUDE = [
   "02-modules/PROJECT_SCHEDULING.md",
   "02-modules/JOBSITE_LOG.md",
   "02-modules/CERTIFICATIONS.md",
+  "02-modules/SUBCONTRACTS.md",
   "02-modules/EXPENSES_AND_PAYMENTS.md",
   "02-modules/SALES_AND_COLLECTIONS.md",
   "02-modules/TREASURY.md",
@@ -58,7 +59,11 @@ export function computeKnowledgeSourceManifest(): {
     const content = fs.readFileSync(abs, "utf8");
     const sha = hashFileContent(content);
     hash.update(sha);
-    sources.push({ path: `docs/bloqer2.0/${rel}`, sha256: sha, bytes: Buffer.byteLength(content, "utf8") });
+    sources.push({
+      path: `docs/bloqer2.0/${rel}`,
+      sha256: sha,
+      bytes: Buffer.byteLength(content, "utf8"),
+    });
   }
   return { sourceHash: hash.digest("hex"), sources };
 }

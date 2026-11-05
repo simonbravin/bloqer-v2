@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -37,6 +37,8 @@ export function NewCertificationDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const running = useRef(false);
+  const [pending, setPending] = useState(false);
   const hasBudgets = budgets.length > 0;
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export function NewCertificationDialog({
   }
 
   function closeDialog() {
+    if (running.current) return;
     setOpen(false);
     clearCreateQueryParam();
   }
@@ -64,6 +67,7 @@ export function NewCertificationDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && running.current) return;
         setOpen(next);
         if (!next) clearCreateQueryParam();
       }}
@@ -71,7 +75,10 @@ export function NewCertificationDialog({
       <DialogTrigger asChild>
         <Button>{triggerLabel}</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        closeButtonDisabled={pending}
+        className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-lg"
+      >
         <DialogHeader>
           <DialogTitle>Nueva certificación</DialogTitle>
           <DialogDescription className="sr-only">
@@ -102,6 +109,10 @@ export function NewCertificationDialog({
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}
+            onPendingChange={(value) => {
+              running.current = value;
+              setPending(value);
+            }}
           />
         ) : null}
       </DialogContent>

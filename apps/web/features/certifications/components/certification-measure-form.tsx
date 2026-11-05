@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -30,12 +31,20 @@ interface Props {
   onSave: (data: SaveCertificationMeasurementInput) => Promise<{ ok: true } | { error: string }>;
   onClose: () => void;
   onSaved: () => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
-export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved }: Props) {
+export function CertificationMeasureForm({
+  sheet,
+  row,
+  onSave,
+  onClose,
+  onSaved,
+  onPendingChange,
+}: Props) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending, run } = useOperationalAction({ onPendingChange, onError: setError });
   const [currentQty, setCurrentQty] = useState(row.currentQty ?? row.suggestedQty ?? "");
   const [physicalPct, setPhysicalPct] = useState(row.physicalPct ?? row.suggestedPhysicalPct ?? "");
   const [source, setSource] = useState<string | null>(row.lineId ? null : "PHYSICAL");
@@ -68,11 +77,13 @@ export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved 
       setError("Revisá la cantidad y el % físico.");
       return;
     }
-    startTransition(async () => {
+    void run(async () => {
       const result = await onSave({
         certificationId: sheet.certificationId,
         expectedRevision: sheet.revision,
-        rows: [{ wbsNodeId: row.wbsNodeId, included, currentQty, physicalPct }],
+        rows: [
+          { wbsNodeId: row.wbsNodeId, included, ...(included ? { currentQty, physicalPct } : {}) },
+        ],
       });
       if ("error" in result) {
         setError(result.error);
@@ -157,7 +168,7 @@ export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved 
           <Label htmlFor="measurement-qty">Cantidad de este período</Label>
           <DecimalInput
             id="measurement-qty"
-            scale={4}
+            precision={4}
             value={currentQty}
             disabled={pending}
             onValueChange={(value) => {
@@ -171,7 +182,7 @@ export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved 
           <Label htmlFor="measurement-physical">% físico de este período</Label>
           <DecimalInput
             id="measurement-physical"
-            scale={4}
+            precision={4}
             value={physicalPct}
             disabled={pending}
             onValueChange={setPhysicalPct}
@@ -210,11 +221,19 @@ export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved 
         <div className="mt-3 grid grid-cols-2 gap-3">
           <Ref
             label="Libro acumulado al corte"
-            value={`${formatQtyFromString(row.logQtyAcum)} ${row.unit} · ${pct(row.logPctAcum)}`}
+            value={
+              row.logQtyAcum == null
+                ? "—"
+                : `${formatQtyFromString(row.logQtyAcum)} ${row.unit} · ${pct(row.logPctAcum)}`
+            }
           />
           <Ref
             label="Libro del período"
-            value={`${formatQtyFromString(row.logQtyPeriod)} ${row.unit} · ${pct(row.logPctPeriod)}`}
+            value={
+              row.logQtyPeriod == null
+                ? "—"
+                : `${formatQtyFromString(row.logQtyPeriod)} ${row.unit} · ${pct(row.logPctPeriod)}`
+            }
           />
           {sheet.costAvailable && row.cost && (
             <>
@@ -222,7 +241,14 @@ export function CertificationMeasureForm({ sheet, row, onSave, onClose, onSaved 
                 label="Comprometido del período"
                 value={formatMoneyAmount(row.cost.committedCost)}
               />
-              <Ref label="Consumido del período" value={row.cost.consumedCost == null ? "Sin valuación" : formatMoneyDisplay(row.cost.consumedCost)} />
+              <Ref
+                label="Consumido del período"
+                value={
+                  row.cost.consumedCost == null
+                    ? "Sin valuación"
+                    : formatMoneyDisplay(row.cost.consumedCost)
+                }
+              />
               <Ref label="Mano de obra" value={formatMoneyAmount(row.cost.laborCost)} />
               <Ref label="Equipos" value={formatMoneyAmount(row.cost.equipmentCost)} />
               <Ref label="Subcontratos" value={formatMoneyAmount(row.cost.subcontractCost)} />

@@ -420,6 +420,8 @@ export async function registerApExpense(
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
             if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+            // Share the company INVOICE sequence with manual and subcontract drafts.
+            await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
             const maxNum = await tx.supplierInvoice.aggregate({
               where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
               _max: { number: true },

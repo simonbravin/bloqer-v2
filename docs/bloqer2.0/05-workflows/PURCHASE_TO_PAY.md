@@ -25,7 +25,7 @@ PROCUREMENT + FINANCE.
 
 ## 7. Subcontrato (certificación → AP → pago)
 - `subcontract_certification.approved` → genera `Payable` ([BR-SUB-003]).
-- Certificación subcontrato: `DRAFT` → `SUBMITTED` → `APPROVED` | **`REJECTED`** ([BR-SUB-005]: rechazo **terminal**; nueva versión con `replaces_certification_id`).
+- Certificación subcontrato: `DRAFT` → `ISSUED` → `APPROVED` | **`REJECTED`** ([BR-SUB-005]: rechazo **terminal**; nueva versión con `replaces_certification_id`).
 - Solo **`APPROVED`** crea/incrementa AP.
 
 ## Referencias

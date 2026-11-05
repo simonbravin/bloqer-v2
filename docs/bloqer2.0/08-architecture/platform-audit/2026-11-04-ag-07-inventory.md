@@ -1,5 +1,7 @@
 # AG-07 — Inventario y depósitos
 
+Actualización 05/11/2026: el cierre local conservado abajo fue [publicado en PR #5 / Production d897aa7f](./2026-11-05-ag-07-publication.md). AG-08 comenzó después, en una entrega separada.
+
 **Estado: AG-07 cerrada, corregida y verificada localmente.** D-130 implementada; 38 grupos verificados. AG-05/06 publicadas; AG-07 sin publicar y AG-08 no iniciada.
 
 ## Encargo, base y alcance

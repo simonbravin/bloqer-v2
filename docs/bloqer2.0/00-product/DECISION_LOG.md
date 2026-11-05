@@ -352,6 +352,7 @@
 - **Contexto:** política “ISSUED o APPROVED” genera ambigüedad contable.
 - **Decisión:** una `SubcontractCertification` genera o incrementa **`AccountsPayable` únicamente** en **`APPROVED`**. `SUBMITTED` no genera AP; `REJECTED` no genera AP; `CANCELLED` revierte por mecanismo compensatorio si ya había obligación. La revisión interna previa a obligación ocurre **antes** de `APPROVED`.
 - **Implicancias:** no hay toggle de producto entre ISSUED/APPROVED para crear AP.
+- **Precisión vigente (D-089/D-131):** el texto anterior se conserva como antecedente. El estado previo es ISSUED/Emitido; aprobar crea la factura de proveedor en borrador y la CxP nace al emitir esa factura. No hay Payable directo al emitir o aprobar el certificado.
 - **Documentos afectados:** [`01-domain/BUSINESS_RULES.md`](../01-domain/BUSINESS_RULES.md) ([BR-SUB-003]), [`01-domain/EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md), [`02-modules/SUBCONTRACTS.md`](../02-modules/SUBCONTRACTS.md), [`03-finance/ACCOUNTS_PAYABLE.md`](../03-finance/ACCOUNTS_PAYABLE.md), [`05-workflows/PURCHASE_TO_PAY.md`](../05-workflows/PURCHASE_TO_PAY.md), [`01-domain/STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §19.
 
 ---
@@ -2016,6 +2017,26 @@
 - **Límites:** no agrega campos persistidos, estados, eventos, dependencias ni migraciones; no implementa conversiones, FIFO, reservas ni cierre parcial de OC.
 - **Propuesta aprobada:** [unidad y cantidades de stock AG-07](../08-architecture/platform-audit/2026-11-05-ag-07-stock-unit-proposal.md).
 - **Documentos afectados:** INVENTORY, MASTER_DATA, PURCHASE_ORDERS_AND_RECEIPTS, JOBSITE_LOG, guía, ayuda, conocimiento AI y evidencia AG-07.
+
+### D-131 — Conservar ISSUED en la certificación de subcontrato
+
+- **Fecha:** 2026-11-05.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-08 (Q-078).
+- **Decisión:** conservar el circuito existente `DRAFT → ISSUED → APPROVED | REJECTED`, con acción visible **Emitir**, y armonizar los textos que usaban `SUBMITTED`. Se mantienen los estados, identificadores operativos y documentos históricos; no se migra ni renombra el enum persistido, ni se agrega un evento ejecutable.
+- **Finanzas:** se aplica la precisión ya aprobada en D-089: aprobar genera/habilita la factura AP en borrador; emitir la factura genera CxP. Emitir el certificado no genera deuda. D-028 mantiene la prohibición de obligación previa a la aprobación; su expresión anterior de Payable directo queda precisada por D-089. D-027/D-115 rigen la liquidación derivada; D-033 conserva el rechazo terminal y el certificado nuevo de reemplazo.
+- **Límites:** sin nuevos campos, estados, permisos, dependencias o migraciones. Correcciones de acceso, topes, auditoría, reintentos y efectos atómicos dentro de AG-08.
+- **Propuesta aprobada:** [estado previo del certificado de subcontrato](../08-architecture/platform-audit/2026-11-05-ag-08-subcert-lifecycle-proposal.md).
+- **Documentos afectados:** STATE_MACHINES, BUSINESS_RULES, CORE_ENTITIES, EVENTS_AND_AUTOMATIONS, SUBCONTRACTS, ACCOUNTS_PAYABLE, PURCHASE_TO_PAY, guía/ayuda y conocimiento AI.
+
+### D-132 — Certificaciones no negativas y rectificaciones con diseño previo
+
+- **Fecha:** 2026-11-05.
+- **Estado:** ACTIVA — aprobación explícita del Owner del punto 1 de Q-079, con aclaración de que una certificación negativa no corresponde al flujo habitual.
+- **Decisión:** conservar y corregir el contrato actual de cantidades no negativas; no hay una excepción de negativos autorizados disponible. La frase de CERTIFICATIONS §13 no habilita cantidades negativas en el servicio ni en la interfaz. Los importes de una certificación normal conservan su cálculo y topes D-119.
+- **Alcance:** cualquier eventual rectificación que reduzca lo reconocido previamente requiere diseño y aprobación específicos de autorización, acumulados, estados, facturación/NC/AR y trazabilidad, fuera del lote correctivo AG-08. No constituye un compromiso de implementar certificaciones negativas ni una instrucción para simularlas con otro documento.
+- **Históricos:** se conservan sin migración, regularización o signos inferidos. Las notas de crédito existentes siguen D-115; esta decisión no las convierte en certificación física negativa.
+- **Propuesta aprobada:** [alcance AG-08 de certificaciones negativas](../08-architecture/platform-audit/2026-11-05-ag-08-negative-certification-scope-proposal.md).
+- **Documentos afectados:** Q-079, CERTIFICATIONS, alcance pendiente, guía/ayuda y conocimiento AI.
 
 ## Decisiones SUPERSEDED
 

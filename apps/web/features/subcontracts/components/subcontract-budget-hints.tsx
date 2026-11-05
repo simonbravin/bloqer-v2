@@ -7,9 +7,11 @@ import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
 type Props = {
   hints: WbsSubcontractBudgetHint[];
   onPick: (hint: WbsSubcontractBudgetHint) => void;
+  currency: string;
+  disabled?: boolean;
 };
 
-export function SubcontractBudgetHints({ hints, onPick }: Props) {
+export function SubcontractBudgetHints({ hints, onPick, currency, disabled }: Props) {
   if (hints.length === 0) return null;
 
   return (
@@ -18,7 +20,8 @@ export function SubcontractBudgetHints({ hints, onPick }: Props) {
         <p className="text-sm font-semibold">Ítems con subcontrato en presupuesto</p>
         <p className="text-xs text-muted-foreground mt-1">
           Sugerencias desde el APU aprobado. Al elegir una, se completa la línea con EDT, unidad y
-          monto referencial (editable).
+          monto referencial (editable). Solo podés usarla en la misma moneda; no se convierten
+          precios.
         </p>
       </div>
       <ul className="max-h-48 overflow-y-auto space-y-2 text-sm">
@@ -31,11 +34,23 @@ export function SubcontractBudgetHints({ hints, onPick }: Props) {
               <span className="font-mono text-xs text-muted-foreground">{h.code}</span>{" "}
               <span className="font-medium">{h.name}</span>
               <span className="block text-xs text-muted-foreground">
-                Presup. subcontrato: {formatMoneyAmount(h.budgetSubcontractTotal)} ({formatQtyFromString(h.quantity)}{" "}
-                {h.unit})
+                Presup. subcontrato: {formatMoneyAmount(h.budgetSubcontractTotal, h.currency)} (
+                {formatQtyFromString(h.quantity)} {h.unit})
               </span>
             </span>
-            <Button type="button" variant="outline" size="sm" className="h-7 shrink-0" onClick={() => onPick(h)}>
+            {h.currency !== currency && (
+              <span className="text-xs text-muted-foreground">
+                Moneda no comparable con {currency}
+              </span>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 shrink-0"
+              disabled={disabled || h.currency !== currency}
+              onClick={() => onPick(h)}
+            >
               Usar
             </Button>
           </li>

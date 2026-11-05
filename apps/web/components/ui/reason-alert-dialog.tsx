@@ -124,7 +124,7 @@ export function ReasonAlertDialog({
     if (isBusy()) return;
     const trimmed = reason.trim();
     if (trimmed.length < minChars) {
-      setLocalError(`Indicá un motivo (mín. ${minChars} caracteres)`);
+      setLocalError(`Indicá un motivo (mín. ${minChars} ${minChars === 1 ? "carácter" : "caracteres"})`);
       return;
     }
     setLocalError(null);

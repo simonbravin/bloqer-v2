@@ -142,6 +142,13 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 - **Antes del código:** especificar representación y efecto exacto en compromiso/exposición, recepción tardía/reversa, facturas/NC/ND, permisos, trazabilidad y migración. El Owner debe aprobar el diseño y las reglas/campos nuevos; D-128 solo aprueba la separación de alcance.
 - **Fuentes:** [propuesta aprobada](./platform-audit/2026-11-04-ag-06-partial-close-scope-proposal.md), [informe AG-06](./platform-audit/2026-11-04-ag-06-procurement.md). La guía y ayuda distinguen esta capacidad futura de las recepciones parciales actuales.
 
+## P-AG08-01 — Rectificación de certificaciones ya reconocidas
+
+- **Estado:** alcance separado con diseño previo, aprobado en D-132/Q-079 (05/11/2026). No implementado ni comprometido como función de certificados negativos; no bloquea el cierre correctivo AG-08.
+- **Contrato vigente:** las cantidades de una certificación habitual son no negativas y respetan los topes D-119. No se alteran históricos ni se usa una NC para simular avance físico negativo.
+- **Si se solicita:** definir previamente autorización, acumulados, estados, vínculo con facturas/NC/CxC y trazabilidad; someter las nuevas reglas o campos a aprobación. La aprobación actual solo separa el alcance.
+- **Fuentes:** [propuesta aprobada](./platform-audit/2026-11-05-ag-08-negative-certification-scope-proposal.md), [CERTIFICATIONS §13](../02-modules/CERTIFICATIONS.md).
+
 ## AG-00 — Aislamiento: reconciliación documental resuelta
 
 Diagnóstico inicial del 03/11/2026: [subanálisis de arquitectura](./platform-audit/2026-11-03-ag-00-architecture.md). El usuario confirmó explícitamente la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), formalizada en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md). El cierre siguiente es documental/arquitectónico; no equivale a comprobar SQL ni autorización de todos los recorridos y no introduce schema, migraciones o middleware.

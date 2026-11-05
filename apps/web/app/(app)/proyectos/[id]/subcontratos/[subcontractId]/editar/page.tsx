@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import {
   getSubcontractById,
   getSubcontractFormWbsPickList,
@@ -19,6 +20,8 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId, subcontractId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS"))
+    redirect(`/proyectos/${projectId}/subcontratos/${subcontractId}`);
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -30,7 +33,8 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   try {
     subcontract = await getSubcontractById(subcontractId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
@@ -43,7 +47,8 @@ export default async function EditarSubcontratoPage({ params }: PageProps) {
   try {
     wbsPick = await getSubcontractFormWbsPickList(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 

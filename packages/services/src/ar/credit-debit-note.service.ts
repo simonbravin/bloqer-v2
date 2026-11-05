@@ -577,7 +577,7 @@ export async function issueSalesCreditNote(
     );
 
     return issued;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await ensureDraftJournalFromSalesInvoice(result.id, ctx);
   return mapNoteView(result);
@@ -708,7 +708,7 @@ export async function issueSalesDebitNote(
     );
 
     return issued;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await ensureDraftJournalFromSalesInvoice(result.id, ctx);
   return mapNoteView(result);

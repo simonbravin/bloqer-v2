@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 type Props = {
   label: string;
@@ -32,8 +33,8 @@ export function ConfirmActionButton({
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending, run, isBusy } = useOperationalAction({ onError: setError });
 
   return (
     <>
@@ -52,7 +53,10 @@ export function ConfirmActionButton({
       </Button>
       <ConfirmAlertDialog
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={(next) => {
+          if (!next && isBusy()) return;
+          setOpen(next);
+        }}
         title={title}
         description={
           <div className="space-y-2">
@@ -67,8 +71,8 @@ export function ConfirmActionButton({
         confirmLabel={confirmLabel}
         variant={variant === "destructive" ? "destructive" : "default"}
         pending={pending}
-        onConfirm={() => {
-          startTransition(async () => {
+        onConfirm={() =>
+          run(async () => {
             setError(null);
             const res = await action();
             if ("error" in res) {
@@ -79,8 +83,8 @@ export function ConfirmActionButton({
             setOpen(false);
             if (successMessage) toast.success(successMessage);
             router.refresh();
-          });
-        }}
+          })
+        }
       />
     </>
   );

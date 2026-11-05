@@ -1,16 +1,20 @@
 import { z } from "zod";
 
 export const certificationStatusSchema = z.enum([
-  "DRAFT", "ISSUED", "APPROVED", "REJECTED", "CANCELLED",
+  "DRAFT",
+  "ISSUED",
+  "APPROVED",
+  "REJECTED",
+  "CANCELLED",
 ]);
 
 export const createCertificationSchema = z
   .object({
-    projectId:     z.string().uuid("Proyecto inválido"),
-    budgetId:      z.string().uuid("Presupuesto inválido"),
-    periodStart:   z.string().min(1, "La fecha de inicio es obligatoria"),
-    periodEnd:     z.string().min(1, "La fecha de fin es obligatoria"),
-    notes:         z.string().max(2000).optional(),
+    projectId: z.string().uuid("Proyecto inválido"),
+    budgetId: z.string().uuid("Presupuesto inválido"),
+    periodStart: z.string().date("Fecha de inicio inválida"),
+    periodEnd: z.string().date("Fecha de fin inválida"),
+    notes: z.string().max(2000).optional(),
     internalNotes: z.string().max(2000).optional(),
   })
   .refine((v) => v.periodEnd >= v.periodStart, {
@@ -20,52 +24,50 @@ export const createCertificationSchema = z
 
 export const updateCertificationSchema = z
   .object({
-    periodStart:   z.string().optional(),
-    periodEnd:     z.string().optional(),
-    notes:         z.string().max(2000).optional(),
-    internalNotes: z.string().max(2000).optional(),
+    periodStart: z.string().date("Fecha de inicio inválida").optional(),
+    periodEnd: z.string().date("Fecha de fin inválida").optional(),
+    notes: z.string().max(2000).nullable().optional(),
+    internalNotes: z.string().max(2000).nullable().optional(),
   })
-  .refine(
-    (v) =>
-      v.periodStart == null
-      || v.periodEnd == null
-      || v.periodEnd >= v.periodStart,
-    {
-      message: "La fecha de fin del período no puede ser anterior al inicio",
-      path: ["periodEnd"],
-    },
-  );
+  .refine((v) => v.periodStart == null || v.periodEnd == null || v.periodEnd >= v.periodStart, {
+    message: "La fecha de fin del período no puede ser anterior al inicio",
+    path: ["periodEnd"],
+  });
 
 export const addCertificationLineSchema = z.object({
   certificationId: z.string().uuid(),
-  wbsNodeId:       z.string().uuid("Nodo EDT inválido"),
-  physicalPct:     z.number().min(0).max(100),
-  currentQty:      z.number().min(0),
-  notes:           z.string().max(2000).optional(),
-  sortOrder:       z.number().int().min(0).optional(),
+  wbsNodeId: z.string().uuid("Nodo EDT inválido"),
+  physicalPct: z.number().finite().min(0).max(100),
+  currentQty: z.number().finite().min(0),
+  notes: z.string().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
 });
 
 export const updateCertificationLineSchema = z.object({
-  physicalPct: z.number().min(0).max(100).optional(),
-  currentQty:  z.number().min(0).optional(),
-  notes:       z.string().max(2000).optional(),
-  sortOrder:   z.number().int().min(0).optional(),
+  physicalPct: z.number().finite().min(0).max(100).optional(),
+  currentQty: z.number().finite().min(0).optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  sortOrder: z.number().int().min(0).optional(),
 });
 
 export const saveCertificationMeasurementSchema = z.object({
   certificationId: z.string().uuid(),
   expectedRevision: z.string().datetime().optional(),
-  rows: z.array(z.object({
-    wbsNodeId: z.string().uuid(),
-    included: z.boolean(),
-    /** Canonical decimal string. The service rounds to 4 dp; a JS number is not accepted. */
-    currentQty: z.string().trim().max(40).optional(),
-    physicalPct: z.string().trim().max(40).optional(),
-  })).max(2000),
+  rows: z
+    .array(
+      z.object({
+        wbsNodeId: z.string().uuid(),
+        included: z.boolean(),
+        /** Canonical decimal string. The service rounds to 4 dp; a JS number is not accepted. */
+        currentQty: z.string().trim().max(40).optional(),
+        physicalPct: z.string().trim().max(40).optional(),
+      }),
+    )
+    .max(2000),
 });
 
-export type CreateCertificationInput  = z.infer<typeof createCertificationSchema>;
-export type UpdateCertificationInput  = z.infer<typeof updateCertificationSchema>;
-export type AddCertificationLineInput    = z.infer<typeof addCertificationLineSchema>;
+export type CreateCertificationInput = z.infer<typeof createCertificationSchema>;
+export type UpdateCertificationInput = z.infer<typeof updateCertificationSchema>;
+export type AddCertificationLineInput = z.infer<typeof addCertificationLineSchema>;
 export type UpdateCertificationLineInput = z.infer<typeof updateCertificationLineSchema>;
 export type SaveCertificationMeasurementInput = z.infer<typeof saveCertificationMeasurementSchema>;

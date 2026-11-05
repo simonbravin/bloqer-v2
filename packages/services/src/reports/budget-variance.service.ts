@@ -1,5 +1,9 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { CostCategory } from "@bloqer/database";
+import { can } from "@bloqer/domain";
+import { companyScopeFilter, isCrossCompany } from "../company-scope";
+import { requireProjectAccess } from "../security/access";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import {
   getProjectCostControl,
   type CostControlFilters,
@@ -10,8 +14,19 @@ import {
 import { canViewProjectCostControlReport } from "../project/project-nav-guards";
 import { compareWbsCodes } from "../budget/wbs-code-rules";
 import { ServiceContext, ServiceError } from "../types";
-import { addDecimal, compareDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
-import { isPositiveMoneyDecimal, serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import {
+  addDecimal,
+  compareDecimal,
+  divideDecimal,
+  multiplyDecimal,
+  serializeMoney,
+} from "@bloqer/utils";
+import {
+  isPositiveMoneyDecimal,
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeUnitPriceDecimal,
+} from "../finance/money-decimal";
 
 /** Capa de costo para comparar contra presupuesto ([D-021]). */
 export type CostVarianceLayer = "exposure" | "committed" | "accrued" | "paid";
@@ -198,7 +213,8 @@ export async function getBudgetVarianceReport(
     rows,
     totals: {
       ...base.totals,
-      expectedCostExposure: layer === "exposure" ? base.totals.expectedCostExposure : totActual.toFixed(2),
+      expectedCostExposure:
+        layer === "exposure" ? base.totals.expectedCostExposure : totActual.toFixed(2),
       costVariance: totVariance,
       actualCost: totActual.toFixed(2),
       variancePct: totVariancePct,
@@ -264,9 +280,7 @@ export async function getBudgetCompositionReport(
 
   const slices: BudgetCompositionSlice[] = VISIBLE_CATEGORIES.map((category) => {
     const amount = totals.get(category) ?? new Prisma.Decimal(0);
-    const percent = grand.isZero()
-      ? "0.00"
-      : amount.div(grand).times(100).toFixed(2);
+    const percent = grand.isZero() ? "0.00" : amount.div(grand).times(100).toFixed(2);
     return {
       category,
       label: CATEGORY_LABELS[category],
@@ -291,6 +305,7 @@ export type WbsSubcontractBudgetHint = {
   code: string;
   name: string;
   unit: string;
+  currency: string;
   quantity: string;
   budgetSubcontractTotal: string;
   unitSubcontractCost: string;
@@ -301,18 +316,57 @@ export async function getWbsIdsWithActiveSubcontract(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<Set<string>> {
+  const project = await authorizeSubcontractHints(projectId, ctx);
   const lines = await prisma.subcontractLine.findMany({
     where: {
-      subcontract: { projectId, tenantId: ctx.tenantId, status: "ACTIVE" },
+      subcontract: {
+        projectId,
+        tenantId: ctx.tenantId,
+        status: "ACTIVE",
+        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      },
       wbsNodeId: { not: null },
     },
-    select: { wbsNodeId: true },
+    select: {
+      wbsNodeId: true,
+      subcontract: {
+        select: {
+          tenantId: true,
+          companyId: true,
+          projectId: true,
+          company: { select: { tenantId: true } },
+        },
+      },
+      wbsNode: {
+        select: { budget: { select: { tenantId: true, projectId: true, companyId: true } } },
+      },
+    },
   });
   const ids = new Set<string>();
   for (const l of lines) {
+    if (
+      !l.wbsNode ||
+      l.subcontract.company.tenantId !== ctx.tenantId ||
+      l.wbsNode.budget.tenantId !== ctx.tenantId ||
+      l.wbsNode.budget.projectId !== projectId ||
+      isCrossCompany(l.wbsNode.budget.companyId, ctx) ||
+      (l.wbsNode.budget.companyId && l.wbsNode.budget.companyId !== l.subcontract.companyId) ||
+      (project.companyId && project.companyId !== l.subcontract.companyId)
+    )
+      throw new ServiceError(
+        "CONFLICT",
+        "Las relaciones del subcontrato y la partida son inconsistentes",
+      );
     if (l.wbsNodeId) ids.add(l.wbsNodeId);
   }
   return ids;
+}
+
+async function authorizeSubcontractHints(projectId: string, ctx: ServiceContext) {
+  await assertTenantModuleEnabled(ctx, "SUBCONTRACTS");
+  if (!can(ctx.roles, "VIEW", "SUBCONTRACTS"))
+    throw new ServiceError("FORBIDDEN", "Sin permisos para consultar referencias de subcontratos");
+  return requireProjectAccess(projectId, ctx);
 }
 
 /** Ítems WBS con monto de subcontrato en APU (para sugerencias al crear subcontrato). */
@@ -321,22 +375,41 @@ export async function getWbsSubcontractBudgetHints(
   ctx: ServiceContext,
   options?: { excludeWithActiveContract?: boolean },
 ): Promise<WbsSubcontractBudgetHint[]> {
+  const project = await authorizeSubcontractHints(projectId, ctx);
   const wbsNodes = await prisma.wbsNode.findMany({
     where: {
       type: "ITEM",
-      budget: { projectId, status: { in: ["APPROVED", "CLOSED"] } },
+      budget: {
+        projectId,
+        tenantId: ctx.tenantId,
+        status: { in: ["APPROVED", "CLOSED"] },
+        ...companyScopeFilter(ctx),
+      },
     },
     select: {
       id: true,
+      budgetId: true,
+      budget: {
+        select: {
+          tenantId: true,
+          projectId: true,
+          companyId: true,
+          currency: true,
+          company: { select: { tenantId: true } },
+        },
+      },
       code: true,
       name: true,
       costItem: {
         select: {
+          id: true,
+          budgetId: true,
+          wbsNodeId: true,
           unit: true,
           quantity: true,
           analysisLines: {
             where: { category: "SUBCONTRACT" },
-            select: { totalCost: true },
+            select: { totalCost: true, budgetId: true, costItemId: true },
           },
         },
       },
@@ -348,6 +421,20 @@ export async function getWbsSubcontractBudgetHints(
   for (const node of wbsNodes) {
     const ci = node.costItem;
     if (!ci?.analysisLines.length) continue;
+    if (
+      ci.budgetId !== node.budgetId ||
+      ci.wbsNodeId !== node.id ||
+      node.budget.tenantId !== ctx.tenantId ||
+      node.budget.projectId !== projectId ||
+      (node.budget.company && node.budget.company.tenantId !== ctx.tenantId) ||
+      (project.companyId && node.budget.companyId && project.companyId !== node.budget.companyId) ||
+      !node.budget.currency.trim() ||
+      ci.analysisLines.some((line) => line.budgetId !== node.budgetId || line.costItemId !== ci.id)
+    )
+      throw new ServiceError(
+        "CONFLICT",
+        "Las relaciones del presupuesto y sus insumos son inconsistentes",
+      );
 
     const unitSub = ci.analysisLines.reduce(
       (sum, l) => sum.plus(l.totalCost),
@@ -363,6 +450,7 @@ export async function getWbsSubcontractBudgetHints(
       code: node.code,
       name: node.name,
       unit: ci.unit,
+      currency: node.budget.currency,
       quantity: serializeQtyDecimal(qty),
       budgetSubcontractTotal: serializeMoneyDecimal(total),
       unitSubcontractCost: serializeUnitPriceDecimal(unitSub),
@@ -371,7 +459,9 @@ export async function getWbsSubcontractBudgetHints(
 
   if (options?.excludeWithActiveContract !== false) {
     const covered = await getWbsIdsWithActiveSubcontract(projectId, ctx);
-    return hints.filter((h) => !covered.has(h.wbsNodeId)).sort((a, b) => compareWbsCodes(a.code, b.code));
+    return hints
+      .filter((h) => !covered.has(h.wbsNodeId))
+      .sort((a, b) => compareWbsCodes(a.code, b.code));
   }
 
   return hints.sort((a, b) => compareWbsCodes(a.code, b.code));

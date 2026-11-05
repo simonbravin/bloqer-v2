@@ -65,7 +65,7 @@ Se adoptan esos criterios de presentación y trazabilidad con las entidades y re
 - [`../04-formulas/CERTIFICATION_FORMULAS.md`](../04-formulas/CERTIFICATION_FORMULAS.md), [`PROGRESS_FORMULAS.md`](../04-formulas/PROGRESS_FORMULAS.md).
 
 ## 13. Casos borde
-- Certificación negativa (descuentos): permitir líneas negativas con autorización.
+- Rectificación de lo certificado: no hay un procedimiento de certificación negativa habilitado. Se conserva el contrato de cantidades no negativas; cualquier excepción requiere diseño y aprobación previos fuera de AG-08 (D-132).
 - Anticipos financieros vs certificación física: documentar en notas.
 
 ## 14. Reportes relacionados
@@ -90,3 +90,7 @@ PM emite; FINANCE factura; ADMIN anula.
 
 ## 19. Preguntas abiertas
 - Retenciones acumuladas fondo de reparo ([Q-023]).
+
+## Hallazgo — AG-08: negativos sin procedimiento autorizado
+
+Contradicción resuelta por D-132/Q-079: el Owner aprobó conservar el flujo no negativo y tratar cualquier rectificación con diseño previo separado. La frase original no constituía un procedimiento autorizado. No se habilitan negativos, se prometen nuevas funciones ni se alteran históricos por inferencia. Corregir el bypass de validación del servicio forma parte del lote actual.

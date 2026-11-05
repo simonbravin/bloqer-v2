@@ -1,19 +1,32 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { requiresArInvoiceLetter, suggestInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice } from "@bloqer/domain";
+import {
+  requiresArInvoiceLetter,
+  suggestInvoiceLetter,
+  evaluateInvoiceLetterTaxConsistency,
+  isZeroIvaRate,
+  type InvoiceLetterCode,
+  type IvaConditionCode,
+  invoiceLetterHint,
+  classifySalesInvoice,
+} from "@bloqer/domain";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { InvoiceLetterSelect, TaxRateSelect } from "@/features/finance/components/invoice-letter-fields";
+import {
+  InvoiceLetterSelect,
+  TaxRateSelect,
+} from "@/features/finance/components/invoice-letter-fields";
 import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import { IibbPerceptionFields } from "@/features/finance/components/iibb-perception-fields";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { createInvoiceFromCertificationAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { formatMoneyAmount } from "@/lib/format-money";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 export type CertSummary = {
   id: string;
@@ -42,8 +55,8 @@ export function CertificationInvoiceForm({
   clientIvaCondition = null,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
 
   const showLetter = requiresArInvoiceLetter(companyCountry, clientCountry);
   const suggested = useMemo(
@@ -65,22 +78,24 @@ export function CertificationInvoiceForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     if (showLetter && !invoiceLetter) {
       setError("Seleccioná la letra del comprobante (A, B, C o E)");
       return;
     }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    void run(async () => {
+      setError(null);
       const forceZeroTax = invoiceLetter === "C" || invoiceLetter === "E";
       const res = await createInvoiceFromCertificationAction(projectId, {
         certificationId: cert.id,
         fxRate: cert.currency === "ARS" ? undefined : fxRate,
         issueDate: fd.get("issueDate") as string,
-        dueDate:   fd.get("dueDate")   as string,
-        taxRate: forceZeroTax ? "0" : (taxRate || "0"),
+        dueDate: fd.get("dueDate") as string,
+        taxRate: forceZeroTax ? "0" : taxRate || "0",
         invoiceLetter: showLetter ? invoiceLetter : null,
         iibbPerceptionRate,
-        notes:     (fd.get("notes") as string) || null,
+        notes: (fd.get("notes") as string) || null,
       });
       if ("error" in res) {
         setError(res.error);
@@ -107,103 +122,126 @@ export function CertificationInvoiceForm({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
-        )}
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {showLetter ? (
-            <div className="sm:col-span-2 flex flex-wrap items-start justify-between gap-3">
-              <InvoiceLetterSelect
-                id="invoiceLetter"
-                className="min-w-[12rem] flex-1"
-                value={invoiceLetter}
-                required
-                onValueChange={(v) => {
-                  setInvoiceLetter(v);
-                  if (v === "C" || v === "E") setTaxRate("0");
-                }}
-                hint={invoiceLetterHint(invoiceLetter)}
-              />
-              <DocumentClassCreateHint
-                variant="inline"
-                className="pt-7"
-                classLabel={
-                  classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
-                }
-                classFamily={
-                  classifySalesInvoice({ projectId, certificationId: cert.id }).family
-                }
-              />
-            </div>
-          ) : (
-            <div className="sm:col-span-2">
-              <DocumentClassCreateHint
-                variant="inline"
-                classLabel={
-                  classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
-                }
-                classFamily={
-                  classifySalesInvoice({ projectId, certificationId: cert.id }).family
-                }
-              />
-            </div>
-          )}
-          <div className="space-y-1">
-            <Label htmlFor="issueDate">Fecha de emisión</Label>
-            <Input id="issueDate" name="issueDate" type="date" required defaultValue={today} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="dueDate">Fecha de vencimiento</Label>
-            <Input id="dueDate" name="dueDate" type="date" required defaultValue={today} />
-          </div>
-          <div className="space-y-1">
-            <TaxRateSelect
-              id="taxRate"
-              value={taxRate}
-              onValueChange={setTaxRate}
-              showConstructionHint
-            />
-            <p className="text-[11px] text-muted-foreground">
-              El PU de la certificación ya incluye impuestos del presupuesto. Dejá 0% salvo que
-              necesites discriminar IVA adicional (p. ej. Factura A al 21% o 10,5%).
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
+          {error && (
+            <p
+              role="alert"
+              className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {error}
             </p>
-            {evaluateInvoiceLetterTaxConsistency({
-              invoiceLetter,
-              taxAmount: isZeroIvaRate(taxRate) ? "0" : "1",
-            }).map((i) => (
-              <p
-                key={i.message}
-                className={
-                  i.severity === "error"
-                    ? "text-[11px] text-destructive"
-                    : "text-[11px] text-amber-700 dark:text-amber-300"
-                }
-              >
-                {i.message}
+          )}
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {showLetter ? (
+              <div className="sm:col-span-2 flex flex-wrap items-start justify-between gap-3">
+                <InvoiceLetterSelect
+                  id="invoiceLetter"
+                  className="min-w-[12rem] flex-1"
+                  value={invoiceLetter}
+                  required
+                  onValueChange={(v) => {
+                    if (isBusy()) return;
+                    setInvoiceLetter(v);
+                    if (v === "C" || v === "E") setTaxRate("0");
+                  }}
+                  hint={invoiceLetterHint(invoiceLetter)}
+                />
+                <DocumentClassCreateHint
+                  variant="inline"
+                  className="pt-7"
+                  classLabel={
+                    classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
+                  }
+                  classFamily={classifySalesInvoice({ projectId, certificationId: cert.id }).family}
+                />
+              </div>
+            ) : (
+              <div className="sm:col-span-2">
+                <DocumentClassCreateHint
+                  variant="inline"
+                  classLabel={
+                    classifySalesInvoice({ projectId, certificationId: cert.id }).classLabel
+                  }
+                  classFamily={classifySalesInvoice({ projectId, certificationId: cert.id }).family}
+                />
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label htmlFor="issueDate">Fecha de emisión</Label>
+              <Input id="issueDate" name="issueDate" type="date" required defaultValue={today} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="dueDate">Fecha de vencimiento</Label>
+              <Input id="dueDate" name="dueDate" type="date" required defaultValue={today} />
+            </div>
+            <div className="space-y-1">
+              <TaxRateSelect
+                id="taxRate"
+                value={taxRate}
+                onValueChange={(value) => {
+                  if (!isBusy()) setTaxRate(value);
+                }}
+                showConstructionHint
+              />
+              <p className="text-[11px] text-muted-foreground">
+                El PU de la certificación ya incluye impuestos del presupuesto. Dejá 0% salvo que
+                necesites discriminar IVA adicional (p. ej. Factura A al 21% o 10,5%).
               </p>
-            ))}
+              {evaluateInvoiceLetterTaxConsistency({
+                invoiceLetter,
+                taxAmount: isZeroIvaRate(taxRate) ? "0" : "1",
+              }).map((i) => (
+                <p
+                  key={i.message}
+                  className={
+                    i.severity === "error"
+                      ? "text-[11px] text-destructive"
+                      : "text-[11px] text-amber-700 dark:text-amber-300"
+                  }
+                >
+                  {i.message}
+                </p>
+              ))}
+            </div>
+            <IibbPerceptionFields
+              id="iibbPerceptionRate"
+              rate={iibbPerceptionRate}
+              onRateChange={(value) => {
+                if (!isBusy()) setIibbPerceptionRate(value);
+              }}
+              disabled={isPending}
+              subtotal={cert.totalAmount}
+              label="Alícuota IIBB (%)"
+            />
           </div>
-          <IibbPerceptionFields
-            id="iibbPerceptionRate"
-            rate={iibbPerceptionRate}
-            onRateChange={setIibbPerceptionRate}
-            subtotal={cert.totalAmount}
-            label="Alícuota IIBB (%)"
+
+          <ManualFxField
+            currency={cert.currency}
+            value={fxRate}
+            onValueChange={(value) => {
+              if (!isBusy()) setFxRate(value);
+            }}
+            disabled={isPending}
           />
-        </div>
+          <ExpandableNotesField label="Notas" disabled={isPending} />
 
-        <ManualFxField currency={cert.currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
-        <ExpandableNotesField label="Notas" />
-
-        <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={isPending}>
-            {isPending ? "Creando borrador…" : "Crear borrador de factura"}
-          </Button>
-        </div>
+          <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => {
+                if (!isBusy()) router.back();
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "Creando borrador…" : "Crear borrador de factura"}
+            </Button>
+          </div>
+        </fieldset>
       </form>
     </div>
   );

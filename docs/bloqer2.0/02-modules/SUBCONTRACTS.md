@@ -38,8 +38,8 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Subcontract y Subco
 
 ## 8. Acciones disponibles
 - Crear borrador de subcontrato → activar.
-- Certificar avance: `SubcontractCertification` `DRAFT` → `SUBMITTED` → `APPROVED` / `REJECTED` (ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §19).
-- Obligación interna típica al **`APPROVED`** vía `Payable` ([BR-SUB-003]).
+- Certificar avance: `SubcontractCertification` `DRAFT` → `ISSUED` → `APPROVED` / `REJECTED` (ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) §19).
+- Al APPROVED nace la factura AP en borrador; la CxP (Payable) nace al emitir esa factura (D-089/D-131).
 - Registrar retenciones manuales en pago.
 
 ## 9. Pantallas y vistas necesarias
@@ -48,7 +48,7 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § Subcontract y Subco
 - Estado de avance vs contrato.
 
 ## 10. Reglas de negocio
-- **BR-SUB-003**: AP **solo** al certificar **`APPROVED`**; sin política configurable ISSUED/APPROVED ([BR-SUB-003], [D-028]).
+- **BR-SUB-003**: factura AP borrador solo al certificar APPROVED; CxP al emitirla (D-089/D-131, precisión de D-028). Emitir el certificado no genera deuda.
 - **BR-SUB-004**: liquidación hacia subcontrato = **`settlement_status`** derivado (AP/pagos), no `payment_status` de cliente ([BR-SUB-004], [D-027]).
 - **BR-SUB-005**: **`REJECTED`** terminal; corrección = **nuevo** certificado con `replaces_certification_id` al rechazado ([BR-SUB-005], [D-033]).
 - Imputación siempre a proyecto ([BR-SUB-001]).

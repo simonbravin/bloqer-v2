@@ -15,6 +15,7 @@ import { createCollection, listCollectionsByReceivable } from "../treasury/colle
 import { clearProjectAccessModeCache } from "../security/access";
 import { listCertificationWbsHints } from "./certification-line.service";
 import { assertProcurementFixtureDatabase } from "../procurement/fixtures/procurement-regression";
+import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
 import {
   createCertification,
@@ -63,7 +64,9 @@ describe(
       );
 
     before(async () => {
-      const database = assertProcurementFixtureDatabase();
+      const database = process.env.BLOQER_AUDIT_TEST_DATABASE
+        ? await assertAuditDatabaseIdentity(prisma)
+        : assertProcurementFixtureDatabase();
       const identity = await prisma.$queryRaw<
         Array<{ database: string }>
       >`SELECT current_database() AS database`;
@@ -703,7 +706,10 @@ describe(
       ]);
       if (issue.status === "rejected") throw issue.reason;
       if (edit.status === "rejected") {
-        assert.ok(edit.reason instanceof ServiceError && edit.reason.code === "CONFLICT");
+        assert.ok(
+          edit.reason instanceof ServiceError && edit.reason.code === "CONFLICT",
+          `Unexpected edit failure: ${String(edit.reason)}`,
+        );
       }
       const saved = await prisma.salesInvoice.findUniqueOrThrow({
         where: { id: invoice.id },

@@ -55,8 +55,8 @@ export const createSalesInvoiceSchema = z.object({
 export const createInvoiceFromCertificationSchema = z.object({
   certificationId: z.string().uuid(),
   fxRate: optionalFxRateString,
-  issueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  dueDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  issueDate:       z.string().date("Fecha inválida"),
+  dueDate:         z.string().date("Fecha inválida"),
   taxRate:         ratePctString.optional().default("0.0000"),
   invoiceLetter:   invoiceLetterSchema.optional().nullable(),
   /** Gross certification amount already embeds tax; usually leave false. */

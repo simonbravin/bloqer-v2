@@ -209,9 +209,9 @@ La **facturación** no emite transición de `Certification.status` ([BR-CERT-007
 
 | Evento | Cuándo |
 |---|---|
-| `subcontract_certification.submitted` | `DRAFT` → `SUBMITTED` |
-| `subcontract_certification.approved` | `SUBMITTED` → `APPROVED` (**genera** `Payable` — [BR-SUB-003]); recalcula `settlement_status` |
-| `subcontract_certification.rejected` | `SUBMITTED` → `REJECTED` |
+| `subcontract_certification.issued` | `DRAFT` → `ISSUED` |
+| `subcontract_certification.approved` | `ISSUED` → `APPROVED` (factura AP borrador — D-089/D-131; CxP al emitirla); liquidación derivada de AP/pagos |
+| `subcontract_certification.rejected` | `ISSUED` → `REJECTED` |
 | `subcontract_certification.cancelled` | → `CANCELLED` |
 
 ### 2.14c Document / DocumentVersion

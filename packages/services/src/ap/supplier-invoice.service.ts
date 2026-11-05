@@ -822,6 +822,8 @@ export async function createSupplierInvoice(
   const writeInvoice = async (tx: Prisma.TransactionClient) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
     await assertInvoicePurchaseOrderScope(invoiceOrderScope, tx);
+    // INVOICE numbering is company-wide, shared with automatic subcontract drafts.
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
     const maxNum = await tx.supplierInvoice.aggregate({
       where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
       _max: { number: true },
@@ -1436,7 +1438,7 @@ export async function issueSupplierInvoice(
     );
 
     return result;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await ensureDraftJournalFromSupplierInvoice(result.id, ctx);
 

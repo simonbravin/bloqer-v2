@@ -10,6 +10,10 @@ type InvoiceRef = {
   status: string;
   receivableId: string | null;
   canCollect: boolean;
+  /** Service-derived: absence of a collectible receivable does not prove settlement. */
+  isSettled?: boolean;
+  collectionStatusAvailable?: boolean;
+  currency?: string;
 } | null;
 
 type CollectionRef = {
@@ -56,11 +60,10 @@ const COPY = {
 type StepId = keyof typeof COPY;
 
 function stepVisual(id: StepId, props: Props): { state: ProcessStepState; label: string } {
-  const { status, hasLines, invoice, collections } = props;
+  const { status, hasLines, invoice } = props;
   const issued = status === "ISSUED" || status === "APPROVED";
   const approved = status === "APPROVED";
   const invoiced = invoice?.status === "ISSUED";
-  const collected = collections.length > 0;
 
   if (status === "CANCELLED") {
     if (id === "medir" && hasLines) return { state: "done", label: "Medir" };
@@ -79,14 +82,21 @@ function stepVisual(id: StepId, props: Props): { state: ProcessStepState; label:
       state: approved ? "done" : status === "ISSUED" ? "current" : "upcoming",
       label: "Aprobar",
     };
+  if (!props.moneyVisible)
+    return {
+      state: "upcoming",
+      label: id === "factura" ? "Facturación restringida" : "Cobranza restringida",
+    };
   if (id === "factura") {
     if (invoiced) return { state: "done", label: "Facturar" };
     if (invoice?.status === "DRAFT" || approved) return { state: "current", label: "Facturar" };
     return { state: "upcoming", label: "Facturar" };
   }
   if (!invoiced) return { state: "upcoming", label: "Cobrar" };
-  if (collected && !invoice?.canCollect) return { state: "done", label: "Cobrar" };
-  return { state: "current", label: "Cobrar" };
+  if (!invoice?.collectionStatusAvailable)
+    return { state: "upcoming", label: "Saldo no disponible" };
+  if (invoice.isSettled === true) return { state: "done", label: "Sin saldo pendiente" };
+  return { state: "current", label: invoice.canCollect ? "Cobrar" : "Saldo pendiente" };
 }
 
 function labelOf(id: StepId): string {
@@ -116,6 +126,13 @@ export function CertificationFlowTrail(props: Props) {
   });
   const focus = COPY[focusId(steps)];
   const completed = steps.every((step) => step.state === "done");
+  const financialRestricted = !moneyVisible && props.status === "APPROVED";
+  const balanceUnavailable = invoice?.status === "ISSUED" && !invoice.collectionStatusAvailable;
+  const relatedBalancePending =
+    invoice?.status === "ISSUED" &&
+    invoice.collectionStatusAvailable &&
+    invoice.isSettled === false &&
+    !invoice.canCollect;
 
   return (
     <div className="space-y-3">
@@ -125,18 +142,30 @@ export function CertificationFlowTrail(props: Props) {
           <span className="font-medium">
             {props.status === "CANCELLED"
               ? "Anulado."
-              : completed
-                ? "Cobro registrado."
-                : focus.who + "."}
+              : financialRestricted
+                ? "Facturación y cobranza no disponibles."
+                : balanceUnavailable
+                  ? "Saldo no disponible."
+                  : relatedBalancePending
+                    ? "Saldo pendiente en documentos vinculados."
+                    : completed
+                      ? "Sin saldo pendiente."
+                      : focus.who + "."}
           </span>{" "}
           <span className="text-muted-foreground">
             {props.status === "CANCELLED"
               ? "No sigue a factura ni a cobranza."
               : props.status === "REJECTED" && focusId(steps) === "aprobar"
                 ? "El mandante rechazó el certificado. No se factura ni se elige cuenta."
-                : completed
-                  ? "La factura no tiene saldo pendiente de cobro. Podés consultar las cuentas de destino abajo."
-                  : focus.detail}
+                : financialRestricted
+                  ? "El estado financiero no se puede comprobar sin acceso a Cuentas por cobrar."
+                  : balanceUnavailable
+                    ? "No se pudo comprobar la liquidación de la factura. Revisá la cuenta por cobrar vinculada."
+                    : relatedBalancePending
+                      ? "Revisá la factura y sus notas vinculadas antes de dar el recorrido por terminado."
+                      : completed
+                        ? "La factura no tiene saldo pendiente. Los cobros confirmados, si los hubo, se muestran abajo."
+                        : focus.detail}
           </span>
         </p>
         <details className="mt-2 text-xs text-muted-foreground">
@@ -155,11 +184,16 @@ export function CertificationFlowTrail(props: Props) {
             >
               {invoice.code}
             </Link>
+            {invoice.currency ? ` · ${invoice.currency}` : null}
             {invoice.status === "DRAFT" ? " · borrador, todavía sin cuenta por cobrar" : null}
             {invoice.status === "ISSUED"
-              ? invoice.canCollect
-                ? " · emitida, con saldo pendiente"
-                : " · emitida, sin saldo pendiente de cobro"
+              ? !invoice.collectionStatusAvailable
+                ? " · emitida, saldo no disponible"
+                : invoice.isSettled === true
+                  ? " · emitida, sin saldo pendiente de cobro"
+                  : invoice.canCollect
+                    ? " · emitida, con saldo pendiente"
+                    : " · emitida, con saldo pendiente en documentos vinculados"
               : null}
           </p>
         ) : null}
@@ -173,7 +207,7 @@ export function CertificationFlowTrail(props: Props) {
                 >
                   {c.accountName}
                 </Link>
-                {` · ${formatMoneyAmount(c.amount)} ${currency}`}
+                {` · ${formatMoneyAmount(c.amount, invoice?.currency ?? currency)}`}
               </li>
             ))}
           </ul>

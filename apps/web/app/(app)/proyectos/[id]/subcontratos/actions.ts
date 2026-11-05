@@ -14,6 +14,8 @@ import {
   rejectSubcontractCertification,
   cancelSubcontractCertification,
   uploadDocument,
+  getSubcontractById,
+  getSubcontractCertificationById,
   ServiceError,
 } from "@bloqer/services";
 import {
@@ -27,7 +29,7 @@ import {
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import { revalidateProjectCostAndFinancePaths } from "@/lib/revalidate-project-paths";
-import { redirect }       from "next/navigation";
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { randomUUID } from "crypto";
 import {
@@ -41,9 +43,9 @@ async function getCtx() {
   if (!current?.tenantCtx) redirect("/login");
   return {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 }
 
@@ -173,28 +175,74 @@ async function uploadCreateAttachments(
   return attachmentFailureSummary(failed);
 }
 
+function revalidateSubcontractPaths(projectId: string, subcontractId: string, certId?: string) {
+  revalidatePath(`/proyectos/${projectId}/subcontratos`);
+  revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}`);
+  revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/editar`);
+  if (certId) {
+    revalidatePath(
+      `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}`,
+    );
+    revalidatePath(
+      `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${certId}/editar`,
+    );
+  }
+  revalidatePath(`/proyectos/${projectId}/reportes/subcontratos`);
+  revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
+  revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
+  revalidatePath("/finanzas/cuentas-por-pagar");
+  revalidatePath("/pendientes");
+  revalidateProjectCostAndFinancePaths(projectId);
+}
+
+async function assertSubcontractPath(
+  id: string,
+  projectId: string,
+  ctx: Awaited<ReturnType<typeof getCtx>>,
+) {
+  const existing = await getSubcontractById(id, ctx);
+  if (existing.projectId !== projectId)
+    throw new ServiceError("CONFLICT", "El subcontrato no corresponde a esta obra.");
+  return existing;
+}
+
+async function assertSubcontractCertificationPath(
+  id: string,
+  subcontractId: string,
+  projectId: string,
+  ctx: Awaited<ReturnType<typeof getCtx>>,
+) {
+  const existing = await getSubcontractCertificationById(id, ctx);
+  if (existing.projectId !== projectId || existing.subcontractId !== subcontractId)
+    throw new ServiceError(
+      "CONFLICT",
+      "La certificación no corresponde a esta obra o subcontrato.",
+    );
+  return existing;
+}
+
 // ─── Subcontract ──────────────────────────────────────────────────────────────
 
 export async function createSubcontractAction(
   fd: FormData,
 ): Promise<CreateSubcontractActionResult> {
   try {
-    const ctx  = await getCtx();
+    const ctx = await getCtx();
     const linesParsed = parseLinesJson(fd.get("lines"));
     if ("error" in linesParsed) return linesParsed;
-    const raw  = {
-      companyId:              fd.get("companyId") as string,
-      projectId:              fd.get("projectId") as string,
+    const raw = {
+      companyId: fd.get("companyId") as string,
+      projectId: fd.get("projectId") as string,
       subcontractorContactId: fd.get("subcontractorContactId") as string,
-      title:                  fd.get("title") as string,
-      description:            fd.get("description") as string || null,
-      contractDate:           fd.get("contractDate") as string,
-      startDate:              (fd.get("startDate") as string) || null,
-      expectedEndDate:        (fd.get("expectedEndDate") as string) || null,
-      currency:               (fd.get("currency") as string) || "ARS",
-      notes:                  (fd.get("notes") as string) || null,
-      internalNotes:          (fd.get("internalNotes") as string) || null,
-      lines:                  linesParsed.lines,
+      title: fd.get("title") as string,
+      description: (fd.get("description") as string) || null,
+      contractDate: fd.get("contractDate") as string,
+      startDate: (fd.get("startDate") as string) || null,
+      expectedEndDate: (fd.get("expectedEndDate") as string) || null,
+      currency: (fd.get("currency") as string) || "ARS",
+      notes: (fd.get("notes") as string) || null,
+      internalNotes: (fd.get("internalNotes") as string) || null,
+      lines: linesParsed.lines,
     };
     const parsed = createSubcontractSchema.safeParse(raw);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
@@ -204,8 +252,7 @@ export async function createSubcontractAction(
     if (attachmentGate) return attachmentGate;
 
     const result = await createSubcontract(parsed.data, ctx);
-    revalidatePath(`/proyectos/${parsed.data.projectId}/subcontratos`);
-    revalidateProjectCostAndFinancePaths(parsed.data.projectId);
+    revalidateSubcontractPaths(parsed.data.projectId, result.id);
 
     const attachmentWarning = await uploadCreateAttachments(
       files,
@@ -217,7 +264,9 @@ export async function createSubcontractAction(
     revalidatePath(`/proyectos/${parsed.data.projectId}/subcontratos/${result.id}`);
 
     return attachmentWarning ? { id: result.id, attachmentWarning } : { id: result.id };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function updateSubcontractAction(
@@ -234,22 +283,26 @@ export async function updateSubcontractAction(
       lines = linesParsed.lines;
     }
     const raw = {
-      title:           fd.get("title") as string || undefined,
-      description:     (fd.get("description") as string) || null,
-      contractDate:    (fd.get("contractDate") as string) || undefined,
-      startDate:       (fd.get("startDate") as string) || null,
+      title: (fd.get("title") as string) || undefined,
+      description: (fd.get("description") as string) || null,
+      contractDate: (fd.get("contractDate") as string) || undefined,
+      startDate: (fd.get("startDate") as string) || null,
       expectedEndDate: (fd.get("expectedEndDate") as string) || null,
-      notes:           (fd.get("notes") as string) || null,
-      internalNotes:   (fd.get("internalNotes") as string) || null,
+      notes: (fd.get("notes") as string) || null,
+      internalNotes: (fd.get("internalNotes") as string) || null,
       lines,
     };
     const parsed = updateSubcontractSchema.safeParse(raw);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    const existing = await getSubcontractById(id, ctx);
+    if (fd.get("projectId") && fd.get("projectId") !== existing.projectId)
+      return { error: "El subcontrato no corresponde a esta obra." };
     const result = await updateSubcontract(id, parsed.data, ctx);
-    revalidatePath(`/proyectos/${result.projectId}/subcontratos`);
-    revalidateProjectCostAndFinancePaths(result.projectId);
+    revalidateSubcontractPaths(result.projectId, id);
     return { id };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function updateSubcontractMetaAction(
@@ -260,17 +313,20 @@ export async function updateSubcontractMetaAction(
   try {
     const ctx = await getCtx();
     const raw = {
-      notes:           (fd.get("notes") as string) || null,
-      internalNotes:   (fd.get("internalNotes") as string) || null,
+      notes: (fd.get("notes") as string) || null,
+      internalNotes: (fd.get("internalNotes") as string) || null,
       expectedEndDate: (fd.get("expectedEndDate") as string) || null,
-      startDate:       (fd.get("startDate") as string) || null,
+      startDate: (fd.get("startDate") as string) || null,
     };
     const parsed = updateSubcontractMetaSchema.safeParse(raw);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    await assertSubcontractPath(id, projectId, ctx);
     await updateSubcontractMeta(id, parsed.data, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
+    revalidateSubcontractPaths(projectId, id);
     return { ok: true };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function activateSubcontractAction(
@@ -279,9 +335,9 @@ export async function activateSubcontractAction(
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
+    await assertSubcontractPath(id, projectId, ctx);
     await activateSubcontract(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateSubcontractPaths(projectId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -294,9 +350,9 @@ export async function completeSubcontractAction(
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
+    await assertSubcontractPath(id, projectId, ctx);
     await completeSubcontract(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateSubcontractPaths(projectId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -306,12 +362,13 @@ export async function completeSubcontractAction(
 export async function cancelSubcontractAction(
   id: string,
   projectId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
-    await cancelSubcontract(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    await assertSubcontractPath(id, projectId, ctx);
+    await cancelSubcontract(id, ctx, reason);
+    revalidateSubcontractPaths(projectId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -333,24 +390,23 @@ export async function createSubcontractCertificationAction(
       return { error: "Datos inválidos en líneas de certificación" };
     }
     const raw = {
-      subcontractId:     fd.get("subcontractId") as string,
-      periodStart:       fd.get("periodStart") as string,
-      periodEnd:         fd.get("periodEnd") as string,
+      subcontractId: fd.get("subcontractId") as string,
+      periodStart: fd.get("periodStart") as string,
+      periodEnd: fd.get("periodEnd") as string,
       certificationDate: fd.get("certificationDate") as string,
-      notes:             (fd.get("notes") as string) || null,
+      notes: (fd.get("notes") as string) || null,
       replacesCertificationId:
-        typeof replacesRaw === "string" && replacesRaw.trim()
-          ? replacesRaw.trim()
-          : null,
+        typeof replacesRaw === "string" && replacesRaw.trim() ? replacesRaw.trim() : null,
       lines,
     };
     const parsed = createSubcontractCertificationSchema.safeParse(raw);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     const result = await createSubcontractCertification(parsed.data, ctx);
-    revalidatePath(`/proyectos`);
-    revalidateProjectCostAndFinancePaths(result.projectId);
+    revalidateSubcontractPaths(result.projectId, result.subcontractId, result.id);
     return { id: result.id };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function updateSubcontractCertificationAction(
@@ -367,19 +423,23 @@ export async function updateSubcontractCertificationAction(
       lines = linesParsed.lines;
     }
     const raw = {
-      periodStart:       (fd.get("periodStart") as string) || undefined,
-      periodEnd:         (fd.get("periodEnd") as string) || undefined,
+      periodStart: (fd.get("periodStart") as string) || undefined,
+      periodEnd: (fd.get("periodEnd") as string) || undefined,
       certificationDate: (fd.get("certificationDate") as string) || undefined,
-      notes:             (fd.get("notes") as string) || null,
+      notes: (fd.get("notes") as string) || null,
       lines,
     };
     const parsed = updateSubcontractCertificationSchema.safeParse(raw);
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+    const existing = await getSubcontractCertificationById(id, ctx);
+    if (fd.get("subcontractId") && fd.get("subcontractId") !== existing.subcontractId)
+      return { error: "La certificación no corresponde a este subcontrato." };
     const result = await updateSubcontractCertification(id, parsed.data, ctx);
-    revalidatePath(`/proyectos`);
-    revalidateProjectCostAndFinancePaths(result.projectId);
+    revalidateSubcontractPaths(result.projectId, result.subcontractId, id);
     return { ok: true };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function issueSubcontractCertificationAction(
@@ -389,9 +449,9 @@ export async function issueSubcontractCertificationAction(
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
+    await assertSubcontractCertificationPath(id, subcontractId, projectId, ctx);
     await issueSubcontractCertification(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateSubcontractPaths(projectId, subcontractId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -405,9 +465,9 @@ export async function approveSubcontractCertificationAction(
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
+    await assertSubcontractCertificationPath(id, subcontractId, projectId, ctx);
     await approveSubcontractCertification(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateSubcontractPaths(projectId, subcontractId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -421,9 +481,9 @@ export async function rejectSubcontractCertificationAction(
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
+    await assertSubcontractCertificationPath(id, subcontractId, projectId, ctx);
     await rejectSubcontractCertification(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    revalidateSubcontractPaths(projectId, subcontractId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -434,12 +494,13 @@ export async function cancelSubcontractCertificationAction(
   id: string,
   subcontractId: string,
   projectId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   try {
     const ctx = await getCtx();
-    await cancelSubcontractCertification(id, ctx);
-    revalidatePath(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${id}`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    await assertSubcontractCertificationPath(id, subcontractId, projectId, ctx);
+    await cancelSubcontractCertification(id, ctx, reason);
+    revalidateSubcontractPaths(projectId, subcontractId, id);
     return { ok: true };
   } catch (err) {
     return handle(err);

@@ -44,7 +44,8 @@ function setup(t: TestContext) {
   stub(t, prisma.company, "findFirst", async () => ({ id: companyId }));
   stub(t, prisma.company, "findMany", async () => [{ id: companyId }]);
   stub(t, prisma.project, "findUnique", async () => ({ ...state.project }));
-  stub(t, prisma.budget, "findFirst", async () => ({ id: budgetId, tenantId, projectId, status: "APPROVED" }));
+  const budget = () => ({ id: budgetId, tenantId, projectId, companyId, company: { id: companyId, tenantId }, currency: "ARS", status: "APPROVED" });
+  stub(t, prisma.budget, "findFirst", async () => budget());
   stub(t, prisma.auditLog, "create", async () => ({ id: "audit" }));
   for (const delegate of [prisma.purchaseOrder, prisma.purchaseRequest, prisma.supplierInvoice, prisma.salesInvoice, prisma.collection, prisma.payment, prisma.receivable, prisma.payable, prisma.subcontract]) {
     stub(t, delegate, "count", async () => 0);
@@ -86,6 +87,8 @@ function setup(t: TestContext) {
           };
         },
       },
+      budget: { findFirst: async () => budget() },
+      company: { findFirst: async () => ({ id: companyId }) },
       ...Object.fromEntries(["purchaseOrder", "purchaseRequest", "supplierInvoice", "salesInvoice", "collection", "payment", "receivable", "payable", "subcontract"].map((name) => [name, { count: async () => 0 }])),
       auditLog: { create: async () => ({ id: "audit" }) },
     };
@@ -116,7 +119,7 @@ describe("AG-03 controlled cancellation/certification race (no database)", { con
       // The actual createCertification calls this only after its ACTIVE guard.
       announceGuardPassed();
       await release;
-      return { id: budgetId, tenantId, projectId, status: "APPROVED" };
+      return { id: budgetId, tenantId, projectId, companyId, company: { id: companyId, tenantId }, currency: "ARS", status: "APPROVED" };
     });
     const creation = createCertification(certificationInput, ctx)
       .then((value) => ({ ok: true as const, value }), (error: unknown) => ({ ok: false as const, error }));

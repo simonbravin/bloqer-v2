@@ -2,9 +2,17 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceError } from "../types";
+import type { ServiceContext } from "../types";
+import { lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import {
+  assertCertificationBudgetActive,
+  assertCertificationNode,
+  loadCertificationRecord,
+} from "./certification-scope";
 import {
   assertCertificationLineWithinBudget,
   assertCertificationStatusEditable,
+  assertCertificationMeasurementValues,
 } from "./certification-guards";
 
 type TxClient = Omit<
@@ -22,16 +30,23 @@ export async function _lockCertificationProject(tx: TxClient, projectId: string)
 export async function _lockEditableCertification(
   tx: TxClient,
   certificationId: string,
-  tenantId: string,
+  ctx: ServiceContext,
   expectedRevision?: string,
 ) {
-  const before = await tx.certification.findFirst({ where: { id: certificationId, tenantId } });
-  if (!before) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  await _lockCertificationProject(tx, before.projectId);
-  const cert = await tx.certification.findFirstOrThrow({
-    where: { id: certificationId, tenantId },
+  const before = await tx.certification.findFirst({
+    where: { id: certificationId, tenantId: ctx.tenantId },
   });
+  if (!before) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
+  await lockProjectForOperationalMutation(tx, before.projectId, ctx);
+  await _lockCertificationProject(tx, before.projectId);
+  const cert = await loadCertificationRecord(certificationId, ctx, tx);
+  if (cert.projectId !== before.projectId)
+    throw new ServiceError(
+      "CONFLICT",
+      "La certificación cambió de obra. Recargá e intentá de nuevo.",
+    );
   assertCertificationStatusEditable(cert.status);
+  assertCertificationBudgetActive(cert.budget.status);
   if (expectedRevision && cert.updatedAt.toISOString() !== expectedRevision) {
     throw new ServiceError(
       "CONFLICT",
@@ -49,6 +64,7 @@ export async function _validateCertificationMeasurement(
   currentQty: Prisma.Decimal,
   physicalPct: Prisma.Decimal,
 ) {
+  assertCertificationMeasurementValues(currentQty, physicalPct);
   const node = await tx.wbsNode.findFirst({
     where: {
       id: wbsNodeId,
@@ -63,6 +79,7 @@ export async function _validateCertificationMeasurement(
       "CONFLICT",
       "La partida no pertenece al presupuesto de esta certificación",
     );
+  assertCertificationNode(node, cert.budgetId);
   const result = await tx.certificationLine.aggregate({
     where: {
       wbsNodeId,
@@ -85,6 +102,7 @@ export async function _validateCertificationMeasurement(
 export async function _recalcCertificationTotals(
   tx: TxClient,
   certificationId: string,
+  actorUserId?: string,
 ): Promise<void> {
   const lines = await tx.certificationLine.findMany({
     where: { certificationId },
@@ -98,6 +116,6 @@ export async function _recalcCertificationTotals(
   );
   await tx.certification.update({
     where: { id: certificationId },
-    data: { totalAmount: total },
+    data: { totalAmount: total, updatedBy: actorUserId },
   });
 }
