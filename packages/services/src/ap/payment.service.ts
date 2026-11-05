@@ -346,7 +346,7 @@ export async function createPayment(
         );
 
         return { result, supplierInvoice };
-      });
+      }, { maxWait: 10_000, timeout: 30_000 });
 
       // Replay must not emit a second in-app/email notification (inside create()).
       await notifyPaymentConfirmed({

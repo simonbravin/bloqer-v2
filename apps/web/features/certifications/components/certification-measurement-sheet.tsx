@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import { previewCertificationMeasurement } from "@bloqer/services/certification-measurement-pure";
 import type { CertificationMeasurementRow, CertificationMeasurementSheet } from "@bloqer/services";
@@ -39,6 +39,8 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
   const [query, setQuery] = useState("");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [lock, setLock] = useState<string | null>(null);
+  const running = useRef(false);
+  const [pending, setPending] = useState(false);
   if (lock && lock !== sheet.revision) setLock(null);
   const active = sheet.rows.find((row) => row.wbsNodeId === activeId) ?? null;
   const byId = useMemo(() => new Map(sheet.rows.map((row) => [row.wbsNodeId, row])), [sheet.rows]);
@@ -73,6 +75,18 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
 
   return (
     <section className="space-y-3" aria-label="Planilla de medición">
+      {sheet.sourceWarnings?.length > 0 && (
+        <div
+          role="status"
+          className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-muted-foreground"
+        >
+          <ul className="list-disc space-y-1 pl-4">
+            {sheet.sourceWarnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold">Planilla de medición</h2>
@@ -231,10 +245,14 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
       <Dialog
         open={active != null}
         onOpenChange={(open) => {
+          if (!open && running.current) return;
           if (!open) setActiveId(null);
         }}
       >
-        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogContent
+          closeButtonDisabled={pending}
+          className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl"
+        >
           {active && (
             <CertificationMeasureForm
               key={`${active.wbsNodeId}:${sheet.revision}`}
@@ -245,6 +263,10 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
               onSaved={() => {
                 setLock(sheet.revision);
                 setActiveId(null);
+              }}
+              onPendingChange={(value) => {
+                running.current = value;
+                setPending(value);
               }}
             />
           )}

@@ -36,7 +36,8 @@ export default async function NuevaCertificacionPage({ params, searchParams }: P
   try {
     subcontract = await getSubcontractById(subcontractId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
@@ -53,15 +54,19 @@ export default async function NuevaCertificacionPage({ params, searchParams }: P
     try {
       predecessor = await getSubcontractCertificationById(replaces, ctx);
     } catch (err) {
-      if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+      if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+        notFound();
       throw err;
     }
-    if (
-      predecessor.subcontractId !== subcontractId
-      || predecessor.projectId !== projectId
-      || predecessor.status !== "REJECTED"
-    ) {
+    if (predecessor.subcontractId !== subcontractId || predecessor.projectId !== projectId)
+      notFound();
+    if (predecessor.status !== "REJECTED") {
       redirect(`/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${replaces}`);
+    }
+    if (predecessor.successorCertificationId) {
+      redirect(
+        `/proyectos/${projectId}/subcontratos/${subcontractId}/certificaciones/${predecessor.successorCertificationId}`,
+      );
     }
     replacesCertificationId = predecessor.id;
     replacesCertificationCode = predecessor.code;
@@ -80,6 +85,8 @@ export default async function NuevaCertificacionPage({ params, searchParams }: P
       </div>
       <div className="rounded-lg border bg-card p-6">
         <SubcontractCertificationForm
+          projectId={projectId}
+          currency={subcontract.currency}
           subcontractId={subcontractId}
           subcontractLines={subcontract.lines}
           action={createSubcontractCertificationAction}

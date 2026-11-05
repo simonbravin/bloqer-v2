@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { toast } from "sonner";
-import { Button }   from "@/components/ui/button";
-import { Input }    from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
-import { Label }    from "@/components/ui/label";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
@@ -19,7 +20,12 @@ import {
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
-import { CONTACT_PICKER_SEARCH_PLACEHOLDER, contactsToSearchableOptions, withNoneOption, wbsToSearchableOptions } from "@/lib/searchable-options";
+import {
+  CONTACT_PICKER_SEARCH_PLACEHOLDER,
+  contactsToSearchableOptions,
+  withNoneOption,
+  wbsToSearchableOptions,
+} from "@/lib/searchable-options";
 import { CurrencySelect } from "@/components/ui/currency-select";
 import { UnitSelect } from "@/features/budgets/components/unit-select";
 import { addDecimal, divideDecimal, multiplyDecimal, serializeMoney } from "@bloqer/utils";
@@ -34,40 +40,53 @@ import {
 } from "../lib/create-attachment-limits";
 
 export type SubcontractorOption = { id: string; legalName: string; fantasyName: string | null };
-export type WbsOption           = { id: string; code: string; name: string; unit: string; budgetName?: string };
-
-type LineState = {
-  wbsNodeId:   string;
-  description: string;
-  unit:        string;
-  quantity:    string;
-  unitPrice:   string;
-  notes:       string;
+export type WbsOption = {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  budgetName?: string;
 };
 
-const DEFAULT_LINE: LineState = { wbsNodeId: "__none__", description: "", unit: "", quantity: "", unitPrice: "", notes: "" };
+type LineState = {
+  wbsNodeId: string;
+  description: string;
+  unit: string;
+  quantity: string;
+  unitPrice: string;
+  notes: string;
+};
+
+const DEFAULT_LINE: LineState = {
+  wbsNodeId: "__none__",
+  description: "",
+  unit: "",
+  quantity: "",
+  unitPrice: "",
+  notes: "",
+};
 
 type Props = {
-  projectId:             string;
-  companyId:             string;
-  subcontractorOptions:  SubcontractorOption[];
-  wbsOptions:            WbsOption[];
-  budgetHints?:          WbsSubcontractBudgetHint[];
+  projectId: string;
+  companyId: string;
+  subcontractorOptions: SubcontractorOption[];
+  wbsOptions: WbsOption[];
+  budgetHints?: WbsSubcontractBudgetHint[];
   /** Pre-select WBS from report deep-link (R-SUB-01). */
-  initialWbsNodeId?:     string;
+  initialWbsNodeId?: string;
   action: (fd: FormData) => Promise<{ error: string } | { id: string; attachmentWarning?: string }>;
   /** Only on create: edit uses the detail Adjuntos panel. */
   allowAttachments?: boolean;
   storageConfigured?: boolean;
   defaultValues?: {
     subcontractorContactId: string;
-    title:       string;
+    title: string;
     description: string;
     contractDate: string;
-    startDate:   string;
+    startDate: string;
     expectedEndDate: string;
-    currency:    string;
-    notes:       string;
+    currency: string;
+    notes: string;
     internalNotes: string;
     lines: LineState[];
   };
@@ -75,76 +94,91 @@ type Props = {
 };
 
 export function SubcontractForm({
-  projectId, companyId, subcontractorOptions, wbsOptions, budgetHints, initialWbsNodeId, action,
-  defaultValues, submitLabel = "Crear subcontrato", allowAttachments = false,
+  projectId,
+  companyId,
+  subcontractorOptions,
+  wbsOptions,
+  budgetHints,
+  initialWbsNodeId,
+  action,
+  defaultValues,
+  submitLabel = "Crear subcontrato",
+  allowAttachments = false,
   storageConfigured = false,
 }: Props) {
   const router = useRouter();
-  const [lines, setLines]                 = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
-  const [subcontractorId, setSubcontractorId] = useState(defaultValues?.subcontractorContactId ?? "");
+  const [lines, setLines] = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
+  const [subcontractorId, setSubcontractorId] = useState(
+    defaultValues?.subcontractorContactId ?? "",
+  );
   const [currency, setCurrency] = useState(defaultValues?.currency ?? "ARS");
-  const [error, setError]                 = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [pending, setPending]             = useState(false);
-  const [attachments, setAttachments]     = useState<File[]>([]);
+  const { pending, run } = useOperationalAction({ onError: setError });
+  const editing = defaultValues != null;
+  const [attachments, setAttachments] = useState<File[]>([]);
   const appliedInitialWbs = useRef(false);
   const wbsComboboxOptions = useMemo(
     () => withNoneOption(wbsToSearchableOptions(wbsOptions), { label: "Sin EDT" }),
     [wbsOptions],
   );
 
-  function addLine() { setLines((prev) => [...prev, { ...DEFAULT_LINE }]); }
-  function removeLine(i: number) { setLines((prev) => prev.filter((_, idx) => idx !== i)); }
+  function addLine() {
+    setLines((prev) => [...prev, { ...DEFAULT_LINE }]);
+  }
+  function removeLine(i: number) {
+    setLines((prev) => prev.filter((_, idx) => idx !== i));
+  }
   function updateLine(i: number, field: keyof LineState, value: string) {
-    setLines((prev) => prev.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
+    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, [field]: value } : l)));
   }
   function handleWbsChange(i: number, wbsId: string) {
     const wbs = wbsOptions.find((w) => w.id === wbsId);
-    setLines((prev) => prev.map((l, idx) =>
-      idx === i ? { ...l, wbsNodeId: wbsId, unit: wbs?.unit ?? l.unit } : l,
-    ));
+    setLines((prev) =>
+      prev.map((l, idx) => (idx === i ? { ...l, wbsNodeId: wbsId, unit: wbs?.unit ?? l.unit } : l)),
+    );
   }
 
-  function applyBudgetHint(hint: WbsSubcontractBudgetHint) {
-    let unitPrice = hint.unitSubcontractCost;
-    try {
-      unitPrice = divideDecimal(hint.budgetSubcontractTotal, hint.quantity || "1", 4);
-    } catch {
-      /* keep snapshot unit cost */
-    }
-    const newLine: LineState = {
-      wbsNodeId: hint.wbsNodeId,
-      description: hint.name,
-      unit: hint.unit,
-      quantity: hint.quantity,
-      unitPrice,
-      notes: "",
-    };
-    setLines((prev) => {
-      const emptyIdx = prev.findIndex(
-        (l) => l.wbsNodeId === "__none__" && !l.description.trim(),
-      );
-      if (emptyIdx >= 0) {
-        return prev.map((l, i) => (i === emptyIdx ? newLine : l));
+  const applyBudgetHint = useCallback(
+    (hint: WbsSubcontractBudgetHint) => {
+      if (hint.currency !== currency) return;
+      let unitPrice = hint.unitSubcontractCost;
+      try {
+        unitPrice = divideDecimal(hint.budgetSubcontractTotal, hint.quantity || "1", 4);
+      } catch {
+        /* keep snapshot unit cost */
       }
-      return [...prev, newLine];
-    });
-  }
+      const newLine: LineState = {
+        wbsNodeId: hint.wbsNodeId,
+        description: hint.name,
+        unit: hint.unit,
+        quantity: hint.quantity,
+        unitPrice,
+        notes: "",
+      };
+      setLines((prev) => {
+        const emptyIdx = prev.findIndex((l) => l.wbsNodeId === "__none__" && !l.description.trim());
+        if (emptyIdx >= 0) {
+          return prev.map((l, i) => (i === emptyIdx ? newLine : l));
+        }
+        return [...prev, newLine];
+      });
+    },
+    [currency],
+  );
 
   useEffect(() => {
     if (!initialWbsNodeId || appliedInitialWbs.current || !budgetHints?.length) return;
     const hint = budgetHints.find((h) => h.wbsNodeId === initialWbsNodeId);
-    if (hint) {
+    if (hint && hint.currency === currency) {
       applyBudgetHint(hint);
       appliedInitialWbs.current = true;
     }
-  }, [initialWbsNodeId, budgetHints]);
+  }, [initialWbsNodeId, budgetHints, currency, applyBudgetHint]);
 
   function previewLineMoney(qty: string, price: string): string {
     try {
-      return serializeMoney(
-        multiplyDecimal(serializeMoney(qty.trim() || "0"), serializeMoney(price.trim() || "0")),
-      );
+      return serializeMoney(multiplyDecimal(qty.trim() || "0", price.trim() || "0"));
     } catch {
       return "0.00";
     }
@@ -155,39 +189,44 @@ export function SubcontractForm({
     "0",
   );
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setPending(true);
-    setError(null);
-    setAttachmentError(null);
     const fd = new FormData(e.currentTarget);
-    fd.set("projectId",  projectId);
-    fd.set("companyId",  companyId);
-    if (!subcontractorId) {
-      setError("Debe seleccionar un subcontratista");
-      setPending(false);
-      return;
-    }
-    fd.set("subcontractorContactId", subcontractorId);
-    fd.set("currency", currency);
-    fd.set("lines", JSON.stringify(lines.map((l) => ({
-      wbsNodeId:   l.wbsNodeId === "__none__" ? null : l.wbsNodeId || null,
-      description: l.description,
-      unit:        l.unit,
-      quantity:    l.quantity,
-      unitPrice:   l.unitPrice,
-      notes:       l.notes || null,
-    }))));
-    if (allowAttachments) {
-      const total = attachments.reduce((sum, file) => sum + file.size, 0);
-      if (attachments.length > MAX_CREATE_ATTACHMENT_FILES || total > MAX_CREATE_ATTACHMENT_TOTAL_BYTES) {
-        setAttachmentError(`Revisá los adjuntos: ${createAttachmentLimitHint()}.`);
-        setPending(false);
+    run(async () => {
+      setError(null);
+      setAttachmentError(null);
+      fd.set("projectId", projectId);
+      fd.set("companyId", companyId);
+      if (!subcontractorId) {
+        setError("Debe seleccionar un subcontratista");
         return;
       }
-      attachments.forEach((file) => fd.append("attachments", file));
-    }
-    try {
+      fd.set("subcontractorContactId", subcontractorId);
+      fd.set("currency", currency);
+      fd.set(
+        "lines",
+        JSON.stringify(
+          lines.map((l) => ({
+            wbsNodeId: l.wbsNodeId === "__none__" ? null : l.wbsNodeId || null,
+            description: l.description,
+            unit: l.unit,
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            notes: l.notes || null,
+          })),
+        ),
+      );
+      if (allowAttachments) {
+        const total = attachments.reduce((sum, file) => sum + file.size, 0);
+        if (
+          attachments.length > MAX_CREATE_ATTACHMENT_FILES ||
+          total > MAX_CREATE_ATTACHMENT_TOTAL_BYTES
+        ) {
+          setAttachmentError(`Revisá los adjuntos: ${createAttachmentLimitHint()}.`);
+          return;
+        }
+        attachments.forEach((file) => fd.append("attachments", file));
+      }
       const res = await action(fd);
       if ("error" in res) {
         setError(res.error ?? null);
@@ -199,83 +238,124 @@ export function SubcontractForm({
         toast.success("Subcontrato guardado.");
       }
       router.push(`/proyectos/${projectId}/subcontratos/${res.id}`);
-    } catch {
-      setError("Error inesperado. Intentá de nuevo.");
-    } finally {
-      setPending(false);
-    }
+    });
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      <fieldset disabled={pending} className="min-w-0 space-y-6">
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2 space-y-1">
-          <Label htmlFor="title">Título *</Label>
-          <Input id="title" name="title" required defaultValue={defaultValues?.title} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2 space-y-1">
+            <Label htmlFor="title">Título *</Label>
+            <Input id="title" name="title" required defaultValue={defaultValues?.title} />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="subcontractor">Subcontratista *</Label>
+            <SearchableCombobox
+              id="subcontractor"
+              disabled={pending || editing}
+              popoverWidth="wide"
+              options={contactsToSearchableOptions(subcontractorOptions)}
+              value={subcontractorId}
+              onValueChange={setSubcontractorId}
+              placeholder="Seleccionar subcontratista…"
+              searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
+              emptyText="Ningún subcontratista coincide."
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="currency">Moneda</Label>
+            <CurrencySelect
+              id="currency"
+              value={currency}
+              onValueChange={setCurrency}
+              disabled={pending || editing}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="contractDate">Fecha de contrato *</Label>
+            <Input
+              id="contractDate"
+              name="contractDate"
+              type="date"
+              required
+              defaultValue={defaultValues?.contractDate}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="startDate">Fecha de inicio</Label>
+            <Input
+              id="startDate"
+              name="startDate"
+              type="date"
+              defaultValue={defaultValues?.startDate}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="expectedEndDate">Fecha estimada de fin</Label>
+            <Input
+              id="expectedEndDate"
+              name="expectedEndDate"
+              type="date"
+              defaultValue={defaultValues?.expectedEndDate}
+            />
+          </div>
+
+          <div className="sm:col-span-2 space-y-1">
+            <Label htmlFor="description">Descripción</Label>
+            <Textarea
+              id="description"
+              name="description"
+              rows={2}
+              defaultValue={defaultValues?.description}
+            />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="notes">Notas</Label>
+            <Textarea id="notes" name="notes" rows={2} defaultValue={defaultValues?.notes} />
+          </div>
+
+          <div className="space-y-1">
+            <Label htmlFor="internalNotes">Notas internas</Label>
+            <Textarea
+              id="internalNotes"
+              name="internalNotes"
+              rows={2}
+              defaultValue={defaultValues?.internalNotes}
+            />
+          </div>
         </div>
 
-        <div className="space-y-1">
-          <Label>Subcontratista *</Label>
-          <SearchableCombobox
-            popoverWidth="wide"
-            options={contactsToSearchableOptions(subcontractorOptions)}
-            value={subcontractorId}
-            onValueChange={setSubcontractorId}
-            placeholder="Seleccionar subcontratista…"
-            searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
-            emptyText="Ningún subcontratista coincide."
+        {budgetHints && budgetHints.length > 0 ? (
+          <SubcontractBudgetHints
+            hints={budgetHints}
+            currency={currency}
+            disabled={pending}
+            onPick={applyBudgetHint}
           />
-        </div>
+        ) : null}
 
-        <div className="space-y-1">
-          <Label htmlFor="currency">Moneda</Label>
-          <CurrencySelect id="currency" value={currency} onValueChange={setCurrency} />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="contractDate">Fecha de contrato *</Label>
-          <Input id="contractDate" name="contractDate" type="date" required defaultValue={defaultValues?.contractDate} />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="startDate">Fecha de inicio</Label>
-          <Input id="startDate" name="startDate" type="date" defaultValue={defaultValues?.startDate} />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="expectedEndDate">Fecha estimada de fin</Label>
-          <Input id="expectedEndDate" name="expectedEndDate" type="date" defaultValue={defaultValues?.expectedEndDate} />
-        </div>
-
-        <div className="col-span-2 space-y-1">
-          <Label htmlFor="description">Descripción</Label>
-          <Textarea id="description" name="description" rows={2} defaultValue={defaultValues?.description} />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="notes">Notas</Label>
-          <Textarea id="notes" name="notes" rows={2} defaultValue={defaultValues?.notes} />
-        </div>
-
-        <div className="space-y-1">
-          <Label htmlFor="internalNotes">Notas internas</Label>
-          <Textarea id="internalNotes" name="internalNotes" rows={2} defaultValue={defaultValues?.internalNotes} />
-        </div>
-      </div>
-
-      {budgetHints && budgetHints.length > 0 ? (
-        <SubcontractBudgetHints hints={budgetHints} onPick={applyBudgetHint} />
-      ) : null}
-
-      {/* Lines */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="font-medium">Líneas del subcontrato</h3>
-          <Button type="button" variant="outline" size="sm" onClick={addLine}>+ Agregar línea</Button>
-        </div>
-        <TableScroll>
+        {/* Lines */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium">Líneas del subcontrato</h3>
+            <Button type="button" variant="outline" size="sm" onClick={addLine}>
+              + Agregar línea
+            </Button>
+          </div>
+          <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -294,39 +374,70 @@ export function SubcontractForm({
                   return (
                     <TableRow key={i}>
                       <TableCell className="min-w-[160px]">
-                      <SearchableCombobox
-                        popoverWidth="wide"
-                        className="h-8 text-xs"
-                        options={wbsComboboxOptions}
-                        value={line.wbsNodeId}
-                        onValueChange={(v) => handleWbsChange(i, v)}
-                        placeholder="Sin EDT"
-                        searchPlaceholder="Buscar partida…"
-                      />
+                        <SearchableCombobox
+                          disabled={pending}
+                          popoverWidth="wide"
+                          className="h-8 text-xs"
+                          options={wbsComboboxOptions}
+                          value={line.wbsNodeId}
+                          onValueChange={(v) => handleWbsChange(i, v)}
+                          placeholder="Sin EDT"
+                          searchPlaceholder="Buscar partida…"
+                        />
                       </TableCell>
                       <TableCell className="min-w-[200px]">
-                        <Input className="h-8 text-xs" value={line.description} onChange={(e) => updateLine(i, "description", e.target.value)} required />
+                        <Input
+                          className="h-8 text-xs"
+                          value={line.description}
+                          onChange={(e) => updateLine(i, "description", e.target.value)}
+                          required
+                        />
                       </TableCell>
                       <TableCell className="min-w-[100px]">
                         <UnitSelect
+                          disabled={pending}
                           value={line.unit}
                           onChange={(v) => updateLine(i, "unit", v)}
                           className="h-8 text-xs"
                         />
                       </TableCell>
                       <TableCell className="min-w-[100px]">
-                        <DecimalInput className="h-8 text-xs text-right" value={line.quantity} onValueChange={(v) => updateLine(i, "quantity", v)} placeholder="1,00" required />
+                        <DecimalInput
+                          precision={4}
+                          aria-label={`Cantidad de la línea ${i + 1}`}
+                          className="h-8 text-xs text-right"
+                          value={line.quantity}
+                          onValueChange={(v) => updateLine(i, "quantity", v)}
+                          placeholder="1,00"
+                          required
+                        />
                       </TableCell>
                       <TableCell className="min-w-[120px]">
-                        <DecimalInput className="h-8 text-xs text-right" value={line.unitPrice} onValueChange={(v) => updateLine(i, "unitPrice", v)} placeholder="0,00" required />
+                        <DecimalInput
+                          precision={4}
+                          aria-label={`Precio unitario de la línea ${i + 1}`}
+                          className="h-8 text-xs text-right"
+                          value={line.unitPrice}
+                          onValueChange={(v) => updateLine(i, "unitPrice", v)}
+                          placeholder="0,00"
+                          required
+                        />
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {formatMoneyAmount(sub)}
+                        {formatMoneyAmount(sub, currency)}
                       </TableCell>
                       <TableCell>
-                      {lines.length > 1 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={() => removeLine(i)} className="h-6 w-6 p-0 text-destructive">×</Button>
-                      )}
+                        {lines.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeLine(i)}
+                            className="h-6 w-6 p-0 text-destructive"
+                          >
+                            ×
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -338,40 +449,53 @@ export function SubcontractForm({
                     Total del contrato:
                   </TableCell>
                   <TableCell className="text-right font-semibold">
-                    {formatMoneyAmount(totalValue)}
+                    {formatMoneyAmount(totalValue, currency)}
                   </TableCell>
                   <TableCell />
                 </TableRow>
               </TableFooter>
             </Table>
-        </TableScroll>
-      </div>
-
-      {allowAttachments && storageConfigured ? (
-        <div className="space-y-2">
-          <Label>Adjuntos (opcional)</Label>
-          <p className="text-xs text-muted-foreground">
-            Contrato firmado u otros documentos. Se adjuntan después de crear el subcontrato ({createAttachmentLimitHint()}).
-          </p>
-          <DocumentUploadZone
-            multiple
-            selectedFiles={attachments}
-            onFilesChange={setAttachments}
-            maxFiles={MAX_CREATE_ATTACHMENT_FILES}
-            maxTotalBytes={MAX_CREATE_ATTACHMENT_TOTAL_BYTES}
-            onValidationError={setAttachmentError}
-            disabled={pending}
-          />
-          {attachmentError ? (
-            <p role="alert" className="text-sm text-destructive">{attachmentError}</p>
-          ) : null}
+          </TableScroll>
         </div>
-      ) : null}
 
-      <div className="flex gap-2 justify-end">
-        <Button type="button" variant="outline" onClick={() => router.back()} disabled={pending}>Cancelar</Button>
-        <Button type="submit" disabled={pending}>{pending ? "Guardando..." : submitLabel}</Button>
-      </div>
+        {allowAttachments && storageConfigured ? (
+          <div className="space-y-2">
+            <Label>Adjuntos (opcional)</Label>
+            <p className="text-xs text-muted-foreground">
+              Contrato firmado u otros documentos. Se adjuntan después de crear el subcontrato (
+              {createAttachmentLimitHint()}).
+            </p>
+            <DocumentUploadZone
+              multiple
+              selectedFiles={attachments}
+              onFilesChange={setAttachments}
+              maxFiles={MAX_CREATE_ATTACHMENT_FILES}
+              maxTotalBytes={MAX_CREATE_ATTACHMENT_TOTAL_BYTES}
+              onValidationError={setAttachmentError}
+              disabled={pending}
+            />
+            {attachmentError ? (
+              <p role="alert" className="text-sm text-destructive">
+                {attachmentError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {editing && (
+          <p className="text-sm text-muted-foreground">
+            El subcontratista y la moneda conservan los valores del subcontrato.
+          </p>
+        )}
+        <div className="flex gap-2 justify-end">
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Guardando..." : submitLabel}
+          </Button>
+        </div>
+      </fieldset>
     </form>
   );
 }

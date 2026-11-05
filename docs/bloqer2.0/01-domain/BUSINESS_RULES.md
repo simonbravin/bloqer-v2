@@ -496,8 +496,8 @@ Cada regla tiene un ID `BR-<área>-NNN`. Citala así: `[BR-CERT-002]`.
 - **Regla:** un Subcontract apunta a un `Contact` que tiene rol `SUBCONTRACTOR`.
 - **Origen:** [D-016].
 
-### BR-SUB-003 — Payable solo al aprobar certificación de subcontrato
-- **Regla:** una `SubcontractCertification` genera o incrementa **`Payable` únicamente** al pasar a **`APPROVED`**. En **`SUBMITTED`** no hay AP. En **`REJECTED`** no se genera AP. En **`CANCELLED`**, si ya existía obligación, se revierte por **mecanismo compensatorio** auditado. No hay política configurable “ISSUED o APPROVED” ([D-028]).
+### BR-SUB-003 — Obligación desde factura posterior a aprobación
+- **Regla:** solo APPROVED habilita/genera la factura AP en borrador; emitir esa factura crea Payable (D-089/D-131, precisión de D-028). En ISSUED o REJECTED no se genera obligación. En CANCELLED, cualquier obligación previa requiere el mecanismo compensatorio auditado admitido por sus documentos; no se borra deuda ni se anula una factura procesada por omisión. No hay política configurable de deuda al emitir/aprobar el certificado.
 
 ### BR-SUB-004 — settlement_status en subcontrato (no payment_status)
 - **Regla:** el indicador derivado de liquidación frente a AP/pagos del **subcontrato** se llama **`settlement_status`**: `UNSETTLED` \| `PARTIALLY_SETTLED` \| `SETTLED` \| `OVERDUE`. **No** reutilizar el nombre `payment_status` en `SubcontractCertification` para evitar confusión con certificación **a cliente** (`payment_status` + AR) ([D-027]).

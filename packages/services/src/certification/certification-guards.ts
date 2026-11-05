@@ -8,6 +8,23 @@ export type CertificationCeilingInput = {
   cumulativePhysicalPct?: Prisma.Decimal;
 };
 
+export function assertCertificationMeasurementValues(
+  currentQty: Prisma.Decimal,
+  physicalPct: Prisma.Decimal,
+) {
+  if (
+    !currentQty.isFinite() ||
+    currentQty.isNegative() ||
+    !physicalPct.isFinite() ||
+    physicalPct.isNegative() ||
+    physicalPct.greaterThan(100)
+  )
+    throw new ServiceError(
+      "VALIDATION",
+      "La cantidad debe ser no negativa y el físico debe estar entre 0 y 100",
+    );
+}
+
 /**
  * BR-CERT-002 / D-119: strict accumulated limits, including PRIVATE projects.
  */

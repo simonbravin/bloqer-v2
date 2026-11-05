@@ -165,6 +165,7 @@ export const AUDIT_ACTION_LABELS_ES: Record<string, string> = {
   SUBCONTRACT_COMPLETED: "Subcontrato completado",
   SUBCONTRACT_CANCELLED: "Subcontrato anulado",
   SUBCONTRACT_CERTIFICATION_CREATED: "Certificación de subcontrato creada",
+  SUBCONTRACT_CERTIFICATION_UPDATED: "Certificación de subcontrato actualizada",
   SUBCONTRACT_CERTIFICATION_ISSUED: "Certificación de subcontrato emitida",
   SUBCONTRACT_CERTIFICATION_APPROVED: "Certificación de subcontrato aprobada",
   SUBCONTRACT_CERTIFICATION_REJECTED: "Certificación de subcontrato rechazada",

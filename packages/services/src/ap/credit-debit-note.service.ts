@@ -339,7 +339,7 @@ async function createNoteDraft(
     );
 
     return full;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return mapNoteView(created);
 }
@@ -731,7 +731,7 @@ export async function issueSupplierDebitNote(
     );
 
     return issued;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await ensureDraftJournalFromSupplierInvoice(result.id, ctx);
   return mapNoteView(result);

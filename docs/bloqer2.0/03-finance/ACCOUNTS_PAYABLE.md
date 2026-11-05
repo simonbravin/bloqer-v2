@@ -7,7 +7,7 @@ Obligación de la empresa hacia **proveedores/subcontratos/servicios** por factu
 
 ## Origen de Payable
 1. **PurchaseInvoice** → AP según máquina de factura.
-2. **`SubcontractCertification`** → AP **solo** en **`APPROVED`** ([BR-SUB-003]); liquidación hacia subcontrato reflejada en **`settlement_status`** derivado ([BR-SUB-004]), no confundir con `payment_status` de certificación a cliente.
+2. **SubcontractCertification APPROVED** → factura AP borrador → al emitir la factura nace CxP (D-089/D-131; BR-SUB-003); liquidación reflejada en settlement_status derivado (D-027/D-115), distinto de payment_status de la certificación cliente.
 3. **Manual**: cuenta corriente fotocopiadora, etc.
 
 ## Pagos parciales

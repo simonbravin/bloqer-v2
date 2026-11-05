@@ -1,10 +1,16 @@
 "use server";
 
 import {
-  createSalesInvoice, createInvoiceFromCertification,
-  updateSalesInvoice, issueSalesInvoice, cancelSalesInvoice,
-  createSalesCreditNoteFromInvoice, createSalesDebitNoteFromInvoice,
-  issueSalesCreditNote, issueSalesDebitNote, cancelSalesCreditNote,
+  createSalesInvoice,
+  createInvoiceFromCertification,
+  updateSalesInvoice,
+  issueSalesInvoice,
+  cancelSalesInvoice,
+  createSalesCreditNoteFromInvoice,
+  createSalesDebitNoteFromInvoice,
+  issueSalesCreditNote,
+  issueSalesDebitNote,
+  cancelSalesCreditNote,
   getSalesInvoiceById,
   cancelReceivable,
   registerArAdvance,
@@ -12,11 +18,13 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import {
-  createSalesInvoiceSchema, createInvoiceFromCertificationSchema,
+  createSalesInvoiceSchema,
+  createInvoiceFromCertificationSchema,
   updateSalesInvoiceSchema,
   registerArAdvanceSchema,
   registerArSaleSchema,
-  type CreateSalesInvoiceInput, type CreateInvoiceFromCertificationInput,
+  type CreateSalesInvoiceInput,
+  type CreateInvoiceFromCertificationInput,
   type UpdateSalesInvoiceInput,
   type RegisterArAdvanceInput,
   type RegisterArSaleInput,
@@ -29,7 +37,7 @@ import {
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-type Ok  = { ok: true };
+type Ok = { ok: true };
 type Err = { error: string };
 
 async function getCtx() {
@@ -37,15 +45,58 @@ async function getCtx() {
   if (!current?.tenantCtx) redirect("/login");
   return {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx.tenantId,
-    companyId:   current.tenantCtx.companyId,
-    roles:       current.tenantCtx.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
 }
 
 function handle(err: unknown): Err {
   if (err instanceof ServiceError) return { error: err.message };
   return { error: "Error inesperado" };
+}
+
+type InvoiceCacheReference = Pick<
+  Awaited<ReturnType<typeof getSalesInvoiceById>>,
+  "id" | "projectId" | "certificationId" | "referencedSalesInvoiceId"
+>;
+
+/** Resolve a note's certification before committing; invalidation never requires a post-write read. */
+async function getInvoiceCertificationReference(
+  invoiceId: string,
+  projectId: string,
+  ctx: Awaited<ReturnType<typeof getCtx>>,
+) {
+  const invoice = await getSalesInvoiceById(invoiceId, ctx, projectId);
+  if (invoice.certificationId || !invoice.referencedSalesInvoiceId) return invoice.certificationId;
+  const parent = await getSalesInvoiceById(invoice.referencedSalesInvoiceId, ctx, projectId);
+  return parent.certificationId;
+}
+
+function revalidateInvoicePaths(
+  invoice: InvoiceCacheReference,
+  certificationId: string | null = invoice.certificationId,
+) {
+  const projectId = invoice.projectId;
+  if (!projectId) return;
+  revalidatePath(`/proyectos/${projectId}/facturas`);
+  revalidatePath(`/proyectos/${projectId}/facturas/${invoice.id}`);
+  revalidatePath(`/proyectos/${projectId}/facturas/${invoice.id}/editar`);
+  if (invoice.referencedSalesInvoiceId) {
+    revalidatePath(`/proyectos/${projectId}/facturas/${invoice.referencedSalesInvoiceId}`);
+    revalidatePath(`/proyectos/${projectId}/facturas/${invoice.referencedSalesInvoiceId}/editar`);
+  }
+  revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+  revalidatePath("/finanzas/cuentas-por-cobrar");
+  revalidatePath("/pendientes");
+  if (certificationId) {
+    revalidatePath(`/proyectos/${projectId}/certificaciones`);
+    revalidatePath(`/proyectos/${projectId}/certificaciones/${certificationId}`);
+    revalidatePath(`/proyectos/${projectId}/certificaciones/${certificationId}/editar`);
+    revalidatePath(`/proyectos/${projectId}/reportes/certificaciones`);
+    revalidatePath(`/proyectos/${projectId}/reportes/avances`);
+  }
+  revalidateProjectCostAndFinancePaths(projectId);
 }
 
 export async function createSalesInvoiceAction(
@@ -60,9 +111,11 @@ export async function createSalesInvoiceAction(
   }
   try {
     const inv = await createSalesInvoice({ ...parsed.data, projectId }, ctx);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidateInvoicePaths(inv);
     return { id: inv.id };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 /** Emit + optional collectNow in one shot ([D-077] / Q-055). */
@@ -100,9 +153,11 @@ export async function createInvoiceFromCertificationAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const inv = await createInvoiceFromCertification(parsed.data, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidateInvoicePaths(inv);
     return { id: inv.id };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function registerArAdvanceAction(
@@ -139,10 +194,13 @@ export async function updateSalesInvoiceAction(
   const parsed = updateSalesInvoiceSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
-    await updateSalesInvoice(invoiceId, parsed.data, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
+    const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
+    const invoice = await updateSalesInvoice(invoiceId, parsed.data, ctx, projectId);
+    revalidateInvoicePaths(invoice, invoice.certificationId ?? certificationId);
     return { ok: true };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function issueSalesInvoiceAction(
@@ -151,13 +209,14 @@ export async function issueSalesInvoiceAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await issueSalesInvoice(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
+    const invoice = await issueSalesInvoice(invoiceId, ctx, projectId);
+    revalidateInvoicePaths(invoice, invoice.certificationId ?? certificationId);
     revalidateTreasuryPaths();
     return { ok: true };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function cancelSalesInvoiceAction(
@@ -166,13 +225,14 @@ export async function cancelSalesInvoiceAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await cancelSalesInvoice(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
+    const invoice = await cancelSalesInvoice(invoiceId, ctx, projectId);
+    revalidateInvoicePaths(invoice, invoice.certificationId ?? certificationId);
     revalidateTreasuryPaths();
     return { ok: true };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function createSalesCreditNoteFromInvoiceAction(
@@ -182,7 +242,7 @@ export async function createSalesCreditNoteFromInvoiceAction(
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
   try {
-    await getSalesInvoiceById(parentInvoiceId, ctx, projectId);
+    const parent = await getSalesInvoiceById(parentInvoiceId, ctx, projectId);
     const note = await createSalesCreditNoteFromInvoice(
       {
         parentSalesInvoiceId: parentInvoiceId,
@@ -202,8 +262,7 @@ export async function createSalesCreditNoteFromInvoiceAction(
       },
       ctx,
     );
-    revalidatePath(`/proyectos/${projectId}/facturas`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
+    revalidateInvoicePaths(note, parent.certificationId);
     return { id: note.id };
   } catch (err) {
     return handle(err);
@@ -216,12 +275,12 @@ export async function createSalesDebitNoteFromInvoiceAction(
 ): Promise<{ id: string } | Err> {
   const ctx = await getCtx();
   try {
-    await getSalesInvoiceById(parentInvoiceId, ctx, projectId);
+    const parent = await getSalesInvoiceById(parentInvoiceId, ctx, projectId);
     const note = await createSalesDebitNoteFromInvoice(
       { parentSalesInvoiceId: parentInvoiceId },
       ctx,
     );
-    revalidatePath(`/proyectos/${projectId}/facturas`);
+    revalidateInvoicePaths(note, parent.certificationId);
     return { id: note.id };
   } catch (err) {
     return handle(err);
@@ -234,10 +293,9 @@ export async function issueSalesCreditNoteAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await issueSalesCreditNote(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
+    const note = await issueSalesCreditNote(invoiceId, ctx, projectId);
+    revalidateInvoicePaths(note, certificationId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -250,10 +308,9 @@ export async function issueSalesDebitNoteAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await issueSalesDebitNote(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
+    const note = await issueSalesDebitNote(invoiceId, ctx, projectId);
+    revalidateInvoicePaths(note, certificationId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -266,10 +323,9 @@ export async function cancelSalesCreditNoteAction(
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await cancelSalesCreditNote(invoiceId, ctx, projectId);
-    revalidatePath(`/proyectos/${projectId}/facturas`);
-    revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
-    revalidateProjectCostAndFinancePaths(projectId);
+    const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
+    const note = await cancelSalesCreditNote(invoiceId, ctx, projectId);
+    revalidateInvoicePaths(note, certificationId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -283,9 +339,14 @@ export async function cancelReceivableAction(
   const ctx = await getCtx();
   try {
     await cancelReceivable(receivableId, ctx, projectId);
+    // The existing receivable getter can reconcile balances while reading. Avoid it for cache
+    // discovery: the mutation has already authorized this exact project, including its descendants.
+    revalidatePath(`/proyectos/${projectId}`, "layout");
     revalidatePath(`/proyectos/${projectId}/cuentas-por-cobrar`);
     revalidateProjectCostAndFinancePaths(projectId);
     revalidateTreasuryPaths();
     return { ok: true };
-  } catch (err) { return handle(err); }
+  } catch (err) {
+    return handle(err);
+  }
 }

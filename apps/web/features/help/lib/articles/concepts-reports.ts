@@ -16,6 +16,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     steps: [
       "Confirmar OC (o activar subcontrato) → capa Comprometido.",
       "Emitir factura de proveedor → Devengado + CxP (y asiento DRAFT contable).",
+      "En subcontratos, Emitir el certificado no genera deuda. Aprobar crea la factura AP en borrador; la CxP nace al emitir esa factura.",
       "Pagar la CxP → Pagado + egreso de caja.",
       "Certificar al cliente → Avance certificado (otra dimensión; no es costo de compra).",
       "Miralo por partida en Planificación → EDT y costos. Exposición ≈ devengado + comprometido abierto.",
@@ -33,6 +34,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "orden-de-compra-y-afectar-edt",
       "presupuesto-vs-real",
       "circuito-comprar-material-hasta-pagarlo",
+      "certificar-y-pagar-subcontrato",
     ],
     keywords: [
       "afectaciones",
@@ -145,7 +147,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     summary:
       "Cada documento tiene su acción: Devolver (OC/presupuesto), Anular (OC, facturas, SC…) o Cancelar certificación.",
     intents: ["anular-documentos"],
-    modules: ["compras", "finanzas", "certificaciones", "presupuesto"],
+    modules: ["compras", "finanzas", "certificaciones", "subcontratos", "presupuesto"],
     level: "both",
     typicalRoles: ["Compras", "PM", "Finanzas", "OWNER / ADMIN"],
     where: { menu: "Detalle del documento → Anular / Devolver / Cancelar" },
@@ -158,13 +160,14 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "OC en aprobación: Devolver a borrador (motivo). OC confirmada/aprobada: Anular según estado permitido.",
       "Solicitud de compra: Anular desde el detalle.",
       "Factura de venta (obra) o factura de proveedor: Anular en el detalle (obra o Finanzas).",
-      "Certificación al cliente: Cancelar certificación (no dice «Anular»).",
-      "Certificación de subcontrato / recepción / parte de obra: Anular en su detalle.",
+      "Certificación al cliente: Cancelar certificación. Certificación de subcontrato: Anular. En ambas, Emitida o Aprobada exige Motivo; Borrador sólo pide confirmación, sin motivo obligatorio.",
+      "En la certificación de subcontrato, si su factura vinculada ya fue emitida, primero anulala por el circuito financiero. Recepción / parte de obra: Anular en su detalle.",
       "Si el documento ya generó asiento POSTED sin reverso, o un movimiento Conciliado, el sistema puede bloquear la anulación hasta revertir/desemparejar.",
     ],
     pitfalls: [
       "Devolver ≠ Anular: devolver vuelve a borrador; anular cierra el ciclo.",
       "Mes cerrado (Contabilidad → Cierres) bloquea mutaciones con fecha en ese período.",
+      "En certificaciones, esperá el resultado de la confirmación. Si falla, el diálogo conserva el error; ante una falla de conexión, revisá el documento antes de repetir la acción.",
     ],
     relatedSlugs: [
       "orden-de-compra-y-afectar-edt",
@@ -172,6 +175,8 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "cerrar-el-mes",
       "contabilizar-asientos",
       "errores-operativos-frecuentes",
+      "certificar-y-pagar-subcontrato",
+      "emitir-y-aprobar-certificacion",
     ],
     keywords: [
       "anular",
@@ -179,11 +184,13 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "cancelar",
       "devolver a borrador",
       "cancelar certificacion",
+      "anular certificacion de subcontrato",
+      "motivo de cancelacion",
       "anular oc",
       "anular factura",
       "deshacer",
     ],
-    guideRef: "§9.2 · §11 · §12 · §8",
+    guideRef: "§9.2 · §10.1 · §11.2 · §12 · §8",
   },
   {
     slug: "hub-reportes-de-obra",

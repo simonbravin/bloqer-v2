@@ -29,7 +29,7 @@ import {
 } from "../idempotency/idempotency";
 import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
-import { resolveCompanyIdForAr } from "./sales-invoice.service";
+import { lockInvoiceNumberCompany, resolveCompanyIdForAr } from "./sales-invoice.service";
 import {
   ensureDraftJournalFromCollection,
   ensureDraftJournalFromSalesInvoice,
@@ -302,6 +302,7 @@ export async function registerArIncome(
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
+        await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
         const maxNum = await tx.salesInvoice.aggregate({
           where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
           _max: { number: true },
@@ -565,7 +566,7 @@ export async function registerArIncome(
           movementId,
           collectAccountId,
         };
-      });
+      }, { timeout: 30_000, maxWait: 10_000 });
           break;
         } catch (err) {
           if (isIdempotencyUniqueConflict(err)) throw err;

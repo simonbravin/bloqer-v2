@@ -1,4 +1,13 @@
 import { Prisma, prisma, SalesInvoice, SalesInvoiceStatus } from "@bloqer/database";
+import { createInvoiceFromCertificationSchema } from "@bloqer/validators";
+import {
+  requireCertificationAccess,
+  loadCertificationRecord,
+} from "../certification/certification-scope";
+import {
+  certificationInvoiceStatusSelect,
+  deriveCertificationInvoiceStatus,
+} from "./certification-invoice-status";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import type {
   CreateSalesInvoiceInput,
@@ -19,15 +28,32 @@ import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-let
 import { resolveSuggestedArInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
-import { canEditArArea, canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
+import {
+  canEditArArea,
+  canMutateArForScope,
+  canViewArProjectArea,
+  canViewCompanyAr,
+} from "./ar-access";
 import { resolvePagination } from "../finance/pagination";
 import { calcLine, lockSalesInvoiceRow, recalcInvoiceTotals } from "./sales-invoice-calc.service";
 import { assertManualInvoiceHasNoCertificationLinks } from "./manual-invoice-guards";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
-import { indexStoredDocumentLines, resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import {
+  indexStoredDocumentLines,
+  resolveInvoiceLineMoney,
+  parseDiscountPct,
+} from "../finance/invoice-line-money";
+import {
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeRatePctDecimal,
+  serializeUnitPriceDecimal,
+} from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
-import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import {
+  assertProjectAllowsOperationalMutation,
+  lockProjectForOperationalMutation,
+} from "../project/project-operational-guard";
 import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
@@ -107,7 +133,8 @@ export async function getSalesInvoiceById(
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-  if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (inv.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (isCrossCompany(inv.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
@@ -141,7 +168,8 @@ export async function getCompanySalesInvoiceById(
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-  if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (inv.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (inv.projectId !== null) {
     throw new ServiceError(
       "FORBIDDEN",
@@ -161,47 +189,51 @@ export async function getActiveInvoiceForCertification(
   id: string;
   code: string;
   status: SalesInvoiceStatus;
+  currency: string;
   receivableId: string | null;
   canCollect: boolean;
+  isSettled: boolean;
+  collectionStatusAvailable: boolean;
 } | null> {
   if (!canViewArProjectArea(ctx.roles)) return null;
   if (!(await getTenantModuleGate(ctx)).isEnabled("AR")) return null;
-  const cert = await prisma.certification.findFirst({
-    where: { id: certificationId, tenantId: ctx.tenantId },
-    select: { projectId: true },
-  });
-  if (!cert) return null;
-  await requireProjectAccess(cert.projectId, ctx);
+  let cert;
+  try {
+    cert = await requireCertificationAccess(certificationId, ctx);
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "NOT_FOUND") return null;
+    throw error;
+  }
   const inv = await prisma.salesInvoice.findFirst({
-    where: { certificationId, tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
-    select: { id: true, number: true, status: true, companyId: true },
+    where: {
+      certificationId,
+      tenantId: ctx.tenantId,
+      documentKind: "INVOICE",
+      status: { not: "CANCELLED" },
+    },
+    select: certificationInvoiceStatusSelect,
   });
   if (!inv) return null;
-  if (isCrossCompany(inv.companyId, ctx)) {
+  if (isCrossCompany(inv.companyId, ctx))
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
-  }
-
-  let receivableId: string | null = null;
-  let canCollect = false;
-  if (inv.status === "ISSUED") {
-    const receivable = await prisma.receivable.findFirst({
-      where: {
-        salesInvoiceId: inv.id,
-        tenantId: ctx.tenantId,
-        status: { in: ["OPEN", "PARTIAL", "OVERDUE"] },
-      },
-      select: { id: true },
-    });
-    receivableId = receivable?.id ?? null;
-    canCollect = Boolean(receivable);
-  }
-
+  if (
+    inv.projectId !== cert.projectId ||
+    (cert.companyId && inv.companyId !== cert.companyId) ||
+    (cert.budget.companyId && inv.companyId !== cert.budget.companyId) ||
+    (cert.project.companyId && inv.companyId !== cert.project.companyId) ||
+    inv.company.tenantId !== ctx.tenantId ||
+    inv.clientContact.tenantId !== ctx.tenantId
+  )
+    throw new ServiceError(
+      "CONFLICT",
+      "Las relaciones de la factura y certificación son inconsistentes",
+    );
   return {
     id: inv.id,
-    code: `FAC-${String(inv.number).padStart(5, "0")}`,
+    code: "FAC-" + String(inv.number).padStart(5, "0"),
     status: inv.status,
-    receivableId,
-    canCollect,
+    currency: inv.currency,
+    ...deriveCertificationInvoiceStatus(inv),
   };
 }
 
@@ -301,7 +333,6 @@ export async function listInvoicesByProject(
 
 // ─── Resolve company ──────────────────────────────────────────────────────────
 
-
 export async function countOpenSalesInvoicesByProject(
   projectId: string,
   ctx: ServiceContext,
@@ -322,10 +353,31 @@ export async function countOpenSalesInvoicesByProject(
   });
 }
 
-async function resolveCompanyId(projectId: string | null | undefined, ctx: ServiceContext): Promise<string> {
+/** All writers of the company INVOICE series take this lock after the project lock, when present. */
+export async function lockInvoiceNumberCompany(
+  tx: Prisma.TransactionClient,
+  companyId: string,
+  tenantId: string,
+) {
+  await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${tenantId} FOR NO KEY UPDATE`;
+  const company = await tx.company.findFirst({
+    where: { id: companyId, tenantId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!company)
+    throw new ServiceError("CONFLICT", "La empresa no está activa para crear la factura");
+}
+
+async function resolveCompanyId(
+  projectId: string | null | undefined,
+  ctx: ServiceContext,
+): Promise<string> {
   if (ctx.companyId) return ctx.companyId;
   if (projectId) {
-    const project = await prisma.project.findUnique({ where: { id: projectId }, select: { companyId: true } });
+    const project = await prisma.project.findUnique({
+      where: { id: projectId },
+      select: { companyId: true },
+    });
     if (project?.companyId) return project.companyId;
   }
   const company = await prisma.company.findFirst({
@@ -387,83 +439,88 @@ export async function createSalesInvoice(
   const forceZeroTax = suggestedLetter === "C" || suggestedLetter === "E";
   const pricesIncludeTax = forceZeroTax ? false : Boolean(input.pricesIncludeTax);
 
-  const maxNum = await prisma.salesInvoice.aggregate({
-    where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
-    _max: { number: true },
-  });
-  const number = (maxNum._max.number ?? 0) + 1;
-
-  const inv = await prisma.$transaction(async (tx) => {
-    if (input.projectId) await lockProjectForOperationalMutation(tx, input.projectId, ctx);
-    const created = await tx.salesInvoice.create({
-      data: {
-        tenantId: ctx.tenantId,
-        companyId,
-        projectId: input.projectId,
-        clientContactId: input.clientContactId,
-        certificationId: null,
-        number,
-        issueDate: new Date(input.issueDate),
-        dueDate: new Date(input.dueDate),
-        currency: input.currency ?? "ARS",
-        invoiceLetter: suggestedLetter,
-        iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
-        notes: input.notes ?? null,
-        internalNotes: input.internalNotes ?? null,
-        externalInvoiceRef: input.externalInvoiceRef ?? null,
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-      },
-    });
-
-    for (const line of input.lines) {
-      const qty   = new Prisma.Decimal(line.quantity);
-      const price = new Prisma.Decimal(line.unitPrice);
-      const rate  = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
-      const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
-        quantity: qty,
-        unitPrice: price,
-        taxRate: rate,
-        discountPct: parseDiscountPct(line.discountPct),
-        pricesIncludeTax,
+  const inv = await prisma.$transaction(
+    async (tx) => {
+      if (input.projectId) await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+      await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
+      const maxNum = await tx.salesInvoice.aggregate({
+        where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
+        _max: { number: true },
       });
-      await tx.salesInvoiceLine.create({
+      const number = (maxNum._max.number ?? 0) + 1;
+      const created = await tx.salesInvoice.create({
         data: {
-          invoiceId: created.id,
-          description: line.description,
-          quantity: qty,
-          unitPrice: unitPriceNet,
-          taxRate: rate,
-          discountPct: parseDiscountPct(line.discountPct),
-          lineSubtotal,
-          lineTax,
-          lineTotal,
-          certificationLineId: null,
-          sortOrder: line.sortOrder ?? 0,
+          tenantId: ctx.tenantId,
+          companyId,
+          projectId: input.projectId,
+          clientContactId: input.clientContactId,
+          certificationId: null,
+          number,
+          issueDate: new Date(input.issueDate),
+          dueDate: new Date(input.dueDate),
+          currency: input.currency ?? "ARS",
+          invoiceLetter: suggestedLetter,
+          iibbPerceptionRate: new Prisma.Decimal(
+            input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT,
+          ),
+          notes: input.notes ?? null,
+          internalNotes: input.internalNotes ?? null,
+          externalInvoiceRef: input.externalInvoiceRef ?? null,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
         },
       });
-    }
 
-    await recalcInvoiceTotals(tx as never, created.id);
-    const inv = await tx.salesInvoice.findUniqueOrThrow({
-      where: { id: created.id },
-      include: {
-        lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
-      },
-    });
+      for (const line of input.lines) {
+        const qty = new Prisma.Decimal(line.quantity);
+        const price = new Prisma.Decimal(line.unitPrice);
+        const rate = new Prisma.Decimal(forceZeroTax ? "0" : (line.taxRate ?? "0"));
+        const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+          quantity: qty,
+          unitPrice: price,
+          taxRate: rate,
+          discountPct: parseDiscountPct(line.discountPct),
+          pricesIncludeTax,
+        });
+        await tx.salesInvoiceLine.create({
+          data: {
+            invoiceId: created.id,
+            description: line.description,
+            quantity: qty,
+            unitPrice: unitPriceNet,
+            taxRate: rate,
+            discountPct: parseDiscountPct(line.discountPct),
+            lineSubtotal,
+            lineTax,
+            lineTotal,
+            certificationLineId: null,
+            sortOrder: line.sortOrder ?? 0,
+          },
+        });
+      }
 
-    await auditAr(
-      ctx,
-      "sales_invoice.created",
-      "SalesInvoice",
-      inv.id,
-      { projectId: inv.projectId, companyId: inv.companyId },
-      { after: { number: inv.number, projectId: inv.projectId }, tx },
-    );
+      await recalcInvoiceTotals(tx as never, created.id);
+      const inv = await tx.salesInvoice.findUniqueOrThrow({
+        where: { id: created.id },
+        include: {
+          lines: { orderBy: { sortOrder: "asc" } },
+          clientContact: { select: { legalName: true, fantasyName: true } },
+        },
+      });
 
-    return inv;
-  });
+      await auditAr(
+        ctx,
+        "sales_invoice.created",
+        "SalesInvoice",
+        inv.id,
+        { projectId: inv.projectId, companyId: inv.companyId },
+        { after: { number: inv.number, projectId: inv.projectId }, tx },
+      );
+
+      return inv;
+    },
+    { timeout: 30_000, maxWait: 10_000 },
+  );
 
   return serializeInvoice(inv);
 }
@@ -478,17 +535,11 @@ export async function createInvoiceFromCertification(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas");
   }
 
-  const cert = await prisma.certification.findUnique({
-    where: { id: input.certificationId },
-    include: {
-      budget: { select: { currency: true } },
-      project: true,
-      lines: { include: { wbsNode: { include: { costItem: true } } } },
-    },
-  });
-  if (!cert) throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  if (cert.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const parsed = createInvoiceFromCertificationSchema.safeParse(input);
+  if (!parsed.success)
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Datos inválidos");
+  input = parsed.data;
+  const cert = await requireCertificationAccess(input.certificationId, ctx);
   if (projectScopeId !== undefined && cert.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
   }
@@ -501,7 +552,14 @@ export async function createInvoiceFromCertification(
     throw new ServiceError("CONFLICT", "La certificación no tiene líneas para facturar");
   }
 
-  const companyId = await resolveCompanyId(cert.projectId, ctx);
+  const companyId =
+    cert.companyId ??
+    cert.budget.companyId ??
+    cert.project.companyId ??
+    (await resolveCompanyId(cert.projectId, ctx));
+  if (isCrossCompany(companyId, ctx))
+    throw new ServiceError("FORBIDDEN", "La certificación no pertenece a la empresa activa");
+  await assertContactRoleInTenant(cert.project.clientContactId, "CLIENT", ctx.tenantId);
 
   const suggestedLetter =
     input.invoiceLetter ??
@@ -527,11 +585,39 @@ export async function createInvoiceFromCertification(
     inv = await prisma.$transaction(
       async (tx) => {
         await lockProjectForOperationalMutation(tx, cert.projectId, ctx);
+        await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
         await _lockCertificationProject(tx, cert.projectId);
-        const currentCert = await tx.certification.findFirstOrThrow({
-          where: { id: cert.id, tenantId: ctx.tenantId },
-          select: { status: true },
-        });
+        await assertArTenantModule({ ...ctx });
+        const currentCert = await loadCertificationRecord(cert.id, ctx, tx);
+        if (
+          currentCert.updatedAt.getTime() !== cert.updatedAt.getTime() ||
+          currentCert.companyId !== cert.companyId ||
+          currentCert.budget.companyId !== cert.budget.companyId ||
+          currentCert.project.companyId !== cert.project.companyId ||
+          currentCert.budget.currency !== cert.budget.currency ||
+          currentCert.project.clientContactId !== cert.project.clientContactId ||
+          currentCert.lines.length !== cert.lines.length ||
+          currentCert.lines.some((line, i) => {
+            const before = cert.lines[i];
+            return (
+              !before ||
+              line.id !== before.id ||
+              !line.currentQty.equals(before.currentQty) ||
+              !line.unitSalePriceSnapshot.equals(before.unitSalePriceSnapshot) ||
+              !line.periodAmount.equals(before.periodAmount)
+            );
+          })
+        )
+          throw new ServiceError(
+            "CONFLICT",
+            "La certificación cambió durante la facturación. Recargá y revisá sus valores.",
+          );
+        await assertContactRoleInTenant(
+          currentCert.project.clientContactId,
+          "CLIENT",
+          ctx.tenantId,
+          { tx },
+        );
         if (currentCert.status !== "APPROVED") {
           throw new ServiceError("CONFLICT", "Solo se pueden facturar certificaciones aprobadas");
         }
@@ -540,6 +626,7 @@ export async function createInvoiceFromCertification(
             certificationId: input.certificationId,
             tenantId: ctx.tenantId,
             status: { not: "CANCELLED" },
+            documentKind: "INVOICE",
           },
           select: { id: true },
         });
@@ -578,12 +665,17 @@ export async function createInvoiceFromCertification(
           data: cert.lines.map((line, sortOrder) => {
             const qty = line.currentQty;
             const price = line.unitSalePriceSnapshot;
-            const { lineSubtotal, lineTax, lineTotal } = calcLine(qty, price, taxRate);
+            const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+              quantity: qty,
+              unitPrice: price,
+              taxRate,
+              pricesIncludeTax: !forceZeroTax && Boolean(input.pricesIncludeTax),
+            });
             return {
               invoiceId: created.id,
               description: `${line.wbsNode.code} - ${line.wbsNode.name}`,
               quantity: qty,
-              unitPrice: price,
+              unitPrice: unitPriceNet,
               taxRate,
               lineSubtotal,
               lineTax,
@@ -636,7 +728,8 @@ export async function updateSalesInvoice(
   await assertArTenantModule(ctx);
   const inv = await prisma.salesInvoice.findUnique({ where: { id } });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-  if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (inv.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (isCrossCompany(inv.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
@@ -649,10 +742,8 @@ export async function updateSalesInvoice(
   await assertProjectGuardIfPresent(inv.projectId, ctx);
   assertInvoiceEditable(inv);
 
-  const zeroTaxForLetter =
-    input.invoiceLetter === "C" || input.invoiceLetter === "E";
-  const isFiscalNote =
-    inv.documentKind === "CREDIT_NOTE" || inv.documentKind === "DEBIT_NOTE";
+  const zeroTaxForLetter = input.invoiceLetter === "C" || input.invoiceLetter === "E";
+  const isFiscalNote = inv.documentKind === "CREDIT_NOTE" || inv.documentKind === "DEBIT_NOTE";
   const isCreditNote = inv.documentKind === "CREDIT_NOTE";
   if (input.lines && !isFiscalNote) {
     throw new ServiceError(
@@ -671,8 +762,8 @@ export async function updateSalesInvoice(
     const updatedInvoice = await tx.salesInvoice.update({
       where: { id },
       data: {
-        issueDate:     input.issueDate ? new Date(input.issueDate) : undefined,
-        dueDate:       input.dueDate   ? new Date(input.dueDate)   : undefined,
+        issueDate: input.issueDate ? new Date(input.issueDate) : undefined,
+        dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
         ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
         // NC credit amount is gross; never inherit/persist parent IIBB on draft edits.
         ...(isCreditNote
@@ -680,7 +771,7 @@ export async function updateSalesInvoice(
           : input.iibbPerceptionRate !== undefined
             ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
             : {}),
-        notes:         input.notes         ?? undefined,
+        notes: input.notes ?? undefined,
         internalNotes: input.internalNotes ?? undefined,
         updatedBy: ctx.actorUserId,
       },
@@ -700,7 +791,8 @@ export async function updateSalesInvoice(
         const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
           quantity: new Prisma.Decimal(line.quantity),
           unitPrice: new Prisma.Decimal(line.unitPrice),
-          taxRate, discountPct: new Prisma.Decimal(line.discountPct ?? "0"),
+          taxRate,
+          discountPct: new Prisma.Decimal(line.discountPct ?? "0"),
           previous: line.id ? previousById.get(line.id) : undefined,
         });
         await tx.salesInvoiceLine.create({
@@ -797,7 +889,7 @@ export async function updateSalesInvoice(
         clientContact: { select: { legalName: true, fantasyName: true } },
       },
     });
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   return serializeInvoice(updated);
 }
@@ -816,7 +908,8 @@ export async function issueSalesInvoice(
     select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-  if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (invPreview.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
@@ -828,103 +921,112 @@ export async function issueSalesInvoice(
   }
   await assertProjectGuardIfPresent(invPreview.projectId, ctx);
 
-  const result = await prisma.$transaction(async (tx) => {
-    if (invPreview.projectId) await lockProjectForOperationalMutation(tx, invPreview.projectId, ctx);
-    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
-    const inv = await tx.salesInvoice.findUnique({
-      where: { id },
-      include: {
-        lines: true,
-        clientContact: { select: { legalName: true, fantasyName: true, country: true } },
-        company: { select: { country: true } },
-      },
-    });
-    if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-    if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    assertInvoiceEditable(inv);
+  const result = await prisma.$transaction(
+    async (tx) => {
+      if (invPreview.projectId)
+        await lockProjectForOperationalMutation(tx, invPreview.projectId, ctx);
+      await lockSalesInvoiceRow(tx, id, ctx.tenantId);
+      const inv = await tx.salesInvoice.findUnique({
+        where: { id },
+        include: {
+          lines: true,
+          clientContact: { select: { legalName: true, fantasyName: true, country: true } },
+          company: { select: { country: true } },
+        },
+      });
+      if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
+      if (inv.tenantId !== ctx.tenantId)
+        throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+      assertInvoiceEditable(inv);
 
-    if (inv.documentKind !== "INVOICE") {
-      throw new ServiceError(
-        "VALIDATION",
-        inv.documentKind === "CREDIT_NOTE"
-          ? "Usá emitir nota de crédito para este comprobante."
-          : "Usá emitir nota de débito para este comprobante.",
+      if (inv.documentKind !== "INVOICE") {
+        throw new ServiceError(
+          "VALIDATION",
+          inv.documentKind === "CREDIT_NOTE"
+            ? "Usá emitir nota de crédito para este comprobante."
+            : "Usá emitir nota de débito para este comprobante.",
+        );
+      }
+
+      if (inv.lines.length === 0) {
+        throw new ServiceError("CONFLICT", "No se puede emitir una factura sin líneas");
+      }
+
+      assertInvoiceLetterOnIssue({
+        invoiceLetter: inv.invoiceLetter,
+        companyCountry: inv.company.country,
+        counterpartyCountry: inv.clientContact.country,
+        documentLabel: "factura de venta",
+      });
+      await recalcInvoiceTotals(tx as never, id);
+      const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
+      if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
+        throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
+      }
+      assertInvoiceLetterTaxConsistencyOnIssue({
+        invoiceLetter: inv.invoiceLetter,
+        taxAmount: refreshed.taxAmount,
+      });
+
+      const fx = computeDocumentFxAmounts(
+        refreshed.currency,
+        refreshed.totalAmount,
+        refreshed.fxRate,
       );
-    }
 
-    if (inv.lines.length === 0) {
-      throw new ServiceError("CONFLICT", "No se puede emitir una factura sin líneas");
-    }
+      // Conditional flip prevents issue↔cancel races leaving orphan receivables.
+      const flipped = await tx.salesInvoice.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+        data: {
+          status: "ISSUED",
+          fxRate: fx.fxRate,
+          amountArs: fx.amountArs,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "La factura ya no está en borrador. Recargá e intentá de nuevo.",
+      );
 
-    assertInvoiceLetterOnIssue({
-      invoiceLetter: inv.invoiceLetter,
-      companyCountry: inv.company.country,
-      counterpartyCountry: inv.clientContact.country,
-      documentLabel: "factura de venta",
-    });
-    await recalcInvoiceTotals(tx as never, id);
-    const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
-    if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
-      throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
-    }
-    assertInvoiceLetterTaxConsistencyOnIssue({
-      invoiceLetter: inv.invoiceLetter,
-      taxAmount: refreshed.taxAmount,
-    });
+      // BR-AR-001: create Receivable 1:1
+      await tx.receivable.create({
+        data: {
+          tenantId: inv.tenantId,
+          companyId: inv.companyId,
+          projectId: inv.projectId,
+          clientContactId: inv.clientContactId,
+          salesInvoiceId: inv.id,
+          issueDate: inv.issueDate,
+          dueDate: inv.dueDate,
+          currency: inv.currency,
+          originalAmount: refreshed.totalAmount,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+        },
+      });
 
-    const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
+      const issued = await tx.salesInvoice.findUniqueOrThrow({
+        where: { id },
+        include: {
+          lines: { orderBy: { sortOrder: "asc" } },
+          clientContact: { select: { legalName: true, fantasyName: true } },
+        },
+      });
 
-    // Conditional flip prevents issue↔cancel races leaving orphan receivables.
-    const flipped = await tx.salesInvoice.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-      data: {
-        status: "ISSUED",
-        fxRate: fx.fxRate,
-        amountArs: fx.amountArs,
-        updatedBy: ctx.actorUserId,
-      },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La factura ya no está en borrador. Recargá e intentá de nuevo.",
-    );
+      await auditAr(
+        ctx,
+        "sales_invoice.issued",
+        "SalesInvoice",
+        id,
+        { projectId: issued.projectId, companyId: issued.companyId },
+        { before: { status: "DRAFT" }, after: { number: issued.number, status: "ISSUED" }, tx },
+      );
 
-    // BR-AR-001: create Receivable 1:1
-    await tx.receivable.create({
-      data: {
-        tenantId: inv.tenantId,
-        companyId: inv.companyId,
-        projectId: inv.projectId,
-        clientContactId: inv.clientContactId,
-        salesInvoiceId: inv.id,
-        issueDate: inv.issueDate,
-        dueDate: inv.dueDate,
-        currency: inv.currency,
-        originalAmount: refreshed.totalAmount,
-        createdBy: ctx.actorUserId,
-        updatedBy: ctx.actorUserId,
-      },
-    });
-
-    const issued = await tx.salesInvoice.findUniqueOrThrow({
-      where: { id },
-      include: {
-        lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
-      },
-    });
-
-    await auditAr(
-      ctx,
-      "sales_invoice.issued",
-      "SalesInvoice",
-      id,
-      { projectId: issued.projectId, companyId: issued.companyId },
-      { before: { status: "DRAFT" }, after: { number: issued.number, status: "ISSUED" }, tx },
-    );
-
-    return issued;
-  }, { timeout: 30_000, maxWait: 10_000 });
+      return issued;
+    },
+    { timeout: 30_000, maxWait: 10_000 },
+  );
 
   await ensureDraftJournalFromSalesInvoice(result.id, ctx);
 
@@ -966,7 +1068,8 @@ export async function cancelSalesInvoice(
     select: { tenantId: true, projectId: true, companyId: true, status: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-  if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (invPreview.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (projectScopeId !== undefined && invPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
@@ -998,7 +1101,8 @@ export async function cancelSalesInvoice(
     if (invPreview.projectId) await lockProjectForMutation(tx, invPreview.projectId, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({ where: { id } });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
-    if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    if (inv.tenantId !== ctx.tenantId)
+      throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (inv.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "La factura ya está anulada");
     }
@@ -1112,11 +1216,7 @@ type RawInvoiceListRow = SalesInvoice & {
 
 function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceListRow {
   const codePrefix =
-    inv.documentKind === "CREDIT_NOTE"
-      ? "NC"
-      : inv.documentKind === "DEBIT_NOTE"
-        ? "ND"
-        : "FAC";
+    inv.documentKind === "CREDIT_NOTE" ? "NC" : inv.documentKind === "DEBIT_NOTE" ? "ND" : "FAC";
   return {
     ...inv,
     code: `${codePrefix}-${String(inv.number).padStart(5, "0")}`,
@@ -1153,11 +1253,7 @@ type RawInvoice = SalesInvoice & {
 
 function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
   const codePrefix =
-    inv.documentKind === "CREDIT_NOTE"
-      ? "NC"
-      : inv.documentKind === "DEBIT_NOTE"
-        ? "ND"
-        : "FAC";
+    inv.documentKind === "CREDIT_NOTE" ? "NC" : inv.documentKind === "DEBIT_NOTE" ? "ND" : "FAC";
   return {
     ...inv,
     code: `${codePrefix}-${String(inv.number).padStart(5, "0")}`,

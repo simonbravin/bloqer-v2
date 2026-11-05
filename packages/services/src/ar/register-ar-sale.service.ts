@@ -27,6 +27,7 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 import { recalcInvoiceTotals } from "./sales-invoice-calc.service";
+import { lockInvoiceNumberCompany } from "./sales-invoice.service";
 import { assertManualInvoiceHasNoCertificationLinks } from "./manual-invoice-guards";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
@@ -345,6 +346,7 @@ export async function registerArSale(
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
         await lockProjectForOperationalMutation(tx, projectId, ctx);
+        await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
         const maxNum = await tx.salesInvoice.aggregate({
           where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
           _max: { number: true },
@@ -607,7 +609,7 @@ export async function registerArSale(
           movementId,
           collectAccountId,
         };
-      });
+      }, { timeout: 30_000, maxWait: 10_000 });
           break;
         } catch (err) {
           if (isIdempotencyUniqueConflict(err)) throw err;

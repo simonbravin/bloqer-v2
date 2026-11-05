@@ -1,687 +1,736 @@
-import { Prisma, prisma, SubcontractCertification, SupplierInvoiceStatus } from "@bloqer/database";
-import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-access";
-import type { CreateSubcontractCertificationInput, UpdateSubcontractCertificationInput } from "@bloqer/validators";
-import { log } from "../audit/audit.service";
-import { assertSubcontractsTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
-import { ServiceContext, ServiceError } from "../types";
+import {
+  Prisma,
+  prisma,
+  type SubcontractCertification,
+  type SupplierInvoiceStatus,
+} from "@bloqer/database";
+import {
+  createSubcontractCertificationSchema,
+  updateSubcontractCertificationSchema,
+  cancelSubcontractSchema,
+  type CreateSubcontractCertificationInput,
+  type UpdateSubcontractCertificationInput,
+} from "@bloqer/validators";
+import { log, sanitizeAuditPayload } from "../audit/audit.service";
+import {
+  assertApTenantModule,
+  assertSubcontractsTenantModule,
+} from "../tenant-modules/tenant-module-enforcement";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { requireProjectAccessIfPresent } from "../security/access";
-import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
+import {
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeUnitPriceDecimal,
+  toMoneyDecimal,
+} from "../finance/money-decimal";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { subcontractCostType } from "../cost-control/cost-type";
+import { ServiceError, type ServiceContext } from "../types";
+import { canEditSubcontractsArea, canViewSubcontractsArea } from "./subcontract-access";
+import { assertSubcontractCertSuccessionAllowed } from "./subcontract-cert-succession";
 import { assertSubcontractCertificationLinesHaveWbs } from "./subcontract-cert-approve-guards";
-
-// ─── View types ───────────────────────────────────────────────────────────────
+import {
+  assertSubcontractAccess,
+  assertSubcontractCertificationParents,
+  assertSubcontractParents,
+  subcontractCertificationInclude,
+  subcontractInclude,
+  lockSubcontractMutation,
+  type SubcontractCertificationRecord,
+  type SubcontractRecord,
+} from "./subcontract-scope";
+import {
+  assertSubcontractDateRange,
+  assertSubcontractQuantityWithinBalance,
+  parseSubcontractInput,
+  subcontractLineTotal,
+} from "./subcontract-values";
+import { loadSubcontractSettlements, type SubcontractSettlement } from "./subcontract-settlement";
 
 export type SubcontractCertificationLineView = {
-  id:                         string;
+  id: string;
   subcontractCertificationId: string;
-  subcontractLineId:          string;
-  previousQty:                string;
-  currentQty:                 string;
-  cumulativeQty:              string;
-  remainingQty:               string;
-  unitPriceSnapshot:          string;
-  lineTotal:                  string;
-  notes:                      string | null;
-  sortOrder:                  number;
-  subcontractLine:            { description: string; unit: string; quantity: string };
+  subcontractLineId: string;
+  previousQty: string;
+  currentQty: string;
+  cumulativeQty: string;
+  remainingQty: string;
+  unitPriceSnapshot: string;
+  lineTotal: string;
+  notes: string | null;
+  sortOrder: number;
+  subcontractLine: { description: string; unit: string; quantity: string };
 };
-
-export type SubcontractCertificationView = Omit<SubcontractCertification, never> & {
-  totalAmount:       string;
-  code:              string;
-  subcontractCode:   string;
-  subcontractorName: string;
-  supplierInvoiceId: string | null;
-  supplierInvoiceCode: string | null;
-  supplierInvoiceStatus: SupplierInvoiceStatus | null;
-  lines:             SubcontractCertificationLineView[];
-};
-
-// ─── Serializer ───────────────────────────────────────────────────────────────
-
-type CertWithRelations = SubcontractCertification & {
-  subcontract: { number: number };
-  subcontractorContact: { legalName: string; fantasyName: string | null };
-  supplierInvoice: { id: string; number: number; status: SupplierInvoiceStatus } | null;
-  lines: Array<{
-    id: string; subcontractCertificationId: string; subcontractLineId: string;
-    previousQty: Prisma.Decimal; currentQty: Prisma.Decimal;
-    cumulativeQty: Prisma.Decimal; remainingQty: Prisma.Decimal;
-    unitPriceSnapshot: Prisma.Decimal; lineTotal: Prisma.Decimal;
-    notes: string | null; sortOrder: number;
-    subcontractLine: { description: string; unit: string; quantity: Prisma.Decimal };
-  }>;
-};
-
-function serializeCert(c: CertWithRelations): SubcontractCertificationView {
-  const totalAmount = c.lines.reduce((sum, l) => sum.plus(l.lineTotal), new Prisma.Decimal(0));
+export type SubcontractCertificationView = SubcontractCertification &
+  SubcontractSettlement & {
+    totalAmount: string;
+    currency: string;
+    code: string;
+    subcontractCode: string;
+    subcontractorName: string;
+    supplierInvoiceId: string | null;
+    supplierInvoiceCode: string | null;
+    supplierInvoiceStatus: SupplierInvoiceStatus | null;
+    successorCertificationId: string | null;
+    successorCertificationCode: string | null;
+    lines: SubcontractCertificationLineView[];
+  };
+function serializeCert(
+  row: SubcontractCertificationRecord,
+  settlement: SubcontractSettlement,
+): SubcontractCertificationView {
+  const { subcontract, supplierInvoice, lines, replacedBy, ...fields } = row;
   return {
-    ...c,
-    code:              `CERT-SC-${String(c.number).padStart(3, "0")}`,
-    subcontractCode:   `SC-${String(c.subcontract.number).padStart(3, "0")}`,
-    subcontractorName: c.subcontractorContact.fantasyName ?? c.subcontractorContact.legalName,
-    totalAmount:       serializeMoneyDecimal(totalAmount),
-    supplierInvoiceId: c.supplierInvoice?.id ?? null,
-    supplierInvoiceCode: c.supplierInvoice ? `FP-${String(c.supplierInvoice.number).padStart(5, "0")}` : null,
-    supplierInvoiceStatus: c.supplierInvoice?.status ?? null,
-    lines: c.lines.map((l) => ({
-      id:                         l.id,
-      subcontractCertificationId: l.subcontractCertificationId,
-      subcontractLineId:          l.subcontractLineId,
-      previousQty:                serializeQtyDecimal(l.previousQty),
-      currentQty:                 serializeQtyDecimal(l.currentQty),
-      cumulativeQty:              serializeQtyDecimal(l.cumulativeQty),
-      remainingQty:               serializeQtyDecimal(l.remainingQty),
-      unitPriceSnapshot:          serializeUnitPriceDecimal(l.unitPriceSnapshot),
-      lineTotal:                  serializeMoneyDecimal(l.lineTotal),
-      notes:                      l.notes,
-      sortOrder:                  l.sortOrder,
+    ...fields,
+    ...settlement,
+    currency: subcontract.currency,
+    code: "CERT-SC-" + String(row.number).padStart(3, "0"),
+    subcontractCode: "SC-" + String(subcontract.number).padStart(3, "0"),
+    subcontractorName:
+      subcontract.subcontractorContact.fantasyName ?? subcontract.subcontractorContact.legalName,
+    totalAmount: serializeMoneyDecimal(
+      lines.reduce((sum, line) => sum.plus(toMoneyDecimal(line.lineTotal)), new Prisma.Decimal(0)),
+    ),
+    supplierInvoiceId: supplierInvoice?.id ?? null,
+    supplierInvoiceCode: supplierInvoice
+      ? "FP-" + String(supplierInvoice.number).padStart(5, "0")
+      : null,
+    supplierInvoiceStatus: supplierInvoice?.status ?? null,
+    successorCertificationId: replacedBy[0]?.id ?? null,
+    successorCertificationCode: replacedBy[0]
+      ? "CERT-SC-" + String(replacedBy[0].number).padStart(3, "0")
+      : null,
+    lines: lines.map((line) => ({
+      id: line.id,
+      subcontractCertificationId: line.subcontractCertificationId,
+      subcontractLineId: line.subcontractLineId,
+      previousQty: serializeQtyDecimal(line.previousQty),
+      currentQty: serializeQtyDecimal(line.currentQty),
+      cumulativeQty: serializeQtyDecimal(line.cumulativeQty),
+      remainingQty: serializeQtyDecimal(line.remainingQty),
+      unitPriceSnapshot: serializeUnitPriceDecimal(line.unitPriceSnapshot),
+      lineTotal: serializeMoneyDecimal(line.lineTotal),
+      notes: line.notes,
+      sortOrder: line.sortOrder,
       subcontractLine: {
-        description: l.subcontractLine.description,
-        unit:        l.subcontractLine.unit,
-        quantity:    serializeQtyDecimal(l.subcontractLine.quantity),
+        description: line.subcontractLine.description,
+        unit: line.subcontractLine.unit,
+        quantity: serializeQtyDecimal(line.subcontractLine.quantity),
       },
     })),
   };
 }
-
-const certInclude = {
-  subcontract:          { select: { number: true } },
-  subcontractorContact: { select: { legalName: true, fantasyName: true } },
-  supplierInvoice:      { select: { id: true, number: true, status: true } },
-  lines: {
-    include: { subcontractLine: { select: { description: true, unit: true, quantity: true } } },
-    orderBy: { sortOrder: "asc" as const },
-  },
-};
-
-// ─── Read ─────────────────────────────────────────────────────────────────────
+async function view(row: SubcontractCertificationRecord, ctx: ServiceContext) {
+  const settlements = await loadSubcontractSettlements([row], ctx);
+  return serializeCert(row, settlements.get(row.id)!);
+}
+async function authorize(ctx: ServiceContext, edit = false) {
+  await assertSubcontractsTenantModule(ctx);
+  if (!(edit ? canEditSubcontractsArea(ctx.roles) : canViewSubcontractsArea(ctx.roles)))
+    throw new ServiceError("FORBIDDEN", "Sin permisos para operar certificaciones de subcontrato");
+}
+async function loadCert(id: string, ctx: ServiceContext): Promise<SubcontractCertificationRecord> {
+  const row = await prisma.subcontractCertification.findUnique({
+    where: { id },
+    include: subcontractCertificationInclude,
+  });
+  if (!row) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
+  await assertSubcontractAccess(row, ctx);
+  assertSubcontractCertificationParents(row);
+  return row;
+}
+async function lockedCert(
+  tx: Prisma.TransactionClient,
+  preview: SubcontractCertificationRecord,
+  ctx: ServiceContext,
+  reversal = false,
+) {
+  const parent = await lockSubcontractMutation(
+    tx,
+    { id: preview.subcontractId, companyId: preview.companyId, projectId: preview.projectId },
+    ctx,
+    { reversal },
+  );
+  await tx.$queryRaw`SELECT id FROM subcontract_certifications WHERE id = ${preview.id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+  const cert = await tx.subcontractCertification.findFirst({
+    where: { id: preview.id, tenantId: ctx.tenantId },
+    include: subcontractCertificationInclude,
+  });
+  if (
+    !cert ||
+    cert.subcontractId !== preview.subcontractId ||
+    cert.companyId !== preview.companyId ||
+    cert.projectId !== preview.projectId
+  )
+    throw new ServiceError("CONFLICT", "La certificación cambió. Recargá e intentá de nuevo.");
+  assertSubcontractCertificationParents(cert);
+  return { cert, parent };
+}
+function audit(
+  ctx: ServiceContext,
+  row: { id: string; companyId: string; projectId: string },
+  action: string,
+  before: unknown,
+  after: unknown,
+  tx: Prisma.TransactionClient,
+) {
+  return log(
+    {
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      companyId: row.companyId,
+      projectId: row.projectId,
+      action,
+      entityType: "SubcontractCertification",
+      entityId: row.id,
+      before: sanitizeAuditPayload(before),
+      after: sanitizeAuditPayload(after),
+    },
+    tx,
+  );
+}
+function activeParent(parent: SubcontractRecord) {
+  if (parent.status !== "ACTIVE")
+    throw new ServiceError(
+      "CONFLICT",
+      "Solo se pueden registrar o editar certificaciones en subcontratos activos",
+    );
+}
+function assertNewLines(
+  lines: CreateSubcontractCertificationInput["lines"],
+  parent: SubcontractRecord,
+) {
+  for (const line of lines) {
+    const source = parent.lines.find((item) => item.id === line.subcontractLineId);
+    if (!source) throw new ServiceError("NOT_FOUND", "Línea del subcontrato no encontrada");
+    assertSubcontractQuantityWithinBalance(
+      new Prisma.Decimal(line.currentQty),
+      source.certifiedQuantity,
+      source.quantity,
+    );
+  }
+}
+async function writeLines(
+  tx: Prisma.TransactionClient,
+  certificationId: string,
+  inputs: CreateSubcontractCertificationInput["lines"],
+  parent: SubcontractRecord,
+  existing: SubcontractCertificationRecord["lines"] = [],
+) {
+  for (const [index, input] of inputs.entries()) {
+    const source = parent.lines.find((line) => line.id === input.subcontractLineId)!;
+    const quantity = new Prisma.Decimal(input.currentQty),
+      previous = source.certifiedQuantity;
+    const previousLine = existing.find(
+      (line) => line.subcontractLineId === input.subcontractLineId,
+    );
+    const price = previousLine?.unitPriceSnapshot ?? source.unitPrice;
+    await tx.subcontractCertificationLine.create({
+      data: {
+        subcontractCertificationId: certificationId,
+        subcontractLineId: source.id,
+        previousQty: previous,
+        currentQty: quantity,
+        cumulativeQty: previous.plus(quantity),
+        remainingQty: source.quantity.minus(previous.plus(quantity)),
+        unitPriceSnapshot: price,
+        lineTotal: subcontractLineTotal(quantity, price),
+        notes: input.notes ?? null,
+        sortOrder: index,
+      },
+    });
+  }
+}
 
 export async function getSubcontractCertificationById(
   id: string,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canViewSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver certificaciones de subcontrato");
-  }
-  const cert = await prisma.subcontractCertification.findUnique({ where: { id }, include: certInclude });
-  if (!cert) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  if (cert.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await requireProjectAccessIfPresent(cert.projectId, ctx);
-  return serializeCert(cert);
+  await authorize(ctx);
+  return view(await loadCert(id, ctx), ctx);
 }
-
 export async function listSubcontractCertificationsBySubcontract(
   subcontractId: string,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView[]> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canViewSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver certificaciones de subcontrato");
-  }
-  const sub = await prisma.subcontract.findUnique({ where: { id: subcontractId } });
-  if (!sub) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
-  if (sub.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await requireProjectAccessIfPresent(sub.projectId, ctx);
-
-  const certs = await prisma.subcontractCertification.findMany({
-    where: { subcontractId, tenantId: ctx.tenantId },
-    include: certInclude,
-    orderBy: { number: "desc" },
+  await authorize(ctx);
+  const parent = await prisma.subcontract.findUnique({
+    where: { id: subcontractId },
+    include: subcontractInclude,
   });
-  return certs.map(serializeCert);
+  if (!parent) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
+  await assertSubcontractAccess(parent, ctx);
+  assertSubcontractParents(parent, parent.lines);
+  const rows = await prisma.subcontractCertification.findMany({
+    where: {
+      subcontractId,
+      tenantId: ctx.tenantId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    },
+    include: subcontractCertificationInclude,
+    orderBy: [{ number: "desc" }, { id: "asc" }],
+  });
+  for (const row of rows) assertSubcontractCertificationParents(row);
+  const settlements = await loadSubcontractSettlements(rows, ctx);
+  return rows.map((row) => serializeCert(row, settlements.get(row.id)!));
 }
 
-// ─── Create ───────────────────────────────────────────────────────────────────
-
 export async function createSubcontractCertification(
-  input: CreateSubcontractCertificationInput,
+  raw: CreateSubcontractCertificationInput,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canEditSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para crear certificaciones de subcontrato");
-  }
-
-  const sub = await prisma.subcontract.findUnique({
+  await authorize(ctx, true);
+  const input = parseSubcontractInput(createSubcontractCertificationSchema, raw);
+  const preview = await prisma.subcontract.findUnique({
     where: { id: input.subcontractId },
-    include: { lines: true },
+    include: subcontractInclude,
   });
-  if (!sub) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
-  if (sub.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsOperationalMutation(sub.projectId, ctx);
-  if (sub.status !== "ACTIVE") {
-    throw new ServiceError("CONFLICT", `Solo se pueden crear certificaciones en subcontratos activos. Estado actual: "${sub.status}"`);
-  }
-
-  // Validate lines and quantities
-  for (const inputLine of input.lines) {
-    const subLine = sub.lines.find((l) => l.id === inputLine.subcontractLineId);
-    if (!subLine) {
-      throw new ServiceError("NOT_FOUND", `Línea de subcontrato no encontrada: ${inputLine.subcontractLineId}`);
-    }
-    const currentQty = new Prisma.Decimal(inputLine.currentQty);
-    if (currentQty.lessThanOrEqualTo(0)) {
-      throw new ServiceError("CONFLICT", `La cantidad a certificar debe ser mayor a cero: ${subLine.description}`);
-    }
-    const remaining = subLine.quantity.minus(subLine.certifiedQuantity);
-    if (currentQty.greaterThan(remaining)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Cantidad a certificar (${currentQty}) excede el saldo pendiente (${remaining}) para: ${subLine.description}`,
-      );
-    }
-  }
-
-  const replacesCertificationId = input.replacesCertificationId?.trim() || null;
-
-  let result;
-  try {
-    result = await prisma.$transaction(async (tx) => {
+  if (!preview) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
+  await assertSubcontractAccess(preview, ctx);
+  assertSubcontractParents(preview, preview.lines);
+  await assertProjectAllowsOperationalMutation(preview.projectId, ctx);
+  const row = await prisma.$transaction(
+    async (tx) => {
+      const parent = await lockSubcontractMutation(tx, preview, ctx);
+      activeParent(parent);
+      assertNewLines(input.lines, parent);
+      const replacesCertificationId = input.replacesCertificationId ?? null;
       if (replacesCertificationId) {
         const predecessor = await tx.subcontractCertification.findUnique({
           where: { id: replacesCertificationId },
-          select: { id: true, subcontractId: true, status: true, tenantId: true },
+          include: subcontractCertificationInclude,
         });
-        const existingSuccessor = await tx.subcontractCertification.findFirst({
-          where: {
-            replacesCertificationId,
-            status: { not: "CANCELLED" },
-          },
+        if (predecessor) {
+          await assertSubcontractAccess(predecessor, ctx);
+          assertSubcontractCertificationParents(predecessor);
+        }
+        const successor = await tx.subcontractCertification.findFirst({
+          where: { replacesCertificationId, status: { not: "CANCELLED" } },
           select: { id: true },
         });
         assertSubcontractCertSuccessionAllowed({
           replacesCertificationId,
           predecessor,
-          subcontractId: input.subcontractId,
+          subcontractId: parent.id,
           tenantId: ctx.tenantId,
-          existingSuccessorId: existingSuccessor?.id ?? null,
+          existingSuccessorId: successor?.id,
         });
       }
-
-      const maxNum = await tx.subcontractCertification.aggregate({
-        where: { subcontractId: input.subcontractId },
+      const max = await tx.subcontractCertification.aggregate({
+        where: { subcontractId: parent.id },
         _max: { number: true },
       });
-      const number = (maxNum._max.number ?? 0) + 1;
-
       const created = await tx.subcontractCertification.create({
         data: {
-          tenantId:               sub.tenantId,
-          companyId:              sub.companyId,
-          projectId:              sub.projectId,
-          subcontractId:          input.subcontractId,
-          subcontractorContactId: sub.subcontractorContactId,
-          number,
-          periodStart:            new Date(input.periodStart),
-          periodEnd:              new Date(input.periodEnd),
-          certificationDate:      new Date(input.certificationDate),
+          tenantId: ctx.tenantId,
+          companyId: parent.companyId,
+          projectId: parent.projectId,
+          subcontractId: parent.id,
+          subcontractorContactId: parent.subcontractorContactId,
+          number: (max._max.number ?? 0) + 1,
+          periodStart: new Date(input.periodStart),
+          periodEnd: new Date(input.periodEnd),
+          certificationDate: new Date(input.certificationDate),
           replacesCertificationId,
-          notes:                  input.notes ?? null,
-          createdBy:              ctx.actorUserId,
-          updatedBy:              ctx.actorUserId,
+          notes: input.notes ?? null,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
         },
       });
-
-      for (let i = 0; i < input.lines.length; i++) {
-        const inputLine = input.lines[i]!;
-        const subLine   = sub.lines.find((l) => l.id === inputLine.subcontractLineId)!;
-        const currentQty    = new Prisma.Decimal(inputLine.currentQty);
-        const previousQty   = subLine.certifiedQuantity;
-        const cumulativeQty = previousQty.plus(currentQty);
-        const remainingQty  = subLine.quantity.minus(cumulativeQty);
-        await tx.subcontractCertificationLine.create({
-          data: {
-            subcontractCertificationId: created.id,
-            subcontractLineId:          inputLine.subcontractLineId,
-            previousQty,
-            currentQty,
-            cumulativeQty,
-            remainingQty,
-            unitPriceSnapshot: subLine.unitPrice,
-            lineTotal:         currentQty.times(subLine.unitPrice),
-            notes:             inputLine.notes ?? null,
-            sortOrder:         i,
-          },
-        });
-      }
-
-      return tx.subcontractCertification.findUniqueOrThrow({ where: { id: created.id }, include: certInclude });
-    });
-  } catch (err) {
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new ServiceError(
-        "CONFLICT",
-        "Ya existe una certificación sucesora activa para la certificación reemplazada.",
+      await writeLines(tx, created.id, input.lines, parent);
+      const result = await tx.subcontractCertification.findUniqueOrThrow({
+        where: { id: created.id },
+        include: subcontractCertificationInclude,
+      });
+      await audit(
+        ctx,
+        result,
+        "SUBCONTRACT_CERTIFICATION_CREATED",
+        null,
+        { number: result.number, subcontractId: parent.id, replacesCertificationId },
+        tx,
       );
-    }
-    throw err;
-  }
-
-  await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "SUBCONTRACT_CERTIFICATION_CREATED", entityType: "SubcontractCertification", entityId: result.id,
-    after: {
-      subcontractId: input.subcontractId,
-      number: result.number,
-      replacesCertificationId,
+      return result;
     },
-  });
-
-  return serializeCert(result);
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+  return view(row, ctx);
 }
-
-// ─── Update (DRAFT only) ──────────────────────────────────────────────────────
 
 export async function updateSubcontractCertification(
   id: string,
-  input: UpdateSubcontractCertificationInput,
+  raw: UpdateSubcontractCertificationInput,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canEditSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar certificaciones de subcontrato");
-  }
-
-  const existing = await prisma.subcontractCertification.findUnique({
-    where: { id },
-    include: { subcontract: { include: { lines: true } } },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status !== "DRAFT") {
-    throw new ServiceError("CONFLICT", `La certificación en estado "${existing.status}" no puede editarse`);
-  }
-
-  if (input.lines) {
-    const subLines = existing.subcontract.lines;
-    for (const inputLine of input.lines) {
-      const subLine = subLines.find((l) => l.id === inputLine.subcontractLineId);
-      if (!subLine) throw new ServiceError("NOT_FOUND", `Línea de subcontrato no encontrada: ${inputLine.subcontractLineId}`);
-      const currentQty = new Prisma.Decimal(inputLine.currentQty);
-      if (currentQty.lessThanOrEqualTo(0)) {
-        throw new ServiceError("CONFLICT", `La cantidad debe ser mayor a cero: ${subLine.description}`);
-      }
-      const remaining = subLine.quantity.minus(subLine.certifiedQuantity);
-      if (currentQty.greaterThan(remaining)) {
-        throw new ServiceError("CONFLICT", `Cantidad (${currentQty}) excede saldo pendiente (${remaining}) para: ${subLine.description}`);
-      }
-    }
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    await tx.subcontractCertification.update({
-      where: { id },
-      data: {
-        periodStart:       input.periodStart       ? new Date(input.periodStart)       : existing.periodStart,
-        periodEnd:         input.periodEnd         ? new Date(input.periodEnd)         : existing.periodEnd,
-        certificationDate: input.certificationDate ? new Date(input.certificationDate) : existing.certificationDate,
-        notes:             input.notes !== undefined ? input.notes : existing.notes,
-        updatedBy:         ctx.actorUserId,
-      },
-    });
-
-    if (input.lines) {
-      await tx.subcontractCertificationLine.deleteMany({ where: { subcontractCertificationId: id } });
-      const subLines = existing.subcontract.lines;
-      for (let i = 0; i < input.lines.length; i++) {
-        const inputLine = input.lines[i]!;
-        const subLine   = subLines.find((l) => l.id === inputLine.subcontractLineId)!;
-        const currentQty    = new Prisma.Decimal(inputLine.currentQty);
-        const previousQty   = subLine.certifiedQuantity;
-        const cumulativeQty = previousQty.plus(currentQty);
-        const remainingQty  = subLine.quantity.minus(cumulativeQty);
-        await tx.subcontractCertificationLine.create({
-          data: {
-            subcontractCertificationId: id,
-            subcontractLineId:          inputLine.subcontractLineId,
-            previousQty,
-            currentQty,
-            cumulativeQty,
-            remainingQty,
-            unitPriceSnapshot: subLine.unitPrice,
-            lineTotal:         currentQty.times(subLine.unitPrice),
-            notes:             inputLine.notes ?? null,
-            sortOrder:         i,
-          },
+  await authorize(ctx, true);
+  const input = parseSubcontractInput(updateSubcontractCertificationSchema, raw),
+    preview = await loadCert(id, ctx);
+  const row = await prisma.$transaction(
+    async (tx) => {
+      const { cert, parent } = await lockedCert(tx, preview, ctx);
+      activeParent(parent);
+      if (cert.status !== "DRAFT" || cert.updatedAt.getTime() !== preview.updatedAt.getTime())
+        throw new ServiceError(
+          "CONFLICT",
+          "La certificación ya no es el borrador revisado. Recargá e intentá de nuevo.",
+        );
+      if (input.lines) assertNewLines(input.lines, parent);
+      const periodStart = input.periodStart ? new Date(input.periodStart) : cert.periodStart,
+        periodEnd = input.periodEnd ? new Date(input.periodEnd) : cert.periodEnd;
+      if (input.periodStart !== undefined || input.periodEnd !== undefined)
+        assertSubcontractDateRange(periodStart, periodEnd);
+      await tx.subcontractCertification.update({
+        where: { id },
+        data: {
+          periodStart,
+          periodEnd,
+          certificationDate: input.certificationDate
+            ? new Date(input.certificationDate)
+            : cert.certificationDate,
+          notes: input.notes === undefined ? cert.notes : input.notes,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      if (input.lines) {
+        await tx.subcontractCertificationLine.deleteMany({
+          where: { subcontractCertificationId: id },
         });
+        await writeLines(tx, id, input.lines, parent, cert.lines);
       }
-    }
-
-    return tx.subcontractCertification.findUniqueOrThrow({ where: { id }, include: certInclude });
-  });
-
-  return serializeCert(result);
+      const result = await tx.subcontractCertification.findUniqueOrThrow({
+        where: { id },
+        include: subcontractCertificationInclude,
+      });
+      await audit(
+        ctx,
+        result,
+        "SUBCONTRACT_CERTIFICATION_UPDATED",
+        { notes: cert.notes, lineCount: cert.lines.length },
+        { notes: result.notes, lineCount: result.lines.length },
+        tx,
+      );
+      return result;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+  return view(row, ctx);
 }
-
-// ─── Issue ────────────────────────────────────────────────────────────────────
 
 export async function issueSubcontractCertification(
   id: string,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canEditSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para emitir certificaciones de subcontrato");
-  }
-
-  const existing = await prisma.subcontractCertification.findUnique({
-    where: { id },
-    include: { lines: { select: { id: true } } },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status !== "DRAFT") {
-    throw new ServiceError("CONFLICT", `La certificación en estado "${existing.status}" no puede emitirse`);
-  }
-  if (existing.lines.length === 0) {
-    throw new ServiceError("CONFLICT", "La certificación no tiene líneas");
-  }
-
-  const flipped = await prisma.subcontractCertification.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-    data: { status: "ISSUED", updatedBy: ctx.actorUserId },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "La certificación ya no está en borrador. Recargá e intentá de nuevo.",
+  await authorize(ctx, true);
+  const preview = await loadCert(id, ctx);
+  const row = await prisma.$transaction(
+    async (tx) => {
+      const { cert, parent } = await lockedCert(tx, preview, ctx);
+      activeParent(parent);
+      if (cert.status !== "DRAFT" || !cert.lines.length)
+        throw new ServiceError("CONFLICT", "Solo se puede emitir un borrador con líneas");
+      // Recheck the same contract quantities after acquiring the operational locks.
+      const inputs = cert.lines.map((line) => ({
+        subcontractLineId: line.subcontractLineId,
+        currentQty: line.currentQty.toString(),
+        notes: line.notes,
+      }));
+      parseSubcontractInput(updateSubcontractCertificationSchema, { lines: inputs });
+      assertNewLines(inputs, parent);
+      const result = await tx.subcontractCertification.update({
+        where: { id },
+        data: { status: "ISSUED", updatedBy: ctx.actorUserId },
+        include: subcontractCertificationInclude,
+      });
+      await audit(
+        ctx,
+        result,
+        "SUBCONTRACT_CERTIFICATION_ISSUED",
+        { status: cert.status },
+        { status: result.status },
+        tx,
+      );
+      return result;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
   );
-
-  const updated = await prisma.subcontractCertification.findUniqueOrThrow({
-    where: { id },
-    include: certInclude,
-  });
-
-  await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "SUBCONTRACT_CERTIFICATION_ISSUED", entityType: "SubcontractCertification", entityId: id,
-    after: { status: "ISSUED" },
-  });
-
-  return serializeCert(updated);
+  return view(row, ctx);
 }
-
-// ─── Approve ─────────────────────────────────────────────────────────────────
 
 export async function approveSubcontractCertification(
   id: string,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canEditSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para aprobar certificaciones de subcontrato");
-  }
-
-  const existing = await prisma.subcontractCertification.findUnique({
-    where: { id },
-    include: {
-      lines: {
-        include: {
-          subcontractLine: {
-            // wbsNodeId required on issue ([D-055]); copy onto draft AP lines.
-            select: { unitPrice: true, description: true, wbsNodeId: true },
-          },
-        },
-      },
-      subcontract: { select: { companyId: true, currency: true, number: true } },
-      subcontractorContact: { select: { legalName: true, fantasyName: true } },
-    },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status !== "ISSUED") {
-    throw new ServiceError("CONFLICT", `La certificación en estado "${existing.status}" no puede aprobarse. Debe estar emitida (ISSUED).`);
-  }
-
-  assertSubcontractCertificationLinesHaveWbs(existing.lines);
-
-  const companyId = existing.companyId;
-
+  await authorize(ctx, true);
+  await assertApTenantModule(ctx);
+  const preview = await loadCert(id, ctx);
   const suggestedLetter = await resolveSuggestedApInvoiceLetter({
-    companyId,
-    supplierContactId: existing.subcontractorContactId,
+    companyId: preview.companyId,
+    supplierContactId: preview.subcontractorContactId,
     tenantId: ctx.tenantId,
   });
-
-  const result = await prisma.$transaction(async (tx) => {
-    // Serialize invoice number allocation vs concurrent AP creates.
-    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
-
-    // Claim ISSUED → APPROVED first to block concurrent approve/reject/cancel.
-    const flipped = await tx.subcontractCertification.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "ISSUED" },
-      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La certificación ya no está emitida. Recargá e intentá de nuevo.",
-    );
-
-    // Increment certifiedQuantity on each subcontract line
-    for (const line of existing.lines) {
-      await tx.subcontractLine.update({
-        where: { id: line.subcontractLineId },
-        data: { certifiedQuantity: { increment: line.currentQty } },
+  const row = await prisma.$transaction(
+    async (tx) => {
+      const { cert, parent } = await lockedCert(tx, preview, ctx);
+      const ap = await tx.tenantModuleSetting.findFirst({
+        where: { tenantId: ctx.tenantId, moduleKey: "AP" },
+        select: { isEnabled: true },
       });
-    }
-
-    const maxNum = await tx.supplierInvoice.aggregate({
-      where: { tenantId: ctx.tenantId, companyId },
-      _max: { number: true },
-    });
-    const invoiceNumber = (maxNum._max.number ?? 0) + 1;
-
-    // Create SupplierInvoice DRAFT
-    const totalAmount = existing.lines.reduce(
-      (sum, l) => sum.plus(l.lineTotal),
-      new Prisma.Decimal(0),
-    );
-    const invoice = await tx.supplierInvoice.create({
-      data: {
-        tenantId:                  ctx.tenantId,
-        companyId,
-        projectId:                 existing.projectId,
-        supplierContactId:         existing.subcontractorContactId,
-        subcontractCertificationId: id,
-        number:                    invoiceNumber,
-        issueDate:                 existing.certificationDate,
-        dueDate:                   existing.certificationDate,
-        currency:                  existing.subcontract.currency,
-        invoiceLetter:             suggestedLetter,
-        subtotal:                  totalAmount,
-        taxAmount:                 new Prisma.Decimal(0),
-        // Certifications are net of IVA; no IIBB perception on this auto-draft ([D-112]).
-        iibbPerceptionRate:        new Prisma.Decimal(0),
-        iibbPerceptionAmount:      new Prisma.Decimal(0),
-        totalAmount,
-        createdBy:                 ctx.actorUserId,
-        updatedBy:                 ctx.actorUserId,
-      },
-    });
-
-    for (let i = 0; i < existing.lines.length; i++) {
-      const line = existing.lines[i]!;
-      await tx.supplierInvoiceLine.create({
+      if (ap?.isEnabled === false)
+        throw new ServiceError("FORBIDDEN", "El módulo Cuentas por pagar (AP) está deshabilitado");
+      if (cert.status !== "ISSUED" || !cert.lines.length)
+        throw new ServiceError(
+          "CONFLICT",
+          "Solo se puede aprobar una certificación emitida con líneas",
+        );
+      if (parent.status !== "ACTIVE" && parent.status !== "COMPLETED")
+        throw new ServiceError("CONFLICT", "El subcontrato no permite nuevas obligaciones");
+      if (cert.supplierInvoice)
+        throw new ServiceError("CONFLICT", "La certificación ya tiene una factura vinculada");
+      assertSubcontractCertificationLinesHaveWbs(cert.lines);
+      const inputs = cert.lines.map((line) => ({
+        subcontractLineId: line.subcontractLineId,
+        currentQty: line.currentQty.toString(),
+        notes: line.notes,
+      }));
+      parseSubcontractInput(updateSubcontractCertificationSchema, { lines: inputs });
+      assertNewLines(inputs, parent);
+      let totalAmount = new Prisma.Decimal(0);
+      for (const line of cert.lines) {
+        const source = parent.lines.find((item) => item.id === line.subcontractLineId)!;
+        if (!line.unitPriceSnapshot.isFinite() || line.unitPriceSnapshot.lessThan(0))
+          throw new ServiceError(
+            "CONFLICT",
+            "El precio histórico de la certificación es inválido. Revisá el documento origen.",
+          );
+        const lineTotal = subcontractLineTotal(line.currentQty, line.unitPriceSnapshot);
+        if (serializeMoneyDecimal(line.lineTotal) !== serializeMoneyDecimal(lineTotal))
+          throw new ServiceError(
+            "CONFLICT",
+            "Los importes de la certificación son inconsistentes. Revisá el documento origen.",
+          );
+        totalAmount = totalAmount.plus(lineTotal);
+        const cumulative = source.certifiedQuantity.plus(line.currentQty);
+        await tx.subcontractCertificationLine.update({
+          where: { id: line.id },
+          data: {
+            previousQty: source.certifiedQuantity,
+            cumulativeQty: cumulative,
+            remainingQty: source.quantity.minus(cumulative),
+            lineTotal,
+          },
+        });
+        await tx.subcontractLine.update({
+          where: { id: source.id },
+          data: { certifiedQuantity: cumulative },
+        });
+      }
+      subcontractLineTotal(new Prisma.Decimal(1), totalAmount);
+      const max = await tx.supplierInvoice.aggregate({
+        where: { tenantId: ctx.tenantId, companyId: cert.companyId, documentKind: "INVOICE" },
+        _max: { number: true },
+      });
+      const invoice = await tx.supplierInvoice.create({
         data: {
-          invoiceId:   invoice.id,
-          description: line.subcontractLine.description,
-          quantity:    line.currentQty,
-          unitPrice:   line.unitPriceSnapshot,
-          taxRate:     new Prisma.Decimal(0),
-          costType:    subcontractCostType(),
-          // Project AP issue requires EDT on every line ([D-055]).
-          wbsNodeId:   line.subcontractLine.wbsNodeId ?? null,
-          lineSubtotal: line.lineTotal,
-          lineTax:     new Prisma.Decimal(0),
-          lineTotal:   line.lineTotal,
-          sortOrder:   i,
+          tenantId: ctx.tenantId,
+          companyId: cert.companyId,
+          projectId: cert.projectId,
+          supplierContactId: cert.subcontractorContactId,
+          subcontractCertificationId: id,
+          number: (max._max.number ?? 0) + 1,
+          issueDate: cert.certificationDate,
+          dueDate: cert.certificationDate,
+          currency: parent.currency,
+          invoiceLetter: suggestedLetter,
+          subtotal: totalAmount,
+          taxAmount: new Prisma.Decimal(0),
+          iibbPerceptionRate: new Prisma.Decimal(0),
+          iibbPerceptionAmount: new Prisma.Decimal(0),
+          totalAmount,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
         },
       });
-    }
-
-    return tx.subcontractCertification.findUniqueOrThrow({
-      where: { id },
-      include: certInclude,
-    });
-  });
-
-  await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "SUBCONTRACT_CERTIFICATION_APPROVED", entityType: "SubcontractCertification", entityId: id,
-    after: { status: "APPROVED" },
-  });
-
-  return serializeCert(result);
+      for (const [index, line] of cert.lines.entries())
+        await tx.supplierInvoiceLine.create({
+          data: {
+            invoiceId: invoice.id,
+            description: line.subcontractLine.description,
+            quantity: line.currentQty,
+            unitPrice: line.unitPriceSnapshot,
+            taxRate: new Prisma.Decimal(0),
+            costType: subcontractCostType(),
+            wbsNodeId: line.subcontractLine.wbsNodeId,
+            lineSubtotal: subcontractLineTotal(line.currentQty, line.unitPriceSnapshot),
+            lineTax: new Prisma.Decimal(0),
+            lineTotal: subcontractLineTotal(line.currentQty, line.unitPriceSnapshot),
+            sortOrder: index,
+          },
+        });
+      const result = await tx.subcontractCertification.update({
+        where: { id },
+        data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+        include: subcontractCertificationInclude,
+      });
+      await audit(
+        ctx,
+        result,
+        "SUBCONTRACT_CERTIFICATION_APPROVED",
+        { status: cert.status },
+        { status: result.status, supplierInvoiceId: invoice.id },
+        tx,
+      );
+      return result;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+  return view(row, ctx);
 }
-
-// ─── Reject ───────────────────────────────────────────────────────────────────
 
 export async function rejectSubcontractCertification(
   id: string,
   ctx: ServiceContext,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canEditSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para rechazar certificaciones de subcontrato");
-  }
-
-  const existing = await prisma.subcontractCertification.findUnique({ where: { id } });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status !== "ISSUED") {
-    throw new ServiceError("CONFLICT", `La certificación en estado "${existing.status}" no puede rechazarse. Solo pueden rechazarse certificaciones emitidas.`);
-  }
-
-  const flipped = await prisma.subcontractCertification.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "ISSUED" },
-    data: { status: "REJECTED", updatedBy: ctx.actorUserId },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "La certificación ya no está emitida. Recargá e intentá de nuevo.",
+  await authorize(ctx, true);
+  const preview = await loadCert(id, ctx);
+  const row = await prisma.$transaction(
+    async (tx) => {
+      const { cert } = await lockedCert(tx, preview, ctx);
+      if (cert.status !== "ISSUED")
+        throw new ServiceError("CONFLICT", "Solo se puede rechazar una certificación emitida");
+      const result = await tx.subcontractCertification.update({
+        where: { id },
+        data: { status: "REJECTED", updatedBy: ctx.actorUserId },
+        include: subcontractCertificationInclude,
+      });
+      await audit(
+        ctx,
+        result,
+        "SUBCONTRACT_CERTIFICATION_REJECTED",
+        { status: cert.status },
+        { status: result.status },
+        tx,
+      );
+      return result;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
   );
-
-  const updated = await prisma.subcontractCertification.findUniqueOrThrow({
-    where: { id },
-    include: certInclude,
-  });
-
-  await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "SUBCONTRACT_CERTIFICATION_REJECTED", entityType: "SubcontractCertification", entityId: id,
-    after: { status: "REJECTED" },
-  });
-
-  return serializeCert(updated);
+  return view(row, ctx);
 }
-
-// ─── Cancel ───────────────────────────────────────────────────────────────────
 
 export async function cancelSubcontractCertification(
   id: string,
   ctx: ServiceContext,
+  reason?: string,
 ): Promise<SubcontractCertificationView> {
-  await assertSubcontractsTenantModule(ctx);
-  if (!canEditSubcontractsArea(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para anular certificaciones de subcontrato");
-  }
-
-  const existing = await prisma.subcontractCertification.findUnique({
-    where: { id },
-    include: {
-      lines: { select: { subcontractLineId: true, currentQty: true } },
-      supplierInvoice: { select: { id: true, status: true } },
-    },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-
-  if (existing.status === "CANCELLED") {
-    throw new ServiceError("CONFLICT", "La certificación ya está anulada");
-  }
-  if (existing.status === "REJECTED") {
-    throw new ServiceError("CONFLICT", "Una certificación rechazada no puede anularse. Ya no tiene efectos.");
-  }
-
-  // If APPROVED, must reverse effects — but only if linked invoice is DRAFT
-  if (existing.status === "APPROVED") {
-    if (!existing.supplierInvoice) {
-      // Unexpected state — allow cancel anyway, just reverse qty
-    } else if (existing.supplierInvoice.status === "ISSUED") {
-      throw new ServiceError(
-        "CONFLICT",
-        "No se puede anular: la factura de proveedor vinculada ya fue emitida. Primero anulá/cancelá la factura de proveedor vinculada.",
-      );
-    }
-  }
-
-  const result = await prisma.$transaction(async (tx) => {
-    // Claim current status → CANCELLED before reversing side effects (TOCTOU-safe).
-    const flipped = await tx.subcontractCertification.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: existing.status },
-      data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "La certificación cambió de estado. Recargá e intentá de nuevo.",
-    );
-
-    if (existing.status === "APPROVED") {
-      for (const line of existing.lines) {
-        const subLine = await tx.subcontractLine.findUnique({ where: { id: line.subcontractLineId } });
-        if (!subLine) {
-          throw new ServiceError(
-            "NOT_FOUND",
-            "Línea de subcontrato no encontrada al revertir certificación",
-          );
-        }
-        const newQty = subLine.certifiedQuantity.minus(line.currentQty);
-        if (newQty.lessThan(0)) {
+  await authorize(ctx, true);
+  const preview = await loadCert(id, ctx);
+  if (preview.status === "CANCELLED") return view(preview, ctx);
+  const input = parseSubcontractInput(cancelSubcontractSchema, { reason });
+  const row = await prisma.$transaction(
+    async (tx) => {
+      const { cert, parent } = await lockedCert(tx, preview, ctx, true);
+      if (cert.status === "CANCELLED") return cert;
+      if (cert.status === "REJECTED")
+        throw new ServiceError(
+          "CONFLICT",
+          "Una certificación rechazada es terminal y no puede anularse",
+        );
+      if ((cert.status === "ISSUED" || cert.status === "APPROVED") && !input.reason)
+        throw new ServiceError("VALIDATION", "Indicá el motivo de la anulación");
+      if (cert.status === "APPROVED") {
+        if (!cert.supplierInvoice)
           throw new ServiceError(
             "CONFLICT",
-            "Error de integridad: la reversión resultaría en cantidad negativa. Contacte soporte.",
+            "Falta la factura vinculada. Revisá la certificación antes de revertir sus cantidades.",
           );
-        }
-        await tx.subcontractLine.update({
-          where: { id: line.subcontractLineId },
-          data: { certifiedQuantity: newQty },
-        });
-      }
-
-      if (existing.supplierInvoice) {
-        const invoiceCancel = await tx.supplierInvoice.updateMany({
-          where: {
-            id: existing.supplierInvoice.id,
-            tenantId: ctx.tenantId,
-            status: "DRAFT",
+        if (cert.supplierInvoice.status === "ISSUED")
+          throw new ServiceError(
+            "CONFLICT",
+            "La factura vinculada ya fue emitida. Primero anulá esa factura.",
+          );
+        const payable = await tx.payable.findUnique({
+          where: { supplierInvoiceId: cert.supplierInvoice.id },
+          include: {
+            payments: { where: { status: "CONFIRMED" }, select: { id: true } },
+            creditApplications: { where: { status: "CONFIRMED" }, select: { id: true } },
           },
-          data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
         });
-        if (invoiceCancel.count === 0 && existing.supplierInvoice.status === "DRAFT") {
+        if (
+          payable &&
+          (cert.supplierInvoice.status === "DRAFT" ||
+            payable.tenantId !== cert.tenantId ||
+            payable.companyId !== cert.companyId ||
+            payable.projectId !== cert.projectId ||
+            payable.supplierContactId !== cert.subcontractorContactId ||
+            payable.status !== "CANCELLED" ||
+            payable.paidAmount.greaterThan(0) ||
+            payable.creditedAmount.greaterThan(0) ||
+            payable.payments.length ||
+            payable.creditApplications.length)
+        )
           throw new ServiceError(
             "CONFLICT",
-            "La factura de proveedor vinculada ya no está en borrador. Anulá esa factura primero.",
+            "Los efectos financieros vinculados no están anulados. Revisá la factura y Cuentas por pagar.",
           );
+        if (cert.supplierInvoice.status === "DRAFT") {
+          const ap = await tx.tenantModuleSetting.findFirst({
+            where: { tenantId: ctx.tenantId, moduleKey: "AP" },
+            select: { isEnabled: true },
+          });
+          if (ap?.isEnabled === false)
+            throw new ServiceError(
+              "FORBIDDEN",
+              "El módulo Cuentas por pagar (AP) está deshabilitado",
+            );
         }
+        const quantities = new Map<string, Prisma.Decimal>();
+        for (const line of cert.lines)
+          quantities.set(
+            line.subcontractLineId,
+            (quantities.get(line.subcontractLineId) ?? new Prisma.Decimal(0)).plus(line.currentQty),
+          );
+        for (const [lineId, quantity] of quantities) {
+          const source = parent.lines.find((item) => item.id === lineId);
+          if (
+            !source ||
+            quantity.lessThanOrEqualTo(0) ||
+            source.certifiedQuantity.lessThan(quantity)
+          )
+            throw new ServiceError(
+              "CONFLICT",
+              "Las cantidades vigentes no permiten esta reversión. Revisá los documentos de origen.",
+            );
+          await tx.subcontractLine.update({
+            where: { id: lineId },
+            data: { certifiedQuantity: source.certifiedQuantity.minus(quantity) },
+          });
+        }
+        if (cert.supplierInvoice.status === "DRAFT")
+          await tx.supplierInvoice.update({
+            where: { id: cert.supplierInvoice.id },
+            data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+          });
       }
-    }
-
-    return tx.subcontractCertification.findUniqueOrThrow({
-      where: { id },
-      include: certInclude,
-    });
-  });
-
-  await log({
-    tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
-    action: "SUBCONTRACT_CERTIFICATION_CANCELLED", entityType: "SubcontractCertification", entityId: id,
-    after: { wasApproved: existing.status === "APPROVED" },
-  });
-
-  return serializeCert(result);
+      const result = await tx.subcontractCertification.update({
+        where: { id },
+        data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+        include: subcontractCertificationInclude,
+      });
+      await audit(
+        ctx,
+        result,
+        "SUBCONTRACT_CERTIFICATION_CANCELLED",
+        { status: cert.status },
+        {
+          status: result.status,
+          reason: input.reason || null,
+          wasApproved: cert.status === "APPROVED",
+        },
+        tx,
+      );
+      return result;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+  return view(row, ctx);
 }

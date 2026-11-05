@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { can } from "@bloqer/domain";
 import {
   getSubcontractFormWbsPickList,
   getWbsSubcontractBudgetHints,
@@ -21,6 +22,8 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId } = await params;
+  if (!can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS"))
+    redirect(`/proyectos/${projectId}/subcontratos`);
   const sp = await searchParams;
   const ctx = {
     actorUserId: current.session.user.id!,
@@ -34,7 +37,8 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
   try {
     wbsPick = await getSubcontractFormWbsPickList(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     if (err instanceof ServiceError && err.code === "VALIDATION") {
       companyResolveError = err.message;
     } else {
@@ -42,12 +46,16 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
     }
   }
 
+  const companyId = wbsPick?.companyId ?? "";
+  const hintCtx = companyId ? { ...ctx, companyId } : null;
   const [subcontractorOptions, budgetHints] = await Promise.all([
     listSubcontractorContacts(projectId, ctx),
-    getWbsSubcontractBudgetHints(projectId, ctx, { excludeWithActiveContract: true }).catch(() => []),
+    hintCtx
+      ? getWbsSubcontractBudgetHints(projectId, hintCtx, { excludeWithActiveContract: true }).catch(
+          () => [],
+        )
+      : Promise.resolve([]),
   ]);
-
-  const companyId = wbsPick?.companyId ?? "";
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -64,9 +72,9 @@ export default async function NuevoSubcontratoPage({ params, searchParams }: Pag
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/20">
           <p className="text-sm font-medium">Partidas pendientes de contrato</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {budgetHints.length}{" "}
-            {budgetHints.length === 1 ? "ítem tiene" : "ítems tienen"} subcontrato en presupuesto sin
-            contrato activo. Elegí una sugerencia en el formulario para comenzar.
+            {budgetHints.length} {budgetHints.length === 1 ? "ítem tiene" : "ítems tienen"}{" "}
+            subcontrato en presupuesto sin contrato activo. Elegí una sugerencia en el formulario
+            para comenzar.
           </p>
         </div>
       ) : null}

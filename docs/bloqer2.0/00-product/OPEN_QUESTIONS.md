@@ -694,6 +694,22 @@
 - **Propuesta concreta:** [unidad fija desde primera referencia y compatibilidad antes de nuevos efectos de stock](../08-architecture/platform-audit/2026-11-05-ag-07-stock-unit-proposal.md), sin conversiones ni migraciones/históricos alterados. Las reglas precisas y verificaciones están preparadas; AGENTS §§2/5 exige aprobación porque define una regla de negocio.
 - **Continuación:** D-130 implementada y verificada en AG-07, con unidades protegidas y efectos atómicos. Sin conversiones ni cambios históricos; AG-08 espera indicación del usuario.
 
+### Q-078 — Estado de revisión real del certificado de subcontrato
+
+- **Fecha:** 2026-11-05.
+- **Estado:** RESUELTA → D-131, aprobación explícita del Owner de la propuesta recomendada el 05/11/2026.
+- **Contradicción:** STATE_MACHINES §19 / D-028 usan SUBMITTED; schema, servicios y UI usan ISSUED. D-089 ya precisa la factura AP borrador y CxP al emitirla.
+- **Propuesta:** [formalizar ISSUED y conservar el circuito vigente sin migrar históricos](../08-architecture/platform-audit/2026-11-05-ag-08-subcert-lifecycle-proposal.md). La aprobación se refiere a armonizar el estado previo; no se vuelve a someter D-089 a decisión.
+- **Continuación:** aplicar D-131 y verificar el flujo conservado, junto con las correcciones de acceso, integridad, formularios y auditoría de AG-08. Sin migrar estados o documentos históricos.
+
+### Q-079 — Certificación negativa sin procedimiento de autorización definido
+
+- **Fecha:** 2026-11-05.
+- **Estado:** RESUELTA en alcance → D-132, aprobación explícita del punto 1 por el Owner el 05/11/2026.
+- **Contradicción:** CERTIFICATIONS §13 promete negativos autorizados, pero el contrato vigente usa cantidades no negativas y no define permisos ni efectos financieros de esa excepción.
+- **Propuesta:** [desarrollo separado con diseño previo, conservando y corrigiendo el flujo actual](../08-architecture/platform-audit/2026-11-05-ag-08-negative-certification-scope-proposal.md). Alternativa: diseñar/implementar esa funcionalidad completa antes de cerrar AG-08.
+- **Continuación:** aplicar y verificar el contrato no negativo vigente. Cualquier rectificación requiere diseño previo separado; no se promete una función de certificación negativa. Sin autorizaciones, signos o cambios históricos inferidos.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

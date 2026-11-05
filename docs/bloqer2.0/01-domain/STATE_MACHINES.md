@@ -660,11 +660,11 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
   [*] --> DRAFT
-  DRAFT --> SUBMITTED : enviar
+  DRAFT --> ISSUED : enviar
   DRAFT --> CANCELLED : cancelar
-  SUBMITTED --> APPROVED : aprobar
-  SUBMITTED --> REJECTED : rechazar
-  SUBMITTED --> CANCELLED : anular
+  ISSUED --> APPROVED : aprobar
+  ISSUED --> REJECTED : rechazar
+  ISSUED --> CANCELLED : anular
   APPROVED --> CANCELLED : anular
   REJECTED --> [*]
   CANCELLED --> [*]
@@ -674,21 +674,25 @@ stateDiagram-v2
 
 | Desde | Hacia | Notas |
 |---|---|---|
-| `DRAFT` | `SUBMITTED` | Listo para revisión/aprobación interna |
+| `DRAFT` | `ISSUED` | Listo para revisión/aprobación interna |
 | `DRAFT` | `CANCELLED` | Descarte |
-| `SUBMITTED` | `APPROVED` | Habilita reconocimiento de obligación según [BR-SUB-003] |
-| `SUBMITTED` | `REJECTED` | **Terminal** para esta versión ([BR-SUB-005]): corrección = **nuevo** `SubcontractCertification` con `replaces_certification_id` → rechazado |
-| `SUBMITTED` | `CANCELLED` | Anulación |
+| `ISSUED` | `APPROVED` | Habilita reconocimiento de obligación según [BR-SUB-003] |
+| `ISSUED` | `REJECTED` | **Terminal** para esta versión ([BR-SUB-005]): corrección = **nuevo** `SubcontractCertification` con `replaces_certification_id` → rechazado |
+| `ISSUED` | `CANCELLED` | Anulación |
 | `APPROVED` | `CANCELLED` | Anulación con impacto en `Payable` según reglas de anulación |
 
 ### Eventos (SubcontractCertification)
 
 | Evento | Transición |
 |---|---|
-| `subcontract_certification.submitted` | `DRAFT` → `SUBMITTED` |
-| `subcontract_certification.approved` | `SUBMITTED` → `APPROVED` |
-| `subcontract_certification.rejected` | `SUBMITTED` → `REJECTED` |
+| `subcontract_certification.issued` | `DRAFT` → `ISSUED` |
+| `subcontract_certification.approved` | `ISSUED` → `APPROVED` |
+| `subcontract_certification.rejected` | `ISSUED` → `REJECTED` |
 | `subcontract_certification.cancelled` | → `CANCELLED` |
+
+## Hallazgo — AG-08: estado previo del certificado de subcontrato
+
+Contradicción resuelta por el Owner en D-131/Q-078: se conserva ISSUED del modelo, servicios y UI. Se armonizan los textos anteriores que decían SUBMITTED. D-089 precisa la frontera financiera: factura AP borrador al aprobar; CxP al emitir esa factura. Sin cambios de estados persistidos o históricos.
 
 ### 19.1 `settlement_status` — derivado (liquidación subcontrato)
 
@@ -700,7 +704,7 @@ Atributo **derivado** (solo lectura en flujo normal): `UNSETTLED` | `PARTIALLY_S
 
 ### Reglas críticas (SubcontractCertification)
 
-- **Solo `APPROVED`** genera o incrementa **`Payable`** ([BR-SUB-003]). `SUBMITTED` **no** genera AP.
+- **Solo APPROVED** habilita/genera la factura AP en borrador; emitir esa factura crea Payable (D-089/D-131). ISSUED no genera obligación. No nace deuda al aprobar sin emitir la factura.
 - **`REJECTED`:** no se reabre el mismo documento a `DRAFT`; la corrección es un **nuevo** certificado con vínculo al rechazado ([BR-SUB-005]).
 - **`CANCELLED`:** si ya existía `Payable`, reversión por mecanismo **compensatorio** auditado (anulación NC / contrapartida), no borrado silencioso.
 - Liquidación: solo vía AP/pagos; reflejada en **`settlement_status`**, no como `status`.
@@ -1005,7 +1009,7 @@ stateDiagram-v2
 | Rfi | DRAFT, SUBMITTED, ANSWERED, CLOSED, CANCELLED (+ `is_overdue` derivado) |
 | JobsiteLogEntry | DRAFT, SUBMITTED, APPROVED, CANCELLED |
 | Subcontract | DRAFT, ACTIVE, COMPLETED, CANCELLED |
-| SubcontractCertification | DRAFT, SUBMITTED, APPROVED, REJECTED, CANCELLED (+ `settlement_status` derivado AP/pagos) |
+| SubcontractCertification | DRAFT, ISSUED, APPROVED, REJECTED, CANCELLED (+ `settlement_status` derivado AP/pagos) |
 | BankReconciliation | DRAFT, IN_PROGRESS, CLOSED, CANCELLED |
 | StockReservation | ACTIVE, PARTIALLY_RELEASED, RELEASED, CONSUMED, CANCELLED |
 | Period | OPEN, CLOSED |

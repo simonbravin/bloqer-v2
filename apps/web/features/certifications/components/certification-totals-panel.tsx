@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import type { CertificationStatus } from "@bloqer/database";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 
 import { formatMoneyAmount } from "@/lib/format-money";
 
@@ -19,7 +21,7 @@ interface CertificationTotalsPanelProps {
   onIssue: () => Promise<{ ok: true } | { error: string }>;
   onApprove: () => Promise<{ ok: true } | { error: string }>;
   onReject: () => Promise<{ ok: true } | { error: string }>;
-  onCancel: () => Promise<{ ok: true } | { error: string }>;
+  onCancel: (reason?: string) => Promise<{ ok: true } | { error: string }>;
 }
 
 export function CertificationTotalsPanel({
@@ -34,12 +36,12 @@ export function CertificationTotalsPanel({
   onCancel,
 }: CertificationTotalsPanelProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run: execute } = useOperationalAction({ onError: setError });
 
   function run(action: () => Promise<{ ok: true } | { error: string }>, successMsg: string) {
-    setError(null);
-    startTransition(async () => {
+    void execute(async () => {
+      setError(null);
       const result = await action();
       if ("error" in result) {
         setError(result.error);
@@ -108,22 +110,25 @@ export function CertificationTotalsPanel({
               </>
             )}
             {showCancel && (
-              <Button
-                size="sm"
+              <ReasonActionButton
+                label="Cancelar certificación"
+                title="Cancelar certificación"
+                description="La certificación quedará cancelada. Revisá sus documentos vinculados antes de continuar."
+                confirmLabel="Cancelar certificación"
+                requiresReason={status !== "DRAFT"}
+                disabled={isPending}
                 variant="ghost"
                 className="text-muted-foreground hover:text-destructive"
-                disabled={isPending}
-                onClick={() => {
-                  if (confirm("¿Cancelar esta certificación? Esta acción no se puede deshacer.")) {
-                    run(onCancel, "Certificación cancelada");
-                  }
-                }}
-              >
-                Cancelar certificación
-              </Button>
+                successMessage="Certificación cancelada"
+                action={(reason) => onCancel(reason)}
+              />
             )}
           </div>
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && (
+            <p role="alert" className="text-xs text-destructive">
+              {error}
+            </p>
+          )}
         </div>
       )}
     </div>

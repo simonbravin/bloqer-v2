@@ -41,7 +41,8 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
       getSubcontractById(subcontractId, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
@@ -74,7 +75,10 @@ export default async function EditarCertificacionPage({ params }: PageProps) {
       </div>
       <div className="rounded-lg border bg-card p-6">
         <SubcontractCertificationForm
+          projectId={projectId}
           subcontractId={subcontractId}
+          certificationId={certId}
+          currency={subcontract.currency}
           subcontractLines={subcontract.lines}
           action={action}
           mode="edit"

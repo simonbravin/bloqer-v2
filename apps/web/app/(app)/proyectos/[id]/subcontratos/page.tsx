@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
+import { can } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -29,7 +30,8 @@ export default async function SubcontratosPage({ params }: PageProps) {
   try {
     await getProjectShellInfo(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -38,7 +40,8 @@ export default async function SubcontratosPage({ params }: PageProps) {
   try {
     subcontracts = await listSubcontractsByProject(projectId, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -64,9 +67,11 @@ export default async function SubcontratosPage({ params }: PageProps) {
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`subcontratos-${projectId}`} />
             </Suspense>
-            <Button asChild>
-              <Link href={`/proyectos/${projectId}/subcontratos/nuevo`}>+ Nuevo subcontrato</Link>
-            </Button>
+            {can(current.tenantCtx.roles, "EDIT", "SUBCONTRACTS") && (
+              <Button asChild>
+                <Link href={`/proyectos/${projectId}/subcontratos/nuevo`}>+ Nuevo subcontrato</Link>
+              </Button>
+            )}
           </div>
         }
       />
