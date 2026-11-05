@@ -5,8 +5,14 @@ import { useListViewMode } from "@/components/ui/list-view-toggle";
 import { ProductCards } from "./product-cards";
 import { ProductTable } from "./product-table";
 
-export function ProductListSection({ products }: { products: ProductView[] }) {
+export function ProductListSection({
+  products,
+  canCreate = false,
+}: {
+  products: ProductView[];
+  canCreate?: boolean;
+}) {
   const view = useListViewMode();
-  if (view === "cards") return <ProductCards products={products} />;
-  return <ProductTable products={products} />;
+  if (view === "cards") return <ProductCards products={products} canCreate={canCreate} />;
+  return <ProductTable products={products} canCreate={canCreate} />;
 }

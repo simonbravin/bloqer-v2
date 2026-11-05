@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { can } from "@bloqer/domain";
+import { InventoryStatusAction } from "@/features/inventory/components/inventory-status-action";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getWarehouseById, listStockMovements, ServiceError } from "@bloqer/services";
@@ -38,16 +40,17 @@ export default async function DepositoPage({ params }: PageProps) {
       listStockMovements({ warehouseId }, ctx),
     ]);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     throw err;
   }
 
   return (
     <PageShell variant="detail" className="space-y-6" breadcrumbLabel={warehouse.name}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">{warehouse.name}</h1>
+            <h1 className="break-words text-2xl font-bold tracking-tight">{warehouse.name}</h1>
             <div className="flex items-center gap-2 mt-1">
               <WarehouseStatusBadge status={warehouse.status} />
               <span className="text-sm text-muted-foreground">
@@ -59,7 +62,7 @@ export default async function DepositoPage({ params }: PageProps) {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href={`/inventario/depositos/${warehouseId}/stock`}>Stock</Link>
           </Button>
@@ -68,28 +71,26 @@ export default async function DepositoPage({ params }: PageProps) {
               Transferencias
             </Link>
           </Button>
-          {warehouse.status === "ACTIVE" ? (
-            <form
-              action={async () => {
-                "use server";
-                await deactivateWarehouseAction(warehouseId);
-              }}
-            >
-              <Button variant="outline" size="sm" type="submit">
-                Desactivar
-              </Button>
-            </form>
-          ) : warehouse.status === "INACTIVE" ? (
-            <form
-              action={async () => {
-                "use server";
-                await reactivateWarehouseAction(warehouseId);
-              }}
-            >
-              <Button variant="outline" size="sm" type="submit">
-                Reactivar
-              </Button>
-            </form>
+          {can(ctx.roles, "EDIT", "INVENTORY") && warehouse.status !== "CLOSED" ? (
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/inventario/depositos/${warehouseId}/editar`}>Editar</Link>
+            </Button>
+          ) : null}
+          {can(ctx.roles, "EDIT", "INVENTORY") &&
+          (warehouse.status === "ACTIVE" || warehouse.status === "INACTIVE") ? (
+            <InventoryStatusAction
+              label={warehouse.status === "ACTIVE" ? "Desactivar" : "Reactivar"}
+              description={
+                warehouse.status === "ACTIVE"
+                  ? "Dejará de estar disponible para nuevas operaciones. Se conserva el historial."
+                  : "Volverá a estar disponible para nuevas operaciones autorizadas."
+              }
+              action={
+                warehouse.status === "ACTIVE"
+                  ? deactivateWarehouseAction.bind(null, warehouseId)
+                  : reactivateWarehouseAction.bind(null, warehouseId)
+              }
+            />
           ) : null}
         </div>
       </div>

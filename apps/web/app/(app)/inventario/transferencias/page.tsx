@@ -1,5 +1,6 @@
 import { formatDate } from "@/lib/format";
 import Link from "next/link";
+import { can } from "@bloqer/domain";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
@@ -18,7 +19,11 @@ import { WarehouseTransferStatusBadge } from "@/features/warehouse-transfer";
 import { PageShell } from "@/components/layout/page-shell";
 import { formatQtyFromString } from "@/lib/format-money";
 
-export default async function TransferenciasPage() {
+export default async function TransferenciasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ warehouseId?: string }>;
+}) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
@@ -29,7 +34,9 @@ export default async function TransferenciasPage() {
     roles: current.tenantCtx.roles,
   };
 
-  const transfers = await listWarehouseTransfers({}, ctx);
+  const sp = await searchParams;
+  const transfers = await listWarehouseTransfers({ warehouseId: sp.warehouseId || undefined }, ctx);
+  const canEdit = can(ctx.roles, "EDIT", "INVENTORY");
 
   function fmt(v: string) {
     return formatQtyFromString(v);
@@ -37,23 +44,35 @@ export default async function TransferenciasPage() {
 
   return (
     <PageShell variant="default" className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold tracking-tight">Transferencias de depósito</h1>
         </div>
-        <Button asChild size="sm">
-          <Link href="/inventario/transferencias/nueva">Nueva transferencia</Link>
-        </Button>
+        {canEdit ? (
+          <Button asChild size="sm">
+            <Link href="/inventario/transferencias/nueva">Nueva transferencia</Link>
+          </Button>
+        ) : null}
       </div>
 
+      {sp.warehouseId ? (
+        <p className="text-sm text-muted-foreground">
+          Transferencias del depósito seleccionado.{" "}
+          <Link className="underline" href="/inventario/transferencias">
+            Ver todas
+          </Link>
+        </p>
+      ) : null}
       {transfers.length === 0 ? (
         <ListEmptyState
           title="Sin transferencias"
           description="Mové stock entre depósitos cuando haga falta reponer obra o centralizar materiales."
           action={
-            <Button asChild size="sm">
-              <Link href="/inventario/transferencias/nueva">Nueva transferencia</Link>
-            </Button>
+            canEdit ? (
+              <Button asChild size="sm">
+                <Link href="/inventario/transferencias/nueva">Nueva transferencia</Link>
+              </Button>
+            ) : undefined
           }
         />
       ) : (

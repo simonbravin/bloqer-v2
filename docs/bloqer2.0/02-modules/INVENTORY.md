@@ -32,6 +32,8 @@ Fugas de materiales, compras duplicadas y costos de obra mal imputados.
 - Transferencia entre depósitos (par de movimientos [BR-INV-003]).
 - Reservar stock para proyecto ([Q-019]).
 
+**Implementación vigente (AG-07):** alta/edición de catálogos, consulta de existencias/historial, recepción vinculada a OC, consumo manual/en parte aprobado y transferencia confirmada/anulación. Reservas y motor FIFO/promedio siguen diferidos por D-083. No hay alta general de ingreso/ajuste manual expuesta; las acciones conceptuales anteriores no son instrucciones de pantalla. Los ajustes históricos sin dirección definida quedan señalados y excluidos del saldo físico, sin inferir un signo.
+
 ## 9. Pantallas y vistas necesarias
 - Stock por depósito y consolidado.
 - Kardex por producto.
@@ -39,6 +41,7 @@ Fugas de materiales, compras duplicadas y costos de obra mal imputados.
 
 ## 10. Reglas de negocio
 - **BR-INV-001**: stock siempre por depósito ([D-022]).
+- **Unidad física (D-130):** la unidad del producto queda fija desde su primera referencia en SC, OC, APU, material de parte, transferencia o movimiento, en cualquier estado. Antes del primer uso se puede cambiar; después, editar otros campos conserva la unidad. Para otra unidad se crea otro producto. Las nuevas operaciones con unidad explícita deben coincidir (solo trim y comparación sin distinguir mayúsculas); no hay conversiones ni equivalencias inferidas. El servicio bloquea/revalida el producto frente a operaciones simultáneas. No reescribe históricos ni repite efectos en reintentos ya realizados.
 - **BR-INV-002**: saldo no negativo salvo ajuste autorizado ([BR-INV-002]).
 - **BR-INV-004**: cambio método valuación con restricciones ([BR-INV-004]).
 - **BR-INV-007**: anulación de movimiento confirmado con trazabilidad ([BR-INV-007]).
@@ -72,3 +75,7 @@ WAREHOUSE operativo; PM puede solicitar egreso.
 
 ## 19. Preguntas abiertas
 - Reserva automática desde OC ([Q-019]); método por depósito ([Q-018]).
+
+## Hallazgo — Alcance expuesto frente al diseño de inventario
+
+AG-07 distingue el diseño funcional de las capacidades actuales: D-083 mantiene diferidas valuación plena y reservas; D-124 impide usar un precio nominal sin moneda/capa como costo de consumo o importe para un asiento nuevo. Los reportes conservan cantidades y advertencias, y la recepción con origen comprobado identifica su moneda original. No se incorporaron estados, backfill ni mecanismos de valuación para cerrar esta auditoría.

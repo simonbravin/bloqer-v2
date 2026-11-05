@@ -5,6 +5,11 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import type { CreateJournalEntryInput, GenerateJournalSuggestionInput } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import { isCrossCompany } from "../company-scope";
+import {
+  inventoryMovementParentInclude,
+  assertInventoryMovementRelations,
+} from "../inventory/inventory-scope";
+import { STOCK_CONSUMPTION_UNVALUED_WARNING } from "../inventory/stock-consumption-warnings";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { findActiveMappingRule } from "./accounting-mapping.service";
 import {
@@ -13,9 +18,7 @@ import {
   type JournalEntryView,
 } from "./journal-entry.service";
 import { resolveAccountingCompanyId } from "./accounting-company-context";
-import {
-  treasuryMovementSupportsAccountingDraft,
-} from "./accounting-treasury-gl-eligibility";
+import { treasuryMovementSupportsAccountingDraft } from "./accounting-treasury-gl-eligibility";
 import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
 import {
   buildSalesInvoiceJournalInput,
@@ -81,44 +84,44 @@ function noRuleError(label: string): ServiceError {
 }
 
 function buildTwoLineDraftInput(params: {
-  companyId:     string;
-  projectId:     string | null;
-  entryDate:     string;
-  description:   string;
-  reference:     string | null;
-  currency:      string;
-  amountStr:     string;
-  debitAccountId:  string;
+  companyId: string;
+  projectId: string | null;
+  entryDate: string;
+  description: string;
+  reference: string | null;
+  currency: string;
+  amountStr: string;
+  debitAccountId: string;
   creditAccountId: string;
-  lineDescriptionDebit:  string;
+  lineDescriptionDebit: string;
   lineDescriptionCredit: string;
-  sourceType:    JournalEntrySourceType;
-  sourceId:      string;
+  sourceType: JournalEntrySourceType;
+  sourceId: string;
 }): CreateJournalEntryInput {
   return {
-    companyId:   params.companyId,
-    projectId:   params.projectId,
-    entryDate:   params.entryDate,
+    companyId: params.companyId,
+    projectId: params.projectId,
+    entryDate: params.entryDate,
     description: params.description,
-    reference:   params.reference,
-    sourceType:  params.sourceType,
-    sourceId:    params.sourceId,
-    lines:       [
+    reference: params.reference,
+    sourceType: params.sourceType,
+    sourceId: params.sourceId,
+    lines: [
       {
-        accountId:   params.debitAccountId,
-        projectId:   params.projectId,
+        accountId: params.debitAccountId,
+        projectId: params.projectId,
         description: params.lineDescriptionDebit,
-        debit:       params.amountStr,
-        credit:      "0",
-        currency:    params.currency,
+        debit: params.amountStr,
+        credit: "0",
+        currency: params.currency,
       },
       {
-        accountId:   params.creditAccountId,
-        projectId:   params.projectId,
+        accountId: params.creditAccountId,
+        projectId: params.projectId,
         description: params.lineDescriptionCredit,
-        debit:       "0",
-        credit:      params.amountStr,
-        currency:    params.currency,
+        debit: "0",
+        credit: params.amountStr,
+        currency: params.currency,
       },
     ],
   };
@@ -128,7 +131,10 @@ function movementToEventType(m: { type: string }): AccountingMappingEventType {
   if (m.type === "INFLOW") return "TREASURY_INFLOW";
   if (m.type === "OUTFLOW") return "TREASURY_OUTFLOW";
   if (m.type === "TRANSFER_IN" || m.type === "TRANSFER_OUT") return "TREASURY_TRANSFER";
-  throw new ServiceError("CONFLICT", "Este tipo de movimiento de tesorería aún no admite sugerencia automática de asiento");
+  throw new ServiceError(
+    "CONFLICT",
+    "Este tipo de movimiento de tesorería aún no admite sugerencia automática de asiento",
+  );
 }
 
 function movementToJournalSourceType(m: { type: string }): JournalEntrySourceType {
@@ -149,15 +155,18 @@ export async function suggestJournalFromCollection(
   });
   if (!col) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (col.status !== "CONFIRMED") {
-    throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para cobranzas confirmadas");
+    throw new ServiceError(
+      "CONFLICT",
+      "Solo se pueden sugerir asientos para cobranzas confirmadas",
+    );
   }
   assertCompanyScope(ctx, col.companyId);
   await resolveAccountingCompanyId(ctx, col.companyId);
 
   const existingCol = await getJournalEntryBySourceIfNotCancelled(ctx, {
-    companyId:  col.companyId,
+    companyId: col.companyId,
     sourceType: "COLLECTION",
-    sourceId:   col.id,
+    sourceId: col.id,
   });
   if (existingCol) return existingCol;
 
@@ -165,28 +174,24 @@ export async function suggestJournalFromCollection(
   if (!rule) throw noRuleError("cobranza confirmada");
 
   const treasuryGlCode = suggestTreasuryGlAccountCode(col.account);
-  const debitOverride = await resolveActiveGlAccountId(
-    ctx.tenantId,
-    col.companyId,
-    treasuryGlCode,
-  );
+  const debitOverride = await resolveActiveGlAccountId(ctx.tenantId, col.companyId, treasuryGlCode);
 
   const amountStr = decimalToAmountString(col.amount);
   const entryDate = col.collectionDate.toISOString().slice(0, 10);
   const input = buildTwoLineDraftInput({
-    companyId:     col.companyId,
-    projectId:     col.projectId,
+    companyId: col.companyId,
+    projectId: col.projectId,
     entryDate,
-    description:   `Asiento sugerido — cobranza (${col.id.slice(0, 8)}…)`,
-    reference:     `COB-${col.id.slice(0, 8)}`,
-    currency:      col.currency,
+    description: `Asiento sugerido — cobranza (${col.id.slice(0, 8)}…)`,
+    reference: `COB-${col.id.slice(0, 8)}`,
+    currency: col.currency,
     amountStr,
-    debitAccountId:  debitOverride ?? rule.debitAccountId,
+    debitAccountId: debitOverride ?? rule.debitAccountId,
     creditAccountId: rule.creditAccountId,
-    lineDescriptionDebit:  "Debe — según regla contable",
+    lineDescriptionDebit: "Debe — según regla contable",
     lineDescriptionCredit: "Haber — según regla contable",
-    sourceType:    "COLLECTION",
-    sourceId:      col.id,
+    sourceType: "COLLECTION",
+    sourceId: col.id,
   });
   return createJournalEntry(input, ctx);
 }
@@ -208,9 +213,9 @@ export async function suggestJournalFromPayment(
   await resolveAccountingCompanyId(ctx, pay.companyId);
 
   const existingPay = await getJournalEntryBySourceIfNotCancelled(ctx, {
-    companyId:  pay.companyId,
+    companyId: pay.companyId,
     sourceType: "PAYMENT",
-    sourceId:   pay.id,
+    sourceId: pay.id,
   });
   if (existingPay) return existingPay;
 
@@ -227,19 +232,19 @@ export async function suggestJournalFromPayment(
   const amountStr = decimalToAmountString(pay.amount);
   const entryDate = pay.paymentDate.toISOString().slice(0, 10);
   const input = buildTwoLineDraftInput({
-    companyId:     pay.companyId,
-    projectId:     pay.projectId,
+    companyId: pay.companyId,
+    projectId: pay.projectId,
     entryDate,
-    description:   `Asiento sugerido — pago a proveedor (${pay.id.slice(0, 8)}…)`,
-    reference:     `PAGO-${pay.id.slice(0, 8)}`,
-    currency:      pay.currency,
+    description: `Asiento sugerido — pago a proveedor (${pay.id.slice(0, 8)}…)`,
+    reference: `PAGO-${pay.id.slice(0, 8)}`,
+    currency: pay.currency,
     amountStr,
-    debitAccountId:  rule.debitAccountId,
+    debitAccountId: rule.debitAccountId,
     creditAccountId: creditOverride ?? rule.creditAccountId,
-    lineDescriptionDebit:  "Debe — según regla contable",
+    lineDescriptionDebit: "Debe — según regla contable",
     lineDescriptionCredit: "Haber — según regla contable",
-    sourceType:    "PAYMENT",
-    sourceId:      pay.id,
+    sourceType: "PAYMENT",
+    sourceId: pay.id,
   });
   return createJournalEntry(input, ctx);
 }
@@ -281,8 +286,7 @@ export async function suggestJournalFromTreasuryMovement(
   const sourceType = movementToJournalSourceType(mov);
   // Canonical INTERNAL_TRANSFER sourceId is InternalTransfer.id (same as auto-draft / cancel-sync).
   const transferId =
-    mov.transferId
-    ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
+    mov.transferId ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
   if ((mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT") && !transferId) {
     throw new ServiceError(
       "CONFLICT",
@@ -311,10 +315,7 @@ export async function suggestJournalFromTreasuryMovement(
       where: {
         tenantId: ctx.tenantId,
         status: { in: ["CONFIRMED", "RECONCILED"] },
-        OR: [
-          { transferId },
-          { sourceType: "INTERNAL_TRANSFER", sourceId: transferId },
-        ],
+        OR: [{ transferId }, { sourceType: "INTERNAL_TRANSFER", sourceId: transferId }],
       },
       include: { account: true },
       orderBy: { id: "asc" },
@@ -365,11 +366,11 @@ export async function suggestJournalFromTreasuryMovement(
 
   const input = buildTwoLineDraftInput({
     companyId,
-    projectId:     null,
+    projectId: null,
     entryDate,
-    description:   `Asiento sugerido — tesorería: ${mov.description.slice(0, 200)}`,
-    reference:     `MOV-${mov.id.slice(0, 8)}`,
-    currency:      mov.currency,
+    description: `Asiento sugerido — tesorería: ${mov.description.slice(0, 200)}`,
+    reference: `MOV-${mov.id.slice(0, 8)}`,
+    currency: mov.currency,
     amountStr,
     debitAccountId,
     creditAccountId,
@@ -388,10 +389,15 @@ export async function suggestJournalFromStockMovement(
   await assertEdit(ctx);
   const sm = await prisma.stockMovement.findFirst({
     where: { id: stockMovementId, tenantId: ctx.tenantId },
+    include: inventoryMovementParentInclude,
   });
   if (!sm) throw new ServiceError("NOT_FOUND", "Movimiento de stock no encontrado");
+  await assertInventoryMovementRelations(sm, ctx);
   if (sm.status !== "CONFIRMED") {
-    throw new ServiceError("CONFLICT", "Solo se pueden sugerir asientos para movimientos confirmados");
+    throw new ServiceError(
+      "CONFLICT",
+      "Solo se pueden sugerir asientos para movimientos confirmados",
+    );
   }
   if (sm.type !== "OUT" || sm.sourceType !== "CONSUMPTION") {
     throw new ServiceError(
@@ -404,43 +410,15 @@ export async function suggestJournalFromStockMovement(
   await resolveAccountingCompanyId(ctx, sm.companyId);
 
   const existingSm = await getJournalEntryBySourceIfNotCancelled(ctx, {
-    companyId:  sm.companyId,
+    companyId: sm.companyId,
     sourceType: "STOCK_MOVEMENT",
-    sourceId:   sm.id,
+    sourceId: sm.id,
   });
   if (existingSm) return existingSm;
 
-  const rule = await findActiveMappingRule(ctx.tenantId, sm.companyId, "STOCK_CONSUMPTION");
-  if (!rule) throw noRuleError("consumo de inventario");
-
-  const cost = sm.totalCost ?? sm.unitCost;
-  if (!cost || cost.lte(0)) {
-    throw new ServiceError("CONFLICT", "El movimiento de stock no tiene costo contable para imputar");
-  }
-  const amountStr = decimalToAmountString(cost);
-  const entryDate = sm.movementDate.toISOString().slice(0, 10);
-  const projectId = sm.projectId;
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: ctx.tenantId },
-    select: { baseCurrency: true },
-  });
-  const stockCurrency = tenant?.baseCurrency ?? "ARS";
-  const input = buildTwoLineDraftInput({
-    companyId:     sm.companyId,
-    projectId,
-    entryDate,
-    description:   `Asiento sugerido — consumo de inventario (${sm.id.slice(0, 8)}…)`,
-    reference:     `STK-${sm.id.slice(0, 8)}`,
-    currency:      stockCurrency,
-    amountStr,
-    debitAccountId:  rule.debitAccountId,
-    creditAccountId: rule.creditAccountId,
-    lineDescriptionDebit:  "Debe — costo consumo",
-    lineDescriptionCredit: "Haber — salida inventario",
-    sourceType:    "STOCK_MOVEMENT",
-    sourceId:      sm.id,
-  });
-  return createJournalEntry(input, ctx);
+  // D-124: a nominal price does not establish valued consumption or its currency.
+  // Preserve existing journals; never create a new fiscal amount by assumption.
+  throw new ServiceError("CONFLICT", STOCK_CONSUMPTION_UNVALUED_WARNING);
 }
 
 export async function suggestJournalFromSalesInvoice(

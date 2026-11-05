@@ -109,3 +109,14 @@ Smoke autorizado: hub/lista/detalle/formulario SC/OC/recepción, al menos escrit
 
 - [`CODE_REVIEW_CHECKLIST.md`](./CODE_REVIEW_CHECKLIST.md)  
 - [`LEDGER_TABLES_STRATEGY.md`](./LEDGER_TABLES_STRATEGY.md)
+
+
+## Selección reutilizable AG-07 — Inventario y depósitos
+
+- Suites mantenidas: `inventory/inventory-audit.live.test.ts` (catálogos, consumo, transferencias, concurrencia, replay y auditoría) e `inventory-reports/inventory-reports-audit.live.test.ts` (reportes, exportación, saldo físico frente a ACL, avisos y frontera contable). Ambas requieren `BLOQER_AUDIT_LIVE=1`, las dos URLs explícitas y `assertAuditDatabaseIdentity` antes de fixtures; únicamente base aislada `bloqer_audit_ag01_20261103`, nunca producción/dev normal.
+- Si cambia el helper de stock/locks/recepciones: repetir la suite `procurement/procurement-orders-audit.live.test.ts` y los casos receipt de `schedule/schedule-audit.live.test.ts`. No sumar como casos nuevos sus repeticiones.
+- Sin DB: `inventory-scope.test.ts`, `inventory-movement-cost.test.ts`, `inventory-inputs.test.ts` y `inventory-interactions.test.ts`; cubren cantidades4dp, dinero2dp persistido, moneda demostrable, mutex/errores, Actions, rutas de edición y selector opcional de obra. Las suites live omitidas se informan aparte.
+- **D-130:** `inventory/product-unit.test.ts` y `inventory/product-unit-audit.live.test.ts` comprueban las seis familias de referencia, unidad libre/referenciada, auditoría/rollback, unidad explícita y carreras de primera referencia con SC/APU/partes. En `procurement/procurement-orders-audit.live.test.ts`, el patrón focal `D130 ` selecciona altas/edición, adjudicación múltiple, recepción incompatible, históricos y ambos órdenes de carrera con OC; no coincide con el título padre. No usar alias/conversiones ni agregar campos de unidad al parte para validar el control.
+- **Selector del parte (GA-AG-07-038):** `inventory/jobsite-inventory-options.live.test.ts` comprueba empresa/compartidos, depósitos generales o de la misma obra, acceso al proyecto, gate/permiso de Inventario sin consultas a catálogos cuando no corresponden, subcontratos por empresa/obra y contactos compartidos del tenant. Las suites nuevas usan el mismo guard de identidad y limpieza exclusiva de sus tenants sintéticos.
+- Con cambios visibles: Guía §14.1 y ayuda Inventario en el mismo lote; regenerar y comprobar knowledge, incluyendo `inventory-knowledge.test.ts` sobre el índice distribuido. No requiere proveedores LLM.
+- Muestra manual: Owner y lectura restringida según cambios, crear/editar producto y depósito, vínculo opcional a obra, transferir/ver stock/anular con disponible y consumir desde obra. Comprobar confirmaciones, rechazo conservando datos, invalidación, tablas/tarjetas y ambos temas. Los históricos CLOSED siguen sin editar/reactivar. No simular valuación FIFO/reservas (D-083), ni asiento desde consumo sin moneda/capa (D-124).

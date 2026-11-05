@@ -69,7 +69,7 @@ Libros (diario, sumas y saldos, mayor), ESP y EERR gerenciales — [D-062]. Solo
 
 ## 15. Relación con otros módulos
 
-AR, AP, Tesorería, Inventario (sugerencia manual stock; auto diferido).
+AR, AP, Tesorería, Inventario (auto diferido; las sugerencias de consumo requieren valor y moneda trazables). Por D-124, un nominal guardado sin moneda/capa no permite crear un asiento nuevo; los asientos históricos existentes conservan su lectura.
 
 ## 16. Permisos
 

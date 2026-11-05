@@ -686,6 +686,14 @@
 - **Propuesta:** [desarrollo separado con especificación previa; sin simularlo modificando OC confirmadas](../08-architecture/platform-audit/2026-11-04-ag-06-partial-close-scope-proposal.md). Alternativa: mantener AG-06 abierta hasta diseñar/aprobar/implementar esa funcionalidad.
 - **Continuación:** D-128 delimita el cierre correctivo AG-06 y registra el desarrollo separado en PENDING_ARCHITECTURE_ITEMS. La funcionalidad de cierre parcial no está implementada ni aprobada en su diseño; su alcance ya no bloquea AG-06.
 
+### Q-077 — Unidad maestra y compatibilidad física al afectar stock
+
+- **Fecha:** 2026-11-05.
+- **Estado:** RESUELTA → D-130, aprobación explícita del Owner de ambas protecciones recomendadas el 05/11/2026.
+- **Hallazgo:** editar Product.unit reetiqueta movimientos anteriores y materiales del parte sin convertir cantidades; una recepción puede copiar cantidades de una unidad distinta al producto. El parte usa la unidad del producto y no guarda una independiente. No había una regla explícita de conversión/inmutabilidad en esta frontera.
+- **Propuesta concreta:** [unidad fija desde primera referencia y compatibilidad antes de nuevos efectos de stock](../08-architecture/platform-audit/2026-11-05-ag-07-stock-unit-proposal.md), sin conversiones ni migraciones/históricos alterados. Las reglas precisas y verificaciones están preparadas; AGENTS §§2/5 exige aprobación porque define una regla de negocio.
+- **Continuación:** D-130 implementada y verificada en AG-07, con unidades protegidas y efectos atómicos. Sin conversiones ni cambios históricos; AG-08 espera indicación del usuario.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

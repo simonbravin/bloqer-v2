@@ -1,205 +1,224 @@
-import { prisma, Warehouse, WarehouseStatus } from "@bloqer/database";
+import { prisma, type Warehouse, type WarehouseStatus } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import type { CreateWarehouseInput, UpdateWarehouseInput } from "@bloqer/validators";
+import {
+  createWarehouseSchema,
+  updateWarehouseSchema,
+  type CreateWarehouseInput,
+  type UpdateWarehouseInput,
+} from "@bloqer/validators";
 import { log } from "../audit/audit.service";
+import { isCrossCompany } from "../company-scope";
+import { lockProjectForMutation } from "../project/project-write-lock";
+import { requireProjectAccess } from "../security/access";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { ServiceContext, ServiceError } from "../types";
-import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
-
-// ─── View types ───────────────────────────────────────────────────────────────
+import { ServiceError, type ServiceContext } from "../types";
+import { assertInventoryWarehouseScope, inventoryWarehouseWhere } from "./inventory-scope";
 
 export type WarehouseView = Omit<Warehouse, never>;
-
-// ─── Read ─────────────────────────────────────────────────────────────────────
-
-export async function getWarehouseById(id: string, ctx: ServiceContext): Promise<WarehouseView> {
+async function authorize(ctx: ServiceContext, action: "VIEW" | "EDIT") {
   await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver depósitos");
-  }
-  const wh = await prisma.warehouse.findUnique({ where: { id } });
-  if (!wh) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
-  if (wh.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await requireProjectAccessIfPresent(wh.projectId, ctx);
-  return wh;
+  if (!can(ctx.roles, action, "INVENTORY"))
+    throw new ServiceError("FORBIDDEN", "Sin permisos para operar depósitos");
 }
-
+export async function getWarehouseById(id: string, ctx: ServiceContext): Promise<WarehouseView> {
+  await authorize(ctx, "VIEW");
+  const row = await prisma.warehouse.findUnique({ where: { id } });
+  if (!row) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
+  await assertInventoryWarehouseScope(row, ctx);
+  return row;
+}
 export async function listWarehouses(
   filters: { companyId?: string; projectId?: string; status?: WarehouseStatus },
   ctx: ServiceContext,
 ): Promise<WarehouseView[]> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver depósitos");
-  }
-  if (filters.projectId) {
-    await requireProjectAccess(filters.projectId, ctx);
-  }
-  return prisma.warehouse.findMany({
+  await authorize(ctx, "VIEW");
+  if (filters.companyId && isCrossCompany(filters.companyId, ctx))
+    throw new ServiceError("FORBIDDEN", "Empresa fuera del contexto autorizado");
+  if (filters.projectId) await requireProjectAccess(filters.projectId, ctx);
+  const rows = await prisma.warehouse.findMany({
     where: {
-      tenantId:  ctx.tenantId,
-      companyId: filters.companyId ?? undefined,
-      projectId: filters.projectId ?? undefined,
-      status:    filters.status ?? undefined,
+      AND: [
+        await inventoryWarehouseWhere(ctx),
+        { companyId: filters.companyId, projectId: filters.projectId, status: filters.status },
+      ],
     },
-    orderBy: [{ name: "asc" }],
+    orderBy: [{ name: "asc" }, { id: "asc" }],
   });
+  await Promise.all(rows.map((row) => assertInventoryWarehouseScope(row, ctx)));
+  return rows;
 }
-
-// ─── Mutations ────────────────────────────────────────────────────────────────
-
+/** General warehouses and the selected project's own warehouses, never another worksite's. */
+export async function listInventoryConsumptionWarehouses(
+  projectId: string,
+  ctx: ServiceContext,
+): Promise<WarehouseView[]> {
+  await authorize(ctx, "VIEW");
+  const project = await requireProjectAccess(projectId, ctx);
+  const rows = await prisma.warehouse.findMany({
+    where: {
+      AND: [
+        await inventoryWarehouseWhere(ctx),
+        {
+          status: "ACTIVE",
+          ...(project.companyId ? { companyId: project.companyId } : {}),
+          OR: [{ projectId: null }, { projectId }],
+        },
+      ],
+    },
+    orderBy: [{ name: "asc" }, { id: "asc" }],
+  });
+  await Promise.all(rows.map((row) => assertInventoryWarehouseScope(row, ctx)));
+  return rows;
+}
 export async function createWarehouse(
   input: CreateWarehouseInput,
   ctx: ServiceContext,
 ): Promise<WarehouseView> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para crear depósitos");
-  }
-
-  const company = await prisma.company.findFirst({
-    where: { id: input.companyId, tenantId: ctx.tenantId },
-    select: { id: true },
-  });
-  if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada en el tenant");
-
-  const existing = await prisma.warehouse.findFirst({
-    where: { tenantId: ctx.tenantId, companyId: input.companyId, name: input.name },
-  });
-  if (existing) {
-    throw new ServiceError("CONFLICT", `Ya existe un depósito con el nombre "${input.name}"`);
-  }
-
+  await authorize(ctx, "EDIT");
+  const parsed = createWarehouseSchema.safeParse(input);
+  if (!parsed.success)
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Depósito inválido");
+  input = parsed.data;
+  if (isCrossCompany(input.companyId, ctx))
+    throw new ServiceError("FORBIDDEN", "Empresa fuera del contexto autorizado");
   if (input.projectId) {
     const project = await requireProjectAccess(input.projectId, ctx);
-    if (project.companyId && project.companyId !== input.companyId) {
+    if (project.companyId && project.companyId !== input.companyId)
       throw new ServiceError("VALIDATION", "El proyecto no pertenece a la empresa seleccionada");
-    }
   }
-
-  const wh = await prisma.warehouse.create({
-    data: {
-      tenantId:  ctx.tenantId,
-      companyId: input.companyId,
-      projectId: input.projectId ?? null,
-      name:      input.name,
-      type:      input.type ?? "CENTRAL",
-      address:   input.address ?? null,
-      notes:     input.notes ?? null,
-      createdBy: ctx.actorUserId,
-      updatedBy: ctx.actorUserId,
+  return prisma.$transaction(
+    async (tx) => {
+      if (input.projectId) {
+        const project = await lockProjectForMutation(tx, input.projectId, ctx.tenantId);
+        if (project.companyId && project.companyId !== input.companyId)
+          throw new ServiceError("CONFLICT", "Las relaciones del depósito cambiaron");
+      }
+      await tx.$queryRaw`SELECT id FROM companies WHERE id = ${input.companyId} FOR NO KEY UPDATE`;
+      if (
+        !(await tx.company.findFirst({
+          where: { id: input.companyId, tenantId: ctx.tenantId },
+          select: { id: true },
+        }))
+      )
+        throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
+      if (
+        await tx.warehouse.findFirst({
+          where: { tenantId: ctx.tenantId, companyId: input.companyId, name: input.name },
+        })
+      )
+        throw new ServiceError("CONFLICT", "Ya existe un depósito con ese nombre");
+      const row = await tx.warehouse.create({
+        data: {
+          ...input,
+          tenantId: ctx.tenantId,
+          createdBy: ctx.actorUserId,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      await log(
+        {
+          tenantId: ctx.tenantId,
+          companyId: row.companyId,
+          projectId: row.projectId,
+          actorUserId: ctx.actorUserId,
+          action: "WAREHOUSE_CREATED",
+          entityType: "Warehouse",
+          entityId: row.id,
+          after: { name: row.name, type: row.type },
+        },
+        tx,
+      );
+      return row;
     },
-  });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "WAREHOUSE_CREATED",
-    entityType:  "Warehouse",
-    entityId:    wh.id,
-    after:       { name: wh.name, type: wh.type },
-  });
-
-  return wh;
+    { maxWait: 10000, timeout: 30000 },
+  );
 }
-
+async function mutateWarehouse(
+  id: string,
+  ctx: ServiceContext,
+  action: string,
+  change: (row: Warehouse) => {
+    name?: string;
+    type?: Warehouse["type"];
+    address?: string | null;
+    notes?: string | null;
+    status?: WarehouseStatus;
+  },
+): Promise<WarehouseView> {
+  await authorize(ctx, "EDIT");
+  const preview = await prisma.warehouse.findUnique({ where: { id } });
+  if (!preview) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
+  await assertInventoryWarehouseScope(preview, ctx);
+  return prisma.$transaction(
+    async (tx) => {
+      if (preview.projectId) await lockProjectForMutation(tx, preview.projectId, ctx.tenantId);
+      await tx.$queryRaw`SELECT id FROM companies WHERE id = ${preview.companyId} FOR NO KEY UPDATE`;
+      await tx.$queryRaw`SELECT id FROM warehouses WHERE id = ${id} FOR UPDATE`;
+      const current = await tx.warehouse.findUnique({ where: { id } });
+      if (
+        !current ||
+        current.tenantId !== ctx.tenantId ||
+        current.companyId !== preview.companyId ||
+        current.projectId !== preview.projectId
+      )
+        throw new ServiceError("CONFLICT", "El depósito cambió. Recargá e intentá de nuevo.");
+      if (current.status === "CLOSED")
+        throw new ServiceError("CONFLICT", "No se puede modificar un depósito cerrado");
+      const data = change(current);
+      if (
+        data.name &&
+        (await tx.warehouse.findFirst({
+          where: {
+            tenantId: ctx.tenantId,
+            companyId: current.companyId,
+            name: data.name,
+            id: { not: id },
+          },
+        }))
+      )
+        throw new ServiceError("CONFLICT", "Ya existe un depósito con ese nombre");
+      const row = await tx.warehouse.update({
+        where: { id },
+        data: { ...data, updatedBy: ctx.actorUserId },
+      });
+      await log(
+        {
+          tenantId: ctx.tenantId,
+          companyId: row.companyId,
+          projectId: row.projectId,
+          actorUserId: ctx.actorUserId,
+          action,
+          entityType: "Warehouse",
+          entityId: id,
+          before: { name: current.name, status: current.status },
+          after: data,
+        },
+        tx,
+      );
+      return row;
+    },
+    { maxWait: 10000, timeout: 30000 },
+  );
+}
 export async function updateWarehouse(
   id: string,
   input: UpdateWarehouseInput,
   ctx: ServiceContext,
 ): Promise<WarehouseView> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para editar depósitos");
-  }
-
-  const existing = await prisma.warehouse.findUnique({ where: { id } });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status === WarehouseStatus.CLOSED) {
-    throw new ServiceError("CONFLICT", "No se puede editar un depósito cerrado");
-  }
-
-  const wh = await prisma.warehouse.update({
-    where: { id },
-    data: {
-      name:      input.name    ?? undefined,
-      type:      input.type    ?? undefined,
-      address:   input.address ?? undefined,
-      notes:     input.notes   ?? undefined,
-      updatedBy: ctx.actorUserId,
-    },
-  });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "WAREHOUSE_UPDATED",
-    entityType:  "Warehouse",
-    entityId:    id,
-    after:       input,
-  });
-
-  return wh;
+  const parsed = updateWarehouseSchema.safeParse(input);
+  if (!parsed.success)
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Depósito inválido");
+  return mutateWarehouse(id, ctx, "WAREHOUSE_UPDATED", () => parsed.data);
 }
-
 export async function deactivateWarehouse(id: string, ctx: ServiceContext): Promise<WarehouseView> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para desactivar depósitos");
-  }
-
-  const existing = await prisma.warehouse.findUnique({ where: { id } });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status !== WarehouseStatus.ACTIVE) {
-    throw new ServiceError("CONFLICT", `El depósito ya está en estado "${existing.status}"`);
-  }
-
-  const wh = await prisma.warehouse.update({
-    where: { id },
-    data: { status: WarehouseStatus.INACTIVE, updatedBy: ctx.actorUserId },
+  return mutateWarehouse(id, ctx, "WAREHOUSE_DEACTIVATED", (row) => {
+    if (row.status !== "ACTIVE") throw new ServiceError("CONFLICT", "El depósito ya está inactivo");
+    return { status: "INACTIVE" };
   });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "WAREHOUSE_DEACTIVATED",
-    entityType:  "Warehouse",
-    entityId:    id,
-  });
-
-  return wh;
 }
-
 export async function reactivateWarehouse(id: string, ctx: ServiceContext): Promise<WarehouseView> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para reactivar depósitos");
-  }
-
-  const existing = await prisma.warehouse.findUnique({ where: { id } });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (existing.status === WarehouseStatus.ACTIVE) {
-    throw new ServiceError("CONFLICT", "El depósito ya está activo");
-  }
-  if (existing.status === WarehouseStatus.CLOSED) {
-    throw new ServiceError("CONFLICT", "No se puede reactivar un depósito cerrado");
-  }
-
-  const wh = await prisma.warehouse.update({
-    where: { id },
-    data: { status: WarehouseStatus.ACTIVE, updatedBy: ctx.actorUserId },
+  return mutateWarehouse(id, ctx, "WAREHOUSE_REACTIVATED", (row) => {
+    if (row.status !== "INACTIVE") throw new ServiceError("CONFLICT", "El depósito ya está activo");
+    return { status: "ACTIVE" };
   });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "WAREHOUSE_REACTIVATED",
-    entityType:  "Warehouse",
-    entityId:    id,
-  });
-
-  return wh;
 }

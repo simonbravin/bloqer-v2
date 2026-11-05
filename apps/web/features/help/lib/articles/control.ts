@@ -108,7 +108,8 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
   {
     slug: "contabilizar-asientos",
     title: "Contabilizar asientos (DRAFT ≠ POSTED)",
-    summary: "La generación automática propone borradores según las reglas; hay que Contabilizarlos para los libros.",
+    summary:
+      "La generación automática propone borradores según las reglas; hay que Contabilizarlos para los libros.",
     intents: ["contabilizar", "revertir-asiento"],
     modules: ["contabilidad"],
     level: "company",
@@ -134,11 +135,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Si falla la generación automática, la operación confirmada sigue registrada. Revisá las reglas y el asiento desde el documento; no repitas pagos, cobros ni transferencias para obtener el borrador.",
       "Si hay POSTED sin reverso, anular el documento origen se bloquea.",
     ],
-    relatedSlugs: [
-      "cerrar-el-mes",
-      "aplicar-plantilla-plan-de-cuentas",
-      "leer-reportes-contables",
-    ],
+    relatedSlugs: ["cerrar-el-mes", "aplicar-plantilla-plan-de-cuentas", "leer-reportes-contables"],
     keywords: [
       "contabilizar",
       "asiento",
@@ -166,7 +163,11 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     hrefs: [
       { kind: "company", path: "/contabilidad/libro-diario", label: "Libro diario" },
       { kind: "company", path: "/contabilidad/sumas-y-saldos", label: "Sumas y saldos" },
-      { kind: "company", path: "/contabilidad/situacion-patrimonial", label: "Situación patrimonial" },
+      {
+        kind: "company",
+        path: "/contabilidad/situacion-patrimonial",
+        label: "Situación patrimonial",
+      },
       { kind: "company", path: "/contabilidad/estado-resultados", label: "Estado de resultados" },
     ],
     steps: [
@@ -243,15 +244,21 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       { kind: "company", path: "/inventario/reportes", label: "Reportes" },
     ],
     steps: [
-      "Inventario → Productos: alta de ítems.",
-      "Depósitos: ubicaciones físicas.",
-      "Movimientos: ledger append-only (el saldo se calcula sumando movimientos).",
-      "Transferencias: entre depósitos.",
+      "En Nuevo depósito, Obra (opcional) permite buscar una obra autorizada o dejar Sin obra vinculada. La edición conserva ese vínculo; los depósitos históricos Cerrados no ofrecen edición ni reactivación.",
+      "Inventario → Productos / Depósitos: alta de ítems y ubicaciones físicas. Desde la ficha, Editar abre Editar producto o Editar depósito; Guardar cambios conserva SKU y vínculos de empresa/obra existentes.",
+      "La unidad del producto se puede cambiar antes del primer uso. Al tener referencias queda fija y Editar producto lo informa; para operar otra unidad, creá otro producto. Los demás campos siguen editables.",
+      "Desactivar / Reactivar requiere permiso de edición y confirmación. Un error se muestra en la ficha sin perder el contexto.",
+      "Movimientos: historial append-only. El saldo físico se calcula por producto y depósito con ingresos y salidas confirmados; los anulados quedan como historial.",
+      "Transferencias: entre depósitos; la salida y la entrada se confirman juntas. El acceso desde un depósito filtra ese historial; Ver todas elimina el filtro.",
       "Reportes: Stock actual y Movimientos confirmados (exportar CSV/PDF).",
       "En obra, las recepciones de OC también ingresan stock.",
     ],
     pitfalls: [
-      "No hay valuación FIFO/promedio configurable aún: el costo se toma de la compra.",
+      "Se respeta la empresa activa, los productos compartidos y el acceso a la obra del depósito. No ver un depósito puede deberse al alcance autorizado.",
+      "Los formularios conservan los datos si falla el guardado; esperá el resultado antes de volver a intentar. El disponible se comprueba otra vez al guardar.",
+      "La unidad explícita de la compra debe coincidir con el producto para los nuevos ingresos. El material del parte usa directamente la unidad del producto, sin un campo independiente. No hay conversión de bolsas a kg ni de kg a toneladas. Ante un error, revisá el documento origen; no cambies una OC confirmada para sortearlo. Los históricos se conservan.",
+      "No hay motor FIFO/promedio ni reservas implementadas. Un costo nominal sin moneda y origen trazables no demuestra valuación ni ARS; los reportes/CSV muestran la advertencia. Los consumos sin valuación no generan asientos nuevos por ese nominal.",
+      "Las fechas de reportes deben existir en el calendario y formar un rango ordenado. Los ajustes históricos sin dirección definida no se muestran como ingresos positivos.",
     ],
     relatedSlugs: ["recibir-una-oc", "registrar-consumo-materiales"],
     keywords: [
@@ -264,6 +271,14 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "transferencias",
       "reportes inventario",
       "stock actual",
+      "editar producto",
+      "unidad fija",
+      "unidades incompatibles",
+      "convertir kg toneladas bolsas",
+      "editar depósito",
+      "desactivar depósito",
+      "sin valuación",
+      "moneda de costo",
     ],
     guideRef: "§14",
   },
@@ -280,7 +295,11 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     hrefs: [
       { kind: "company", path: "/notificaciones", label: "Inbox de notificaciones" },
       { kind: "company", path: "/configuracion/notificaciones", label: "Preferencias de email" },
-      { kind: "company", path: "/configuracion/politicas#notificaciones", label: "Políticas de notificaciones" },
+      {
+        kind: "company",
+        path: "/configuracion/politicas#notificaciones",
+        label: "Políticas de notificaciones",
+      },
     ],
     steps: [
       "Abrí la campana (badge si hay no leídas).",
@@ -338,11 +357,20 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     modules: ["general", "configuracion"],
     level: "company",
     typicalRoles: ["Todos", "Propietario", "Administrador", "Compras", "Jefe de obra"],
-    permissionHint: "Cualquier miembro activo. Política de organización: solo Propietario/Administrador.",
+    permissionHint:
+      "Cualquier miembro activo. Política de organización: solo Propietario/Administrador.",
     where: { menu: "Configuración → Notificaciones" },
     hrefs: [
-      { kind: "company", path: "/configuracion/notificaciones", label: "Mis notificaciones por email" },
-      { kind: "company", path: "/configuracion/politicas#notificaciones", label: "Políticas de notificaciones" },
+      {
+        kind: "company",
+        path: "/configuracion/notificaciones",
+        label: "Mis notificaciones por email",
+      },
+      {
+        kind: "company",
+        path: "/configuracion/politicas#notificaciones",
+        label: "Políticas de notificaciones",
+      },
       { kind: "company", path: "/notificaciones", label: "Inbox (Configurar emails)" },
     ],
     steps: [
@@ -362,11 +390,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Canal CxP «in-app + email» habilita mail de listo para pagar (categoría CxP) y de pago confirmado (categoría Compras — flujo diario).",
       "Apagar el email no saca el aviso de la campana ni de Pendientes.",
     ],
-    relatedSlugs: [
-      "usar-notificaciones",
-      "revisar-pendientes",
-      "errores-operativos-frecuentes",
-    ],
+    relatedSlugs: ["usar-notificaciones", "revisar-pendientes", "errores-operativos-frecuentes"],
     keywords: [
       "email",
       "preferencias email",
@@ -471,9 +495,21 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "La zona se usa en Registro de actividad y reportes programados.",
       "Para eliminar Sitio web o Condición frente al IVA, dejá el campo vacío/sin especificar y guardá.",
     ],
-    pitfalls: ["Se edita la empresa asignada a tu membresía; una empresa inactiva no se reemplaza en silencio por otra.", "General y Equipo requieren que su módulo esté habilitado además del permiso del usuario."],
+    pitfalls: [
+      "Se edita la empresa asignada a tu membresía; una empresa inactiva no se reemplaza en silencio por otra.",
+      "General y Equipo requieren que su módulo esté habilitado además del permiso del usuario.",
+    ],
     relatedSlugs: ["invitar-un-usuario", "que-ve-cada-rol"],
-    keywords: ["logo", "zona horaria", "moneda", "configuracion", "marca", "borrar sitio web", "condición IVA", "empresa asignada"],
+    keywords: [
+      "logo",
+      "zona horaria",
+      "moneda",
+      "configuracion",
+      "marca",
+      "borrar sitio web",
+      "condición IVA",
+      "empresa asignada",
+    ],
     guideRef: "§1.3",
   },
   {
@@ -491,14 +527,20 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Imputá / cerrá según el flujo de la pantalla.",
       "No es el cierre de período contable.",
     ],
-    relatedSlugs: ["cerrar-el-mes", "gasto-corporativo", "ver-rentabilidad-de-obra", "gastos-generales-de-obra"],
+    relatedSlugs: [
+      "cerrar-el-mes",
+      "gasto-corporativo",
+      "ver-rentabilidad-de-obra",
+      "gastos-generales-de-obra",
+    ],
     keywords: ["gastos generales", "gg", "overhead", "imputacion"],
     guideRef: "§14 · §16",
   },
   {
     slug: "errores-operativos-frecuentes",
     title: "Errores operativos frecuentes",
-    summary: "Atajos incorrectos que más confunden: roles, Solo caja, OC vs subcontrato, doble conteo.",
+    summary:
+      "Atajos incorrectos que más confunden: roles, Solo caja, OC vs subcontrato, doble conteo.",
     intents: ["errores-frecuentes"],
     modules: ["general", "directorio", "compras", "finanzas"],
     level: "both",

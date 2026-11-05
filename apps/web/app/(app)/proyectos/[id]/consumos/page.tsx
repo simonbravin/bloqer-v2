@@ -19,11 +19,12 @@ import {
   canViewProjectCostControlReport,
   canViewPurchaseRequests,
   getProjectShellInfo,
+  getProjectOperationalMutationBlockReason,
   getTenantModuleGate,
   listInventoryConsumptionWbsOptions,
   listProducts,
   listStockMovements,
-  listWarehouses,
+  listInventoryConsumptionWarehouses,
   ServiceError,
 } from "@bloqer/services";
 
@@ -45,10 +46,12 @@ export default async function ProyectoConsumosPage({ params, searchParams }: Pag
     roles: current.tenantCtx.roles,
   };
 
+  let project;
   try {
-    await getProjectShellInfo(id, ctx);
+    project = await getProjectShellInfo(id, ctx);
   } catch (err) {
-    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN"))
+      notFound();
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
@@ -63,7 +66,8 @@ export default async function ProyectoConsumosPage({ params, searchParams }: Pag
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
-  const canCreateConsumption = can(current.tenantCtx.roles, "EDIT", "INVENTORY");
+  const blockReason = getProjectOperationalMutationBlockReason(project.status);
+  const canCreateConsumption = !blockReason && can(current.tenantCtx.roles, "EDIT", "INVENTORY");
   const gate = await getTenantModuleGate(ctx);
   const showMateriales =
     gate.isEnabled("PROJECTS") &&
@@ -81,8 +85,11 @@ export default async function ProyectoConsumosPage({ params, searchParams }: Pag
   if (canCreateConsumption) {
     try {
       const [productsResult, warehouseRows, wbsNodes] = await Promise.all([
-        listProducts({ status: "ACTIVE" }, ctx),
-        listWarehouses({ status: "ACTIVE" }, ctx),
+        listProducts(
+          { status: "ACTIVE", companyId: project.companyId ?? ctx.companyId ?? undefined },
+          ctx,
+        ),
+        listInventoryConsumptionWarehouses(id, ctx),
         listInventoryConsumptionWbsOptions(id, ctx),
       ]);
       products = productsResult.data.map((p) => ({
@@ -150,6 +157,14 @@ export default async function ProyectoConsumosPage({ params, searchParams }: Pag
         }
       />
 
+      {blockReason ? (
+        <p
+          role="status"
+          className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground"
+        >
+          {blockReason}
+        </p>
+      ) : null}
       <Suspense fallback={<ListSectionSkeleton />}>
         <StockMovementList
           movements={movements}

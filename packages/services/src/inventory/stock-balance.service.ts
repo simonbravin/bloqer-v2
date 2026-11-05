@@ -1,64 +1,64 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { serializeQtyDecimal } from "../finance/money-decimal";
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { ServiceError } from "../types";
+import {
+  assertInventoryMovementParentScope,
+  inventoryMovementParentInclude,
+  type InventoryMovementWithParents,
+} from "./inventory-scope";
 
 export type StockBalanceEntry = {
-  productId:   string;
+  productId: string;
   warehouseId: string;
-  projectId:   string | null;
-  quantity:    string;
+  projectId: string | null;
+  quantity: string;
 };
-
 export type StockBalanceResult = {
-  productId:    string;
-  warehouseId:  string;
-  projectId:    string | null;
-  wbsNodeId:    string | null;
+  productId: string;
+  warehouseId: string;
+  companyId: string;
+  projectId: string | null;
+  wbsNodeId: string | null;
   totalQuantity: string;
 };
-
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-// Returns aggregated confirmed stock balance for a given product/warehouse/tenant.
-// CONFIRMED IN movements add; CONFIRMED OUT movements subtract.
-// Cancelled movements are excluded.
 type StockBalanceDb = {
-  stockMovement: {
-    findMany: typeof prisma.stockMovement.findMany;
-  };
+  stockMovement: { findMany: typeof prisma.stockMovement.findMany };
   $queryRaw?: typeof prisma.$queryRaw;
 };
-
-type StockLockTx = {
-  $queryRaw: typeof prisma.$queryRaw;
-};
-
-/**
- * Serialize writers for a (warehouse, product) stock key (BR-INV-002).
- * Call before `getStockBalance(..., tx)` inside the same write transaction.
- * Parent rows always exist — unlike locking an empty stock_movements set.
- */
+type StockLockTx = { $queryRaw: typeof prisma.$queryRaw };
+/** Acquire warehouses in sorted order before products when locking more than one key. */
 export async function lockStockBalanceKey(
   tx: StockLockTx,
   warehouseId: string,
   productId: string,
 ): Promise<void> {
-  await tx.$queryRaw`SELECT id FROM warehouses WHERE id = ${warehouseId} FOR UPDATE`;
-  await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+  await lockStockBalanceKeys(tx, [{ warehouseId, productId }]);
 }
-
+export async function lockStockBalanceKeys(
+  tx: StockLockTx,
+  keys: Array<{ warehouseId: string; productId: string }>,
+): Promise<void> {
+  for (const warehouseId of [...new Set(keys.map((key) => key.warehouseId))].sort())
+    await tx.$queryRaw`SELECT id FROM warehouses WHERE id = ${warehouseId} FOR UPDATE`;
+  for (const productId of [...new Set(keys.map((key) => key.productId))].sort())
+    await tx.$queryRaw`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`;
+}
+export function stockMovementQuantityDelta(row: {
+  type: string;
+  quantity: Prisma.Decimal;
+}): Prisma.Decimal {
+  // No adjustment writer or signed-direction rule exists in this phase (D-083).
+  // Preserve its historical exclusion; reports expose the unknown direction separately.
+  if (row.type === "ADJUSTMENT") return new Prisma.Decimal(0);
+  if (!row.quantity.isFinite() || row.quantity.lte(0))
+    throw new ServiceError("CONFLICT", "El movimiento tiene cantidad inválida");
+  if (row.type === "IN" || row.type === "TRANSFER_IN") return row.quantity;
+  if (row.type === "OUT" || row.type === "TRANSFER_OUT") return row.quantity.negated();
+  throw new ServiceError("CONFLICT", "El tipo de movimiento no permite calcular el saldo físico");
+}
+/** Physical stock is product + warehouse; project/WBS attribution never splits availability. */
 export async function getStockBalance(
-  filters: {
-    tenantId: string;
-    warehouseId: string;
-    productId: string;
-    projectId?: string;
-  },
-  /**
-   * Pass the transaction client when checking stock inside a write tx.
-   * Not sufficient alone — callers must `lockStockBalanceKey` first for BR-INV-002.
-   */
+  filters: { tenantId: string; warehouseId: string; productId: string; projectId?: string },
   db: StockBalanceDb = prisma,
 ): Promise<Prisma.Decimal> {
   const rows = await db.stockMovement.findMany({
@@ -66,92 +66,60 @@ export async function getStockBalance(
       tenantId: filters.tenantId,
       warehouseId: filters.warehouseId,
       productId: filters.productId,
-      projectId: filters.projectId ?? undefined,
       status: "CONFIRMED",
     },
-    select: { type: true, quantity: true },
+    include: inventoryMovementParentInclude,
   });
-
   let balance = new Prisma.Decimal(0);
   for (const row of rows) {
-    if (row.type === "IN" || row.type === "TRANSFER_IN") {
-      balance = balance.plus(row.quantity);
-    } else if (row.type === "OUT" || row.type === "TRANSFER_OUT") {
-      balance = balance.minus(row.quantity);
-    }
-    // ADJUSTMENT signs are handled explicitly in adjustment creation (not exposed in Phase 4C)
+    assertInventoryMovementParentScope(row);
+    balance = balance.plus(stockMovementQuantityDelta(row));
   }
   return balance;
 }
-
+function aggregate(rows: InventoryMovementWithParents[]): StockBalanceResult[] {
+  const map = new Map<string, { first: InventoryMovementWithParents; quantity: Prisma.Decimal }>();
+  for (const row of rows) {
+    assertInventoryMovementParentScope(row);
+    const key = row.warehouseId + ":" + row.productId;
+    const existing = map.get(key);
+    if (existing && existing.first.companyId !== row.companyId)
+      throw new ServiceError("CONFLICT", "El saldo tiene relaciones de empresa inconsistentes");
+    if (existing) existing.quantity = existing.quantity.plus(stockMovementQuantityDelta(row));
+    else map.set(key, { first: row, quantity: stockMovementQuantityDelta(row) });
+  }
+  return [...map.values()].map(({ first, quantity }) => ({
+    productId: first.productId,
+    warehouseId: first.warehouseId,
+    companyId: first.companyId,
+    projectId: first.warehouse.projectId,
+    wbsNodeId: null,
+    totalQuantity: serializeQtyDecimal(quantity),
+  }));
+}
 export async function getStockBalanceByWarehouse(filters: {
-  tenantId:    string;
+  tenantId: string;
   warehouseId: string;
-  companyId?:  string;
+  companyId?: string;
+}): Promise<StockBalanceResult[]> {
+  const warehouse = await prisma.warehouse.findFirst({
+    where: { id: filters.warehouseId, tenantId: filters.tenantId },
+  });
+  if (!warehouse) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
+  if (filters.companyId && filters.companyId !== warehouse.companyId)
+    throw new ServiceError("FORBIDDEN", "Depósito de otra empresa");
+  const rows = await prisma.stockMovement.findMany({
+    where: { tenantId: filters.tenantId, warehouseId: filters.warehouseId, status: "CONFIRMED" },
+    include: inventoryMovementParentInclude,
+  });
+  return aggregate(rows).filter((row) => new Prisma.Decimal(row.totalQuantity).gt(0));
+}
+export async function listNegativeStockBalancesForTenant(params: {
+  tenantId: string;
 }): Promise<StockBalanceResult[]> {
   const rows = await prisma.stockMovement.findMany({
-    where: {
-      tenantId:    filters.tenantId,
-      warehouseId: filters.warehouseId,
-      companyId:   filters.companyId ?? undefined,
-      status:      "CONFIRMED",
-    },
-    select: { type: true, quantity: true, productId: true, warehouseId: true, projectId: true, wbsNodeId: true },
+    where: { tenantId: params.tenantId, status: "CONFIRMED" },
+    include: inventoryMovementParentInclude,
   });
-
-  // Aggregate by product+warehouse+project+wbs
-  const map = new Map<string, Prisma.Decimal>();
-  const keyMeta = new Map<string, { productId: string; warehouseId: string; projectId: string | null; wbsNodeId: string | null }>();
-
-  for (const row of rows) {
-    const key = `${row.productId}|${row.warehouseId}|${row.projectId ?? ""}|${row.wbsNodeId ?? ""}`;
-    const current = map.get(key) ?? new Prisma.Decimal(0);
-    let delta = new Prisma.Decimal(0);
-    if (row.type === "IN" || row.type === "TRANSFER_IN") delta = row.quantity;
-    else if (row.type === "OUT" || row.type === "TRANSFER_OUT") delta = row.quantity.negated();
-    map.set(key, current.plus(delta));
-    if (!keyMeta.has(key)) {
-      keyMeta.set(key, { productId: row.productId, warehouseId: row.warehouseId, projectId: row.projectId, wbsNodeId: row.wbsNodeId });
-    }
-  }
-
-  return Array.from(map.entries())
-    .filter(([, qty]) => qty.greaterThan(0))
-    .map(([key, qty]) => ({
-      ...keyMeta.get(key)!,
-      totalQuantity: serializeQtyDecimal(qty),
-    }));
-}
-
-/** Aggregated confirmed balances &lt; 0 (per product/warehouse/project/WBS). For operational alerts. */
-export async function listNegativeStockBalancesForTenant(params: { tenantId: string }): Promise<StockBalanceResult[]> {
-  const rows = await prisma.stockMovement.findMany({
-    where: {
-      tenantId: params.tenantId,
-      status:   "CONFIRMED",
-    },
-    select: { type: true, quantity: true, productId: true, warehouseId: true, projectId: true, wbsNodeId: true },
-  });
-
-  const map = new Map<string, Prisma.Decimal>();
-  const keyMeta = new Map<string, { productId: string; warehouseId: string; projectId: string | null; wbsNodeId: string | null }>();
-
-  for (const row of rows) {
-    const key = `${row.productId}|${row.warehouseId}|${row.projectId ?? ""}|${row.wbsNodeId ?? ""}`;
-    const current = map.get(key) ?? new Prisma.Decimal(0);
-    let delta = new Prisma.Decimal(0);
-    if (row.type === "IN" || row.type === "TRANSFER_IN") delta = row.quantity;
-    else if (row.type === "OUT" || row.type === "TRANSFER_OUT") delta = row.quantity.negated();
-    map.set(key, current.plus(delta));
-    if (!keyMeta.has(key)) {
-      keyMeta.set(key, { productId: row.productId, warehouseId: row.warehouseId, projectId: row.projectId, wbsNodeId: row.wbsNodeId });
-    }
-  }
-
-  return Array.from(map.entries())
-    .filter(([, qty]) => qty.lessThan(0))
-    .map(([key, qty]) => ({
-      ...keyMeta.get(key)!,
-      totalQuantity: serializeQtyDecimal(qty),
-    }));
+  return aggregate(rows).filter((row) => new Prisma.Decimal(row.totalQuantity).lt(0));
 }

@@ -26,7 +26,14 @@ export function StockBalanceTable({ rows }: Props) {
   }
 
   return (
-    <TableScroll>
+    <div className="space-y-3">
+      {rows.some((row) => row.flags.adjustmentPresent) ? (
+        <p className="text-sm text-muted-foreground">
+          Los ajustes sin dirección definida se conservan en el historial y no se suman al saldo
+          físico.
+        </p>
+      ) : null}
+      <TableScroll>
         <Table>
           <TableHeader>
             <TableRow>
@@ -42,10 +49,14 @@ export function StockBalanceTable({ rows }: Props) {
           <TableBody>
             {rows.map((r) => (
               <TableRow key={`${r.productId}-${r.warehouseId}`}>
-                <TableCell className="font-mono text-xs text-muted-foreground">{r.productSku}</TableCell>
+                <TableCell className="font-mono text-xs text-muted-foreground">
+                  {r.productSku}
+                </TableCell>
                 <TableCell className="font-medium">{r.productName}</TableCell>
                 <TableCell className="text-muted-foreground">{r.warehouseName}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">{r.projectName ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground text-xs">
+                  {r.projectName ?? "—"}
+                </TableCell>
                 <TableCell
                   className={`text-right tabular-nums font-mono font-medium ${
                     r.flags.negativeStock
@@ -83,6 +94,7 @@ export function StockBalanceTable({ rows }: Props) {
             ))}
           </TableBody>
         </Table>
-    </TableScroll>
+      </TableScroll>
+    </div>
   );
 }

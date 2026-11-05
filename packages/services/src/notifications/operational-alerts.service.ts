@@ -1,19 +1,29 @@
-import type { EmailDeliveryStatus, LinkedEntityType, NotificationSeverity, NotificationType, Prisma } from "@bloqer/database";
+import type {
+  EmailDeliveryStatus,
+  LinkedEntityType,
+  NotificationSeverity,
+  NotificationType,
+  Prisma,
+} from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { ServiceContext, ServiceError } from "../types";
-import {
-  resolveNotificationAudience,
-} from "./notification-audience.service";
+import { resolveNotificationAudience } from "./notification-audience.service";
 import { createSystemNotification } from "./notification.service";
 import { sendOperationalAlertEmailAsSystem } from "./notification-email.service";
-import { resolveDocumentNotificationEntityLabel, staleDocumentUploadCopy } from "./notification-copy";
+import {
+  resolveDocumentNotificationEntityLabel,
+  staleDocumentUploadCopy,
+} from "./notification-copy";
 import { filterUserIdsByProjectAccess } from "../security/access";
 
 /** Re-export recipient helpers for existing call sites. */
-export { findActiveOwnerAdminUserIds, findActiveUsersForPermission } from "./notification-audience.service";
+export {
+  findActiveOwnerAdminUserIds,
+  findActiveUsersForPermission,
+} from "./notification-audience.service";
 
 /** Rolling window to avoid duplicate operational alerts for the same entity + recipient. */
 const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
@@ -111,7 +121,9 @@ async function tryCreateAlert(
 
 // ─── Public runners (invoke manually or from future jobs) ────────────────────
 
-export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
+export async function runOverdueReceivablesAlert(
+  ctx: ServiceContext,
+): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
   const recipients = await resolveNotificationAudience({
     tenantId: ctx.tenantId,
@@ -197,7 +209,9 @@ export async function runOverdueReceivablesAlert(ctx: ServiceContext): Promise<O
   return summary;
 }
 
-export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
+export async function runOverduePayablesAlert(
+  ctx: ServiceContext,
+): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
   const recipients = await resolveNotificationAudience({
     tenantId: ctx.tenantId,
@@ -283,18 +297,27 @@ export async function runOverduePayablesAlert(ctx: ServiceContext): Promise<Oper
   return summary;
 }
 
-function negativeStockLinkedEntityId(row: { productId: string; warehouseId: string; projectId: string | null; wbsNodeId: string | null }): string {
+function negativeStockLinkedEntityId(row: {
+  productId: string;
+  warehouseId: string;
+  projectId: string | null;
+  wbsNodeId: string | null;
+}): string {
   return `negstock:${row.productId}:${row.warehouseId}:${row.projectId ?? "_"}:${row.wbsNodeId ?? "_"}`;
 }
 
-export async function runNegativeStockAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
+export async function runNegativeStockAlert(
+  ctx: ServiceContext,
+): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
   const recipients = await resolveNotificationAudience({
     tenantId: ctx.tenantId,
     permissionTargets: [{ action: "VIEW", module: "INVENTORY" }],
   });
 
-  const negatives = await listNegativeStockBalancesForTenant({ tenantId: ctx.tenantId });
+  const negatives = (await listNegativeStockBalancesForTenant({ tenantId: ctx.tenantId })).filter(
+    (row) => !ctx.companyId || row.companyId === ctx.companyId,
+  );
   const productIds = [...new Set(negatives.map((row) => row.productId))];
   const warehouseIds = [...new Set(negatives.map((row) => row.warehouseId))];
   const [products, warehouses] = await Promise.all([
@@ -329,10 +352,20 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
 
     if (recipients.length === 0) continue;
 
+    const memberships = await prisma.userMembership.findMany({
+      where: {
+        tenantId: ctx.tenantId,
+        status: "ACTIVE",
+        userId: { in: recipients },
+        user: { status: "ACTIVE" },
+        OR: [{ companyId: row.companyId }, { companyId: null }],
+      },
+      select: { userId: true },
+    });
     const scopedRecipients = await filterUserIdsByProjectAccess(
       ctx.tenantId,
       row.projectId,
-      recipients,
+      memberships.map((member) => member.userId),
     );
     for (const uid of scopedRecipients) {
       await tryCreateAlert(
@@ -341,6 +374,7 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
           tenantId: ctx.tenantId,
           recipientUserId: uid,
           type: "NEGATIVE_STOCK",
+          companyId: row.companyId,
           title: "Stock negativo detectado",
           body,
           severity: "ERROR",
@@ -363,7 +397,9 @@ export async function runNegativeStockAlert(ctx: ServiceContext): Promise<Operat
   return summary;
 }
 
-export async function runApprovedCertificationsWithoutInvoiceAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
+export async function runApprovedCertificationsWithoutInvoiceAlert(
+  ctx: ServiceContext,
+): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
   const recipients = await resolveNotificationAudience({
     tenantId: ctx.tenantId,
@@ -420,7 +456,9 @@ export async function runApprovedCertificationsWithoutInvoiceAlert(ctx: ServiceC
 
 const STALE_UPLOAD_MS = 60 * 60 * 1000;
 
-export async function runStaleUploadingDocumentsAlert(ctx: ServiceContext): Promise<OperationalAlertRunSummary> {
+export async function runStaleUploadingDocumentsAlert(
+  ctx: ServiceContext,
+): Promise<OperationalAlertRunSummary> {
   const summary = emptySummary();
   const threshold = new Date(Date.now() - STALE_UPLOAD_MS);
 

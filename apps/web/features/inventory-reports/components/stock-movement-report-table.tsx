@@ -25,9 +25,11 @@ const TYPE_LABELS: Record<string, string> = {
   ADJUSTMENT: "Ajuste",
 };
 
-function fmtQty(v: string, unit: string) {
+function fmtQty(v: string | null, unit: string) {
+  if (v == null) return "Sin dirección definida";
   const body = formatQtyFromString(v);
-  const signed = isPositiveQty(v) || isZeroQty(v) ? (body.startsWith("-") ? body : `+${body}`) : body;
+  const signed =
+    isPositiveQty(v) || isZeroQty(v) ? (body.startsWith("-") ? body : `+${body}`) : body;
   return signed + (unit ? ` ${unit}` : "");
 }
 
@@ -48,66 +50,79 @@ export function StockMovementReportTable({
 
   return (
     <TableScroll>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Fecha</TableHead>
-              {showProduct && <TableHead>Producto</TableHead>}
-              {showWarehouse && <TableHead>Depósito</TableHead>}
-              <TableHead>Tipo</TableHead>
-              <TableHead>Origen</TableHead>
-              <TableHead>Proyecto / EDT</TableHead>
-              <TableHead className="text-right">Cantidad</TableHead>
-              <TableHead className="text-right">Costo unit.</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.map((m) => {
-              const isAdj = m.type === "ADJUSTMENT";
-              const qtyPositive = isPositiveQty(m.signedQuantity) || isZeroQty(m.signedQuantity);
-              return (
-                <TableRow key={m.id}>
-                  <TableCell className="whitespace-nowrap">{formatDate(m.movementDate)}</TableCell>
-                  {showProduct && (
-                    <TableCell>
-                      <span className="font-medium">{m.productName}</span>
-                      <span className="ml-1 text-xs text-muted-foreground">{m.productUnit}</span>
-                    </TableCell>
-                  )}
-                  {showWarehouse && (
-                    <TableCell className="text-muted-foreground">{m.warehouseName}</TableCell>
-                  )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Fecha</TableHead>
+            {showProduct && <TableHead>Producto</TableHead>}
+            {showWarehouse && <TableHead>Depósito</TableHead>}
+            <TableHead>Tipo</TableHead>
+            <TableHead>Origen</TableHead>
+            <TableHead>Proyecto / EDT</TableHead>
+            <TableHead className="text-right">Cantidad</TableHead>
+            <TableHead className="text-right">Costo unit.</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((m) => {
+            const isAdj = m.type === "ADJUSTMENT";
+            const qtyPositive =
+              m.signedQuantity != null &&
+              (isPositiveQty(m.signedQuantity) || isZeroQty(m.signedQuantity));
+            return (
+              <TableRow key={m.id}>
+                <TableCell className="whitespace-nowrap">{formatDate(m.movementDate)}</TableCell>
+                {showProduct && (
                   <TableCell>
-                    <span className={isAdj ? "text-yellow-600 dark:text-yellow-400 text-xs" : ""}>
-                      {TYPE_LABELS[m.type] ?? m.type}
+                    <span className="font-medium">{m.productName}</span>
+                    <span className="ml-1 text-xs text-muted-foreground">{m.productUnit}</span>
+                  </TableCell>
+                )}
+                {showWarehouse && (
+                  <TableCell className="text-muted-foreground">{m.warehouseName}</TableCell>
+                )}
+                <TableCell>
+                  <span className={isAdj ? "text-yellow-600 dark:text-yellow-400 text-xs" : ""}>
+                    {TYPE_LABELS[m.type] ?? m.type}
+                  </span>
+                </TableCell>
+                <TableCell className="text-xs text-muted-foreground">{m.sourceLabel}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {m.projectName ?? ""}
+                  {m.projectName && m.wbsNodeName ? " · " : ""}
+                  {m.wbsNodeName ?? ""}
+                  {!m.projectName && !m.wbsNodeName ? "—" : ""}
+                </TableCell>
+                <TableCell
+                  className={`text-right tabular-nums font-mono ${
+                    isAdj
+                      ? "text-yellow-600 dark:text-yellow-400"
+                      : qtyPositive
+                        ? "text-emerald-600 dark:text-emerald-400"
+                        : "text-red-600 dark:text-red-400"
+                  }`}
+                >
+                  {m.signedQuantity == null ? (
+                    <span>
+                      {formatQtyFromString(m.quantity)} {m.productUnit}
+                      <span className="block text-xs">Sin dirección definida</span>
                     </span>
-                  </TableCell>
-                  <TableCell className="text-xs text-muted-foreground">{m.sourceLabel}</TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {m.projectName ?? ""}
-                    {m.projectName && m.wbsNodeName ? " · " : ""}
-                    {m.wbsNodeName ?? ""}
-                    {!m.projectName && !m.wbsNodeName ? "—" : ""}
-                  </TableCell>
-                  <TableCell
-                    className={`text-right tabular-nums font-mono ${
-                      isAdj
-                        ? "text-yellow-600 dark:text-yellow-400"
-                        : qtyPositive
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-red-600 dark:text-red-400"
-                    }`}
-                  >
-                    {isAdj ? `${formatQtyFromString(m.quantity)}⚠` : fmtQty(m.signedQuantity, m.productUnit)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-mono text-muted-foreground text-xs">
-                    {m.unitCost ? formatUnitPriceFromString(m.unitCost) : "—"}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                  ) : (
+                    fmtQty(m.signedQuantity, m.productUnit)
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums font-mono text-muted-foreground text-xs">
+                  {m.unitCost ? formatUnitPriceFromString(m.unitCost) : "—"}
+                  {m.costCurrency ? <span className="ml-1">{m.costCurrency}</span> : null}
+                  {m.costWarning ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{m.costWarning}</p>
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </TableScroll>
   );
 }

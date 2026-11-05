@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { can } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
 import { listWarehouses, listProducts, getSourceStockPreview } from "@bloqer/services";
 import { WarehouseTransferForm } from "@/features/warehouse-transfer";
@@ -12,6 +13,7 @@ interface PageProps {
 export default async function NuevaTransferenciaPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
+  if (!can(current.tenantCtx.roles, "EDIT", "INVENTORY")) redirect("/inventario/transferencias");
 
   const sp = await searchParams;
   const ctx = {
@@ -26,11 +28,15 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
     listProducts({ status: "ACTIVE" }, ctx),
   ]);
   const products = productsResult.data;
+  const selectedSourceId = warehouses.some((w) => w.id === sp.sourceWarehouseId)
+    ? sp.sourceWarehouseId
+    : undefined;
+  const selectedProductId = products.some((p) => p.id === sp.productId) ? sp.productId : undefined;
 
   let sourceStockBalance: string | undefined;
-  if (sp.sourceWarehouseId && sp.productId) {
+  if (selectedSourceId && selectedProductId) {
     try {
-      sourceStockBalance = await getSourceStockPreview(sp.sourceWarehouseId, sp.productId, ctx);
+      sourceStockBalance = await getSourceStockPreview(selectedSourceId, selectedProductId, ctx);
     } catch {
       // preview is non-blocking — service validation is the real guard
     }
@@ -47,8 +53,8 @@ export default async function NuevaTransferenciaPage({ searchParams }: PageProps
           warehouses={warehouses.map((w) => ({ id: w.id, name: w.name }))}
           products={products.map((p) => ({ id: p.id, name: p.name, unit: p.unit }))}
           sourceStockBalance={sourceStockBalance}
-          selectedSourceId={sp.sourceWarehouseId}
-          selectedProductId={sp.productId}
+          selectedSourceId={selectedSourceId}
+          selectedProductId={selectedProductId}
           action={createWarehouseTransferAction}
         />
       </div>

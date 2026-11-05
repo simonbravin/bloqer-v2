@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { getStockMovementReport } from "@bloqer/services";
+import { getStockMovementReport, parseStockMovementFilters, ServiceError } from "@bloqer/services";
+import { InventoryReportError } from "@/features/inventory-reports/components/inventory-report-error";
 import { StockMovementReportTable, StockReportFilters } from "@/features/inventory-reports";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
@@ -33,21 +34,22 @@ export default async function MovimientosInventarioPage({ searchParams }: PagePr
     roles: current.tenantCtx.roles,
   };
 
-  const rows = await getStockMovementReport(
-    {
-      warehouseId: sp.warehouseId || undefined,
-      productId: sp.productId || undefined,
-      projectId: sp.projectId || undefined,
-      wbsNodeId: sp.wbsNodeId || undefined,
-      companyId: sp.companyId || undefined,
-      sourceType: sp.sourceType || undefined,
-      movementType: sp.movementType || undefined,
-      dateFrom: sp.dateFrom || undefined,
-      dateTo: sp.dateTo || undefined,
-    },
-    ctx,
-  );
-
+  let rows;
+  try {
+    rows = await getStockMovementReport(parseStockMovementFilters(sp), ctx);
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "VALIDATION")
+      return (
+        <InventoryReportError
+          title="Movimientos de inventario"
+          mode="movements"
+          message={error.message}
+        />
+      );
+    if (error instanceof ServiceError && (error.code === "FORBIDDEN" || error.code === "NOT_FOUND"))
+      notFound();
+    throw error;
+  }
   return (
     <PageShell variant="default" className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -55,7 +57,11 @@ export default async function MovimientosInventarioPage({ searchParams }: PagePr
           <h1 className="text-2xl font-bold tracking-tight">Movimientos de inventario</h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportExportActions exportPath="/api/reports/inventario/movimientos.csv" params={sp} pdf />
+          <ReportExportActions
+            exportPath="/api/reports/inventario/movimientos.csv"
+            params={sp}
+            pdf
+          />
           <ReportEmailSendDialog
             reportType="INVENTORY_MOVEMENTS"
             supportsPdf={false}

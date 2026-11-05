@@ -1,72 +1,110 @@
 import {
   Prisma,
   prisma,
-  StockMovement,
-  StockMovementSourceType,
-  StockMovementStatus,
+  type StockMovement,
+  type StockMovementSourceType,
+  type StockMovementStatus,
 } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import type { CreateStockConsumptionInput } from "@bloqer/validators";
+import { createStockConsumptionSchema, type CreateStockConsumptionInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
 import { assertInventoryTenantModule } from "../tenant-modules/tenant-module-enforcement";
-import { getStockBalance, lockStockBalanceKey } from "./stock-balance.service";
-import { ServiceContext, ServiceError } from "../types";
-import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
-import { consumptionReplayMatches, requireIdempotencyKey, withIdempotentCreate } from "../idempotency/idempotency";
+import {
+  getStockBalance,
+  lockStockBalanceKey,
+  lockStockBalanceKeys,
+} from "./stock-balance.service";
+import { ServiceError, type ServiceContext } from "../types";
+import {
+  assertProjectAllowsOperationalMutation,
+  lockProjectForOperationalMutation,
+} from "../project/project-operational-guard";
+import { requireProjectAccess } from "../security/access";
+import { companyScopeFilter } from "../company-scope";
+import {
+  serializeMoneyDecimal,
+  serializeQtyDecimal,
+  serializeUnitPriceDecimal,
+  toMoneyDecimal,
+} from "../finance/money-decimal";
+import {
+  assertIdempotentPayloadMatch,
+  consumptionReplayMatches,
+  requireIdempotencyKey,
+  withIdempotentCreate,
+} from "../idempotency/idempotency";
 import { consumptionWarehouseScopeConflict } from "./consumption-warehouse-scope";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
-
-// ─── View types ───────────────────────────────────────────────────────────────
+import { inventoryMovementCostProvenance } from "./inventory-movement-cost";
+import { assertProductUnitCompatible } from "./product-unit";
+import {
+  assertInventoryMovementRelations,
+  assertInventoryProductScope,
+  assertInventoryWarehouseScope,
+  inventoryMovementParentInclude,
+  inventoryMovementWhere,
+  type InventoryMovementWithParents,
+} from "./inventory-scope";
 
 export type StockMovementView = Omit<StockMovement, "quantity" | "unitCost" | "totalCost"> & {
   quantity: string;
   unitCost: string | null;
   totalCost: string | null;
   productName: string;
+  productUnit: string;
   warehouseName: string;
+  canGenerateAccountingDraft: false;
+  costCurrency: string | null;
+  costWarning: string | null;
 };
-
-// ─── Serializer ───────────────────────────────────────────────────────────────
-
-function serializeMovement(
-  m: StockMovement & {
-    product: { name: string };
-    warehouse: { name: string };
-  },
-): StockMovementView {
+function serializeMovement(m: InventoryMovementWithParents): StockMovementView {
   return {
-    ...m,
+    id: m.id,
+    tenantId: m.tenantId,
+    companyId: m.companyId,
+    warehouseId: m.warehouseId,
+    productId: m.productId,
+    projectId: m.projectId,
+    wbsNodeId: m.wbsNodeId,
+    purchaseReceiptId: m.purchaseReceiptId,
+    purchaseReceiptLineId: m.purchaseReceiptLineId,
+    type: m.type,
+    sourceType: m.sourceType,
+    sourceId: m.sourceId,
+    movementDate: m.movementDate,
+    status: m.status,
+    notes: m.notes,
+    idempotencyKey: m.idempotencyKey,
+    createdBy: m.createdBy,
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
+    warehouseTransferId: m.warehouseTransferId,
     quantity: serializeQtyDecimal(m.quantity),
     unitCost: m.unitCost != null ? serializeUnitPriceDecimal(m.unitCost) : null,
     totalCost: m.totalCost != null ? serializeMoneyDecimal(m.totalCost) : null,
     productName: m.product.name,
+    productUnit: m.product.unit,
     warehouseName: m.warehouse.name,
+    canGenerateAccountingDraft: false,
+    ...inventoryMovementCostProvenance(m),
   };
 }
-
-const movementInclude = {
-  product: { select: { name: true } },
-  warehouse: { select: { name: true } },
-};
-
-// ─── Read ─────────────────────────────────────────────────────────────────────
-
+const movementInclude = inventoryMovementParentInclude;
+async function authorize(ctx: ServiceContext, action: "VIEW" | "EDIT") {
+  await assertInventoryTenantModule(ctx);
+  if (!can(ctx.roles, action, "INVENTORY"))
+    throw new ServiceError("FORBIDDEN", "Sin permisos para operar movimientos de stock");
+}
 export async function getStockMovementById(
   id: string,
   ctx: ServiceContext,
 ): Promise<StockMovementView> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos de stock");
-  }
+  await authorize(ctx, "VIEW");
   const m = await prisma.stockMovement.findUnique({ where: { id }, include: movementInclude });
   if (!m) throw new ServiceError("NOT_FOUND", "Movimiento de stock no encontrado");
-  if (m.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  await assertInventoryMovementRelations(m, ctx);
   return serializeMovement(m);
 }
-
 export async function listStockMovements(
   filters: {
     warehouseId?: string;
@@ -79,54 +117,40 @@ export async function listStockMovements(
   },
   ctx: ServiceContext,
 ): Promise<StockMovementView[]> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "VIEW", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver movimientos de stock");
-  }
-  const sourceIds = filters.sourceIds?.filter(Boolean) ?? [];
-  const movements = await prisma.stockMovement.findMany({
+  await authorize(ctx, "VIEW");
+  if (filters.sourceIds && filters.sourceIds.length === 0) return [];
+  const rows = await prisma.stockMovement.findMany({
     where: {
-      tenantId: ctx.tenantId,
-      warehouseId: filters.warehouseId ?? undefined,
-      productId: filters.productId ?? undefined,
-      projectId: filters.projectId ?? undefined,
-      purchaseReceiptId: filters.purchaseReceiptId ?? undefined,
-      sourceType: filters.sourceType ?? undefined,
-      ...(sourceIds.length > 0 ? { sourceId: { in: sourceIds } } : {}),
-      status: filters.status ?? undefined,
+      AND: [
+        await inventoryMovementWhere(ctx, filters.projectId),
+        {
+          warehouseId: filters.warehouseId,
+          productId: filters.productId,
+          purchaseReceiptId: filters.purchaseReceiptId,
+          sourceType: filters.sourceType,
+          ...(filters.sourceIds ? { sourceId: { in: filters.sourceIds } } : {}),
+          status: filters.status,
+        },
+      ],
     },
     include: movementInclude,
-    orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }],
+    orderBy: [{ movementDate: "desc" }, { createdAt: "desc" }, { id: "asc" }],
   });
-  return movements.map(serializeMovement);
+  await Promise.all(rows.map((row) => assertInventoryMovementRelations(row, ctx)));
+  return rows.map(serializeMovement);
 }
-
 export type InventoryConsumptionWbsOption = {
   id: string;
   code: string;
   name: string;
   budgetName: string;
 };
-
-/** WBS items available to inventory consumption, independent of the PROCUREMENT module. */
 export async function listInventoryConsumptionWbsOptions(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<InventoryConsumptionWbsOption[]> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar consumos de stock");
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { tenantId: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) {
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  }
-
+  await authorize(ctx, "EDIT");
+  await requireProjectAccess(projectId, ctx);
   const nodes = await prisma.wbsNode.findMany({
     where: {
       type: "ITEM",
@@ -134,6 +158,7 @@ export async function listInventoryConsumptionWbsOptions(
         tenantId: ctx.tenantId,
         projectId,
         status: { in: ["APPROVED", "CLOSED"] },
+        ...companyScopeFilter(ctx),
       },
     },
     select: {
@@ -152,160 +177,146 @@ export async function listInventoryConsumptionWbsOptions(
     id: node.id,
     code: node.code,
     name: node.name,
-    budgetName: `${node.budget.name} v${node.budget.versionNumber}`,
+    budgetName: node.budget.name + " v" + node.budget.versionNumber,
   }));
 }
-
-// ─── Consumption (OUT) ────────────────────────────────────────────────────────
 
 export async function createStockConsumption(
   input: CreateStockConsumptionInput,
   ctx: ServiceContext,
 ): Promise<StockMovementView> {
-  await assertInventoryTenantModule(ctx);
-  if (!can(ctx.roles, "EDIT", "INVENTORY")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para registrar consumos de stock");
-  }
-
+  await authorize(ctx, "EDIT");
+  const parsed = createStockConsumptionSchema.safeParse(input);
+  if (!parsed.success)
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Consumo inválido");
+  input = parsed.data;
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
-
-  const movement = await withIdempotentCreate({
-    findExisting: () =>
-      prisma.stockMovement.findFirst({
-        where: { tenantId: ctx.tenantId, idempotencyKey },
-        include: movementInclude,
-      }),
-    payloadsMatch: (existing) =>
-      consumptionReplayMatches(existing, {
-        warehouseId: input.warehouseId,
-        productId: input.productId,
-        projectId: input.projectId,
-        wbsNodeId: input.wbsNodeId,
-        movementDate: input.movementDate,
-        quantity: input.quantity,
-      }),
-    create: async () => {
-      const created = await createStockConsumptionOnce(input, ctx, idempotencyKey);
-      await log({
-        tenantId: ctx.tenantId,
-        actorUserId: ctx.actorUserId,
-        action: "STOCK_CONSUMPTION_CREATED",
-        entityType: "StockMovement",
-        entityId: created.id,
-        after: { productId: input.productId, warehouseId: input.warehouseId, quantity: input.quantity },
-      });
-      return created;
-    },
-  });
-
-  return serializeMovement(movement);
-}
-
-async function createStockConsumptionOnce(
-  input: CreateStockConsumptionInput,
-  ctx: ServiceContext,
-  idempotencyKey: string,
-) {
-  const [warehouse, product] = await Promise.all([
-    prisma.warehouse.findUnique({ where: { id: input.warehouseId } }),
-    prisma.product.findUnique({ where: { id: input.productId } }),
-  ]);
-
-  if (!warehouse) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
-  if (warehouse.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (warehouse.status !== "ACTIVE")
-    throw new ServiceError("CONFLICT", "El depósito no está activo");
-
-  if (!product) throw new ServiceError("NOT_FOUND", "Producto no encontrado");
-  if (product.tenantId !== ctx.tenantId)
-    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (product.status !== "ACTIVE") throw new ServiceError("CONFLICT", "El producto no está activo");
-
-  let projectCompanyId: string | null = null;
-  if (input.projectId) {
-    const project = await assertProjectAllowsOperationalMutation(input.projectId, ctx);
-    projectCompanyId = project.companyId;
-  }
-
-  const scopeConflict = consumptionWarehouseScopeConflict({
-    warehouseCompanyId: warehouse.companyId,
-    warehouseProjectId: warehouse.projectId,
-    productCompanyId: product.companyId,
-    consumptionProjectId: input.projectId ?? null,
-    projectCompanyId,
-  });
-  if (scopeConflict) throw new ServiceError("CONFLICT", scopeConflict);
-
-  if (input.wbsNodeId) {
-    const wbs = await prisma.wbsNode.findUnique({
-      where: { id: input.wbsNodeId },
-      include: {
-        budget: {
-          select: { tenantId: true, projectId: true, status: true },
-        },
-      },
-    });
-    if (!wbs) throw new ServiceError("NOT_FOUND", "Nodo EDT no encontrado");
-    if (wbs.budget.tenantId !== ctx.tenantId) {
-      throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    }
-    if (wbs.budget.projectId !== input.projectId) {
-      throw new ServiceError("CONFLICT", "El nodo EDT no pertenece al proyecto del consumo");
-    }
-    if (wbs.type !== "ITEM")
-      throw new ServiceError("CONFLICT", "El nodo EDT debe ser de tipo ITEM");
-    if (wbs.budget.status !== "APPROVED" && wbs.budget.status !== "CLOSED") {
-      throw new ServiceError(
-        "CONFLICT",
-        "El nodo EDT debe pertenecer a un presupuesto aprobado o cerrado",
-      );
-    }
-  }
-
-  const qty = new Prisma.Decimal(input.quantity);
-  if (qty.lessThanOrEqualTo(0)) {
-    throw new ServiceError("CONFLICT", "La cantidad debe ser mayor a cero");
-  }
-
-  const movement = await prisma.$transaction(async (tx) => {
-    await lockStockBalanceKey(tx, input.warehouseId, input.productId);
-    const balance = await getStockBalance(
-      {
-        tenantId: ctx.tenantId,
-        warehouseId: input.warehouseId,
-        productId: input.productId,
-      },
-      tx,
-    );
-    if (qty.greaterThan(balance)) {
-      throw new ServiceError(
-        "CONFLICT",
-        `Stock insuficiente. Disponible: ${serializeQtyDecimal(balance)}, solicitado: ${serializeQtyDecimal(qty)}`,
-      );
-    }
-
-    return tx.stockMovement.create({
-      data: {
-        tenantId: ctx.tenantId,
-        companyId: warehouse.companyId,
-        warehouseId: input.warehouseId,
-        productId: input.productId,
-        projectId: input.projectId,
-        wbsNodeId: input.wbsNodeId ?? null,
-        type: "OUT",
-        sourceType: "CONSUMPTION",
-        movementDate: new Date(input.movementDate),
-        quantity: qty,
-        status: "CONFIRMED",
-        notes: input.notes ?? null,
-        idempotencyKey,
-        createdBy: ctx.actorUserId,
-      },
+  const matches = (m: InventoryMovementWithParents) =>
+    m.type === "OUT" &&
+    m.sourceType === "CONSUMPTION" &&
+    consumptionReplayMatches(m, { ...input, wbsNodeId: input.wbsNodeId ?? null }) &&
+    (m.notes ?? null) === (input.notes ?? null);
+  const findExisting = async (db: Pick<Prisma.TransactionClient, "stockMovement"> = prisma) => {
+    const m = await db.stockMovement.findFirst({
+      where: { tenantId: ctx.tenantId, idempotencyKey },
       include: movementInclude,
     });
+    if (m) await assertInventoryMovementRelations(m, ctx);
+    return m;
+  };
+  const movement = await withIdempotentCreate({
+    findExisting,
+    payloadsMatch: matches,
+    create: async () => {
+      await assertProjectAllowsOperationalMutation(input.projectId, ctx);
+      const [warehouse, product] = await Promise.all([
+        prisma.warehouse.findUnique({ where: { id: input.warehouseId } }),
+        prisma.product.findUnique({ where: { id: input.productId } }),
+      ]);
+      if (!warehouse || !product)
+        throw new ServiceError("NOT_FOUND", "Producto o depósito no encontrado");
+      await assertInventoryWarehouseScope(warehouse, ctx);
+      await assertInventoryProductScope(product, ctx);
+      return prisma.$transaction(
+        async (tx) => {
+          const project = await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+          await tx.$queryRaw`SELECT id FROM companies WHERE id = ${warehouse.companyId} FOR NO KEY UPDATE`;
+          await lockStockBalanceKey(tx, input.warehouseId, input.productId);
+          const replay = await findExisting(tx);
+          if (replay) {
+            assertIdempotentPayloadMatch(matches(replay));
+            return replay;
+          }
+          const [wh, prod] = await Promise.all([
+            tx.warehouse.findUnique({ where: { id: input.warehouseId } }),
+            tx.product.findUnique({ where: { id: input.productId } }),
+          ]);
+          if (
+            !wh ||
+            !prod ||
+            wh.tenantId !== ctx.tenantId ||
+            prod.tenantId !== ctx.tenantId ||
+            wh.companyId !== warehouse.companyId
+          )
+            throw new ServiceError("CONFLICT", "Las relaciones del consumo cambiaron");
+          if (wh.status !== "ACTIVE" || prod.status !== "ACTIVE")
+            throw new ServiceError("CONFLICT", "El producto y el depósito deben estar activos");
+          assertProductUnitCompatible(prod.unit, prod.unit);
+          const conflict = consumptionWarehouseScopeConflict({
+            warehouseCompanyId: wh.companyId,
+            warehouseProjectId: wh.projectId,
+            productCompanyId: prod.companyId,
+            consumptionProjectId: input.projectId,
+            projectCompanyId: project.companyId,
+          });
+          if (conflict) throw new ServiceError("CONFLICT", conflict);
+          if (input.wbsNodeId) {
+            const wbs = await tx.wbsNode.findUnique({
+              where: { id: input.wbsNodeId },
+              include: { budget: true },
+            });
+            if (
+              !wbs ||
+              wbs.budget.tenantId !== ctx.tenantId ||
+              wbs.budget.projectId !== input.projectId ||
+              (wbs.budget.companyId && wbs.budget.companyId !== wh.companyId) ||
+              wbs.type !== "ITEM" ||
+              !["APPROVED", "CLOSED"].includes(wbs.budget.status)
+            )
+              throw new ServiceError("CONFLICT", "La partida EDT no es válida para este consumo");
+          }
+          const qty = new Prisma.Decimal(input.quantity);
+          const balance = await getStockBalance(
+            { tenantId: ctx.tenantId, warehouseId: wh.id, productId: prod.id },
+            tx,
+          );
+          if (qty.gt(balance))
+            throw new ServiceError(
+              "CONFLICT",
+              "Stock insuficiente. Disponible: " +
+                serializeQtyDecimal(balance) +
+                ", solicitado: " +
+                serializeQtyDecimal(qty),
+            );
+          const row = await tx.stockMovement.create({
+            data: {
+              tenantId: ctx.tenantId,
+              companyId: wh.companyId,
+              warehouseId: wh.id,
+              productId: prod.id,
+              projectId: input.projectId,
+              wbsNodeId: input.wbsNodeId ?? null,
+              type: "OUT",
+              sourceType: "CONSUMPTION",
+              movementDate: new Date(input.movementDate),
+              quantity: qty,
+              status: "CONFIRMED",
+              notes: input.notes ?? null,
+              idempotencyKey,
+              createdBy: ctx.actorUserId,
+            },
+            include: movementInclude,
+          });
+          await log(
+            {
+              tenantId: ctx.tenantId,
+              companyId: wh.companyId,
+              projectId: input.projectId,
+              actorUserId: ctx.actorUserId,
+              action: "STOCK_CONSUMPTION_CREATED",
+              entityType: "StockMovement",
+              entityId: row.id,
+              after: { productId: prod.id, warehouseId: wh.id, quantity: serializeQtyDecimal(qty) },
+            },
+            tx,
+          );
+          return row;
+        },
+        { maxWait: 10000, timeout: 30000 },
+      );
+    },
   });
-  return movement;
+  return serializeMovement(movement);
 }
 
 // ─── Internal: create IN movement from receipt line ───────────────────────────
@@ -348,7 +359,7 @@ export async function createReceiptStockMovement(
       movementDate: params.movementDate,
       quantity: params.quantity,
       unitCost: params.unitCost,
-      totalCost: params.quantity.times(params.unitCost),
+      totalCost: toMoneyDecimal(params.quantity.times(params.unitCost)),
       status: "CONFIRMED",
       createdBy: params.createdBy,
     },
@@ -360,13 +371,35 @@ export async function cancelReceiptStockMovements(
   purchaseReceiptId: string,
   tenantId: string,
 ): Promise<void> {
-  const receipt = await tx.purchaseReceipt.findFirst({ where: { id: purchaseReceiptId, tenantId }, select: { companyId: true, projectId: true, warehouseId: true } });
+  const receipt = await tx.purchaseReceipt.findFirst({
+    where: { id: purchaseReceiptId, tenantId },
+    select: { companyId: true, projectId: true, warehouseId: true },
+  });
   if (!receipt) throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
-  if (await tx.stockMovement.count({ where: { purchaseReceiptId, tenantId: { not: tenantId }, status: "CONFIRMED", type: "IN", sourceType: "PURCHASE_RECEIPT" } })) {
-    throw new ServiceError("CONFLICT", "Los movimientos de la recepción tienen relaciones inconsistentes");
+  if (
+    await tx.stockMovement.count({
+      where: {
+        purchaseReceiptId,
+        tenantId: { not: tenantId },
+        status: "CONFIRMED",
+        type: "IN",
+        sourceType: "PURCHASE_RECEIPT",
+      },
+    })
+  ) {
+    throw new ServiceError(
+      "CONFLICT",
+      "Los movimientos de la recepción tienen relaciones inconsistentes",
+    );
   }
   const movements = await tx.stockMovement.findMany({
-    where: { purchaseReceiptId, tenantId, status: "CONFIRMED", type: "IN", sourceType: "PURCHASE_RECEIPT" },
+    where: {
+      purchaseReceiptId,
+      tenantId,
+      status: "CONFIRMED",
+      type: "IN",
+      sourceType: "PURCHASE_RECEIPT",
+    },
     select: {
       id: true,
       warehouseId: true,
@@ -376,26 +409,49 @@ export async function cancelReceiptStockMovements(
       projectId: true,
       warehouse: { select: { tenantId: true, companyId: true, projectId: true } },
       product: { select: { tenantId: true, companyId: true } },
-      purchaseReceiptLine: { select: { purchaseReceiptId: true, purchaseOrderLine: { select: { productId: true } } } },
+      purchaseReceiptLine: {
+        select: { purchaseReceiptId: true, purchaseOrderLine: { select: { productId: true } } },
+      },
     },
   });
 
-  const byBalance = new Map<string, { warehouseId: string; productId: string; quantity: Prisma.Decimal }>();
+  const byBalance = new Map<
+    string,
+    { warehouseId: string; productId: string; quantity: Prisma.Decimal }
+  >();
   for (const m of movements) {
-    if (!m.quantity.isFinite() || m.quantity.lte(0) || m.companyId !== receipt.companyId || (m.projectId && m.projectId !== receipt.projectId) ||
-        (receipt.warehouseId && m.warehouseId !== receipt.warehouseId) || m.warehouse.tenantId !== tenantId ||
-        m.warehouse.companyId !== receipt.companyId || (m.warehouse.projectId && m.warehouse.projectId !== receipt.projectId) ||
-        m.product.tenantId !== tenantId || (m.product.companyId && m.product.companyId !== receipt.companyId) ||
-        (m.purchaseReceiptLine && (m.purchaseReceiptLine.purchaseReceiptId !== purchaseReceiptId || m.purchaseReceiptLine.purchaseOrderLine.productId !== m.productId))) {
-      throw new ServiceError("CONFLICT", "Los movimientos de la recepción tienen relaciones inconsistentes");
+    if (
+      !m.quantity.isFinite() ||
+      m.quantity.lte(0) ||
+      m.companyId !== receipt.companyId ||
+      (m.projectId && m.projectId !== receipt.projectId) ||
+      (receipt.warehouseId && m.warehouseId !== receipt.warehouseId) ||
+      m.warehouse.tenantId !== tenantId ||
+      m.warehouse.companyId !== receipt.companyId ||
+      (m.warehouse.projectId && m.warehouse.projectId !== receipt.projectId) ||
+      m.product.tenantId !== tenantId ||
+      (m.product.companyId && m.product.companyId !== receipt.companyId) ||
+      (m.purchaseReceiptLine &&
+        (m.purchaseReceiptLine.purchaseReceiptId !== purchaseReceiptId ||
+          m.purchaseReceiptLine.purchaseOrderLine.productId !== m.productId))
+    ) {
+      throw new ServiceError(
+        "CONFLICT",
+        "Los movimientos de la recepción tienen relaciones inconsistentes",
+      );
     }
     const key = `${m.warehouseId}:${m.productId}`;
     const group = byBalance.get(key);
     if (group) group.quantity = group.quantity.plus(m.quantity);
-    else byBalance.set(key, { warehouseId: m.warehouseId, productId: m.productId, quantity: m.quantity });
+    else
+      byBalance.set(key, {
+        warehouseId: m.warehouseId,
+        productId: m.productId,
+        quantity: m.quantity,
+      });
   }
+  await lockStockBalanceKeys(tx, [...byBalance.values()]);
   for (const [, group] of [...byBalance].sort(([left], [right]) => left.localeCompare(right))) {
-    await lockStockBalanceKey(tx, group.warehouseId, group.productId);
     const balance = await getStockBalance(
       {
         tenantId,
@@ -405,7 +461,10 @@ export async function cancelReceiptStockMovements(
       tx,
     );
     if (balance.lessThan(group.quantity)) {
-      const product = await tx.product.findFirst({ where: { id: group.productId, tenantId }, select: { name: true, sku: true } });
+      const product = await tx.product.findFirst({
+        where: { id: group.productId, tenantId },
+        select: { name: true, sku: true },
+      });
       const label = product?.sku ? `${product.sku} — ${product.name}` : "seleccionado";
       throw new ServiceError(
         "CONFLICT",
@@ -415,7 +474,13 @@ export async function cancelReceiptStockMovements(
   }
 
   await tx.stockMovement.updateMany({
-    where: { purchaseReceiptId, tenantId, status: "CONFIRMED", type: "IN", sourceType: "PURCHASE_RECEIPT" },
+    where: {
+      purchaseReceiptId,
+      tenantId,
+      status: "CONFIRMED",
+      type: "IN",
+      sourceType: "PURCHASE_RECEIPT",
+    },
     data: { status: "CANCELLED" },
   });
 }
@@ -484,8 +549,8 @@ export async function createJobsiteLogMaterialStockMovements(
     }
   }
 
+  await lockStockBalanceKeys(tx, [...qtyByPair.values()]);
   for (const { productId, warehouseId, qty } of qtyByPair.values()) {
-    await lockStockBalanceKey(tx, warehouseId, productId);
     const balance = await getStockBalance(
       {
         tenantId: params.tenantId,
@@ -522,7 +587,7 @@ export async function createJobsiteLogMaterialStockMovements(
     }
     const product = await tx.product.findUnique({
       where: { id: m.productId },
-      select: { companyId: true, tenantId: true, status: true },
+      select: { companyId: true, tenantId: true, status: true, unit: true },
     });
     if (!product || product.tenantId !== params.tenantId) {
       throw new ServiceError("NOT_FOUND", "Producto no encontrado");
@@ -530,6 +595,7 @@ export async function createJobsiteLogMaterialStockMovements(
     if (product.status !== "ACTIVE") {
       throw new ServiceError("CONFLICT", "El producto no está activo");
     }
+    assertProductUnitCompatible(product.unit, product.unit);
     const scopeConflict = consumptionWarehouseScopeConflict({
       warehouseCompanyId: warehouse.companyId,
       warehouseProjectId: warehouse.projectId,

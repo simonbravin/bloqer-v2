@@ -14,20 +14,10 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { StockMovementAccountingButton } from "@/features/accounting";
 import { formatDate } from "@/lib/format";
-import {
-  formatQtyFromString,
-  formatUnitPriceFromString,
-  isPositiveMoneyAmount,
-  isPositiveQty,
-} from "@/lib/format-money";
+import { formatQtyFromString, formatUnitPriceFromString } from "@/lib/format-money";
+import { STOCK_MOVEMENT_STATUS_LABELS } from "../lib/stock-movement-ui";
 import { StockMovementTypeBadge } from "./stock-movement-type-badge";
 import { StockConsumptionMobileCards } from "./stock-consumption-mobile-cards";
-
-function consumptionCostOk(m: StockMovementView): boolean {
-  if (m.totalCost && isPositiveMoneyAmount(m.totalCost)) return true;
-  if (m.unitCost && isPositiveQty(m.unitCost)) return true;
-  return false;
-}
 
 interface Props {
   movements: StockMovementView[];
@@ -55,63 +45,75 @@ export function StockMovementList({
 
   return (
     <>
-      <StockConsumptionMobileCards movements={movements} />
+      <StockConsumptionMobileCards
+        movements={movements}
+        accountingReturnPath={accountingReturnPath}
+        canEditAccounting={canEditAccounting}
+      />
       <div className="hidden md:block">
-    <TableScroll stickyFirstColumn>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Fecha</TableHead>
-            <TableHead>Tipo</TableHead>
-            <TableHead>Producto</TableHead>
-            <TableHead>Depósito</TableHead>
-            <TableHead className="text-right">Cantidad</TableHead>
-            <TableHead className="text-right">Costo unit.</TableHead>
-            <TableHead>Estado</TableHead>
-            {showGl && <TableHead>Contabilidad</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {movements.map((m) => (
-            <TableRow key={m.id}>
-              <TableCell className="tabular-nums">{formatDate(m.movementDate)}</TableCell>
-              <TableCell>
-                <StockMovementTypeBadge type={m.type} />
-              </TableCell>
-              <TableCell>{m.productName}</TableCell>
-              <TableCell>{m.warehouseName}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatQtyFromString(m.quantity)}</TableCell>
-              <TableCell className="text-right tabular-nums">
-                {m.unitCost ? formatUnitPriceFromString(m.unitCost) : "—"}
-              </TableCell>
-              <TableCell>
-                <span
-                  className={m.status === "CANCELLED" ? "text-muted-foreground line-through" : ""}
-                >
-                  {m.status === "CONFIRMED" ? "Confirmado" : "Anulado"}
-                </span>
-              </TableCell>
-              {showGl && (
-                <TableCell>
-                  {m.status === "CONFIRMED" &&
-                  m.type === "OUT" &&
-                  m.sourceType === "CONSUMPTION" &&
-                  consumptionCostOk(m) &&
-                  accountingReturnPath ? (
-                    <StockMovementAccountingButton
-                      stockMovementId={m.id}
-                      returnPath={accountingReturnPath}
-                    />
-                  ) : (
-                    <span className="text-muted-foreground text-xs">—</span>
+        <TableScroll stickyFirstColumn>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Producto</TableHead>
+                <TableHead>Depósito</TableHead>
+                <TableHead className="text-right">Cantidad</TableHead>
+                <TableHead className="text-right">Costo unit.</TableHead>
+                <TableHead>Estado</TableHead>
+                {showGl && <TableHead>Contabilidad</TableHead>}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {movements.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell className="tabular-nums">{formatDate(m.movementDate)}</TableCell>
+                  <TableCell>
+                    <StockMovementTypeBadge type={m.type} />
+                  </TableCell>
+                  <TableCell>{m.productName}</TableCell>
+                  <TableCell>{m.warehouseName}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatQtyFromString(m.quantity)} {m.productUnit}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {m.unitCost ? formatUnitPriceFromString(m.unitCost) : "—"}
+                    {m.costCurrency ? <span className="ml-1">{m.costCurrency}</span> : null}
+                    {m.costWarning ? (
+                      <p className="mt-1 text-xs text-muted-foreground">{m.costWarning}</p>
+                    ) : null}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={
+                        m.status === "CANCELLED" ? "text-muted-foreground line-through" : ""
+                      }
+                    >
+                      {STOCK_MOVEMENT_STATUS_LABELS[m.status] ?? m.status}
+                    </span>
+                  </TableCell>
+                  {showGl && (
+                    <TableCell>
+                      {m.status === "CONFIRMED" &&
+                      m.type === "OUT" &&
+                      m.sourceType === "CONSUMPTION" &&
+                      m.canGenerateAccountingDraft &&
+                      accountingReturnPath ? (
+                        <StockMovementAccountingButton
+                          stockMovementId={m.id}
+                          returnPath={accountingReturnPath}
+                        />
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
                   )}
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </TableScroll>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableScroll>
       </div>
     </>
   );

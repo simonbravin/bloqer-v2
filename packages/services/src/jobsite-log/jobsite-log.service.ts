@@ -1,6 +1,10 @@
 import { Prisma, prisma, JobsiteLog } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import type { CreateJobsiteLogInput, UpdateJobsiteLogInput, ReturnJobsiteLogInput } from "@bloqer/validators";
+import type {
+  CreateJobsiteLogInput,
+  UpdateJobsiteLogInput,
+  ReturnJobsiteLogInput,
+} from "@bloqer/validators";
 import { listEntityAuditLogs, log } from "../audit/audit.service";
 import { getStockBalance } from "../inventory/stock-balance.service";
 import {
@@ -9,6 +13,11 @@ import {
   notifyJobsiteLogSubmitted,
 } from "./jobsite-log-notifications.service";
 import { createJobsiteLogMaterialStockMovements } from "../inventory/stock-movement.service";
+import {
+  assertProductUnitCompatible,
+  lockProductsForUnitReferences,
+} from "../inventory/product-unit";
+import { assertInventoryProductScope, inventoryProductWhere, inventoryWarehouseWhere } from "../inventory/inventory-scope";
 import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { syncScheduleProgressFromJobsiteLog } from "../schedule/schedule-progress-sync.service";
 import {
@@ -26,12 +35,20 @@ import {
   remainingPhysicalPct,
   type JobsiteLogProgressSnapshot,
 } from "./jobsite-log-guards";
-import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
+import {
+  assertProjectAllowsOperationalMutation,
+  lockProjectForOperationalMutation,
+} from "../project/project-operational-guard";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { resolveActiveCompanyId } from "../company/company.service";
 import { assertCompanyMatchesProject } from "../procurement/procurement-wbs";
-import { isRichNoteEmpty, normalizeRichNote, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
+import {
+  isRichNoteEmpty,
+  normalizeRichNote,
+  roundToDecimals,
+  toIsoDateInTimeZone,
+} from "@bloqer/utils";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
 import { serializeQtyDecimal, serializeRatePctDecimal } from "../finance/money-decimal";
 import {
@@ -59,62 +76,62 @@ const HUNDRED = new Prisma.Decimal(100);
 // ─── View types ───────────────────────────────────────────────────────────────
 
 export type JobsiteLogProgressView = {
-  id:                string;
-  jobsiteLogId:      string;
-  wbsNodeId:         string;
-  description:       string | null;
+  id: string;
+  jobsiteLogId: string;
+  wbsNodeId: string;
+  description: string | null;
   quantityCompleted: string;
-  physicalPct:       string | null;
-  notes:             string | null;
-  sortOrder:         number;
-  wbsNode:           { code: string; name: string; unit: string };
+  physicalPct: string | null;
+  notes: string | null;
+  sortOrder: number;
+  wbsNode: { code: string; name: string; unit: string };
 };
 
 export type JobsiteLogLaborView = {
-  id:              string;
-  jobsiteLogId:    string;
-  contactId:       string | null;
-  subcontractId:   string | null;
+  id: string;
+  jobsiteLogId: string;
+  contactId: string | null;
+  subcontractId: string | null;
   crewDescription: string | null;
-  workersCount:    number;
-  hoursWorked:     string | null;
-  notes:           string | null;
-  sortOrder:       number;
-  contactName:     string | null;
+  workersCount: number;
+  hoursWorked: string | null;
+  notes: string | null;
+  sortOrder: number;
+  contactName: string | null;
   subcontractCode: string | null;
 };
 
 export type JobsiteLogMaterialView = {
-  id:           string;
+  id: string;
   jobsiteLogId: string;
-  wbsNodeId:    string | null;
-  productId:    string | null;
-  warehouseId:  string | null;
-  description:  string;
-  quantity:     string;
-  notes:        string | null;
-  sortOrder:    number;
-  productName:  string | null;
+  wbsNodeId: string | null;
+  productId: string | null;
+  warehouseId: string | null;
+  description: string;
+  quantity: string;
+  notes: string | null;
+  sortOrder: number;
+  productName: string | null;
   warehouseName: string | null;
 };
 
 export type JobsiteLogIssueView = {
-  id:           string;
+  id: string;
   jobsiteLogId: string;
-  type:         string;
-  severity:     string;
-  description:  string;
-  status:       string;
-  notes:        string | null;
-  sortOrder:    number;
+  type: string;
+  severity: string;
+  description: string;
+  status: string;
+  notes: string | null;
+  sortOrder: number;
 };
 
 export type JobsiteLogView = Omit<JobsiteLog, never> & {
-  projectCode:  string;
-  progress:     JobsiteLogProgressView[];
-  labor:        JobsiteLogLaborView[];
-  materials:    JobsiteLogMaterialView[];
-  issues:       JobsiteLogIssueView[];
+  projectCode: string;
+  progress: JobsiteLogProgressView[];
+  labor: JobsiteLogLaborView[];
+  materials: JobsiteLogMaterialView[];
+  issues: JobsiteLogIssueView[];
 };
 
 export type JobsiteLogLifecycleLogEntry = {
@@ -175,28 +192,51 @@ function parseAuditFileName(json: unknown): string | null {
 type LogWithRelations = JobsiteLog & {
   project: { code: string };
   progress: Array<{
-    id: string; jobsiteLogId: string; wbsNodeId: string; description: string | null;
-    quantityCompleted: Prisma.Decimal; physicalPct: Prisma.Decimal | null;
-    notes: string | null; sortOrder: number;
+    id: string;
+    jobsiteLogId: string;
+    wbsNodeId: string;
+    description: string | null;
+    quantityCompleted: Prisma.Decimal;
+    physicalPct: Prisma.Decimal | null;
+    notes: string | null;
+    sortOrder: number;
     wbsNode: { code: string; name: string; costItem: { unit: string } | null };
   }>;
   labor: Array<{
-    id: string; jobsiteLogId: string; contactId: string | null; subcontractId: string | null;
-    crewDescription: string | null; workersCount: number; hoursWorked: Prisma.Decimal | null;
-    notes: string | null; sortOrder: number;
+    id: string;
+    jobsiteLogId: string;
+    contactId: string | null;
+    subcontractId: string | null;
+    crewDescription: string | null;
+    workersCount: number;
+    hoursWorked: Prisma.Decimal | null;
+    notes: string | null;
+    sortOrder: number;
     contact: { legalName: string; fantasyName: string | null } | null;
     subcontract: { number: number } | null;
   }>;
   materials: Array<{
-    id: string; jobsiteLogId: string; wbsNodeId: string | null;
-    productId: string | null; warehouseId: string | null;
-    description: string; quantity: Prisma.Decimal; notes: string | null; sortOrder: number;
+    id: string;
+    jobsiteLogId: string;
+    wbsNodeId: string | null;
+    productId: string | null;
+    warehouseId: string | null;
+    description: string;
+    quantity: Prisma.Decimal;
+    notes: string | null;
+    sortOrder: number;
     product: { name: string } | null;
     warehouse: { name: string } | null;
   }>;
   issues: Array<{
-    id: string; jobsiteLogId: string; type: string; severity: string;
-    description: string; status: string; notes: string | null; sortOrder: number;
+    id: string;
+    jobsiteLogId: string;
+    type: string;
+    severity: string;
+    description: string;
+    status: string;
+    notes: string | null;
+    sortOrder: number;
   }>;
 };
 
@@ -205,53 +245,73 @@ function serializeLog(l: LogWithRelations): JobsiteLogView {
     ...l,
     projectCode: l.project.code,
     progress: l.progress.map((p) => ({
-      id: p.id, jobsiteLogId: p.jobsiteLogId, wbsNodeId: p.wbsNodeId,
+      id: p.id,
+      jobsiteLogId: p.jobsiteLogId,
+      wbsNodeId: p.wbsNodeId,
       description: p.description,
       quantityCompleted: serializeQtyDecimal(p.quantityCompleted),
       physicalPct: p.physicalPct != null ? serializeRatePctDecimal(p.physicalPct) : null,
-      notes: p.notes, sortOrder: p.sortOrder,
+      notes: p.notes,
+      sortOrder: p.sortOrder,
       wbsNode: { code: p.wbsNode.code, name: p.wbsNode.name, unit: p.wbsNode.costItem?.unit ?? "" },
     })),
     labor: l.labor.map((lb) => ({
-      id: lb.id, jobsiteLogId: lb.jobsiteLogId, contactId: lb.contactId,
-      subcontractId: lb.subcontractId, crewDescription: lb.crewDescription,
+      id: lb.id,
+      jobsiteLogId: lb.jobsiteLogId,
+      contactId: lb.contactId,
+      subcontractId: lb.subcontractId,
+      crewDescription: lb.crewDescription,
       workersCount: lb.workersCount,
       hoursWorked: lb.hoursWorked != null ? serializeQtyDecimal(lb.hoursWorked) : null,
-      notes: lb.notes, sortOrder: lb.sortOrder,
+      notes: lb.notes,
+      sortOrder: lb.sortOrder,
       contactName: lb.contact ? (lb.contact.fantasyName ?? lb.contact.legalName) : null,
-      subcontractCode: lb.subcontract ? `SC-${String(lb.subcontract.number).padStart(3, "0")}` : null,
+      subcontractCode: lb.subcontract
+        ? `SC-${String(lb.subcontract.number).padStart(3, "0")}`
+        : null,
     })),
     materials: l.materials.map((m) => ({
-      id: m.id, jobsiteLogId: m.jobsiteLogId, wbsNodeId: m.wbsNodeId,
-      productId: m.productId, warehouseId: m.warehouseId,
-      description: m.description, quantity: serializeQtyDecimal(m.quantity),
-      notes: m.notes, sortOrder: m.sortOrder,
+      id: m.id,
+      jobsiteLogId: m.jobsiteLogId,
+      wbsNodeId: m.wbsNodeId,
+      productId: m.productId,
+      warehouseId: m.warehouseId,
+      description: m.description,
+      quantity: serializeQtyDecimal(m.quantity),
+      notes: m.notes,
+      sortOrder: m.sortOrder,
       productName: m.product?.name ?? null,
       warehouseName: m.warehouse?.name ?? null,
     })),
     issues: l.issues.map((i) => ({
-      id: i.id, jobsiteLogId: i.jobsiteLogId, type: i.type, severity: i.severity,
-      description: i.description, status: i.status, notes: i.notes, sortOrder: i.sortOrder,
+      id: i.id,
+      jobsiteLogId: i.jobsiteLogId,
+      type: i.type,
+      severity: i.severity,
+      description: i.description,
+      status: i.status,
+      notes: i.notes,
+      sortOrder: i.sortOrder,
     })),
   };
 }
 
 const logInclude = {
-  project:   { select: { code: true } },
+  project: { select: { code: true } },
   progress: {
     include: { wbsNode: { include: { costItem: { select: { unit: true } } } } },
     orderBy: { sortOrder: "asc" as const },
   },
   labor: {
     include: {
-      contact:     { select: { legalName: true, fantasyName: true } },
+      contact: { select: { legalName: true, fantasyName: true } },
       subcontract: { select: { number: true } },
     },
     orderBy: { sortOrder: "asc" as const },
   },
   materials: {
     include: {
-      product:   { select: { name: true } },
+      product: { select: { name: true } },
       warehouse: { select: { name: true } },
     },
     orderBy: { sortOrder: "asc" as const },
@@ -282,7 +342,8 @@ export async function getWbsIncrementalProgressSnapshot(
   db: Prisma.TransactionClient = prisma,
 ): Promise<WbsIncrementalProgressSnapshot> {
   await assertJobsiteLogTenantModule(ctx);
-  if (!canViewJobsiteLogArea(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
+  if (!canViewJobsiteLogArea(ctx.roles))
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
   await requireProjectAccess(projectId, ctx);
   const logStatuses: Array<"APPROVED" | "SUBMITTED"> = options?.includeSubmitted
     ? ["APPROVED", "SUBMITTED"]
@@ -334,11 +395,17 @@ export async function getWbsCumulativePhysicalPct(
   return snapshot[wbsNodeId]?.approvedIncrementalPct ?? null;
 }
 
-
-async function assertWbsBelongsToProject(wbsNodeId: string, projectId: string, ctx: ServiceContext,
-  db: Prisma.TransactionClient = prisma) {
+async function assertWbsBelongsToProject(
+  wbsNodeId: string,
+  projectId: string,
+  ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma,
+) {
   const wbs = await db.wbsNode.findFirst({
-    where: { id: wbsNodeId, budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) } },
+    where: {
+      id: wbsNodeId,
+      budget: { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) },
+    },
     include: { budget: { select: { projectId: true, tenantId: true } } },
   });
   if (!wbs) throw new ServiceError("NOT_FOUND", `Nodo EDT no encontrado: ${wbsNodeId}`);
@@ -370,13 +437,18 @@ async function validateJobsiteLogBusinessRules(
     if (lb.contactId) {
       const contact = await db.contact.findUnique({ where: { id: lb.contactId } });
       if (!contact || contact.tenantId !== tenantId || contact.status !== "ACTIVE") {
-        throw new ServiceError("CONFLICT", "El contacto de mano de obra no existe o no está activo");
+        throw new ServiceError(
+          "CONFLICT",
+          "El contacto de mano de obra no existe o no está activo",
+        );
       }
     }
     if (lb.subcontractId) {
       const sub = await db.subcontract.findUnique({ where: { id: lb.subcontractId } });
-      if (!sub || sub.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
-      if (sub.projectId !== projectId) throw new ServiceError("CONFLICT", "El subcontrato no pertenece a este proyecto");
+      if (!sub || sub.tenantId !== tenantId)
+        throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
+      if (sub.projectId !== projectId)
+        throw new ServiceError("CONFLICT", "El subcontrato no pertenece a este proyecto");
     }
   }
 
@@ -386,18 +458,25 @@ async function validateJobsiteLogBusinessRules(
     }
     if (m.productId) {
       const product = await db.product.findUnique({ where: { id: m.productId } });
-      if (!product || product.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Producto no encontrado");
+      if (!product || product.tenantId !== tenantId)
+        throw new ServiceError("NOT_FOUND", "Producto no encontrado");
     }
     if (m.warehouseId) {
       const warehouse = await db.warehouse.findUnique({ where: { id: m.warehouseId } });
-      if (!warehouse || warehouse.tenantId !== tenantId) throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
+      if (!warehouse || warehouse.tenantId !== tenantId)
+        throw new ServiceError("NOT_FOUND", "Depósito no encontrado");
     }
   }
 
-  const approvedSnapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx, {
-    excludeLogId: options?.excludeLogId,
-    includeSubmitted: options?.includeSubmittedInProgressCap ?? true,
-  }, db);
+  const approvedSnapshot = await getWbsIncrementalProgressSnapshot(
+    projectId,
+    ctx,
+    {
+      excludeLogId: options?.excludeLogId,
+      includeSubmitted: options?.includeSubmittedInProgressCap ?? true,
+    },
+    db,
+  );
 
   const draftPctByWbs = new Map<string, Prisma.Decimal>();
   for (const p of input.progress ?? []) {
@@ -430,7 +509,10 @@ async function validateJobsiteLogBusinessRules(
     (options?.enforceStockOnLifecycle || can(ctx.roles, "VIEW", "INVENTORY"));
 
   if (inventoryChecks) {
-    const qtyByPair = new Map<string, { productId: string; warehouseId: string; qty: Prisma.Decimal }>();
+    const qtyByPair = new Map<
+      string,
+      { productId: string; warehouseId: string; qty: Prisma.Decimal }
+    >();
     for (const m of input.materials ?? []) {
       if (!m.productId || !m.warehouseId) continue;
       const key = `${m.productId}:${m.warehouseId}`;
@@ -543,23 +625,48 @@ async function validateJobsiteLogFromDb(
 }
 
 async function writeChildren(
-  tx: Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">,
+  tx: Omit<
+    typeof prisma,
+    "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+  >,
   logId: string,
   input: Pick<CreateJobsiteLogInput, "progress" | "labor" | "materials" | "issues">,
+  ctx: ServiceContext,
 ) {
+  const productIds = (input.materials ?? [])
+    .map((line) => line.productId)
+    .filter((id): id is string => Boolean(id));
+  if (productIds.length > 0) {
+    const parent = await tx.jobsiteLog.findUniqueOrThrow({
+      where: { id: logId },
+      select: { tenantId: true, companyId: true },
+    });
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${parent.companyId} AND "tenantId" = ${ctx.tenantId} FOR KEY SHARE`;
+    await lockProductsForUnitReferences(tx, productIds, ctx.tenantId);
+    const products = await tx.product.findMany({
+      where: { id: { in: productIds }, tenantId: ctx.tenantId },
+    });
+    if (products.length !== new Set(productIds).size)
+      throw new ServiceError("NOT_FOUND", "Producto no encontrado");
+    for (const product of products) {
+      await assertInventoryProductScope(product, { ...ctx, companyId: parent.companyId });
+      // Material usages have no separate unit column: inherit the protected product unit.
+      assertProductUnitCompatible(product.unit, product.unit);
+    }
+  }
   for (let i = 0; i < (input.progress?.length ?? 0); i++) {
     const p = input.progress![i]!;
     await tx.jobsiteLogProgress.create({
       data: {
-        jobsiteLogId:      logId,
-        wbsNodeId:         p.wbsNodeId,
-        description:       p.description ?? null,
+        jobsiteLogId: logId,
+        wbsNodeId: p.wbsNodeId,
+        description: p.description ?? null,
         quantityCompleted: new Prisma.Decimal(serializeQtyDecimal(p.quantityCompleted)),
-        physicalPct:       p.physicalPct
+        physicalPct: p.physicalPct
           ? new Prisma.Decimal(serializeRatePctDecimal(p.physicalPct))
           : null,
-        notes:             p.notes ?? null,
-        sortOrder:         p.sortOrder ?? i,
+        notes: p.notes ?? null,
+        sortOrder: p.sortOrder ?? i,
       },
     });
   }
@@ -567,14 +674,14 @@ async function writeChildren(
     const lb = input.labor![i]!;
     await tx.jobsiteLogLabor.create({
       data: {
-        jobsiteLogId:    logId,
-        contactId:       lb.contactId ?? null,
-        subcontractId:   lb.subcontractId ?? null,
+        jobsiteLogId: logId,
+        contactId: lb.contactId ?? null,
+        subcontractId: lb.subcontractId ?? null,
         crewDescription: lb.crewDescription ?? null,
-        workersCount:    lb.workersCount,
-        hoursWorked:     lb.hoursWorked ? new Prisma.Decimal(lb.hoursWorked) : null,
-        notes:           lb.notes ?? null,
-        sortOrder:       lb.sortOrder ?? i,
+        workersCount: lb.workersCount,
+        hoursWorked: lb.hoursWorked ? new Prisma.Decimal(lb.hoursWorked) : null,
+        notes: lb.notes ?? null,
+        sortOrder: lb.sortOrder ?? i,
       },
     });
   }
@@ -583,13 +690,13 @@ async function writeChildren(
     await tx.jobsiteLogMaterialUsage.create({
       data: {
         jobsiteLogId: logId,
-        wbsNodeId:    m.wbsNodeId ?? null,
-        productId:    m.productId ?? null,
-        warehouseId:  m.warehouseId ?? null,
-        description:  m.description,
-        quantity:     new Prisma.Decimal(m.quantity),
-        notes:        m.notes ?? null,
-        sortOrder:    m.sortOrder ?? i,
+        wbsNodeId: m.wbsNodeId ?? null,
+        productId: m.productId ?? null,
+        warehouseId: m.warehouseId ?? null,
+        description: m.description,
+        quantity: new Prisma.Decimal(m.quantity),
+        notes: m.notes ?? null,
+        sortOrder: m.sortOrder ?? i,
       },
     });
   }
@@ -598,12 +705,12 @@ async function writeChildren(
     await tx.jobsiteLogIssue.create({
       data: {
         jobsiteLogId: logId,
-        type:         iss.type,
-        severity:     iss.severity,
-        description:  iss.description,
-        status:       iss.status ?? "OPEN",
-        notes:        iss.notes ?? null,
-        sortOrder:    iss.sortOrder ?? i,
+        type: iss.type,
+        severity: iss.severity,
+        description: iss.description,
+        status: iss.status ?? "OPEN",
+        notes: iss.notes ?? null,
+        sortOrder: iss.sortOrder ?? i,
       },
     });
   }
@@ -618,7 +725,8 @@ export async function getJobsiteLogById(id: string, ctx: ServiceContext): Promis
   }
   const l = await prisma.jobsiteLog.findUnique({ where: { id }, include: logInclude });
   if (!l) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (l.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (l.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await requireProjectAccessIfPresent(l.projectId, ctx);
   return serializeLog(l);
 }
@@ -637,16 +745,12 @@ export async function getJobsiteLogActivityLog(
     select: { id: true, tenantId: true, projectId: true, createdBy: true, updatedBy: true },
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   await requireProjectAccessIfPresent(existing.projectId, ctx);
 
   const [lifecycleRows, linkedDocs, actorUsers] = await Promise.all([
-    listEntityAuditLogs(
-      ctx.tenantId,
-      "JobsiteLog",
-      logId,
-      [...JOBSITE_LOG_LIFECYCLE_ACTIONS],
-    ),
+    listEntityAuditLogs(ctx.tenantId, "JobsiteLog", logId, [...JOBSITE_LOG_LIFECYCLE_ACTIONS]),
     prisma.documentAttachment.findMany({
       where: {
         tenantId: ctx.tenantId,
@@ -700,8 +804,8 @@ export async function getJobsiteLogActivityLog(
 
   return {
     entries,
-    createdByName: existing.createdBy ? actorNameById.get(existing.createdBy) ?? null : null,
-    updatedByName: existing.updatedBy ? actorNameById.get(existing.updatedBy) ?? null : null,
+    createdByName: existing.createdBy ? (actorNameById.get(existing.createdBy) ?? null) : null,
+    updatedByName: existing.updatedBy ? (actorNameById.get(existing.updatedBy) ?? null) : null,
   };
 }
 
@@ -761,9 +865,7 @@ export async function listJobsiteLogsByProject(
             },
           }
         : {}),
-      ...(wbsNodeIdFilter
-        ? { progress: { some: { wbsNodeId: wbsNodeIdFilter } } }
-        : {}),
+      ...(wbsNodeIdFilter ? { progress: { some: { wbsNodeId: wbsNodeIdFilter } } } : {}),
     },
     include: logInclude,
     orderBy: [{ logDate: "desc" }, { createdAt: "desc" }],
@@ -790,40 +892,36 @@ export async function getJobsiteLogFormPickList(
   if (!canViewJobsiteLogArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
   }
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { tenantId: true, companyId: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  const project = await requireProjectAccess(projectId, ctx);
+  const [gate, resolvedCompanyId] = await Promise.all([getTenantModuleGate(ctx), resolveActiveCompanyId(ctx, project.companyId)]);
+  const scopeCtx = { ...ctx, companyId: resolvedCompanyId ?? ctx.companyId };
+  const inventoryModuleEnabled = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
+  const warehouseWhere = inventoryModuleEnabled ? await inventoryWarehouseWhere(scopeCtx) : null;
 
-  const [contacts, products, warehouses, subcontracts, gate, resolvedCompanyId] = await Promise.all([
-    prisma.contact.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-      select: { id: true, legalName: true, fantasyName: true },
-      orderBy: { legalName: "asc" },
-    }),
-    prisma.product.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.warehouse.findMany({
-      where: { tenantId: ctx.tenantId, status: "ACTIVE" },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.subcontract.findMany({
-      where: { tenantId: ctx.tenantId, projectId, status: "ACTIVE" },
-      select: { id: true, number: true, title: true },
-      orderBy: { number: "asc" },
-    }),
-    getTenantModuleGate(ctx),
-    resolveActiveCompanyId(ctx, project.companyId),
-  ]);
-
-  const inventoryModuleEnabled =
-    gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
+  const [contacts, products, warehouses, subcontracts] = await Promise.all(
+    [
+      prisma.contact.findMany({
+        where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+        select: { id: true, legalName: true, fantasyName: true },
+        orderBy: { legalName: "asc" },
+      }),
+      inventoryModuleEnabled ? prisma.product.findMany({
+        where: { ...inventoryProductWhere(scopeCtx), status: "ACTIVE" },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }) : Promise.resolve([]),
+      inventoryModuleEnabled ? prisma.warehouse.findMany({
+        where: { AND: [warehouseWhere!, { OR: [{ projectId: null }, { projectId }] }], status: "ACTIVE" },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }) : Promise.resolve([]),
+      prisma.subcontract.findMany({
+        where: { tenantId: ctx.tenantId, projectId, ...(scopeCtx.companyId ? { companyId: scopeCtx.companyId } : {}), status: "ACTIVE" },
+        select: { id: true, number: true, title: true },
+        orderBy: { number: "asc" },
+      }),
+    ],
+  );
 
   return {
     companyId: resolvedCompanyId ?? "",
@@ -886,14 +984,23 @@ export async function createJobsiteLog(
   }
 
   const hasContent =
-    !isRichNoteEmpty(generalNotes) || input.blockers || input.incidents || input.safetyNotes ||
-    input.title || input.workFront || input.weather || input.shift ||
+    !isRichNoteEmpty(generalNotes) ||
+    input.blockers ||
+    input.incidents ||
+    input.safetyNotes ||
+    input.title ||
+    input.workFront ||
+    input.weather ||
+    input.shift ||
     (input.progress?.length ?? 0) > 0 ||
     (input.labor?.length ?? 0) > 0 ||
     (input.materials?.length ?? 0) > 0 ||
     (input.issues?.length ?? 0) > 0;
   if (!hasContent) {
-    throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo o una entrada");
+    throw new ServiceError(
+      "CONFLICT",
+      "El parte debe tener al menos un campo descriptivo o una entrada",
+    );
   }
 
   await validateJobsiteLogBusinessRules(input, input.projectId, ctx.tenantId, ctx);
@@ -906,29 +1013,33 @@ export async function createJobsiteLog(
       }),
     payloadsMatch: (existing) => jobsiteLogReplayMatches(existing, replayInput),
     create: async () => {
-      const created = await prisma.$transaction(async (tx) => {
-        const row = await tx.jobsiteLog.create({
-          data: {
-            tenantId:     ctx.tenantId,
-            companyId,
-            projectId:    input.projectId,
-            logDate:      new Date(input.logDate),
-            title:        input.title ?? null,
-            workFront:    input.workFront ?? null,
-            shift:        input.shift ?? null,
-            weather:      input.weather ?? null,
-            generalNotes,
-            blockers:     input.blockers ?? null,
-            incidents:    input.incidents ?? null,
-            safetyNotes:  input.safetyNotes ?? null,
-            idempotencyKey,
-            createdBy:    ctx.actorUserId,
-            updatedBy:    ctx.actorUserId,
-          },
-        });
-        await writeChildren(tx, row.id, input);
-        return tx.jobsiteLog.findUniqueOrThrow({ where: { id: row.id }, include: logInclude });
-      });
+      const created = await prisma.$transaction(
+        async (tx) => {
+          await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+          const row = await tx.jobsiteLog.create({
+            data: {
+              tenantId: ctx.tenantId,
+              companyId,
+              projectId: input.projectId,
+              logDate: new Date(input.logDate),
+              title: input.title ?? null,
+              workFront: input.workFront ?? null,
+              shift: input.shift ?? null,
+              weather: input.weather ?? null,
+              generalNotes,
+              blockers: input.blockers ?? null,
+              incidents: input.incidents ?? null,
+              safetyNotes: input.safetyNotes ?? null,
+              idempotencyKey,
+              createdBy: ctx.actorUserId,
+              updatedBy: ctx.actorUserId,
+            },
+          });
+          await writeChildren(tx, row.id, input, ctx);
+          return tx.jobsiteLog.findUniqueOrThrow({ where: { id: row.id }, include: logInclude });
+        },
+        { maxWait: 10_000, timeout: 30_000 },
+      );
 
       await log({
         tenantId: ctx.tenantId,
@@ -962,8 +1073,10 @@ export async function updateJobsiteLog(
 
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (ctx.companyId && existing.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
+  if (existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (ctx.companyId && existing.companyId !== ctx.companyId)
+    throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede editarse`);
   }
@@ -983,54 +1096,84 @@ export async function updateJobsiteLog(
     { excludeLogId: id },
   );
 
-  const result = await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.jobsiteLog.findFirst({ where: { id, tenantId: ctx.tenantId, projectId: existing.projectId } });
-    if (!current || current.status !== "DRAFT" || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
-      throw new ServiceError("CONFLICT", "El parte cambió o ya no está en borrador. Recargá e intentá de nuevo.");
-    }
-    if (ctx.companyId && current.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
-    await validateJobsiteLogBusinessRules({ progress: input.progress, labor: input.labor, materials: input.materials }, current.projectId, ctx.tenantId, ctx, { excludeLogId: id }, tx);
-    await tx.jobsiteLog.update({
-      where: { id },
-      data: {
-        logDate:      input.logDate ? new Date(input.logDate) : current.logDate,
-        title:        input.title        !== undefined ? input.title        : current.title,
-        workFront:    input.workFront    !== undefined ? input.workFront    : current.workFront,
-        shift:        input.shift        !== undefined ? input.shift        : current.shift,
-        weather:      input.weather      !== undefined ? input.weather      : current.weather,
-        generalNotes: input.generalNotes !== undefined ? normalizeRichNote(input.generalNotes) : current.generalNotes,
-        blockers:     input.blockers     !== undefined ? input.blockers     : current.blockers,
-        incidents:    input.incidents    !== undefined ? input.incidents    : current.incidents,
-        safetyNotes:  input.safetyNotes  !== undefined ? input.safetyNotes  : current.safetyNotes,
-        updatedBy:    ctx.actorUserId,
-      },
-    });
-    // Full replacement of children
-    await tx.jobsiteLogProgress.deleteMany({ where: { jobsiteLogId: id } });
-    await tx.jobsiteLogLabor.deleteMany({ where: { jobsiteLogId: id } });
-    await tx.jobsiteLogMaterialUsage.deleteMany({ where: { jobsiteLogId: id } });
-    await tx.jobsiteLogIssue.deleteMany({ where: { jobsiteLogId: id } });
-    await writeChildren(tx, id, {
-      progress:  input.progress  ?? [],
-      labor:     input.labor     ?? [],
-      materials: input.materials ?? [],
-      issues:    input.issues    ?? [],
-    });
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      companyId: current.companyId,
-      projectId: current.projectId,
-      action: "JOBSITE_LOG_UPDATED",
-      entityType: "JobsiteLog",
-      entityId: id,
-      after: { logDate: input.logDate },
-    }, tx);
-    return tx.jobsiteLog.findUniqueOrThrow({ where: { id }, include: logInclude });
-  }, { maxWait: 10_000, timeout: 30_000 });
-
+  const result = await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.jobsiteLog.findFirst({
+        where: { id, tenantId: ctx.tenantId, projectId: existing.projectId },
+      });
+      if (
+        !current ||
+        current.status !== "DRAFT" ||
+        current.updatedAt.getTime() !== existing.updatedAt.getTime()
+      ) {
+        throw new ServiceError(
+          "CONFLICT",
+          "El parte cambió o ya no está en borrador. Recargá e intentá de nuevo.",
+        );
+      }
+      if (ctx.companyId && current.companyId !== ctx.companyId)
+        throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
+      await validateJobsiteLogBusinessRules(
+        { progress: input.progress, labor: input.labor, materials: input.materials },
+        current.projectId,
+        ctx.tenantId,
+        ctx,
+        { excludeLogId: id },
+        tx,
+      );
+      await tx.jobsiteLog.update({
+        where: { id },
+        data: {
+          logDate: input.logDate ? new Date(input.logDate) : current.logDate,
+          title: input.title !== undefined ? input.title : current.title,
+          workFront: input.workFront !== undefined ? input.workFront : current.workFront,
+          shift: input.shift !== undefined ? input.shift : current.shift,
+          weather: input.weather !== undefined ? input.weather : current.weather,
+          generalNotes:
+            input.generalNotes !== undefined
+              ? normalizeRichNote(input.generalNotes)
+              : current.generalNotes,
+          blockers: input.blockers !== undefined ? input.blockers : current.blockers,
+          incidents: input.incidents !== undefined ? input.incidents : current.incidents,
+          safetyNotes: input.safetyNotes !== undefined ? input.safetyNotes : current.safetyNotes,
+          updatedBy: ctx.actorUserId,
+        },
+      });
+      // Full replacement of children
+      await tx.jobsiteLogProgress.deleteMany({ where: { jobsiteLogId: id } });
+      await tx.jobsiteLogLabor.deleteMany({ where: { jobsiteLogId: id } });
+      await tx.jobsiteLogMaterialUsage.deleteMany({ where: { jobsiteLogId: id } });
+      await tx.jobsiteLogIssue.deleteMany({ where: { jobsiteLogId: id } });
+      await writeChildren(
+        tx,
+        id,
+        {
+          progress: input.progress ?? [],
+          labor: input.labor ?? [],
+          materials: input.materials ?? [],
+          issues: input.issues ?? [],
+        },
+        ctx,
+      );
+      await log(
+        {
+          tenantId: ctx.tenantId,
+          actorUserId: ctx.actorUserId,
+          companyId: current.companyId,
+          projectId: current.projectId,
+          action: "JOBSITE_LOG_UPDATED",
+          entityType: "JobsiteLog",
+          entityId: id,
+          after: { logDate: input.logDate },
+        },
+        tx,
+      );
+      return tx.jobsiteLog.findUniqueOrThrow({ where: { id }, include: logInclude });
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   return serializeLog(result);
 }
@@ -1052,59 +1195,86 @@ export async function submitJobsiteLog(id: string, ctx: ServiceContext): Promise
     },
   });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (ctx.companyId && existing.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
+  if (existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (ctx.companyId && existing.companyId !== ctx.companyId)
+    throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", `El parte en estado "${existing.status}" no puede enviarse`);
   }
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
   const hasContent =
-    !isRichNoteEmpty(existing.generalNotes) || existing.blockers || existing.incidents || existing.safetyNotes ||
-    existing.title || existing.workFront || existing.weather || existing.shift ||
+    !isRichNoteEmpty(existing.generalNotes) ||
+    existing.blockers ||
+    existing.incidents ||
+    existing.safetyNotes ||
+    existing.title ||
+    existing.workFront ||
+    existing.weather ||
+    existing.shift ||
     existing.progress.length > 0 ||
     existing.labor.length > 0 ||
     existing.materials.length > 0 ||
     existing.issues.length > 0;
   if (!hasContent) {
-    throw new ServiceError("CONFLICT", "El parte debe tener al menos un campo descriptivo antes de enviarse");
+    throw new ServiceError(
+      "CONFLICT",
+      "El parte debe tener al menos un campo descriptivo antes de enviarse",
+    );
   }
 
   await validateJobsiteLogFromDb(id, existing.projectId, ctx.tenantId, ctx);
 
-  const updated = await prisma.$transaction(async (tx) => {
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.jobsiteLog.findFirst({ where: { id, tenantId: ctx.tenantId, projectId: existing.projectId } });
-    if (!current || current.status !== "DRAFT" || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
-      throw new ServiceError("CONFLICT", "El parte cambió o ya no está en borrador. Recargá e intentá de nuevo.");
-    }
-    if (ctx.companyId && current.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
-    await validateJobsiteLogFromDb(id, current.projectId, ctx.tenantId, ctx, tx);
-    const flipped = await tx.jobsiteLog.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
-      data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "El parte ya no está en borrador. Recargá e intentá de nuevo.",
-    );
-    const updated = await tx.jobsiteLog.findUniqueOrThrow({
-      where: { id },
-      include: logInclude,
-    });
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      companyId: current.companyId,
-      projectId: current.projectId,
-      action: "JOBSITE_LOG_SUBMITTED",
-      entityType: "JobsiteLog",
-      entityId: id,
-      before: { status: current.status },
-      after: { status: "SUBMITTED" },
-    }, tx);
-    return updated;
-  }, { maxWait: 10_000, timeout: 30_000 });
+  const updated = await prisma.$transaction(
+    async (tx) => {
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.jobsiteLog.findFirst({
+        where: { id, tenantId: ctx.tenantId, projectId: existing.projectId },
+      });
+      if (
+        !current ||
+        current.status !== "DRAFT" ||
+        current.updatedAt.getTime() !== existing.updatedAt.getTime()
+      ) {
+        throw new ServiceError(
+          "CONFLICT",
+          "El parte cambió o ya no está en borrador. Recargá e intentá de nuevo.",
+        );
+      }
+      if (ctx.companyId && current.companyId !== ctx.companyId)
+        throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
+      await validateJobsiteLogFromDb(id, current.projectId, ctx.tenantId, ctx, tx);
+      const flipped = await tx.jobsiteLog.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+        data: { status: "SUBMITTED", returnNotes: null, updatedBy: ctx.actorUserId },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "El parte ya no está en borrador. Recargá e intentá de nuevo.",
+      );
+      const updated = await tx.jobsiteLog.findUniqueOrThrow({
+        where: { id },
+        include: logInclude,
+      });
+      await log(
+        {
+          tenantId: ctx.tenantId,
+          actorUserId: ctx.actorUserId,
+          companyId: current.companyId,
+          projectId: current.projectId,
+          action: "JOBSITE_LOG_SUBMITTED",
+          entityType: "JobsiteLog",
+          entityId: id,
+          before: { status: current.status },
+          after: { status: "SUBMITTED" },
+        },
+        tx,
+      );
+      return updated;
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   await notifyJobsiteLogSubmitted({
     ctx,
@@ -1125,8 +1295,10 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
   }
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  if (ctx.companyId && existing.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
+  if (existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (ctx.companyId && existing.companyId !== ctx.companyId)
+    throw new ServiceError("FORBIDDEN", "El documento no pertenece a la empresa activa");
   assertJobsiteLogApprovable(existing.status);
 
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
@@ -1138,77 +1310,90 @@ export async function approveJobsiteLog(id: string, ctx: ServiceContext): Promis
   }
 
   let stockMovementsCreated = 0;
-  const updated = await prisma.$transaction(async (tx) => {
-    // Serialize project lifecycle and manual schedule edits before document locks.
-    await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
-    await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
-    const current = await tx.jobsiteLog.findFirst({
-      where: { id, tenantId: ctx.tenantId, projectId: existing.projectId },
-    });
-    if (!current || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
-      throw new ServiceError("CONFLICT", "El parte cambió durante la aprobación. Recargá e intentá de nuevo.");
-    }
-    assertJobsiteLogApprovable(current.status);
-    await validateJobsiteLogFromDb(id, current.projectId, ctx.tenantId, ctx, tx);
-    if (ctx.companyId && current.companyId !== ctx.companyId) throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
-    const flipped = await tx.jobsiteLog.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
-      data: { status: "APPROVED", updatedBy: ctx.actorUserId },
-    });
-    assertOptimisticRowUpdate(
-      flipped.count,
-      "El parte ya no está enviado. Recargá e intentá de nuevo.",
-    );
+  const updated = await prisma.$transaction(
+    async (tx) => {
+      // Serialize project lifecycle and manual schedule edits before document locks.
+      await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+      await tx.$queryRaw`SELECT id FROM jobsite_logs WHERE id = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.jobsiteLog.findFirst({
+        where: { id, tenantId: ctx.tenantId, projectId: existing.projectId },
+      });
+      if (!current || current.updatedAt.getTime() !== existing.updatedAt.getTime()) {
+        throw new ServiceError(
+          "CONFLICT",
+          "El parte cambió durante la aprobación. Recargá e intentá de nuevo.",
+        );
+      }
+      assertJobsiteLogApprovable(current.status);
+      await validateJobsiteLogFromDb(id, current.projectId, ctx.tenantId, ctx, tx);
+      if (ctx.companyId && current.companyId !== ctx.companyId)
+        throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
+      const flipped = await tx.jobsiteLog.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "SUBMITTED" },
+        data: { status: "APPROVED", updatedBy: ctx.actorUserId },
+      });
+      assertOptimisticRowUpdate(
+        flipped.count,
+        "El parte ya no está enviado. Recargá e intentá de nuevo.",
+      );
 
-    if (gate.isEnabled("INVENTORY")) {
-      const logWithMaterials = await tx.jobsiteLog.findUniqueOrThrow({
+      if (gate.isEnabled("INVENTORY")) {
+        const logWithMaterials = await tx.jobsiteLog.findUniqueOrThrow({
+          where: { id },
+          include: { materials: true, progress: { select: { wbsNodeId: true } } },
+        });
+        stockMovementsCreated = await createJobsiteLogMaterialStockMovements(tx, {
+          jobsiteLogId: id,
+          projectId: existing.projectId,
+          logDate: existing.logDate,
+          tenantId: ctx.tenantId,
+          companyId: existing.companyId,
+          actorUserId: ctx.actorUserId,
+          progressWbsNodeIds: logWithMaterials.progress.map((p) => p.wbsNodeId),
+          materials: logWithMaterials.materials,
+        });
+      }
+
+      await syncScheduleProgressFromJobsiteLog(id, existing.projectId, ctx, tx);
+
+      if (stockMovementsCreated > 0) {
+        await log(
+          {
+            tenantId: ctx.tenantId,
+            actorUserId: ctx.actorUserId,
+            companyId: existing.companyId,
+            projectId: existing.projectId,
+            action: "JOBSITE_LOG_STOCK_CONSUMED",
+            entityType: "JobsiteLog",
+            entityId: id,
+            after: { stockMovementsCreated },
+          },
+          tx,
+        );
+      }
+
+      await log(
+        {
+          tenantId: ctx.tenantId,
+          actorUserId: ctx.actorUserId,
+          companyId: existing.companyId,
+          projectId: existing.projectId,
+          action: "JOBSITE_LOG_APPROVED",
+          entityType: "JobsiteLog",
+          entityId: id,
+          before: { status: existing.status },
+          after: { status: "APPROVED" },
+        },
+        tx,
+      );
+
+      return tx.jobsiteLog.findUniqueOrThrow({
         where: { id },
-        include: { materials: true, progress: { select: { wbsNodeId: true } } },
+        include: logInclude,
       });
-      stockMovementsCreated = await createJobsiteLogMaterialStockMovements(tx, {
-        jobsiteLogId: id,
-        projectId:    existing.projectId,
-        logDate:      existing.logDate,
-        tenantId:     ctx.tenantId,
-        companyId:    existing.companyId,
-        actorUserId:  ctx.actorUserId,
-        progressWbsNodeIds: logWithMaterials.progress.map((p) => p.wbsNodeId),
-        materials:    logWithMaterials.materials,
-      });
-    }
-
-    await syncScheduleProgressFromJobsiteLog(id, existing.projectId, ctx, tx);
-
-    if (stockMovementsCreated > 0) {
-      await log({
-        tenantId:    ctx.tenantId,
-        actorUserId: ctx.actorUserId,
-        companyId:   existing.companyId,
-        projectId:   existing.projectId,
-        action:      "JOBSITE_LOG_STOCK_CONSUMED",
-        entityType:  "JobsiteLog",
-        entityId:    id,
-        after:       { stockMovementsCreated },
-      }, tx);
-    }
-
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      companyId: existing.companyId,
-      projectId: existing.projectId,
-      action: "JOBSITE_LOG_APPROVED",
-      entityType: "JobsiteLog",
-      entityId: id,
-      before: { status: existing.status },
-      after: { status: "APPROVED" },
-    }, tx);
-
-    return tx.jobsiteLog.findUniqueOrThrow({
-      where: { id },
-      include: logInclude,
-    });
-  }, { maxWait: 10_000, timeout: 30_000 });
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
 
   await notifyJobsiteLogApproved({
     ctx,
@@ -1233,9 +1418,13 @@ export async function returnJobsiteLog(
   }
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (existing.status !== "SUBMITTED") {
-    throw new ServiceError("CONFLICT", `Solo los partes enviados pueden devolverse para corrección. Estado actual: "${existing.status}"`);
+    throw new ServiceError(
+      "CONFLICT",
+      `Solo los partes enviados pueden devolverse para corrección. Estado actual: "${existing.status}"`,
+    );
   }
 
   await assertProjectAllowsOperationalMutation(existing.projectId, ctx);
@@ -1284,9 +1473,13 @@ export async function cancelJobsiteLog(id: string, ctx: ServiceContext): Promise
   }
   const existing = await prisma.jobsiteLog.findUnique({ where: { id } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  if (existing.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (existing.tenantId !== ctx.tenantId)
+    throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (existing.status !== "DRAFT") {
-    throw new ServiceError("CONFLICT", `Solo los partes en borrador pueden cancelarse. Estado actual: "${existing.status}"`);
+    throw new ServiceError(
+      "CONFLICT",
+      `Solo los partes en borrador pueden cancelarse. Estado actual: "${existing.status}"`,
+    );
   }
   const flipped = await prisma.jobsiteLog.updateMany({
     where: { id, tenantId: ctx.tenantId, status: "DRAFT" },

@@ -16,6 +16,7 @@ import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject, lockProcurementCompanyForNumbering } from "./procurement-wbs";
 import { isCrossCompany } from "../company-scope";
+import { assertProductUnitCompatible, lockProductsForUnitReferences } from "../inventory/product-unit";
 
 // Multi-supplier awards include locks, line writes and audit in one atomic transaction.
 // Bound their duration explicitly; the Prisma 5s default expired on the isolated Neon regression.
@@ -278,9 +279,13 @@ async function createOnePoFromQuoteLinesInTx(
   }
   const productIds = [...new Set(prLines.map((line) => line.productId).filter((id): id is string => Boolean(id)))];
   if (productIds.length) {
-    const products = await tx.product.findMany({ where: { id: { in: productIds }, tenantId: ctx.tenantId }, select: { id: true, companyId: true } });
+    await lockProductsForUnitReferences(tx, productIds, ctx.tenantId);
+    const products = await tx.product.findMany({ where: { id: { in: productIds }, tenantId: ctx.tenantId }, select: { id: true, companyId: true, unit: true } });
     if (products.length !== productIds.length || products.some((product) => isCrossCompany(product.companyId, lineCtx))) {
       throw new ServiceError("CONFLICT", "Uno o más productos no pertenecen al alcance de la solicitud");
+    }
+    for (const line of prLines) {
+      if (line.productId) assertProductUnitCompatible(products.find((product) => product.id === line.productId)!.unit, line.unit);
     }
   }
 
@@ -547,6 +552,12 @@ export async function createPurchaseOrdersFromAwards(
     await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await lockProcurementCompanyForNumbering(tx, pr.companyId, ctx.tenantId);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${purchaseRequestId} FOR UPDATE`;
+
+    // A batch can span multiple quote groups; acquire the complete product set once.
+    const productLines = await tx.purchaseRequestLine.findMany({
+      where: { purchaseRequestId, id: { in: allLineIds } }, select: { productId: true },
+    });
+    await lockProductsForUnitReferences(tx, productLines.flatMap((line) => line.productId ? [line.productId] : []), ctx.tenantId);
 
     const maxNum = await tx.purchaseOrder.aggregate({
       where: { tenantId: ctx.tenantId, companyId: pr.companyId },

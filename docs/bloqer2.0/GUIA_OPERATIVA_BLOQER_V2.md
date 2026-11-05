@@ -926,6 +926,8 @@ flowchart LR
 
 - Actualiza el **% Real** de tareas con partida EDT primaria enlazada.
 - Materiales del parte con producto + depósito pueden generar **consumo de inventario**.
+- La cantidad del material del parte usa la unidad de su producto; el parte no tiene una unidad independiente. Vincular el producto fija su unidad desde ese uso, incluso en borrador (D-130). Al aprobar se revalida el producto antes de consumir; no se convierte ni se usa la unidad de la partida como equivalencia.
+- Los productos, depósitos y subcontratos del parte respetan la empresa del documento y el acceso a la obra; los contactos mantienen el directorio compartido del tenant. Productos y depósitos aparecen únicamente con Inventario habilitado y permiso de consulta; para consumir se ofrecen depósitos generales o de esa misma obra, dentro del alcance autorizado.
 - **Imputación EDT del consumo (D-055):** partida EDT de la línea de material (`WbsNode`); si falta y hay **exactamente una** partida de progreso → esa; si hay **varias** partidas y el material no trae partida EDT → **conflicto** (no se crea consumo).
 
 ### 8.3 Procedimiento — Consumos de stock (manual)
@@ -1157,6 +1159,8 @@ En el **detalle** de la OC, debajo del título, hay una **pista de proceso** (Bo
 1. Desde **Pendientes** (botón **Recibir**), la **campana** (CTA **Registrar recepción**), la OC (**Registrar recepción** / **Continuar recepción**) o Compras → **Recepciones**. Todos los caminos usan la **misma ficha**.
 2. Si ya hay una recepción en **Borrador** para esa OC, el sistema **abre ese borrador** (no crea otro). En borrador podés editar **fecha**, cantidades, notas y depósito.
 3. **Guardar borrador** deja la recepción pendiente; **Confirmar recepción** cierra el ingreso. **Depósito destino** es obligatorio para líneas con producto: genera el ingreso de stock. Las líneas sin producto asociado no generan stock, aunque el tipo de costo sea Materiales. Si no aparece un depósito autorizado, revisá Inventario o pedí acceso. Esta orientación se muestra también cuando no hay depósitos disponibles. Cantidades pendientes se muestran a **2 decimales** y ya descuentan lo reservado en borradores; se admite el excedente autorizado por la tolerancia de la empresa.
+
+   La unidad de la línea de OC debe coincidir con la del producto para confirmar el ingreso (D-130). Una diferencia se rechaza sin convertir cantidades ni alterar históricos; revisá el documento origen sin modificar una OC confirmada para sortear el control.
 4. Al confirmar: si hay un **hito** del mismo proyecto vinculado a la EDT de alguna línea recibida (`PLANNED`/`IN_PROGRESS`), el sistema lo marca **Completado** ([D-104] / [BR-SCH-005]). Anular la recepción **no** reabre el hito.
 5. Si la política **Al recibir, crear borrador de factura** está ON ([D-108]), se crea un borrador AP (idempotente). Completar y **emitir** sigue siendo necesario para CxP.
 
@@ -1533,7 +1537,20 @@ Las facturas y cuentas por pagar **sin proyecto** requieren permisos de finanzas
 
 *Inventario con subnav.*
 
-> **Limitación:** no hay **valuación de inventario FIFO/promedio** configurable; el costo se toma de la compra.
+### 14.1 Productos, depósitos y movimientos
+
+**Unidad del producto (D-130):** podés cambiarla antes de su primer uso. Desde que se referencia en una solicitud, OC, APU, material de parte, transferencia o movimiento, queda fija; **Editar producto** lo informa y permite corregir los demás campos. Para trabajar con otra unidad, creá otro producto. Las compras vinculadas y los nuevos ingresos/consumos deben usar la misma unidad: Bloqer no convierte bolsas a kg ni kg a toneladas. El material del parte usa directamente la unidad del producto, sin un campo independiente. Un error de unidad conserva la operación sin efectos parciales; revisá el producto y la unidad del documento origen. No modifiques una OC confirmada para sortearlo. Los históricos se conservan.
+
+En **Nuevo depósito**, **Obra (opcional)** permite elegir una obra autorizada o **Sin obra vinculada** para un depósito general. La búsqueda respeta la empresa y los accesos actuales. Editar conserva ese vínculo; un depósito histórico **Cerrado** no ofrece edición ni reactivación.
+
+- Abrí **Productos** o **Depósitos** y entrá a la ficha. Con permiso de edición, **Editar** abre **Editar producto** (`/inventario/productos/[productId]/editar`) o **Editar depósito** (`/inventario/depositos/[warehouseId]/editar`); completá los campos disponibles y pulsá **Guardar cambios**. El SKU del producto y la empresa/obra del depósito conservan sus vínculos existentes. **Desactivar** / **Reactivar** pide confirmación y muestra los errores sin perder el contexto.
+- El catálogo respeta la empresa activa; los productos compartidos del tenant siguen disponibles. Los depósitos y movimientos de obra requieren acceso a esa obra, incluso cuando el movimiento no tiene una imputación propia.
+- El saldo físico se calcula por **producto y depósito**, sumando ingresos y restando salidas confirmadas. Imputar un consumo a otra partida no crea un stock independiente ni un negativo por partida. Los movimientos anulados quedan en el historial y no se suman al saldo actual.
+- En la ficha del depósito, **Transferencias** limita el historial a ese depósito; **Ver todas** quita ese filtro. Una transferencia genera su salida y entrada juntas. Si se informa un costo nominal sin moneda registrada, el dato no constituye valuación de stock ni costo en ARS.
+- Los formularios conservan los datos ante un error, impiden repetir el envío mientras procesan y muestran el resultado. Revisá el disponible después de cambiar producto u origen; el servidor vuelve a comprobar existencias al guardar.
+- **Reportes → Stock actual / Movimientos** y sus exportaciones respetan el mismo alcance de empresa/obra. Los filtros de fecha requieren días válidos y un rango ordenado. Un ajuste histórico sin dirección definida no se presenta como ingreso positivo ni como saldo confirmado calculado a partir de esa cantidad.
+
+> **Limitación vigente (D-083/D-124):** no hay motor FIFO/promedio ni reservas de stock implementados. Los importes nominales sin moneda y origen trazables se identifican con advertencia; **no se presume ARS ni costo cero**. Los consumos sin valuación no permiten crear un asiento contable nuevo por su precio nominal. Los asientos históricos existentes se conservan. Las recepciones con origen de OC comprobable conservan la moneda original de ese costo; no equivalen a una valuación del consumo.
 
 ---
 

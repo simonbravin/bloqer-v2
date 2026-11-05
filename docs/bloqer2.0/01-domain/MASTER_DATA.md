@@ -318,6 +318,8 @@ Al onboarding, el sistema **automáticamente** crea:
 
 **Política:** no permitido. Solo `enabled = false`.
 
+**Unidad asignada al producto (D-130):** se puede editar únicamente antes de su primera referencia en SC, OC, APU, material de parte, transferencia o movimiento, cualquiera sea su estado. Reenviar la misma unidad y editar otros campos siguen permitidos. El control se revalida bajo bloqueo del producto frente a la creación simultánea de referencias. Para otra unidad se crea otro producto; no hay conversión ni reetiquetado de históricos.
+
 ### 8.4 Cambio de nombre de categoría
 
 **Política:** permitido. La referencia se mantiene por id.
