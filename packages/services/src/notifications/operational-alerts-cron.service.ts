@@ -14,7 +14,7 @@ export type CronOperationalAlertsTenantSummary = {
 };
 
 export type CronOperationalAlertsJobResult = {
-  ok: true;
+  ok: boolean;
   tenantsProcessed: number;
   totals: {
     checkedCount: number;
@@ -65,9 +65,10 @@ export async function runOperationalAlertsForTenant(tenantId: string): Promise<C
   try {
     const ctx = buildOperationalAlertsCronServiceContext(tenantId);
     const result = await runAllOperationalAlertsForSystemContext(ctx);
-    const row = summarizeTenantRun(tenantId, true, result);
+    const ok = result.totals.errorCount === 0;
+    const row = summarizeTenantRun(tenantId, ok, result);
     return {
-      ok: true,
+      ok,
       tenantsProcessed: 1,
       totals: { ...result.totals },
       tenants: [row],
@@ -75,7 +76,7 @@ export async function runOperationalAlertsForTenant(tenantId: string): Promise<C
   } catch (e) {
     console.error(`[operational-alerts-cron] tenant fatal tenantId=${tenantId}`, e instanceof Error ? e.message : e);
     return {
-      ok: true,
+      ok: false,
       tenantsProcessed: 1,
       totals: { checkedCount: 0, createdCount: 0, skippedCount: 0, errorCount: 1 },
       tenants: [
@@ -109,7 +110,7 @@ export async function runOperationalAlertsForAllActiveTenants(): Promise<CronOpe
     try {
       const ctx = buildOperationalAlertsCronServiceContext(id);
       const result = await runAllOperationalAlertsForSystemContext(ctx);
-      tenants.push(summarizeTenantRun(id, true, result));
+      tenants.push(summarizeTenantRun(id, result.totals.errorCount === 0, result));
       totals.checkedCount += result.totals.checkedCount;
       totals.createdCount += result.totals.createdCount;
       totals.skippedCount += result.totals.skippedCount;
@@ -129,7 +130,7 @@ export async function runOperationalAlertsForAllActiveTenants(): Promise<CronOpe
   }
 
   return {
-    ok: true,
+    ok: totals.errorCount === 0,
     tenantsProcessed: tenants.length,
     totals,
     tenants,

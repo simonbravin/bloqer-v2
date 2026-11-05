@@ -45,6 +45,37 @@ export const EMAIL_DELIVERY_STATUS_HINT: Record<EmailDeliveryStatus, string> = {
   FAILED: "Se intentó enviar y el proveedor o la validación devolvieron error.",
 };
 
+export function scheduledReportDeliveryLabel(status: EmailDeliveryStatus): string {
+  return status === "PENDING" ? "Sin confirmar" : EMAIL_DELIVERY_STATUS_LABEL[status];
+}
+
+const PROVIDER_REJECTED_PREFIX = "provider_rejected: ";
+
+export function scheduledReportDeliveryHint(status: EmailDeliveryStatus, errorMessage: string | null): string {
+  if (status === "FAILED" && !errorMessage?.startsWith(PROVIDER_REJECTED_PREFIX)) {
+    return "No hay constancia de un rechazo del proveedor. No entra en Reintentar fallidos.";
+  }
+  return status === "PENDING"
+    ? "Todavía no se confirmó esta entrega. No entra en Reintentar fallidos."
+    : EMAIL_DELIVERY_STATUS_HINT[status];
+}
+
+export function scheduledReportDeliveryDetail(row: {
+  status: EmailDeliveryStatus;
+  skippedReason: string | null;
+  errorMessage: string | null;
+  providerMessageId?: string | null;
+}): string {
+  if (row.status === "PENDING" ||
+    (row.status === "FAILED" && !row.errorMessage?.startsWith(PROVIDER_REJECTED_PREFIX))) {
+    return scheduledReportDeliveryHint(row.status, row.errorMessage);
+  }
+  const error = row.errorMessage?.startsWith(PROVIDER_REJECTED_PREFIX)
+    ? row.errorMessage.slice(PROVIDER_REJECTED_PREFIX.length)
+    : row.errorMessage;
+  return row.skippedReason ?? error ?? row.providerMessageId ?? scheduledReportDeliveryHint(row.status, row.errorMessage);
+}
+
 export function runStatusBadgeVariant(
   status: ScheduledReportRunStatus | null | undefined,
 ): "default" | "secondary" | "destructive" | "outline" {

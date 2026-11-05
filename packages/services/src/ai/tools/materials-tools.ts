@@ -21,7 +21,7 @@ export const getProjectMaterialShortagesTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "project_operational",
+    accessKind: "materials",
   },
   inputSchema,
   jsonSchema: {

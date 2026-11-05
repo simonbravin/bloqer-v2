@@ -4,6 +4,6 @@
 export function safeActionHref(url: string | null | undefined): string | null {
   if (!url) return null;
   const u = url.trim();
-  if (!u.startsWith("/") || u.startsWith("//")) return null;
+  if (!u.startsWith("/") || u.startsWith("//") || /[\\\s]/.test(u)) return null;
   return u;
 }

@@ -312,6 +312,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Compras — vencimientos ([D-097]): OC con entrega prevista pasada, SC con fecha requerida pasada, OC recibida sin factura. Campana con CC OWNER/ADMIN; el email respeta tus preferencias.",
       "Libro de obra: Parte pendiente / Parte devuelto / Parte aprobado en campana.",
       "OWNER/ADMIN: Alertas operativas en /notificaciones/alertas (cron diario 12:00 UTC). Campana siempre; email según preferencia.",
+      "La corrida manual y el historial respetan tu empresa y las obras que podés consultar.",
       "En mobile: Más → Notificaciones. La cola de acciones (Pendientes) es otra cosa: no confundir con esta campana.",
     ],
     effects: [
@@ -382,7 +383,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Cada interruptor es «Recibir por email». El badge indica si es el default de tu rol o una preferencia que guardaste.",
       "Por defecto: Compras / Jefe de obra / Depósito reciben el flujo diario SC/OC; Propietario/Administrador no (sí ven la campana). Escalamientos (SLA, umbral alto) sí llegan a dirección.",
       "Propietario/Administrador: Políticas → Notificaciones para alertas de empresa, canal CxP, CC del flujo diario a dirección, digest on/off y hora local.",
-      "El digest es un mail matutino con colas estilo Pendientes + críticos; si no hay nada pendiente, no se envía.",
+      "El resumen usa los Pendientes y alertas críticas que podés consultar. La revisión automática ocurre a las 10:05 UTC. El envío puede ocurrir en la hora local elegida o hasta tres horas después dentro del mismo día.",
     ],
     effects: [
       "El cambio aplica al próximo email de esa categoría (best-effort).",

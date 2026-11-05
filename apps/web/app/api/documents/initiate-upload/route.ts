@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
-import { initiateDocumentUpload, ServiceError } from "@bloqer/services";
+import { revalidatePath } from "next/cache";
+import { documentRevalidatePaths } from "@/features/documents/lib/document-revalidate-paths";
+import { getDocumentById, initiateDocumentUpload, ServiceError } from "@bloqer/services";
 import { initiateUploadSchema } from "@bloqer/validators";
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -33,7 +35,14 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   try {
     const result = await initiateDocumentUpload(parsed.data, ctx);
-    return NextResponse.json(result, { status: result.created ? 201 : 200 });
+    if (result.status === "ACTIVE") {
+      const doc = await getDocumentById(result.documentId, ctx);
+      for (const path of documentRevalidatePaths({ ...doc, documentId: doc.id })) revalidatePath(path);
+    }
+    return NextResponse.json(result, {
+      status: result.created ? 201 : 200,
+      headers: { "Cache-Control": "private, no-store" },
+    });
   } catch (err) {
     if (err instanceof ServiceError) {
       const status =

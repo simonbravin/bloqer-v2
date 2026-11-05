@@ -36,13 +36,14 @@ import {
 } from "@/lib/ai-rate-limit";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { filterSafeAiLinks } from "@/features/bloqer-ai/lib/safe-ai-content";
+import { AI_CHAT_MAX_MESSAGE_CHARS, AI_CHAT_MAX_MESSAGES } from "@/features/bloqer-ai/lib/chat-history";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const chatMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
-  content: z.string().min(1).max(8000),
+  content: z.string().min(1).max(AI_CHAT_MAX_MESSAGE_CHARS),
 });
 
 const bodySchema = z.object({
@@ -58,7 +59,8 @@ const bodySchema = z.object({
         content: typeof m.content === "string" ? m.content.trim() : m.content,
       }))
       .filter((m) => typeof m.content === "string" && m.content.length > 0);
-  }, z.array(chatMessageSchema).min(1).max(40)),
+  }, z.array(chatMessageSchema).min(1).max(AI_CHAT_MAX_MESSAGES)
+    .refine((messages) => messages[0]?.role === "user" && messages.at(-1)?.role === "user")),
   currentRoute: z.string().max(500).optional(),
   currentProjectId: z.string().uuid().optional(),
   // Reserved for future entity-aware tools — ignored for auth until revalidated like projects.
@@ -250,7 +252,7 @@ export async function POST(req: Request) {
     // Entity hints ignored until ownership-validated tools exist.
     currentEntityType: undefined,
     currentEntityId: undefined,
-    actorDisplayName: current.session.user.name ?? current.session.user.email ?? undefined,
+    actorDisplayName: current.session.user.name ?? undefined,
     tenantName: current.tenantCtx.tenantName,
     enabledModules,
     isFirstAssistantTurn: body.isFirstAssistantTurn === true,
@@ -284,9 +286,9 @@ export async function POST(req: Request) {
     isFirstAssistantTurn: aiCtx.isFirstAssistantTurn,
     hasCompanyFinanceAccess,
     contextSummary: [
-      `Usuario (sesión): ${aiCtx.actorPreferredName ?? aiCtx.actorDisplayName ?? "—"}`,
+      `Usuario (sesión): ${aiCtx.actorPreferredName ?? "—"}`,
       `Roles: ${(aiCtx.actorRoleLabels ?? []).join(", ") || "—"}`,
-      `Empresa: ${aiCtx.tenantName ?? "—"}`,
+      `Empresa: ${JSON.stringify(aiCtx.tenantName ?? "—")}`,
       `Ruta: ${aiCtx.currentRoute ?? "—"}`,
       `Proyecto actual (hint validado al usarlo): ${aiCtx.currentProjectId ?? "ninguno"}`,
       `Acceso finanzas empresa: ${hasCompanyFinanceAccess ? "sí" : "no"}`,
@@ -303,17 +305,19 @@ export async function POST(req: Request) {
 
   const started = Date.now();
   const encoder = new TextEncoder();
-  const agentSignal = combineAbortSignals(AbortSignal.timeout(env.timeoutMs), req.signal);
+  const streamCancellation = new AbortController();
+  const agentSignal = combineAbortSignals(AbortSignal.timeout(env.timeoutMs), req.signal, streamCancellation.signal);
 
   const stream = new ReadableStream({
     async start(controller) {
       let closed = false;
       const send = (event: string, data: unknown) => {
-        if (closed || req.signal.aborted) return;
+        if (closed || req.signal.aborted || streamCancellation.signal.aborted) return;
         try {
           controller.enqueue(encoder.encode(sseEncode(event, data)));
         } catch {
           closed = true;
+          streamCancellation.abort();
         }
       };
       try {
@@ -332,7 +336,7 @@ export async function POST(req: Request) {
         });
 
         for await (const ev of agent) {
-          if (req.signal.aborted || closed) break;
+          if (req.signal.aborted || streamCancellation.signal.aborted || closed) break;
           if (ev.type === "text_delta") send("text_delta", { text: ev.text });
           else if (ev.type === "tool_start") {
             send("tool_start", {
@@ -341,7 +345,7 @@ export async function POST(req: Request) {
               label:
                 ev.label ??
                 registry.get(ev.name)?.statusLabel ??
-                `Consultando ${ev.name}…`,
+                "Consultando…",
             });
           } else if (ev.type === "tool_end") {
             const links = filterSafeAiLinks(ev.links);
@@ -411,14 +415,14 @@ export async function POST(req: Request) {
       }
     },
     cancel() {
-      // Client disconnected — AbortSignal on req propagates via agentSignal.
+      streamCancellation.abort();
     },
   });
 
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
+      "Cache-Control": "no-store, no-transform",
       Connection: "keep-alive",
     },
   });

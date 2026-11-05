@@ -124,7 +124,6 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
                 projectId={id}
                 folderId={uploadFolderId}
                 storageConfigured={storageConfigured}
-                revalidatePaths={[`/proyectos/${id}/documentos`]}
                 triggerLabel="Agregar documento"
                 title="Agregar documento"
                 submitLabel="Subir documento"

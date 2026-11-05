@@ -5,6 +5,7 @@ import {
   DeleteObjectCommand,
   HeadObjectCommand,
   PutBucketCorsCommand,
+  type S3ClientConfig,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getStorageEnv } from "@bloqer/config";
@@ -13,12 +14,13 @@ import { randomUUID } from "node:crypto";
 // ─── Key helpers ──────────────────────────────────────────────────────────────
 
 function sanitizeFilename(filename: string): string {
-  return filename
+  const safe = filename
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_")
     .toLowerCase();
+  return !safe || safe === "." || safe === ".." ? "file" : safe;
 }
 
 export function buildStorageKey(
@@ -68,12 +70,13 @@ export function isTenantScopedStorageKey(tenantId: string, storageKey: string): 
 
 // ─── S3 client ────────────────────────────────────────────────────────────────
 
-function createS3Client() {
+function createS3Client(requestChecksumCalculation?: S3ClientConfig["requestChecksumCalculation"]) {
   const env = getStorageEnv();
   return {
     client: new S3Client({
       region:      "auto",
       endpoint:    `https://${env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+      requestChecksumCalculation,
       credentials: {
         accessKeyId:     env.R2_ACCESS_KEY_ID,
         secretAccessKey: env.R2_SECRET_ACCESS_KEY,
@@ -108,15 +111,25 @@ export async function putObject(
 export async function getPresignedPutUrl(
   storageKey: string,
   mimeType: string,
+  sizeBytes: number,
   expiresInSeconds = 300,
 ): Promise<string> {
-  const { client, bucket } = createS3Client();
+  // The payload is sent by the browser, not present in this command. Do not
+  // let the SDK sign the optional checksum of an empty request body.
+  const { client, bucket } = createS3Client("WHEN_REQUIRED");
   const command = new PutObjectCommand({
     Bucket: bucket,
     Key: storageKey,
     ContentType: mimeType,
+    ContentLength: sizeBytes,
+    IfNoneMatch: "*",
   });
-  return getSignedUrl(client, command, { expiresIn: expiresInSeconds });
+  return getSignedUrl(client, command, {
+    expiresIn: expiresInSeconds,
+    // The default S3 presigner omits Content-Type. The browser supplies the exact
+    // content length for its File body and sends If-None-Match explicitly.
+    signableHeaders: new Set(["content-type", "content-length", "if-none-match"]),
+  });
 }
 
 export async function headObject(storageKey: string): Promise<{

@@ -19,7 +19,7 @@ export function canReadConfigNav(
 
 export function buildConfiguracionSubnavLinks(
   roles: UserRole[],
-  isTenantModuleEnabled: (module: "TENANT_SETTINGS" | "USERS_PERMISSIONS") => boolean = () => true,
+  isTenantModuleEnabled: (module: "TENANT_SETTINGS" | "USERS_PERMISSIONS" | "AUDIT") => boolean = () => true,
 ): ModuleSubnavLink[] {
   const links: ModuleSubnavLink[] = [
     { href: "/configuracion/perfil", label: "Mi perfil" },
@@ -39,7 +39,7 @@ export function buildConfiguracionSubnavLinks(
     links.push({ href: "/configuracion/reportes", label: "Reportes programados" });
   }
 
-  if (canViewTenantAuditLog(roles)) {
+  if (canViewTenantAuditLog(roles) && isTenantModuleEnabled("AUDIT")) {
     links.push({ href: "/configuracion/registro", label: "Registro" });
   }
 

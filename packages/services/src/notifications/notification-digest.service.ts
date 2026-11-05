@@ -15,14 +15,21 @@ import {
   markEmailDeliverySent,
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
+import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
 import { getMyFieldPendingCounts } from "../field/field-pending.service";
 import type { ServiceContext } from "../types";
+import {
+  activeNotificationMembershipWhere,
+  loadActiveNotificationRecipient,
+  sameNotificationRecipientAccess,
+} from "./notification-audience.service";
 import {
   getOrCreateTenantNotificationEmailPolicy,
   isDigestEnabledForUser,
   isMissingNotificationEmailPrefsSchema,
   type TenantNotificationEmailPolicyView,
 } from "./notification-email-preference.service";
+import { getUnreadNotificationCount } from "./notification.service";
 
 const DIGEST_CRON_ACTOR = "00000000-0000-4000-8000-0000000000d1";
 /** Stuck PENDING rows older than this are treated as failed and may retry. */
@@ -48,7 +55,7 @@ export type DigestTenantSummary = {
 };
 
 export type DigestJobResult = {
-  ok: true;
+  ok: boolean;
   tenantsProcessed: number;
   sent: number;
   skipped: number;
@@ -81,19 +88,6 @@ function localDateKey(now: Date, timeZone: string): string {
   return fmt.format(now);
 }
 
-function buildUserServiceContext(
-  tenantId: string,
-  userId: string,
-  roles: DomainUserRole[],
-): ServiceContext {
-  return {
-    actorUserId: userId,
-    tenantId,
-    companyId: null,
-    roles,
-  };
-}
-
 function cronCtx(tenantId: string): ServiceContext {
   return {
     actorUserId: DIGEST_CRON_ACTOR,
@@ -101,17 +95,6 @@ function cronCtx(tenantId: string): ServiceContext {
     companyId: null,
     roles: [],
   };
-}
-
-async function countUnreadCriticals(tenantId: string, userId: string): Promise<number> {
-  return prisma.notification.count({
-    where: {
-      tenantId,
-      recipientUserId: userId,
-      status: "UNREAD",
-      type: { in: CRITICAL_TYPES },
-    },
-  });
 }
 
 function pendingFieldsFromCounts(
@@ -161,6 +144,7 @@ async function findBlockingDigestLog(params: {
   const rows = await prisma.emailDeliveryLog.findMany({
     where: {
       tenantId: params.tenantId,
+      emailType: "NOTIFICATION_DIGEST",
       idempotencyKey: params.idempotencyKey,
     },
     select: {
@@ -185,8 +169,8 @@ async function findBlockingDigestLog(params: {
     if (row.status === "PENDING") {
       if (row.providerMessageId) {
         // Send likely succeeded; mark SENT so catch-up never double-sends.
-        await prisma.emailDeliveryLog.update({
-          where: { id: row.id },
+        await prisma.emailDeliveryLog.updateMany({
+          where: { id: row.id, tenantId: params.tenantId, status: "PENDING", providerMessageId: row.providerMessageId },
           data: {
             status: "SENT",
             provider: "RESEND",
@@ -199,13 +183,14 @@ async function findBlockingDigestLog(params: {
       }
       const age = params.now.getTime() - row.createdAt.getTime();
       if (age < STALE_PENDING_MS) return row;
-      await prisma.emailDeliveryLog.update({
-        where: { id: row.id },
+      const expired = await prisma.emailDeliveryLog.updateMany({
+        where: { id: row.id, tenantId: params.tenantId, status: "PENDING", providerMessageId: null },
         data: {
           status: "FAILED",
           errorMessage: "stale_pending_timeout",
         },
       });
+      if (expired.count === 0) return row;
     }
   }
   return null;
@@ -229,22 +214,8 @@ async function markDigestSentBestEffort(
 ): Promise<void> {
   try {
     await markEmailDeliverySent(logId, messageId, system);
-  } catch (err) {
-    console.error(
-      `[notification-digest] mark SENT failed logId=${logId}; forcing status`,
-      err instanceof Error ? err.message : err,
-    );
-    await prisma.emailDeliveryLog.update({
-      where: { id: logId },
-      data: {
-        status: "SENT",
-        provider: "RESEND",
-        providerMessageId: messageId ? messageId.slice(0, 256) : "mark_sent_recovered",
-        sentAt: new Date(),
-        skippedReason: null,
-        errorMessage: null,
-      },
-    });
+  } catch {
+    await markEmailDeliverySent(logId, messageId, system);
   }
 }
 
@@ -291,13 +262,13 @@ export async function runNotificationDigestForTenant(
 
   const memberships = await prisma.userMembership.findMany({
     where: {
-      tenantId,
-      status: "ACTIVE",
-      OR: [{ roles: { has: "OWNER" } }, { roles: { has: "ADMIN" } }],
+      ...activeNotificationMembershipWhere(tenantId),
+      AND: [{ OR: [{ roles: { has: "OWNER" } }, { roles: { has: "ADMIN" } }] }],
     },
     select: {
       userId: true,
       roles: true,
+      companyId: true,
       user: { select: { email: true, name: true } },
     },
   });
@@ -309,42 +280,52 @@ export async function runNotificationDigestForTenant(
   const base = getPublicAppBaseUrl();
   const system = cronCtx(tenantId);
   const allowRetryConfigurableSkips = options?.forceHourMatch === true;
+  const soleCompanyId = memberships.some((row) => row.companyId === null)
+    ? await getSoleActiveCompanyIdForTenant(tenantId)
+    : null;
 
   for (const m of memberships) {
-    const roles = m.roles as DomainUserRole[];
-    const enabled = await isDigestEnabledForUser({
-      tenantId,
-      userId: m.userId,
-      roles,
-      policy,
-    });
-    if (!enabled) {
-      skipped += 1;
-      continue;
-    }
-
-    const email = m.user.email?.trim();
-    if (!email) {
-      skipped += 1;
-      continue;
-    }
-
-    const idempotencyKey = `notification-digest:${tenantId}:${m.userId}:${dateKey}`;
-    const blocked = await findBlockingDigestLog({
-      tenantId,
-      idempotencyKey,
-      now,
-      allowRetryConfigurableSkips,
-    });
-    if (blocked) {
-      skipped += 1;
-      continue;
-    }
-
     try {
-      const userCtx = buildUserServiceContext(tenantId, m.userId, roles);
-      const counts = await getMyFieldPendingCounts(userCtx);
-      const criticalUnread = await countUnreadCriticals(tenantId, m.userId);
+      const roles = m.roles as DomainUserRole[];
+      const enabled = await isDigestEnabledForUser({
+        tenantId,
+        userId: m.userId,
+        roles,
+        policy,
+      });
+      if (!enabled) {
+        skipped += 1;
+        continue;
+      }
+
+      const email = m.user.email?.trim();
+      if (!email) {
+        skipped += 1;
+        continue;
+      }
+
+      const idempotencyKey = `notification-digest:${tenantId}:${m.userId}:${dateKey}`;
+      const blocked = await findBlockingDigestLog({
+        tenantId,
+        idempotencyKey,
+        now,
+        allowRetryConfigurableSkips,
+      });
+      if (blocked) {
+        skipped += 1;
+        continue;
+      }
+
+      const userCtx: ServiceContext = {
+        actorUserId: m.userId,
+        tenantId,
+        companyId: m.companyId ?? soleCompanyId,
+        roles,
+      };
+      const [counts, criticalUnread] = await Promise.all([
+        getMyFieldPendingCounts(userCtx),
+        getUnreadNotificationCount(userCtx, CRITICAL_TYPES),
+      ]);
       const pendingFields = pendingFieldsFromCounts(counts);
       const criticalFields: EmailContextField[] =
         criticalUnread > 0
@@ -361,6 +342,7 @@ export async function runNotificationDigestForTenant(
               status: "SKIPPED",
               provider: "DISABLED",
               recipientUserId: m.userId,
+              companyId: userCtx.companyId,
               idempotencyKey,
               skippedReason: "digest_empty",
               metadata: { digestDate: dateKey },
@@ -390,12 +372,20 @@ export async function runNotificationDigestForTenant(
             status: "SKIPPED",
             provider: "DISABLED",
             recipientUserId: m.userId,
+            companyId: userCtx.companyId,
             idempotencyKey,
             skippedReason: "email_not_configured",
             metadata: { digestDate: dateKey },
           },
           system,
         );
+        skipped += 1;
+        continue;
+      }
+
+      const current = await loadActiveNotificationRecipient(tenantId, m.userId);
+      if (!sameNotificationRecipientAccess({ ...userCtx, email }, current) ||
+        !await isDigestEnabledForUser({ tenantId, userId: m.userId, roles, policy })) {
         skipped += 1;
         continue;
       }
@@ -407,6 +397,7 @@ export async function runNotificationDigestForTenant(
             subject,
             emailType: "NOTIFICATION_DIGEST",
             recipientUserId: m.userId,
+            companyId: userCtx.companyId,
             idempotencyKey,
             metadata: { digestDate: dateKey, pendingTotal: counts.total, criticalUnread },
           },
@@ -442,7 +433,7 @@ export async function runNotificationDigestForTenant(
         settingsUrlAbsolute,
       });
 
-      const result = await sendEmail({ to: email, subject, html, text });
+      const result = await sendEmail({ to: email, subject, html, text, idempotencyKey });
       if (result.provider === "disabled") {
         await markEmailDeliverySkipped(logId, "email_not_configured", system);
         skipped += 1;
@@ -455,8 +446,8 @@ export async function runNotificationDigestForTenant(
       }
       // Persist messageId on PENDING first so a crash before SENT still heals without resend.
       if (result.messageId) {
-        await prisma.emailDeliveryLog.update({
-          where: { id: logId },
+        await prisma.emailDeliveryLog.updateMany({
+          where: { id: logId, tenantId, status: "PENDING" },
           data: { providerMessageId: result.messageId.slice(0, 256) },
         });
       }
@@ -511,7 +502,7 @@ export async function runNotificationDigestForAllActiveTenants(
   }
 
   return {
-    ok: true,
+    ok: errors === 0,
     tenantsProcessed: tenants.length,
     sent,
     skipped,

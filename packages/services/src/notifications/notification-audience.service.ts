@@ -1,6 +1,67 @@
-import { prisma } from "@bloqer/database";
+import { prisma, type Prisma } from "@bloqer/database";
 import { can, type PermissionAction, type PermissionModule, type UserRole } from "@bloqer/domain";
+import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
 import { canSuperviseJobsiteLog } from "../jobsite-log/jobsite-log-access";
+import { filterUserIdsByProjectAccess } from "../security/access";
+
+export function activeNotificationMembershipWhere(tenantId: string): Prisma.UserMembershipWhereInput {
+  return {
+    tenantId,
+    status: "ACTIVE",
+    user: { status: "ACTIVE" },
+    OR: [{ companyId: null }, { company: { tenantId, status: "ACTIVE" } }],
+  };
+}
+
+export async function loadActiveNotificationRecipient(tenantId: string, userId: string) {
+  const membership = await prisma.userMembership.findFirst({
+    where: { ...activeNotificationMembershipWhere(tenantId), userId },
+    select: { companyId: true, roles: true, user: { select: { email: true } } },
+  });
+  if (!membership) return null;
+  return {
+    tenantId,
+    actorUserId: userId,
+    companyId: membership.companyId ?? await getSoleActiveCompanyIdForTenant(tenantId),
+    roles: membership.roles,
+    email: membership.user.email,
+  };
+}
+
+type ActiveNotificationRecipient = NonNullable<Awaited<ReturnType<typeof loadActiveNotificationRecipient>>>;
+
+export function sameNotificationRecipientAccess(
+  original: Pick<ActiveNotificationRecipient, "companyId" | "roles" | "email">,
+  current: ActiveNotificationRecipient | null,
+): current is ActiveNotificationRecipient {
+  return current !== null && original.companyId === current.companyId &&
+    original.email.trim() === current.email.trim() && original.roles.length === current.roles.length &&
+    original.roles.every((role) => current.roles.includes(role));
+}
+
+/** A shared project never widens the scope of the company that owns its source. */
+export async function filterNotificationAudienceForScope(params: {
+  tenantId: string;
+  companyId: string | null;
+  projectId: string | null;
+  candidateUserIds: string[];
+  canView?: (roles: UserRole[]) => boolean;
+}): Promise<string[]> {
+  const { tenantId, companyId, projectId, candidateUserIds, canView } = params;
+  if (candidateUserIds.length === 0) return [];
+  const memberships = await prisma.userMembership.findMany({
+    where: { ...activeNotificationMembershipWhere(tenantId), userId: { in: candidateUserIds } },
+    select: { userId: true, companyId: true, roles: true },
+  });
+  const soleCompanyId = companyId && memberships.some((row) => row.companyId === null)
+    ? await getSoleActiveCompanyIdForTenant(tenantId)
+    : null;
+  const visible = memberships.filter((row) => {
+    const company = row.companyId ?? soleCompanyId;
+    return (!companyId || !company || companyId === company) && (!canView || canView(row.roles));
+  });
+  return filterUserIdsByProjectAccess(tenantId, projectId, visible.map((row) => row.userId));
+}
 
 export type NotificationPermissionTarget = {
   action: PermissionAction;
@@ -28,7 +89,7 @@ export async function findActiveUsersForPermission(
   module: PermissionModule,
 ): Promise<string[]> {
   const memberships = await prisma.userMembership.findMany({
-    where: { tenantId, status: "ACTIVE" },
+    where: activeNotificationMembershipWhere(tenantId),
     select: { userId: true, roles: true },
   });
   const out: string[] = [];
@@ -42,9 +103,8 @@ export async function findActiveUsersForPermission(
 export async function findActiveOwnerAdminUserIds(tenantId: string): Promise<string[]> {
   const rows = await prisma.userMembership.findMany({
     where: {
-      tenantId,
-      status: "ACTIVE",
-      OR: [{ roles: { has: "OWNER" } }, { roles: { has: "ADMIN" } }],
+      ...activeNotificationMembershipWhere(tenantId),
+      AND: [{ OR: [{ roles: { has: "OWNER" } }, { roles: { has: "ADMIN" } }] }],
     },
     select: { userId: true },
   });
@@ -85,8 +145,7 @@ export async function resolveJobsiteLogSubmittedAudience(params: {
 
   const memberships = await prisma.userMembership.findMany({
     where: {
-      tenantId: params.tenantId,
-      status: "ACTIVE",
+      ...activeNotificationMembershipWhere(params.tenantId),
       userId: { in: teamIds },
     },
     select: { userId: true, roles: true },
@@ -131,8 +190,7 @@ export async function resolveNotificationAudience(
       : prisma.userMembership
           .findMany({
             where: {
-              tenantId,
-              status: "ACTIVE",
+              ...activeNotificationMembershipWhere(tenantId),
               userId: { in: trimmedPrimary },
             },
             select: { userId: true },

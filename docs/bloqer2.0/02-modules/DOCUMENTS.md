@@ -66,7 +66,7 @@ _No aplica._
 - Transversal a todos los módulos operativos.
 
 ## 16. Permisos
-Hereda del módulo padre; VIEWER solo descarga si tiene ver proyecto. Mutar carpetas = editar documentos del proyecto.
+La biblioteca, el enlace directo y la descarga comprueban tenant, empresa, acceso a la obra y permiso de lectura del módulo padre. Archivar o adjuntar también requiere el permiso de la operación de origen. Mutar carpetas exige editar documentos del proyecto.
 
 ## 17. Eventos disparados / consumidos
 - `document.archived`, `document.reactivated`, `document.deleted`; `document_version.*` según [`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md) §2.14c.

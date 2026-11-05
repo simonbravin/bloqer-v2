@@ -17,8 +17,7 @@ export type ParsedAssistantPresentation = {
 function isSafeInternalHref(href: string): boolean {
   const h = href.trim();
   if (!h.startsWith("/") || h.startsWith("//")) return false;
-  if (h.includes("://")) return false;
-  if (/^(javascript|data):/i.test(h)) return false;
+  if (h.includes("://") || /[\\\s]/.test(h)) return false;
   return true;
 }
 
@@ -98,6 +97,10 @@ export function parseAiPresentationFromAssistantText(
 ): ParsedAssistantPresentation {
   const fenced = extractFencedBlock(text);
   if (!fenced) {
+    const unfinishedFence = text.indexOf(PRESENTATION_START);
+    if (unfinishedFence >= 0) {
+      return { visibleText: text.slice(0, unfinishedFence).trimEnd(), presentation: null, invalidPresentation: true };
+    }
     // Optional: whole message is JSON presentation
     const asJson = tryParseJsonObject(text);
     if (asJson && typeof asJson === "object" && asJson !== null && "kind" in asJson && "headline" in asJson) {
@@ -109,7 +112,7 @@ export function parseAiPresentationFromAssistantText(
           invalidPresentation: false,
         };
       }
-      return { visibleText: text, presentation: null, invalidPresentation: true };
+      return { visibleText: "", presentation: null, invalidPresentation: true };
     }
     return { visibleText: text, presentation: null, invalidPresentation: false };
   }
@@ -117,11 +120,11 @@ export function parseAiPresentationFromAssistantText(
   const payload = tryParseJsonObject(fenced.json);
   const visibleText = [fenced.before, fenced.after].filter(Boolean).join("\n\n").trim();
   if (!payload) {
-    return { visibleText: visibleText || text, presentation: null, invalidPresentation: true };
+    return { visibleText, presentation: null, invalidPresentation: true };
   }
   const parsed = aiPresentationSchema.safeParse(payload);
   if (!parsed.success) {
-    return { visibleText: visibleText || text, presentation: null, invalidPresentation: true };
+    return { visibleText, presentation: null, invalidPresentation: true };
   }
   return {
     visibleText,

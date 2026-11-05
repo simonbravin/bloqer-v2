@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { sanitizeAssistantPlainText, filterSafeAiLinks } from "@/features/bloqer-ai/lib/safe-ai-content";
 import { BloqerAiPresentationView } from "@/features/bloqer-ai/components/bloqer-ai-presentation";
+import { AI_CHAT_MAX_MESSAGE_CHARS, buildAiChatHistory } from "@/features/bloqer-ai/lib/chat-history";
 
 type ChatMessage = {
   id: string;
@@ -121,8 +122,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
 
   async function send(text: string) {
     const trimmed = text.trim();
-    if (!trimmed || busy) return;
-    abortRef.current?.abort();
+    if (!trimmed || trimmed.length > AI_CHAT_MAX_MESSAGE_CHARS || abortRef.current) return;
     const ac = new AbortController();
     abortRef.current = ac;
     setBusy(true);
@@ -141,13 +141,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
     ]);
 
     try {
-      // Never send empty assistant stubs (abort leftovers) — server also filters.
-      const history = [...messages, userMsg]
-        .filter((m) => m.content.trim().length > 0)
-        .map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+      const history = buildAiChatHistory([...messages, userMsg]);
       const res = await fetch("/api/ai/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,13 +153,13 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
           isFirstAssistantTurn: !messages.some((m) => m.role === "assistant"),
         }),
       });
-      if (!res.ok || !res.body) {
+      if (!res.ok || !res.body || !res.headers.get("Content-Type")?.startsWith("text/event-stream")) {
         const err = await res.json().catch(() => ({ error: "No se pudo consultar a Bloqer AI." }));
         const msg =
           res.status === 429
             ? (typeof err.error === "string" && err.error) ||
               "Alcanzaste temporalmente el límite de consultas de Bloqer AI. Intentá nuevamente en unos minutos."
-            : (err.error ?? "Error al consultar el asistente.");
+            : (typeof err.error === "string" && err.error) || "Error al consultar el asistente.";
         setMessages((prev) =>
           prev.map((m) => (m.id === assistantId ? { ...m, content: msg } : m)),
         );
@@ -176,6 +170,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
       const decoder = new TextDecoder();
       let buffer = "";
       let eventName = "message";
+      let terminal = false;
 
       while (true) {
         if (ac.signal.aborted) {
@@ -237,6 +232,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
               );
             }
           } else if (eventName === "error") {
+            terminal = true;
             const msg = typeof data.message === "string" ? data.message : "Error del asistente";
             setMessages((prev) =>
               prev.map((m) =>
@@ -246,6 +242,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
               ),
             );
           } else if (eventName === "done") {
+            terminal = true;
             const finalText =
               typeof data.assistantText === "string" ? data.assistantText.trim() : "";
             setMessages((prev) =>
@@ -266,6 +263,8 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
 
       if (ac.signal.aborted) {
         setMessages((prev) => withoutAbortedEmptyTurn(prev, assistantId));
+      } else if (!terminal) {
+        throw new Error("Incomplete AI response stream");
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
@@ -275,7 +274,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
-            ? { ...m, content: m.content || "No se pudo completar la consulta." }
+            ? { ...m, content: [m.content, "No se pudo completar la consulta."].filter(Boolean).join("\n\n") }
             : m,
         ),
       );
@@ -417,6 +416,8 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
                     data-testid="bloqer-ai-input"
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
+                    maxLength={AI_CHAT_MAX_MESSAGE_CHARS}
+                    aria-label="Pregunta para Bloqer AI"
                     placeholder="Preguntale algo a Bloqer…"
                     className="flex-1 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     disabled={busy}

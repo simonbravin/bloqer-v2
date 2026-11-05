@@ -3,6 +3,7 @@ import type { MembershipStatus, UserRole as PrismaUserRole } from "@bloqer/datab
 import { updateTenantMemberRolesInputSchema, updateTenantMemberStatusInputSchema } from "@bloqer/validators";
 import type { UserRole } from "@bloqer/domain";
 import { log } from "../audit/audit.service";
+import { companyScopeFilter } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { canEditTeamMembership } from "./tenant-settings-guards";
@@ -39,7 +40,7 @@ function dedupeRoles(roles: UserRole[]): PrismaUserRole[] {
 export async function listTenantMembers(ctx: ServiceContext): Promise<TenantMemberListRow[]> {
   await assertTenantConfigReadAccess(ctx);
   const rows = await prisma.userMembership.findMany({
-    where: { tenantId: ctx.tenantId },
+    where: { tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
     orderBy: { createdAt: "asc" },
     select: {
       id:        true,
@@ -66,7 +67,7 @@ export async function getTenantMemberById(
 ): Promise<TenantMemberDetail> {
   await assertTenantConfigReadAccess(ctx);
   const m = await prisma.userMembership.findFirst({
-    where: { id: membershipId, tenantId: ctx.tenantId },
+    where: { id: membershipId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
     select: {
       id:        true,
       status:    true,
@@ -111,8 +112,8 @@ export async function updateTenantMemberRoles(
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
     const existing = await tx.userMembership.findFirst({
-      where: { id: parsed.data.membershipId, tenantId: ctx.tenantId },
-      select: { id: true, userId: true, status: true, roles: true },
+      where: { id: parsed.data.membershipId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
+      select: { id: true, userId: true, status: true, roles: true, companyId: true },
     });
     if (!existing) throw new ServiceError("NOT_FOUND", "Membresía no encontrada");
 
@@ -137,8 +138,9 @@ export async function updateTenantMemberRoles(
       action:      "MEMBERSHIP_ROLES_UPDATED",
       entityType:  "UserMembership",
       entityId:    existing.id,
+      companyId:   existing.companyId,
       before:      { userId: existing.userId, roles: beforeRoles },
-      after:       { userId: existing.userId, roles: unique },
+      after:       { userId: existing.userId, roles: unique, companyId: existing.companyId },
       ipAddress:   ctx.ipAddress,
     }, tx);
   });
@@ -162,8 +164,8 @@ export async function updateTenantMemberStatus(
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM tenants WHERE id = ${ctx.tenantId} FOR UPDATE`;
     const existing = await tx.userMembership.findFirst({
-      where: { id: parsed.data.membershipId, tenantId: ctx.tenantId },
-      select: { id: true, userId: true, status: true, roles: true },
+      where: { id: parsed.data.membershipId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
+      select: { id: true, userId: true, status: true, roles: true, companyId: true },
     });
     if (!existing) throw new ServiceError("NOT_FOUND", "Membresía no encontrada");
 
@@ -188,8 +190,9 @@ export async function updateTenantMemberStatus(
       action:      "MEMBERSHIP_STATUS_UPDATED",
       entityType:  "UserMembership",
       entityId:    existing.id,
+      companyId:   existing.companyId,
       before:      { userId: existing.userId, status: beforeStatus },
-      after:       { userId: existing.userId, status: parsed.data.status },
+      after:       { userId: existing.userId, status: parsed.data.status, companyId: existing.companyId },
       ipAddress:   ctx.ipAddress,
     }, tx);
   });

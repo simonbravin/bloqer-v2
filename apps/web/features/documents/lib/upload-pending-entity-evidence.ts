@@ -46,7 +46,6 @@ export async function uploadPendingEntityEvidence(input: {
       linkedEntityType: input.linkedEntityType,
       linkedEntityId: input.entityId,
       idempotencyKey: clientId,
-      revalidatePaths: [input.afterUploadPath],
     });
     if ("error" in result) {
       failures.push({ index, fileName: item.file.name, error: result.error });

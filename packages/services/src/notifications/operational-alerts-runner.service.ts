@@ -1,5 +1,7 @@
+import type { PermissionModule } from "@bloqer/domain";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import {
   runApprovedCertificationsWithoutInvoiceAlert,
   runNegativeStockAlert,
@@ -28,6 +30,18 @@ export const OPERATIONAL_ALERT_TYPES = [
 ] as const;
 
 export type OperationalAlertType = (typeof OPERATIONAL_ALERT_TYPES)[number];
+
+const SOURCE_MODULES: Record<OperationalAlertType, PermissionModule[]> = {
+  overdueReceivables: ["AR"],
+  overduePayables: ["AP"],
+  negativeStock: ["INVENTORY"],
+  approvedCertificationsWithoutInvoice: ["CERTIFICATIONS", "AR"],
+  staleUploadingDocuments: ["DOCUMENTS"],
+  procurementSlaReminders: ["PROCUREMENT"],
+  purchaseOrderDeliveryOverdue: ["PROCUREMENT"],
+  purchaseRequestNeededByOverdue: ["PROCUREMENT"],
+  purchaseOrderReceivedWithoutInvoice: ["PROCUREMENT", "AP"],
+};
 
 export function isOperationalAlertType(v: string): v is OperationalAlertType {
   return (OPERATIONAL_ALERT_TYPES as readonly string[]).includes(v);
@@ -72,6 +86,10 @@ async function dispatchOperationalAlert(
   alertType: OperationalAlertType,
   ctx: ServiceContext,
 ): Promise<OperationalAlertRunSummary> {
+  const gate = await getTenantModuleGate(ctx);
+  if (SOURCE_MODULES[alertType].some((module) => !gate.isEnabled(module))) {
+    return { checkedCount: 0, createdCount: 0, skippedCount: 0, errors: [] };
+  }
   switch (alertType) {
     case "overdueReceivables":
       return runOverdueReceivablesAlert(ctx);
@@ -136,25 +154,7 @@ export async function runAllOperationalAlerts(ctx: ServiceContext): Promise<RunA
     throw new ServiceError("FORBIDDEN", "Solo OWNER o ADMIN pueden ejecutar alertas operativas");
   }
 
-  const runs: OperationalAlertRunResult[] = [];
-  let checkedCount = 0;
-  let createdCount = 0;
-  let skippedCount = 0;
-  let errorCount = 0;
-
-  for (const alertType of OPERATIONAL_ALERT_TYPES) {
-    const summary = await dispatchOperationalAlert(alertType, ctx);
-    runs.push(toResult(alertType, summary));
-    checkedCount += summary.checkedCount;
-    createdCount += summary.createdCount;
-    skippedCount += summary.skippedCount;
-    errorCount += summary.errors.length;
-  }
-
-  return {
-    runs,
-    totals: { checkedCount, createdCount, skippedCount, errorCount },
-  };
+  return runAllOperationalAlertsForSystemContext(ctx);
 }
 
 /**
@@ -183,7 +183,7 @@ export async function runAllOperationalAlertsForSystemContext(ctx: ServiceContex
         checkedCount: 0,
         createdCount: 0,
         skippedCount: 0,
-        errors: [],
+        errors: ["No se pudo ejecutar esta alerta operativa."],
       });
       console.error(
         `[operational-alerts] system run failed tenant=${ctx.tenantId} alert=${alertType}`,

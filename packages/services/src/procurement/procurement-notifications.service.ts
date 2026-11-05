@@ -1,6 +1,6 @@
 import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
-import { createSystemNotification } from "../notifications/notification.service";
+import { createOperationalNotificationOnce, createSystemNotification } from "../notifications/notification.service";
 import { sendNotificationEmailAsSystem } from "../notifications/notification-email.service";
 import {
   findActiveOwnerAdminUserIds,
@@ -72,7 +72,10 @@ async function notifyRecipients(params: {
   let created = 0;
   for (const recipientUserId of scoped) {
     try {
-      const { id: notificationId } = await createSystemNotification({
+      const create = params.type === "PROCUREMENT_SLA_REMINDER"
+        ? createOperationalNotificationOnce
+        : createSystemNotification;
+      const notification = await create({
         tenantId: params.ctx.tenantId,
         companyId: params.companyId,
         recipientUserId,
@@ -86,9 +89,10 @@ async function notifyRecipients(params: {
         actionUrl: params.actionUrl,
         metadata: params.metadata ?? undefined,
       });
+      if (!notification) continue;
       // Best-effort email (D-050 / BR-PUR-015); never abort the business flow.
       // [D-114] Preference gate inside sendNotificationEmailAsSystem.
-      await sendNotificationEmailAsSystem(notificationId, params.ctx).catch(() => undefined);
+      await sendNotificationEmailAsSystem(notification.id, params.ctx).catch(() => undefined);
       created += 1;
     } catch {
       /* best-effort */
@@ -433,6 +437,7 @@ export async function runProcurementSlaReminders(
       where: {
         tenantId: ctx.tenantId,
         companyId: company.id,
+        project: { tenantId: ctx.tenantId, OR: [{ companyId: company.id }, { companyId: null }] },
         status: "SUBMITTED",
         updatedAt: { lte: cutoff },
       },
@@ -492,6 +497,7 @@ export async function runProcurementSlaReminders(
       where: {
         tenantId: ctx.tenantId,
         companyId: company.id,
+        project: { tenantId: ctx.tenantId, OR: [{ companyId: company.id }, { companyId: null }] },
         status: "SUBMITTED",
         submittedAt: { lte: cutoff },
       },
@@ -500,7 +506,7 @@ export async function runProcurementSlaReminders(
 
     for (const pr of stalePrs) {
       const quoteCount = await prisma.procurementQuote.count({
-        where: { purchaseRequestId: pr.id, status: { in: ["RECEIVED", "SELECTED"] } },
+        where: { tenantId: ctx.tenantId, purchaseRequestId: pr.id, status: { in: ["RECEIVED", "SELECTED"] } },
       });
       if (quoteCount > 0) continue;
       checkedCount += 1;

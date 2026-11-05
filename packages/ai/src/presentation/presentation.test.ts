@@ -75,6 +75,13 @@ describe("parseAiPresentationFromAssistantText", () => {
     assert.equal(parsed.invalidPresentation, false);
     assert.match(parsed.visibleText, /Solo texto/);
   });
+
+  it("keeps prose and omits incomplete or malformed presentation protocol", () => {
+    const unfinished = parseAiPresentationFromAssistantText(`Resumen.\n${PRESENTATION_START}{"kind":`);
+    assert.deepEqual(unfinished, { visibleText: "Resumen.", presentation: null, invalidPresentation: true });
+    const invalid = parseAiPresentationFromAssistantText(`${PRESENTATION_START}{invalid${PRESENTATION_END}`);
+    assert.deepEqual(invalid, { visibleText: "", presentation: null, invalidPresentation: true });
+  });
 });
 
 describe("scorePresentationQuality", () => {

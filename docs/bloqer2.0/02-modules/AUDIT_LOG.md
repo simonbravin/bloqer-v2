@@ -51,6 +51,8 @@ _No aplica._
 ## 16. Permisos
 Solo ADMIN/OWNER por defecto.
 
+Con Auditoría habilitada, lista, detalle y exportaciones aplican el alcance vigente de empresa y obra. Los eventos compartidos siguen disponibles. D-144 reserva los históricos de entidades con empresa cuyo alcance no puede comprobarse a un contexto autorizado global. Se conserva el registro original. Los filtros Desde/Hasta usan la misma zona que la pantalla.
+
 ## 17. Eventos disparados / consumidos
 - Emite logs en cada mutación crítica.
 

@@ -12,6 +12,10 @@ import {
 import { listTenantAuditLogFiltersSchema } from "@bloqer/validators";
 import { formatDateTime, formatTimezoneOptionLabel } from "@bloqer/utils";
 import { ServiceContext, ServiceError } from "../types";
+import { companyScopeFilter, isCrossCompany } from "../company-scope";
+import { projectIdWhereForScope, projectRowIdWhereForScope, requireProjectAccess, resolveAccessibleProjectScope } from "../security/access";
+import { sanitizeAuditPayload } from "./audit-sanitize";
+import { filterAuditLegacyScope } from "./audit-legacy-scope";
 import {
   decodeAuditLogCursor,
   encodeAuditLogCursor,
@@ -26,6 +30,7 @@ import { buildCsv } from "../report-exports/csv-export.service";
 import { safeReportFilename } from "../report-exports/filename.service";
 import type { ReportCsvPayload } from "../report-exports/report-export.types";
 import { getTenantDisplayTimezone } from "../tenant-settings/tenant-settings.service";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 
 export const MAX_TENANT_AUDIT_LOG_EXPORT_ROWS = 10_000;
 
@@ -89,6 +94,7 @@ export type TenantAuditLogExportUrlFilters = {
 
 export function resolveTenantAuditLogExportFilters(
   input: TenantAuditLogExportUrlFilters,
+  timeZone = "UTC",
 ): Omit<ListTenantAuditLogFilters, "cursor" | "limit"> {
   return {
     module: input.module,
@@ -99,15 +105,16 @@ export function resolveTenantAuditLogExportFilters(
     entityId: input.entityId,
     action: input.action,
     reference: input.reference,
-    dateFrom: input.dateFrom ? parseAuditDateFrom(input.dateFrom) : undefined,
-    dateTo: input.dateTo ? parseAuditDateToInclusive(input.dateTo) : undefined,
+    dateFrom: input.dateFrom ? parseAuditDateFrom(input.dateFrom, timeZone) : undefined,
+    dateTo: input.dateTo ? parseAuditDateToInclusive(input.dateTo, timeZone) : undefined,
   };
 }
 
-function assertCanViewAuditLog(ctx: ServiceContext): void {
+async function assertCanViewAuditLog(ctx: ServiceContext): Promise<void> {
   if (!can(ctx.roles, "VIEW", "AUDIT")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver el registro de actividad");
   }
+  await assertTenantModuleEnabled(ctx, "AUDIT");
 }
 
 function parseFilters(raw: ListTenantAuditLogFilters) {
@@ -116,23 +123,18 @@ function parseFilters(raw: ListTenantAuditLogFilters) {
     const msg = parsed.error.issues.map((i) => i.message).join("; ") || "validación";
     throw new ServiceError("VALIDATION", msg);
   }
+  if (parsed.data.dateFrom && parsed.data.dateTo && parsed.data.dateFrom > parsed.data.dateTo) {
+    throw new ServiceError("VALIDATION", "Desde debe ser anterior o igual a Hasta");
+  }
   return parsed.data;
 }
 
-async function assertProjectInTenant(tenantId: string, projectId: string): Promise<void> {
-  const project = await prisma.project.findFirst({
-    where: { id: projectId, tenantId },
-    select: { id: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-}
-
 async function buildProjectFilter(
-  tenantId: string,
+  ctx: ServiceContext,
   projectId: string,
   entityTypes: readonly string[],
 ): Promise<Prisma.AuditLogWhereInput> {
-  const legacyIds = await resolveEntityIdsForProject(tenantId, projectId, entityTypes);
+  const legacyIds = await resolveEntityIdsForProject(ctx, projectId, entityTypes);
 
   const orClauses: Prisma.AuditLogWhereInput[] = [{ projectId }];
 
@@ -147,11 +149,26 @@ async function buildProjectFilter(
   return { OR: orClauses };
 }
 
+async function auditReadScope(ctx: ServiceContext): Promise<Prisma.AuditLogWhereInput> {
+  const projects = await resolveAccessibleProjectScope(ctx);
+  return {
+    tenantId: ctx.tenantId,
+    AND: [
+      companyScopeFilter(ctx),
+      { OR: [{ companyId: null }, { company: { tenantId: ctx.tenantId } }] },
+      { OR: [{ projectId: null }, { ...projectIdWhereForScope(projects), project: { tenantId: ctx.tenantId } }] },
+    ],
+  };
+}
+
 async function buildWhereClause(
-  tenantId: string,
+  ctx: ServiceContext,
   input: ReturnType<typeof parseFilters>,
 ): Promise<Prisma.AuditLogWhereInput> {
-  const parts: Prisma.AuditLogWhereInput[] = [{ tenantId }];
+  if (input.companyId && isCrossCompany(input.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La empresa del filtro no coincide con tu acceso");
+  }
+  const parts: Prisma.AuditLogWhereInput[] = [await auditReadScope(ctx)];
 
   if (input.module) {
     parts.push({ entityType: { in: [...entityTypesForAuditModule(input.module)] } });
@@ -195,11 +212,11 @@ async function buildWhereClause(
     (AUDIT_MODULES_WITHOUT_PROJECT_SCOPE as readonly string[]).includes(input.module);
 
   if (input.projectId && !skipProjectFilter) {
-    await assertProjectInTenant(tenantId, input.projectId);
+    await requireProjectAccess(input.projectId, ctx);
     const scopedTypes = input.module
       ? entityTypesForAuditModule(input.module)
       : ALL_PROJECT_SCOPED_ENTITY_TYPES;
-    parts.push(await buildProjectFilter(tenantId, input.projectId, scopedTypes));
+    parts.push(await buildProjectFilter(ctx, input.projectId, scopedTypes));
   }
 
   return parts.length === 1 ? parts[0]! : { AND: parts };
@@ -214,11 +231,37 @@ const listSelect = {
   companyId: true,
   ipAddress: true,
   createdAt: true,
+  before: true,
   after: true,
   actorUserId: true,
   actor: { select: { name: true, email: true } },
   project: { select: { name: true } },
 } as const;
+
+function beforeCursor(createdAt: Date, id: string): Prisma.AuditLogWhereInput {
+  return { OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: id } }] };
+}
+
+/** Fill the page with visible rows; skipped historical records cannot consume a result slot. */
+async function findVisibleAuditRows(where: Prisma.AuditLogWhereInput, count: number, ctx: ServiceContext) {
+  const orderBy = [{ createdAt: "desc" }, { id: "desc" }] satisfies Prisma.AuditLogOrderByWithRelationInput[];
+  if (!ctx.companyId) return prisma.auditLog.findMany({ where, orderBy, take: count, select: listSelect });
+
+  const take = Math.min(250, Math.max(50, count));
+  let scanAfter: Prisma.AuditLogWhereInput | undefined;
+  const visible: Prisma.AuditLogGetPayload<{ select: typeof listSelect }>[] = [];
+  while (visible.length < count) {
+    const batch = await prisma.auditLog.findMany({
+      where: scanAfter ? { AND: [where, scanAfter] } : where,
+      orderBy, take, select: listSelect,
+    });
+    visible.push(...await filterAuditLegacyScope(batch, ctx));
+    if (batch.length < take) break;
+    const last = batch.at(-1)!;
+    scanAfter = beforeCursor(last.createdAt, last.id);
+  }
+  return visible.slice(0, count);
+}
 
 function mapRow(r: {
   id: string;
@@ -229,6 +272,7 @@ function mapRow(r: {
   companyId: string | null;
   ipAddress: string | null;
   createdAt: Date;
+  before: unknown;
   after: unknown;
   actorUserId: string | null;
   actor: { name: string | null; email: string } | null;
@@ -241,7 +285,7 @@ function mapRow(r: {
     entityType: r.entityType,
     entityId: r.entityId,
     module: resolveAuditModuleForEntityType(r.entityType),
-    reference: extractAuditReference(null, r.after),
+    reference: extractAuditReference(r.before, r.after),
     actorUserId: r.actorUserId,
     actorName: r.actor?.name ?? null,
     actorEmail: r.actor?.email ?? null,
@@ -258,11 +302,11 @@ export async function listTenantAuditLog(
   filters: ListTenantAuditLogFilters,
   ctx: ServiceContext,
 ): Promise<ListTenantAuditLogResult> {
-  assertCanViewAuditLog(ctx);
+  await assertCanViewAuditLog(ctx);
   const input = parseFilters(filters);
   const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
 
-  const where = await buildWhereClause(ctx.tenantId, input);
+  const where = await buildWhereClause(ctx, input);
 
   let cursorWhere: Prisma.AuditLogWhereInput | undefined;
   if (input.cursor) {
@@ -270,22 +314,10 @@ export async function listTenantAuditLog(
     if (!decoded) {
       throw new ServiceError("VALIDATION", "Cursor de paginación inválido");
     }
-    cursorWhere = {
-      OR: [
-        { createdAt: { lt: new Date(decoded.createdAt) } },
-        {
-          AND: [{ createdAt: new Date(decoded.createdAt) }, { id: { lt: decoded.id } }],
-        },
-      ],
-    };
+    cursorWhere = beforeCursor(new Date(decoded.createdAt), decoded.id);
   }
 
-  const rows = await prisma.auditLog.findMany({
-    where: cursorWhere ? { AND: [where, cursorWhere] } : where,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: limit + 1,
-    select: listSelect,
-  });
+  const rows = await findVisibleAuditRows(cursorWhere ? { AND: [where, cursorWhere] } : where, limit + 1, ctx);
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
@@ -301,25 +333,22 @@ export async function getTenantAuditLogEntry(
   id: string,
   ctx: ServiceContext,
 ): Promise<TenantAuditLogDetail> {
-  assertCanViewAuditLog(ctx);
+  await assertCanViewAuditLog(ctx);
 
   const row = await prisma.auditLog.findFirst({
-    where: { id, tenantId: ctx.tenantId },
-    select: {
-      ...listSelect,
-      before: true,
-      after: true,
-    },
+    where: { id, ...await auditReadScope(ctx) },
+    select: listSelect,
   });
 
-  if (!row) throw new ServiceError("NOT_FOUND", "Registro de auditoría no encontrado");
+  if (!row || (await filterAuditLegacyScope([row], ctx)).length === 0) {
+    throw new ServiceError("NOT_FOUND", "Registro de auditoría no encontrado");
+  }
 
   const mapped = mapRow(row);
   return {
     ...mapped,
-    reference: extractAuditReference(row.before, row.after),
-    before: row.before,
-    after: row.after,
+    before: sanitizeAuditPayload(row.before) ?? null,
+    after: sanitizeAuditPayload(row.after) ?? null,
   };
 }
 
@@ -336,9 +365,9 @@ export type AuditProjectOption = {
 };
 
 export async function listAuditActorOptions(ctx: ServiceContext): Promise<AuditActorOption[]> {
-  assertCanViewAuditLog(ctx);
+  await assertCanViewAuditLog(ctx);
   const rows = await prisma.userMembership.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: { tenantId: ctx.tenantId, status: "ACTIVE", ...companyScopeFilter(ctx) },
     orderBy: { createdAt: "asc" },
     select: {
       user: { select: { id: true, name: true, email: true } },
@@ -352,20 +381,14 @@ export async function listAuditActorOptions(ctx: ServiceContext): Promise<AuditA
 }
 
 export async function listAuditProjectOptions(ctx: ServiceContext): Promise<AuditProjectOption[]> {
-  assertCanViewAuditLog(ctx);
+  await assertCanViewAuditLog(ctx);
   return prisma.project.findMany({
-    where: { tenantId: ctx.tenantId },
+    where: { tenantId: ctx.tenantId, ...projectRowIdWhereForScope(await resolveAccessibleProjectScope(ctx)) },
     select: { id: true, name: true, code: true },
     orderBy: { name: "asc" },
     take: 500,
   });
 }
-
-const exportSelect = {
-  ...listSelect,
-  before: true,
-  after: true,
-} as const;
 
 function jsonForCsv(value: unknown): string {
   if (value == null) return "";
@@ -391,16 +414,11 @@ export async function fetchTenantAuditLogForExport(
   ctx: ServiceContext,
   maxRows: number,
 ): Promise<TenantAuditLogExportResult> {
-  assertCanViewAuditLog(ctx);
+  await assertCanViewAuditLog(ctx);
   const input = parseFilters(filters);
-  const where = await buildWhereClause(ctx.tenantId, input);
+  const where = await buildWhereClause(ctx, input);
 
-  const rawRows = await prisma.auditLog.findMany({
-    where,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    take: maxRows + 1,
-    select: exportSelect,
-  });
+  const rawRows = await findVisibleAuditRows(where, maxRows + 1, ctx);
 
   const truncated = rawRows.length > maxRows;
   const page = truncated ? rawRows.slice(0, maxRows) : rawRows;
@@ -409,9 +427,8 @@ export async function fetchTenantAuditLogForExport(
     const mapped = mapRow(r);
     return {
       ...mapped,
-      reference: extractAuditReference(r.before, r.after),
-      before: r.before,
-      after: r.after,
+      before: sanitizeAuditPayload(r.before) ?? null,
+      after: sanitizeAuditPayload(r.after) ?? null,
     };
   });
 

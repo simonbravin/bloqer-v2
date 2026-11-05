@@ -4,7 +4,6 @@ import { formatDbDate } from "@bloqer/utils";
 import { computeObligationBalanceDue, normalizeObligationBalanceDue } from "../finance/obligation-balance";
 import type { EmailContextField } from "@bloqer/email";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
-import { resolveUserDisplayNames, userDisplayNameFromMap } from "../user/resolve-user-display-names";
 
 const MAX_ITEMS = 8;
 const MAX_NOTES = 280;
@@ -255,24 +254,17 @@ export function buildBaseContextFields(params: {
   return fields;
 }
 
-async function loadUserLabels(userIds: Array<string | null | undefined>): Promise<Map<string, string>> {
+async function loadUserLabels(tenantId: string, userIds: Array<string | null | undefined>): Promise<Map<string, string>> {
   const ids = [...new Set(userIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
   if (ids.length === 0) return new Map();
   const users = await prisma.user.findMany({
-    where: { id: { in: ids } },
+    where: { id: { in: ids }, memberships: { some: { tenantId } } },
     select: { id: true, name: true, email: true },
   });
   const map = new Map<string, string>();
   for (const u of users) {
     const label = formatUserLabel(u.name, u.email);
     if (label) map.set(u.id, label);
-  }
-  const fallback = await resolveUserDisplayNames(ids);
-  for (const id of ids) {
-    if (!map.has(id)) {
-      const fb = userDisplayNameFromMap(fallback, id);
-      if (fb) map.set(id, fb);
-    }
   }
   return map;
 }
@@ -297,11 +289,15 @@ export async function loadNotificationIdentityFacts(params: {
       : Promise.resolve(null),
     params.projectId
       ? prisma.project.findFirst({
-          where: { id: params.projectId, tenantId: params.tenantId },
+          where: {
+            id: params.projectId,
+            tenantId: params.tenantId,
+            ...(params.companyId ? { OR: [{ companyId: params.companyId }, { companyId: null }] } : {}),
+          },
           select: { code: true, name: true },
         })
       : Promise.resolve(null),
-    loadUserLabels([params.requestedByUserId, params.actorUserId]),
+    loadUserLabels(params.tenantId, [params.requestedByUserId, params.actorUserId]),
   ]);
   return {
     organizationName: tenant?.name.trim() || null,
@@ -322,14 +318,29 @@ function metaString(meta: Prisma.JsonValue | null | undefined, key: string): str
   return typeof v === "string" && v.trim() ? v.trim() : null;
 }
 
+type NotificationSourceScope = { tenantId: string; companyId?: string; projectId: string | null };
+
+type ScopedSource = { tenantId: string; companyId: string; projectId: string | null };
+
+function sameSourceScope(source: ScopedSource, linked: ScopedSource): boolean {
+  return source.tenantId === linked.tenantId && source.companyId === linked.companyId &&
+    source.projectId === linked.projectId;
+}
+
+const scopedSourceSelect = { tenantId: true, companyId: true, projectId: true } as const;
+const obligationSelect = {
+  ...scopedSourceSelect, currency: true, originalAmount: true, paidAmount: true, creditedAmount: true, dueDate: true,
+} as const;
+
 async function appendPurchaseRequestFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   purchaseRequestId: string,
   fields: EmailContextField[],
   items: string[],
 ): Promise<void> {
+  if (!scope.projectId) return;
   const pr = await prisma.purchaseRequest.findFirst({
-    where: { id: purchaseRequestId, tenantId },
+    where: { ...scope, projectId: scope.projectId, id: purchaseRequestId },
     select: {
       number: true,
       requestedByUserId: true,
@@ -348,7 +359,7 @@ async function appendPurchaseRequestFields(
   if (!pr) return;
 
   pushField(fields, "Código", padDoc("SC", pr.number, 3));
-  const names = await loadUserLabels([pr.requestedByUserId, pr.createdBy, pr.updatedBy]);
+  const names = await loadUserLabels(scope.tenantId, [pr.requestedByUserId, pr.createdBy, pr.updatedBy]);
   const requestedBy = pr.requestedByUserId ? names.get(pr.requestedByUserId) : null;
   const submittedBy = pr.updatedBy ? names.get(pr.updatedBy) : pr.createdBy ? names.get(pr.createdBy) : null;
   pushField(fields, "Solicitante", requestedBy);
@@ -372,13 +383,17 @@ async function appendPurchaseRequestFields(
 }
 
 async function appendPurchaseOrderFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   purchaseOrderId: string,
   fields: EmailContextField[],
   items: string[],
 ): Promise<void> {
+  if (!scope.projectId) return;
   const po = await prisma.purchaseOrder.findFirst({
-    where: { id: purchaseOrderId, tenantId },
+    where: {
+      ...scope, projectId: scope.projectId, id: purchaseOrderId,
+      supplierContact: { tenantId: scope.tenantId },
+    },
     select: {
       number: true,
       currency: true,
@@ -403,7 +418,7 @@ async function appendPurchaseOrderFields(
   pushField(fields, "Código", padDoc("OC", po.number, 3));
   pushField(fields, "Proveedor", contactLabel(po.supplierContact));
   pushField(fields, "Total", moneyLabel(po.totalAmount, po.currency));
-  const names = await loadUserLabels([
+  const names = await loadUserLabels(scope.tenantId, [
     po.originRequestedByUserId,
     po.createdBy,
     po.approvedByUserId,
@@ -434,13 +449,14 @@ async function appendPurchaseOrderFields(
 }
 
 async function appendSalesInvoiceFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   salesInvoiceId: string,
   fields: EmailContextField[],
 ): Promise<void> {
   const inv = await prisma.salesInvoice.findFirst({
-    where: { id: salesInvoiceId, tenantId },
+    where: { ...scope, id: salesInvoiceId, clientContact: { tenantId: scope.tenantId } },
     select: {
+      ...scopedSourceSelect,
       number: true,
       invoiceLetter: true,
       currency: true,
@@ -449,7 +465,8 @@ async function appendSalesInvoiceFields(
       issueDate: true,
       createdBy: true,
       clientContact: { select: { legalName: true, fantasyName: true } },
-      receivable: { select: { originalAmount: true, paidAmount: true, creditedAmount: true, dueDate: true } },
+      clientContactId: true,
+      receivable: { select: { ...obligationSelect, clientContactId: true } },
     },
   });
   if (!inv) return;
@@ -457,7 +474,8 @@ async function appendSalesInvoiceFields(
   pushField(fields, "Código", `${padDoc("FAC", inv.number, 5)}${letter}`);
   pushField(fields, "Cliente", contactLabel(inv.clientContact));
   pushField(fields, "Total", moneyLabel(inv.totalAmount, inv.currency));
-  if (inv.receivable) {
+  if (inv.receivable && sameSourceScope(inv, inv.receivable) &&
+    inv.clientContactId === inv.receivable.clientContactId && inv.currency === inv.receivable.currency) {
     const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(inv.receivable.originalAmount, inv.receivable.paidAmount, inv.receivable.creditedAmount));
     pushField(fields, "Saldo", moneyLabel(balance, inv.currency));
     pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.receivable.dueDate));
@@ -465,18 +483,19 @@ async function appendSalesInvoiceFields(
     pushField(fields, "Emisión", formatEmailCalendarDate(inv.issueDate));
     pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.dueDate));
   }
-  const names = await loadUserLabels([inv.createdBy]);
+  const names = await loadUserLabels(scope.tenantId, [inv.createdBy]);
   pushField(fields, "Emitida por", inv.createdBy ? names.get(inv.createdBy) : null);
 }
 
 async function appendSupplierInvoiceFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   supplierInvoiceId: string,
   fields: EmailContextField[],
 ): Promise<void> {
   const inv = await prisma.supplierInvoice.findFirst({
-    where: { id: supplierInvoiceId, tenantId },
+    where: { ...scope, id: supplierInvoiceId, supplierContact: { tenantId: scope.tenantId } },
     select: {
+      ...scopedSourceSelect,
       number: true,
       invoiceLetter: true,
       currency: true,
@@ -484,20 +503,23 @@ async function appendSupplierInvoiceFields(
       dueDate: true,
       issueDate: true,
       createdBy: true,
-      purchaseOrder: { select: { number: true } },
+      supplierContactId: true,
+      purchaseOrder: { select: { ...scopedSourceSelect, number: true, supplierContactId: true } },
       supplierContact: { select: { legalName: true, fantasyName: true } },
-      payable: { select: { originalAmount: true, paidAmount: true, creditedAmount: true, dueDate: true } },
+      payable: { select: { ...obligationSelect, supplierContactId: true } },
     },
   });
   if (!inv) return;
   const letter = inv.invoiceLetter ? ` ${inv.invoiceLetter}` : "";
   pushField(fields, "Código", `${padDoc("FP", inv.number, 5)}${letter}`);
   pushField(fields, "Proveedor", contactLabel(inv.supplierContact));
-  if (inv.purchaseOrder) {
+  if (inv.purchaseOrder && sameSourceScope(inv, inv.purchaseOrder) &&
+    inv.supplierContactId === inv.purchaseOrder.supplierContactId) {
     pushField(fields, "Orden", padDoc("OC", inv.purchaseOrder.number, 3));
   }
   pushField(fields, "Total", moneyLabel(inv.totalAmount, inv.currency));
-  if (inv.payable) {
+  if (inv.payable && sameSourceScope(inv, inv.payable) &&
+    inv.supplierContactId === inv.payable.supplierContactId && inv.currency === inv.payable.currency) {
     const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(inv.payable.originalAmount, inv.payable.paidAmount, inv.payable.creditedAmount));
     pushField(fields, "Saldo", moneyLabel(balance, inv.currency));
     pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.payable.dueDate));
@@ -505,31 +527,42 @@ async function appendSupplierInvoiceFields(
     pushField(fields, "Emisión", formatEmailCalendarDate(inv.issueDate));
     pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.dueDate));
   }
-  const names = await loadUserLabels([inv.createdBy]);
+  const names = await loadUserLabels(scope.tenantId, [inv.createdBy]);
   pushField(fields, "Cargada por", inv.createdBy ? names.get(inv.createdBy) : null);
 }
 
 async function appendCertificationFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   certificationId: string,
   fields: EmailContextField[],
 ): Promise<void> {
+  if (!scope.projectId) return;
   const cert = await prisma.certification.findFirst({
-    where: { id: certificationId, tenantId },
+    where: {
+      tenantId: scope.tenantId, projectId: scope.projectId, id: certificationId,
+      ...(scope.companyId ? { OR: [{ companyId: scope.companyId }, { companyId: null }] } : {}),
+      budget: {
+        tenantId: scope.tenantId,
+        projectId: scope.projectId,
+        ...(scope.companyId ? { OR: [{ companyId: scope.companyId }, { companyId: null }] } : {}),
+      },
+    },
     select: {
       number: true,
       periodStart: true,
       periodEnd: true,
       totalAmount: true,
+      companyId: true,
+      budget: { select: { currency: true, companyId: true } },
       createdBy: true,
       updatedBy: true,
     },
   });
-  if (!cert) return;
+  if (!cert || (cert.companyId && cert.budget.companyId && cert.companyId !== cert.budget.companyId)) return;
   pushField(fields, "Código", padDoc("CERT", cert.number, 3));
   pushField(fields, "Período", `${formatEmailCalendarDate(cert.periodStart)} → ${formatEmailCalendarDate(cert.periodEnd)}`);
-  pushField(fields, "Total", moneyLabel(cert.totalAmount, "ARS"));
-  const names = await loadUserLabels([cert.createdBy, cert.updatedBy]);
+  pushField(fields, "Total", moneyLabel(cert.totalAmount, cert.budget.currency));
+  const names = await loadUserLabels(scope.tenantId, [cert.createdBy, cert.updatedBy]);
   pushField(fields, "Creada por", cert.createdBy ? names.get(cert.createdBy) : null);
   if (cert.updatedBy && cert.updatedBy !== cert.createdBy) {
     pushField(fields, "Actualizada por", names.get(cert.updatedBy));
@@ -537,12 +570,13 @@ async function appendCertificationFields(
 }
 
 async function appendJobsiteLogFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   jobsiteLogId: string,
   fields: EmailContextField[],
 ): Promise<void> {
+  if (!scope.projectId) return;
   const log = await prisma.jobsiteLog.findFirst({
-    where: { id: jobsiteLogId, tenantId },
+    where: { ...scope, projectId: scope.projectId, id: jobsiteLogId },
     select: {
       logDate: true,
       title: true,
@@ -557,7 +591,7 @@ async function appendJobsiteLogFields(
   pushField(fields, "Título", log.title);
   pushField(fields, "Frente", log.workFront);
   pushField(fields, "Turno", log.shift);
-  const names = await loadUserLabels([log.createdBy]);
+  const names = await loadUserLabels(scope.tenantId, [log.createdBy]);
   pushField(fields, "Autor", log.createdBy ? names.get(log.createdBy) : null);
   if (log.returnNotes?.trim()) {
     pushField(fields, "Motivo de devolución", truncatePlainText(log.returnNotes, MAX_NOTES));
@@ -565,47 +599,59 @@ async function appendJobsiteLogFields(
 }
 
 async function appendPurchaseReceiptFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   receiptId: string,
   fields: EmailContextField[],
 ): Promise<void> {
+  if (!scope.projectId) return;
   const rec = await prisma.purchaseReceipt.findFirst({
-    where: { id: receiptId, tenantId },
+    where: {
+      ...scope, projectId: scope.projectId, id: receiptId,
+      purchaseOrder: { ...scope, projectId: scope.projectId },
+      supplierContact: { tenantId: scope.tenantId },
+    },
     select: {
+      companyId: true,
       receiptDate: true,
       createdBy: true,
-      warehouse: { select: { name: true } },
+      warehouse: { select: { ...scopedSourceSelect, name: true } },
       supplierContact: { select: { legalName: true, fantasyName: true } },
-      purchaseOrder: { select: { number: true } },
+      purchaseOrder: { select: { number: true, companyId: true } },
     },
   });
-  if (!rec) return;
+  if (!rec || rec.companyId !== rec.purchaseOrder.companyId) return;
   pushField(fields, "Fecha", formatEmailCalendarDate(rec.receiptDate));
   pushField(fields, "Proveedor", contactLabel(rec.supplierContact));
   pushField(fields, "Orden", padDoc("OC", rec.purchaseOrder.number, 3));
-  pushField(fields, "Depósito", rec.warehouse?.name);
-  const names = await loadUserLabels([rec.createdBy]);
+  if (rec.warehouse?.tenantId === scope.tenantId && rec.warehouse.companyId === rec.companyId &&
+    (!rec.warehouse.projectId || rec.warehouse.projectId === scope.projectId)) {
+    pushField(fields, "Depósito", rec.warehouse.name);
+  }
+  const names = await loadUserLabels(scope.tenantId, [rec.createdBy]);
   pushField(fields, "Registrada por", rec.createdBy ? names.get(rec.createdBy) : null);
 }
 
 async function appendDocumentFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   documentId: string,
   fields: EmailContextField[],
 ): Promise<void> {
   const doc = await prisma.documentAttachment.findFirst({
-    where: { id: documentId, tenantId },
+    where: {
+      id: documentId, tenantId: scope.tenantId, projectId: scope.projectId,
+      ...(scope.companyId ? { OR: [{ companyId: scope.companyId }, { companyId: null }] } : {}),
+    },
     select: { originalFileName: true, category: true, uploadedBy: true },
   });
   if (!doc) return;
   pushField(fields, "Archivo", doc.originalFileName);
   pushField(fields, "Categoría", DOCUMENT_CATEGORY_LABEL_ES[doc.category] ?? doc.category);
-  const names = await loadUserLabels([doc.uploadedBy]);
+  const names = await loadUserLabels(scope.tenantId, [doc.uploadedBy]);
   pushField(fields, "Subido por", names.get(doc.uploadedBy));
 }
 
 async function appendNegativeStockFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   meta: Prisma.JsonValue | null | undefined,
   fields: EmailContextField[],
 ): Promise<void> {
@@ -615,13 +661,16 @@ async function appendNegativeStockFields(
   const [product, warehouse] = await Promise.all([
     productId
       ? prisma.product.findFirst({
-          where: { id: productId, tenantId },
+          where: {
+            id: productId, tenantId: scope.tenantId,
+            ...(scope.companyId ? { OR: [{ companyId: scope.companyId }, { companyId: null }] } : {}),
+          },
           select: { sku: true, name: true, unit: true },
         })
       : Promise.resolve(null),
     warehouseId
       ? prisma.warehouse.findFirst({
-          where: { id: warehouseId, tenantId },
+          where: { id: warehouseId, tenantId: scope.tenantId, companyId: scope.companyId },
           select: { name: true },
         })
       : Promise.resolve(null),
@@ -634,7 +683,7 @@ async function appendNegativeStockFields(
 }
 
 async function appendLinkedEntityFields(
-  tenantId: string,
+  scope: NotificationSourceScope,
   linkedEntityType: LinkedEntityType | null,
   linkedEntityId: string | null,
   fields: EmailContextField[],
@@ -643,25 +692,25 @@ async function appendLinkedEntityFields(
   if (!linkedEntityType || !linkedEntityId) return;
   switch (linkedEntityType) {
     case "PURCHASE_REQUEST":
-      await appendPurchaseRequestFields(tenantId, linkedEntityId, fields, items);
+      await appendPurchaseRequestFields(scope, linkedEntityId, fields, items);
       break;
     case "PURCHASE_ORDER":
-      await appendPurchaseOrderFields(tenantId, linkedEntityId, fields, items);
+      await appendPurchaseOrderFields(scope, linkedEntityId, fields, items);
       break;
     case "SALES_INVOICE":
-      await appendSalesInvoiceFields(tenantId, linkedEntityId, fields);
+      await appendSalesInvoiceFields(scope, linkedEntityId, fields);
       break;
     case "SUPPLIER_INVOICE":
-      await appendSupplierInvoiceFields(tenantId, linkedEntityId, fields);
+      await appendSupplierInvoiceFields(scope, linkedEntityId, fields);
       break;
     case "CERTIFICATION":
-      await appendCertificationFields(tenantId, linkedEntityId, fields);
+      await appendCertificationFields(scope, linkedEntityId, fields);
       break;
     case "JOBSITE_LOG":
-      await appendJobsiteLogFields(tenantId, linkedEntityId, fields);
+      await appendJobsiteLogFields(scope, linkedEntityId, fields);
       break;
     case "PURCHASE_RECEIPT":
-      await appendPurchaseReceiptFields(tenantId, linkedEntityId, fields);
+      await appendPurchaseReceiptFields(scope, linkedEntityId, fields);
       break;
     default:
       break;
@@ -681,6 +730,7 @@ export async function resolveNotificationEmailContext(params: {
   notificationType?: NotificationType | null;
   metadata?: Prisma.JsonValue | null;
   actionUrl?: string | null;
+  recipientCompanyId?: string | null;
 }): Promise<NotificationEmailResolvedContext> {
   const identity = await loadNotificationIdentityFacts({
     tenantId: params.tenantId,
@@ -689,21 +739,27 @@ export async function resolveNotificationEmailContext(params: {
   });
   const fields = buildBaseContextFields(identity);
   const items: string[] = [];
+  const scope: NotificationSourceScope = {
+    tenantId: params.tenantId,
+    companyId: params.companyId ?? params.recipientCompanyId ?? undefined,
+    projectId: params.projectId,
+  };
 
   try {
     await appendLinkedEntityFields(
-      params.tenantId,
+      scope,
       params.linkedEntityType,
       params.linkedEntityId,
       fields,
       items,
     );
     const documentId = metaString(params.metadata, "documentId");
-    if (documentId) {
-      await appendDocumentFields(params.tenantId, documentId, fields);
+    if (documentId && (params.notificationType === "DOCUMENT_UPLOAD_CONFIRMED" ||
+      params.notificationType === "STALE_DOCUMENT_UPLOAD")) {
+      await appendDocumentFields(scope, documentId, fields);
     }
-    if (params.notificationType === "NEGATIVE_STOCK" || metaString(params.metadata, "productId")) {
-      await appendNegativeStockFields(params.tenantId, params.metadata ?? null, fields);
+    if (params.notificationType === "NEGATIVE_STOCK") {
+      await appendNegativeStockFields(scope, params.metadata ?? null, fields);
     }
     if (params.notificationType === "ACCOUNTING_DRAFTS_PENDING") {
       pushField(fields, "Cola", "Asientos contables en borrador");

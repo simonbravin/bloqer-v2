@@ -10,7 +10,6 @@ export type ClientUploadDocumentInput = {
   linkedEntityType?: string;
   linkedEntityId?: string;
   idempotencyKey: string;
-  revalidatePaths?: string[];
 };
 
 export type ClientUploadDocumentResult =
@@ -58,7 +57,8 @@ export async function clientUploadDocument(
           }
         : {}),
     }),
-  });
+  }).catch(() => null);
+  if (!initiateRes) return { error: "No se pudo iniciar la subida. Revisá la conexión e intentá de nuevo." };
 
   let initiateData: {
     documentId?: string;
@@ -82,7 +82,6 @@ export async function clientUploadDocument(
     return { error: "Respuesta inesperada del servidor" };
   }
 
-  const paths = input.revalidatePaths ?? [];
   const needsPut = Boolean(initiateData.uploadUrl);
 
   if (needsPut && initiateData.uploadUrl) {
@@ -90,7 +89,7 @@ export async function clientUploadDocument(
     try {
       putRes = await fetch(initiateData.uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": mimeType },
+        headers: { "Content-Type": mimeType, "If-None-Match": "*" },
         body: input.file,
       });
     } catch {
@@ -100,7 +99,9 @@ export async function clientUploadDocument(
       };
     }
 
-    if (!putRes.ok) {
+    // An earlier PUT may have succeeded even if its response was lost.
+    // The signed create-once upload returns 412 in that case; confirm the existing bytes.
+    if (!putRes.ok && putRes.status !== 412) {
       return {
         error:
           putRes.status === 403
@@ -111,9 +112,8 @@ export async function clientUploadDocument(
 
     const confirmRes = await fetch(`/api/documents/${documentId}/confirm`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ revalidatePaths: paths }),
-    });
+    }).catch(() => null);
+    if (!confirmRes) return { error: "No se pudo confirmar la subida. Revisá la conexión e intentá de nuevo." };
     const confirmData = (await confirmRes.json().catch(() => ({}))) as { error?: string };
     if (!confirmRes.ok) {
       return {
@@ -122,7 +122,7 @@ export async function clientUploadDocument(
           "El archivo se subió pero no se pudo confirmar. Intentá de nuevo o contactá soporte.",
       };
     }
-  } else if (initiateData.storageConfigured && initiateData.status === "UPLOADING") {
+  } else if (initiateData.status === "UPLOADING") {
     return {
       error: "No se pudo obtener la URL de subida. Recargá e intentá de nuevo.",
     };

@@ -319,9 +319,6 @@ export function SupplierInvoiceForm({
 
   async function uploadAttachmentIfAny(invoiceId: string, scopeProjectId: string | null) {
     if (!attachment || !storageConfigured) return null;
-    const detailPath = scopeProjectId
-      ? `/proyectos/${scopeProjectId}/facturas-proveedor/${invoiceId}`
-      : `/finanzas/facturas-proveedor/${invoiceId}`;
     return clientUploadDocument({
       file: attachment,
       projectId: scopeProjectId,
@@ -329,7 +326,6 @@ export function SupplierInvoiceForm({
       linkedEntityType: "SUPPLIER_INVOICE",
       linkedEntityId: invoiceId,
       idempotencyKey: attachmentKey,
-      revalidatePaths: [detailPath],
     }).catch(() => ({ error: "Se perdió la conexión durante la subida" }));
   }
 

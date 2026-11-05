@@ -622,13 +622,13 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     modules: ["configuracion"],
     level: "company",
     typicalRoles: ["OWNER / ADMIN"],
-    permissionHint: "Solo OWNER/ADMIN (permiso de auditoría).",
+    permissionHint: "OWNER/ADMIN con Auditoría habilitada. Los históricos de alcance no comprobable requieren alcance global.",
     where: { menu: "Configuración → Registro" },
     hrefs: [{ kind: "company", path: "/configuracion/registro", label: "Registro de actividad" }],
     steps: [
       "Configuración → Registro.",
       "Filtrá / abrí el detalle: actor, entidad, acción y fecha.",
-      "Las horas están en la zona horaria de la empresa (no UTC del servidor).",
+      "Las horas y los filtros Desde/Hasta usan la zona de la empresa. Lista, detalle y exportaciones aplican la misma empresa y obra autorizadas.",
       "Exportá CSV o PDF si necesitás respaldo (el CSV indica la zona en el encabezado).",
     ],
     relatedSlugs: [
@@ -843,7 +843,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Libro de obra — parte del día aparece en alcance empresa. Seleccioná obras activas autorizadas. Se genera PDF con el día de la corrida.",
       "Desde una obra (Planificación → Reportes → Envíos programados) el catálogo es solo de proyecto; el parte diario se crea desde Configuración → Reportes programados (empresa).",
       "En el detalle de un envío Activo, usá **Enviar ahora** y confirmá. Una configuración compartida de alcance global se modifica desde una sesión con alcance global.",
-      "En **Reportes de esta configuración** ves la selección guardada. **Reintentar fallidos** usa la fecha original y omite entregas ya completadas.",
+      "En **Reportes de esta configuración** ves la selección guardada. **Reintentar fallidos** usa la fecha original de un fallo confirmado. Si figura **Sin confirmar**, revisá el historial. **Enviar ahora** inicia una entrega nueva con los permisos vigentes.",
       "Presupuesto vs real ya no se programa: usá EDT y costos.",
     ],
     effects: [
@@ -900,8 +900,8 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Retirá el mouse para que el botón vuelva a su tamaño compacto. Si tapa un resultado al final de la página, desplazate hacia abajo para verlo por encima del botón.",
       "Preguntá en lenguaje natural (ej. «¿Qué OC están pendientes?» o «¿Cómo creo una SC?»).",
       "Si estás dentro de una obra, el asistente usa ese contexto; si no, puede pedirte aclarar el proyecto.",
-      "Usá los chips de acción debajo de la respuesta (links internos seguros) para ir a la pantalla correspondiente.",
-      "El historial vive solo en esta sesión del navegador: al cerrar o recargar se pierde (aún no hay historial persistido).",
+      "Usá los enlaces debajo de la respuesta para abrir pantallas respaldadas por los resultados autorizados de esa consulta.",
+      "El asistente usa los últimos mensajes de la conversación en memoria. Si cambia tu cuenta, organización, empresa o permisos, empieza una conversación limpia. Si la respuesta se interrumpe, podés volver a preguntar.",
       "En preguntas abiertas («¿cómo viene esta obra?») el asistente prioriza 3–5 insights con acciones y links; no enumera todos los KPIs.",
     ],
     effects: [

@@ -4,6 +4,10 @@ import type { ServiceContext } from "../../types";
 import { canViewCompanyAp, canViewApProjectArea } from "../../ap/ap-access";
 import { canViewCompanyAr, canViewArProjectArea } from "../../ar/ar-access";
 import { canViewTreasury, canViewProjectFinancialsCapability } from "../../security/access";
+import { canViewProcurementProjectArea, canViewPurchaseRequests } from "../../procurement/procurement-access";
+import { canViewScheduleArea } from "../../schedule/schedule-access";
+import { canViewProjectCostControlReport } from "../../project/project-nav-guards";
+import { canViewJobsiteLogArea } from "../../jobsite-log/jobsite-log-access";
 import type { AiExecutionContext } from "../types";
 import type { AiDataClass, AiToolScope } from "./data-class";
 
@@ -25,12 +29,16 @@ export type AiToolAccessKind =
   | "session"
   | "help"
   | "projects"
-  | "project_operational"
+  | "schedule"
+  | "materials"
+  | "jobsite"
+  | "certifications"
   | "project_financial"
   | "project_or_company_ap"
   | "project_or_company_ar"
   | "treasury"
-  | "procurement"
+  | "purchase_requests"
+  | "purchase_orders"
   | "field";
 
 /** AI advertise can be stricter than UI service helpers (defense in depth). */
@@ -39,28 +47,7 @@ export function aiCanViewProjects(roles: ServiceContext["roles"]): boolean {
 }
 
 export function aiCanViewProcurement(roles: ServiceContext["roles"]): boolean {
-  // Stricter than canViewProcurementProjectArea: do NOT advertise via VIEW PROJECTS alone.
-  return (
-    can(roles, "VIEW", "PROCUREMENT") ||
-    can(roles, "VIEW", "PURCHASE_ORDERS") ||
-    can(roles, "VIEW", "PURCHASE_REQUESTS")
-  );
-}
-
-export function aiCanViewSchedule(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "SCHEDULE") || can(roles, "VIEW", "PROJECTS");
-}
-
-export function aiCanViewMaterials(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "BUDGETS") || can(roles, "VIEW", "PROJECTS");
-}
-
-export function aiCanViewJobsite(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "JOBSITE_LOG") || can(roles, "VIEW", "PROJECTS");
-}
-
-export function aiCanViewCertifications(roles: ServiceContext["roles"]): boolean {
-  return can(roles, "VIEW", "CERTIFICATIONS") || can(roles, "VIEW", "PROJECTS");
+  return canViewPurchaseRequests(roles);
 }
 
 export function aiCanViewProjectAp(roles: ServiceContext["roles"]): boolean {
@@ -126,13 +113,17 @@ export function evaluateAiToolAccess(
       return aiCanViewProjects(roles)
         ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TOOL }
         : { allowed: false, denyMessage: AI_DENY_MESSAGES.TOOL };
-    case "project_operational":
-      return aiCanViewProjects(roles) ||
-        aiCanViewSchedule(roles) ||
-        aiCanViewMaterials(roles) ||
-        aiCanViewJobsite(roles)
-        ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TOOL }
-        : { allowed: false, denyMessage: AI_DENY_MESSAGES.TOOL };
+    case "schedule":
+      return { allowed: canViewScheduleArea(roles), denyMessage: AI_DENY_MESSAGES.TOOL };
+    case "materials":
+      return { allowed: canViewProjectCostControlReport(roles), denyMessage: AI_DENY_MESSAGES.TOOL };
+    case "jobsite":
+      return { allowed: canViewJobsiteLogArea(roles), denyMessage: AI_DENY_MESSAGES.TOOL };
+    case "certifications":
+      return {
+        allowed: can(roles, "VIEW", "CERTIFICATIONS") && canViewProjectFinancialsCapability(roles),
+        denyMessage: AI_DENY_MESSAGES.TOOL,
+      };
     case "project_financial":
       // Align with G4 capability — not VIEW PROJECTS alone.
       return canViewProjectFinancialsCapability(roles)
@@ -150,10 +141,10 @@ export function evaluateAiToolAccess(
       return aiCanViewTreasury(roles)
         ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TREASURY }
         : { allowed: false, denyMessage: AI_DENY_MESSAGES.TREASURY };
-    case "procurement":
-      return aiCanViewProcurement(roles)
-        ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TOOL }
-        : { allowed: false, denyMessage: AI_DENY_MESSAGES.TOOL };
+    case "purchase_requests":
+      return { allowed: canViewPurchaseRequests(roles), denyMessage: AI_DENY_MESSAGES.TOOL };
+    case "purchase_orders":
+      return { allowed: canViewProcurementProjectArea(roles), denyMessage: AI_DENY_MESSAGES.TOOL };
     case "field":
       return aiCanViewFieldSummary(roles)
         ? { allowed: true, denyMessage: AI_DENY_MESSAGES.TOOL }

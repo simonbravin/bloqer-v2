@@ -54,18 +54,8 @@ async function loadDocumentInProject(
 function revalidateDocumentSurfaces(
   doc: DocumentAttachmentView,
   projectId: string,
-  extraPathsToRevalidate?: string[],
 ): void {
-  const paths = new Set([
-    ...documentRevalidatePaths({
-      projectId,
-      documentId: doc.id,
-      linkedEntityType: doc.linkedEntityType,
-      linkedEntityId: doc.linkedEntityId,
-    }),
-    ...(extraPathsToRevalidate ?? []),
-  ]);
-  for (const p of paths) revalidatePath(p);
+  for (const path of documentRevalidatePaths({ ...doc, projectId, documentId: doc.id })) revalidatePath(path);
 }
 
 function revalidateProjectDocuments(projectId: string): void {
@@ -75,7 +65,6 @@ function revalidateProjectDocuments(projectId: string): void {
 export async function archiveDocumentAction(
   id: string,
   projectId: string,
-  extraPathsToRevalidate?: string[],
 ): Promise<void> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -83,7 +72,7 @@ export async function archiveDocumentAction(
   try {
     const doc = await loadDocumentInProject(id, projectId, ctx);
     await archiveDocument(id, ctx);
-    revalidateDocumentSurfaces(doc, projectId, extraPathsToRevalidate);
+    revalidateDocumentSurfaces(doc, projectId);
   } catch (err) {
     rethrowActionError(err);
   }
@@ -92,7 +81,6 @@ export async function archiveDocumentAction(
 export async function restoreDocumentAction(
   id: string,
   projectId: string,
-  extraPathsToRevalidate?: string[],
 ): Promise<void> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -100,7 +88,7 @@ export async function restoreDocumentAction(
   try {
     const doc = await loadDocumentInProject(id, projectId, ctx);
     await restoreDocument(id, ctx);
-    revalidateDocumentSurfaces(doc, projectId, extraPathsToRevalidate);
+    revalidateDocumentSurfaces(doc, projectId);
   } catch (err) {
     rethrowActionError(err);
   }
@@ -109,7 +97,7 @@ export async function restoreDocumentAction(
 export async function softDeleteDocumentAction(
   id: string,
   projectId: string,
-  options?: { extraPathsToRevalidate?: string[]; redirectToProjectDocuments?: boolean },
+  options?: { redirectToProjectDocuments?: boolean },
 ): Promise<void> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -117,7 +105,7 @@ export async function softDeleteDocumentAction(
   try {
     const doc = await loadDocumentInProject(id, projectId, ctx);
     await softDeleteDocument(id, ctx);
-    revalidateDocumentSurfaces(doc, projectId, options?.extraPathsToRevalidate);
+    revalidateDocumentSurfaces(doc, projectId);
   } catch (err) {
     rethrowActionError(err);
   }

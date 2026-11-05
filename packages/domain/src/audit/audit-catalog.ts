@@ -38,7 +38,7 @@ export const AUDIT_UI_MODULE_LABEL_ES: Record<AuditUiModule, string> = {
 };
 
 export const AUDIT_MODULE_ENTITY_TYPES: Record<AuditUiModule, readonly string[]> = {
-  PROCUREMENT: ["PurchaseOrder", "PurchaseReceipt"],
+  PROCUREMENT: ["PurchaseRequest", "ProcurementQuote", "PurchaseOrder", "PurchaseReceipt", "CompanyProcurementSettings"],
   AP: ["SupplierInvoice", "Payable", "Payment"],
   AR: ["SalesInvoice", "Receivable", "Collection"],
   TREASURY: [
@@ -50,13 +50,13 @@ export const AUDIT_MODULE_ENTITY_TYPES: Record<AuditUiModule, readonly string[]>
     "BankReconciliationMatch",
   ],
   INVENTORY: ["Product", "Warehouse", "StockMovement", "WarehouseTransfer"],
-  BUDGET: ["Budget", "WbsNode", "CostItem", "CostAnalysisLine"],
+  BUDGET: ["Budget", "BudgetSettings", "WbsNode", "CostItem", "CostAnalysisLine"],
   CERTIFICATIONS: ["Certification", "CertificationLine"],
   SUBCONTRACTS: ["Subcontract", "SubcontractCertification"],
   SCHEDULE: ["Schedule", "ScheduleItem"],
   JOBSITE_LOG: ["JobsiteLog"],
   ACCOUNTING: ["JournalEntry", "AccountingAccount", "AccountingMappingRule"],
-  PROJECTS: ["Project"],
+  PROJECTS: ["Project", "ProjectMembership", "ProjectTeamMember"],
   DIRECTORY: [
     "Contact",
     "ContactRole",
@@ -65,7 +65,7 @@ export const AUDIT_MODULE_ENTITY_TYPES: Record<AuditUiModule, readonly string[]>
     "SubcontractorProfile",
   ],
   CONFIGURATION: ["Tenant", "UserMembership", "TenantInvitation", "Company"],
-  DOCUMENTS: ["DocumentAttachment"],
+  DOCUMENTS: ["DocumentAttachment", "DocumentFolder"],
 };
 
 const ENTITY_TYPE_TO_MODULE = new Map<string, AuditUiModule>();

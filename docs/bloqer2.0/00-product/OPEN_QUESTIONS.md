@@ -772,6 +772,18 @@
 - **Hallazgo:** el reparto automático del pool en ARS usa costos directos nominales de distinta moneda como si fueran comparables. D-041/D-043 definen la ponderación y el cierre, sin especificar cómo tratar un costo sin equivalencia en ARS.
 - **Propuesta:** [ponderar con valores comprobables en ARS y bloquear el cálculo incompleto](../08-architecture/platform-audit/2026-11-05-ag-12-overhead-weight-currency-proposal.md).
 
+### Q-090 — Entregas programadas sin confirmación
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-143. El Owner aprobó conservar la evidencia y evitar el reenvío ambiguo.
+- **Hallazgo:** un reporte puede ser aceptado por el proveedor y perderse su respuesta o confirmación local. La regla actual de reintento no distingue ese caso del rechazo confirmado.
+- **Propuesta:** [preservar la evidencia y excluir los envíos ambiguos del reintento](../08-architecture/platform-audit/2026-11-05-ag-13-email-confirmation-proposal.md).
+
+### Q-091 — Alcance de registros históricos sin empresa comprobable
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-144. El Owner aprobó reservar los registros ambiguos a alcance global.
+- **Hallazgo:** faltan campos de alcance en registros históricos y algunos eventos de membresía. Un valor vacío puede corresponder a una operación de otra empresa.
+- **Propuesta:** [conservar los registros y exigir alcance global donde la empresa no se pueda verificar](../08-architecture/platform-audit/2026-11-05-ag-13-audit-history-scope-proposal.md).
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

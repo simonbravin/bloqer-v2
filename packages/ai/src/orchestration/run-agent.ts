@@ -1,6 +1,6 @@
 import type { AiMessage, AiToolCall, AiToolDefinition, AiUsage } from "../types";
 import type { AiProvider } from "../provider";
-import { AiProviderError, userFacingAiProviderErrorMessage } from "../errors";
+import { AiProviderError, userFacingAiProviderErrorMessage, type AiProviderErrorCode } from "../errors";
 import {
   parseAiPresentationFromAssistantText,
   PRESENTATION_START,
@@ -69,19 +69,21 @@ function ensureAssistantText(text: string): { text: string; filled: boolean } {
   return { text: EMPTY_ASSISTANT_FALLBACK, filled: true };
 }
 
-/** Merge trusted tool links into presentation only when pairing is unambiguous. */
-function enrichPresentationWithToolLinks(
+/** Keep only links returned by a successful tool in this request. */
+function reconcilePresentationLinks(
   presentation: AiPresentation,
   toolLinks: { label: string; href: string }[],
 ): AiPresentation {
-  if (toolLinks.length !== 1) return presentation;
-  const only = toolLinks[0]!;
-  const insights = presentation.insights.map((insight) =>
-    insight.links.length > 0 ? insight : { ...insight, links: [only] },
-  );
-  const actions = presentation.actions.map((action) =>
-    action.links.length > 0 ? action : { ...action, links: [only] },
-  );
+  const byHref = new Map(toolLinks.map((link) => [link.href, link]));
+  const trustedLinks = (links: AiPresentation["insights"][number]["links"]) => {
+    if (!links.length && toolLinks.length === 1) return toolLinks;
+    return links.flatMap(({ href }) => {
+      const trusted = byHref.get(href);
+      return trusted ? [trusted] : [];
+    });
+  };
+  const insights = presentation.insights.map((insight) => ({ ...insight, links: trustedLinks(insight.links) }));
+  const actions = presentation.actions.map((action) => ({ ...action, links: trustedLinks(action.links) }));
   return { ...presentation, insights, actions };
 }
 
@@ -92,7 +94,7 @@ function finalizeAssistantOutput(
   const parsed = parseAiPresentationFromAssistantText(rawText);
   let presentation = parsed.presentation;
   if (presentation) {
-    presentation = enrichPresentationWithToolLinks(presentation, toolLinks);
+    presentation = reconcilePresentationLinks(presentation, toolLinks);
   }
   let visibleText = parsed.visibleText.trim();
   if (!visibleText && presentation) {
@@ -163,6 +165,29 @@ function mergeUsage(base: AiUsage, partial: Partial<AiUsage> | undefined, toolDe
   };
 }
 
+async function executeToolUntilAbort(
+  executeTool: AgentToolExecutor,
+  call: AiToolCall,
+  signal?: AbortSignal,
+): ReturnType<AgentToolExecutor> {
+  if (!signal) return executeTool(call);
+  signal.throwIfAborted();
+  let onAbort: (() => void) | undefined;
+  const cancellation = new Promise<never>((_, reject) => {
+    onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  try {
+    const execution = Promise.resolve().then(() => {
+      signal.throwIfAborted();
+      return executeTool(call);
+    });
+    return await Promise.race([execution, cancellation]);
+  } finally {
+    if (onAbort) signal.removeEventListener("abort", onAbort);
+  }
+}
+
 /**
  * Provider-agnostic tool loop. Tools are Bloqer-owned; provider only sees AiToolDefinition.
  */
@@ -189,14 +214,7 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
     const seenLinkHrefs = new Set<string>();
 
     for (let turn = 0; turn < maxTurns; turn++) {
-      if (input.signal?.aborted) {
-        yield {
-          type: "error",
-          message: userFacingAiProviderErrorMessage("CANCELLED"),
-          code: "CANCELLED",
-        };
-        return;
-      }
+      input.signal?.throwIfAborted();
 
       const useStream = input.stream !== false && input.provider.capabilities.supportsStreaming;
       let toolCalls: AiToolCall[] = [];
@@ -214,6 +232,7 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
           signal: input.signal,
         });
         for await (const ev of stream) {
+          input.signal?.throwIfAborted();
           if (ev.type === "text_delta") {
             streamer.push(ev.text);
             for (const d of streamer.takeDeltas()) {
@@ -264,6 +283,9 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
         }
       }
 
+      input.signal?.throwIfAborted();
+      if (!input.provider.capabilities.supportsParallelTools) toolCalls = toolCalls.slice(0, 1);
+
       history.push({
         role: "assistant",
         content: turnText || null,
@@ -288,11 +310,8 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
 
       // Tool turn: keep raw assistant text for history; visible streaming already happened
       assistantText = ""; // reset visible accumulator for next (final) turn
-      if (!input.provider.capabilities.supportsParallelTools && toolCalls.length > 1) {
-        toolCalls = toolCalls.slice(0, 1);
-      }
-
       for (const call of toolCalls) {
+        input.signal?.throwIfAborted();
         if (toolCallsTotal >= maxToolCalls) {
           yield {
             type: "error",
@@ -321,10 +340,10 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
         let resultContent: string;
         let resultLinks: { label: string; href: string }[] | undefined;
         try {
-          const result = await input.executeTool(call);
+          const result = await executeToolUntilAbort(input.executeTool, call, input.signal);
           resultContent = result.content;
           ok = !result.isError;
-          if (result.links?.length) resultLinks = result.links;
+          if (ok && result.links?.length) resultLinks = result.links;
           if (result.statusLabel) {
             yield {
               type: "tool_start",
@@ -333,13 +352,13 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
               label: result.statusLabel,
             };
           }
-        } catch (err) {
+        } catch {
+          input.signal?.throwIfAborted();
           ok = false;
           console.error(
             JSON.stringify({
               type: "bloqer_ai_tool_execute_error",
-              tool: call.name,
-              detail: err instanceof Error ? err.message.slice(0, 300) : "unknown",
+              tool: input.tools.find((tool) => tool.name === call.name)?.name ?? "unknown",
             }),
           );
           resultContent = JSON.stringify({
@@ -386,17 +405,12 @@ export async function* runAgent(input: RunAgentInput): AsyncGenerator<AgentStrea
     }
     yield { type: "done", assistantText: finalized.visibleText };
   } catch (err) {
-    const code =
-      err instanceof AiProviderError
-        ? err.code
-        : input.signal?.aborted
-          ? "CANCELLED"
-          : "UNKNOWN";
-    // Never put raw vendor / Error.message into done — chat UI may render assistantText.
-    const message =
-      err instanceof AiProviderError
-        ? err.message || userFacingAiProviderErrorMessage(code)
-        : userFacingAiProviderErrorMessage(code === "CANCELLED" ? "CANCELLED" : "UNKNOWN");
+    let code: AiProviderErrorCode = err instanceof AiProviderError ? err.code : "UNKNOWN";
+    if (input.signal?.aborted) {
+      const reason = input.signal.reason;
+      code = reason instanceof Error && reason.name === "TimeoutError" ? "TIMEOUT" : "CANCELLED";
+    }
+    const message = userFacingAiProviderErrorMessage(code);
     yield {
       type: "error",
       message,

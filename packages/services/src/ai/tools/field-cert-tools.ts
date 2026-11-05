@@ -10,13 +10,13 @@ import { ServiceError } from "../../types";
 
 export const getRecentJobsiteLogsTool = defineBloqerAiTool({
   name: "get_recent_jobsite_logs",
-  description: "Últimos partes de obra (libro de obra) del proyecto.",
+  description: "Últimos partes de obra (libro de obra) del proyecto. Si hay más resultados, el total exacto queda sin calcular.",
   risk: "READ",
   requiredModules: ["JOBSITE_LOG"],
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "field",
+    accessKind: "jobsite",
   },
   inputSchema: z.object({
     projectId: z.string().uuid().optional(),
@@ -41,11 +41,12 @@ export const getRecentJobsiteLogsTool = defineBloqerAiTool({
       projectId,
       {
         ...(args.status ? { status: args.status } : {}),
-        take: limit,
+        take: limit + 1,
       },
       ctx.service,
     );
-    const rows = logs.map((l) => ({
+    const truncated = logs.length > limit;
+    const rows = logs.slice(0, limit).map((l) => ({
       id: l.id,
       logDate:
         l.logDate instanceof Date ? l.logDate.toISOString().slice(0, 10) : String(l.logDate),
@@ -55,9 +56,8 @@ export const getRecentJobsiteLogsTool = defineBloqerAiTool({
     }));
     const href = `/proyectos/${projectId}/libro-obra`;
     return {
-      data: { total: rows.length, logs: rows, truncated: rows.length >= limit },
+      data: { total: truncated ? null : rows.length, logs: rows, truncated },
       provenance: { sourceType: "bloqer_data", entityType: "Project", entityId: projectId, route: href, asOf: nowIso() },
-      truncation: { total: rows.length, returned: rows.length },
       ui: { links: [{ label: "Ver libro de obra", href }], summaryLabel: "Consultando partes de obra…" },
     };
   },
@@ -111,7 +111,7 @@ export const getProjectCertificationSummaryTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_FINANCIAL,
     scope: "PROJECT",
-    accessKind: "project_financial",
+    accessKind: "certifications",
   },
   inputSchema: z.object({ projectId: z.string().uuid().optional() }),
   jsonSchema: {
@@ -128,14 +128,17 @@ export const getProjectCertificationSummaryTool = defineBloqerAiTool({
     for (const c of certs) {
       byStatus[c.status] = (byStatus[c.status] ?? 0) + 1;
     }
-    const recent = certs.slice(0, 8).map((c) => ({
-      id: c.id,
-      number: c.number,
-      status: c.status,
-      periodStart: c.periodStart instanceof Date ? c.periodStart.toISOString().slice(0, 10) : c.periodStart,
-      periodEnd: c.periodEnd instanceof Date ? c.periodEnd.toISOString().slice(0, 10) : c.periodEnd,
-      href: `/proyectos/${projectId}/certificaciones/${c.id}`,
-    }));
+    const recent = [...certs]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.number - a.number || a.id.localeCompare(b.id))
+      .slice(0, 8)
+      .map((c) => ({
+        id: c.id,
+        number: c.number,
+        status: c.status,
+        periodStart: c.periodStart instanceof Date ? c.periodStart.toISOString().slice(0, 10) : c.periodStart,
+        periodEnd: c.periodEnd instanceof Date ? c.periodEnd.toISOString().slice(0, 10) : c.periodEnd,
+        href: `/proyectos/${projectId}/certificaciones/${c.id}`,
+      }));
     const href = `/proyectos/${projectId}/certificaciones`;
     return {
       data: { total: certs.length, byStatus, recent },

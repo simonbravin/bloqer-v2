@@ -1,41 +1,59 @@
-import type { Prisma } from "@bloqer/database";
+import { Prisma } from "@bloqer/database";
 
 const META_MAX_KEYS = 32;
 const META_STR_MAX = 400;
-const SECRET_KEY = /secret|password|token|apikey|authorization|cookie|storagekey/i;
+const META_MAX_DEPTH = 4;
+const SECRET_KEY = /secret|password|token|apikey|authorization|cookie|storagekey|privatekey|credential/i;
 
-function truncate(s: string, max: number): string {
-  if (s.length <= max) return s;
-  return s.slice(0, max - 1) + "…";
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return value.slice(0, max - 1) + "…";
 }
 
-/** Shallow JSON-safe payload for tenant audit before/after (no secrets, bounded size). */
-export function sanitizeAuditPayload(meta: unknown): Prisma.InputJsonValue | undefined {
-  if (meta == null) return undefined;
-  if (typeof meta !== "object" || Array.isArray(meta)) return undefined;
+function safeEntries(value: object) {
+  return Object.entries(value)
+    .filter(([key]) => !SECRET_KEY.test(key.replace(/[^a-z0-9]/gi, "")))
+    .slice(0, META_MAX_KEYS)
+    .map(([key, item]) => [truncate(key.replace(/[^\w.-]/g, "_"), 64), item] as const);
+}
 
-  const o = meta as Record<string, unknown>;
-  const out: Record<string, string | number | boolean | null> = {};
-  let n = 0;
-
-  for (const [k, v] of Object.entries(o)) {
-    if (n >= META_MAX_KEYS) break;
-    const key = truncate(k.replace(/[^\w.-]/g, "_"), 64);
-    if (SECRET_KEY.test(key)) continue;
-
-    if (v === null) {
-      out[key] = null;
-    } else if (typeof v === "boolean" || typeof v === "number") {
-      out[key] = v;
-    } else if (typeof v === "string") {
-      out[key] = truncate(v, META_STR_MAX);
-    } else if (v && typeof v === "object" && !Array.isArray(v)) {
-      out[key] = truncate(JSON.stringify(v), META_STR_MAX);
-    } else {
-      out[key] = truncate(String(v), META_STR_MAX);
+function redact(value: unknown, depth: number): Prisma.InputJsonValue | null {
+  if (value == null) return null;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "string") {
+    const text = value.trimStart();
+    if (text.startsWith("{") || text.startsWith("[")) {
+      if (depth >= META_MAX_DEPTH) return "…";
+      try {
+        return truncate(JSON.stringify(redact(JSON.parse(text), depth + 1)), META_STR_MAX);
+      } catch {
+        // Historical stringified snapshots may have been truncated before redaction.
+        if (SECRET_KEY.test(text.replace(/[^a-z0-9]/gi, ""))) return "[dato protegido]";
+      }
     }
-    n += 1;
+    return truncate(value, META_STR_MAX);
   }
+  if (typeof value !== "object") return truncate(String(value), META_STR_MAX);
+  if (value instanceof Date) return value.toJSON();
+  if (Prisma.Decimal.isDecimal(value)) return truncate(value.toString(), META_STR_MAX);
+  if (depth >= META_MAX_DEPTH) return "…";
+  if (Array.isArray(value)) return value.slice(0, META_MAX_KEYS).map((item) => redact(item, depth + 1));
+  return Object.fromEntries(safeEntries(value).map(([key, item]) => [key, redact(item, depth + 1)]));
+}
 
+/** Redact nested values before flattening them into bounded audit text. */
+export function sanitizeAuditPayload(meta: unknown): Prisma.InputJsonValue | undefined {
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return undefined;
+  const out = Object.fromEntries(safeEntries(meta).map(([key, item]) => {
+    const cleaned = redact(item, 0);
+    if (Array.isArray(item) && Array.isArray(cleaned) &&
+      cleaned.every((value) => value === null || typeof value !== "object")) {
+      return [key, truncate(cleaned.join(","), META_STR_MAX)];
+    }
+    return [key, cleaned !== null && typeof cleaned === "object"
+      ? truncate(JSON.stringify(cleaned), META_STR_MAX)
+      : cleaned];
+  }));
   return Object.keys(out).length > 0 ? out : undefined;
 }

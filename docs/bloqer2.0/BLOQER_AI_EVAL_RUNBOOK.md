@@ -36,10 +36,11 @@ Si `ai:check-docs-index` falla: regenerar con `pnpm ai:index-docs` y commitear e
 ## 3. Modo fake (CI / default)
 
 ```bash
-pnpm ai:eval -- --provider=fake --output=evals/reports/structural-latest.json
+pnpm ai:eval --mode=structural --provider=fake --live-tools=0 --output=evals/reports/structural-latest.json
 ```
 
 Valida orquestación/heurística sobre `expectTools` **sin** red. **No** cuenta como calidad de modelo para el gate de staging.
+El evaluador usa variables explícitas del proceso y no carga `.env` de forma automática.
 
 También: `FakeAiProvider` en unit tests (`run-agent.test.ts`).
 
@@ -48,10 +49,11 @@ También: `FakeAiProvider` en unit tests (`run-agent.test.ts`).
 ## 4. Modo live (opcional, manual)
 
 ```bash
-# Neon DEV only — assert host ≠ ep-cold-mouse
+# Con DATABASE_URL y DIRECT_URL explícitas a la misma base aislada de auditoría.
+# BLOQER_AUDIT_TEST_DATABASE identifica esa base (bloqer_audit_*).
 pnpm ai:seed-adversarial
 # Isolation / RBAC / module gates (tools reales):
-# PowerShell: $env:BLOQER_AI_LIVE_DB='1'; pnpm --filter @bloqer/services test -- src/ai/live-isolation.test.ts
+# PowerShell: $env:BLOQER_AI_LIVE_DB='1'; pnpm --filter @bloqer/services exec node --import tsx --test src/ai/live-isolation.test.ts
 
 # Live provider (requiere key sandbox):
 $env:BLOQER_AI_LIVE='1'
@@ -62,10 +64,11 @@ pnpm ai:eval -- --provider=openai --model=gpt-4.1-mini --output=evals/reports/li
 | Variable | Valor | Notas |
 |---|---|---|
 | `BLOQER_AI_LIVE=1` | requerido para live provider | |
-| `BLOQER_AI_LIVE_DB=1` | suite isolation | |
+| `BLOQER_AI_LIVE_DB=1` | suite de aislamiento | Requiere destino de auditoría explícito |
+| `BLOQER_AUDIT_TEST_DATABASE` | nombre `bloqer_audit_*` | La semilla comprueba ambas URLs y el destino efectivo antes de escribir |
 | `OPENAI_API_KEY` | sandbox | ausente → eval cae a structural |
 | `BLOQER_AI_BASE_URL` | opcional | OpenAI-compatible |
-| Neon | branch **dev** | Nunca production |
+| Neon | base de auditoría aislada en el compute dev permitido | La base habitual de desarrollo queda fuera de la selección |
 
 ---
 

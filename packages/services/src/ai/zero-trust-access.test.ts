@@ -94,11 +94,15 @@ describe("Bloqer AI zero-trust advertise filter", () => {
     assert.ok(!/balance|accountCount|ARS|USD|banco/i.test(res.content));
   });
 
-  it("SITE_FOREMAN can see PR path via PURCHASE_REQUESTS but not cash", () => {
+  it("SITE_FOREMAN can see purchase requests without cash or order tools", () => {
     const names = registry
       .definitions({ risks: ["READ"], ctx: ctx(["SITE_FOREMAN"]), logAdvertise: false })
       .map((t) => t.name);
     assert.ok(!names.includes("get_cash_position"));
+    assert.ok(names.includes("search_purchase_requests"));
+    assert.ok(!names.includes("search_purchase_orders"));
+    assert.ok(!names.includes("get_purchase_order"));
+    assert.ok(!names.includes("get_pending_purchase_orders"));
     assert.equal(aiCanViewTreasury(["SITE_FOREMAN"]), false);
     assert.equal(aiCanViewProcurement(["SITE_FOREMAN"]), true);
   });

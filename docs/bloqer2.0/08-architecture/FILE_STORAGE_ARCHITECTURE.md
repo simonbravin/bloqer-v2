@@ -36,6 +36,8 @@ Vercel Functions tienen un **límite duro de ~4.5 MB** en el body de request. Po
 2. Browser `PUT` a URL firmada R2
 3. `POST /api/documents/[id]/confirm`
 
+El PUT firma tipo, longitud y `If-None-Match: *` para impedir que un enlace de subida sobrescriba los bytes de un intento confirmado. Ante HTTP 412, el cliente consulta la confirmación del intento existente. El servidor comprueba alcance y metadatos antes de exponer el archivo. Los intentos simultáneos del transporte vía servidor usan claves separadas.
+
 **Requisito:** CORS del bucket R2 permitiendo el origin de la app (`https://portal.bloqer.app`, `http://localhost:3000`). JSON en [`ENVIRONMENT_VARIABLES.md`](./ENVIRONMENT_VARIABLES.md) § R2 CORS.
 
 **Excepción residual:** adjuntos al *crear* subcontrato todavía pueden ir por Server Action con tope ~3.5 MB (FormData). Detalle / Documentos / evidencias = R2 directo hasta 50 MB. Unificar create-subcontrato → **P-DOC-05**.

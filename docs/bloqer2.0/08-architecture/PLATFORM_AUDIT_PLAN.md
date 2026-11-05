@@ -3,7 +3,7 @@
 > Preparado: **03/11/2026**. Alcance de esta entrega: plan y herramientas reutilizables.
 > La inspección inicial fue de documentación, estructura y configuración. **No acredita que la plataforma esté auditada ni que se hayan ejecutado sus suites.**
 > Este plan organiza trabajo de calidad; no cambia decisiones de producto, estados, arquitectura ni el roadmap de implementación.
-> **Avance al 05/11/2026.** AG-00 a AG-11 publicadas. [Publicación AG-11](./platform-audit/2026-11-05-ag-11-publication.md) con PR #9 y Production verificada. [AG-12 cerrada localmente](./platform-audit/2026-11-05-ag-12-reporting.md) con 2.733 pruebas generales, 32 casos SQL y una muestra de escritorio, tablet y teléfono. La revisión integral de UX/UI se mantiene como etapa posterior.
+> **Avance al 05/11/2026.** AG-00 a AG-12 publicadas. [Publicación AG-12](./platform-audit/2026-11-05-ag-12-publication.md) con PR #10 y Production verificada. [AG-13 cerrada localmente](./platform-audit/2026-11-05-ag-13-cross-cutting.md) con 2.756 pruebas generales, 10 casos SQL y 202 casos estructurales de Bloqer AI. La revisión integral de UX/UI se mantiene como etapa posterior.
 
 ## 1. Resultado buscado
 

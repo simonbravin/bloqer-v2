@@ -60,7 +60,7 @@ export async function markNotificationReadFormAction(formData: FormData): Promis
 
 /** Client-friendly mark-read used by the header bell dropdown. */
 export async function markNotificationReadAction(notificationId: string): Promise<{ ok: boolean }> {
-  if (!notificationId?.trim()) return { ok: false };
+  if (typeof notificationId !== "string" || !notificationId.trim()) return { ok: false };
   const ctx = await tryServiceCtx();
   if (!ctx) return { ok: false };
   try {

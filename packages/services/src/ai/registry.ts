@@ -103,7 +103,7 @@ export class BloqerAiToolRegistry {
         correlationId: ctx.correlationId,
         tenantId: ctx.service.tenantId,
         userId: ctx.service.actorUserId,
-        tool: call.name,
+        tool: tool?.name ?? "unknown",
         decision: "deny",
         phase: "execute",
         reason: "unknown_or_risk",

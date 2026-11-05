@@ -213,6 +213,7 @@ export async function setUserProjectMemberships(
       await log({
         tenantId: ctx.tenantId, actorUserId: ctx.actorUserId,
         action: "project_membership.user_set", entityType: "User", entityId: userId,
+        companyId: ctx.companyId,
         after: { addedProjectIds: toAdd, removedProjectIds: toRemove.map((row) => row.projectId) },
       }, tx);
     }

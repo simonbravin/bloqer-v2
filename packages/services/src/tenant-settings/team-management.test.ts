@@ -19,6 +19,7 @@ const ctx: ServiceContext = {
 type Member = {
   id: string;
   tenantId: string;
+  companyId: string | null;
   userId: string;
   roles: UserRole[];
   status: MembershipStatus;
@@ -27,7 +28,7 @@ type Member = {
 type State = { members: Member[]; audit: Record<string, unknown>[] };
 
 function owner(id: string): Member {
-  return { id, tenantId: TENANT, userId: `user-${id}`, roles: ["OWNER"], status: "ACTIVE" };
+  return { id, tenantId: TENANT, companyId: null, userId: `user-${id}`, roles: ["OWNER"], status: "ACTIVE" };
 }
 
 /** In-memory transactions model a shared tenant row lock; no database is accessed. */
@@ -42,8 +43,9 @@ async function withMemberships(
   function delegates(state: () => State) {
     return {
       userMembership: {
-        findFirst: async ({ where }: { where: { id: string; tenantId: string } }) =>
-          structuredClone(state().members.find((m) => m.id === where.id && m.tenantId === where.tenantId) ?? null),
+        findFirst: async ({ where }: { where: { id: string; tenantId: string; OR?: { companyId: string | null }[] } }) =>
+          structuredClone(state().members.find((m) => m.id === where.id && m.tenantId === where.tenantId &&
+            (!where.OR || where.OR.some(({ companyId }) => m.companyId === companyId))) ?? null),
         findMany: async ({ where }: { where: { tenantId: string; status: MembershipStatus; user?: { status: UserStatus } } }) =>
           structuredClone(state().members.filter((m) => m.tenantId === where.tenantId && m.status === where.status &&
             (!where.user || (m.userStatus ?? "ACTIVE") === where.user.status))),
@@ -170,6 +172,15 @@ for (const [label, mutate] of [["roles", demote], ["status", deactivate]] as con
       assert.deepEqual(state(), { members: original, audit: [] });
     });
   });
+
+  test(`${label}: deny membership changes in a sibling company`, async () => {
+    const original = [owner(FIRST), { ...owner(SECOND), companyId: "other-company" }];
+    await withMemberships(original, async (state) => {
+      await assert.rejects(() => mutate(SECOND, { ...ctx, companyId: "active-company" }), (e: unknown) =>
+        e instanceof ServiceError && e.code === "NOT_FOUND");
+      assert.deepEqual(state(), { members: original, audit: [] });
+    });
+  });
 }
 
 test("role changes deduplicate roles and audit their before/after values", async () => {
@@ -177,7 +188,7 @@ test("role changes deduplicate roles and audit their before/after values", async
     await updateTenantMemberRoles(FIRST, ["ADMIN", "ADMIN", "VIEWER"], ctx);
     assert.deepEqual(state().members[0]?.roles, ["ADMIN", "VIEWER"]);
     assert.deepEqual(state().audit[0]?.before, { userId: `user-${FIRST}`, roles: "OWNER" });
-    assert.deepEqual(state().audit[0]?.after, { userId: `user-${FIRST}`, roles: "ADMIN,VIEWER" });
+    assert.deepEqual(state().audit[0]?.after, { userId: `user-${FIRST}`, roles: "ADMIN,VIEWER", companyId: null });
   });
 });
 
@@ -187,7 +198,7 @@ test("reactivation keeps the existing roles and records the status change", asyn
     assert.equal(state().members[1]?.status, "ACTIVE");
     assert.deepEqual(state().members[1]?.roles, ["OWNER"]);
     assert.deepEqual(state().audit[0]?.before, { userId: `user-${SECOND}`, status: "INACTIVE" });
-    assert.deepEqual(state().audit[0]?.after, { userId: `user-${SECOND}`, status: "ACTIVE" });
+    assert.deepEqual(state().audit[0]?.after, { userId: `user-${SECOND}`, status: "ACTIVE", companyId: null });
   });
 });
 

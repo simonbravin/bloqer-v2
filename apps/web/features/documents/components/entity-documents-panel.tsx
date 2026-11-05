@@ -61,33 +61,32 @@ type AttachmentMutations = {
 
 function getAttachmentMutations(
   doc: DocumentAttachmentView,
-  opts: { isCompany: boolean; projectId: string | null; revalidateExtra: string[] },
+  opts: { isCompany: boolean; projectId: string | null },
 ): AttachmentMutations {
   if (!doc.canMutate) return {};
-  const { isCompany, projectId, revalidateExtra } = opts;
+  const { isCompany, projectId } = opts;
   const cancelUpload =
     doc.status === "UPLOADING"
       ? isCompany
-        ? () => softDeleteCompanyFinanzasAttachmentAction(doc.id, revalidateExtra)
+        ? () => softDeleteCompanyFinanzasAttachmentAction(doc.id)
         : projectId
           ? () =>
               softDeleteDocumentAction(doc.id, projectId, {
-                extraPathsToRevalidate: revalidateExtra,
                 redirectToProjectDocuments: false,
               })
           : undefined
       : undefined;
   if (isCompany) {
     return {
-      onArchive: () => archiveCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
-      onRestore: () => restoreCompanyFinanzasAttachmentAction(doc.id, revalidateExtra),
+      onArchive: () => archiveCompanyFinanzasAttachmentAction(doc.id),
+      onRestore: () => restoreCompanyFinanzasAttachmentAction(doc.id),
       onDelete: cancelUpload,
     };
   }
   if (!projectId) return {};
   return {
-    onArchive: () => archiveDocumentAction(doc.id, projectId, revalidateExtra),
-    onRestore: () => restoreDocumentAction(doc.id, projectId, revalidateExtra),
+    onArchive: () => archiveDocumentAction(doc.id, projectId),
+    onRestore: () => restoreDocumentAction(doc.id, projectId),
     onDelete: cancelUpload,
   };
 }
@@ -153,7 +152,7 @@ function EntityDocumentMobileList({
   docs: DocumentAttachmentView[];
   projectId: string | null;
   emptyMessage: string;
-  mutationOpts: { isCompany: boolean; projectId: string | null; revalidateExtra: string[] };
+  mutationOpts: { isCompany: boolean; projectId: string | null };
 }) {
   const gallery = useDocumentImageGallery();
   if (docs.length === 0) {
@@ -232,7 +231,6 @@ export type EntityDocumentsPanelScope =
   | { kind: "company-finanzas"; afterUploadPath: string };
 
 interface PanelPaths {
-  revalidateExtra: string[];
   afterUploadPath: string;
   emptyMessage: string;
   defaultCategory: string;
@@ -247,7 +245,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     const p = scope.afterUploadPath;
     const isSales = linkedEntity.type === "SALES_INVOICE";
     return {
-      revalidateExtra: [p],
       afterUploadPath: p,
       emptyMessage: isSales
         ? "No hay adjuntos en esta factura de venta."
@@ -265,7 +262,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "JOBSITE_LOG": {
       const p = `/proyectos/${projectId}/libro-obra/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en este parte.",
         defaultCategory: "JOBSITE_EVIDENCE",
@@ -275,7 +271,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "CERTIFICATION": {
       const p = `/proyectos/${projectId}/certificaciones/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta certificación.",
         defaultCategory: "CERTIFICATE",
@@ -285,7 +280,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "SUPPLIER_INVOICE": {
       const p = `/proyectos/${projectId}/facturas-proveedor/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta factura de proveedor.",
         defaultCategory: "INVOICE",
@@ -295,7 +289,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "SALES_INVOICE": {
       const p = `/proyectos/${projectId}/facturas/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta factura de venta.",
         defaultCategory: "INVOICE",
@@ -305,7 +298,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "PURCHASE_ORDER": {
       const p = `/proyectos/${projectId}/ordenes-compra/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta orden de compra.",
         defaultCategory: "CONTRACT",
@@ -315,7 +307,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "PURCHASE_RECEIPT": {
       const p = `/proyectos/${projectId}/recepciones/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta recepción.",
         defaultCategory: "RECEIPT",
@@ -325,7 +316,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "PURCHASE_REQUEST": {
       const p = `/proyectos/${projectId}/solicitudes-compra/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta solicitud.",
         defaultCategory: "OTHER",
@@ -335,7 +325,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "PROCUREMENT_QUOTE": {
       const p = `/proyectos/${projectId}/solicitudes-compra`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta cotización.",
         defaultCategory: "QUOTE",
@@ -345,7 +334,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "SUBCONTRACT": {
       const p = `/proyectos/${projectId}/subcontratos/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en este subcontrato.",
         defaultCategory: "CONTRACT",
@@ -355,7 +343,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "SUBCONTRACT_CERTIFICATION": {
       const p = `/proyectos/${projectId}/subcontratos/${linkedEntity.subcontractId}/certificaciones/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en esta certificación de subcontrato.",
         defaultCategory: "CERTIFICATE",
@@ -365,7 +352,6 @@ function getPanelPaths(scope: EntityDocumentsPanelScope, linkedEntity: EntityDoc
     case "BUDGET": {
       const p = `/proyectos/${projectId}/presupuestos/${linkedEntity.id}`;
       return {
-        revalidateExtra: [p],
         afterUploadPath: p,
         emptyMessage: "No hay adjuntos en este presupuesto.",
         defaultCategory: "BUDGET",
@@ -390,7 +376,7 @@ export function EntityDocumentsPanel({
   docs,
   canEdit,
 }: Props) {
-  const { revalidateExtra, afterUploadPath, emptyMessage, defaultCategory, uploadHint } =
+  const { afterUploadPath, emptyMessage, defaultCategory, uploadHint } =
     getPanelPaths(scope, linkedEntity);
 
   const isCompany = scope.kind === "company-finanzas";
@@ -416,7 +402,6 @@ export function EntityDocumentsPanel({
               linkedEntity={linkedEntity}
               defaultCategory={defaultCategory}
               afterUploadPath={afterUploadPath}
-              revalidatePaths={revalidateExtra}
               triggerLabel="Adjuntar"
               title="Adjuntar archivo"
               description={uploadHint ?? undefined}
@@ -444,7 +429,7 @@ export function EntityDocumentsPanel({
               docs={docs}
               projectId={projectIdForTable}
               emptyMessage={emptyMessage}
-              mutationOpts={{ isCompany, projectId: projectIdForTable, revalidateExtra }}
+              mutationOpts={{ isCompany, projectId: projectIdForTable }}
             />
             <TableScroll className="hidden md:block">
               <Table>
@@ -463,7 +448,6 @@ export function EntityDocumentsPanel({
                     const mutations = getAttachmentMutations(doc, {
                       isCompany,
                       projectId: projectIdForTable,
-                      revalidateExtra,
                     });
                     return (
                       <TableRow key={doc.id}>

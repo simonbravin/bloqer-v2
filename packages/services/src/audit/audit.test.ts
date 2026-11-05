@@ -79,6 +79,16 @@ describe("audit-display", () => {
     assert.equal(parseAuditDateToInclusive("2026-01-15").toISOString(), "2026-01-15T23:59:59.999Z");
     assert.equal(isValidDateOnly("2026-02-30"), false);
   });
+
+  it("uses local day boundaries, even when DST skips midnight", () => {
+    const art = "America/Argentina/Buenos_Aires";
+    assert.equal(parseAuditDateFrom("2026-11-05", art).toISOString(), "2026-11-05T03:00:00.000Z");
+    assert.equal(parseAuditDateToInclusive("2026-11-05", art).toISOString(), "2026-11-06T02:59:59.999Z");
+    const santiago = "America/Santiago";
+    assert.equal(parseAuditDateFrom("2026-09-06", santiago).toISOString(), "2026-09-06T04:00:00.000Z");
+    assert.equal(parseAuditDateToInclusive("2026-09-06", santiago).toISOString(), "2026-09-07T02:59:59.999Z");
+    assert.equal(exportTenantAuditLogUrlFiltersSchema.safeParse({ dateFrom: "2026-02-30" }).success, false);
+  });
 });
 
 describe("audit-sanitize", () => {
@@ -91,6 +101,19 @@ describe("audit-sanitize", () => {
     assert.equal(out.number, 1);
     assert.equal(out.apiKey, undefined);
     assert.ok(String(out.note).length <= 400);
+  });
+
+  it("redacts nested and historically stringified secrets without losing safe trace fields", () => {
+    const out = sanitizeAuditPayload({
+      "api_key": "private-value-1",
+      details: { ok: true, header: [{ "Authorization": "private-value-2", scope: "audit" }] },
+      prior: '{"password_hash":"private-value-3","number":18}',
+      clipped: '{"Storage-Key":"private-value-4…',
+    });
+    const serialized = JSON.stringify(out);
+    assert.doesNotMatch(serialized, /private-value/);
+    assert.match(serialized, /scope/);
+    assert.match(serialized, /18/);
   });
 });
 

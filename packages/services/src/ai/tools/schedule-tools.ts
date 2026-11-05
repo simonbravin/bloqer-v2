@@ -17,7 +17,7 @@ export const getProjectScheduleSummaryTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "project_operational",
+    accessKind: "schedule",
   },
   inputSchema,
   jsonSchema: {
@@ -29,7 +29,7 @@ export const getProjectScheduleSummaryTool = defineBloqerAiTool({
   async execute(ctx, args) {
     const projectId = await resolveAiProjectId(ctx, args.projectId);
     if (!projectId) throw new ServiceError("VALIDATION", "Indicá un proyecto o abrí una obra.");
-    const ws = await getProjectScheduleWorkspace(projectId, {}, ctx.service);
+    const ws = await getProjectScheduleWorkspace(projectId, {}, ctx.service, { readOnly: true });
     const href = `/proyectos/${projectId}/cronograma`;
     if (ws.type !== "WORKSPACE") {
       return {
@@ -64,7 +64,7 @@ export const getDelayedScheduleItemsTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "project_operational",
+    accessKind: "schedule",
   },
   inputSchema: delayedInput,
   jsonSchema: {
@@ -80,7 +80,7 @@ export const getDelayedScheduleItemsTool = defineBloqerAiTool({
     const projectId = await resolveAiProjectId(ctx, args.projectId);
     if (!projectId) throw new ServiceError("VALIDATION", "Indicá un proyecto o abrí una obra.");
     const limit = args.limit ?? 15;
-    const ws = await getProjectScheduleWorkspace(projectId, { delayedOnly: true }, ctx.service);
+    const ws = await getProjectScheduleWorkspace(projectId, { delayedOnly: true }, ctx.service, { readOnly: true });
     const href = `/proyectos/${projectId}/cronograma`;
     if (ws.type !== "WORKSPACE") {
       return {

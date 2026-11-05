@@ -1,0 +1,79 @@
+{
+  "phase": "AG-13",
+  "status": "closed_local",
+  "date": "2026-11-05",
+  "base": "65c2d0ad907f6736e717adc9e10cb2c0251eb837",
+  "previousRelease": {
+    "phase": "AG-12",
+    "pr": 10,
+    "main": "8c18f331c5193723322e96d449036a122600e47e",
+    "productionVerified": true
+  },
+  "findings": [
+    {
+      "id": "GA-AG-13-001",
+      "title": "Adjuntos con acceso al documento de origen",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-13-002",
+      "title": "Carga de archivos y concurrencia de carpetas",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-13-003",
+      "title": "Registro, exportaciones y equipo en su ámbito",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-13-004",
+      "title": "Campana, alertas y resumen diario con permisos vigentes",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-13-005",
+      "title": "Correo programado con confirmación recuperable",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-13-006",
+      "title": "Bloqer AI consulta con el mismo contrato que la aplicación",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-13-007",
+      "title": "Ayuda vinculada al flujo efectivo",
+      "state": "corrected_verified"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-143",
+      "question": "Q-090"
+    },
+    {
+      "id": "D-144",
+      "question": "Q-091"
+    }
+  ],
+  "verification": {
+    "generalPassed": 2756,
+    "topLevelSuitesSkipped": 44,
+    "isolatedSqlDistinctPassed": 10,
+    "aiStructuralSimulatedPassed": 202,
+    "typecheckTasksPassed": 13,
+    "lint": "passed",
+    "build": "passed",
+    "buildSourceMatches": 97,
+    "docsIndexChunks": 596,
+    "browser": "deferred_to_ux_ui_stage",
+    "providers": "simulated_or_disabled",
+    "evidenceDirectory": "output/platform-audit/ag-13-2026-11-05"
+  },
+  "followUp": [
+    "P-DOC-05",
+    "Verificación de correo, R2 y modelo AI contra proveedores reales",
+    "Revisión integral UX/UI"
+  ],
+  "nextPhase": "AG-14"
+}

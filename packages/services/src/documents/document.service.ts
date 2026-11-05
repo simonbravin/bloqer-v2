@@ -1,5 +1,5 @@
 import { prisma } from "@bloqer/database";
-import type { LinkedEntityType } from "@bloqer/database";
+import type { DocumentAttachment, LinkedEntityType, Prisma } from "@bloqer/database";
 import {
   buildStorageKey,
   putObject,
@@ -9,40 +9,31 @@ import {
   getPresignedGetUrl,
   deleteObject,
   headObject,
-  assertTenantScopedStorageKey,
   buildContentDispositionHeader,
   type ContentDispositionKind,
 } from "@bloqer/storage";
 import { isStorageConfigured } from "@bloqer/config";
 import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
-import { isCrossCompany } from "../company-scope";
+import { companyScopeFilter } from "../company-scope";
 import { log } from "../audit/audit.service";
 import { createSystemNotification } from "../notifications/notification.service";
-import { resolveNotificationAudience } from "../notifications/notification-audience.service";
+import { filterNotificationAudienceForScope, resolveNotificationAudience } from "../notifications/notification-audience.service";
 import {
   documentUploadConfirmedCopy,
   resolveDocumentNotificationEntityLabel,
 } from "../notifications/notification-copy";
 import type { CreateDocumentMetadataInput, InitiateUploadInput, ListProjectDocumentsInput } from "@bloqer/validators";
-import { ALLOWED_MIME_TYPES, isInlineDocumentPreviewMime, resolveAllowedMimeType } from "@bloqer/validators";
+import { isInlineDocumentPreviewMime, resolveAllowedMimeType } from "@bloqer/validators";
 import type { AllowedMimeType } from "@bloqer/validators";
 import {
   assertTenantModuleEnabledWithGate,
   getTenantModuleGate,
   type TenantModuleGate,
 } from "../tenant-modules/tenant-module.service";
-import { assertProjectAllowsBudgetPlanning } from "../project/project-operational-guard";
-import { requireProjectAccess, requireProjectAccessIfPresent, filterUserIdsByProjectAccess } from "../security/access";
-import {
-  canEditPurchaseOrders,
-  canEditPurchaseReceipts,
-  canEditPurchaseRequests,
-  canViewProcurementProjectArea,
-  canViewPurchaseRequests,
-} from "../procurement/procurement-access";
+import { assertProjectAllowsBudgetPlanning, lockProjectForBudgetPlanning } from "../project/project-operational-guard";
+import { requireProjectAccess } from "../security/access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
-import { canMutateJobsiteLogAsContributor, canViewJobsiteLogArea } from "../jobsite-log/jobsite-log-access";
 import {
   documentReplayMatches,
   requireIdempotencyKey,
@@ -59,6 +50,18 @@ import {
   getFolderInProjectOrThrow,
   resolveFolderIdForUpload,
 } from "./document-folder.service";
+import {
+  assertDocumentCompanyInTenant,
+  canMutateDocumentByLink,
+  canViewDocumentByLink,
+  documentMatchesScope,
+  documentScopeInProject,
+  filterProjectDocumentsByLink,
+  isDocumentOperationalLink,
+  requireDocumentLinkAccess,
+  requireDocumentParent,
+  type DocumentLinkScope,
+} from "./document-link-scope";
 
 export {
   canSoftDeleteDocumentByLink,
@@ -102,7 +105,7 @@ function canonicalizeDeclaredUploadMime(originalFileName: string, declaredMime: 
 /** Default age after which an UPLOADING row is considered abandoned (1 hour) — admin batch cleanup. */
 const DEFAULT_STALE_UPLOAD_THRESHOLD_MS = 60 * 60 * 1000;
 
-/** Auto-reconcile on list: abandon incomplete direct uploads (presigned PUT is 5 min). */
+/** Hide abandoned direct uploads from the entity panel (presigned PUT is 5 min). */
 const ABANDONED_UPLOAD_THRESHOLD_MS = 15 * 60 * 1000;
 
 /** Prefix bytes fetched on confirm for MIME sniff (stay under Vercel response limits). */
@@ -126,6 +129,8 @@ export type DocumentAttachmentView = {
   status:           string;
   linkedEntityType: string | null;
   linkedEntityId:   string | null;
+  /** Optional parent/receivable route for an authorized detail or confirmed upload. */
+  relatedEntityId?: string;
   uploadedBy:       string;
   createdAt:        string;
   updatedAt:        string;
@@ -161,13 +166,8 @@ export async function createDocumentMetadata(
     throw new ServiceError("FORBIDDEN", "Sin permisos para subir documentos");
   }
 
-  const project = await prisma.project.findUnique({
-    where:  { id: input.projectId },
-    select: { id: true, tenantId: true },
-  });
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-  await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
+  const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
+  await assertDocumentCompanyInTenant(project.companyId ?? ctx.companyId, ctx.tenantId);
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
@@ -182,310 +182,113 @@ export async function createDocumentMetadata(
     ctx,
   });
 
-  const doc = await prisma.documentAttachment.create({
-    data: {
-      id,
-      tenantId:         ctx.tenantId,
-      companyId:        ctx.companyId ?? null,
-      projectId:        input.projectId,
-      folderId,
-      originalFileName: input.originalFileName,
-      fileName,
-      mimeType:         input.mimeType,
-      sizeBytes:        input.sizeBytes,
-      storageProvider:  "PLACEHOLDER",
-      storageKey,
-      category:         input.category ?? "OTHER",
-      description:      input.description ?? null,
-      status:           "ACTIVE",
-      linkedEntityType: "PROJECT",
-      linkedEntityId:   input.projectId,
-      uploadedBy:       ctx.actorUserId,
-    },
-  });
+  const doc = await prisma.$transaction(async (tx) => {
+    await lockDocumentUploadProject(tx, input.projectId, project.companyId ?? ctx.companyId, ctx);
+    const row = await tx.documentAttachment.create({
+      data: {
+        id,
+        tenantId:         ctx.tenantId,
+        companyId:        project.companyId ?? ctx.companyId,
+        projectId:        input.projectId,
+        folderId,
+        originalFileName: input.originalFileName,
+        fileName,
+        mimeType:         input.mimeType,
+        sizeBytes:        input.sizeBytes,
+        storageProvider:  "PLACEHOLDER",
+        storageKey,
+        category:         input.category ?? "OTHER",
+        description:      input.description ?? null,
+        status:           "ACTIVE",
+        linkedEntityType: "PROJECT",
+        linkedEntityId:   input.projectId,
+        uploadedBy:       ctx.actorUserId,
+      },
+    });
 
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.created",
-    entityType:  "DocumentAttachment",
-    entityId:    doc.id,
-    after:       { originalFileName: doc.originalFileName, category: doc.category, projectId: doc.projectId },
+    await log({
+      tenantId:    ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action:      "document.created",
+      entityType:  "DocumentAttachment",
+      entityId:    row.id,
+      projectId:   row.projectId,
+      companyId:   row.companyId,
+      after:       { originalFileName: row.originalFileName, category: row.category, projectId: row.projectId },
+    }, tx);
+    return row;
   });
 
   return serialize(doc, ctx, gate);
 }
 
 type DocumentUploadPlan = {
-  id:               string;
-  anchorProjectId:  string | null;
-  fileName:         string;
-  storageKey:       string;
-  linkedEntityType:
-    | "PROJECT"
-    | "JOBSITE_LOG"
-    | "CERTIFICATION"
-    | "SUPPLIER_INVOICE"
-    | "SALES_INVOICE"
-    | "PURCHASE_ORDER"
-    | "PURCHASE_RECEIPT"
-    | "PURCHASE_REQUEST"
-    | "PROCUREMENT_QUOTE"
-    | "SUBCONTRACT"
-    | "SUBCONTRACT_CERTIFICATION"
-    | "BUDGET";
+  id: string;
+  anchorProjectId: string | null;
+  companyId: string | null;
+  fileName: string;
+  storageKey: string;
+  linkedEntityType: LinkedEntityType;
   linkedEntityId: string;
 };
 
+async function lockDocumentUploadProject(
+  tx: Prisma.TransactionClient,
+  projectId: string | null,
+  companyId: string | null,
+  ctx: ServiceContext,
+): Promise<void> {
+  if (!projectId) return;
+  const current = await lockProjectForBudgetPlanning(tx, projectId, ctx);
+  if (current.companyId !== null && current.companyId !== companyId) {
+    throw new ServiceError("CONFLICT", "La empresa del proyecto cambió. Recargá e intentá de nuevo.");
+  }
+}
+
 async function resolveDocumentUploadPlan(
   input: InitiateUploadInput,
-  ctx:   ServiceContext,
-  storageObjectId: string,
+  ctx: ServiceContext,
 ): Promise<DocumentUploadPlan> {
-  const linkedJobsiteLog =
-    input.linkedEntityType === "JOBSITE_LOG" && input.linkedEntityId
-      ? { logId: input.linkedEntityId as string }
-      : null;
-  const linkedCertification =
-    input.linkedEntityType === "CERTIFICATION" && input.linkedEntityId
-      ? { certificationId: input.linkedEntityId as string }
-      : null;
-  const linkedSupplierInvoice =
-    input.linkedEntityType === "SUPPLIER_INVOICE" && input.linkedEntityId
-      ? { supplierInvoiceId: input.linkedEntityId as string }
-      : null;
-  const linkedSalesInvoice =
-    input.linkedEntityType === "SALES_INVOICE" && input.linkedEntityId
-      ? { salesInvoiceId: input.linkedEntityId as string }
-      : null;
-  const linkedPurchaseOrder =
-    input.linkedEntityType === "PURCHASE_ORDER" && input.linkedEntityId
-      ? { purchaseOrderId: input.linkedEntityId as string }
-      : null;
-  const linkedPurchaseReceipt =
-    input.linkedEntityType === "PURCHASE_RECEIPT" && input.linkedEntityId
-      ? { purchaseReceiptId: input.linkedEntityId as string }
-      : null;
-  const linkedPurchaseRequest =
-    input.linkedEntityType === "PURCHASE_REQUEST" && input.linkedEntityId
-      ? { purchaseRequestId: input.linkedEntityId as string }
-      : null;
-  const linkedProcurementQuote =
-    input.linkedEntityType === "PROCUREMENT_QUOTE" && input.linkedEntityId
-      ? { procurementQuoteId: input.linkedEntityId as string }
-      : null;
-  const linkedSubcontract =
-    input.linkedEntityType === "SUBCONTRACT" && input.linkedEntityId
-      ? { subcontractId: input.linkedEntityId as string }
-      : null;
-  const linkedSubcontractCertification =
-    input.linkedEntityType === "SUBCONTRACT_CERTIFICATION" && input.linkedEntityId
-      ? { subcontractCertificationId: input.linkedEntityId as string }
-      : null;
-  const linkedBudget =
-    input.linkedEntityType === "BUDGET" && input.linkedEntityId
-      ? { budgetId: input.linkedEntityId as string }
-      : null;
-
-  if (linkedJobsiteLog) {
-    if (!canMutateJobsiteLogAsContributor(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos al libro de obra");
-    }
-  } else if (linkedCertification) {
-    if (!can(ctx.roles, "EDIT", "CERTIFICATIONS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la certificación");
-    }
-  } else if (linkedSupplierInvoice) {
-    if (!can(ctx.roles, "EDIT", "AP")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la factura de proveedor");
-    }
-  } else if (linkedSalesInvoice) {
-    if (!can(ctx.roles, "EDIT", "AR")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la factura de venta");
-    }
-  } else if (linkedPurchaseOrder) {
-    if (!canEditPurchaseOrders(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la orden de compra");
-    }
-  } else if (linkedPurchaseReceipt) {
-    if (!canEditPurchaseReceipts(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la recepción");
-    }
-  } else if (linkedPurchaseRequest) {
-    if (!canEditPurchaseRequests(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la solicitud de compra");
-    }
-  } else if (linkedProcurementQuote) {
-    if (!canEditPurchaseOrders(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a la cotización");
-    }
-  } else if (linkedSubcontract || linkedSubcontractCertification) {
-    if (!can(ctx.roles, "EDIT", "SUBCONTRACTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos al subcontrato");
-    }
-  } else if (linkedBudget) {
-    if (!can(ctx.roles, "EDIT", "BUDGETS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos al presupuesto");
-    }
-  } else if (!can(ctx.roles, "EDIT", "PROJECTS")) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para subir documentos");
+  const linkedEntityType = input.linkedEntityType ?? "PROJECT";
+  const linkedEntityId = input.linkedEntityId ?? input.projectId;
+  if (!linkedEntityId || (input.linkedEntityType && !input.linkedEntityId)) {
+    throw new ServiceError("VALIDATION", "Proyecto o entidad del adjunto requerido");
   }
 
-  const gate = await getTenantModuleGate(ctx);
-  if (linkedJobsiteLog) {
-    assertTenantModuleEnabledWithGate(gate, "JOBSITE_LOG");
-  } else if (linkedCertification) {
-    assertTenantModuleEnabledWithGate(gate, "CERTIFICATIONS");
-  } else if (linkedSupplierInvoice) {
-    assertTenantModuleEnabledWithGate(gate, "AP");
-  } else if (linkedSalesInvoice) {
-    assertTenantModuleEnabledWithGate(gate, "AR");
-  } else if (linkedPurchaseOrder || linkedPurchaseReceipt || linkedProcurementQuote) {
-    assertTenantModuleEnabledWithGate(gate, "PROCUREMENT");
-  } else if (linkedPurchaseRequest) {
-    assertTenantModuleEnabledWithGate(gate, "PURCHASE_REQUESTS");
-  } else if (linkedSubcontract || linkedSubcontractCertification) {
-    assertTenantModuleEnabledWithGate(gate, "SUBCONTRACTS");
-  } else if (linkedBudget) {
-    assertTenantModuleEnabledWithGate(gate, "BUDGETS");
-  } else {
-    assertTenantModuleEnabledWithGate(gate, "PROJECTS");
-  }
-
-  if (!(ALLOWED_MIME_TYPES as readonly string[]).includes(input.mimeType)) {
-    throw new ServiceError("VALIDATION", "Tipo de archivo no permitido");
-  }
-  if (input.sizeBytes > MAX_SIZE_BYTES) {
-    throw new ServiceError("VALIDATION", "El archivo no puede superar 50 MB");
-  }
-
-  let anchorProjectId: string | null = null;
-  let strictProjectId: string | undefined;
-
-  if (linkedSupplierInvoice) {
-    const inv = await prisma.supplierInvoice.findUnique({
-      where: { id: linkedSupplierInvoice.supplierInvoiceId },
-      select: { tenantId: true, projectId: true, companyId: true },
-    });
-    if (!inv || inv.tenantId !== ctx.tenantId) {
-      throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
-    }
-    if (inv.projectId) {
-      // Derive project from the invoice when the client omitted it (corporate UI
-      // always passes null; project-scoped invoices still need the anchor).
-      if (input.projectId && input.projectId !== inv.projectId) {
-        throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
-      }
-      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx);
-      anchorProjectId = inv.projectId;
-      strictProjectId   = inv.projectId;
-    } else {
-      if (input.projectId) {
-        throw new ServiceError("VALIDATION", "Esta factura es corporativa: no indique proyecto para el adjunto");
-      }
-      anchorProjectId = null;
-      if (isCrossCompany(inv.companyId, ctx)) {
-        throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
-      }
-    }
-  } else if (linkedSalesInvoice) {
-    const inv = await prisma.salesInvoice.findUnique({
-      where: { id: linkedSalesInvoice.salesInvoiceId },
-      select: { tenantId: true, projectId: true, companyId: true },
-    });
-    if (!inv || inv.tenantId !== ctx.tenantId) {
-      throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
-    }
-    if (inv.projectId) {
-      if (input.projectId && input.projectId !== inv.projectId) {
-        throw new ServiceError("FORBIDDEN", "La factura no pertenece al proyecto indicado");
-      }
-      await assertProjectAllowsBudgetPlanning(inv.projectId, ctx);
-      anchorProjectId = inv.projectId;
-      strictProjectId   = inv.projectId;
-    } else {
-      if (input.projectId) {
-        throw new ServiceError("VALIDATION", "Esta factura es corporativa: no indique proyecto para el adjunto");
-      }
-      anchorProjectId = null;
-      if (isCrossCompany(inv.companyId, ctx)) {
-        throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
-      }
-    }
-  } else {
-    if (!input.projectId) {
+  let target: DocumentLinkScope;
+  if (linkedEntityType === "PROJECT") {
+    if (!input.projectId || linkedEntityId !== input.projectId) {
       throw new ServiceError("VALIDATION", "Proyecto requerido");
     }
-    const project = await prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: { id: true, tenantId: true },
-    });
-    if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-    if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
-    anchorProjectId = input.projectId;
-    strictProjectId   = input.projectId;
+    const project = await assertProjectAllowsBudgetPlanning(input.projectId, ctx);
+    target = { ...project, projectId: project.id };
+  } else {
+    target = await requireDocumentParent(linkedEntityType, linkedEntityId, ctx);
+    const invoice = linkedEntityType === "SUPPLIER_INVOICE" || linkedEntityType === "SALES_INVOICE";
+    if ((!invoice || input.projectId != null) && input.projectId !== target.projectId) {
+      throw new ServiceError("FORBIDDEN", "La entidad del adjunto no pertenece al proyecto indicado");
+    }
+    if (target.projectId) {
+      const project = await assertProjectAllowsBudgetPlanning(target.projectId, ctx);
+      const scoped = documentScopeInProject(target, project);
+      if (!scoped) throw new ServiceError("CONFLICT", "La entidad del adjunto no corresponde a la empresa del proyecto");
+      target = scoped;
+    }
   }
 
-  let linkedEntityType: DocumentUploadPlan["linkedEntityType"] = "PROJECT";
-  let linkedEntityId = anchorProjectId ?? "";
-  if (linkedJobsiteLog) {
-    await assertJobsiteLogDocumentTarget(strictProjectId!, linkedJobsiteLog.logId, ctx);
-    linkedEntityType = "JOBSITE_LOG";
-    linkedEntityId   = linkedJobsiteLog.logId;
-  } else if (linkedCertification) {
-    await assertCertificationDocumentTarget(strictProjectId!, linkedCertification.certificationId, ctx);
-    linkedEntityType = "CERTIFICATION";
-    linkedEntityId   = linkedCertification.certificationId;
-  } else if (linkedSupplierInvoice) {
-    linkedEntityType = "SUPPLIER_INVOICE";
-    linkedEntityId   = linkedSupplierInvoice.supplierInvoiceId;
-  } else if (linkedSalesInvoice) {
-    linkedEntityType = "SALES_INVOICE";
-    linkedEntityId   = linkedSalesInvoice.salesInvoiceId;
-  } else if (linkedPurchaseOrder) {
-    await assertPurchaseOrderDocumentTarget(strictProjectId!, linkedPurchaseOrder.purchaseOrderId, ctx);
-    linkedEntityType = "PURCHASE_ORDER";
-    linkedEntityId   = linkedPurchaseOrder.purchaseOrderId;
-  } else if (linkedPurchaseReceipt) {
-    await assertPurchaseReceiptDocumentTarget(strictProjectId!, linkedPurchaseReceipt.purchaseReceiptId, ctx);
-    linkedEntityType = "PURCHASE_RECEIPT";
-    linkedEntityId   = linkedPurchaseReceipt.purchaseReceiptId;
-  } else if (linkedPurchaseRequest) {
-    await assertPurchaseRequestDocumentTarget(strictProjectId!, linkedPurchaseRequest.purchaseRequestId, ctx);
-    linkedEntityType = "PURCHASE_REQUEST";
-    linkedEntityId   = linkedPurchaseRequest.purchaseRequestId;
-  } else if (linkedProcurementQuote) {
-    await assertProcurementQuoteDocumentTarget(strictProjectId!, linkedProcurementQuote.procurementQuoteId, ctx);
-    linkedEntityType = "PROCUREMENT_QUOTE";
-    linkedEntityId   = linkedProcurementQuote.procurementQuoteId;
-  } else if (linkedSubcontract) {
-    await assertSubcontractDocumentTarget(strictProjectId!, linkedSubcontract.subcontractId, ctx);
-    linkedEntityType = "SUBCONTRACT";
-    linkedEntityId   = linkedSubcontract.subcontractId;
-  } else if (linkedSubcontractCertification) {
-    await assertSubcontractCertificationDocumentTarget(
-      strictProjectId!,
-      linkedSubcontractCertification.subcontractCertificationId,
-      ctx,
-    );
-    linkedEntityType = "SUBCONTRACT_CERTIFICATION";
-    linkedEntityId   = linkedSubcontractCertification.subcontractCertificationId;
-  } else if (linkedBudget) {
-    await assertBudgetDocumentTarget(strictProjectId!, linkedBudget.budgetId, ctx);
-    linkedEntityType = "BUDGET";
-    linkedEntityId   = linkedBudget.budgetId;
+  if (!canMutateDocumentByLink(linkedEntityType, ctx.roles, target.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para adjuntar archivos a esta entidad");
   }
+  assertLinkedEntityTenantModuleEnabled(await getTenantModuleGate(ctx), linkedEntityType);
+  await assertDocumentCompanyInTenant(target.companyId ?? ctx.companyId, ctx.tenantId);
 
-  const id         = crypto.randomUUID();
-  const fileName   = sanitize(input.originalFileName);
-  const storageKey = buildStorageKey(ctx.tenantId, anchorProjectId, storageObjectId, input.originalFileName);
-
+  const id = crypto.randomUUID();
   return {
     id,
-    anchorProjectId,
-    fileName,
-    storageKey,
+    anchorProjectId: target.projectId,
+    companyId: target.companyId ?? ctx.companyId,
+    fileName: sanitize(input.originalFileName),
+    storageKey: buildStorageKey(ctx.tenantId, target.projectId, id, input.originalFileName),
     linkedEntityType,
     linkedEntityId,
   };
@@ -536,17 +339,14 @@ async function notifyDocumentUploadConfirmed(
     });
     if (recipients.length === 0) return;
 
-    if (doc.linkedEntityType === "JOBSITE_LOG") {
-      companyId = await requireDocumentProjectAccess(doc, ctx);
-    }
-    scopedRecipients = await filterUserIdsByProjectAccess(
-      ctx.tenantId,
-      doc.projectId,
-      recipients,
-      doc.linkedEntityType === "JOBSITE_LOG" && companyId
-        ? { companyId, canView: canViewJobsiteLogArea }
-        : undefined,
-    );
+    companyId = await requireDocumentLinkAccess({ ...doc, tenantId: ctx.tenantId }, ctx);
+    scopedRecipients = await filterNotificationAudienceForScope({
+      tenantId: ctx.tenantId,
+      companyId,
+      projectId: doc.projectId,
+      candidateUserIds: recipients,
+      canView: (roles) => canViewDocumentByLink(doc.linkedEntityType, roles, doc.projectId),
+    });
   } catch {
     return;
   }
@@ -599,8 +399,11 @@ export async function uploadDocument(
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
   const mimeType = canonicalizeDeclaredUploadMime(input.originalFileName, input.mimeType);
 
-  if (input.sizeBytes === 0) {
+  if (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes <= 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
+  }
+  if (input.sizeBytes > MAX_SIZE_BYTES) {
+    throw new ServiceError("VALIDATION", "El archivo no puede superar 50 MB");
   }
   if (content.length === 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
@@ -612,7 +415,7 @@ export async function uploadDocument(
   await assertUploadContentMatchesDeclaredMime(content, mimeType);
 
   const contentSha256 = sha256Hex(content);
-  const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx, idempotencyKey);
+  const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
@@ -625,13 +428,8 @@ export async function uploadDocument(
     prisma.documentAttachment.findFirst({
       where: { tenantId: ctx.tenantId, idempotencyKey },
     });
-  const payloadsMatch = (existing: {
-    contentSha256: string | null;
-    linkedEntityType: string | null;
-    linkedEntityId: string | null;
-    status: string;
-  }) =>
-    documentReplayMatches(existing, {
+  const payloadsMatch = (existing: DocumentAttachment) =>
+    uploadIntentMatches(existing, input, plan, folderId, ctx) && documentReplayMatches(existing, {
       contentSha256,
       linkedEntityType: plan.linkedEntityType,
       linkedEntityId: plan.linkedEntityId,
@@ -645,7 +443,8 @@ export async function uploadDocument(
         "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
       );
     }
-    return { documentId: existing.id, storageConfigured: configured };
+    await requireDocumentLinkAccess(existing, ctx);
+    return { documentId: existing.id, storageConfigured: existing.storageProvider === "R2" };
   }
 
   if (configured) {
@@ -663,55 +462,98 @@ export async function uploadDocument(
       findExisting,
       payloadsMatch,
       create: async () => {
-        const row = await prisma.documentAttachment.create({
-          data: {
-            id:               plan.id,
-            tenantId:         ctx.tenantId,
-            companyId:        ctx.companyId ?? null,
-            projectId:        plan.anchorProjectId,
-            folderId,
-            originalFileName: input.originalFileName,
-            fileName:         plan.fileName,
-            mimeType,
-            sizeBytes:        input.sizeBytes,
-            storageProvider:  provider,
-            storageKey:       plan.storageKey,
-            category:         input.category ?? "OTHER",
-            description:      input.description ?? null,
-            status:           "ACTIVE",
-            linkedEntityType: plan.linkedEntityType,
-            linkedEntityId:   plan.linkedEntityId,
-            contentSha256,
-            idempotencyKey,
-            uploadedBy:       ctx.actorUserId,
-          },
+        const row = await prisma.$transaction(async (tx) => {
+          await lockDocumentUploadProject(tx, plan.anchorProjectId, plan.companyId, ctx);
+          const row = await tx.documentAttachment.create({
+            data: {
+              id:               plan.id,
+              tenantId:         ctx.tenantId,
+              companyId:        plan.companyId,
+              projectId:        plan.anchorProjectId,
+              folderId,
+              originalFileName: input.originalFileName,
+              fileName:         plan.fileName,
+              mimeType,
+              sizeBytes:        input.sizeBytes,
+              storageProvider:  provider,
+              storageKey:       plan.storageKey,
+              category:         input.category ?? "OTHER",
+              description:      input.description ?? null,
+              status:           "ACTIVE",
+              linkedEntityType: plan.linkedEntityType,
+              linkedEntityId:   plan.linkedEntityId,
+              contentSha256,
+              idempotencyKey,
+              uploadedBy:       ctx.actorUserId,
+            },
+          });
+          await log({
+            tenantId: ctx.tenantId,
+            actorUserId: ctx.actorUserId,
+            action: "document.uploaded",
+            entityType: "DocumentAttachment",
+            entityId: row.id,
+            projectId: row.projectId,
+            companyId: row.companyId,
+            after: { originalFileName: row.originalFileName, storageProvider: row.storageProvider, status: row.status },
+          }, tx);
+          return row;
         });
         createdNow = true;
         return row;
       },
     });
   } catch (err) {
-    const conflict =
-      err instanceof ServiceError && err.code === "CONFLICT";
-    if (configured && !conflict) {
-      await deleteObject(plan.storageKey).catch(() => undefined);
+    if (configured) {
+      // After a transport failure the insert may have committed. Delete only
+      // when a fresh DB read proves this attempt has no attachment row.
+      const persisted = await prisma.documentAttachment.findFirst({
+        where: { id: plan.id, tenantId: ctx.tenantId }, select: { id: true },
+      }).catch(() => undefined);
+      if (persisted === null) await deleteObject(plan.storageKey).catch(() => undefined);
     }
     throw err;
   }
 
-  if (createdNow) {
-    await log({
-      tenantId:    ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action:      "document.uploaded",
-      entityType:  "DocumentAttachment",
-      entityId:    doc.id,
-      after:       { originalFileName: doc.originalFileName, storageProvider: provider, status: "ACTIVE" },
-    });
-    await notifyDocumentUploadConfirmed(doc, ctx);
+  if (configured && !createdNow) {
+    await deleteObject(plan.storageKey).catch(() => undefined);
   }
 
-  return { documentId: doc.id, storageConfigured: configured };
+  if (createdNow) await notifyDocumentUploadConfirmed(doc, ctx).catch(() => undefined);
+
+  return { documentId: doc.id, storageConfigured: doc.storageProvider === "R2" };
+}
+
+function uploadIntentMatches(
+  row: DocumentAttachment,
+  input: InitiateUploadInput,
+  plan: DocumentUploadPlan,
+  folderId: string | null,
+  ctx: ServiceContext,
+): boolean {
+  return row.uploadedBy === ctx.actorUserId && row.projectId === plan.anchorProjectId &&
+    // Older rows may have inherited their company only through the parent.
+    (row.companyId === null || row.companyId === plan.companyId) &&
+    row.folderId === folderId && row.originalFileName === input.originalFileName &&
+    row.mimeType === input.mimeType && row.sizeBytes === input.sizeBytes &&
+    row.category === (input.category ?? "OTHER") && row.description === (input.description ?? null) &&
+    row.linkedEntityType === plan.linkedEntityType && row.linkedEntityId === plan.linkedEntityId;
+}
+
+async function uploadResponse(doc: DocumentAttachment, configured: boolean, created: boolean, ctx: ServiceContext) {
+  await requireDocumentLinkAccess(doc, ctx);
+  let uploadUrl: string | null = null;
+  if (configured && doc.status === "UPLOADING" && doc.storageProvider === "R2") {
+    assertDocumentStorageObject(doc);
+    uploadUrl = await getPresignedPutUrl(doc.storageKey, doc.mimeType, doc.sizeBytes, 300);
+  }
+  return {
+    documentId: doc.id,
+    uploadUrl,
+    storageConfigured: doc.storageProvider === "R2",
+    status: doc.status as "UPLOADING" | "ACTIVE",
+    created,
+  };
 }
 
 /**
@@ -732,14 +574,14 @@ export async function initiateDocumentUpload(
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
   const mimeType = canonicalizeDeclaredUploadMime(input.originalFileName, input.mimeType);
 
-  if (input.sizeBytes <= 0) {
+  if (!Number.isSafeInteger(input.sizeBytes) || input.sizeBytes <= 0) {
     throw new ServiceError("VALIDATION", "El archivo está vacío");
   }
   if (input.sizeBytes > MAX_SIZE_BYTES) {
     throw new ServiceError("VALIDATION", "El archivo no puede superar 50 MB");
   }
 
-  const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx, idempotencyKey);
+  const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
@@ -754,24 +596,9 @@ export async function initiateDocumentUpload(
       where: { tenantId: ctx.tenantId, idempotencyKey },
     });
 
-  const payloadsMatch = (existing: {
-    originalFileName: string;
-    mimeType: string;
-    sizeBytes: number;
-    linkedEntityType: string | null;
-    linkedEntityId: string | null;
-    status: string;
-    storageProvider: string;
-  }) => {
-    if (existing.status !== "UPLOADING" && existing.status !== "ACTIVE") return false;
-    return (
-      existing.originalFileName === input.originalFileName &&
-      existing.mimeType === mimeType &&
-      existing.sizeBytes === input.sizeBytes &&
-      (existing.linkedEntityType ?? null) === plan.linkedEntityType &&
-      (existing.linkedEntityId ?? null) === plan.linkedEntityId
-    );
-  };
+  const payloadsMatch = (existing: DocumentAttachment) =>
+    (existing.status === "UPLOADING" || existing.status === "ACTIVE") &&
+    uploadIntentMatches(existing, { ...input, mimeType }, plan, folderId, ctx);
 
   const existing = await findExisting();
   if (existing) {
@@ -781,17 +608,7 @@ export async function initiateDocumentUpload(
         "Esta operación ya se registró con datos distintos. Recargá e intentá de nuevo.",
       );
     }
-    let uploadUrl: string | null = null;
-    if (configured && existing.status === "UPLOADING" && existing.storageProvider === "R2") {
-      uploadUrl = await getPresignedPutUrl(existing.storageKey, existing.mimeType, 300);
-    }
-    return {
-      documentId: existing.id,
-      uploadUrl,
-      storageConfigured: configured,
-      status: existing.status as "UPLOADING" | "ACTIVE",
-      created: false,
-    };
+    return uploadResponse(existing, configured, false, ctx);
   }
 
   let createdNow = false;
@@ -799,81 +616,68 @@ export async function initiateDocumentUpload(
     findExisting,
     payloadsMatch,
     create: async () => {
-      const row = await prisma.documentAttachment.create({
-        data: {
-          id: plan.id,
+      const row = await prisma.$transaction(async (tx) => {
+        await lockDocumentUploadProject(tx, plan.anchorProjectId, plan.companyId, ctx);
+        const row = await tx.documentAttachment.create({
+          data: {
+            id: plan.id,
+            tenantId: ctx.tenantId,
+            companyId: plan.companyId,
+            projectId: plan.anchorProjectId,
+            folderId,
+            originalFileName: input.originalFileName,
+            fileName: plan.fileName,
+            mimeType,
+            sizeBytes: input.sizeBytes,
+            storageProvider: provider,
+            storageKey: plan.storageKey,
+            category: input.category ?? "OTHER",
+            description: input.description ?? null,
+            status,
+            linkedEntityType: plan.linkedEntityType,
+            linkedEntityId: plan.linkedEntityId,
+            idempotencyKey,
+            uploadedBy: ctx.actorUserId,
+          },
+        });
+        await log({
           tenantId: ctx.tenantId,
-          companyId: ctx.companyId ?? null,
-          projectId: plan.anchorProjectId,
-          folderId,
-          originalFileName: input.originalFileName,
-          fileName: plan.fileName,
-          mimeType,
-          sizeBytes: input.sizeBytes,
-          storageProvider: provider,
-          storageKey: plan.storageKey,
-          category: input.category ?? "OTHER",
-          description: input.description ?? null,
-          status,
-          linkedEntityType: plan.linkedEntityType,
-          linkedEntityId: plan.linkedEntityId,
-          idempotencyKey,
-          uploadedBy: ctx.actorUserId,
-        },
+          actorUserId: ctx.actorUserId,
+          action: "document.upload_initiated",
+          entityType: "DocumentAttachment",
+          entityId: row.id,
+          projectId: row.projectId,
+          companyId: row.companyId,
+          after: { originalFileName: row.originalFileName, storageProvider: row.storageProvider, status: row.status },
+        }, tx);
+        return row;
       });
       createdNow = true;
       return row;
     },
   });
 
-  if (createdNow) {
-    await log({
-      tenantId: ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action: "document.upload_initiated",
-      entityType: "DocumentAttachment",
-      entityId: doc.id,
-      after: {
-        originalFileName: doc.originalFileName,
-        storageProvider: provider,
-        status,
-      },
-    });
-    if (!configured) {
-      await notifyDocumentUploadConfirmed(doc, ctx);
-    }
-  }
+  if (createdNow && !configured) await notifyDocumentUploadConfirmed(doc, ctx).catch(() => undefined);
 
-  let uploadUrl: string | null = null;
-  if (configured && doc.status === "UPLOADING") {
-    uploadUrl = await getPresignedPutUrl(doc.storageKey, doc.mimeType, 300);
-  }
-
-  return {
-    documentId: doc.id,
-    uploadUrl,
-    storageConfigured: configured,
-    status: doc.status as "UPLOADING" | "ACTIVE",
-    created: createdNow,
-  };
+  return uploadResponse(doc, configured, createdNow, ctx);
 }
 
 export async function confirmDocumentUpload(
   id: string,
   ctx: ServiceContext,
-): Promise<void> {
+): Promise<DocumentRouteTarget> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   }
   const gate = await getTenantModuleGate(ctx);
   assertLinkedEntityTenantModuleEnabled(gate, doc.linkedEntityType);
-  if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
+  if (!canMutateDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para confirmar subida");
   }
-  await requireDocumentProjectAccess(doc, ctx);
+  const companyId = await requireDocumentLinkAccess(doc, ctx);
   if (doc.status === "ACTIVE" && doc.storageProvider === "R2") {
-    return;
+    return resolveDocumentRouteTarget(doc);
   }
   if (doc.status !== "UPLOADING") {
     throw new ServiceError("CONFLICT", "El documento no está en estado UPLOADING");
@@ -882,11 +686,7 @@ export async function confirmDocumentUpload(
     throw new ServiceError("CONFLICT", "Solo se confirman subidas al almacenamiento R2");
   }
 
-  try {
-    assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
-  } catch {
-    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  }
+  assertDocumentStorageObject(doc);
 
   let contentLength: number | undefined;
   try {
@@ -899,58 +699,113 @@ export async function confirmDocumentUpload(
     );
   }
 
-  if (contentLength == null || contentLength <= 0) {
-    throw new ServiceError("VALIDATION", "El archivo subido está vacío");
-  }
-  if (contentLength !== doc.sizeBytes) {
-    // Keep UPLOADING so the same idempotency key can re-issue a PUT URL.
-    await deleteObject(doc.storageKey).catch(() => undefined);
+  if (contentLength == null || contentLength <= 0 || contentLength > MAX_SIZE_BYTES || contentLength !== doc.sizeBytes) {
+    await replaceRejectedUploadObject(doc);
     throw new ServiceError(
       "VALIDATION",
       "El tamaño del archivo subido no coincide. Intentá de nuevo.",
     );
   }
 
+  const sniffEnd = Math.min(contentLength, CONFIRM_SNIFF_MAX_BYTES) - 1;
+  let prefix: Buffer;
   try {
-    const sniffEnd = Math.min(contentLength, CONFIRM_SNIFF_MAX_BYTES) - 1;
-    if (sniffEnd >= 0) {
-      const prefix = await getObjectByteRange(doc.storageKey, 0, sniffEnd);
-      await assertUploadContentMatchesDeclaredMime(prefix, doc.mimeType);
-    }
+    prefix = await getObjectByteRange(doc.storageKey, 0, sniffEnd);
+  } catch {
+    throw new ServiceError("VALIDATION", "No se pudo verificar el archivo en el almacenamiento. Intentá de nuevo.");
+  }
+  try {
+    await assertUploadContentMatchesDeclaredMime(prefix, doc.mimeType);
   } catch (err) {
-    await deleteObject(doc.storageKey).catch(() => undefined);
-    if (err instanceof ServiceError) throw err;
-    throw new ServiceError("VALIDATION", "Error al validar el archivo subido");
+    if (err instanceof ServiceError) {
+      await replaceRejectedUploadObject(doc);
+      throw err;
+    }
+    throw new ServiceError("VALIDATION", "No se pudo verificar el archivo en el almacenamiento. Intentá de nuevo.");
   }
 
   // Atomic transition: only one concurrent confirm wins and notifies.
-  const activated = await prisma.documentAttachment.updateMany({
-    where: {
-      id,
-      tenantId: ctx.tenantId,
-      status: "UPLOADING",
-      storageProvider: "R2",
-    },
-    data: { status: "ACTIVE" },
+  const activated = await prisma.$transaction(async (tx) => {
+    await lockDocumentUploadProject(tx, doc.projectId, companyId, ctx);
+    const result = await tx.documentAttachment.updateMany({
+      where: {
+        id,
+        tenantId: ctx.tenantId,
+        status: "UPLOADING",
+        storageProvider: "R2",
+        storageKey: doc.storageKey,
+      },
+      data: { status: "ACTIVE" },
+    });
+    if (result.count === 1) {
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "document.upload_confirmed",
+        entityType: "DocumentAttachment",
+        entityId: id,
+        projectId: doc.projectId,
+        companyId,
+        before: { status: "UPLOADING" },
+        after: { status: "ACTIVE" },
+      }, tx);
+    }
+    return result;
   });
   if (activated.count === 0) {
     const again = await prisma.documentAttachment.findUnique({ where: { id } });
-    if (again?.tenantId === ctx.tenantId && again.status === "ACTIVE") {
-      return;
+    if (again?.tenantId === ctx.tenantId && again.status === "ACTIVE" && again.storageKey === doc.storageKey) {
+      return resolveDocumentRouteTarget(again);
     }
     throw new ServiceError("CONFLICT", "El documento no está en estado UPLOADING");
   }
 
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "document.upload_confirmed",
-    entityType: "DocumentAttachment",
-    entityId: id,
-    after: { status: "ACTIVE" },
-  });
+  await notifyDocumentUploadConfirmed(doc, ctx).catch(() => undefined);
+  return resolveDocumentRouteTarget(doc);
+}
 
-  await notifyDocumentUploadConfirmed(doc, ctx);
+type DocumentRouteTarget = Pick<DocumentAttachmentView, "id" | "projectId" | "linkedEntityType" | "linkedEntityId" | "relatedEntityId">;
+
+async function resolveDocumentRouteTarget(doc: DocumentAttachment): Promise<DocumentRouteTarget> {
+  const { id, projectId, linkedEntityType, linkedEntityId } = doc;
+  const target: DocumentRouteTarget = { id, projectId, linkedEntityType, linkedEntityId };
+  if (!linkedEntityId) return target;
+  if (linkedEntityType === "SUBCONTRACT_CERTIFICATION" && projectId) {
+    const parent = await prisma.subcontractCertification.findFirst({
+      where: { id: linkedEntityId, tenantId: doc.tenantId, projectId }, select: { subcontractId: true },
+    });
+    if (parent) target.relatedEntityId = parent.subcontractId;
+  } else if (linkedEntityType === "PROCUREMENT_QUOTE" && projectId) {
+    const parent = await prisma.procurementQuote.findFirst({
+      where: { id: linkedEntityId, tenantId: doc.tenantId, purchaseRequest: { tenantId: doc.tenantId, projectId } },
+      select: { purchaseRequestId: true },
+    });
+    if (parent) target.relatedEntityId = parent.purchaseRequestId;
+  } else if (linkedEntityType === "SALES_INVOICE" && projectId === null) {
+    const receivable = await prisma.receivable.findFirst({
+      where: { salesInvoiceId: linkedEntityId, tenantId: doc.tenantId, projectId: null, ...(doc.companyId ? { companyId: doc.companyId } : {}) },
+      select: { id: true },
+    });
+    if (receivable) target.relatedEntityId = receivable.id;
+  }
+  return target;
+}
+
+/** Advance the pending attempt before deleting its rejected object. A different
+ * confirm can only activate the key it checked, and only one rejection wins. */
+async function replaceRejectedUploadObject(doc: DocumentAttachment): Promise<void> {
+  const replaced = await prisma.documentAttachment.updateMany({
+    where: { id: doc.id, tenantId: doc.tenantId, status: "UPLOADING", storageKey: doc.storageKey },
+    data: { storageKey: buildStorageKey(doc.tenantId, doc.projectId, crypto.randomUUID(), doc.originalFileName) },
+  });
+  if (replaced.count === 1) await deleteObject(doc.storageKey).catch(() => undefined);
+}
+
+function assertDocumentStorageObject(doc: Pick<DocumentAttachment, "tenantId" | "projectId" | "storageKey">): void {
+  const [tenant, project, object, file, ...rest] = doc.storageKey.split("/");
+  if (tenant !== doc.tenantId || project !== (doc.projectId ?? "global") || !object || !file || rest.length > 0) {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
 }
 
 export async function getDocumentDownloadUrl(
@@ -960,10 +815,10 @@ export async function getDocumentDownloadUrl(
 ): Promise<string> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
+  if (!canViewDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
-  await requireDocumentProjectAccess(doc, ctx);
+  await requireDocumentLinkAccess(doc, ctx);
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
   if (doc.storageProvider !== "R2") {
@@ -979,11 +834,7 @@ export async function getDocumentDownloadUrl(
     disposition = "attachment";
   }
 
-  try {
-    assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
-  } catch {
-    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  }
+  assertDocumentStorageObject(doc);
   return getPresignedGetUrl(doc.storageKey, {
     expiresInSeconds: 300,
     responseContentDisposition: buildContentDispositionHeader(disposition, doc.originalFileName),
@@ -1005,10 +856,10 @@ export async function getDocumentFileBytes(
 ): Promise<DocumentFileBytes> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
+  if (!canViewDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
-  await requireDocumentProjectAccess(doc, ctx);
+  await requireDocumentLinkAccess(doc, ctx);
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
   if (doc.storageProvider !== "R2") {
@@ -1018,147 +869,87 @@ export async function getDocumentFileBytes(
     );
   }
 
-  try {
-    assertTenantScopedStorageKey(ctx.tenantId, doc.storageKey);
-  } catch {
-    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  }
+  assertDocumentStorageObject(doc);
 
-  const { body, contentType } = await getObjectBytes(doc.storageKey);
+  const { body } = await getObjectBytes(doc.storageKey);
+  if (body.length !== doc.sizeBytes || body.length > MAX_SIZE_BYTES) {
+    throw new ServiceError("CONFLICT", "El tamaño del archivo almacenado no coincide");
+  }
   return {
     body,
-    mimeType: contentType || doc.mimeType,
+    mimeType: doc.mimeType,
     originalFileName: doc.originalFileName,
     sizeBytes: doc.sizeBytes,
   };
 }
 
+async function changeDocumentStatus(
+  doc: DocumentAttachment,
+  status: "ACTIVE" | "ARCHIVED" | "DELETED",
+  action: "document.reactivated" | "document.archived" | "document.deleted",
+  ctx: ServiceContext,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const flipped = await tx.documentAttachment.updateMany({
+      where: { id: doc.id, tenantId: ctx.tenantId, status: doc.status },
+      data: { status },
+    });
+    assertOptimisticRowUpdate(flipped.count, "El documento ya fue modificado. Recargá e intentá de nuevo.");
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action,
+      entityType: "DocumentAttachment",
+      entityId: doc.id,
+      projectId: doc.projectId,
+      companyId: doc.companyId,
+      before: { status: doc.status },
+      after: { status },
+    }, tx);
+  });
+}
+
 export async function archiveDocument(id: string, ctx: ServiceContext): Promise<void> {
-  const gate = await getTenantModuleGate(ctx);
-  const doc = await getOwned(id, ctx, gate);
-  if (doc.status !== "ACTIVE") throw new ServiceError("CONFLICT", "Solo se pueden archivar documentos activos (no UPLOADING ni ARCHIVED)");
-
-  const flipped = await prisma.documentAttachment.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "ACTIVE" },
-    data: { status: "ARCHIVED" },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El documento ya no está activo. Recargá e intentá de nuevo.",
-  );
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.archived",
-    entityType:  "DocumentAttachment",
-    entityId:    id,
-    after:       { status: "ARCHIVED" },
-  });
+  const doc = await getOwned(id, ctx, await getTenantModuleGate(ctx));
+  if (doc.status !== "ACTIVE") throw new ServiceError("CONFLICT", "Solo se pueden archivar documentos activos");
+  await changeDocumentStatus(doc, "ARCHIVED", "document.archived", ctx);
 }
 
 export async function restoreDocument(id: string, ctx: ServiceContext): Promise<void> {
-  const gate = await getTenantModuleGate(ctx);
-  const doc = await getOwned(id, ctx, gate);
+  const doc = await getOwned(id, ctx, await getTenantModuleGate(ctx));
   if (doc.status !== "ARCHIVED") throw new ServiceError("CONFLICT", "Solo se pueden restaurar documentos archivados");
-
-  const flipped = await prisma.documentAttachment.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: "ARCHIVED" },
-    data: { status: "ACTIVE" },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El documento ya no está archivado. Recargá e intentá de nuevo.",
-  );
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.reactivated",
-    entityType:  "DocumentAttachment",
-    entityId:    id,
-    after:       { status: "ACTIVE" },
-  });
+  await changeDocumentStatus(doc, "ACTIVE", "document.reactivated", ctx);
 }
 
 export async function softDeleteDocument(id: string, ctx: ServiceContext): Promise<void> {
-  const gate = await getTenantModuleGate(ctx);
-  const doc = await getOwned(id, ctx, gate);
+  const doc = await getOwned(id, ctx, await getTenantModuleGate(ctx));
   if (doc.status === "DELETED") throw new ServiceError("CONFLICT", "El documento ya está eliminado");
   if (!canSoftDeleteDocumentByLink({ status: doc.status, linkedEntityType: doc.linkedEntityType })) {
     throw new ServiceError("FORBIDDEN", LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE);
   }
-
-  const flipped = await prisma.documentAttachment.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: { not: "DELETED" } },
-    data: { status: "DELETED" },
-  });
-  assertOptimisticRowUpdate(
-    flipped.count,
-    "El documento ya está eliminado o fue modificado. Recargá e intentá de nuevo.",
-  );
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "document.deleted",
-    entityType:  "DocumentAttachment",
-    entityId:    id,
-    after:       { status: "DELETED" },
-  });
+  await changeDocumentStatus(doc, "DELETED", "document.deleted", ctx);
 }
 
 export async function getDocumentById(id: string, ctx: ServiceContext): Promise<DocumentAttachmentView> {
-  const doc = await prisma.documentAttachment.findUnique({ where: { id } });
-  if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
+  const doc = await prisma.documentAttachment.findFirst({ where: { id, tenantId: ctx.tenantId } });
+  if (!doc || doc.status === "DELETED") throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  if (!canViewDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver documentos");
   }
-  await requireDocumentProjectAccess(doc, ctx);
-  const gate = await getTenantModuleGate(ctx);
-  return serialize(doc, ctx, gate);
-}
-
-/**
- * Soft-deletes UPLOADING rows older than {@link ABANDONED_UPLOAD_THRESHOLD_MS}.
- * Called automatically on document list reads — no admin role required.
- * Covers abandoned direct-to-R2 uploads (client never confirmed).
- */
-async function reconcileAbandonedUploadingDocuments(
-  ctx: ServiceContext,
-  scope?: {
-    projectId?:        string;
-    linkedEntityType?: string;
-    linkedEntityId?:   string;
-  },
-): Promise<void> {
-  const cutoff = new Date(Date.now() - ABANDONED_UPLOAD_THRESHOLD_MS);
-  await prisma.documentAttachment.updateMany({
-    where: {
-      tenantId:  ctx.tenantId,
-      status:    "UPLOADING",
-      createdAt: { lt: cutoff },
-      ...(scope?.projectId ? { projectId: scope.projectId } : {}),
-      ...(scope?.linkedEntityType && scope.linkedEntityId
-        ? { linkedEntityType: scope.linkedEntityType as never, linkedEntityId: scope.linkedEntityId }
-        : {}),
-    },
-    data: { status: "DELETED" },
-  });
+  await requireDocumentLinkAccess(doc, ctx);
+  const route = await resolveDocumentRouteTarget(doc);
+  return { ...serialize(doc, ctx, await getTenantModuleGate(ctx)), relatedEntityId: route.relatedEntityId };
 }
 
 export async function listProjectDocuments(
   projectId: string,
-  filters:   ListProjectDocumentsInput,
-  ctx:       ServiceContext,
+  filters: ListProjectDocumentsInput,
+  ctx: ServiceContext,
 ): Promise<DocumentAttachmentView[]> {
   if (!can(ctx.roles, "VIEW", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver documentos");
   }
-
-  await requireProjectAccess(projectId, ctx);
-
-  await reconcileAbandonedUploadingDocuments(ctx, { projectId });
+  const project = await requireProjectAccess(projectId, ctx);
   await backfillProjectDocumentFolders(projectId, ctx);
 
   if (filters.folderId) {
@@ -1167,170 +958,89 @@ export async function listProjectDocuments(
 
   const docs = await prisma.documentAttachment.findMany({
     where: {
-      tenantId:  ctx.tenantId,
+      tenantId: ctx.tenantId,
       projectId,
-      status:    filters.status ?? "ACTIVE",
+      status: filters.status ?? "ACTIVE",
+      AND: [
+        companyScopeFilter(ctx),
+        { OR: [{ folderId: null }, { folder: { tenantId: ctx.tenantId, projectId } }] },
+        ...(filters.search ? [{
+          OR: [
+            { originalFileName: { contains: filters.search, mode: "insensitive" as const } },
+            { fileName: { contains: filters.search, mode: "insensitive" as const } },
+            { description: { contains: filters.search, mode: "insensitive" as const } },
+          ],
+        }] : []),
+      ],
       ...(filters.folderId ? { folderId: filters.folderId } : {}),
       ...(filters.category ? { category: filters.category } : {}),
-      ...(filters.search ? {
-        OR: [
-          { originalFileName: { contains: filters.search, mode: "insensitive" } },
-          { fileName:         { contains: filters.search, mode: "insensitive" } },
-          { description:      { contains: filters.search, mode: "insensitive" } },
-        ],
-      } : {}),
     },
     orderBy: { createdAt: "desc" },
   });
 
-  const jobsiteLogIds = docs.flatMap((doc) =>
-    doc.linkedEntityType === "JOBSITE_LOG" && doc.linkedEntityId ? [doc.linkedEntityId] : [],
-  );
-  const jobsiteLogs = jobsiteLogIds.length === 0 ? [] : await prisma.jobsiteLog.findMany({
-    where: {
-      id: { in: [...new Set(jobsiteLogIds)] },
-      tenantId: ctx.tenantId,
-      projectId,
-      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
-    },
-    select: { id: true, companyId: true },
-  });
-  const jobsiteCompanies = new Map(jobsiteLogs.map((part) => [part.id, part.companyId]));
+  const visible = await filterProjectDocumentsByLink(docs, project, ctx);
   const gate = await getTenantModuleGate(ctx);
-  return docs.filter((doc) => {
-    if (doc.linkedEntityType !== "JOBSITE_LOG") return true;
-    const companyId = doc.linkedEntityId ? jobsiteCompanies.get(doc.linkedEntityId) : undefined;
-    return companyId !== undefined && (doc.companyId === null || doc.companyId === companyId);
-  }).map((doc) => serialize(doc, ctx, gate));
+  return visible.map((doc) => serialize(doc, ctx, gate));
 }
 
 export async function listEntityDocuments(
   entityType: string,
-  entityId:   string,
-  ctx:        ServiceContext,
-  options?:   { projectId?: string },
+  entityId: string,
+  ctx: ServiceContext,
+  options?: { projectId?: string },
 ): Promise<DocumentAttachmentView[]> {
-  const scoped = [
-    "JOBSITE_LOG",
-    "CERTIFICATION",
-    "SUPPLIER_INVOICE",
-    "SALES_INVOICE",
-    "PURCHASE_ORDER",
-    "PURCHASE_RECEIPT",
-    "PURCHASE_REQUEST",
-    "PROCUREMENT_QUOTE",
-    "SUBCONTRACT",
-    "SUBCONTRACT_CERTIFICATION",
-    "BUDGET",
-  ] as const;
-  /** Corporate supplier / sales invoices are listed without a project scope. */
-  const needsProject =
-    (scoped as readonly string[]).includes(entityType) &&
-    entityType !== "SUPPLIER_INVOICE" &&
-    entityType !== "SALES_INVOICE";
-  if (needsProject && !options?.projectId) {
-    throw new ServiceError("VALIDATION", "projectId requerido para listar adjuntos de esta entidad");
-  }
-
-  let entityDocScope: { projectId?: string | null } = {};
-  let jobsiteCompanyId: string | undefined;
-
-  if (entityType === "JOBSITE_LOG") {
-    if (!can(ctx.roles, "VIEW", "JOBSITE_LOG") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos del libro de obra");
-    }
-    jobsiteCompanyId = await assertJobsiteLogDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "CERTIFICATION") {
-    if (!can(ctx.roles, "VIEW", "CERTIFICATIONS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la certificación");
-    }
-    await assertCertificationDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "SUPPLIER_INVOICE") {
-    const { invoiceProjectId } = await assertSupplierInvoiceDocumentTarget(options?.projectId, entityId, ctx);
-    if (invoiceProjectId == null) {
-      if (!can(ctx.roles, "VIEW", "AP")) {
-        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de proveedor");
-      }
-      entityDocScope = { projectId: null };
-    } else {
-      if (!can(ctx.roles, "VIEW", "AP") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de proveedor");
-      }
-      entityDocScope = { projectId: invoiceProjectId };
-    }
-  } else if (entityType === "SALES_INVOICE") {
-    const { invoiceProjectId } = await assertSalesInvoiceDocumentTarget(options?.projectId, entityId, ctx);
-    if (invoiceProjectId == null) {
-      if (!can(ctx.roles, "VIEW", "AR")) {
-        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de venta");
-      }
-      entityDocScope = { projectId: null };
-    } else {
-      if (!can(ctx.roles, "VIEW", "AR") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-        throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la factura de venta");
-      }
-      entityDocScope = { projectId: invoiceProjectId };
-    }
-  } else if (entityType === "PURCHASE_ORDER") {
-    if (!canViewProcurementProjectArea(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la orden de compra");
-    }
-    await assertPurchaseOrderDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "PURCHASE_RECEIPT") {
-    if (!canViewProcurementProjectArea(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la recepción");
-    }
-    await assertPurchaseReceiptDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "PURCHASE_REQUEST") {
-    if (!canViewPurchaseRequests(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la solicitud");
-    }
-    await assertPurchaseRequestDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "PROCUREMENT_QUOTE") {
-    if (!canViewPurchaseRequests(ctx.roles)) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la cotización");
-    }
-    await assertProcurementQuoteDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "SUBCONTRACT") {
-    if (!can(ctx.roles, "VIEW", "SUBCONTRACTS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos del subcontrato");
-    }
-    await assertSubcontractDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "SUBCONTRACT_CERTIFICATION") {
-    if (!can(ctx.roles, "VIEW", "SUBCONTRACTS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la certificación de subcontrato");
-    }
-    await assertSubcontractCertificationDocumentTarget(options!.projectId!, entityId, ctx);
-  } else if (entityType === "BUDGET") {
-    if (!can(ctx.roles, "VIEW", "BUDGETS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
-      throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos del presupuesto");
-    }
-    await assertBudgetDocumentTarget(options!.projectId!, entityId, ctx);
-  } else {
+  if (!isDocumentOperationalLink(entityType)) {
     throw new ServiceError("VALIDATION", "Tipo de entidad no soportado para adjuntos");
   }
 
-  await reconcileAbandonedUploadingDocuments(ctx, {
-    projectId:        needsProject ? options?.projectId : undefined,
-    linkedEntityType: entityType,
-    linkedEntityId:   entityId,
-  });
+  let parent = await requireDocumentParent(entityType, entityId, ctx);
+  if (parent.projectId !== (options?.projectId ?? null)) {
+    throw new ServiceError("FORBIDDEN", "La entidad del adjunto no pertenece al proyecto indicado");
+  }
+  if (!canViewDocumentByLink(entityType, ctx.roles, parent.projectId)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de esta entidad");
+  }
+  if (parent.projectId) {
+    const project = await requireProjectAccess(parent.projectId, ctx);
+    const scoped = documentScopeInProject(parent, project);
+    if (!scoped) throw new ServiceError("NOT_FOUND", "Entidad del adjunto no encontrada");
+    parent = scoped;
+  }
+  await assertDocumentCompanyInTenant(parent.companyId, ctx.tenantId);
 
   const docs = await prisma.documentAttachment.findMany({
     where: {
-      tenantId:         ctx.tenantId,
-      linkedEntityType: entityType as never,
-      linkedEntityId:   entityId,
-      status:           { not: "DELETED" },
-      ...entityDocScope,
-      ...(jobsiteCompanyId ? { OR: [{ companyId: null }, { companyId: jobsiteCompanyId }] } : {}),
-      ...(needsProject && options?.projectId ? { projectId: options.projectId } : {}),
+      tenantId: ctx.tenantId,
+      linkedEntityType: entityType,
+      linkedEntityId: entityId,
+      projectId: parent.projectId,
+      AND: [
+        companyScopeFilter(ctx),
+        parent.projectId
+          ? { OR: [{ folderId: null }, { folder: { tenantId: ctx.tenantId, projectId: parent.projectId } }] }
+          : { folderId: null },
+        {
+          OR: [
+            { status: { in: ["ACTIVE", "ARCHIVED"] } },
+            { status: "UPLOADING", createdAt: { gte: new Date(Date.now() - ABANDONED_UPLOAD_THRESHOLD_MS) } },
+          ],
+        },
+      ],
     },
     orderBy: { createdAt: "desc" },
   });
 
+  const companyIds = parent.companyId === null
+    ? [...new Set(docs.flatMap((doc) => doc.companyId ? [doc.companyId] : []))]
+    : [];
+  const companyRows = companyIds.length === 0 ? [] : await prisma.company.findMany({
+    where: { tenantId: ctx.tenantId, id: { in: companyIds } }, select: { id: true },
+  });
+  const validCompanies = new Set(companyRows.map(({ id }) => id));
   const gate = await getTenantModuleGate(ctx);
-  return docs.map((d) => serialize(d, ctx, gate));
+  return docs.filter((doc) => documentMatchesScope(doc, parent, ctx) &&
+    (parent.companyId !== null || doc.companyId === null || validCompanies.has(doc.companyId)))
+    .map((doc) => serialize(doc, ctx, gate));
 }
 
 /**
@@ -1347,386 +1057,67 @@ export async function cleanupStaleUploadingDocuments(
   }
 
   const olderThanMs = options?.olderThanMs ?? DEFAULT_STALE_UPLOAD_THRESHOLD_MS;
-  const cutoff      = new Date(Date.now() - olderThanMs);
-
-  const { cleanedCount, documentIds } = await prisma.$transaction(async (tx) => {
-    const candidates = await tx.documentAttachment.findMany({
-      where: {
-        tenantId:  ctx.tenantId,
-        status:    "UPLOADING",
-        createdAt: { lt: cutoff },
-      },
-      select: { id: true },
-    });
-    const documentIds = candidates.map((c) => c.id);
-    if (documentIds.length === 0) {
-      return { cleanedCount: 0, documentIds: [] as string[] };
+  if (!Number.isFinite(olderThanMs) || olderThanMs < ABANDONED_UPLOAD_THRESHOLD_MS) {
+    throw new ServiceError("VALIDATION", "La antigüedad de limpieza debe superar la ventana de subida");
+  }
+  const cutoff = new Date(Date.now() - olderThanMs);
+  const pendingWhere = {
+    tenantId: ctx.tenantId, status: "UPLOADING" as const, createdAt: { lt: cutoff }, ...companyScopeFilter(ctx),
+  };
+  const candidates = await prisma.documentAttachment.findMany({ where: pendingWhere });
+  const documentIds: string[] = [];
+  for (const doc of candidates) {
+    try {
+      await requireDocumentLinkAccess(doc, ctx);
+      documentIds.push(doc.id);
+    } catch (err) {
+      if (!(err instanceof ServiceError && (err.code === "FORBIDDEN" || err.code === "NOT_FOUND"))) throw err;
     }
+  }
+  if (documentIds.length === 0) return { cleanedCount: 0, documentIds };
 
+  const cleanedCount = await prisma.$transaction(async (tx) => {
     const updated = await tx.documentAttachment.updateMany({
-      where: {
-        tenantId: ctx.tenantId,
-        id:       { in: documentIds },
-        status:   "UPLOADING",
-      },
+      where: { ...pendingWhere, id: { in: documentIds } },
       data: { status: "DELETED" },
     });
-
-    return { cleanedCount: updated.count, documentIds };
+    if (updated.count > 0) {
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "document.stale_upload_batch_cleaned",
+        entityType: "Tenant",
+        entityId: ctx.tenantId,
+        companyId: ctx.companyId,
+        after: { cleanedCount: updated.count, documentIds, olderThanMs, cutoffIso: cutoff.toISOString() },
+      }, tx);
+    }
+    return updated.count;
   });
-
-  if (cleanedCount > 0) {
-    await log({
-      tenantId:    ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action:      "document.stale_upload_batch_cleaned",
-      entityType:  "Tenant",
-      entityId:    ctx.tenantId,
-      after:       {
-        cleanedCount,
-        documentIds,
-        olderThanMs,
-        cutoffIso: cutoff.toISOString(),
-      },
-    });
-  }
-
   return { cleanedCount, documentIds };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function sanitize(filename: string): string {
-  return filename
+  const safe = filename
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_")
     .toLowerCase();
+  return !safe || safe === "." || safe === ".." ? "file" : safe;
 }
 
 async function getOwned(id: string, ctx: ServiceContext, gate: TenantModuleGate) {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   assertLinkedEntityTenantModuleEnabled(gate, doc.linkedEntityType);
-  if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
+  if (!canMutateDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para modificar documentos");
   }
-  await requireDocumentProjectAccess(doc, ctx);
-  return doc;
-}
-
-async function requireDocumentProjectAccess(
-  doc: { projectId: string | null; companyId: string | null; linkedEntityType: string | null; linkedEntityId: string | null },
-  ctx: ServiceContext,
-): Promise<string | null> {
-  if (doc.linkedEntityType !== "JOBSITE_LOG") {
-    await requireProjectAccessIfPresent(doc.projectId, ctx);
-    return doc.companyId;
-  }
-  if (!doc.projectId || !doc.linkedEntityId) {
-    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  }
-  const companyId = await assertJobsiteLogDocumentTarget(doc.projectId, doc.linkedEntityId, ctx);
-  if (doc.companyId !== null && doc.companyId !== companyId) {
-    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
-  }
-  return companyId;
-}
-
-async function assertBudgetDocumentTarget(
-  projectId: string,
-  budgetId: string,
-  ctx:       ServiceContext,
-): Promise<void> {
-  const b = await prisma.budget.findUnique({
-    where:  { id: budgetId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!b || b.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Presupuesto no encontrado");
-  }
-  if (b.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "El presupuesto no pertenece a este proyecto");
-  }
-}
-
-/** Attachments inherit the part's project and company, including historical attachments without companyId. */
-async function assertJobsiteLogDocumentTarget(
-  projectId:    string,
-  jobsiteLogId: string,
-  ctx:          ServiceContext,
-): Promise<string> {
-  await requireProjectAccess(projectId, ctx);
-  const jl = await prisma.jobsiteLog.findUnique({
-    where:  { id: jobsiteLogId },
-    select: { tenantId: true, projectId: true, companyId: true },
-  });
-  if (!jl || jl.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
-  }
-  if (jl.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "El parte no pertenece a este proyecto");
-  }
-  if (isCrossCompany(jl.companyId, ctx)) {
-    throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
-  }
-  return jl.companyId;
-}
-
-/** Certification must exist, match tenant, and belong to the given project. */
-async function assertCertificationDocumentTarget(
-  projectId:        string,
-  certificationId: string,
-  ctx:              ServiceContext,
-): Promise<void> {
-  const c = await prisma.certification.findUnique({
-    where:  { id: certificationId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!c || c.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Certificación no encontrada");
-  }
-  if (c.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
-  }
-}
-
-async function assertSupplierInvoiceDocumentTarget(
-  routeProjectId: string | null | undefined,
-  supplierInvoiceId: string,
-  ctx: ServiceContext,
-): Promise<{ invoiceProjectId: string | null }> {
-  const inv = await prisma.supplierInvoice.findUnique({
-    where: { id: supplierInvoiceId },
-    select: { tenantId: true, projectId: true, companyId: true },
-  });
-  if (!inv || inv.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
-  }
-  if (inv.projectId != null) {
-    if (routeProjectId !== inv.projectId) {
-      throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
-    }
-  } else {
-    if (isCrossCompany(inv.companyId, ctx)) {
-      throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
-    }
-    if (routeProjectId != null && routeProjectId !== "") {
-      throw new ServiceError("VALIDATION", "Esta factura es corporativa; no use filtro por proyecto");
-    }
-  }
-  return { invoiceProjectId: inv.projectId };
-}
-
-async function assertSalesInvoiceDocumentTarget(
-  routeProjectId: string | null | undefined,
-  salesInvoiceId: string,
-  ctx: ServiceContext,
-): Promise<{ invoiceProjectId: string | null }> {
-  const inv = await prisma.salesInvoice.findUnique({
-    where: { id: salesInvoiceId },
-    select: { tenantId: true, projectId: true, companyId: true },
-  });
-  if (!inv || inv.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Factura de venta no encontrada");
-  }
-  if (inv.projectId != null) {
-    if (routeProjectId !== inv.projectId) {
-      throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
-    }
-  } else {
-    if (isCrossCompany(inv.companyId, ctx)) {
-      throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
-    }
-    if (routeProjectId != null && routeProjectId !== "") {
-      throw new ServiceError("VALIDATION", "Esta factura es corporativa; no use filtro por proyecto");
-    }
-  }
-  return { invoiceProjectId: inv.projectId };
-}
-
-async function assertPurchaseOrderDocumentTarget(
-  projectId:      string,
-  purchaseOrderId: string,
-  ctx:            ServiceContext,
-): Promise<void> {
-  const po = await prisma.purchaseOrder.findUnique({
-    where:  { id: purchaseOrderId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!po || po.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Orden de compra no encontrada");
-  }
-  if (po.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La orden de compra no pertenece a este proyecto");
-  }
-}
-
-async function assertPurchaseReceiptDocumentTarget(
-  projectId:         string,
-  purchaseReceiptId: string,
-  ctx:               ServiceContext,
-): Promise<void> {
-  const r = await prisma.purchaseReceipt.findUnique({
-    where:  { id: purchaseReceiptId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!r || r.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Recepción no encontrada");
-  }
-  if (r.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La recepción no pertenece a este proyecto");
-  }
-}
-
-async function assertPurchaseRequestDocumentTarget(
-  projectId: string,
-  purchaseRequestId: string,
-  ctx: ServiceContext,
-): Promise<void> {
-  const pr = await prisma.purchaseRequest.findUnique({
-    where: { id: purchaseRequestId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!pr || pr.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Solicitud de compra no encontrada");
-  }
-  if (pr.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La solicitud no pertenece a este proyecto");
-  }
-}
-
-async function assertProcurementQuoteDocumentTarget(
-  projectId: string,
-  procurementQuoteId: string,
-  ctx: ServiceContext,
-): Promise<void> {
-  const quote = await prisma.procurementQuote.findUnique({
-    where: { id: procurementQuoteId },
-    include: { purchaseRequest: { select: { projectId: true, tenantId: true } } },
-  });
-  if (!quote || quote.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Cotización no encontrada");
-  }
-  if (quote.purchaseRequest.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La cotización no pertenece a este proyecto");
-  }
-}
-
-async function assertSubcontractDocumentTarget(
-  projectId:    string,
-  subcontractId: string,
-  ctx:          ServiceContext,
-): Promise<void> {
-  const s = await prisma.subcontract.findUnique({
-    where:  { id: subcontractId },
-    select: { id: true, tenantId: true, projectId: true },
-  });
-  if (!s || s.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Subcontrato no encontrado");
-  }
-  if (s.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "El subcontrato no pertenece a este proyecto");
-  }
-}
-
-async function assertSubcontractCertificationDocumentTarget(
-  projectId:                  string,
-  subcontractCertificationId: string,
-  ctx:                        ServiceContext,
-): Promise<void> {
-  const c = await prisma.subcontractCertification.findUnique({
-    where:  { id: subcontractCertificationId },
-    select: { id: true, tenantId: true, projectId: true, subcontractId: true },
-  });
-  if (!c || c.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Certificación de subcontrato no encontrada");
-  }
-  if (c.projectId !== projectId) {
-    throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
-  }
-}
-
-function canViewDocumentByLink(
-  linkedEntityType: string | null,
-  ctx:              ServiceContext,
-  options?:         { projectId?: string | null },
-): boolean {
-  const isCorporateInvoice =
-    (linkedEntityType === "SUPPLIER_INVOICE" || linkedEntityType === "SALES_INVOICE") &&
-    (options?.projectId == null || options.projectId === "");
-
-  // Corporate Finanzas attachments are not project-scoped: VIEW PROJECTS alone is not enough.
-  if (isCorporateInvoice) {
-    if (linkedEntityType === "SUPPLIER_INVOICE") return can(ctx.roles, "VIEW", "AP");
-    return can(ctx.roles, "VIEW", "AR");
-  }
-
-  if (can(ctx.roles, "VIEW", "PROJECTS")) return true;
-  if (linkedEntityType === "JOBSITE_LOG" && can(ctx.roles, "VIEW", "JOBSITE_LOG")) return true;
-  if (linkedEntityType === "CERTIFICATION" && can(ctx.roles, "VIEW", "CERTIFICATIONS")) return true;
-  if (linkedEntityType === "SUPPLIER_INVOICE" && can(ctx.roles, "VIEW", "AP")) return true;
-  if (linkedEntityType === "SALES_INVOICE" && can(ctx.roles, "VIEW", "AR")) return true;
-  if (
-    (linkedEntityType === "PURCHASE_ORDER" || linkedEntityType === "PURCHASE_RECEIPT") &&
-    canViewProcurementProjectArea(ctx.roles)
-  ) {
-    return true;
-  }
-  if (
-    (linkedEntityType === "PURCHASE_REQUEST" || linkedEntityType === "PROCUREMENT_QUOTE") &&
-    canViewPurchaseRequests(ctx.roles)
-  ) {
-    return true;
-  }
-  if (
-    (linkedEntityType === "SUBCONTRACT" || linkedEntityType === "SUBCONTRACT_CERTIFICATION") &&
-    can(ctx.roles, "VIEW", "SUBCONTRACTS")
-  ) {
-    return true;
-  }
-  if (linkedEntityType === "BUDGET" && can(ctx.roles, "VIEW", "BUDGETS")) return true;
-  return false;
-}
-
-function canMutateDocumentByLink(
-  linkedEntityType: string | null,
-  ctx:              ServiceContext,
-): boolean {
-  const t = linkedEntityType ?? "PROJECT";
-  if (t === "PROJECT") {
-    return can(ctx.roles, "EDIT", "PROJECTS");
-  }
-  if (t === "JOBSITE_LOG") {
-    // Must match initiateDocumentUpload / resolveDocumentUploadPlan.
-    return canMutateJobsiteLogAsContributor(ctx.roles);
-  }
-  if (t === "CERTIFICATION") {
-    return can(ctx.roles, "EDIT", "CERTIFICATIONS");
-  }
-  if (t === "SUPPLIER_INVOICE") {
-    return can(ctx.roles, "EDIT", "AP");
-  }
-  if (t === "SALES_INVOICE") {
-    return can(ctx.roles, "EDIT", "AR");
-  }
-  if (t === "PURCHASE_ORDER" || t === "PROCUREMENT_QUOTE") {
-    return canEditPurchaseOrders(ctx.roles);
-  }
-  if (t === "PURCHASE_RECEIPT") {
-    return canEditPurchaseReceipts(ctx.roles);
-  }
-  if (t === "PURCHASE_REQUEST") {
-    return canEditPurchaseRequests(ctx.roles);
-  }
-  if (t === "SUBCONTRACT" || t === "SUBCONTRACT_CERTIFICATION") {
-    return can(ctx.roles, "EDIT", "SUBCONTRACTS");
-  }
-  if (t === "BUDGET") {
-    return can(ctx.roles, "EDIT", "BUDGETS");
-  }
-  return false;
+  const companyId = await requireDocumentLinkAccess(doc, ctx);
+  return { ...doc, companyId };
 }
 
 function linkedEntityTypeToPermissionModule(linkedEntityType: string | null): PermissionModule {
@@ -1755,7 +1146,7 @@ function serialize(
     folderId?: string | null;
     originalFileName: string; fileName: string; mimeType: string; sizeBytes: number;
     storageProvider: string; category: string; description: string | null;
-    status: string; linkedEntityType: string | null; linkedEntityId: string | null;
+    status: string; linkedEntityType: LinkedEntityType | null; linkedEntityId: string | null;
     uploadedBy: string; createdAt: Date; updatedAt: Date;
   },
   ctx: ServiceContext,
@@ -1763,7 +1154,7 @@ function serialize(
 ): DocumentAttachmentView {
   const mod = linkedEntityTypeToPermissionModule(doc.linkedEntityType);
   const moduleDisabled = !gate.isEnabled(mod);
-  const canMutate = canMutateDocumentByLink(doc.linkedEntityType, ctx) && !moduleDisabled;
+  const canMutate = canMutateDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId) && !moduleDisabled;
   return {
     id:               doc.id,
     tenantId:         doc.tenantId,
