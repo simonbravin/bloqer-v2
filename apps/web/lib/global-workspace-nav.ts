@@ -164,7 +164,7 @@ export function buildGlobalNavSections(
           continue;
         }
         if (item.href === "/configuracion/registro") {
-          if (canViewTenantAuditLog(roles)) {
+          if (canViewTenantAuditLog(roles) && isTenantModuleEnabled("AUDIT")) {
             items.push({ label: item.label, href: item.href, matchExact: item.matchExact });
           }
           continue;

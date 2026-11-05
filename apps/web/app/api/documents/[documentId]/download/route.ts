@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { getDocumentDownloadUrl, ServiceError } from "@bloqer/services";
+import { isUuid } from "@bloqer/utils";
 
 interface RouteParams {
   params: Promise<{ documentId: string }>;
@@ -17,6 +18,9 @@ export async function GET(req: NextRequest, { params }: RouteParams): Promise<Ne
   }
 
   const { documentId } = await params;
+  if (!isUuid(documentId)) {
+    return new NextResponse("Documento no encontrado", { status: 404 });
+  }
   const disposition = parseDisposition(req.nextUrl.searchParams.get("disposition"));
 
   const ctx = {
@@ -28,7 +32,10 @@ export async function GET(req: NextRequest, { params }: RouteParams): Promise<Ne
 
   try {
     const url = await getDocumentDownloadUrl(documentId, ctx, { disposition });
-    return NextResponse.redirect(url, 302);
+    return NextResponse.redirect(url, {
+      status: 302,
+      headers: { "Cache-Control": "private, no-store", "Referrer-Policy": "no-referrer" },
+    });
   } catch (err) {
     if (err instanceof ServiceError) {
       const status = err.code === "FORBIDDEN" ? 403 : err.code === "NOT_FOUND" ? 404 : 409;

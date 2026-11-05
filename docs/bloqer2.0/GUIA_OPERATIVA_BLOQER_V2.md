@@ -100,7 +100,7 @@ El botón es circular y compacto: muestra el ícono de destellos y despliega el 
 **Qué no hace aún:**
 
 - **No modifica** información (no crea, aprueba, paga ni anula).
-- **No guarda historial** en servidor: la conversación vive solo en la sesión del navegador.
+- La conversación se conserva en memoria durante el contexto activo. El asistente usa los últimos mensajes para responder y empieza una conversación limpia al cambiar de cuenta, organización, empresa o permisos. Si se interrumpe la respuesta, podés volver a preguntar.
 - No reemplaza el Centro de Ayuda (`/ayuda`); lo complementa.
 - **No amplía permisos:** solo ve lo que tu usuario podría consultar en Bloqer. Tesorería / finanzas de empresa quedan ocultas si tu rol no las tiene (p. ej. Jefe de obra).
 
@@ -282,10 +282,11 @@ Caminitos y láminas de compras, subcontrato, certificar, EDT/APU y cronograma e
 
 ### 1.3a Registro de actividad
 
-- **Ruta:** Configuración → **Registro** → `/configuracion/registro` (solo OWNER/ADMIN).
+- **Ruta:** Configuración → **Registro** → `/configuracion/registro` (OWNER/ADMIN con Auditoría habilitada).
 - Lista quién hizo qué, sobre qué entidad y cuándo.
 - **Fechas y horas** en la zona de la empresa (§1.3), no en UTC del servidor ni en la zona del navegador. El detalle al hacer click debe coincidir con la columna Fecha.
 - Exports CSV/PDF usan la misma zona (el encabezado CSV indica la zona, ej. `Fecha (Buenos Aires (GMT-3))`).
+- **Desde** y **Hasta** también usan esa zona. Lista, detalle y exportaciones respetan empresa y obra. Los históricos cuyo alcance no se puede comprobar requieren una sesión con alcance global (D-144).
 
 ### 1.4 Notificaciones (campana, inbox, alertas y emails) — D-054 / D-091 / D-094 / D-114
 
@@ -297,7 +298,7 @@ Las preferencias de correo no apagan la campana. Si la plataforma deshabilita el
 
 **Políticas de notificaciones (empresa):** Configuración → **Políticas** → sección **Notificaciones** (`/configuracion/politicas#notificaciones`): alertas de vencimiento y canal CxP (campana vs campana+email, [D-070]/[D-097]); más **Email a dirección** (solo Propietario/Administrador): CC del flujo diario y digest matutino on/off + hora local ([D-114]).
 
-**Digest diario:** un mail matutino a Propietario/Administrador con colas estilo Pendientes + alertas críticas sin leer (si hay algo que reportar). Cron diario en Vercel (10:05 UTC ≈ 07:05 ART); se envía cuando coincide la hora local de la organización o la ventana de catch-up del mismo día.
+**Digest diario:** un mail a Propietario/Administrador con Pendientes y alertas críticas sin leer que puede consultar. La revisión automática ocurre una vez al día a las 10:05 UTC (07:05 en Argentina). El resumen puede salir si en la zona de la organización es la hora elegida o hasta tres horas después, dentro del mismo día.
 
 **Reportes de la empresa ([D-098]):** menú General → **Reportes** → `/reportes`. Las cards están agrupadas en **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario). Los reportes de una obra siguen en Planificación → Reportes dentro del proyecto.
 
@@ -337,7 +338,7 @@ Las preferencias de correo no apagan la campana. Si la plataforma deshabilita el
 - El sistema envía un email con un enlace a **`/invitaciones/aceptar`**. El asunto va como `[organización] Invitación a Bloqer` y el cuerpo indica quién invitó y los roles. El token de invitación **no queda visible en la URL** de la pantalla de aceptación (se guarda en cookie httpOnly al hacer clic en el enlace); no hay que copiar/pegar tokens a mano.
 - Si el invitado **aún no tiene cuenta**, primero se registra / inicia sesión; al volver a aceptar, la cookie sigue vigente hasta que acepte o expire.
 - Tras aceptar, queda como miembro con uno o más roles, anclado a la empresa del tenant cuando hay una sola razón social (no hay que elegirla).
-- Gestión de cada miembro: `/configuracion/equipo/[membershipId]`.
+- Gestión de cada miembro: `/configuracion/equipo/[membershipId]`. Al trabajar con una empresa activa, el equipo incluye sus miembros y los compartidos de la organización.
 - No podés quitar el rol de Propietario ni desactivar al último propietario que pueda ingresar. Primero debe quedar otro propietario con cuenta y membresía activas. La protección también se aplica a cambios simultáneos.
 - Dos solicitudes de invitación simultáneas al mismo email dejan una sola invitación pendiente por organización. Una invitación vencida no se puede aceptar ni cancelar como pendiente; queda **Vencida**. Cancelarla mientras se acepta produce un solo resultado válido.
 - **Tenant suspendido:** no se puede aceptar una invitación a una empresa inactiva; el mensaje lo indica en pantalla.
@@ -955,6 +956,8 @@ flowchart LR
 5. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.
 6. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar (con el mismo visor de fotos) aparece en las tarjetas y en el detalle del documento. Esos archivos también aparecen en Documentos dentro de su carpeta de sistema.
 
+La biblioteca, el detalle y los enlaces directos muestran archivos de la empresa, obra y comprobante que podés consultar. Si una subida llegó al almacenamiento y faltó confirmarla, reintentá para completar el proceso. Los intentos abandonados quedan fuera del listado habitual.
+
 > Ver [D-113](./00-product/DECISION_LOG.md): carpetas SYSTEM + USER; auto-filing; adjuntos sin obra no entran al árbol.
 
 <!-- capture:23 parte-de-obra-detalle -->
@@ -1535,7 +1538,7 @@ Con filtros de fechas, los bloques del detalle se identifican como **Físico del
 - **Exportar:** en cada pantalla de reporte, menú **Exportar** → **CSV** / **PDF** (o botón **Exportar PDF** si solo hay PDF). Contabilidad/tesorería/finanzas/inventario/registro siguen el mismo patrón; algunos libros ofrecen también XLSX.
 - **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y Configuración → **Reportes programados** → `/configuracion/reportes`. El listado muestra el catálogo por alcance (**Empresa general** / **Un proyecto**) y por sección (**Financieros** / **Operativos**). En el alta, elegí el alcance con las dos tarjetas. Formato **PDF** o **CSV (Excel)** según el reporte. *Presupuesto vs real* quedó absorbido por **EDT y costos** y no se ofrece en envíos nuevos. **Libro de obra — parte del día** ([D-100]): solo en alcance empresa, solo PDF, multi-obra ACTIVE, un adjunto por parte del día de la corrida (no aparece en el catálogo de una sola obra). En el detalle de un envío **Activo**, **Enviar ahora** (junto a Volver / Pausar / Eliminar) genera y manda el correo de inmediato; pide confirmación y **no** mueve la próxima ejecución programada. El job automático en Vercel Hobby corre **una vez al día** (05:05 UTC); si necesitás el adjunto ya, usá **Enviar ahora**.
 
-  **Reportes de esta configuración** muestra lo que se guardó para el envío, incluidos nombres legados si corresponde. **Reintentar fallidos** usa el día de cada envío original y omite las entregas ya completadas. Al ejecutar se comprueba qué puede consultar cada destinatario. Si no queda ningún adjunto permitido o disponible, la entrega se registra como **Omitida**. **Enviar por email** desde un reporte permite elegir una dirección si tenés permiso para exportarlo.
+  **Reportes de esta configuración** muestra la selección guardada, incluidos nombres legados si corresponde. **Reintentar fallidos** usa el día original de los fallos confirmados de los últimos siete días. Una entrega **Sin confirmar** queda en el historial y fuera del reintento. **Enviar ahora** crea una nueva entrega explícita y comprueba los permisos vigentes de cada destinatario. Si no queda un adjunto autorizado, la entrega figura **Omitida**. **Enviar por email** desde un reporte permite elegir una dirección si tenés permiso para exportarlo.
 
 ### 13.3 Avances del proyecto — lectura para dirección
 

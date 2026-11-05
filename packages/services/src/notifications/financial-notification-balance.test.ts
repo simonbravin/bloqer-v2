@@ -13,8 +13,10 @@ describe("financial notification balances", () => {
   for (const kind of ["SALES_INVOICE", "SUPPLIER_INVOICE"] as const) {
     it(`${kind} explains the remaining debt after cash and credit without sending email`, async (t) => {
       stub(t, prisma.tenant, "findFirst", async () => ({ name: "Synthetic notification" }));
-      const obligation = { originalAmount: new Prisma.Decimal("100"), paidAmount: new Prisma.Decimal("20"), creditedAmount: new Prisma.Decimal("30"), dueDate: new Date("2026-12-01") };
-      const invoice = { number: 1, invoiceLetter: "A", currency: "ARS", totalAmount: new Prisma.Decimal("100"), dueDate: new Date("2026-12-01"), issueDate: new Date("2026-11-05"), createdBy: null, purchaseOrder: null,
+      const scope = { tenantId: "tenant-a", companyId: "company-a", projectId: null };
+      const contacts = { clientContactId: "client-a", supplierContactId: "supplier-a" };
+      const obligation = { ...scope, ...contacts, currency: "ARS", originalAmount: new Prisma.Decimal("100"), paidAmount: new Prisma.Decimal("20"), creditedAmount: new Prisma.Decimal("30"), dueDate: new Date("2026-12-01") };
+      const invoice = { ...scope, ...contacts, number: 1, invoiceLetter: "A", currency: "ARS", totalAmount: new Prisma.Decimal("100"), dueDate: new Date("2026-12-01"), issueDate: new Date("2026-11-05"), createdBy: null, purchaseOrder: null,
         clientContact: { legalName: "Synthetic client", fantasyName: null }, supplierContact: { legalName: "Synthetic supplier", fantasyName: null }, receivable: obligation, payable: obligation };
       const model = kind === "SALES_INVOICE" ? prisma.salesInvoice : prisma.supplierInvoice;
       const reads: unknown[] = [];
@@ -26,6 +28,11 @@ describe("financial notification balances", () => {
       const query = reads[0] as { where: { tenantId: string }; select: Record<string, unknown> };
       assert.equal(query.where.tenantId, "tenant-a");
       assert.ok(query.select[kind === "SALES_INVOICE" ? "receivable" : "payable"]);
+
+      obligation.companyId = "company-b";
+      const inconsistent = await resolveNotificationEmailContext({ tenantId: "tenant-a", companyId: null, projectId: null, linkedEntityType: kind, linkedEntityId: "invoice-a" });
+      assert.equal(inconsistent.contextFields.some(field => field.label === "Saldo"), false);
+      assert.equal(inconsistent.contextFields.find(field => field.label === "Total")?.value, "100.00 ARS");
     });
   }
 });

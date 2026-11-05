@@ -1,4 +1,4 @@
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import type { PermissionModule } from "@bloqer/domain";
 import { isEmailConfigured } from "@bloqer/config";
 import {
@@ -12,6 +12,8 @@ import {
   markEmailDeliveryFailed,
   markEmailDeliverySent,
   markEmailDeliverySkipped,
+  markEmailDeliveryUnconfirmed,
+  type CreateEmailDeliveryLogInput,
 } from "../email-delivery/email-delivery-log.service";
 import { PRODUCT_TIMEZONE, toIsoDateInTimeZone } from "@bloqer/utils";
 import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
@@ -26,8 +28,11 @@ import {
 import { getTenantEnabledModules } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import type { ScheduledReportAttachment } from "./scheduled-report-attachment.service";
+import { SCHEDULED_REPORT_PROVIDER_REJECTED_PREFIX } from "./scheduled-report-run-status";
 
 export type ScheduledReportDeliveryKind = "scheduled" | "manual" | "retry";
+
+const DELIVERY_CLAIM_LOCK = 824_014_013;
 
 export type ScheduledReportRecipientAccess = Pick<ServiceContext, "companyId" | "roles"> & {
   email: string;
@@ -78,20 +83,37 @@ export function buildScheduledReportIdempotencyKey(
   return `${prefix}:${scheduleId}:${runWindow}:${recipientEmail.trim().toLowerCase()}`;
 }
 
-export async function hasScheduledReportBundleBeenSent(
-  tenantId: string,
-  idempotencyKey: string,
-): Promise<boolean> {
-  const row = await prisma.emailDeliveryLog.findFirst({
-    where: {
-      tenantId,
-      idempotencyKey,
-      emailType: "REPORT_SCHEDULED",
-      status: "SENT",
-    },
-    select: { id: true },
+async function claimScheduledReportDelivery(
+  input: DeliverScheduledReportBundleInput,
+  log: CreateEmailDeliveryLogInput,
+  ctx: ServiceContext,
+): Promise<{ id: string } | null> {
+  return prisma.$transaction(async (db) => {
+    const key = JSON.stringify([ctx.tenantId, input.scheduleId, input.runWindow, input.recipientUserId]);
+    await db.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(${DELIVERY_CLAIM_LOCK}::integer, hashtext(${key}::text))`);
+    const blocking = await db.emailDeliveryLog.findFirst({
+      where: {
+        tenantId: ctx.tenantId,
+        emailType: "REPORT_SCHEDULED",
+        relatedEntityType: "SCHEDULED_REPORT",
+        relatedEntityId: input.scheduleId,
+        OR: [
+          { recipientUserId: input.recipientUserId },
+          { recipientUserId: null, recipientEmail: { equals: log.recipientEmail, mode: "insensitive" } },
+        ],
+        metadata: { path: ["runWindow"], equals: input.runWindow },
+        AND: [{ OR: [
+          { status: { in: ["PENDING", "SENT"] } },
+          // Legacy failed rows did not distinguish rejection from a lost response.
+          { status: "FAILED", errorMessage: null },
+          { status: "FAILED", NOT: { errorMessage: { startsWith: SCHEDULED_REPORT_PROVIDER_REJECTED_PREFIX } } },
+        ] }],
+      },
+      select: { id: true },
+    });
+    if (blocking) return null;
+    return createEmailDeliveryLog(log, ctx, db);
   });
-  return Boolean(row);
 }
 
 export type DeliverScheduledReportBundleInput = {
@@ -182,10 +204,6 @@ export async function deliverScheduledReportBundle(
     deliveryKind,
   );
 
-  if (await hasScheduledReportBundleBeenSent(ctx.tenantId, idempotencyKey)) {
-    return { outcome: "duplicate" };
-  }
-
   const dateLabel = toIsoDateInTimeZone(
     asOfFromRunWindow(input.runWindow, deliveryKind),
     input.timezone?.trim() || PRODUCT_TIMEZONE,
@@ -212,9 +230,10 @@ export async function deliverScheduledReportBundle(
       ? "recipient_inactive"
       : attachments.length === 0
         ? "no_authorized_attachments"
-        : null;
-  const { id: logId } = await createEmailDeliveryLog(
-    {
+        : !isEmailConfigured()
+          ? "email_not_configured"
+          : null;
+  const log: CreateEmailDeliveryLogInput = {
       recipientEmail,
       recipientUserId: input.recipientUserId,
       subject,
@@ -235,15 +254,11 @@ export async function deliverScheduledReportBundle(
         attachmentCount: attachments.length,
         reportKeys: attachments.map((a) => a.reportKey).join(","),
       },
-    },
-    ctx,
-  );
+  };
 
-  if (skipReason) return { outcome: "skipped", reason: skipReason };
-
-  if (!isEmailConfigured()) {
-    await markEmailDeliverySkipped(logId, "email_not_configured", ctx);
-    return { outcome: "skipped", reason: "email_not_configured" };
+  if (skipReason) {
+    await createEmailDeliveryLog(log, ctx);
+    return { outcome: "skipped", reason: skipReason };
   }
 
   const templateInput = {
@@ -267,6 +282,9 @@ export async function deliverScheduledReportBundle(
   const html = renderNotificationEmailHtml(templateInput);
   const text = renderNotificationEmailText(templateInput);
 
+  const claim = await claimScheduledReportDelivery(input, log, ctx);
+  if (!claim) return { outcome: "duplicate" };
+  const logId = claim.id;
   const sendResult = await sendEmail({
     to: recipientEmail,
     subject,
@@ -280,8 +298,13 @@ export async function deliverScheduledReportBundle(
   });
 
   if (!sendResult.ok) {
-    await markEmailDeliveryFailed(logId, sendResult.error ?? "send_failed", ctx, "RESEND");
-    return { outcome: "failed", error: sendResult.error ?? "send_failed" };
+    if (sendResult.failureKind === "rejected") {
+      const error = sendResult.error ?? "send_failed";
+      await markEmailDeliveryFailed(logId, SCHEDULED_REPORT_PROVIDER_REJECTED_PREFIX + error, ctx, "RESEND");
+      return { outcome: "failed", error };
+    }
+    await markEmailDeliveryUnconfirmed(logId, ctx).catch(() => undefined);
+    return { outcome: "failed", error: "delivery_unconfirmed" };
   }
 
   if (sendResult.provider === "disabled") {
@@ -289,7 +312,16 @@ export async function deliverScheduledReportBundle(
     return { outcome: "skipped", reason: "email_not_configured" };
   }
 
-  await markEmailDeliverySent(logId, sendResult.messageId, ctx);
+  try {
+    await markEmailDeliverySent(logId, sendResult.messageId, ctx);
+  } catch {
+    try {
+      await markEmailDeliverySent(logId, sendResult.messageId, ctx);
+    } catch {
+      await markEmailDeliveryUnconfirmed(logId, ctx).catch(() => undefined);
+      return { outcome: "failed", error: "delivery_unconfirmed" };
+    }
+  }
   return { outcome: "sent", messageId: sendResult.messageId };
 }
 

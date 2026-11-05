@@ -328,7 +328,6 @@ export function NewTransactionDialog({
     file: File;
     linkedEntityType: "SUPPLIER_INVOICE" | "SALES_INVOICE";
     invoiceId: string;
-    detailPath: string;
     paidOrCollected: boolean;
   }): Promise<boolean> {
     const uploadRes = await clientUploadDocument({
@@ -338,7 +337,6 @@ export function NewTransactionDialog({
       linkedEntityType: opts.linkedEntityType,
       linkedEntityId: opts.invoiceId,
       idempotencyKey: attachmentKey,
-      revalidatePaths: [opts.detailPath],
     }).catch(() => ({ error: "Se perdió la conexión durante la subida" }));
     if ("error" in uploadRes) {
       toast.warning(
@@ -438,7 +436,6 @@ export function NewTransactionDialog({
               file: pendingAttachment!,
               linkedEntityType: "SUPPLIER_INVOICE",
               invoiceId,
-              detailPath: invoiceHref,
               paidOrCollected: payNow,
             });
           }
@@ -522,7 +519,6 @@ export function NewTransactionDialog({
               file: pendingAttachment!,
               linkedEntityType: "SALES_INVOICE",
               invoiceId,
-              detailPath,
               paidOrCollected: collectNow,
             });
           }

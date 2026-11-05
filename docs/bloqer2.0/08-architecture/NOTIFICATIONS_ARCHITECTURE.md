@@ -197,7 +197,7 @@ Best-effort `try/catch` so core flows never fail if notification insert fails. R
 
 - **Email:** Resend **opcional** (Phase 8E); la app arranca sin `RESEND_*`. No hay envío automático desde cron ni desde creación de notificación genérica (sí best-effort en procurement, CxP/CxC y libro de obra [D-091]). **Phase 9D:** los intentos explícitos de email quedan en `EmailDeliveryLog`.
 - No **browser Web Push**, no WebSocket/SSE (polling 30s only).
-- Cron HTTP implementado (8D); **sin** cola de reintentos dedicada ni lock distribuido (dos invocaciones solapadas pueden correr en paralelo hasta que exista lock).
+- Cron HTTP implementado (8D). Las corridas pueden solaparse, pero el alta de una alerta protege de forma transaccional la clave de deduplicación vigente por destinatario y evento. La ejecución manual respeta empresa y obra. El resumen D-114 usa los mismos filtros de acceso que la campana y Pendientes.
 - No templates UI, **no per-user notification preferences**, no dedupe beyond the 7-day window above.
 - **Roster vs RBAC:** `ProjectTeamMember` routes jobsite-log SUBMITTED mail/campana only; does **not** filter `/pendientes` or `listProjects`. Full project-scoped permissions (R-USR-007) still deferred.
 - Operational alerts: AR/AP overdue **do** set `status` to `OVERDUE` when OPEN/PARTIAL; other alerts (stock, stale upload, cert without invoice) do **not** mutate source entities (stale uploads remain alert-only; cleanup is separate).

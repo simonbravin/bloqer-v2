@@ -1,12 +1,10 @@
 /**
- * Live AI tool isolation / RBAC / module-gate tests against Neon DEV fixtures.
+ * Live AI tool isolation / RBAC / module-gate tests against an isolated audit database.
  *
  * Gated: BLOQER_AI_LIVE_DB=1
  * Never production. Seeds adversarial fixtures idempotently when enabled.
  */
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, it, before } from "node:test";
 import type { UserRole } from "@bloqer/database";
 import { AI_ADV } from "./fixtures/adversarial-ids";
@@ -14,36 +12,9 @@ import { seedAiAdversarialFixtures, type AiAdversarialFixtureResult } from "./fi
 import { buildAiExecutionContext } from "./context";
 import { createDefaultBloqerAiToolRegistry } from "./create-default-registry";
 import type { ServiceContext } from "../types";
-
-function loadEnvIfNeeded(): void {
-  if (process.env.DATABASE_URL) return;
-  for (const p of [resolve(process.cwd(), "../../.env"), resolve(process.cwd(), ".env")]) {
-    try {
-      for (const line of readFileSync(p, "utf8").split(/\r?\n/)) {
-        const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-        if (!m) continue;
-        let v = m[2]!;
-        if (
-          (v.startsWith('"') && v.endsWith('"')) ||
-          (v.startsWith("'") && v.endsWith("'"))
-        ) {
-          v = v.slice(1, -1);
-        }
-        if (process.env[m[1]!] === undefined) process.env[m[1]!] = v;
-      }
-      return;
-    } catch {
-      /* next */
-    }
-  }
-}
+import { assertAuditFixtureDatabase } from "../testing/audit-fixture";
 
 const live = process.env.BLOQER_AI_LIVE_DB === "1";
-
-function assertNonProd(): void {
-  const url = process.env.DATABASE_URL ?? "";
-  assert.ok(!url.includes("ep-cold-mouse-appkpn84"), "refusing production Neon");
-}
 
 function svc(
   tenantId: string,
@@ -84,14 +55,13 @@ function leaksTenantB(content: string, fx: AiAdversarialFixtureResult): boolean 
   );
 }
 
-describe("Bloqer AI live isolation (Neon DEV)", { skip: !live }, () => {
+describe("Bloqer AI live isolation (isolated audit database)", { skip: !live }, () => {
   let fx: AiAdversarialFixtureResult;
   let prisma: Awaited<typeof import("@bloqer/database")>["prisma"];
   const registry = createDefaultBloqerAiToolRegistry();
 
   before(async () => {
-    loadEnvIfNeeded();
-    assertNonProd();
+    assertAuditFixtureDatabase();
     ({ prisma } = await import("@bloqer/database"));
     fx = await seedAiAdversarialFixtures(prisma);
     // Keep this suite on TENANT_WIDE so D-111 SCOPED fixtures do not leak into RBAC baseline.

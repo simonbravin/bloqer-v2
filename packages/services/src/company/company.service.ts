@@ -95,6 +95,7 @@ export async function createCompany(input: CreateCompanyInput, ctx: ServiceConte
       action: "COMPANY_CREATED",
       entityType: "Company",
       entityId: company.id,
+      companyId: company.id,
       after: { name: company.name, tenantId: company.tenantId },
       ipAddress: ctx.ipAddress,
     }, tx);

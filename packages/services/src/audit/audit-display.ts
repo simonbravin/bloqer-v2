@@ -52,16 +52,39 @@ export function parseAuditReferenceFilter(reference: string): number | null {
   const trimmed = reference.trim().replace(/^#/, "");
   if (!/^\d+$/.test(trimmed)) return null;
   const n = Number.parseInt(trimmed, 10);
-  return Number.isFinite(n) ? n : null;
+  return Number.isSafeInteger(n) ? n : null;
 }
 
-/** Inclusive UTC day range from YYYY-MM-DD inputs (date-only fields). */
-export function parseAuditDateFrom(date: string): Date {
-  return new Date(`${date}T00:00:00.000Z`);
+/** Find the first instant of the local day, including zones that skip midnight at DST. */
+function localAuditDayStart(day: Date, timeZone: string): Date {
+  if (timeZone === "UTC" || Number.isNaN(day.getTime())) return day;
+  const target = day.getUTCFullYear() * 10_000 + (day.getUTCMonth() + 1) * 100 + day.getUTCDate();
+  const format = new Intl.DateTimeFormat("en-CA", {
+    timeZone, year: "numeric", month: "numeric", day: "numeric",
+  });
+  const twoDays = 2 * 24 * 60 * 60 * 1000;
+  let lower = day.getTime() - twoDays;
+  let upper = day.getTime() + twoDays;
+  while (lower < upper) {
+    const mid = Math.floor((lower + upper) / 2);
+    const { year, month, day: date } = Object.fromEntries(
+      format.formatToParts(new Date(mid)).map(({ type, value }) => [type, Number(value)]),
+    );
+    const candidate = year! * 10_000 + month! * 100 + date!;
+    if (candidate < target) lower = mid + 1;
+    else upper = mid;
+  }
+  return new Date(lower);
 }
 
-export function parseAuditDateToInclusive(date: string): Date {
-  return new Date(`${date}T23:59:59.999Z`);
+export function parseAuditDateFrom(date: string, timeZone = "UTC"): Date {
+  return localAuditDayStart(new Date(`${date}T00:00:00.000Z`), timeZone);
+}
+
+export function parseAuditDateToInclusive(date: string, timeZone = "UTC"): Date {
+  const nextDay = new Date(`${date}T00:00:00.000Z`);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  return new Date(localAuditDayStart(nextDay, timeZone).getTime() - 1);
 }
 
 export function isValidDateOnly(value: string): boolean {

@@ -34,6 +34,23 @@ function mockQuery(
   });
 }
 
+function mockDeliveryClaimTransaction(t: TestContext) {
+  // The in-memory transaction serializes check+insert like the database advisory lock.
+  let previous = Promise.resolve<unknown>(undefined);
+  mockQuery(t, prisma, "$transaction", (argument) => {
+    const callback = argument as (db: { $executeRaw: (query: { sql: string }) => Promise<number>; emailDeliveryLog: typeof prisma.emailDeliveryLog }) => Promise<unknown>;
+    const attempt = previous.then(() => callback({
+      $executeRaw: async ({ sql }) => {
+        assert.match(sql, /pg_advisory_xact_lock/);
+        return 1;
+      },
+      emailDeliveryLog: prisma.emailDeliveryLog,
+    }));
+    previous = attempt.catch(() => undefined);
+    return attempt;
+  });
+}
+
 const ownProjectId = "a0000000-0000-4000-8000-000000000001";
 const otherProjectId = "a0000000-0000-4000-8000-000000000002";
 const admin: ServiceContext = {
@@ -238,8 +255,11 @@ test("retry searches only failed deliveries visible to the company operating the
   mockQuery(t, prisma.scheduledReport, "findFirst", () => sharedDailySchedule(ownProjectId));
   mockQuery(t, prisma.userMembership, "findMany", () => [{ userId: "recipient" }]);
   mockQuery(t, prisma.emailDeliveryLog, "findMany", (args) => {
-    const { where } = args as { where: { OR: unknown; status: unknown; recipientUserId: unknown } };
-    assert.deepEqual(where.status, { in: ["FAILED", "SENT"] });
+    const { where } = args as { where: { OR: unknown; AND: unknown; recipientUserId: unknown } };
+    assert.deepEqual(where.AND, [{ OR: [
+      { status: { in: ["PENDING", "SENT"] } },
+      { status: "FAILED", errorMessage: { startsWith: "provider_rejected: " } },
+    ] }]);
     assert.deepEqual(where.recipientUserId, { in: ["recipient"] });
     assert.deepEqual(where.OR, [
       { companyId: "company" },
@@ -304,9 +324,9 @@ test("pause refuses a configuration locked for an in-progress delivery", async (
   await assert.rejects(() => deactivateScheduledReport({ ...admin }, "schedule"), /ejecución en curso/);
 });
 
-test("retry builds each original daily slot and excludes delivered and untraceable attempts", async (t) => {
+test("retry builds original daily slots and excludes delivered, unconfirmed and untraceable attempts", async (t) => {
   mockInactiveRecipientDeliveries(t);
-  const recipients = ["one", "two", "done", "legacy"];
+  const recipients = ["one", "two", "done", "legacy", "unconfirmed"];
   const row = {
     ...sharedDailySchedule(ownProjectId),
     recipients: recipients.map((id) => ({
@@ -319,7 +339,7 @@ test("retry builds each original daily slot and excludes delivered and untraceab
   mockQuery(t, prisma.scheduledReport, "findFirst", () => row);
   mockQuery(t, prisma.scheduledReport, "updateMany", () => ({ count: 1 }));
   mockQuery(t, prisma.userMembership, "findMany", () => recipients.map((userId) => ({ userId })));
-  const delivery = (recipientUserId: string, status: "SENT" | "FAILED", runWindow: string) =>
+  const delivery = (recipientUserId: string, status: "SENT" | "PENDING" | "FAILED", runWindow: string) =>
     ({ recipientUserId, status, metadata: { runWindow } });
   const first = "2026-11-01T03:00:00.000Z";
   const second = "manual:2026-11-02T03:00:00.000Z";
@@ -329,6 +349,8 @@ test("retry builds each original daily slot and excludes delivered and untraceab
     delivery("done", "FAILED", "2026-11-03T03:00:00.000Z"),
     delivery("done", "SENT", "2026-11-03T03:00:00.000Z"),
     delivery("legacy", "FAILED", "retry:2026-11-04T03:00:00.000Z"),
+    delivery("unconfirmed", "FAILED", "2026-11-05T03:00:00.000Z"),
+    delivery("unconfirmed", "PENDING", "2026-11-05T03:00:00.000Z"),
   ]);
   const dates: Array<string | undefined> = [];
   const summary = await retryScheduledReportFailedDeliveries(
@@ -364,6 +386,7 @@ test("a configuration edit after loading the schedule blocks a stale run before 
 });
 
 test("a global daily run sends each company and project member only their authorized part PDFs", async (t) => {
+  mockDeliveryClaimTransaction(t);
   clearProjectAccessModeCache();
   const row = {
     ...sharedDailySchedule(ownProjectId),
@@ -404,8 +427,8 @@ test("a global daily run sends each company and project member only their author
       .map((userId) => ({ userId })),
   );
   mockQuery(t, prisma.emailDeliveryLog, "findFirst", (args) => {
-    const { where } = args as { where: { status?: string } };
-    return where.status === "SENT" ? null : { id: "log" };
+    const { where } = args as { where: { metadata?: unknown } };
+    return where.metadata ? null : { id: "log" };
   });
   mockQuery(t, prisma.emailDeliveryLog, "update", () => ({ id: "log" }));
   const logs = new Map<
@@ -512,6 +535,7 @@ test("a global daily run sends each company and project member only their author
 });
 
 test("D-140 scopes cron, Send now and Retry attachments to the active recipient's company, roles and project", async (t) => {
+  mockDeliveryClaimTransaction(t);
   clearProjectAccessModeCache();
   t.after(clearProjectAccessModeCache);
   const members = {
@@ -565,8 +589,8 @@ test("D-140 scopes cron, Send now and Retry attachments to the active recipient'
     metadata: { runWindow: "2026-11-01T03:00:00.000Z" },
   })));
   mockQuery(t, prisma.emailDeliveryLog, "findFirst", (args) => {
-    const { where } = args as { where: { status?: string } };
-    return where.status === "SENT" ? null : { id: "log" };
+    const { where } = args as { where: { metadata?: unknown } };
+    return where.metadata ? null : { id: "log" };
   });
   mockQuery(t, prisma.emailDeliveryLog, "update", () => ({ id: "log" }));
   const skipped = new Map<string, string>();
@@ -669,4 +693,125 @@ test("D-140 scopes cron, Send now and Retry attachments to the active recipient'
     assert.deepEqual([...sent.keys()], ["full@example.com"]);
     assert.equal(skipped.get("limited"), "no_authorized_attachments");
   }
+});
+
+test("D-143 reconciles provider confirmation, keeps ambiguous claims and permits confirmed rejection retry", async (t) => {
+  mockDeliveryClaimTransaction(t);
+  mockQuery(t, prisma.tenant, "findFirst", () => ({ name: "Test" }));
+  mockQuery(t, prisma.tenantModuleSetting, "findMany", () => []);
+  mockQuery(t, prisma.company, "findFirst", () => ({ name: "Test" }));
+  let email = "recipient@example.test";
+  mockQuery(t, prisma.userMembership, "findUnique", () => ({
+    ...activeRecipient("recipient", "company", ["OWNER"]),
+    user: { email, status: "ACTIVE" },
+  }));
+  type Log = {
+    id: string;
+    status: string;
+    providerMessageId?: string;
+    errorMessage?: string | null;
+    metadata: { runWindow: string };
+  };
+  const logs: Log[] = [];
+  mockQuery(t, prisma.emailDeliveryLog, "findFirst", (args) => {
+    const { where } = args as { where: { id?: string; metadata?: { equals: string }; AND?: unknown } };
+    if (where.id) return logs.find((item) => item.id === where.id) ?? null;
+    assert.deepEqual(where.AND, [{ OR: [
+      { status: { in: ["PENDING", "SENT"] } },
+      { status: "FAILED", errorMessage: null },
+      { status: "FAILED", NOT: { errorMessage: { startsWith: "provider_rejected: " } } },
+    ] }]);
+    return logs.find((item) => item.metadata.runWindow === where.metadata?.equals &&
+      (["PENDING", "SENT"].includes(item.status) ||
+        (item.status === "FAILED" && !item.errorMessage?.startsWith("provider_rejected: ")))) ?? null;
+  });
+  mockQuery(t, prisma.emailDeliveryLog, "create", (args) => {
+    const { data } = args as { data: Omit<Log, "id"> };
+    const item = { ...data, id: String(logs.length + 1) };
+    logs.push(item);
+    return item;
+  });
+  let failWrite = 0;
+  let sentWrites = 0;
+  mockQuery(t, prisma.emailDeliveryLog, "update", (args) => {
+    const { where, data } = args as { where: { id: string }; data: Partial<Log> };
+    if (data.status === "SENT") {
+      sentWrites++;
+      if (failWrite-- > 0) throw new Error("fixture lost local write");
+    }
+    return Object.assign(logs.find((item) => item.id === where.id)!, data);
+  });
+  mockQuery(t, prisma.emailDeliveryLog, "updateMany", (args) => {
+    const { where, data } = args as { where: { id: string }; data: Partial<Log> };
+    Object.assign(logs.find((item) => item.id === where.id)!, data);
+    return { count: 1 };
+  });
+  const oldKey = process.env.RESEND_API_KEY;
+  const oldFrom = process.env.RESEND_FROM_EMAIL;
+  process.env.RESEND_API_KEY = "fixture-only";
+  process.env.RESEND_FROM_EMAIL = "reports@example.com";
+  t.after(() => {
+    if (oldKey === undefined) delete process.env.RESEND_API_KEY;
+    else process.env.RESEND_API_KEY = oldKey;
+    if (oldFrom === undefined) delete process.env.RESEND_FROM_EMAIL;
+    else process.env.RESEND_FROM_EMAIL = oldFrom;
+  });
+  let response = "accepted";
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    if (response === "rejected") return Response.json({ name: "validation_error", message: "invalid" }, { status: 403 });
+    if (response === "lost") throw new Error("fixture lost provider response");
+    return Response.json({ id: "fixture-accepted" });
+  });
+  const deliver = (runWindow: string, deliveryKind: "scheduled" | "retry" = "scheduled") => deliverScheduledReportBundle({
+    scheduleId: "schedule",
+    scheduleName: "Avances",
+    runWindow,
+    runId: "run",
+    recipientUserId: "recipient",
+    recipientEmail: email,
+    recipientAccess: { companyId: "company", roles: ["OWNER"], email },
+    generatedWithModules: new Set(),
+    attachments: [{ filename: "avances.csv", content: Buffer.from("fixture"), contentType: "text/csv", reportKey: "PROJECT_PROGRESS" }],
+    deliveryKind,
+  }, { ...admin });
+  const first = "2026-11-01T03:00:00.000Z";
+  failWrite = 1;
+  const concurrent = await Promise.all([deliver(first), deliver(first)]);
+  assert.deepEqual(concurrent.map((result) => result.outcome).sort(), ["duplicate", "sent"]);
+  assert.equal(calls, 1);
+  assert.equal(sentWrites, 2);
+  assert.equal(logs[0]?.status, "SENT");
+
+  const unrecorded = "2026-11-02T03:00:00.000Z";
+  failWrite = 2;
+  assert.deepEqual(await deliver(unrecorded), { outcome: "failed", error: "delivery_unconfirmed" });
+  assert.equal(logs[1]?.status, "PENDING");
+  email = "updated@example.test";
+  assert.deepEqual(await deliver(unrecorded, "retry"), { outcome: "duplicate" });
+
+  const uncertain = "2026-11-03T03:00:00.000Z";
+  response = "lost";
+  assert.deepEqual(await deliver(uncertain), { outcome: "failed", error: "delivery_unconfirmed" });
+  assert.equal(logs[2]?.status, "PENDING");
+  assert.deepEqual(await deliver(uncertain, "retry"), { outcome: "duplicate" });
+  assert.equal(calls, 3);
+
+  const rejected = "2026-11-04T03:00:00.000Z";
+  response = "rejected";
+  assert.equal((await deliver(rejected)).outcome, "failed");
+  assert.equal(logs[3]?.status, "FAILED");
+  assert.match(logs[3]?.errorMessage ?? "", /^provider_rejected: /);
+  response = "accepted";
+  assert.equal((await deliver(rejected, "retry")).outcome, "sent");
+  assert.equal(calls, 5);
+
+  for (const [index, errorMessage] of ["network timeout", null].entries()) {
+    const legacyWindow = `2026-11-0${5 + index}T03:00:00.000Z`;
+    logs.push({ id: `legacy-${index}`, status: "FAILED", errorMessage, metadata: { runWindow: legacyWindow } });
+    assert.deepEqual(await deliver(legacyWindow), { outcome: "duplicate" });
+    assert.deepEqual(await deliver(legacyWindow, "retry"), { outcome: "duplicate" });
+  }
+  assert.equal(calls, 5);
 });

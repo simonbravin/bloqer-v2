@@ -165,8 +165,8 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 
 ## P-AG13-01 — Confirmación del proveedor y persistencia de la entrega
 
-- **Estado:** evidencia para AG-13, servicios transversales de correo. AG-12 protege la corrida y omite entregas con `SENT` confirmado para la ventana.
-- **Caso a reproducir:** el proveedor acepta el correo y se interrumpe la escritura del resultado local. El estado local no alcanza para asegurar la deduplicación de un intento posterior. Revisar la confirmación y las garantías del proveedor junto con los demás productores del canal.
+- **Estado:** contrato resuelto en D-143/Q-090 (05/11/2026).
+- **Caso tratado:** la aceptación confirmada se vuelve a registrar localmente sin repetir el envío. Un intento programado de aceptación incierta queda en el historial fuera del reintento. La verificación del proveedor se simula. Ver [propuesta aprobada](./platform-audit/2026-11-05-ag-13-email-confirmation-proposal.md).
 
 ## AG-00 — Aislamiento: reconciliación documental resuelta
 

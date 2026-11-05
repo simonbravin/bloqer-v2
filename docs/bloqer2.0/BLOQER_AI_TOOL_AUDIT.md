@@ -7,6 +7,16 @@
 
 ---
 
+## Hallazgo y revalidación AG-13
+
+- Las dos herramientas de cronograma usaban el recorrido de escritorio que inicializa el cronograma o su línea base para usuarios editores. Desde AG-13 usan la variante de solo lectura del mismo servicio. La prueba de auditoría compara el grafo antes y después en obras activas con y sin cronograma.
+- La política distingue solicitudes de compra de órdenes. Capataz puede consultar solicitudes por su permiso y las herramientas de órdenes requieren el permiso correspondiente. Las certificaciones comprueban también su permiso específico. Las herramientas de cronograma, materiales y libro de obra reutilizan la capacidad de lectura de su propio servicio. Las obras se revalidan con `requireProjectAccess` (tenant, empresa y asignación D-111).
+- Los vínculos presentados por el modelo deben coincidir con los que una herramienta exitosa devolvió para esa consulta. El servidor conserva la etiqueta de la herramienta y oculta los mensajes crudos del proveedor en el stream y los logs.
+
+El inventario siguiente conserva el diagnóstico de septiembre de 2026. La revalidación AG-13 aplica al código posterior a las correcciones anteriores.
+
+---
+
 ## Invariantes confirmados (transversales)
 
 | Invariante | Evidencia |

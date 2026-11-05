@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
+import { documentRevalidatePaths } from "@/features/documents/lib/document-revalidate-paths";
 import { confirmDocumentUpload, ServiceError } from "@bloqer/services";
 
 interface RouteParams {
@@ -10,24 +11,7 @@ interface RouteParams {
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function parseRevalidatePaths(raw: unknown): string[] {
-  if (!Array.isArray(raw)) return [];
-  return [
-    ...new Set(
-      raw.filter(
-        (p): p is string =>
-          typeof p === "string" &&
-          p.startsWith("/") &&
-          !p.startsWith("//") &&
-          !p.includes("?") &&
-          !p.includes("#") &&
-          !p.includes("\\"),
-      ),
-    ),
-  ];
-}
-
-export async function POST(req: NextRequest, { params }: RouteParams): Promise<NextResponse> {
+export async function POST(_req: NextRequest, { params }: RouteParams): Promise<NextResponse> {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
@@ -38,14 +22,6 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<N
     return NextResponse.json({ error: "Documento no encontrado" }, { status: 404 });
   }
 
-  let revalidatePaths: string[] = [];
-  try {
-    const body = (await req.json()) as { revalidatePaths?: unknown };
-    revalidatePaths = parseRevalidatePaths(body.revalidatePaths);
-  } catch {
-    /* empty body is fine */
-  }
-
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -54,8 +30,8 @@ export async function POST(req: NextRequest, { params }: RouteParams): Promise<N
   };
 
   try {
-    await confirmDocumentUpload(documentId, ctx);
-    for (const path of revalidatePaths) {
+    const doc = await confirmDocumentUpload(documentId, ctx);
+    for (const path of documentRevalidatePaths({ ...doc, documentId: doc.id })) {
       revalidatePath(path);
     }
     return NextResponse.json({ ok: true });

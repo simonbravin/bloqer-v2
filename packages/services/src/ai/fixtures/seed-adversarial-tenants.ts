@@ -1,11 +1,12 @@
 /**
- * Idempotent Bloqer AI adversarial fixtures for Neon DEV only.
+ * Idempotent Bloqer AI adversarial fixtures for an isolated audit database.
  * Creates Tenant A (OWNER/PM/VIEWER + Project A1/A2 + demo entities)
  * and Tenant B (OWNER + Project B1 + equivalent entities).
  *
  * Injection strings live in entity text fields as DATA.
  */
 import type { PrismaClient } from "@bloqer/database";
+import { assertAuditDatabaseIdentity } from "../../testing/audit-fixture";
 import { AI_ADV } from "./adversarial-ids";
 
 function money(n: number): string {
@@ -712,11 +713,12 @@ export type AiAdversarialFixtureResult = {
 
 /**
  * Seeds / refreshes adversarial tenants. Safe to re-run (upserts).
- * Caller must assert non-production DATABASE_URL first.
+ * Verifies the effective isolated database before the first write.
  */
 export async function seedAiAdversarialFixtures(
   prisma: PrismaClient,
 ): Promise<AiAdversarialFixtureResult> {
+  await assertAuditDatabaseIdentity(prisma);
   const a = AI_ADV.tenantA;
   const b = AI_ADV.tenantB;
 

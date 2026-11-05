@@ -22,6 +22,9 @@ import {
   EMAIL_DELIVERY_STATUS_HINT,
   EMAIL_DELIVERY_STATUS_LABEL,
   deliveryStatusBadgeVariant,
+  scheduledReportDeliveryDetail,
+  scheduledReportDeliveryHint,
+  scheduledReportDeliveryLabel,
 } from "@/features/scheduled-reports/scheduled-report-labels";
 
 const STATUSES: EmailDeliveryStatus[] = ["PENDING", "SENT", "SKIPPED", "FAILED"];
@@ -236,9 +239,13 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
                   <TableCell className="text-xs">
                     <Badge
                       variant={deliveryStatusBadgeVariant(row.status)}
-                      title={EMAIL_DELIVERY_STATUS_HINT[row.status]}
+                      title={row.emailType === "REPORT_SCHEDULED"
+                        ? scheduledReportDeliveryHint(row.status, row.errorMessage)
+                        : EMAIL_DELIVERY_STATUS_HINT[row.status]}
                     >
-                      {EMAIL_DELIVERY_STATUS_LABEL[row.status]}
+                      {row.emailType === "REPORT_SCHEDULED"
+                        ? scheduledReportDeliveryLabel(row.status)
+                        : EMAIL_DELIVERY_STATUS_LABEL[row.status]}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs">{row.provider}</TableCell>
@@ -248,13 +255,15 @@ export default async function EmailDeliveryLogsPage({ searchParams }: PageProps)
                   <TableCell
                     className="max-w-[220px] truncate text-xs text-muted-foreground"
                     title={
+                      row.emailType === "REPORT_SCHEDULED" ? scheduledReportDeliveryDetail(row) :
                       row.skippedReason ??
                       row.errorMessage ??
                       row.providerMessageId ??
                       EMAIL_DELIVERY_STATUS_HINT[row.status]
                     }
                   >
-                    {row.skippedReason ??
+                    {row.emailType === "REPORT_SCHEDULED" ? scheduledReportDeliveryDetail(row) :
+                      row.skippedReason ??
                       row.errorMessage ??
                       row.providerMessageId ??
                       EMAIL_DELIVERY_STATUS_HINT[row.status]}

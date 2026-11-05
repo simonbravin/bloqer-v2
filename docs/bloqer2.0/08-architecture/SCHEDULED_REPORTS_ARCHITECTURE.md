@@ -40,7 +40,7 @@
 ## Phase 17E — Cierre operativo (implementado)
 
 - **Enviar ahora** (OWNER/ADMIN): envío manual inmediato desde el detalle (confirmación); idempotencia `scheduled-manual:…`; **no** mueve `nextRunAt`. Solo si el envío está `ACTIVE`.
-- **Reintentar fallidos**: retoma las entregas fallidas de los últimos 7 días con la ventana original, el alcance y los permisos vigentes. Una entrega confirmada como `SENT` para la misma ventana queda fuera del reintento. Disponible con envío ACTIVE o PAUSED.
+- **Reintentar fallidos**: retoma los fallos con rechazo confirmado de los últimos 7 días con la ventana original, el alcance y los permisos vigentes. Los envíos confirmados y los intentos **Sin confirmar** quedan fuera del reintento (D-143). Disponible con envío ACTIVE o PAUSED.
 - **Fuera de alcance deliberado** (no implementar sin ADR + producto):
 
 | Ítem | Motivo |
@@ -63,6 +63,8 @@ Agrupado en **Financieros** / **Operativos** (mismo criterio que los hubs). `PRO
 Una configuración compartida con alcance global se consulta desde los contextos autorizados. Los cambios que afectan sus corridas programadas requieren alcance global. **Enviar ahora** aplica el alcance efectivo de la sesión. El historial y los reintentos comprueban también el alcance de cada entrega.
 
 **Permiso por destinatario (D-140).** Cron, Enviar ahora y Reintentar fallidos generan cada archivo con permisos vigentes del destinatario y dentro del alcance autorizado de la configuración y de la sesión operadora cuando corresponde. Se conservan las reglas corporativas de Tesorería. Los constructores reutilizan filtros de pantalla y exportación. Si ningún adjunto queda disponible y autorizado, se registra una entrega omitida. El [envío puntual desde el reporte](./EMAIL_NOTIFICATIONS_ARCHITECTURE.md#phase-9c--envío-manual-de-reportes-por-email-implementado) sigue usando la autorización de quien exporta y la dirección que elige.
+
+**Confirmación (D-143).** La reserva transaccional usa configuración, ventana original y usuario. Cuando el proveedor confirma, se puede repetir la escritura local de esa confirmación sin volver a enviar. Una pérdida de respuesta deja **Sin confirmar**. Solo entran al reintento fallos con evidencia de rechazo. **Enviar ahora** inicia una nueva ventana explícita y vuelve a verificar D-140.
 
 ## Checklist de prueba manual (pre-producción)
 

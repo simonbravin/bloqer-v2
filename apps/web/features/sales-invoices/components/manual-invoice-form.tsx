@@ -146,7 +146,6 @@ export function ManualInvoiceForm({
 
   async function uploadAttachmentIfAny(invoiceId: string) {
     if (!attachment || !storageConfigured) return null;
-    const detailPath = `/proyectos/${projectId}/facturas/${invoiceId}`;
     return clientUploadDocument({
       file: attachment,
       projectId,
@@ -154,7 +153,6 @@ export function ManualInvoiceForm({
       linkedEntityType: "SALES_INVOICE",
       linkedEntityId: invoiceId,
       idempotencyKey: attachmentKey,
-      revalidatePaths: [detailPath],
     }).catch(() => ({ error: "Se perdió la conexión durante la subida" }));
   }
 

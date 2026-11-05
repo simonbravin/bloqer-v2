@@ -65,6 +65,10 @@ function buildRegistroSearch(params: Record<string, string | undefined>, omit: s
   return q ? `/configuracion/registro?${q}` : "/configuracion/registro";
 }
 
+function queryValue(value: unknown): string | undefined {
+  return typeof value === "string" ? value.trim() || undefined : undefined;
+}
+
 export default async function ConfiguracionRegistroPage({ searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -74,34 +78,28 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
   if (!ctx) redirect("/login");
 
   const sp = await searchParams;
-  const entryId = sp.entry?.trim() || undefined;
+  const entryId = queryValue(sp.entry);
 
   const trimmedFilters = {
-    module: sp.module?.trim() || undefined,
-    projectId: sp.projectId?.trim() || undefined,
-    actorUserId: sp.actorUserId?.trim() || undefined,
-    action: sp.action?.trim() || undefined,
-    reference: sp.reference?.trim() || undefined,
-    dateFrom: sp.dateFrom?.trim() || undefined,
-    dateTo: sp.dateTo?.trim() || undefined,
+    module: queryValue(sp.module),
+    projectId: queryValue(sp.projectId),
+    actorUserId: queryValue(sp.actorUserId),
+    action: queryValue(sp.action),
+    reference: queryValue(sp.reference),
+    dateFrom: queryValue(sp.dateFrom),
+    dateTo: queryValue(sp.dateTo),
   };
 
   const exportFilters = exportTenantAuditLogUrlFiltersSchema.safeParse(trimmedFilters);
 
   const urlFilters = listTenantAuditLogUrlFiltersSchema.safeParse({
     ...trimmedFilters,
-    cursor: sp.cursor?.trim() || undefined,
+    cursor: queryValue(sp.cursor),
   });
 
   const filterParams = {
-    module: sp.module,
-    projectId: sp.projectId,
-    actorUserId: sp.actorUserId,
-    action: sp.action,
-    reference: sp.reference,
-    dateFrom: sp.dateFrom,
-    dateTo: sp.dateTo,
-    cursor: sp.cursor,
+    ...trimmedFilters,
+    cursor: queryValue(sp.cursor),
   };
 
   let validationError: string | null = null;
@@ -150,8 +148,8 @@ export default async function ConfiguracionRegistroPage({ searchParams }: PagePr
           actorUserId,
           action,
           reference,
-          dateFrom: parsed.dateFrom ? parseAuditDateFrom(parsed.dateFrom) : undefined,
-          dateTo: parsed.dateTo ? parseAuditDateToInclusive(parsed.dateTo) : undefined,
+          dateFrom: parsed.dateFrom ? parseAuditDateFrom(parsed.dateFrom, timeZone) : undefined,
+          dateTo: parsed.dateTo ? parseAuditDateToInclusive(parsed.dateTo, timeZone) : undefined,
           cursor,
           limit: 50,
         },

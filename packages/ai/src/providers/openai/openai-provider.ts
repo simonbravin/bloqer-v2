@@ -124,7 +124,7 @@ export function buildOpenAiChatCompletionsExtras(
   return {};
 }
 
-/** Map vendor/SDK errors → AiProviderError with safe Spanish `.message` (detail in cause/log). */
+/** Map vendor/SDK errors to safe Spanish copy and preserve the cause for callers. */
 export function mapAndThrowOpenAiProviderError(err: unknown, providerId = "openai"): never {
   return wrapProviderError(err, providerId);
 }
@@ -157,9 +157,9 @@ function wrapProviderError(err: unknown, providerId: string): never {
     });
   }
 
-  const anyErr = err as { status?: number; code?: string; message?: string };
-  const status = anyErr.status;
-  const detail = anyErr.message ?? message;
+  const status = typeof err === "object" && err !== null && "status" in err && typeof err.status === "number"
+    ? err.status
+    : undefined;
 
   let code: AiProviderErrorCode = "PROVIDER";
   let retryable = Boolean(status && status >= 500);
@@ -177,14 +177,13 @@ function wrapProviderError(err: unknown, providerId: string): never {
     retryable = true;
   }
 
-  // Technical detail stays server-side only (cause + log). Never put vendor text in `.message`.
+  // Vendor errors can echo credentials, prompts or resource IDs. Log only metadata.
   console.error(
     JSON.stringify({
       type: "bloqer_ai_provider_error",
       providerId,
       code,
       status: status ?? null,
-      detail: String(detail).slice(0, 500),
     }),
   );
 

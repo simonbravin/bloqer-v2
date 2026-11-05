@@ -17,6 +17,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 
+function renderHelpText(text: string) {
+  return text.split(/(\*\*[^*\n]+\*\*|`[^`\n]+`)/g).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+      return <strong key={index}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith("`") && part.endsWith("`") && part.length > 2) {
+      return <code key={index} className="break-all rounded bg-muted px-1">{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
+}
+
 export function HelpArticleView({ article }: { article: HelpArticle }) {
   const { convenienceProjectId } = useFieldProjectContext();
   const related = article.relatedSlugs
@@ -106,7 +118,7 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
         <CardContent>
           <ol className="list-decimal space-y-2 pl-5 text-sm leading-relaxed">
             {article.steps.map((step, i) => (
-              <li key={i}>{step}</li>
+              <li key={i}>{renderHelpText(step)}</li>
             ))}
           </ol>
         </CardContent>
@@ -120,7 +132,7 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
           <CardContent>
             <ul className="list-disc space-y-1.5 pl-5 text-sm">
               {article.effects.map((e, i) => (
-                <li key={i}>{e}</li>
+                <li key={i}>{renderHelpText(e)}</li>
               ))}
             </ul>
           </CardContent>
@@ -135,7 +147,7 @@ export function HelpArticleView({ article }: { article: HelpArticle }) {
           <CardContent>
             <ul className="list-disc space-y-1.5 pl-5 text-sm">
               {article.pitfalls.map((p, i) => (
-                <li key={i}>{p}</li>
+                <li key={i}>{renderHelpText(p)}</li>
               ))}
             </ul>
           </CardContent>

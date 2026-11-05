@@ -195,7 +195,7 @@ export const SETUP_ARTICLES: HelpArticle[] = [
     modules: ["configuracion"],
     level: "company",
     typicalRoles: ["OWNER", "ADMIN"],
-    permissionHint: "Solo OWNER/ADMIN gestionan el equipo.",
+    permissionHint: "OWNER y ADMIN gestionan el equipo de la empresa activa y las membresías compartidas.",
     where: { menu: "Configuración → Equipo → Invitar" },
     hrefs: [
       { kind: "company", path: "/configuracion/equipo/invitar", label: "Invitar usuario" },

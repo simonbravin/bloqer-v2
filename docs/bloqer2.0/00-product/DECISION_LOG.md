@@ -2117,6 +2117,20 @@
 - **Históricos:** conservar y leer las imputaciones congeladas. El criterio rige períodos abiertos y períodos reabiertos explícitamente. La imputación y el pool conservan su moneda ARS.
 - **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-12-overhead-weight-currency-proposal.md), PERIOD_CLOSE_AND_LOCKS, PROFITABILITY_FORMULAS, Guía y Ayuda.
 
+### D-143 — Confirmación de entregas programadas de reportes
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita de Q-090.
+- **Decisión:** identificar el intento programado por configuración, ventana original y destinatario. Si el proveedor confirma la aceptación, recuperar el registro local de esa respuesta sin repetir el envío. Si la aceptación es incierta, conservar la evidencia como **Sin confirmar** y omitir el reenvío automático y **Reintentar fallidos** para esa entrega.
+- **Reintentos:** la ventana vigente de siete días se aplica a fallos con evidencia de rechazo. **Enviar ahora** sigue siendo una entrega nueva explícita. En todos los casos se conservan las verificaciones de acceso de D-140. Los intentos históricos sin evidencia de rechazo se conservan en el historial.
+- **Alcance:** no requiere campos nuevos ni persistir adjuntos. [Propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-13-email-confirmation-proposal.md).
+
+### D-144 — Alcance de los históricos del Registro de actividad
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita de Q-091.
+- **Decisión:** el Registro respeta empresa y obra en lista, detalle y exportación. Una sesión anclada puede ver eventos compartidos y de alcance comprobable. Si la empresa de un evento histórico de una entidad acotada es desconocida, lo puede consultar un administrador autorizado con alcance global.
+- **Evidencia:** se puede comprobar el alcance mediante los campos del evento, una relación vigente inequívoca o los datos de empresa del evento. Los cambios de membresía posteriores no prueban la empresa de un evento anterior. Los eventos se conservan y no se reescriben.
+- **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-13-audit-history-scope-proposal.md), AUDIT_LOG, Guía y Ayuda.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

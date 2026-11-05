@@ -120,7 +120,9 @@ export function TenantNotificationEmailPolicyForm({
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
-            Usa la zona horaria de la organización (Configuración → General).
+            La revisión automática ocurre una vez al día a las 10:05 UTC (07:05 en Argentina).
+            El resumen puede salir si en la zona de la organización es la hora elegida o hasta
+            tres horas después, dentro del mismo día.
           </p>
         </div>
 

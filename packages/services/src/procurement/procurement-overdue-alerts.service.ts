@@ -1,7 +1,7 @@
 import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { productCalendarDateUtc } from "@bloqer/utils";
-import { createSystemNotification } from "../notifications/notification.service";
+import { createOperationalNotificationOnce } from "../notifications/notification.service";
 import { sendOperationalAlertEmailAsSystem } from "../notifications/notification-email.service";
 import {
   findActiveOwnerAdminUserIds,
@@ -31,7 +31,6 @@ import type { ServiceContext } from "../types";
  * from `CompanyProcurementSettings`, 7-day dedup window per (type, entity, recipient).
  */
 
-const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Who can register a receipt (mirror of PO_RECEIPT_AUDIENCE in procurement-notifications). */
@@ -81,29 +80,6 @@ export function daysOverdue(reference: Date, now: Date = new Date()): number {
   return Math.max(0, Math.floor((today - ref) / DAY_MS));
 }
 
-async function hasRecentDuplicate(params: {
-  tenantId: string;
-  type: NotificationType;
-  linkedEntityType: LinkedEntityType;
-  linkedEntityId: string;
-  recipientUserId: string;
-}): Promise<boolean> {
-  const since = new Date(Date.now() - DEDUP_WINDOW_MS);
-  const found = await prisma.notification.findFirst({
-    where: {
-      tenantId: params.tenantId,
-      type: params.type,
-      linkedEntityType: params.linkedEntityType,
-      linkedEntityId: params.linkedEntityId,
-      recipientUserId: params.recipientUserId,
-      status: { not: "ARCHIVED" },
-      createdAt: { gte: since },
-    },
-    select: { id: true },
-  });
-  return Boolean(found);
-}
-
 async function fanOut(params: {
   ctx: ServiceContext;
   candidates: string[];
@@ -125,19 +101,8 @@ async function fanOut(params: {
     projectId: params.projectId, candidateUserIds: params.candidates,
   });
   for (const recipientUserId of candidates) {
-    const dup = await hasRecentDuplicate({
-      tenantId: params.tenantId,
-      type: params.type,
-      linkedEntityType: params.linkedEntityType,
-      linkedEntityId: params.linkedEntityId,
-      recipientUserId,
-    });
-    if (dup) {
-      params.summary.skippedCount += 1;
-      continue;
-    }
     try {
-      const { id: notificationId } = await createSystemNotification({
+      const created = await createOperationalNotificationOnce({
         tenantId: params.tenantId,
         companyId: params.companyId ?? null,
         recipientUserId,
@@ -151,9 +116,13 @@ async function fanOut(params: {
         actionUrl: params.actionUrl,
         metadata: params.metadata ?? undefined,
       });
+      if (!created) {
+        params.summary.skippedCount += 1;
+        continue;
+      }
       // Best-effort operational email (D-050 / BR-PUR-015 / D-097). Tagged as
       // OPERATIONAL_ALERT so it aparece en el activity card + `/notificaciones/emails`.
-      await sendOperationalAlertEmailAsSystem(notificationId, params.ctx).catch(() => undefined);
+      await sendOperationalAlertEmailAsSystem(created.id, params.ctx).catch(() => undefined);
       params.summary.createdCount += 1;
     } catch {
       /* best-effort per recipient */
@@ -189,6 +158,8 @@ export async function runPurchaseOrderDeliveryOverdueAlert(
       where: {
         tenantId: ctx.tenantId,
         companyId: company.id,
+        project: { tenantId: ctx.tenantId, OR: [{ companyId: company.id }, { companyId: null }] },
+        supplierContact: { tenantId: ctx.tenantId },
         status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED"] },
         expectedDeliveryDate: { lt: cutoff },
       },
@@ -279,6 +250,7 @@ export async function runPurchaseRequestNeededByOverdueAlert(
       where: {
         tenantId: ctx.tenantId,
         companyId: company.id,
+        project: { tenantId: ctx.tenantId, OR: [{ companyId: company.id }, { companyId: null }] },
         status: { in: ["SUBMITTED", "QUOTE_SELECTED"] },
         neededByDate: { lt: cutoff },
       },
@@ -290,8 +262,8 @@ export async function runPurchaseRequestNeededByOverdueAlert(
         neededByDate: true,
         lines: { select: { awardedPurchaseOrderId: true } },
         purchaseOrders: {
-          where: { status: { not: "CANCELLED" } },
-          select: { id: true, status: true },
+          where: { tenantId: ctx.tenantId, companyId: company.id, status: { not: "CANCELLED" } },
+          select: { id: true, projectId: true, status: true },
         },
       },
     });
@@ -308,7 +280,8 @@ export async function runPurchaseRequestNeededByOverdueAlert(
 
     for (const pr of prs) {
       const totalLines = pr.lines.length;
-      const activePoIds = new Set(pr.purchaseOrders.map((p) => p.id));
+      const validOrders = pr.purchaseOrders.filter((order) => order.projectId === pr.projectId);
+      const activePoIds = new Set(validOrders.map((p) => p.id));
       // Only awards pointing at non-cancelled OCs count (stale cache after Anular).
       const awardedLines = pr.lines.filter(
         (l) => l.awardedPurchaseOrderId != null && activePoIds.has(l.awardedPurchaseOrderId),
@@ -320,7 +293,7 @@ export async function runPurchaseRequestNeededByOverdueAlert(
       const allAwardedConfirmed =
         fullyAwarded &&
         [...awardedPoIds].every((poId) => {
-          const po = pr.purchaseOrders.find((p) => p.id === poId);
+          const po = validOrders.find((p) => p.id === poId);
           return (
             po != null &&
             (po.status === "CONFIRMED" ||
@@ -396,15 +369,16 @@ export async function runPurchaseOrderReceivedWithoutInvoiceAlert(
       where: {
         tenantId: ctx.tenantId,
         companyId: company.id,
+        project: { tenantId: ctx.tenantId, OR: [{ companyId: company.id }, { companyId: null }] },
+        supplierContact: { tenantId: ctx.tenantId },
         status: { in: ["PARTIALLY_RECEIVED", "RECEIVED"] },
         receipts: {
           some: {
+            tenantId: ctx.tenantId,
+            companyId: company.id,
             status: "CONFIRMED",
             receiptDate: { lte: cutoff },
           },
-        },
-        supplierInvoices: {
-          none: { status: "ISSUED" },
         },
       },
       select: {
@@ -415,10 +389,13 @@ export async function runPurchaseOrderReceivedWithoutInvoiceAlert(
         status: true,
         supplierContact: { select: { fantasyName: true, legalName: true } },
         receipts: {
-          where: { status: "CONFIRMED" },
+          where: { tenantId: ctx.tenantId, companyId: company.id, status: "CONFIRMED", receiptDate: { lte: cutoff } },
           orderBy: { receiptDate: "asc" },
-          take: 1,
-          select: { receiptDate: true },
+          select: { receiptDate: true, projectId: true },
+        },
+        supplierInvoices: {
+          where: { tenantId: ctx.tenantId, companyId: company.id, status: "ISSUED" },
+          select: { projectId: true },
         },
       },
     });
@@ -434,8 +411,8 @@ export async function runPurchaseOrderReceivedWithoutInvoiceAlert(
     if (candidates.length === 0) continue;
 
     for (const po of pos) {
-      const firstReceipt = po.receipts[0]?.receiptDate;
-      if (!firstReceipt) continue;
+      const firstReceipt = po.receipts.find((receipt) => receipt.projectId === po.projectId)?.receiptDate;
+      if (!firstReceipt || po.supplierInvoices.some((invoice) => invoice.projectId === po.projectId)) continue;
       summary.checkedCount += 1;
       const code = `OC-${String(po.number).padStart(3, "0")}`;
       const overdue = daysOverdue(firstReceipt);

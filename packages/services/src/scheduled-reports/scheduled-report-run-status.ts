@@ -1,5 +1,7 @@
 import type { ScheduledReportRunStatus } from "@bloqer/database";
 
+export const SCHEDULED_REPORT_PROVIDER_REJECTED_PREFIX = "provider_rejected: ";
+
 export type ScheduledReportRunOutcome = {
   recipientsSent: number;
   recipientsSkipped: number;

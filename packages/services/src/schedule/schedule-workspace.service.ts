@@ -354,6 +354,7 @@ export async function getProjectScheduleWorkspace(
   projectId: string,
   filters: ScheduleWorkspaceFilters,
   ctx: ServiceContext,
+  options?: { readOnly?: boolean },
 ): Promise<ScheduleWorkspaceResult> {
   const t0 = Date.now();
   const mark = (from: number) => Date.now() - from;
@@ -370,7 +371,8 @@ export async function getProjectScheduleWorkspace(
   t = Date.now();
   const project = await requireProjectAccess(projectId, ctx);
   const canEdit =
-    canEditScheduleArea(ctx.roles) && (project.status === "DRAFT" || project.status === "ACTIVE");
+    !options?.readOnly && canEditScheduleArea(ctx.roles) &&
+    (project.status === "DRAFT" || project.status === "ACTIVE");
   const canReadBudgets = gate.isEnabled("BUDGETS") && canViewBudgetsArea(ctx.roles);
   const optionalCosts = canReadBudgets
     ? await readOptionalCostControl(projectId, filters.budgetId, ctx)

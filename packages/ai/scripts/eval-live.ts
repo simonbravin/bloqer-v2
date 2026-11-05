@@ -10,7 +10,7 @@
  *   --id-prefix=foo-     keep items whose id starts with prefix
  *   --category=help      keep items in one category
  *
- * Live tools (Neon DEV only, never production):
+ * Live tools (explicit isolated audit database):
  *   --live-tools=1  or  BLOQER_AI_EVAL_LIVE_TOOLS=1
  *   Executes real Bloqer AI tool registry against adversarial fixtures.
  *
@@ -28,6 +28,7 @@ import {
 import { runAgent } from "../src/orchestration/run-agent";
 import type { AiToolDefinition } from "../src/types";
 import type { AiProvider } from "../src/provider";
+import { AiProviderError } from "../src/errors";
 import { isFakeAiProviderId } from "../src/env";
 import {
   parseAiPresentationFromAssistantText,
@@ -84,28 +85,6 @@ function parseArgs(argv: string[]) {
     if (m) out[m[1]!] = m[2]!;
   }
   return out;
-}
-
-function loadEnvFromRoot(): void {
-  for (const p of [resolve(pkgRoot, "../../.env"), resolve(process.cwd(), ".env")]) {
-    try {
-      for (const line of readFileSync(p, "utf8").split(/\r?\n/)) {
-        const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-        if (!m) continue;
-        let v = m[2]!;
-        if (
-          (v.startsWith('"') && v.endsWith('"')) ||
-          (v.startsWith("'") && v.endsWith("'"))
-        ) {
-          v = v.slice(1, -1);
-        }
-        if (process.env[m[1]!] === undefined) process.env[m[1]!] = v;
-      }
-      return;
-    } catch {
-      /* next */
-    }
-  }
 }
 
 function assertNonProdDb(): void {
@@ -286,7 +265,6 @@ function filterEvalItems(
 }
 
 async function main(): Promise<void> {
-  loadEnvFromRoot();
   const args = parseArgs(process.argv.slice(2));
   const modeArg = (args.mode ?? (process.env.BLOQER_AI_LIVE === "1" ? "live" : "structural")) as
     | "structural"
@@ -303,10 +281,8 @@ async function main(): Promise<void> {
     args.output ?? `evals/reports/eval-${providerId}-${Date.now()}.json`,
   );
   const baseUrl = args.baseUrl ?? process.env.BLOQER_AI_BASE_URL;
-  const useLiveTools =
-    args["live-tools"] === "1" ||
-    process.env.BLOQER_AI_EVAL_LIVE_TOOLS === "1" ||
-    process.env.BLOQER_AI_EVAL_LIVE_TOOLS === "true";
+  const liveToolsFlag = args["live-tools"] ?? process.env.BLOQER_AI_EVAL_LIVE_TOOLS;
+  const useLiveTools = liveToolsFlag === "1" || liveToolsFlag === "true";
 
   precheck({ mode: modeArg, providerId, model, datasetPath });
 
@@ -558,7 +534,9 @@ async function main(): Promise<void> {
       }
       if (item.expectForbiddenOrNotFound || item.category === "hallucination") {
         assistantText = "No encontré ese recurso en Bloqer con tus permisos.";
-        toolsUsed = [];
+        // Some denial cases require a simulated attempt followed by refusal.
+        if (!item.expectTools?.length && !item.expectToolsAnyOf?.length) toolsUsed = [];
+        notes.push("denial simulated; requires live tool authorization for evidence");
       }
       if (item.category === "adversarial_injection" && !item.expectForbiddenOrNotFound) {
         assistantText =
@@ -977,9 +955,13 @@ async function main(): Promise<void> {
       2,
     ),
   );
+  if (report.counts.FAIL > 0) process.exitCode = 1;
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error(JSON.stringify({
+    type: "bloqer_ai_eval_error",
+    code: err instanceof AiProviderError ? err.code : "UNKNOWN",
+  }));
   process.exit(1);
 });

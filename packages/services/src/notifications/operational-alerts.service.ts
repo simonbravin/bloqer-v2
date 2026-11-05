@@ -6,18 +6,23 @@ import type {
   Prisma,
 } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
+import { can } from "@bloqer/domain";
+import { canViewCompanyAp } from "../ap/ap-access";
+import { canViewCompanyAr } from "../ar/ar-access";
+import { companyScopeFilter } from "../company-scope";
+import { canViewDocumentByLink, documentMatchesScope, documentScopeInProject, requireDocumentParent } from "../documents/document-link-scope";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { listNegativeStockBalancesForTenant } from "../inventory/stock-balance.service";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
+import { scheduledReportEmailCompanyScope } from "../scheduled-reports/scheduled-report-execution.service";
 import { ServiceContext, ServiceError } from "../types";
-import { resolveNotificationAudience } from "./notification-audience.service";
-import { createSystemNotification } from "./notification.service";
+import { filterNotificationAudienceForScope, resolveNotificationAudience } from "./notification-audience.service";
+import { createOperationalNotificationOnce, notificationAccessWhere } from "./notification.service";
 import { sendOperationalAlertEmailAsSystem } from "./notification-email.service";
 import {
   resolveDocumentNotificationEntityLabel,
   staleDocumentUploadCopy,
 } from "./notification-copy";
-import { filterUserIdsByProjectAccess } from "../security/access";
 import { computeObligationBalanceDue } from "../finance/obligation-balance";
 
 /** Re-export recipient helpers for existing call sites. */
@@ -25,9 +30,6 @@ export {
   findActiveOwnerAdminUserIds,
   findActiveUsersForPermission,
 } from "./notification-audience.service";
-
-/** Rolling window to avoid duplicate operational alerts for the same entity + recipient. */
-const DEDUP_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** In-app notification types produced by operational alert jobs (Phase 8B + [D-094] + [D-097]). */
 export const OPERATIONAL_NOTIFICATION_TYPES = [
@@ -57,27 +59,12 @@ function emptySummary(): OperationalAlertRunSummary {
   return { checkedCount: 0, createdCount: 0, skippedCount: 0, errors: [] };
 }
 
-async function hasRecentDuplicate(params: {
-  tenantId: string;
-  type: NotificationType;
-  linkedEntityType: LinkedEntityType | null;
-  linkedEntityId: string | null;
-  recipientUserId: string;
-}): Promise<boolean> {
-  const since = new Date(Date.now() - DEDUP_WINDOW_MS);
-  const found = await prisma.notification.findFirst({
-    where: {
-      tenantId: params.tenantId,
-      type: params.type,
-      linkedEntityType: params.linkedEntityType,
-      linkedEntityId: params.linkedEntityId,
-      recipientUserId: params.recipientUserId,
-      status: { not: "ARCHIVED" },
-      createdAt: { gte: since },
-    },
-    select: { id: true },
-  });
-  return Boolean(found);
+function alertProjectScope(ctx: ServiceContext) {
+  return { tenantId: ctx.tenantId, ...companyScopeFilter(ctx) };
+}
+
+function optionalAlertProjectScope(ctx: ServiceContext) {
+  return { AND: [{ OR: [{ projectId: null }, { project: alertProjectScope(ctx) }] }] };
 }
 
 async function tryCreateAlert(
@@ -99,24 +86,17 @@ async function tryCreateAlert(
   summary: OperationalAlertRunSummary,
 ): Promise<void> {
   try {
-    const dup = await hasRecentDuplicate({
-      tenantId: input.tenantId,
-      type: input.type,
-      linkedEntityType: input.linkedEntityType,
-      linkedEntityId: input.linkedEntityId,
-      recipientUserId: input.recipientUserId,
-    });
-    if (dup) {
+    const created = await createOperationalNotificationOnce(input);
+    if (!created) {
       summary.skippedCount += 1;
       return;
     }
-    const { id: notificationId } = await createSystemNotification(input);
     // Best-effort operational email (never abort the run for delivery issues).
     // Tagged as OPERATIONAL_ALERT so it shows up in the activity card email metrics.
-    await sendOperationalAlertEmailAsSystem(notificationId, ctx).catch(() => undefined);
+    await sendOperationalAlertEmailAsSystem(created.id, ctx).catch(() => undefined);
     summary.createdCount += 1;
-  } catch (e) {
-    summary.errors.push(e instanceof Error ? e.message : String(e));
+  } catch {
+    summary.errors.push("No se pudo registrar una alerta.");
   }
 }
 
@@ -134,7 +114,11 @@ export async function runOverdueReceivablesAlert(
   const rows = await prisma.receivable.findMany({
     where: {
       tenantId: ctx.tenantId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      ...optionalAlertProjectScope(ctx),
       status: { in: ["OPEN", "PARTIAL", "OVERDUE"] },
+      clientContact: { tenantId: ctx.tenantId },
+      salesInvoice: { tenantId: ctx.tenantId, status: "ISSUED" },
     },
     select: {
       id: true,
@@ -145,12 +129,16 @@ export async function runOverdueReceivablesAlert(
       paidAmount: true,
       creditedAmount: true,
       dueDate: true,
+      clientContactId: true,
       clientContact: { select: { legalName: true, fantasyName: true } },
       salesInvoiceId: true,
+      salesInvoice: { select: { companyId: true, projectId: true, clientContactId: true } },
     },
   });
 
   for (const r of rows) {
+    if (r.salesInvoice.companyId !== r.companyId || r.salesInvoice.projectId !== r.projectId ||
+      r.salesInvoice.clientContactId !== r.clientContactId) continue;
     const balanceDue = computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount);
     if (!hasOpenObligationBalance(balanceDue)) continue;
     if (!isObligationOverdue(r.dueDate)) continue;
@@ -163,6 +151,9 @@ export async function runOverdueReceivablesAlert(
           where: {
             id: r.id,
             tenantId: ctx.tenantId,
+            companyId: r.companyId,
+            projectId: r.projectId,
+            dueDate: r.dueDate,
             originalAmount: r.originalAmount,
             paidAmount: r.paidAmount,
             creditedAmount: r.creditedAmount,
@@ -171,8 +162,8 @@ export async function runOverdueReceivablesAlert(
           data: { status: "OVERDUE", updatedBy: ctx.actorUserId },
         });
         if (changed.count === 0) continue;
-      } catch (e) {
-        summary.errors.push(e instanceof Error ? e.message : String(e));
+      } catch {
+        summary.errors.push("No se pudo actualizar la cuenta por cobrar vencida.");
         continue;
       }
     }
@@ -186,11 +177,13 @@ export async function runOverdueReceivablesAlert(
       ? `/proyectos/${r.projectId}/cuentas-por-cobrar/${r.id}`
       : `/finanzas/cuentas-por-cobrar/${r.id}`;
 
-    const scopedRecipients = await filterUserIdsByProjectAccess(
-      ctx.tenantId,
-      r.projectId,
-      recipients,
-    );
+    const scopedRecipients = await filterNotificationAudienceForScope({
+      tenantId: ctx.tenantId,
+      companyId: r.companyId,
+      projectId: r.projectId,
+      candidateUserIds: recipients,
+      canView: r.projectId ? (roles) => can(roles, "VIEW", "AR") : canViewCompanyAr,
+    });
     for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
@@ -228,7 +221,11 @@ export async function runOverduePayablesAlert(
   const rows = await prisma.payable.findMany({
     where: {
       tenantId: ctx.tenantId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+      ...optionalAlertProjectScope(ctx),
       status: { in: ["OPEN", "PARTIAL", "OVERDUE"] },
+      supplierContact: { tenantId: ctx.tenantId },
+      supplierInvoice: { tenantId: ctx.tenantId, status: "ISSUED" },
     },
     select: {
       id: true,
@@ -239,12 +236,16 @@ export async function runOverduePayablesAlert(
       paidAmount: true,
       creditedAmount: true,
       dueDate: true,
+      supplierContactId: true,
       supplierContact: { select: { legalName: true, fantasyName: true } },
       supplierInvoiceId: true,
+      supplierInvoice: { select: { companyId: true, projectId: true, supplierContactId: true } },
     },
   });
 
   for (const p of rows) {
+    if (p.supplierInvoice.companyId !== p.companyId || p.supplierInvoice.projectId !== p.projectId ||
+      p.supplierInvoice.supplierContactId !== p.supplierContactId) continue;
     const balanceDue = computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount);
     if (!hasOpenObligationBalance(balanceDue)) continue;
     if (!isObligationOverdue(p.dueDate)) continue;
@@ -257,6 +258,9 @@ export async function runOverduePayablesAlert(
           where: {
             id: p.id,
             tenantId: ctx.tenantId,
+            companyId: p.companyId,
+            projectId: p.projectId,
+            dueDate: p.dueDate,
             originalAmount: p.originalAmount,
             paidAmount: p.paidAmount,
             creditedAmount: p.creditedAmount,
@@ -265,8 +269,8 @@ export async function runOverduePayablesAlert(
           data: { status: "OVERDUE", updatedBy: ctx.actorUserId },
         });
         if (changed.count === 0) continue;
-      } catch (e) {
-        summary.errors.push(e instanceof Error ? e.message : String(e));
+      } catch {
+        summary.errors.push("No se pudo actualizar la cuenta por pagar vencida.");
         continue;
       }
     }
@@ -280,11 +284,13 @@ export async function runOverduePayablesAlert(
       ? `/proyectos/${p.projectId}/cuentas-por-pagar/${p.id}`
       : `/finanzas/cuentas-por-pagar/${p.id}`;
 
-    const scopedRecipients = await filterUserIdsByProjectAccess(
-      ctx.tenantId,
-      p.projectId,
-      recipients,
-    );
+    const scopedRecipients = await filterNotificationAudienceForScope({
+      tenantId: ctx.tenantId,
+      companyId: p.companyId,
+      projectId: p.projectId,
+      candidateUserIds: recipients,
+      canView: p.projectId ? (roles) => can(roles, "VIEW", "AP") : canViewCompanyAp,
+    });
     for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
@@ -365,21 +371,13 @@ export async function runNegativeStockAlert(
 
     if (recipients.length === 0) continue;
 
-    const memberships = await prisma.userMembership.findMany({
-      where: {
-        tenantId: ctx.tenantId,
-        status: "ACTIVE",
-        userId: { in: recipients },
-        user: { status: "ACTIVE" },
-        OR: [{ companyId: row.companyId }, { companyId: null }],
-      },
-      select: { userId: true },
+    const scopedRecipients = await filterNotificationAudienceForScope({
+      tenantId: ctx.tenantId,
+      companyId: row.companyId,
+      projectId: row.projectId,
+      candidateUserIds: recipients,
+      canView: (roles) => can(roles, "VIEW", "INVENTORY"),
     });
-    const scopedRecipients = await filterUserIdsByProjectAccess(
-      ctx.tenantId,
-      row.projectId,
-      memberships.map((member) => member.userId),
-    );
     for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
@@ -425,23 +423,37 @@ export async function runApprovedCertificationsWithoutInvoiceAlert(
   const rows = await prisma.certification.findMany({
     where: {
       tenantId: ctx.tenantId,
+      ...companyScopeFilter(ctx),
+      project: alertProjectScope(ctx),
       status: "APPROVED",
-      salesInvoices: { none: { status: "ISSUED" } },
     },
-    select: { id: true, projectId: true, companyId: true, number: true },
+    select: {
+      id: true,
+      projectId: true,
+      companyId: true,
+      number: true,
+      salesInvoices: {
+        where: { tenantId: ctx.tenantId, status: "ISSUED", documentKind: "INVOICE" },
+        select: { companyId: true, projectId: true },
+      },
+    },
   });
 
   for (const c of rows) {
+    if (c.salesInvoices.some((invoice) => invoice.projectId === c.projectId &&
+      (c.companyId === null || invoice.companyId === c.companyId))) continue;
     summary.checkedCount += 1;
     const body = `La certificación CERT-${String(c.number).padStart(3, "0")} está aprobada sin factura de venta emitida.`;
 
     if (recipients.length === 0) continue;
 
-    const scopedRecipients = await filterUserIdsByProjectAccess(
-      ctx.tenantId,
-      c.projectId,
-      recipients,
-    );
+    const scopedRecipients = await filterNotificationAudienceForScope({
+      tenantId: ctx.tenantId,
+      companyId: c.companyId,
+      projectId: c.projectId,
+      candidateUserIds: recipients,
+      canView: (roles) => can(roles, "VIEW", "AR") || can(roles, "VIEW", "CERTIFICATIONS"),
+    });
     for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
@@ -478,12 +490,16 @@ export async function runStaleUploadingDocumentsAlert(
   const docs = await prisma.documentAttachment.findMany({
     where: {
       tenantId: ctx.tenantId,
+      ...companyScopeFilter(ctx),
+      ...optionalAlertProjectScope(ctx),
       status: "UPLOADING",
       createdAt: { lt: threshold },
     },
     select: {
       id: true,
+      tenantId: true,
       projectId: true,
+      project: { select: { id: true, tenantId: true, companyId: true } },
       companyId: true,
       originalFileName: true,
       uploadedBy: true,
@@ -494,6 +510,23 @@ export async function runStaleUploadingDocumentsAlert(
   });
 
   for (const d of docs) {
+    let companyId: string | null;
+    try {
+      const parent = d.linkedEntityType && d.linkedEntityType !== "PROJECT" && d.linkedEntityId
+        ? await requireDocumentParent(d.linkedEntityType, d.linkedEntityId, ctx)
+        : d.project && (
+            (d.linkedEntityType === null && d.linkedEntityId === null) ||
+            (d.linkedEntityType === "PROJECT" && d.linkedEntityId === d.project.id)
+          )
+          ? { ...d.project, projectId: d.project.id }
+          : null;
+      const target = parent && d.project ? documentScopeInProject(parent, d.project) : parent;
+      if (!target || !documentMatchesScope(d, target, ctx)) continue;
+      companyId = d.companyId ?? target.companyId;
+    } catch (error) {
+      if (error instanceof ServiceError && ["NOT_FOUND", "FORBIDDEN"].includes(error.code)) continue;
+      throw error;
+    }
     summary.checkedCount += 1;
     const uploader = d.uploadedBy?.trim();
     const recipientIds = await resolveNotificationAudience({
@@ -515,17 +548,19 @@ export async function runStaleUploadingDocumentsAlert(
       category: d.category,
     });
 
-    const scopedRecipients = await filterUserIdsByProjectAccess(
-      ctx.tenantId,
-      d.projectId,
-      recipientIds,
-    );
+    const scopedRecipients = await filterNotificationAudienceForScope({
+      tenantId: ctx.tenantId,
+      companyId,
+      projectId: d.projectId,
+      candidateUserIds: recipientIds,
+      canView: (roles) => canViewDocumentByLink(d.linkedEntityType, roles, d.projectId),
+    });
     for (const uid of scopedRecipients) {
       await tryCreateAlert(
         ctx,
         {
           tenantId: ctx.tenantId,
-          companyId: d.companyId,
+          companyId,
           recipientUserId: uid,
           type: "STALE_DOCUMENT_UPLOAD",
           title,
@@ -572,17 +607,21 @@ export async function getOperationalAlertsLastActivity(
 
   const types = [...OPERATIONAL_NOTIFICATION_TYPES];
   const since = new Date(Date.now() - ACTIVITY_WINDOW_MS);
+  const [notificationScope, deliveryScope] = await Promise.all([
+    notificationAccessWhere(ctx),
+    scheduledReportEmailCompanyScope(ctx),
+  ]);
 
   const [latest, grouped, lastEmail] = await Promise.all([
     prisma.notification.findFirst({
-      where: { tenantId: ctx.tenantId, type: { in: types } },
+      where: { ...notificationScope, type: { in: types } },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true },
     }),
     prisma.notification.groupBy({
       by: ["type"],
       where: {
-        tenantId: ctx.tenantId,
+        ...notificationScope,
         type: { in: types },
         createdAt: { gte: since },
       },
@@ -590,7 +629,7 @@ export async function getOperationalAlertsLastActivity(
       _max: { createdAt: true },
     }),
     prisma.emailDeliveryLog.findFirst({
-      where: { tenantId: ctx.tenantId, emailType: "OPERATIONAL_ALERT" },
+      where: { tenantId: ctx.tenantId, ...deliveryScope, emailType: "OPERATIONAL_ALERT" },
       orderBy: { createdAt: "desc" },
       select: { createdAt: true, status: true },
     }),

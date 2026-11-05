@@ -92,13 +92,14 @@ export type CreateEmailDeliveryLogInput = {
 export async function createEmailDeliveryLog(
   input: CreateEmailDeliveryLogInput,
   ctx: ServiceContext,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<{ id: string }> {
   const status: EmailDeliveryStatus = input.status ?? "PENDING";
   const provider =
     input.provider ??
     (status === "SENT" ? "RESEND" : "DISABLED");
 
-  const row = await prisma.emailDeliveryLog.create({
+  const row = await db.emailDeliveryLog.create({
     data: {
       tenantId: ctx.tenantId,
       companyId: input.companyId !== undefined ? input.companyId : ctx.companyId,
@@ -129,17 +130,31 @@ export async function markEmailDeliverySent(
   providerMessageId: string | undefined,
   ctx: ServiceContext,
 ): Promise<void> {
-  await getLogForMutation(id, ctx);
+  const log = await prisma.emailDeliveryLog.findFirst({
+    where: { id, tenantId: ctx.tenantId },
+    select: { id: true, status: true, providerMessageId: true },
+  });
+  if (!log) throw new ServiceError("NOT_FOUND", "Registro de envío no encontrado");
+  const providerId = providerMessageId ? truncate(providerMessageId, 256) : null;
+  if (log.status === "SENT" && log.providerMessageId === providerId) return;
   await prisma.emailDeliveryLog.update({
-    where: { id },
+    where: { id, tenantId: ctx.tenantId, status: "PENDING" },
     data: {
       status: "SENT",
       provider: "RESEND",
-      providerMessageId: providerMessageId ? truncate(providerMessageId, 256) : null,
+      providerMessageId: providerId,
       sentAt: new Date(),
       skippedReason: null,
       errorMessage: null,
     },
+  });
+}
+
+/** Keep the claim pending when the provider response cannot prove acceptance or rejection. */
+export async function markEmailDeliveryUnconfirmed(id: string, ctx: ServiceContext): Promise<void> {
+  await prisma.emailDeliveryLog.updateMany({
+    where: { id, tenantId: ctx.tenantId, status: "PENDING" },
+    data: { provider: "RESEND", errorMessage: "delivery_unconfirmed" },
   });
 }
 
@@ -181,7 +196,7 @@ export async function markEmailDeliveryFailed(
 export async function getEmailDeliveryLogById(id: string, ctx: ServiceContext): Promise<EmailDeliveryLog> {
   assertCanListEmailLogs(ctx);
   const row = await prisma.emailDeliveryLog.findFirst({
-    where: { id, tenantId: ctx.tenantId },
+    where: { id, tenantId: ctx.tenantId, ...await scheduledReportEmailCompanyScope(ctx) },
   });
   if (!row) {
     throw new ServiceError("NOT_FOUND", "Registro de envío no encontrado");
@@ -190,11 +205,7 @@ export async function getEmailDeliveryLogById(id: string, ctx: ServiceContext): 
     const canReadParent =
       row.relatedEntityType === "SCHEDULED_REPORT" && row.relatedEntityId != null &&
       await canReadScheduledReport(row.relatedEntityId, ctx);
-    const allowed = canReadParent && await prisma.emailDeliveryLog.findFirst({
-      where: { id, tenantId: ctx.tenantId, ...await scheduledReportEmailCompanyScope(ctx) },
-      select: { id: true },
-    });
-    if (!allowed) throw new ServiceError("NOT_FOUND", "Registro de envío no encontrado");
+    if (!canReadParent) throw new ServiceError("NOT_FOUND", "Registro de envío no encontrado");
   }
   return row;
 }
@@ -235,6 +246,7 @@ export async function listEmailDeliveryLogs(
 
   const where: Prisma.EmailDeliveryLogWhereInput = {
     tenantId: ctx.tenantId,
+    ...await scheduledReportEmailCompanyScope(ctx),
   };
   if (filters.status) where.status = filters.status;
   if (filters.emailType) where.emailType = filters.emailType;
@@ -246,16 +258,12 @@ export async function listEmailDeliveryLogs(
   const onlyScheduledReports =
     filters.emailType === "REPORT_SCHEDULED" || filters.relatedEntityType === "SCHEDULED_REPORT";
   if (!filters.emailType || onlyScheduledReports) {
-    const [readableIds, companyScope] = await Promise.all([
-      filters.relatedEntityId
-        ? canReadScheduledReport(filters.relatedEntityId, ctx).then(
-            (allowed) => allowed ? [filters.relatedEntityId!] : [],
-          )
-        : listReadableScheduledReportIds(ctx),
-      scheduledReportEmailCompanyScope(ctx),
-    ]);
+    const readableIds = filters.relatedEntityId
+      ? await canReadScheduledReport(filters.relatedEntityId, ctx).then(
+          (allowed) => allowed ? [filters.relatedEntityId!] : [],
+        )
+      : await listReadableScheduledReportIds(ctx);
     const scheduledScope: Prisma.EmailDeliveryLogWhereInput = {
-      ...companyScope,
       emailType: "REPORT_SCHEDULED",
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: { in: readableIds },
@@ -273,7 +281,7 @@ export async function listEmailDeliveryLogs(
     if (filters.dateTo) {
       const d = new Date(filters.dateTo);
       if (!Number.isNaN(d.getTime())) {
-        d.setHours(23, 59, 59, 999);
+        d.setUTCHours(23, 59, 59, 999);
         createdAt.lte = d;
       }
     }

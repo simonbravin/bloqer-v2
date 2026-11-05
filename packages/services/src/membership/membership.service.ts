@@ -142,7 +142,8 @@ export async function createMembership(
       action: "MEMBERSHIP_CREATED",
       entityType: "UserMembership",
       entityId: membership.id,
-      after: { userId: input.userId, roles: input.roles },
+      companyId: membership.companyId,
+      after: { userId: input.userId, roles: input.roles, companyId: membership.companyId },
       ipAddress: ctx.ipAddress,
     }, tx);
 

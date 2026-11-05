@@ -23,8 +23,6 @@ export function DocumentLibraryActions({
   /** After delete, leave the document detail and return to the library. */
   redirectAfterDelete?: boolean;
 }) {
-  const extra = [`/proyectos/${projectId}/documentos`];
-
   return (
     <div className={cn("flex flex-nowrap items-center justify-end gap-0.5", className)}>
       <DocumentFileActions
@@ -45,16 +43,15 @@ export function DocumentLibraryActions({
             : undefined
         }
         onArchive={
-          doc.canMutate ? () => archiveDocumentAction(doc.id, projectId, extra) : undefined
+          doc.canMutate ? () => archiveDocumentAction(doc.id, projectId) : undefined
         }
         onRestore={
-          doc.canMutate ? () => restoreDocumentAction(doc.id, projectId, extra) : undefined
+          doc.canMutate ? () => restoreDocumentAction(doc.id, projectId) : undefined
         }
         onDelete={
           doc.canDelete
             ? () =>
                 softDeleteDocumentAction(doc.id, projectId, {
-                  extraPathsToRevalidate: extra,
                   redirectToProjectDocuments: redirectAfterDelete,
                 })
             : undefined

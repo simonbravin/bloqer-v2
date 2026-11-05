@@ -1,57 +1,83 @@
 import { prisma } from "@bloqer/database";
+import { companyScopeFilter } from "../company-scope";
+import type { ServiceContext } from "../types";
 
 const MAX_ENTITY_IDS = 5000;
 
-type Resolver = (tenantId: string, projectId: string) => Promise<string[]>;
+type Resolver = (ctx: ServiceContext, projectId: string) => Promise<string[]>;
+
+function projectCompanyWhere(ctx: ServiceContext, projectId: string) {
+  return { tenantId: ctx.tenantId, projectId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
+}
+
+function sharedProjectCompanyWhere(ctx: ServiceContext, projectId: string) {
+  return { tenantId: ctx.tenantId, projectId, ...companyScopeFilter(ctx) };
+}
+
+const entityIdPage = { select: { id: true }, orderBy: { id: "asc" }, take: MAX_ENTITY_IDS } as const;
 
 const DIRECT_PROJECT_ID_RESOLVERS: Record<string, Resolver> = {
-  Project: async (_tenantId, projectId) => [projectId],
-  PurchaseOrder: async (tenantId, projectId) =>
-    ids(await prisma.purchaseOrder.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  PurchaseReceipt: async (tenantId, projectId) =>
-    ids(await prisma.purchaseReceipt.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Payment: async (tenantId, projectId) =>
-    ids(await prisma.payment.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Budget: async (tenantId, projectId) =>
-    ids(await prisma.budget.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Certification: async (tenantId, projectId) =>
-    ids(await prisma.certification.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  SalesInvoice: async (tenantId, projectId) =>
-    ids(await prisma.salesInvoice.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Receivable: async (tenantId, projectId) =>
-    ids(await prisma.receivable.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Collection: async (tenantId, projectId) =>
-    ids(await prisma.collection.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  SupplierInvoice: async (tenantId, projectId) =>
-    ids(await prisma.supplierInvoice.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Payable: async (tenantId, projectId) =>
-    ids(await prisma.payable.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  AccountMovement: async (tenantId, projectId) =>
-    ids(await prisma.accountMovement.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  JournalEntry: async (tenantId, projectId) =>
-    ids(await prisma.journalEntry.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Subcontract: async (tenantId, projectId) =>
-    ids(await prisma.subcontract.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  SubcontractCertification: async (tenantId, projectId) =>
-    ids(await prisma.subcontractCertification.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  JobsiteLog: async (tenantId, projectId) =>
-    ids(await prisma.jobsiteLog.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Warehouse: async (tenantId, projectId) =>
-    ids(await prisma.warehouse.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  StockMovement: async (tenantId, projectId) =>
-    ids(await prisma.stockMovement.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  WarehouseTransfer: async (tenantId, projectId) =>
-    ids(await prisma.warehouseTransfer.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  DocumentAttachment: async (tenantId, projectId) =>
-    ids(await prisma.documentAttachment.findMany({ where: { tenantId, projectId }, select: { id: true } })),
-  Schedule: async (tenantId, projectId) =>
-    ids(await prisma.schedule.findMany({ where: { tenantId, projectId }, select: { id: true } })),
+  PurchaseRequest: async (ctx, projectId) =>
+    ids(await prisma.purchaseRequest.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  ProcurementQuote: async (ctx, projectId) =>
+    ids(await prisma.procurementQuote.findMany({
+      where: { tenantId: ctx.tenantId, purchaseRequest: projectCompanyWhere(ctx, projectId) }, ...entityIdPage,
+    })),
+  DocumentFolder: async (ctx, projectId) =>
+    ids(await prisma.documentFolder.findMany({ where: { tenantId: ctx.tenantId, projectId }, ...entityIdPage })),
+  Project: async (_ctx, projectId) => [projectId],
+  ProjectMembership: async (ctx, projectId) =>
+    ids(await prisma.projectMembership.findMany({ where: { tenantId: ctx.tenantId, projectId }, ...entityIdPage })),
+  ProjectTeamMember: async (ctx, projectId) =>
+    ids(await prisma.projectTeamMember.findMany({ where: { tenantId: ctx.tenantId, projectId }, ...entityIdPage })),
+  BudgetSettings: async (ctx, projectId) =>
+    ids(await prisma.budgetSettings.findMany({ where: { budget: sharedProjectCompanyWhere(ctx, projectId) }, ...entityIdPage })),
+  PurchaseOrder: async (ctx, projectId) =>
+    ids(await prisma.purchaseOrder.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  PurchaseReceipt: async (ctx, projectId) =>
+    ids(await prisma.purchaseReceipt.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Payment: async (ctx, projectId) =>
+    ids(await prisma.payment.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Budget: async (ctx, projectId) =>
+    ids(await prisma.budget.findMany({ where: sharedProjectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Certification: async (ctx, projectId) =>
+    ids(await prisma.certification.findMany({ where: sharedProjectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  SalesInvoice: async (ctx, projectId) =>
+    ids(await prisma.salesInvoice.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Receivable: async (ctx, projectId) =>
+    ids(await prisma.receivable.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Collection: async (ctx, projectId) =>
+    ids(await prisma.collection.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  SupplierInvoice: async (ctx, projectId) =>
+    ids(await prisma.supplierInvoice.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Payable: async (ctx, projectId) =>
+    ids(await prisma.payable.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  AccountMovement: async (ctx, projectId) =>
+    ids(await prisma.accountMovement.findMany({ where: { tenantId: ctx.tenantId, projectId }, ...entityIdPage })),
+  JournalEntry: async (ctx, projectId) =>
+    ids(await prisma.journalEntry.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Subcontract: async (ctx, projectId) =>
+    ids(await prisma.subcontract.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  SubcontractCertification: async (ctx, projectId) =>
+    ids(await prisma.subcontractCertification.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  JobsiteLog: async (ctx, projectId) =>
+    ids(await prisma.jobsiteLog.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Warehouse: async (ctx, projectId) =>
+    ids(await prisma.warehouse.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  StockMovement: async (ctx, projectId) =>
+    ids(await prisma.stockMovement.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  WarehouseTransfer: async (ctx, projectId) =>
+    ids(await prisma.warehouseTransfer.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  DocumentAttachment: async (ctx, projectId) =>
+    ids(await prisma.documentAttachment.findMany({ where: sharedProjectCompanyWhere(ctx, projectId), ...entityIdPage })),
+  Schedule: async (ctx, projectId) =>
+    ids(await prisma.schedule.findMany({ where: { tenantId: ctx.tenantId, projectId }, ...entityIdPage })),
 };
 
-async function resolveWbsAndCostItems(tenantId: string, projectId: string): Promise<string[]> {
+async function resolveWbsAndCostItems(ctx: ServiceContext, projectId: string): Promise<string[]> {
   const budgets = await prisma.budget.findMany({
-    where: { tenantId, projectId },
-    select: { id: true },
+    where: sharedProjectCompanyWhere(ctx, projectId),
+    ...entityIdPage,
   });
   if (budgets.length === 0) return [];
 
@@ -72,10 +98,10 @@ async function resolveWbsAndCostItems(tenantId: string, projectId: string): Prom
   ];
 }
 
-async function resolveCertificationLines(tenantId: string, projectId: string): Promise<string[]> {
+async function resolveCertificationLines(ctx: ServiceContext, projectId: string): Promise<string[]> {
   const certs = await prisma.certification.findMany({
-    where: { tenantId, projectId },
-    select: { id: true },
+    where: sharedProjectCompanyWhere(ctx, projectId),
+    ...entityIdPage,
   });
   if (certs.length === 0) return [];
   const lines = await prisma.certificationLine.findMany({
@@ -85,9 +111,9 @@ async function resolveCertificationLines(tenantId: string, projectId: string): P
   return lines.map((l) => l.id);
 }
 
-async function resolveScheduleItems(tenantId: string, projectId: string): Promise<string[]> {
+async function resolveScheduleItems(ctx: ServiceContext, projectId: string): Promise<string[]> {
   const schedule = await prisma.schedule.findFirst({
-    where: { tenantId, projectId },
+    where: { tenantId: ctx.tenantId, projectId },
     select: { id: true },
   });
   if (!schedule) return [];
@@ -107,7 +133,7 @@ function ids(rows: { id: string }[]): string[] {
  * (historical rows without denormalized projectId on audit_logs).
  */
 export async function resolveEntityIdsForProject(
-  tenantId: string,
+  ctx: ServiceContext,
   projectId: string,
   entityTypes: readonly string[],
 ): Promise<string[]> {
@@ -120,24 +146,24 @@ export async function resolveEntityIdsForProject(
   for (const entityType of uniqueTypes) {
     const direct = DIRECT_PROJECT_ID_RESOLVERS[entityType];
     if (direct) {
-      for (const id of await direct(tenantId, projectId)) out.add(id);
+      for (const id of await direct(ctx, projectId)) out.add(id);
       continue;
     }
     if (
       !wbsResolved &&
       (entityType === "WbsNode" || entityType === "CostItem" || entityType === "CostAnalysisLine")
     ) {
-      for (const id of await resolveWbsAndCostItems(tenantId, projectId)) out.add(id);
+      for (const id of await resolveWbsAndCostItems(ctx, projectId)) out.add(id);
       wbsResolved = true;
       continue;
     }
     if (!certLinesResolved && entityType === "CertificationLine") {
-      for (const id of await resolveCertificationLines(tenantId, projectId)) out.add(id);
+      for (const id of await resolveCertificationLines(ctx, projectId)) out.add(id);
       certLinesResolved = true;
       continue;
     }
     if (!scheduleItemsResolved && entityType === "ScheduleItem") {
-      for (const id of await resolveScheduleItems(tenantId, projectId)) out.add(id);
+      for (const id of await resolveScheduleItems(ctx, projectId)) out.add(id);
       scheduleItemsResolved = true;
     }
   }

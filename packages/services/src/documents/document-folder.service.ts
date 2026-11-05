@@ -20,7 +20,12 @@ import type {
 } from "@bloqer/validators";
 import { ServiceContext, ServiceError } from "../types";
 import { log } from "../audit/audit.service";
+import { companyScopeFilter } from "../company-scope";
+import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
+import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess } from "../security/access";
+import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
+import { filterProjectDocumentsByLink, requireDocumentLinkAccess } from "./document-link-scope";
 
 export type DocumentFolderView = {
   id: string;
@@ -81,8 +86,9 @@ function serializeFolder(
 async function loadProjectFolderRows(
   tenantId: string,
   projectId: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<DocumentFolder[]> {
-  return prisma.documentFolder.findMany({
+  return db.documentFolder.findMany({
     where: { tenantId, projectId },
     orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
   });
@@ -155,6 +161,7 @@ export async function backfillProjectDocumentFolders(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<number> {
+  const project = await requireProjectAccess(projectId, ctx);
   const folders = await ensureProjectDocumentFolders(projectId, ctx);
   const byKey = new Map(
     folders
@@ -170,13 +177,14 @@ export async function backfillProjectDocumentFolders(
       projectId,
       folderId: null,
       status: { not: "DELETED" },
+      ...companyScopeFilter(ctx),
     },
-    select: { id: true, linkedEntityType: true },
+    select: { id: true, tenantId: true, projectId: true, companyId: true, linkedEntityType: true, linkedEntityId: true },
   });
   if (pending.length === 0) return 0;
 
   const groups = new Map<string, string[]>();
-  for (const doc of pending) {
+  for (const doc of await filterProjectDocumentsByLink(pending, project, ctx)) {
     const key = resolveSystemKeyForLinkedEntity(doc.linkedEntityType);
     const folderId = byKey.get(key);
     // If SYSTEM seed is incomplete, leave null for a later retry (do not dump into GENERAL).
@@ -194,6 +202,7 @@ export async function backfillProjectDocumentFolders(
         projectId,
         folderId: null,
         id: { in: ids },
+        ...companyScopeFilter(ctx),
       },
       data: { folderId },
     });
@@ -219,6 +228,7 @@ async function requireEditProjects(ctx: ServiceContext): Promise<void> {
   if (!can(ctx.roles, "EDIT", "PROJECTS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar carpetas de documentos");
   }
+  await assertTenantModuleEnabled(ctx, "PROJECTS");
 }
 
 export async function getFolderInProjectOrThrow(
@@ -296,40 +306,47 @@ export async function createDocumentFolder(
   await requireEditProjects(ctx);
   await requireProjectAccess(projectId, ctx);
 
-  const folders = await ensureProjectDocumentFolders(projectId, ctx);
-  const byId = buildFolderMap(folders);
-
-  await getFolderInProjectOrThrow(input.parentId, projectId, ctx);
-  if (!canCreateUserFolderUnder(input.parentId, byId)) {
-    throw new ServiceError(
-      "VALIDATION",
-      "Solo podés crear carpetas bajo Planos, General o sus subcarpetas",
-    );
-  }
-
-  const parentDepth = folderDepth(input.parentId, byId);
-  if (parentDepth >= DOCUMENT_FOLDER_MAX_DEPTH) {
-    throw new ServiceError(
-      "VALIDATION",
-      `La profundidad máxima de carpetas es ${DOCUMENT_FOLDER_MAX_DEPTH}`,
-    );
-  }
-
-  const name = input.name.trim();
-  let created: DocumentFolder;
+  await ensureProjectDocumentFolders(projectId, ctx);
   try {
-    created = await prisma.documentFolder.create({
-      data: {
-        id: randomUUID(),
+    return await prisma.$transaction(async (tx) => {
+      await lockProjectForMutation(tx, projectId, ctx.tenantId);
+      const rows = await loadProjectFolderRows(ctx.tenantId, projectId, tx);
+      const byId = buildFolderMap(rows);
+      if (!byId.has(input.parentId)) {
+        throw new ServiceError("FORBIDDEN", "Carpeta no válida para este proyecto");
+      }
+      if (!canCreateUserFolderUnder(input.parentId, byId)) {
+        throw new ServiceError("VALIDATION", "Solo podés crear carpetas bajo Planos, General o sus subcarpetas");
+      }
+      if (folderDepth(input.parentId, byId) >= DOCUMENT_FOLDER_MAX_DEPTH) {
+        throw new ServiceError("VALIDATION", `La profundidad máxima de carpetas es ${DOCUMENT_FOLDER_MAX_DEPTH}`);
+      }
+
+      const created = await tx.documentFolder.create({
+        data: {
+          id: randomUUID(),
+          tenantId: ctx.tenantId,
+          projectId,
+          parentId: input.parentId,
+          name: input.name.trim(),
+          kind: "USER",
+          systemKey: null,
+          sortOrder: input.sortOrder ?? 0,
+          createdBy: ctx.actorUserId,
+        },
+      });
+      await log({
         tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "document_folder.created",
+        entityType: "DocumentFolder",
+        entityId: created.id,
         projectId,
-        parentId: input.parentId,
-        name,
-        kind: "USER",
-        systemKey: null,
-        sortOrder: input.sortOrder ?? 0,
-        createdBy: ctx.actorUserId,
-      },
+        after: { name: created.name, parentId: created.parentId },
+      }, tx);
+
+      byId.set(created.id, toTreeNode(created));
+      return serializeFolder(created, byId);
     });
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -337,19 +354,6 @@ export async function createDocumentFolder(
     }
     throw err;
   }
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "document_folder.created",
-    entityType: "DocumentFolder",
-    entityId: created.id,
-    projectId,
-    after: { name: created.name, parentId: created.parentId },
-  });
-
-  const rows = await loadProjectFolderRows(ctx.tenantId, projectId);
-  return serializeFolder(created, buildFolderMap(rows));
 }
 
 export async function renameDocumentFolder(
@@ -409,76 +413,68 @@ export async function moveDocumentFolder(
   await requireEditProjects(ctx);
   await requireProjectAccess(projectId, ctx);
 
-  const folder = await getFolderInProjectOrThrow(folderId, projectId, ctx);
-  if (folder.kind !== "USER") {
-    throw new ServiceError("VALIDATION", "Las carpetas de sistema no se pueden mover");
-  }
-
-  const folders = await loadProjectFolderRows(ctx.tenantId, projectId);
-  const byId = buildFolderMap(folders);
-
-  await getFolderInProjectOrThrow(input.parentId, projectId, ctx);
-  if (!canCreateUserFolderUnder(input.parentId, byId)) {
-    throw new ServiceError(
-      "VALIDATION",
-      "Solo podés mover carpetas bajo Planos, General o sus subcarpetas",
-    );
-  }
-  if (wouldCreateFolderCycle(folderId, input.parentId, byId)) {
-    throw new ServiceError("VALIDATION", "No se puede mover una carpeta dentro de sí misma");
-  }
-
-  const newDepth = folderDepth(input.parentId, byId) + 1;
-  // Also account for deepest descendant
-  const descendantExtra = maxDescendantDepth(folderId, byId);
-  if (newDepth + descendantExtra - 1 > DOCUMENT_FOLDER_MAX_DEPTH) {
-    throw new ServiceError(
-      "VALIDATION",
-      `La profundidad máxima de carpetas es ${DOCUMENT_FOLDER_MAX_DEPTH}`,
-    );
-  }
-
   try {
-    const result = await prisma.documentFolder.updateMany({
-      where: { id: folder.id, tenantId: ctx.tenantId, projectId },
-      data: { parentId: input.parentId },
+    return await prisma.$transaction(async (tx) => {
+      await lockProjectForMutation(tx, projectId, ctx.tenantId);
+      const rows = await loadProjectFolderRows(ctx.tenantId, projectId, tx);
+      const folder = rows.find(({ id }) => id === folderId);
+      const byId = buildFolderMap(rows);
+      if (!folder || !byId.has(input.parentId)) {
+        throw new ServiceError("FORBIDDEN", "Carpeta no válida para este proyecto");
+      }
+      if (folder.kind !== "USER") {
+        throw new ServiceError("VALIDATION", "Las carpetas de sistema no se pueden mover");
+      }
+      if (!canCreateUserFolderUnder(input.parentId, byId)) {
+        throw new ServiceError("VALIDATION", "Solo podés mover carpetas bajo Planos, General o sus subcarpetas");
+      }
+      if (wouldCreateFolderCycle(folderId, input.parentId, byId)) {
+        throw new ServiceError("VALIDATION", "No se puede mover una carpeta dentro de sí misma");
+      }
+      if (folderDepth(input.parentId, byId) + maxDescendantDepth(folderId, byId) > DOCUMENT_FOLDER_MAX_DEPTH) {
+        throw new ServiceError("VALIDATION", `La profundidad máxima de carpetas es ${DOCUMENT_FOLDER_MAX_DEPTH}`);
+      }
+
+      const updated = await tx.documentFolder.update({
+        where: { id: folder.id, tenantId: ctx.tenantId, projectId, kind: "USER" },
+        data: { parentId: input.parentId },
+      });
+      await log({
+        tenantId: ctx.tenantId,
+        actorUserId: ctx.actorUserId,
+        action: "document_folder.moved",
+        entityType: "DocumentFolder",
+        entityId: folder.id,
+        projectId,
+        before: { parentId: folder.parentId },
+        after: { parentId: updated.parentId },
+      }, tx);
+      byId.set(updated.id, toTreeNode(updated));
+      return serializeFolder(updated, byId);
     });
-    if (result.count !== 1) {
-      throw new ServiceError("NOT_FOUND", "Carpeta no encontrada");
-    }
   } catch (err) {
-    if (err instanceof ServiceError) throw err;
     if (isUniqueViolation(err)) {
       throw new ServiceError("CONFLICT", "Ya existe una carpeta con ese nombre en este nivel");
     }
     throw err;
   }
-
-  const updated = await getFolderInProjectOrThrow(folderId, projectId, ctx);
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "document_folder.moved",
-    entityType: "DocumentFolder",
-    entityId: folder.id,
-    projectId,
-    before: { parentId: folder.parentId },
-    after: { parentId: updated.parentId },
-  });
-
-  const rows = await loadProjectFolderRows(ctx.tenantId, projectId);
-  return serializeFolder(updated, buildFolderMap(rows));
 }
 
 function maxDescendantDepth(
   folderId: string,
   byId: Map<string, FolderTreeNode>,
+  ancestors = new Set<string>(),
 ): number {
+  if (ancestors.has(folderId)) {
+    throw new ServiceError("CONFLICT", "El árbol de carpetas tiene un vínculo inválido");
+  }
+  // An invalid deep tree cannot satisfy the maximum-depth check in the caller.
+  if (ancestors.size >= DOCUMENT_FOLDER_MAX_DEPTH) return 1;
+  const branch = new Set(ancestors).add(folderId);
   let max = 1;
   const children = [...byId.values()].filter((n) => n.parentId === folderId);
   for (const child of children) {
-    max = Math.max(max, 1 + maxDescendantDepth(child.id, byId));
+    max = Math.max(max, 1 + maxDescendantDepth(child.id, byId, branch));
   }
   return max;
 }
@@ -497,6 +493,7 @@ export async function deleteDocumentFolder(
   }
 
   await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+    await lockProjectForMutation(tx, projectId, ctx.tenantId);
     const childCountTx = await tx.documentFolder.count({
       where: { tenantId: ctx.tenantId, projectId, parentId: folderId },
     });
@@ -538,16 +535,15 @@ export async function deleteDocumentFolder(
     if (deleted.count !== 1) {
       throw new ServiceError("NOT_FOUND", "Carpeta no encontrada");
     }
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "document_folder.deleted",
-    entityType: "DocumentFolder",
-    entityId: folderId,
-    projectId,
-    before: { name: folder.name, parentId: folder.parentId },
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "document_folder.deleted",
+      entityType: "DocumentFolder",
+      entityId: folderId,
+      projectId,
+      before: { name: folder.name, parentId: folder.parentId },
+    }, tx);
   });
 }
 
@@ -566,6 +562,10 @@ export async function moveLibraryDocumentToFolder(
   if (!doc) {
     throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   }
+  if (doc.status !== "ACTIVE" && doc.status !== "ARCHIVED") {
+    throw new ServiceError("CONFLICT", "Solo se pueden mover documentos activos o archivados");
+  }
+  const companyId = await requireDocumentLinkAccess(doc, ctx);
   if (isOperationalLinkedEntity(doc.linkedEntityType)) {
     throw new ServiceError(
       "VALIDATION",
@@ -586,19 +586,22 @@ export async function moveLibraryDocumentToFolder(
     );
   }
 
-  await prisma.documentAttachment.updateMany({
-    where: { id: doc.id, tenantId: ctx.tenantId, projectId },
-    data: { folderId: targetFolderId },
-  });
-
-  await log({
-    tenantId: ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action: "document.moved_folder",
-    entityType: "DocumentAttachment",
-    entityId: doc.id,
-    projectId,
-    before: { folderId: doc.folderId },
-    after: { folderId: targetFolderId },
+  await prisma.$transaction(async (tx) => {
+    const updated = await tx.documentAttachment.updateMany({
+      where: { id: doc.id, tenantId: ctx.tenantId, projectId, status: doc.status, folderId: doc.folderId },
+      data: { folderId: targetFolderId },
+    });
+    assertOptimisticRowUpdate(updated.count, "El documento ya fue modificado. Recargá e intentá de nuevo.");
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "document.moved_folder",
+      entityType: "DocumentAttachment",
+      entityId: doc.id,
+      projectId,
+      companyId,
+      before: { folderId: doc.folderId },
+      after: { folderId: targetFolderId },
+    }, tx);
   });
 }

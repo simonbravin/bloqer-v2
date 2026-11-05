@@ -25,7 +25,10 @@ import {
   markEmailDeliverySent,
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
+import { isCrossCompany } from "../company-scope";
+import { requireProjectAccess } from "../security/access";
 import { ServiceContext, ServiceError } from "../types";
+import { loadActiveNotificationRecipient, sameNotificationRecipientAccess } from "./notification-audience.service";
 import { canRunOperationalAlerts } from "./operational-alerts-runner.service";
 import { OPERATIONAL_NOTIFICATION_TYPES } from "./operational-alerts.service";
 import { resolveNotificationEmailContext, notificationLeadBody } from "./notification-email-context";
@@ -101,12 +104,18 @@ async function loadNotification(notificationId: string, tenantId: string): Promi
   });
 }
 
-async function assertRecipientActiveInTenant(recipientUserId: string, tenantId: string): Promise<boolean> {
-  const m = await prisma.userMembership.findFirst({
-    where: { userId: recipientUserId, tenantId, status: "ACTIVE" },
-    select: { id: true },
-  });
-  return Boolean(m);
+async function canAccessNotification(row: NotificationRow, ctx: ServiceContext): Promise<boolean> {
+  if (isCrossCompany(row.companyId, ctx)) return false;
+  if (!row.projectId) return true;
+  try {
+    await requireProjectAccess(row.projectId, ctx);
+    return true;
+  } catch (error) {
+    if (error instanceof ServiceError && ["NOT_FOUND", "FORBIDDEN"].includes(error.code)) {
+      return false;
+    }
+    throw error;
+  }
 }
 
 async function logNotificationEmailSkipped(
@@ -210,7 +219,9 @@ async function dispatchNotificationEmail(
     throw new ServiceError("VALIDATION", "Notificación sin destinatario");
   }
 
-  if (!options.systemDispatch && !canDispatchNotificationEmail(ctx, n.recipientUserId)) {
+  if (!options.systemDispatch && (
+    !canDispatchNotificationEmail(ctx, n.recipientUserId) || !await canAccessNotification(n, ctx)
+  )) {
     throw new ServiceError("FORBIDDEN", "No podés enviar esta notificación por email");
   }
 
@@ -223,8 +234,8 @@ async function dispatchNotificationEmail(
     return { ok: true, skipped: "invalid_status", provider: "disabled" };
   }
 
-  const inTenant = await assertRecipientActiveInTenant(n.recipientUserId, ctx.tenantId);
-  if (!inTenant) {
+  const recipient = await loadActiveNotificationRecipient(ctx.tenantId, n.recipientUserId);
+  if (!recipient || !await canAccessNotification(n, recipient)) {
     await logNotificationEmailSkipped(ctx, emailType, n, "recipient_not_in_tenant");
     return { ok: true, skipped: "recipient_not_in_tenant", provider: "disabled" };
   }
@@ -254,11 +265,8 @@ async function dispatchNotificationEmail(
     return { ok: true, skipped: "email_disabled", provider: "disabled" };
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: n.recipientUserId },
-    select: { email: true },
-  });
-  if (!user?.email?.trim()) {
+  const email = recipient.email.trim();
+  if (!email) {
     await logNotificationEmailSkipped(ctx, emailType, n, "no_recipient_email");
     return { ok: true, skipped: "no_recipient_email", provider: "disabled" };
   }
@@ -266,6 +274,7 @@ async function dispatchNotificationEmail(
   const emailContext = await resolveNotificationEmailContext({
     tenantId: n.tenantId,
     companyId: n.companyId,
+    recipientCompanyId: recipient.companyId,
     projectId: n.projectId,
     linkedEntityType: n.linkedEntityType,
     linkedEntityId: n.linkedEntityId,
@@ -284,7 +293,7 @@ async function dispatchNotificationEmail(
 
   const { id: logId } = await createEmailDeliveryLog(
     {
-      recipientEmail: user.email.trim(),
+      recipientEmail: email,
       subject,
       emailType,
       recipientUserId: n.recipientUserId,
@@ -298,7 +307,7 @@ async function dispatchNotificationEmail(
 
   const base = getPublicAppBaseUrl();
   const actionUrlAbsolute =
-    n.actionUrl && base && n.actionUrl.startsWith("/") && !n.actionUrl.startsWith("//")
+    n.actionUrl && base && n.actionUrl.startsWith("/") && !n.actionUrl.startsWith("//") && !/[\\\s]/.test(n.actionUrl)
       ? `${base}${n.actionUrl}`
       : null;
 
@@ -330,8 +339,15 @@ async function dispatchNotificationEmail(
         text: renderNotificationEmailText(templateInput),
       };
 
+  const currentRecipient = await loadActiveNotificationRecipient(ctx.tenantId, n.recipientUserId);
+  if (!sameNotificationRecipientAccess(recipient, currentRecipient) ||
+    !await canAccessNotification(n, currentRecipient)) {
+    await markEmailDeliverySkipped(logId, "recipient_not_in_tenant", ctx);
+    return { ok: true, skipped: "recipient_not_in_tenant", provider: "disabled" };
+  }
+
   const sendResult = await sendEmail({
-    to: user.email.trim(),
+    to: email,
     subject,
     html,
     text,

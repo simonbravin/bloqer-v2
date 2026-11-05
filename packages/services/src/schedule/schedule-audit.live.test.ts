@@ -9,6 +9,8 @@ import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
 import { getEmailDeliveryLogById, listEmailDeliveryLogs } from "../email-delivery/email-delivery-log.service";
+import { buildAiExecutionContext } from "../ai/context";
+import { createDefaultBloqerAiToolRegistry } from "../ai/create-default-registry";
 import {
   approveJobsiteLog,
   createJobsiteLog,
@@ -529,6 +531,25 @@ describe(
       assert.equal(await prisma.auditLog.count({ where: { tenantId } }), 0);
     });
 
+    it("keeps AG-13 AI schedule tools read-only even for an owner of an active project", async () => {
+      await prisma.schedule.update({ where: { id: scheduleId }, data: { baselineBudgetId: null } });
+      await prisma.scheduleItem.delete({ where: { id: foreignParentId } });
+      await prisma.schedule.delete({ where: { id: otherScheduleId } });
+      const beforeTools = await snapshot();
+      const registry = createDefaultBloqerAiToolRegistry();
+      const aiCtx = buildAiExecutionContext({ service: ctx });
+      for (const id of [projectId, otherProjectId]) {
+        for (const name of ["get_project_schedule_summary", "get_delayed_schedule_items"]) {
+          const result = await registry.execute(aiCtx, {
+            id: `${name}-${id}`, name, argumentsJson: JSON.stringify({ projectId: id }),
+          });
+          assert.notEqual(result.isError, true, result.content);
+        }
+      }
+      assert.equal(await snapshot(), beforeTools);
+      assert.equal(await prisma.auditLog.count({ where: { tenantId } }), 0);
+    });
+
     it("allows independent desktop planning before any budget is approved", async () => {
       const workspace = await getProjectScheduleWorkspace(otherProjectId, {}, { ...ctx });
       assert.equal(workspace.type, "WORKSPACE");
@@ -896,6 +917,7 @@ describe(
           emailType: "REPORT_SCHEDULED",
           status: "FAILED",
           provider: "DISABLED",
+          errorMessage: "provider_rejected: fixture",
           relatedEntityType: "SCHEDULED_REPORT",
           relatedEntityId: ids.shared,
         } as const;
@@ -903,6 +925,7 @@ describe(
           data: [
             { ...delivery, companyId, recipientUserId: actorId, recipientEmail: "own@example.test", metadata: { runWindow } },
             { ...delivery, companyId: null, recipientUserId: actorId, recipientEmail: "shared-verified@example.test", metadata: { runWindow: otherRunWindow } },
+            { ...delivery, companyId, recipientUserId: actorId, recipientEmail: "unconfirmed@example.test", status: "PENDING", errorMessage: "delivery_unconfirmed", metadata: { runWindow } },
             { ...delivery, companyId: null, recipientEmail: "shared-unknown@example.test" },
             { ...delivery, companyId: otherCompanyId, recipientUserId: actorId, recipientEmail: "foreign@example.test" },
             { ...delivery, companyId, relatedEntityId: ids.sharedForeignSelection, recipientEmail: "foreign-project@example.test" },
@@ -924,7 +947,7 @@ describe(
           relatedEntityType: "SCHEDULED_REPORT",
           relatedEntityId: ids.sharedForeignSelection,
         }, ctx), []);
-        const visibleEmails = ["own@example.test", "shared-verified@example.test"];
+        const visibleEmails = ["own@example.test", "shared-verified@example.test", "unconfirmed@example.test"];
         assert.deepEqual(
           (await listScheduledReportEmailDeliveries(ctx, ids.shared)).map((row) => row.recipientEmail).sort(),
           visibleEmails,
@@ -945,12 +968,12 @@ describe(
           select: { id: true },
         });
         await assert.rejects(getEmailDeliveryLogById(foreignDelivery.id, ctx), isCode("NOT_FOUND"));
-        assert.equal(await countRecentFailedScheduledReportDeliveries(ctx, ids.shared), 2);
+        assert.equal(await countRecentFailedScheduledReportDeliveries(ctx, ids.shared), 1);
         await assert.rejects(deactivateScheduledReport(ctx, ids.shared), isCode("NOT_FOUND"));
         await assert.rejects(deactivateScheduledReport(ctx, ids.foreign), isCode("NOT_FOUND"));
         assert.equal((await getScheduledReportById({ ...ctx, companyId: otherCompanyId }, ids.foreign)).status, "ACTIVE");
         const tenantCtx = { ...ctx, companyId: null };
-        assert.equal((await listScheduledReportEmailDeliveries(tenantCtx, ids.shared)).length, 4);
+        assert.equal((await listScheduledReportEmailDeliveries(tenantCtx, ids.shared)).length, 5);
         assert.equal((await getScheduledReportById(tenantCtx, ids.sharedForeignSelection)).status, "ACTIVE");
 
         await prisma.scheduledReport.update({

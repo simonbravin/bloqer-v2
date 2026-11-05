@@ -1,71 +1,53 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
+import { documentRevalidatePaths } from "@/features/documents/lib/document-revalidate-paths";
 import {
   archiveDocument,
+  getDocumentById,
   restoreDocument,
   softDeleteDocument,
   ServiceError,
+  type ServiceContext,
 } from "@bloqer/services";
-import { redirect } from "next/navigation";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 
-function serviceCtx(current: NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>) {
-  return {
+async function mutateCompanyAttachment(
+  id: string,
+  mutate: (id: string, ctx: ServiceContext) => Promise<void>,
+): Promise<void> {
+  const current = await getCurrentUser();
+  if (!current?.tenantCtx) redirect("/login");
+  const ctx = {
     actorUserId: current.session.user.id!,
-    tenantId:    current.tenantCtx!.tenantId,
-    companyId:   current.tenantCtx!.companyId,
-    roles:       current.tenantCtx!.roles,
+    tenantId: current.tenantCtx.tenantId,
+    companyId: current.tenantCtx.companyId,
+    roles: current.tenantCtx.roles,
   };
-}
 
-function failOrThrow(pathsToRevalidate: string[], err: unknown): never {
-  const message = err instanceof ServiceError ? err.message : "Error inesperado";
-  const path = pathsToRevalidate[0];
-  if (path) redirectWithActionError(path, message);
-  throw err instanceof Error ? err : new Error(message);
-}
-
-/** Revalidate Finanzas invoice detail (and extras) after attachment mutations. */
-export async function archiveCompanyFinanzasAttachmentAction(
-  documentId: string,
-  pathsToRevalidate: string[],
-): Promise<void> {
-  const current = await getCurrentUser();
-  if (!current?.tenantCtx) redirect("/login");
   try {
-    await archiveDocument(documentId, serviceCtx(current));
+    const doc = await getDocumentById(id, ctx);
+    if (doc.projectId !== null ||
+        (doc.linkedEntityType !== "SUPPLIER_INVOICE" && doc.linkedEntityType !== "SALES_INVOICE")) {
+      throw new ServiceError("FORBIDDEN", "El adjunto no pertenece a un comprobante de empresa");
+    }
+    await mutate(id, ctx);
+    for (const path of documentRevalidatePaths({ ...doc, documentId: doc.id })) revalidatePath(path);
   } catch (err) {
-    failOrThrow(pathsToRevalidate, err);
+    if (err instanceof ServiceError) throw new Error(err.message);
+    throw err;
   }
-  for (const p of pathsToRevalidate) revalidatePath(p);
 }
 
-export async function restoreCompanyFinanzasAttachmentAction(
-  documentId: string,
-  pathsToRevalidate: string[],
-): Promise<void> {
-  const current = await getCurrentUser();
-  if (!current?.tenantCtx) redirect("/login");
-  try {
-    await restoreDocument(documentId, serviceCtx(current));
-  } catch (err) {
-    failOrThrow(pathsToRevalidate, err);
-  }
-  for (const p of pathsToRevalidate) revalidatePath(p);
+export async function archiveCompanyFinanzasAttachmentAction(id: string): Promise<void> {
+  await mutateCompanyAttachment(id, archiveDocument);
 }
 
-export async function softDeleteCompanyFinanzasAttachmentAction(
-  documentId: string,
-  pathsToRevalidate: string[],
-): Promise<void> {
-  const current = await getCurrentUser();
-  if (!current?.tenantCtx) redirect("/login");
-  try {
-    await softDeleteDocument(documentId, serviceCtx(current));
-  } catch (err) {
-    failOrThrow(pathsToRevalidate, err);
-  }
-  for (const p of pathsToRevalidate) revalidatePath(p);
+export async function restoreCompanyFinanzasAttachmentAction(id: string): Promise<void> {
+  await mutateCompanyAttachment(id, restoreDocument);
+}
+
+export async function softDeleteCompanyFinanzasAttachmentAction(id: string): Promise<void> {
+  await mutateCompanyAttachment(id, softDeleteDocument);
 }

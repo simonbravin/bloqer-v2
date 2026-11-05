@@ -342,11 +342,13 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Agregar documento solo aparece en Planos, General, sus subcarpetas o en Todos. Al subir, elegí el tipo (Contrato, Plano, Presupuesto, Cotización, etc.).",
       "En Acciones: el ojo abre el archivo. En fotos jpeg/png/webp, clic en el nombre o en Ver abre un visor a pantalla completa (flechas si hay varias); los PDF se abren en pestaña nueva o desde el detalle. La descarga lo baja.",
       "En adjuntos de parte, OC o factura: mismos iconos de ver/descargar y archivar (mismo visor de fotos); esos no se eliminan.",
+      "Lista, detalle y enlaces directos respetan el acceso a la empresa, la obra y el comprobante asociado.",
     ],
     pitfalls: [
       "Si ves un icono de archivo tachado, no hay binario almacenado (almacenamiento no configurado al subir).",
       "HEIC de iPhone no siempre se puede previsualizar en el visor: usá descargar o Ver (pestaña).",
       "Los planos PDF y CAD (.dwg / .dxf) están soportados hasta 50 MB; DWG/DXF no tienen preview in-app (solo descarga). Si falla la subida, reintentá.",
+      "Si el archivo llegó al almacenamiento y faltó confirmar la subida, el reintento completa la confirmación. Los intentos abandonados quedan fuera del listado habitual.",
       "Archivos viejos de tipo Plano pueden seguir en General hasta que los muevas a Planos.",
     ],
     relatedSlugs: ["cargar-libro-de-obra", "eliminar-documento-de-obra", "organizar-carpetas-de-documentos"],

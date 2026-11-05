@@ -12,6 +12,8 @@ export type EmailSendResult = {
   provider: "resend" | "disabled";
   messageId?: string;
   error?: string;
+  /** Only explicit provider rejection proves no message was accepted. */
+  failureKind?: "rejected" | "unconfirmed";
 };
 
 export type SendEmailInput = {
@@ -20,7 +22,28 @@ export type SendEmailInput = {
   html: string;
   text: string;
   attachments?: EmailAttachment[];
+  /** Stable only for a caller that already defines a single delivery identity. */
+  idempotencyKey?: string;
 };
+
+const DEFINITIVE_REJECTIONS = new Set([
+  "missing_required_field",
+  "invalid_idempotency_key",
+  "invalid_access",
+  "invalid_parameter",
+  "invalid_region",
+  "rate_limit_exceeded",
+  "missing_api_key",
+  "invalid_api_key",
+  "invalid_from_address",
+  "validation_error",
+  "not_found",
+  "method_not_allowed",
+]);
+
+export function classifyEmailProviderError(name: string): NonNullable<EmailSendResult["failureKind"]> {
+  return DEFINITIVE_REJECTIONS.has(name.toLowerCase()) ? "rejected" : "unconfirmed";
+}
 
 function toResendAttachment(a: EmailAttachment): { filename: string; content: Buffer | string; contentType?: string } {
   const content =
@@ -61,26 +84,29 @@ export async function sendEmail(input: SendEmailInput): Promise<EmailSendResult>
       ...(input.attachments && input.attachments.length > 0
         ? { attachments: input.attachments.map(toResendAttachment) }
         : {}),
-    });
+    }, input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined);
 
     if (error) {
       return {
         ok: false,
         provider: "resend",
         error: typeof error.message === "string" ? error.message : "resend_error",
+        failureKind: classifyEmailProviderError(error.name),
       };
     }
 
+    if (!data?.id) return { ok: false, provider: "resend", error: "missing_provider_confirmation", failureKind: "unconfirmed" };
     return {
       ok: true,
       provider: "resend",
-      messageId: data?.id,
+      messageId: data.id,
     };
   } catch (e) {
     return {
       ok: false,
       provider: "resend",
       error: e instanceof Error ? e.message : "send_failed",
+      failureKind: "unconfirmed",
     };
   }
 }

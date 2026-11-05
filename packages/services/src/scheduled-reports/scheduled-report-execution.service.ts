@@ -3,6 +3,7 @@ import { prisma } from "@bloqer/database";
 import { companyScopeFilter } from "../company-scope";
 import type { ServiceContext } from "../types";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
+import { SCHEDULED_REPORT_PROVIDER_REJECTED_PREFIX } from "./scheduled-report-run-status";
 import { canReadScheduledReport } from "./scheduled-report.service";
 
 const RETRY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -154,7 +155,12 @@ export async function listPendingScheduledReportRetries(
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: scheduleId,
       recipientUserId: { in: recipientIds },
-      status: { in: ["FAILED", "SENT"] },
+      AND: [{
+        OR: [
+          { status: { in: ["PENDING", "SENT"] } },
+          { status: "FAILED", errorMessage: { startsWith: SCHEDULED_REPORT_PROVIDER_REJECTED_PREFIX } },
+        ],
+      }],
       createdAt: { gte: since },
     },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -162,7 +168,7 @@ export async function listPendingScheduledReportRetries(
   });
 
   const pendingByWindow = new Map<string, ScheduledReportRetryWindow>();
-  const deliveredByWindow = new Map<string, Set<string>>();
+  const blockedByWindow = new Map<string, Set<string>>();
   for (const log of logs) {
     if (!log.recipientUserId) continue;
     const { runWindow } = parseDeliveryMetadata(log.metadata);
@@ -173,10 +179,10 @@ export async function listPendingScheduledReportRetries(
     // but do not generate an unrelated daily report from their attempt date.
     if (Number.isNaN(originalDate.getTime()) || originalDate.toISOString() !== iso) continue;
 
-    if (log.status === "SENT") {
-      const delivered = deliveredByWindow.get(runWindow) ?? new Set<string>();
-      delivered.add(log.recipientUserId);
-      deliveredByWindow.set(runWindow, delivered);
+    if (log.status === "SENT" || log.status === "PENDING") {
+      const blocked = blockedByWindow.get(runWindow) ?? new Set<string>();
+      blocked.add(log.recipientUserId);
+      blockedByWindow.set(runWindow, blocked);
     } else if (log.status === "FAILED") {
       const pending = pendingByWindow.get(runWindow) ?? {
         runWindow,
@@ -188,7 +194,7 @@ export async function listPendingScheduledReportRetries(
     }
   }
   for (const [window, pending] of pendingByWindow) {
-    for (const recipientId of deliveredByWindow.get(window) ?? []) {
+    for (const recipientId of blockedByWindow.get(window) ?? []) {
       pending.recipientIds.delete(recipientId);
     }
   }

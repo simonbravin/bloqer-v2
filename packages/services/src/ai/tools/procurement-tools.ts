@@ -25,7 +25,7 @@ export const searchPurchaseRequestsTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "procurement",
+    accessKind: "purchase_requests",
   },
   inputSchema: searchPrSchema,
   jsonSchema: {
@@ -81,7 +81,7 @@ export const searchPurchaseOrdersTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "procurement",
+    accessKind: "purchase_orders",
   },
   inputSchema: searchPoSchema,
   jsonSchema: {
@@ -136,7 +136,7 @@ export const getPurchaseOrderTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "procurement",
+    accessKind: "purchase_orders",
   },
   inputSchema: z.object({ purchaseOrderId: z.string().uuid() }),
   jsonSchema: {
@@ -181,7 +181,7 @@ export const getPendingPurchaseOrdersTool = defineBloqerAiTool({
   policy: {
     dataClass: AI_DATA_CLASS.PROJECT_OPERATIONAL,
     scope: "PROJECT",
-    accessKind: "procurement",
+    accessKind: "purchase_orders",
   },
   inputSchema: z.object({ projectId: z.string().uuid().optional() }),
   jsonSchema: {

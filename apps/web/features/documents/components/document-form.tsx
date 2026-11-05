@@ -57,7 +57,6 @@ export type DocumentFormProps = {
   cancelHref?: string;
   submitLabel?: string;
   placeholderWarning?: string;
-  revalidatePaths?: string[];
   layout?: "page" | "dialog";
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -74,7 +73,6 @@ export function DocumentForm({
   cancelHref,
   submitLabel = "Subir documento",
   placeholderWarning,
-  revalidatePaths,
   layout = "page",
   onSuccess,
   onCancel,
@@ -106,14 +104,6 @@ export function DocumentForm({
     onPendingChange?.(true);
 
     try {
-      const paths = [
-        ...new Set([
-          ...(revalidatePaths ?? []),
-          ...(afterUploadPath ? [afterUploadPath] : []),
-          ...(projectId ? [`/proyectos/${projectId}/documentos`] : []),
-        ]),
-      ];
-
       const result = await clientUploadDocument({
         file: selectedFile,
         projectId,
@@ -123,7 +113,6 @@ export function DocumentForm({
         linkedEntityType: linkedEntity?.type,
         linkedEntityId: linkedEntity?.id,
         idempotencyKey,
-        revalidatePaths: paths,
       });
 
       if ("error" in result) {

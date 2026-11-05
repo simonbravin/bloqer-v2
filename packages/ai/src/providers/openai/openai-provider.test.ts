@@ -59,6 +59,13 @@ describe("userFacingOpenAiErrorMessage", () => {
 });
 
 describe("mapAndThrowOpenAiProviderError", () => {
+  it("logs status metadata without the provider's credential or payload text", (t) => {
+    const logger = t.mock.method(console, "error", () => {});
+    assert.throws(() => mapAndThrowOpenAiProviderError(Object.assign(new Error("SENSITIVE_PROVIDER_PAYLOAD"), { status: 401 })));
+    assert.deepEqual(JSON.parse(logger.mock.calls[0]!.arguments[0] as string), {
+      type: "bloqer_ai_provider_error", providerId: "openai", code: "AUTH", status: 401,
+    });
+  });
   it("maps HTTP 400 vendor payload to safe BAD_REQUEST Spanish", () => {
     const raw =
       "400 Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'.";

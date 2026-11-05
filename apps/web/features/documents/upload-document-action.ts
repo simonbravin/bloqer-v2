@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
-import { uploadDocument, ServiceError } from "@bloqer/services";
+import { getDocumentById, uploadDocument, ServiceError } from "@bloqer/services";
+import { documentRevalidatePaths } from "./lib/document-revalidate-paths";
 import {
   initiateUploadSchema,
   resolveAllowedMimeType,
@@ -17,29 +18,6 @@ function readOptionalString(value: FormDataEntryValue | null): string | undefine
   if (typeof value !== "string") return undefined;
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
-}
-
-function parseRevalidatePaths(raw: FormDataEntryValue | null): string[] {
-  if (typeof raw !== "string" || !raw.trim()) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return [
-      ...new Set(
-        parsed.filter(
-          (p): p is string =>
-            typeof p === "string" &&
-            p.startsWith("/") &&
-            !p.startsWith("//") &&
-            !p.includes("?") &&
-            !p.includes("#") &&
-            !p.includes("\\"),
-        ),
-      ),
-    ];
-  } catch {
-    return [];
-  }
 }
 
 /**
@@ -98,15 +76,12 @@ export async function uploadDocumentAction(formData: FormData): Promise<UploadDo
     roles:       current.tenantCtx.roles,
   };
 
-  const revalidatePaths = parseRevalidatePaths(formData.get("revalidatePaths"));
-
   try {
     const content = Buffer.from(await file.arrayBuffer());
     const result  = await uploadDocument(parsed.data, content, ctx);
 
-    for (const path of revalidatePaths) {
-      revalidatePath(path);
-    }
+    const doc = await getDocumentById(result.documentId, ctx);
+    for (const path of documentRevalidatePaths({ ...doc, documentId: doc.id })) revalidatePath(path);
 
     return result;
   } catch (err) {

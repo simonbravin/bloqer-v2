@@ -1,11 +1,21 @@
 /** Paths that must refresh after archive / restore / delete of a project document. */
 export function documentRevalidatePaths(params: {
-  projectId: string;
+  projectId: string | null;
   documentId: string;
   linkedEntityType: string | null;
   linkedEntityId: string | null;
+  relatedEntityId?: string;
 }): string[] {
-  const { projectId, documentId, linkedEntityType, linkedEntityId } = params;
+  const { projectId, documentId, linkedEntityType, linkedEntityId, relatedEntityId } = params;
+  if (projectId === null) {
+    if (!linkedEntityId) return [];
+    if (linkedEntityType === "SUPPLIER_INVOICE") return [`/finanzas/facturas-proveedor/${linkedEntityId}`];
+    if (linkedEntityType === "SALES_INVOICE") return [
+      `/finanzas/facturas/${linkedEntityId}`,
+      ...(relatedEntityId ? [`/finanzas/cuentas-por-cobrar/${relatedEntityId}`] : []),
+    ];
+    return [];
+  }
   const paths = [
     `/proyectos/${projectId}/documentos`,
     `/proyectos/${projectId}/documentos/${documentId}`,
@@ -37,6 +47,8 @@ export function documentRevalidatePaths(params: {
       paths.push(`/proyectos/${projectId}/solicitudes-compra`);
       if (linkedEntityType === "PURCHASE_REQUEST") {
         paths.push(`/proyectos/${projectId}/solicitudes-compra/${linkedEntityId}`);
+      } else if (relatedEntityId) {
+        paths.push(`/proyectos/${projectId}/solicitudes-compra/${relatedEntityId}`);
       }
       break;
     case "SUBCONTRACT":
@@ -44,6 +56,7 @@ export function documentRevalidatePaths(params: {
       break;
     case "SUBCONTRACT_CERTIFICATION":
       paths.push(`/proyectos/${projectId}/subcontratos`);
+      if (relatedEntityId) paths.push(`/proyectos/${projectId}/subcontratos/${relatedEntityId}/certificaciones/${linkedEntityId}`);
       break;
     case "BUDGET":
       paths.push(`/proyectos/${projectId}/presupuestos/${linkedEntityId}`);

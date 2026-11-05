@@ -1,10 +1,11 @@
-import type { LinkedEntityType, NotificationSeverity, NotificationStatus, NotificationType, Prisma } from "@bloqer/database";
-import { prisma } from "@bloqer/database";
+import type { LinkedEntityType, NotificationSeverity, NotificationStatus, NotificationType } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import { isUuid } from "@bloqer/utils";
 import { companyScopeFilter } from "../company-scope";
 import { resolveAccessibleProjectScope } from "../security/access";
 import { assertTenantModuleEnabled, isTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
+import { activeNotificationMembershipWhere } from "./notification-audience.service";
 
 export type NotificationInboxFilter = "all" | "unread" | "read" | "archived";
 
@@ -44,7 +45,7 @@ export type NotificationListItem = {
 
 async function assertRecipientInTenant(recipientUserId: string, tenantId: string, db: Prisma.TransactionClient): Promise<void> {
   const m = await db.userMembership.findFirst({
-    where: { userId: recipientUserId, tenantId, status: "ACTIVE" },
+    where: { ...activeNotificationMembershipWhere(tenantId), userId: recipientUserId },
     select: { id: true },
   });
   if (!m) {
@@ -56,7 +57,7 @@ async function assertRecipientInTenant(recipientUserId: string, tenantId: string
 function normalizeActionUrl(actionUrl: string | null | undefined): string | null {
   if (actionUrl === undefined || actionUrl === null || actionUrl.trim() === "") return null;
   const u = actionUrl.trim();
-  if (!u.startsWith("/") || u.startsWith("//")) {
+  if (!u.startsWith("/") || u.startsWith("//") || /[\\\s]/.test(u)) {
     throw new ServiceError("VALIDATION", "actionUrl debe ser una ruta relativa que empiece con /");
   }
   return u;
@@ -157,6 +158,35 @@ export const NOTIFICATION_BELL_LIMIT = 5;
 export const NOTIFICATION_INBOX_PAGE_SIZE = 20;
 const NOTIFICATION_INBOX_MAX_PAGE_SIZE = 50;
 
+const OPERATIONAL_NOTIFICATION_LOCK = 824_014_014;
+const OPERATIONAL_NOTIFICATION_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Make the documented rolling dedupe atomic across the cron and manual runner. */
+export async function createOperationalNotificationOnce(
+  input: CreateSystemNotificationInput,
+): Promise<{ id: string } | null> {
+  const key = {
+    tenantId: input.tenantId,
+    recipientUserId: input.recipientUserId,
+    type: input.type,
+    linkedEntityType: input.linkedEntityType ?? null,
+    linkedEntityId: input.linkedEntityId ?? null,
+  };
+  return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(${OPERATIONAL_NOTIFICATION_LOCK}::integer, hashtext(${JSON.stringify(key)}::text))`);
+    const existing = await tx.notification.findFirst({
+      where: {
+        ...key,
+        status: { not: "ARCHIVED" },
+        createdAt: { gte: new Date(Date.now() - OPERATIONAL_NOTIFICATION_WINDOW_MS) },
+      },
+      select: { id: true },
+    });
+    if (existing) return null;
+    return createSystemNotification(input, tx);
+  });
+}
+
 export type ListMyNotificationsResult = {
   items: NotificationListItem[];
   total: number;
@@ -165,11 +195,10 @@ export type ListMyNotificationsResult = {
 };
 
 /** Re-evaluate access when reading, including notifications created before an ACL revocation. */
-async function myNotificationAccessWhere(ctx: ServiceContext): Promise<Prisma.NotificationWhereInput> {
+export async function notificationAccessWhere(ctx: ServiceContext): Promise<Prisma.NotificationWhereInput> {
   const scope = await resolveAccessibleProjectScope(ctx);
   return {
     tenantId: ctx.tenantId,
-    recipientUserId: ctx.actorUserId,
     AND: [
       companyScopeFilter(ctx),
       ...(scope === "ALL"
@@ -177,6 +206,10 @@ async function myNotificationAccessWhere(ctx: ServiceContext): Promise<Prisma.No
         : [{ OR: [{ projectId: null }, { projectId: { in: scope.projectIds } }] }]),
     ],
   };
+}
+
+async function myNotificationAccessWhere(ctx: ServiceContext): Promise<Prisma.NotificationWhereInput> {
+  return { ...await notificationAccessWhere(ctx), recipientUserId: ctx.actorUserId };
 }
 
 export async function listMyNotifications(
@@ -224,12 +257,16 @@ export async function listMyNotifications(
   };
 }
 
-export async function getUnreadNotificationCount(ctx: ServiceContext): Promise<number> {
+export async function getUnreadNotificationCount(
+  ctx: ServiceContext,
+  types?: NotificationType[],
+): Promise<number> {
   if (!(await isTenantModuleEnabled(ctx, "NOTIFICATIONS"))) return 0;
   return prisma.notification.count({
     where: {
       ...await myNotificationAccessWhere(ctx),
       status: "UNREAD",
+      ...(types ? { type: { in: types } } : {}),
     },
   });
 }

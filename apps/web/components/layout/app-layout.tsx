@@ -56,7 +56,9 @@ export function AppLayout({
       moduleGateSnapshot={moduleGateSnapshot}
     >
       {children}
-      {tenantCtx ? <BloqerAiLauncher /> : null}
+      {tenantCtx ? (
+        <BloqerAiLauncher key={JSON.stringify([user?.id, tenantCtx.tenantId, tenantCtx.companyId, [...roles].sort()])} />
+      ) : null}
     </ShellLayout>
   );
 }

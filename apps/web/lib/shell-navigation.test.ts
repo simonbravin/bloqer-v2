@@ -34,6 +34,13 @@ test("personal profile access does not grant a project manager access to General
   assert.ok(subnav.includes("/configuracion/notificaciones"));
 });
 
+test("the activity log is absent from both menus when AUDIT is disabled", () => {
+  const enabled = (module: string) => module !== "AUDIT";
+  assert.ok(!buildConfiguracionSubnavLinks(["OWNER"], enabled).some(({ href }) => href === "/configuracion/registro"));
+  assert.ok(!buildGlobalNavSections(["OWNER"], enabled).flatMap(({ items }) => items)
+    .some(({ href }) => href === "/configuracion/registro"));
+});
+
 test("enabled child modules cannot offer navigation into a disabled treasury or accounting parent", () => {
   const sections = buildGlobalNavSections(["OWNER"], (module) => module !== "TREASURY" && module !== "ACCOUNTING");
   assert.ok(!sections.some((section) => section.title === "Tesorería"));

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   exportTenantAuditLogCsv,
+  getTenantDisplayTimezone,
   resolveTenantAuditLogExportFilters,
 } from "@bloqer/services";
 import { exportTenantAuditLogPdf } from "@bloqer/report-pdf";
@@ -30,10 +31,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  const filters = resolveTenantAuditLogExportFilters(parsed.data);
   const fmt = (sp.format ?? "csv").toLowerCase();
 
   try {
+    const filters = resolveTenantAuditLogExportFilters(parsed.data, await getTenantDisplayTimezone(auth.ctx));
     if (fmt === "pdf") {
       const { buffer, filename } = await exportTenantAuditLogPdf(filters, auth.ctx, parsed.data);
       return pdfResponse(buffer, filename);

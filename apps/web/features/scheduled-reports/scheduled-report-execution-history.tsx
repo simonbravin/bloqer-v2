@@ -15,16 +15,11 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatScheduledInstant } from "./format-scheduled-instant";
 import {
-  EMAIL_DELIVERY_STATUS_HINT,
-  EMAIL_DELIVERY_STATUS_LABEL,
   deliveryStatusBadgeVariant,
+  scheduledReportDeliveryDetail,
+  scheduledReportDeliveryHint,
+  scheduledReportDeliveryLabel,
 } from "./scheduled-report-labels";
-
-function deliveryDetail(row: ScheduledReportEmailDeliveryRow): string {
-  if (row.skippedReason) return row.skippedReason;
-  if (row.errorMessage) return row.errorMessage;
-  return EMAIL_DELIVERY_STATUS_HINT[row.status] ?? "—";
-}
 
 function runSummary(run: ScheduledReportExecutionRun): string {
   const parts: string[] = [];
@@ -33,7 +28,7 @@ function runSummary(run: ScheduledReportExecutionRun): string {
   if (run.skippedCount)
     parts.push(`${run.skippedCount} omitido${run.skippedCount === 1 ? "" : "s"}`);
   if (run.pendingCount)
-    parts.push(`${run.pendingCount} pendiente${run.pendingCount === 1 ? "" : "s"}`);
+    parts.push(`${run.pendingCount} sin confirmar`);
   return parts.length > 0 ? parts.join(" · ") : "Sin entregas registradas";
 }
 
@@ -101,13 +96,13 @@ export function ScheduledReportExecutionHistory({ runs, deliveries, timezone }: 
                               <TableCell>
                                 <Badge
                                   variant={deliveryStatusBadgeVariant(d.status)}
-                                  title={EMAIL_DELIVERY_STATUS_HINT[d.status]}
+                                  title={scheduledReportDeliveryHint(d.status, d.errorMessage)}
                                 >
-                                  {EMAIL_DELIVERY_STATUS_LABEL[d.status]}
+                                  {scheduledReportDeliveryLabel(d.status)}
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-xs text-muted-foreground max-w-[240px] truncate">
-                                {deliveryDetail(d)}
+                                {scheduledReportDeliveryDetail(d)}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -143,13 +138,13 @@ export function ScheduledReportExecutionHistory({ runs, deliveries, timezone }: 
                         <TableCell>
                           <Badge
                             variant={deliveryStatusBadgeVariant(d.status)}
-                            title={EMAIL_DELIVERY_STATUS_HINT[d.status]}
+                            title={scheduledReportDeliveryHint(d.status, d.errorMessage)}
                           >
-                            {EMAIL_DELIVERY_STATUS_LABEL[d.status]}
+                            {scheduledReportDeliveryLabel(d.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground max-w-[220px] truncate">
-                          {deliveryDetail(d)}
+                          {scheduledReportDeliveryDetail(d)}
                         </TableCell>
                       </TableRow>
                     ))}
