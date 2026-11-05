@@ -52,8 +52,9 @@ export function ProjectCashFlowFilters({
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Desde</Label>
+        <Label htmlFor="project-cash-flow-from" className="text-xs text-muted-foreground">Desde</Label>
         <Input
+          id="project-cash-flow-from"
           type="date"
           value={dateFrom}
           onChange={(e) => update("dateFrom", e.target.value)}
@@ -61,8 +62,9 @@ export function ProjectCashFlowFilters({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Hasta</Label>
+        <Label htmlFor="project-cash-flow-to" className="text-xs text-muted-foreground">Hasta</Label>
         <Input
+          id="project-cash-flow-to"
           type="date"
           value={dateTo}
           onChange={(e) => update("dateTo", e.target.value)}
@@ -70,9 +72,9 @@ export function ProjectCashFlowFilters({
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Agrupación</Label>
+        <Label htmlFor="project-cash-flow-period" className="text-xs text-muted-foreground">Agrupación</Label>
         <Select value={period} onValueChange={(v) => update("period", v)}>
-          <SelectTrigger className="w-36">
+          <SelectTrigger id="project-cash-flow-period" className="w-36">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

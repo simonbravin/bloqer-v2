@@ -754,6 +754,24 @@
 - **Hallazgo:** el generador y sus pruebas conservan la línea de IVA si falta solo la cuenta IIBB. El fallback de D-112 §7 no distingue este caso.
 - **Propuesta:** [documentar el funcionamiento existente y conservar la línea de IVA](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-086--asientos-de-facturas-cuando-falta-solo-la-cuenta-de-iibb).
 
+### Q-087 — Permisos del destinatario en reportes programados
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-140. El Owner aprobó aplicar permisos por destinatario y conservar el envío manual autorizado.
+- **Hallazgo:** excepto en el parte diario D-100, el reporte programado puede distribuir la misma exportación a destinatarios con distinto acceso.
+- **Propuesta:** [aplicar el acceso efectivo por destinatario en programados y conservar el envío manual autorizado](../08-architecture/platform-audit/2026-11-05-ag-12-report-delivery-proposal.md).
+
+### Q-088 — Base facturada del margen por presupuesto
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-141. El Owner aprobó la base neta por presupuesto.
+- **Hallazgo:** la lectura de margen usa costo del presupuesto elegido, total facturado con tributos y vínculo directo con la certificación. Omite ajustes de la factura origen. La documentación de rentabilidad de obra incluye además ventas directas.
+- **Propuesta:** [base neta ajustada y alcance por presupuesto explícito](../08-architecture/platform-audit/2026-11-05-ag-12-profitability-basis-proposal.md).
+
+### Q-089 — Moneda de los costos que ponderan gastos generales
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-142. El Owner aprobó ponderar con equivalentes comprobables en ARS y bloquear el reparto y cierre si faltan datos.
+- **Hallazgo:** el reparto automático del pool en ARS usa costos directos nominales de distinta moneda como si fueran comparables. D-041/D-043 definen la ponderación y el cierre, sin especificar cómo tratar un costo sin equivalencia en ARS.
+- **Propuesta:** [ponderar con valores comprobables en ARS y bloquear el cálculo incompleto](../08-architecture/platform-audit/2026-11-05-ag-12-overhead-weight-currency-proposal.md).
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

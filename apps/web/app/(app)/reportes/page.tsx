@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { can } from "@bloqer/domain";
 import { getCurrentUser } from "@/lib/auth";
-import { getTenantModuleGate } from "@bloqer/services";
+import { canViewCompanyAp, canViewCompanyAr, canViewProjectProfitabilityReport, getTenantModuleGate } from "@bloqer/services";
 import { TenantReportsHub } from "@/features/reports";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -18,18 +18,18 @@ export default async function TenantReportesPage() {
 
   const gate = await getTenantModuleGate(ctx);
   const canProjects = gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS");
-  const canAr = gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR");
-  const canAp = gate.isEnabled("AP") && can(ctx.roles, "VIEW", "AP");
+  const canAr = gate.isEnabled("AR") && canViewCompanyAr(ctx.roles);
+  const canAp = gate.isEnabled("AP") && canViewCompanyAp(ctx.roles);
   const canTreasury = gate.isEnabled("TREASURY") && can(ctx.roles, "VIEW", "TREASURY");
   const canInventory = gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY");
   const canProcurement =
     gate.isEnabled("PROCUREMENT") && can(ctx.roles, "VIEW", "PROJECTS");
-  const canOverhead =
-    gate.isEnabled("PROJECTS") &&
-    (can(ctx.roles, "VIEW", "AP") || can(ctx.roles, "VIEW", "PROJECTS"));
+  const canOverhead = gate.isEnabled("PROJECTS") && canAp;
+  const canProfitability = gate.isEnabled("PROJECTS") && gate.isEnabled("BUDGETS")
+    && canViewProjectProfitabilityReport(ctx.roles);
 
   const hasAny =
-    canProjects || canAr || canAp || canTreasury || canInventory || canProcurement || canOverhead;
+    canProjects || canAr || canAp || canTreasury || canInventory || canProcurement || canOverhead || canProfitability;
   if (!hasAny) redirect("/dashboard");
 
   return (
@@ -49,6 +49,7 @@ export default async function TenantReportesPage() {
         canInventory={canInventory}
         canProcurement={canProcurement}
         canOverhead={canOverhead}
+        canProfitability={canProfitability}
       />
     </PageShell>
   );

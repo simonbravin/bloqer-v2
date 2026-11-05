@@ -14,6 +14,7 @@ import {
   getMaterialVarianceReport,
   getPayableAgingReport,
   getProcurementDeviationReport,
+  getPurchaseOrderVarianceReport,
   getProjectSupplierReport,
   getProjectProgressReport,
   type ProjectProgressFilters,
@@ -70,6 +71,8 @@ import {
   getPortfolioProfitabilityReport,
   getOverheadByProjectReport,
   getMultiProjectProcurementReport,
+  parsePortfolioProfitabilityExportFilters,
+  parsePortfolioReportStatus,
 } from "@bloqer/services";
 import { formatDateTime, formatDbDate, formatTimezoneOptionLabel } from "@bloqer/utils";
 import { resolvePdfReportBranding } from "./branding/pdf-branding.service";
@@ -87,6 +90,13 @@ import { renderReportPdfToBuffer } from "./pdf/pdf-renderer.service";
 import { buildPdfFilterLine } from "./pdf/pdf-filter-line";
 
 type BrandingScope = { projectId?: string };
+
+const PORTFOLIO_COST_LAYER_LABELS = {
+  exposure: "Exposición esperada",
+  committed: "Costo comprometido",
+  accrued: "Costo devengado",
+  paid: "Costo pagado",
+};
 
 async function exportPdfDocument(
   ctx: ServiceContext,
@@ -235,6 +245,7 @@ export async function exportCertificationEvolutionPdf(
   if (report.type === "NO_APPROVED_BUDGETS") {
     throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar");
   }
+  const progressByPeriod = new Map(report.progressSeries.map((point) => [point.periodKey, point]));
   return exportPdfDocument(
     ctx,
     { projectId },
@@ -243,21 +254,48 @@ export async function exportCertificationEvolutionPdf(
       <ProjectSimpleTablePdfDocument
         branding={branding}
         title="Certificaciones — evolución y estado"
-        subtitle={report.budgetName}
+        subtitle={`${report.budgetName} · ${report.currency}`}
         filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
         columns={[
           { key: "period", label: "Período", flex: 1 },
           { key: "cert", label: "Certificado", flex: 1 },
           { key: "inv", label: "Facturado", flex: 1 },
           { key: "col", label: "Cobrado", flex: 1 },
+          { key: "economic", label: "Av. económico %", flex: 0.9 },
+          { key: "physical", label: "Av. físico %", flex: 0.9 },
+          { key: "financial", label: "Av. financiero %", flex: 0.9 },
         ]}
         rows={report.monthlySeries.map((p) => ({
           period: p.periodLabel,
           cert: p.certifiedAmount,
-          inv: p.invoicedAmount,
-          col: p.collectedAmount,
+          inv: p.invoicedAmount ?? "—",
+          col: p.collectedAmount ?? "—",
+          economic: progressByPeriod.get(p.periodKey)?.economicPct ?? "—",
+          physical: progressByPeriod.get(p.periodKey)?.physicalPct ?? "—",
+          financial: progressByPeriod.get(p.periodKey)?.financialPct ?? "—",
         }))}
         warnings={report.warnings}
+        additionalTable={report.portfolio.length > 0 ? {
+          title: "Estado de las certificaciones",
+          columns: [
+            { key: "code", label: "Código", flex: 0.6 },
+            { key: "period", label: "Período", flex: 1.2 },
+            { key: "status", label: "Estado", flex: 0.7 },
+            { key: "certified", label: "Certificado", flex: 0.8 },
+            { key: "invoiced", label: "Facturado", flex: 0.8 },
+            { key: "collected", label: "Cobrado", flex: 0.8 },
+            { key: "payment", label: "Cobranza", flex: 0.8 },
+          ],
+          rows: report.portfolio.map((row) => ({
+            code: row.code,
+            period: `${row.periodStart} → ${row.periodEnd}`,
+            status: row.status,
+            certified: row.totalAmount,
+            invoiced: row.invoicedAmount ?? "—",
+            collected: row.collectedAmount ?? "—",
+            payment: row.paymentStatus ?? "—",
+          })),
+        } : undefined}
       />
     ),
   );
@@ -293,22 +331,50 @@ export async function exportSubcontractVariancePdf(
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Subcontratos — varianza y certificaciones"
-      subtitle={`${report.budgetName} · ${report.pendingContractCount} sin contrato`}
+      subtitle={`${report.budgetName} · ${report.currency} · ${report.pendingContractCount} sin contrato`}
       filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
       columns={[
-        { key: "code", label: "Partida", flex: 0.7 },
+        { key: "code", label: "Código", flex: 0.7 },
         { key: "name", label: "Ítem", flex: 1.2 },
         { key: "budget", label: "Presup. sub", flex: 0.9 },
         { key: "committed", label: "Contratado", flex: 0.9 },
+        { key: "certified", label: "Certificado", flex: 0.9 },
+        { key: "paid", label: "Pagado", flex: 0.75 },
+        { key: "variance", label: "Variación", flex: 0.8 },
         { key: "status", label: "Estado", flex: 0.8 },
       ]}
-      rows={report.byWbs.map((r) => ({
-        code: r.wbsCode,
-        name: r.wbsName,
-        budget: r.budgetSubcontract,
-        committed: r.committedCost,
-        status: r.status,
-      }))}
+      rows={[
+        ...report.byWbs.map((r) => ({
+          code: r.wbsCode,
+          name: r.wbsName,
+          budget: r.budgetSubcontract,
+          committed: r.committedCost,
+          certified: r.certifiedCost,
+          paid: "—",
+          variance: r.varianceCommitted,
+          status: r.status,
+        })),
+        ...report.contracts.map((contract) => ({
+          code: contract.code,
+          name: `${contract.title} · ${contract.subcontractorName}`,
+          budget: "—",
+          committed: contract.totalValue,
+          certified: contract.certifiedCost,
+          paid: "—",
+          variance: "—",
+          status: contract.status,
+        })),
+        ...report.monthlyCertification.map((point) => ({
+          code: point.periodKey,
+          name: point.periodLabel,
+          budget: "—",
+          committed: "—",
+          certified: point.certifiedAmount,
+          paid: report.apAvailable ? point.paidAmount : "—",
+          variance: "—",
+          status: "—",
+        })),
+      ]}
       warnings={report.warnings}
     />
   ));
@@ -320,6 +386,7 @@ export async function exportProjectIncomeExpensePdf(
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
   const report = await getProjectIncomeExpenseReport(projectId, filters, ctx);
+  const { certifications, ar, ap } = report.sourcesAvailable;
   return exportPdfDocument(
     ctx,
     { projectId },
@@ -328,20 +395,29 @@ export async function exportProjectIncomeExpensePdf(
       <ProjectSimpleTablePdfDocument
         branding={branding}
         title="Ingresos vs gastos"
-        subtitle={`${report.dateFrom} → ${report.dateTo} · ${report.displayCurrency}`}
-        totalsLine={`MB devengado: ${report.totals.grossMarginAccrued} · MB caja: ${report.totals.grossMarginCash}`}
+        subtitle={`${report.dateFrom} → ${report.dateTo}`}
         columns={[
+          { key: "currency", label: "Moneda", flex: 0.55 },
           { key: "period", label: "Mes", flex: 1 },
           { key: "cert", label: "Certificado", flex: 0.9 },
           { key: "costAcc", label: "Costo dev.", flex: 0.9 },
           { key: "mb", label: "MB dev.", flex: 0.9 },
+          { key: "collected", label: "Cobrado", flex: 0.9 },
+          { key: "paid", label: "Pagado", flex: 0.9 },
+          { key: "mbCash", label: "MB caja", flex: 0.9 },
         ]}
-        rows={report.series.map((p) => ({
-          period: p.periodLabel,
-          cert: p.certifiedAmount,
-          costAcc: p.costAccrued,
-          mb: p.grossMarginAccrued,
-        }))}
+        rows={report.byCurrency.flatMap(({ currency, series, totals }) =>
+          [{ ...totals, periodLabel: "Total" }, ...series].map((p) => ({
+            currency,
+            period: p.periodLabel,
+            cert: certifications ? p.certifiedAmount : "—",
+            costAcc: ap ? p.costAccrued : "—",
+            mb: p.grossMarginAccrued ?? "—",
+            collected: ar ? p.collectedAmount : "—",
+            paid: ap ? p.costPaid : "—",
+            mbCash: p.grossMarginCash ?? "—",
+          })),
+        )}
         warnings={report.warnings}
       />
     ),
@@ -357,21 +433,34 @@ export async function exportProjectProfitabilityPdf(
   if (report.type === "NO_APPROVED_BUDGETS") {
     throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar");
   }
+  const revenueLabel = report.revenueBasis === "invoiced" ? "Facturado neto" : "Certificado";
+  const overheadCurrency = report.overheadManualAmount != null ? report.currency : "ARS";
   return exportPdfDocument(ctx, { projectId }, `rentabilidad_${report.budgetName}`, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Rentabilidad del proyecto"
-      subtitle={`${report.budgetName} · ${report.currency}`}
-      totalsLine={`Ingresos: ${report.revenue} · Costos: ${report.directCost} · MB: ${report.grossMargin} (${report.grossMarginPct ?? "—"}%)`}
+      subtitle={`${report.budgetName} · ${revenueLabel} · ${PORTFOLIO_COST_LAYER_LABELS[report.costLayer]}`}
       columns={[
         { key: "metric", label: "Concepto", flex: 1.2 },
         { key: "value", label: "Monto", flex: 1 },
+        { key: "currency", label: "Moneda", flex: 0.5 },
       ]}
       rows={[
-        { metric: "Ingresos", value: report.revenue },
-        { metric: "Costos directos", value: report.directCost },
-        { metric: "Margen bruto", value: report.grossMargin },
-        { metric: "Margen proyectado", value: report.projectedMargin },
+        { metric: revenueLabel, value: report.revenue ?? "—", currency: report.currency },
+        { metric: "Costos directos", value: report.directCost ?? "—", currency: report.currency },
+        { metric: "Margen bruto", value: report.grossMargin ?? "—", currency: report.currency },
+        { metric: "Margen bruto %", value: report.grossMarginPct == null ? "—" : `${report.grossMarginPct}%`, currency: "" },
+        { metric: "Margen proyectado", value: report.projectedMargin, currency: report.budgetCurrency },
+        { metric: "Venta presupuestada", value: report.budgetTotalSale, currency: report.budgetCurrency },
+        ...(report.overheadAmount != null ? [
+          { metric: "Gastos generales", value: report.overheadAmount, currency: overheadCurrency },
+          { metric: "Margen neto", value: report.netMargin ?? "—", currency: report.currency },
+        ] : []),
+        ...report.byCurrency.flatMap((slice) => report.byCurrency.length > 1 ? [
+          { metric: `${revenueLabel} por moneda`, value: slice.revenue, currency: slice.currency },
+          { metric: "Costos directos por moneda", value: slice.directCost ?? "—", currency: slice.currency },
+          { metric: "Margen bruto por moneda", value: slice.grossMargin ?? "—", currency: slice.currency },
+        ] : []),
       ]}
       warnings={report.warnings}
     />
@@ -474,29 +563,71 @@ export async function exportProcurementDeviationPdf(
   if (result.type === "NO_APPROVED_BUDGETS") {
     throw new ServiceError("CONFLICT", "No hay presupuesto aprobado para exportar compras");
   }
+  const poVariance = await getPurchaseOrderVarianceReport(projectId, ctx, filters);
   return exportPdfDocument(ctx, { projectId }, `compras_${result.budgetName}`, (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
-      title="Compras y proveedores"
-      subtitle={result.budgetName}
+      title="Análisis de compras"
+      subtitle={`${result.budgetName} · ${result.currency}`}
       filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
       columns={[
-        { key: "code", label: "Partida", flex: 0.7 },
-        { key: "name", label: "Ítem", flex: 1.2 },
+        { key: "type", label: "Tipo", flex: 0.65 },
+        { key: "code", label: "Código", flex: 0.7 },
+        { key: "name", label: "Descripción o proveedor", flex: 1.45 },
         { key: "budget", label: "Presup.", flex: 0.85 },
         { key: "committed", label: "Comprom.", flex: 0.85 },
         { key: "accrued", label: "Deveng.", flex: 0.85 },
         { key: "variance", label: "Var.", flex: 0.75 },
+        { key: "paid", label: "Pagado", flex: 0.75 },
+        { key: "open", label: "OC abierta", flex: 0.8 },
+        { key: "unallocated", label: "Sin EDT", flex: 0.8 },
       ]}
-      rows={result.byWbs.map((r) => ({
-        code: r.wbsCode,
-        name: r.wbsName,
-        budget: r.budgetMaterial,
-        committed: r.committedCost,
-        accrued: r.accruedCost,
-        variance: r.varianceAmount,
-      }))}
+      rows={[
+        ...result.bySupplier.map((row) => ({
+          type: "Proveedor", code: "", name: row.supplierName,
+          budget: "", committed: row.committedCost,
+          accrued: result.apAvailable ? row.accruedCost : "—",
+          variance: "", paid: result.apAvailable ? row.paidCost : "—",
+          open: result.apAvailable ? row.openCommitted : "—", unallocated: "",
+        })),
+        ...result.unallocated.map((row) => ({
+          type: row.documentType, code: row.documentCode,
+          name: `${row.description} · ${row.supplierName}`,
+          budget: "", committed: "", accrued: "", variance: "", paid: "", open: "",
+          unallocated: row.amount,
+        })),
+        ...result.byWbs.map((row) => ({
+          type: "Partida", code: row.wbsCode, name: row.wbsName,
+          budget: row.budgetMaterial, committed: row.committedCost,
+          accrued: result.apAvailable ? row.accruedCost : "—",
+          variance: row.varianceAmount,
+          paid: "", open: "", unallocated: "",
+        })),
+      ]}
       warnings={result.warnings}
+      additionalTable={poVariance.rows.length > 0 ? {
+        title: "Desvíos en líneas de OC",
+        columns: [
+          { key: "order", label: "OC", flex: 0.6 },
+          { key: "description", label: "Línea / EDT", flex: 1.3 },
+          { key: "currency", label: "Moneda OC", flex: 0.6 },
+          { key: "price", label: "P. unitario", flex: 0.7 },
+          { key: "discount", label: "Desc. %", flex: 0.65 },
+          { key: "baseline", label: "Referencia", flex: 0.75 },
+          { key: "variance", label: "Desvío %", flex: 0.7 },
+          { key: "reason", label: "Motivo", flex: 1.5 },
+        ],
+        rows: poVariance.rows.map((row) => ({
+          order: row.purchaseOrderCode,
+          description: row.wbsCode ? `${row.description} · ${row.wbsCode}` : row.description,
+          currency: row.currency,
+          price: row.unitPrice,
+          discount: row.discountPct,
+          baseline: row.budgetUnitCostSnapshot ?? "—",
+          variance: row.variancePct ?? "—",
+          reason: row.varianceJustification ?? row.varianceTier,
+        })),
+      } : undefined}
     />
   ));
 }
@@ -512,9 +643,9 @@ export async function exportProjectSupplierReportPdf(
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Proveedores de la obra"
-      subtitle="Pedidos, capas de costo y saldo CxP (R-AP-03)"
-      filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo })}
-      totalsLine={`Proveedores: ${result.totals.supplierCount} · OC: ${result.totals.poCount} · Comprometido: ${result.totals.committedCost} · Exposición: ${result.totals.expectedExposure} · Saldo CxP: ${result.totals.payableBalance}`}
+      subtitle={`Pedidos, capas de costo y saldo CxP (R-AP-03) · ${result.currency}`}
+      filterLine={buildPdfFilterLine({ dateFrom: filters.dateFrom, dateTo: filters.dateTo, currency: result.currency })}
+      totalsLine={`Proveedores: ${result.totals.supplierCount} · OC: ${result.totals.poCount} · Comprometido: ${result.totals.committedCost}${result.apAvailable ? ` · Exposición: ${result.totals.expectedExposure} · Saldo CxP: ${result.totals.payableBalance}` : ""}`}
       columns={[
         { key: "name", label: "Proveedor", flex: 1.4 },
         { key: "pos", label: "OC", flex: 0.45 },
@@ -529,13 +660,13 @@ export async function exportProjectSupplierReportPdf(
       rows={result.rows.map((r) => ({
         name: r.supplierName,
         pos: String(r.poCount),
-        invoices: String(r.invoiceCount),
+        invoices: result.apAvailable ? String(r.invoiceCount) : "—",
         committed: r.committedCost,
-        accrued: r.accruedCost,
-        paid: r.paidCost,
-        exposure: r.expectedExposure,
-        share: r.shareOfExposurePct ? `${r.shareOfExposurePct}%` : "—",
-        payable: r.payableBalance,
+        accrued: result.apAvailable ? r.accruedCost : "—",
+        paid: result.apAvailable ? r.paidCost : "—",
+        exposure: result.apAvailable ? r.expectedExposure : "—",
+        share: result.apAvailable && r.shareOfExposurePct ? `${r.shareOfExposurePct}%` : "—",
+        payable: result.apAvailable ? r.payableBalance : "—",
       }))}
       warnings={result.warnings}
     />
@@ -548,10 +679,12 @@ export async function exportProjectCashFlowPdf(
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
   const report = await getProjectCashFlowReport(projectId, filters, ctx);
-  const cur = report.currencies.find((c) => c.currency === "ARS") ?? report.currencies[0];
-  if (!cur) {
+  if (report.currencies.length === 0) {
     throw new ServiceError("CONFLICT", "Sin movimientos de caja para exportar");
   }
+  const exclusions = report.warnings.sectionsExcluded ?? [];
+  const inflowsAvailable = !exclusions.some((entry) => entry.module === "AR");
+  const outflowsAvailable = !exclusions.some((entry) => entry.module === "AP");
   const slug = `${report.project.code ?? projectId}_${report.dateFrom}_${report.dateTo}`.replace(
     /[^a-zA-Z0-9._-]+/g,
     "_",
@@ -562,22 +695,38 @@ export async function exportProjectCashFlowPdf(
       title="Flujo de caja — proyecto"
       subtitle={`${report.project.name} · ${report.dateFrom} → ${report.dateTo}`}
       filterLine={buildPdfFilterLine({
-        period: filters.period,
-        currency: filters.currency ?? cur.currency,
+        period: report.period,
+        currency: filters.currency,
       })}
-      totalsLine={`Ingresos: ${cur.totalInflows} · Egresos: ${cur.totalOutflows} · Neto: ${cur.netCashFlow} ${cur.currency}`}
+      warnings={[
+        ...(report.warnings.multiCurrency ? ["Los totales se presentan por moneda."] : []),
+        ...exclusions.map(({ module, reason }) =>
+          `${module === "AR" ? "Cobranzas omitidas" : "Pagos omitidos"} · ${reason === "MISSING_PERMISSION" ? "Sin permiso" : "Módulo deshabilitado"}`,
+        ),
+      ]}
       columns={[
+        { key: "currency", label: "Moneda", flex: 0.5 },
         { key: "period", label: "Período", flex: 1.1 },
         { key: "inflows", label: "Ingresos", flex: 0.9 },
         { key: "outflows", label: "Egresos", flex: 0.9 },
-        { key: "net", label: "Neto", flex: 0.9 },
+        { key: "net", label: exclusions.length > 0 ? "Saldo visible" : "Neto", flex: 0.9 },
       ]}
-      rows={cur.periods.map((p) => ({
-        period: p.periodLabel,
-        inflows: p.inflows,
-        outflows: p.outflows,
-        net: p.netCashFlow,
-      }))}
+      rows={[
+        ...report.currencies.map((cur) => ({
+          currency: cur.currency,
+          period: "Total",
+          inflows: inflowsAvailable ? cur.totalInflows : "—",
+          outflows: outflowsAvailable ? cur.totalOutflows : "—",
+          net: cur.netCashFlow,
+        })),
+        ...report.currencies.flatMap((cur) => cur.periods.map((p) => ({
+          currency: cur.currency,
+          period: p.periodLabel,
+          inflows: inflowsAvailable ? p.inflows : "—",
+          outflows: outflowsAvailable ? p.outflows : "—",
+          net: p.netCashFlow,
+        }))),
+      ]}
     />
   ));
 }
@@ -1189,12 +1338,7 @@ export async function exportProjectPortfolioPdf(
   ctx: ServiceContext,
   filters?: { status?: string },
 ): Promise<ReportPdfPayload> {
-  type PS = import("@bloqer/database").ProjectStatus;
-  const allowed: PS[] = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"];
-  const status =
-    filters?.status && (allowed as string[]).includes(filters.status)
-      ? (filters.status as PS)
-      : undefined;
+  const status = parsePortfolioReportStatus(filters?.status);
   const report = await getProjectPortfolioReport(ctx, { status });
   return exportPdfDocument(ctx, {}, "portafolio_proyectos", (branding) => (
     <ProjectSimpleTablePdfDocument
@@ -1206,6 +1350,7 @@ export async function exportProjectPortfolioPdf(
         { key: "code", label: "Código", flex: 0.7 },
         { key: "name", label: "Proyecto", flex: 1.4 },
         { key: "status", label: "Estado", flex: 0.7 },
+        { key: "currency", label: "Moneda", flex: 0.55 },
         { key: "budget", label: "Presup.", flex: 0.8 },
         { key: "committed", label: "Comprom.", flex: 0.8 },
         { key: "accrued", label: "Deveng.", flex: 0.8 },
@@ -1216,11 +1361,12 @@ export async function exportProjectPortfolioPdf(
         code: r.code,
         name: r.name,
         status: r.status,
-        budget: r.budgetTotalCost,
-        committed: r.committedCost,
-        accrued: r.accruedCost,
-        exposure: r.expectedCostExposure,
-        variance: r.costVariance,
+        currency: r.currency ?? "—",
+        budget: r.currency ? r.budgetTotalCost : "—",
+        committed: r.currency ? r.committedCost : "—",
+        accrued: r.currency ? r.accruedCost : "—",
+        exposure: r.currency ? r.expectedCostExposure : "—",
+        variance: r.currency ? r.costVariance : "—",
       }))}
     />
   ));
@@ -1230,31 +1376,25 @@ export async function exportPortfolioProfitabilityPdf(
   ctx: ServiceContext,
   filters?: { costLayer?: string; revenueBasis?: string; status?: string },
 ): Promise<ReportPdfPayload> {
-  type PS = import("@bloqer/database").ProjectStatus;
-  const allowed: PS[] = ["DRAFT", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"];
-  const report = await getPortfolioProfitabilityReport(ctx, {
-    costLayer: filters?.costLayer as "exposure" | "committed" | "accrued" | "paid" | undefined,
-    revenueBasis: filters?.revenueBasis as "certified" | "invoiced" | undefined,
-    status:
-      filters?.status && (allowed as string[]).includes(filters.status)
-        ? (filters.status as PS)
-        : undefined,
-  });
+  const appliedFilters = parsePortfolioProfitabilityExportFilters(filters);
+  const report = await getPortfolioProfitabilityReport(ctx, appliedFilters);
   const rows = [
     ...report.rows.map((r) => ({
       code: r.code,
       name: r.name,
-      revenue: r.revenue,
-      cost: r.directCost,
-      margin: r.grossMargin,
+      currency: r.currency ?? "",
+      revenue: r.revenue ?? "—",
+      cost: r.directCost ?? "—",
+      margin: r.grossMargin ?? "—",
       pct: r.grossMarginPct ?? "",
     })),
     {
       code: "",
       name: "CONSOLIDADO",
-      revenue: report.consolidatedRevenue,
-      cost: report.consolidatedDirectCost,
-      margin: report.consolidatedGrossMargin,
+      currency: report.consolidatedCurrency ?? "",
+      revenue: report.consolidatedRevenue ?? "—",
+      cost: report.consolidatedDirectCost ?? "—",
+      margin: report.consolidatedGrossMargin ?? "—",
       pct: report.consolidatedGrossMarginPct ?? "",
     },
   ];
@@ -1262,11 +1402,12 @@ export async function exportPortfolioProfitabilityPdf(
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Rentabilidad multi-obra"
-      subtitle="Ingresos vs costos directos por obra"
+      subtitle={`${appliedFilters.revenueBasis === "invoiced" ? "Facturado neto" : "Ingresos certificados"} · ${PORTFOLIO_COST_LAYER_LABELS[appliedFilters.costLayer]}`}
       warnings={report.warnings}
       columns={[
         { key: "code", label: "Código", flex: 0.7 },
         { key: "name", label: "Proyecto", flex: 1.6 },
+        { key: "currency", label: "Moneda", flex: 0.55 },
         { key: "revenue", label: "Ingresos", flex: 0.9 },
         { key: "cost", label: "Costos", flex: 0.9 },
         { key: "margin", label: "Margen", flex: 0.9 },
@@ -1319,20 +1460,26 @@ export async function exportMultiProjectProcurementPdf(
     ...report.topSuppliers.map((s) => ({
       section: "Proveedores",
       supplier: s.supplierName,
+      currency: s.currency,
       project: "",
       po: "",
       committed: s.committedCost,
-      accrued: s.accruedCost,
-      paid: s.paidCost,
+      accrued: report.apAvailable ? s.accruedCost : "—",
+      paid: report.apAvailable ? s.paidCost : "—",
+      status: "",
+      total: "",
     })),
     ...report.openPurchaseOrders.map((po) => ({
       section: "OC abiertas",
       supplier: po.supplierName,
+      currency: po.currency,
       project: `${po.projectCode} — ${po.projectName}`,
       po: po.poNumber,
-      committed: po.totalAmount,
+      committed: "",
       accrued: "",
       paid: "",
+      status: po.status,
+      total: po.totalAmount,
     })),
   ];
   return exportPdfDocument(ctx, {}, "compras_multi_obra", (branding) => (
@@ -1346,9 +1493,12 @@ export async function exportMultiProjectProcurementPdf(
         { key: "supplier", label: "Proveedor", flex: 1.3 },
         { key: "project", label: "Obra", flex: 1.2 },
         { key: "po", label: "OC", flex: 0.6 },
+        { key: "status", label: "Estado", flex: 0.8 },
+        { key: "currency", label: "Moneda", flex: 0.55 },
         { key: "committed", label: "Comprom.", flex: 0.8 },
         { key: "accrued", label: "Deveng.", flex: 0.8 },
         { key: "paid", label: "Pagado", flex: 0.7 },
+        { key: "total", label: "Monto total", flex: 0.8 },
       ]}
       rows={rows}
     />

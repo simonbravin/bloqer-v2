@@ -48,7 +48,7 @@ const timeOfDaySchema = z.preprocess(
   (val) => {
     if (typeof val !== "string") return val;
     const trimmed = val.trim();
-    const match = trimmed.match(/^(\d{2}:\d{2})/);
+    const match = trimmed.match(/^(\d{2}:\d{2})(?::[0-5]\d(?:\.\d{1,3})?)?$/);
     return match ? match[1] : trimmed;
   },
   z.string().regex(/^([01][0-9]|2[0-3]):[0-5][0-9]$/, "Hora inválida (use HH:mm)"),

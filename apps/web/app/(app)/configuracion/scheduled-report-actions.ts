@@ -10,7 +10,9 @@ import {
   reactivateScheduledReport,
   ServiceError,
   updateScheduledReport,
+  type ScheduledReportRunSummary,
 } from "@bloqer/services";
+import { SCHEDULED_REPORT_RUN_STATUS_LABEL } from "@/features/scheduled-reports/scheduled-report-labels";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import {
   executeScheduledReportNow,
@@ -18,15 +20,12 @@ import {
 } from "@/lib/scheduled-report-run";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 
-function runResultMessage(summary: {
-  runStatus: string;
-  recipientsSent: number;
-  recipientsFailed: number;
-  recipientsSkipped: number;
-  attachmentErrors: string[];
-}): string {
+function runResultMessage(summary: ScheduledReportRunSummary): string {
+  const status = summary.runStatus === "LOCKED"
+    ? "Hay otra ejecución en curso. Volvé a intentar cuando termine."
+    : SCHEDULED_REPORT_RUN_STATUS_LABEL[summary.runStatus];
   const parts = [
-    `Estado: ${summary.runStatus}`,
+    `Estado: ${status}`,
     `enviados: ${summary.recipientsSent}`,
     `fallidos: ${summary.recipientsFailed}`,
     `omitidos: ${summary.recipientsSkipped}`,
@@ -41,6 +40,8 @@ function revalidateScheduledReportPaths(projectId?: string | null) {
   revalidatePath("/configuracion/reportes");
   if (projectId) {
     revalidatePath(`/proyectos/${projectId}/reportes/programados`);
+  } else {
+    revalidatePath("/proyectos/[id]/reportes/programados", "page");
   }
 }
 
@@ -66,11 +67,11 @@ export async function updateScheduledReportAction(input: unknown) {
   if (!ctx) redirect("/login");
   try {
     const updated = await updateScheduledReport(ctx, input);
-    revalidateScheduledReportPaths(updated.projectId);
+    revalidateScheduledReportPaths();
     redirect(`/configuracion/reportes/${updated.id}?ok=updated`);
   } catch (e) {
     rethrowNextNavigationError(e);
-    if (e instanceof ServiceError && e.code === "VALIDATION") {
+    if (e instanceof ServiceError && (e.code === "VALIDATION" || e.code === "CONFLICT")) {
       const id =
         typeof input === "object" && input && "id" in input
           ? String((input as { id: string }).id)
@@ -88,7 +89,7 @@ export async function deactivateScheduledReportAction(id: string) {
   if (!ctx) redirect("/login");
   try {
     await deactivateScheduledReport(ctx, id);
-    revalidatePath("/configuracion/reportes");
+    revalidateScheduledReportPaths();
     redirect(`/configuracion/reportes/${id}?ok=paused`);
   } catch (e) {
     rethrowNextNavigationError(e);
@@ -102,7 +103,7 @@ export async function reactivateScheduledReportAction(id: string) {
   if (!ctx) redirect("/login");
   try {
     await reactivateScheduledReport(ctx, id);
-    revalidatePath("/configuracion/reportes");
+    revalidateScheduledReportPaths();
     redirect(`/configuracion/reportes/${id}?ok=reactivated`);
   } catch (e) {
     rethrowNextNavigationError(e);
@@ -162,7 +163,7 @@ export async function deleteScheduledReportAction(id: string) {
   if (!ctx) redirect("/login");
   try {
     await deleteScheduledReport(ctx, id);
-    revalidatePath("/configuracion/reportes");
+    revalidateScheduledReportPaths();
     redirect("/configuracion/reportes?ok=deleted");
   } catch (e) {
     rethrowNextNavigationError(e);

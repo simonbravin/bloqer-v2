@@ -9,6 +9,9 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { requireProjectAccess } from "../security/access";
 import { arCollectionParents, assertArCollectionParents } from "../ar/ar-integrity";
 import { apPaymentParents, assertApPaymentReadParents } from "../ap/ap-integrity";
+import { canViewArProjectArea } from "../ar/ar-access";
+import { canViewApProjectArea } from "../ap/ap-access";
+import { defaultReportDateRange, monthLabel } from "../reports/report-month";
 
 export { canViewProjectCashFlowReport };
 
@@ -33,13 +36,11 @@ function periodKey(date: Date, period: "day" | "week" | "month"): string {
 }
 
 function periodLabel(key: string, period: "day" | "week" | "month"): string {
-  const parts = key.split("-");
   if (period === "day") {
     return formatDate(key);
   }
   if (period === "month") {
-    return new Date(Date.UTC(+parts[0]!, +parts[1]! - 1, 1))
-      .toLocaleDateString("es-AR", { month: "long", year: "numeric" });
+    return monthLabel(key);
   }
   const weekMatch = key.match(/^(\d{4})-W(\d{2})$/);
   if (weekMatch) {
@@ -61,22 +62,12 @@ function pickIsoDate(value: string | undefined, fallback: string): string {
   return value && isValidIsoDate(value) ? value : fallback;
 }
 
-function defaultDateRange(): { dateFrom: string; dateTo: string } {
-  const to   = new Date();
-  const from = new Date(to);
-  from.setFullYear(from.getFullYear() - 1);
-  return {
-    dateFrom: from.toISOString().slice(0, 10),
-    dateTo:   to.toISOString().slice(0, 10),
-  };
-}
-
 /** Merge partial URL filters with defaults so a single date change still narrows the report. */
 export function resolveProjectCashFlowDateRange(filters: {
   dateFrom?: string;
   dateTo?: string;
 }): { dateFrom: string; dateTo: string } {
-  const defaults = defaultDateRange();
+  const defaults = defaultReportDateRange();
   let dateFrom = pickIsoDate(filters.dateFrom, defaults.dateFrom);
   let dateTo = pickIsoDate(filters.dateTo, defaults.dateTo);
   if (dateFrom > dateTo) {
@@ -178,22 +169,22 @@ export async function getProjectCashFlowReport(
 
   const gate = await getTenantModuleGate(ctx);
   assertTenantModuleEnabledWithGate(gate, "PROJECTS");
-  const includeAr = gate.isEnabled("AR");
-  const includeAp = gate.isEnabled("AP");
+  const includeAr = gate.isEnabled("AR") && canViewArProjectArea(ctx.roles);
+  const includeAp = gate.isEnabled("AP") && canViewApProjectArea(ctx.roles);
 
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
   if (!includeAr) {
     sectionsExcluded.push({
       module: "AR",
       section: "collections_inflows",
-      reason:  "TENANT_MODULE_DISABLED",
+      reason:  gate.isEnabled("AR") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
   }
   if (!includeAp) {
     sectionsExcluded.push({
       module: "AP",
       section: "payments_outflows",
-      reason:  "TENANT_MODULE_DISABLED",
+      reason:  gate.isEnabled("AP") ? "MISSING_PERMISSION" : "TENANT_MODULE_DISABLED",
     });
   }
 

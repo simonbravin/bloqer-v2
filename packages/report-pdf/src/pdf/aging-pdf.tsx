@@ -8,7 +8,6 @@ function agingFiltersLine(f: AgingFilters): string {
   const parts: string[] = [];
   if (f.currency) parts.push(`Moneda: ${f.currency}`);
   if (f.bucket) parts.push(`Bucket: ${f.bucket}`);
-  if (f.asOfDate) parts.push(`Corte: ${f.asOfDate}`);
   if (f.search) parts.push(`Búsqueda: ${truncateText(f.search, 80)}`);
   if (f.projectId) parts.push("Proyecto: (filtro activo)");
   if (f.contactId) parts.push("Contacto: (filtro activo)");
@@ -77,7 +76,7 @@ export function AgingReportPdfDocument(props: Props) {
           title={title}
           filterLine={agingFiltersLine(props.filters)}
         />
-        <Text style={reportPdfStyles.meta}>Fecha de corte reporte: {props.report.asOfDate}</Text>
+        <Text style={reportPdfStyles.meta}>Saldos actuales · vencimientos al {props.report.asOfDate}</Text>
         <Text style={reportPdfStyles.sectionTitle}>Totales por moneda (sin convertir)</Text>
         {currencyLines.map((line) => (
           <Text key={line} style={reportPdfStyles.meta}>
@@ -94,7 +93,7 @@ export function AgingReportPdfDocument(props: Props) {
           <Text style={[reportPdfStyles.cell, flexSm]}>Nº</Text>
           <Text style={[reportPdfStyles.cell, flexMd]}>Proyecto</Text>
           <Text style={[reportPdfStyles.cell, flexSm]}>Venc.</Text>
-          <Text style={[reportPdfStyles.cell, flexMd]}>Saldo</Text>
+          <Text style={[reportPdfStyles.cell, flexMd]}>Saldo actual</Text>
           <Text style={[reportPdfStyles.cell, flexSm]}>Est.</Text>
         </View>
         {rows.map((r, i) => (

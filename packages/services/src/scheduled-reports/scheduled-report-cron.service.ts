@@ -40,6 +40,7 @@ function summarizeRuns(runs: ScheduledReportRunSummary[]): Omit<CronScheduledRep
     sent += r.recipientsSent;
     skipped += r.recipientsSkipped;
     failed += r.recipientsFailed;
+    if (r.runStatus === "FAILED" && r.recipientsFailed === 0) failed += 1;
     duplicate += r.recipientsDuplicate;
     if (r.runStatus === "LOCKED") locked += 1;
   }
@@ -84,7 +85,7 @@ export async function runScheduledReportsForTenant(
       ok: true,
       tenantsProcessed: 1,
       totals: { ...stats },
-      tenants: [{ tenantId, ok: true, ...stats }],
+      tenants: [{ tenantId, ok: !runs.some((run) => run.runStatus === "FAILED"), ...stats }],
     };
   } catch (e) {
     console.error(

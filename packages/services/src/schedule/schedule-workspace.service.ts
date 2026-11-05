@@ -26,7 +26,6 @@ import {
   computeDaysLate,
   formatDateOnly,
   computeTimePlanProgressPct,
-  isFormerScheduleContainer,
   isScheduleLeafItem,
   mergeDerivedContainerDatesIntoDtos,
 } from "./schedule-helpers";
@@ -780,34 +779,7 @@ export async function getProjectScheduleWorkspace(
     }));
 
   const activeItems = dtoItems.filter((i) => i.status !== "CANCELLED");
-  // Leaf KPIs from full tree (D-046) — not the status-filtered list.
-  const fullActive = rollupSourceItems.filter((i) => i.status !== "CANCELLED");
-  const fullLeafIds = new Set(
-    fullActive.filter((i) => isScheduleLeafItem(fullActive, i.id)).map((i) => i.id),
-  );
-  const completedItems = fullActive.filter(
-    (i) => fullLeafIds.has(i.id) && i.status === "COMPLETED",
-  ).length;
-  let delayedItems = 0;
-  for (const i of fullActive) {
-    if (!fullLeafIds.has(i.id)) continue;
-    // Align with DTO post-merge: former containers have no reliable endDate.
-    if (isFormerScheduleContainer(rollupSourceItems, i.id)) continue;
-    if (computeDaysLate(i.endDate, i.status) !== null) delayedItems += 1;
-  }
-
-  let weighted = "0";
-  let weightSum = "0";
-  for (const i of fullActive) {
-    if (!fullLeafIds.has(i.id)) continue;
-    const former = isFormerScheduleContainer(rollupSourceItems, i.id);
-    const dur = !former && i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
-    weighted = addDecimal(weighted, multiplyDecimal(i.progressPct.toString(), dur));
-    weightSum = addDecimal(weightSum, dur);
-  }
-  const scheduleProgressPct = new Prisma.Decimal(weightSum).greaterThan(0)
-    ? serializeProgressPct(divideDecimal(weighted, weightSum, 2))
-    : null;
+  const { completedItems, delayedItems, scheduleProgressPct } = summarizeScheduleLeaves(rollupSourceItems);
 
   lastScheduleWorkspaceTimings = {
     moduleGateMs,
@@ -852,11 +824,49 @@ export async function getProjectScheduleWorkspace(
   };
 }
 
-export async function computeProjectScheduleProgressPct(
+type ScheduleSummarySource = {
+  id: string;
+  parentId: string | null;
+  status: ScheduleItemStatus;
+  endDate: Date | null;
+  durationDays: number | null;
+  progressPct: Prisma.Decimal;
+};
+
+function summarizeScheduleLeaves(items: ScheduleSummarySource[]) {
+  // Leaf KPIs from the full tree (D-046), regardless of status filters.
+  const activeParents = new Set(items.filter((i) => i.status !== "CANCELLED").map((i) => i.parentId));
+  const parents = new Set(items.map((i) => i.parentId));
+  let completedItems = 0;
+  let delayedItems = 0;
+  let weighted = "0";
+  let weightSum = "0";
+  for (const item of items) {
+    if (item.status === "CANCELLED" || activeParents.has(item.id)) continue;
+    if (item.status === "COMPLETED") completedItems += 1;
+    // Former containers have no reliable end date or duration.
+    const former = parents.has(item.id);
+    if (!former && computeDaysLate(item.endDate, item.status) !== null) delayedItems += 1;
+    const duration = !former && item.durationDays && item.durationDays > 0 ? String(item.durationDays) : "1";
+    weighted = addDecimal(weighted, multiplyDecimal(item.progressPct.toString(), duration));
+    weightSum = addDecimal(weightSum, duration);
+  }
+  const scheduleProgressPct = new Prisma.Decimal(weightSum).greaterThan(0)
+    ? serializeProgressPct(divideDecimal(weighted, weightSum, 2))
+    : null;
+  return { completedItems, delayedItems, scheduleProgressPct };
+}
+
+/** Overview KPIs read the same leaves as the workspace without seeding a schedule or baseline. */
+export async function getProjectScheduleSummary(
   projectId: string,
   ctx: ServiceContext,
-): Promise<string | null> {
-  const ws = await getProjectScheduleWorkspace(projectId, {}, ctx);
-  if (ws.type !== "WORKSPACE") return null;
-  return ws.summary.scheduleProgressPct;
+) {
+  const schedule = await findScheduleForProject(projectId, ctx);
+  if (!schedule) return summarizeScheduleLeaves([]);
+  const items = await prisma.scheduleItem.findMany({
+    where: { tenantId: ctx.tenantId, scheduleId: schedule.id },
+    select: { id: true, parentId: true, status: true, endDate: true, durationDays: true, progressPct: true },
+  });
+  return summarizeScheduleLeaves(items);
 }

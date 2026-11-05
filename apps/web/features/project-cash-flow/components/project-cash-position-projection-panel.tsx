@@ -68,10 +68,10 @@ export function ProjectCashPositionProjectionPanel({
     router.push(qs ? `${pathname}?${qs}` : pathname);
   }
 
-  const row =
-    report?.currencies.find((c) => c.currency === (sp.get("currency") ?? "")) ??
-    report?.currencies.find((c) => c.currency === "ARS") ??
-    report?.currencies[0];
+  const currencies = report?.currencies ?? [];
+  const exclusions = report?.sectionsExcluded ?? [];
+  const inflowsAvailable = !exclusions.some((entry) => entry.module === "AR");
+  const outflowsAvailable = !exclusions.some((entry) => entry.module === "AP");
 
   const asOfLabel = formatDate(report?.asOfDate ?? appliedAsOfDate);
 
@@ -91,8 +91,8 @@ export function ProjectCashPositionProjectionPanel({
             <div className="space-y-1">
               <h3 className="text-sm font-medium">Proyección de caja (proyecto)</h3>
               <p className="text-xs text-muted-foreground">
-                Posición estimada a una fecha: movimientos confirmados más saldos abiertos de CxC y CxP
-                con vencimiento en o antes de esa fecha.
+                Combina los movimientos confirmados hasta la fecha con los saldos abiertos actuales
+                de CxC y CxP que vencen en esa fecha o antes.
               </p>
             </div>
 
@@ -123,7 +123,7 @@ export function ProjectCashPositionProjectionPanel({
               <p className="text-sm text-muted-foreground">
                 Elegí una fecha y presioná Aplicar para ver los indicadores.
               </p>
-            ) : !row ? (
+            ) : currencies.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 Sin movimientos ni obligaciones abiertas para la fecha seleccionada.
               </p>
@@ -137,20 +137,23 @@ export function ProjectCashPositionProjectionPanel({
                   </ul>
                 )}
 
+                {currencies.map((row) => (
+                <section key={row.currency} className="space-y-4">
+                <h4 className="text-sm font-medium">{row.currency}</h4>
                 <KpiStatGrid title={null} columns={4}>
                   <KpiStatCard
                     label="Cobros recibidos hasta la fecha"
-                    value={formatMoneyAmount(row.collectionsReceived, row.currency)}
+                    value={inflowsAvailable ? formatMoneyAmount(row.collectionsReceived, row.currency) : "—"}
                     tone="success"
                   />
                   <KpiStatCard
                     label="Pagos realizados hasta la fecha"
-                    value={formatMoneyAmount(row.paymentsMade, row.currency)}
+                    value={outflowsAvailable ? formatMoneyAmount(row.paymentsMade, row.currency) : "—"}
                     tone="danger"
                   />
                   <KpiStatCard
                     label="Cuentas por cobrar (vencimiento ≤ fecha)"
-                    value={formatMoneyAmount(row.receivablesDue, row.currency)}
+                    value={inflowsAvailable ? formatMoneyAmount(row.receivablesDue, row.currency) : "—"}
                     helper={
                       row.receivableOpenCount > 0
                         ? `${row.receivableOpenCount} documento(s) abierto(s)`
@@ -159,7 +162,7 @@ export function ProjectCashPositionProjectionPanel({
                   />
                   <KpiStatCard
                     label="Cuentas por pagar (vencimiento ≤ fecha)"
-                    value={formatMoneyAmount(row.payablesDue, row.currency)}
+                    value={outflowsAvailable ? formatMoneyAmount(row.payablesDue, row.currency) : "—"}
                     helper={
                       row.payableOpenCount > 0
                         ? `${row.payableOpenCount} documento(s) abierto(s)`
@@ -169,28 +172,24 @@ export function ProjectCashPositionProjectionPanel({
                 </KpiStatGrid>
 
                 <KpiStatCard
-                  label={`Capital proyectado a ${asOfLabel}`}
+                  label={`${exclusions.length > 0 ? "Capital proyectado visible" : "Capital proyectado"} a ${asOfLabel}`}
                   value={formatMoneyAmount(row.projectedCapital, row.currency)}
                   tone={toneByAmount(row.projectedCapital)}
                   variant="highlight"
-                  helper="Cobros recibidos − Pagos realizados + Cuentas por cobrar − Cuentas por pagar"
+                  helper={exclusions.length > 0 ? "Incluye las fuentes disponibles." : "Cobros recibidos − Pagos realizados + Cuentas por cobrar − Cuentas por pagar"}
                   className="w-full"
                 />
 
-                {report && report.currencies.length > 1 && (
-                  <p className="text-xs text-amber-800 dark:text-amber-200">
-                    El proyecto tiene obligaciones en {report.currencies.length} monedas. Se muestra{" "}
-                    {row.currency}; usá el filtro de moneda del reporte principal para cambiar.
-                  </p>
-                )}
+                </section>
+                ))}
 
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <Button asChild variant="outline" size="sm">
+                  {inflowsAvailable ? <Button asChild variant="outline" size="sm">
                     <Link href={`/proyectos/${projectId}/cuentas-por-cobrar`}>Ver CxC</Link>
-                  </Button>
-                  <Button asChild variant="outline" size="sm">
+                  </Button> : null}
+                  {outflowsAvailable ? <Button asChild variant="outline" size="sm">
                     <Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Ver CxP</Link>
-                  </Button>
+                  </Button> : null}
                 </div>
               </>
             )}

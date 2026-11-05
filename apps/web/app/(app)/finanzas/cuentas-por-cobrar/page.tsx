@@ -165,7 +165,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
-          <p className="text-xs text-muted-foreground">Al {formatDate(agingReport.asOfDate)}</p>
+          <p className="text-xs text-muted-foreground">Saldos actuales · vencimientos al {formatDate(agingReport.asOfDate)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ReportExportActions exportPath="/api/reports/finanzas/ar-aging.csv" params={sp} pdf />

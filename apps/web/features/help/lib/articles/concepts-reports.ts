@@ -322,7 +322,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     modules: ["compras", "finanzas"],
     level: "project",
     typicalRoles: ["PM", "Compras", "Finanzas", "OWNER / ADMIN"],
-    permissionHint: "Necesitás ver Compras o Proyectos.",
+    permissionHint: "Necesitás ver Compras u Órdenes de compra. Los importes de CxP y pagos requieren permiso de Cuentas por pagar.",
     where: { menu: "Planificación → Reportes → Proveedores" },
     hrefs: [
       { kind: "project", suffix: "/reportes/proveedores", label: "Proveedores de la obra" },
@@ -330,6 +330,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Planificación → Reportes → card **Proveedores**.",
+      "Elegí **Moneda** si hay varias. La tabla, los rankings y las descargas usan la misma selección.",
       "Revisá el resumen: cantidad de proveedores, comprometido, exposición, pagado, saldo CxP y concentración del top 3.",
       "Los tres rankings: líderes por monto (exposición), por pedidos (OC confirmadas) y por saldo a pagar.",
       "En la tabla ordená por columna. El nombre abre la ficha del directorio.",
@@ -341,6 +342,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "No sumes comprometido + devengado: la exposición ya evita el doble conteo.",
       "El saldo CxP no respeta el filtro de fechas (es el abierto de hoy).",
       "OTIF / lead time de entrega todavía no está en este reporte.",
+      "En Análisis de compras, la varianza por renglón de OC conserva la referencia APU de la orden y usa su fecha de emisión. El detalle también se incluye en CSV y PDF.",
     ],
     relatedSlugs: [
       "hub-reportes-de-obra",
@@ -405,21 +407,25 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     modules: ["presupuesto", "finanzas"],
     level: "project",
     typicalRoles: ["PM", "OWNER / ADMIN", "Finanzas"],
+    permissionHint: "Necesitás acceso a la obra y permiso de rentabilidad. OWNER y ADMIN ven también el margen neto.",
     where: { menu: "Planificación → Reportes → Rentabilidad" },
     hrefs: [
       { kind: "project", suffix: "/reportes/rentabilidad", label: "Rentabilidad del proyecto" },
+      { kind: "project", suffix: "/facturas", label: "Facturas de la obra" },
       { kind: "company", path: "/finanzas/gastos-generales", label: "Gastos generales" },
     ],
     steps: [
       "Planificación → Reportes → Rentabilidad (también desde el KPI del resumen de obra).",
-      "Revisá margen bruto según capas de costo.",
+      "Elegí el presupuesto, la capa de costo y la base de ingresos.",
+      "Facturado neto toma el subtotal sin IVA ni IIBB de las facturas emitidas por certificaciones de ese presupuesto, más notas de débito y menos notas de crédito emitidas de la factura de origen.",
+      "Usá **Ver facturas de la obra** para consultar las ventas directas si tenés permiso de facturación. Certificado conserva el monto certificado aprobado.",
       "OWNER/ADMIN: margen neto si hay gastos generales imputados a la obra.",
       "Exportá CSV/PDF con Exportar.",
       "Para prorratear overhead: Finanzas → Gastos generales (empresa).",
     ],
     pitfalls: [
-      "Sin imputar GG no esperes margen neto completo.",
-      "Rentabilidad de obra ≠ reportes contables de empresa (libro diario / EERR).",
+      "El margen requiere importes comparables. Cuando las fuentes tienen monedas distintas, se muestran por separado.",
+      "El margen neto depende de los GG imputados.",
     ],
     relatedSlugs: [
       "hub-reportes-de-obra",
@@ -433,6 +439,9 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "margen",
       "margen bruto",
       "margen neto",
+      "facturado neto",
+      "ventas directas",
+      "notas de crédito",
       "ganancia obra",
       "profitability",
       "overhead",
@@ -834,6 +843,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Libro de obra — parte del día aparece en alcance empresa. Seleccioná obras activas autorizadas. Se genera PDF con el día de la corrida.",
       "Desde una obra (Planificación → Reportes → Envíos programados) el catálogo es solo de proyecto; el parte diario se crea desde Configuración → Reportes programados (empresa).",
       "En el detalle de un envío Activo, usá **Enviar ahora** y confirmá. Una configuración compartida de alcance global se modifica desde una sesión con alcance global.",
+      "En **Reportes de esta configuración** ves la selección guardada. **Reintentar fallidos** usa la fecha original y omite entregas ya completadas.",
       "Presupuesto vs real ya no se programa: usá EDT y costos.",
     ],
     effects: [
@@ -842,7 +852,8 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "Los reportes que no ves faltan por módulo deshabilitado (inventario, tesorería, libro de obra, etc.).",
-      "La entrega programada requiere que el destinatario conserve su membresía activa. En Libro de obra se incluyen solo los partes que puede consultar.",
+      "Cada entrega programada se genera según la membresía activa, empresa, obras, permisos y módulos de su destinatario. Si no queda ningún adjunto disponible y autorizado, se registra como Omitida.",
+      "En la pantalla de un reporte, Enviar por email permite elegir una dirección si tenés permiso para exportar ese archivo.",
       "El parte diario no usa el filtro Desde/Hasta: el día lo define la hora de la corrida.",
       "Próxima ejecución se muestra en la zona del envío (ej. 23:00 Buenos Aires), no en UTC del servidor.",
       "En Vercel Hobby el cron de programados corre una vez al día (05:05 UTC): un envío vencido puede demorar hasta esa pasada. Usá Enviar ahora para no esperar.",

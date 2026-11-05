@@ -1,6 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { calendarPartsInTimeZone, formatCalendarDate } from "@bloqer/utils";
 import { getPayableAgingReport, getReceivableAgingReport, type AgingReport } from "../aging/aging.service";
 import { canViewCompanyAp } from "../ap/ap-access";
 import { canViewCompanyAr } from "../ar/ar-access";
@@ -10,12 +9,16 @@ import { canRunOperationalAlerts } from "../notifications/operational-alerts-run
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { canEditTeamMembership, canReadTenantConfigArea } from "../tenant-settings/tenant-settings-guards";
 import { getTreasurySummaryByTenant } from "../treasury/balance.service";
-import { getCashFlowReport, type CashFlowReport } from "../treasury-reports/treasury-reports.service";
+import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "../treasury/balance-affecting-statuses";
+import { cashPositionCurrency } from "../treasury-reports/cash-position-amounts";
+import { getCashFlowReport, treasuryReportAccountScope, type CashFlowReport } from "../treasury-reports/treasury-reports.service";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { pickContractualBudgetCard } from "../budget/sum-contractual-budgets";
+import { companyScopeFilter } from "../company-scope";
 import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
+import { trendDateRange } from "../reports/report-month";
 import { formatDashboardMoney } from "./dashboard-format";
 import {
   projectIdWhereForScope,
@@ -227,27 +230,8 @@ function safeRun<T>(_label: string, fn: () => Promise<T>): Promise<T | null> {
 }
 
 function cashFlowRangeDates(range: DashboardCashFlowRange): { dateFrom: string; dateTo: string } {
-  const now = new Date();
-  const parts = calendarPartsInTimeZone(now);
-  const dateTo = formatCalendarDate(parts);
-  if (range === "month") {
-    return {
-      dateFrom: `${parts.year}-${String(parts.month).padStart(2, "0")}-01`,
-      dateTo,
-    };
-  }
-  const pivot = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0));
-  if (range === "3m") pivot.setUTCMonth(pivot.getUTCMonth() - 3);
-  else if (range === "6m") pivot.setUTCMonth(pivot.getUTCMonth() - 6);
-  else pivot.setUTCFullYear(pivot.getUTCFullYear() - 1);
-  return {
-    dateFrom: formatCalendarDate({
-      year: pivot.getUTCFullYear(),
-      month: pivot.getUTCMonth() + 1,
-      day: pivot.getUTCDate(),
-    }),
-    dateTo,
-  };
+  const months = range === "month" ? 1 : range === "3m" ? 3 : range === "6m" ? 6 : 12;
+  return trendDateRange(months);
 }
 
 function cashFlowPeriodForRange(range: DashboardCashFlowRange): "day" | "week" | "month" {
@@ -255,21 +239,21 @@ function cashFlowPeriodForRange(range: DashboardCashFlowRange): "day" | "week" |
 }
 
 async function sumMonthlyTreasuryOutflows(ctx: ServiceContext): Promise<Map<string, Prisma.Decimal>> {
-  const now = new Date();
-  const parts = calendarPartsInTimeZone(now);
-  const start = new Date(Date.UTC(parts.year, parts.month - 1, 1));
+  const { dateFrom, dateTo } = trendDateRange(1);
   const movements = await prisma.accountMovement.findMany({
     where: {
       tenantId: ctx.tenantId,
-      status: "CONFIRMED",
+      account: treasuryReportAccountScope(ctx.tenantId),
+      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
       type: "OUTFLOW",
-      movementDate: { gte: start, lte: now },
+      movementDate: { gte: new Date(dateFrom), lte: new Date(dateTo) },
     },
     select: { amount: true, currency: true },
   });
   const byCur = new Map<string, Prisma.Decimal>();
   for (const m of movements) {
-    byCur.set(m.currency, (byCur.get(m.currency) ?? ZERO).plus(m.amount));
+    const currency = cashPositionCurrency(m.currency);
+    byCur.set(currency, (byCur.get(currency) ?? ZERO).plus(m.amount));
   }
   return byCur;
 }
@@ -428,6 +412,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
               tenantId:  ctx.tenantId,
               projectId: { in: ids },
               status:    { in: ["APPROVED", "CLOSED"] },
+              ...companyScopeFilter(ctx),
             },
             orderBy: [{ projectId: "asc" }, { versionNumber: "desc" }],
             select: { projectId: true, totalSalePrice: true, totalCost: true, currency: true },
@@ -483,6 +468,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
         tenantId: ctx.tenantId,
         status: "DRAFT",
         ...projectIdWhereForScope(certScope),
+        ...companyScopeFilter(ctx),
       },
     });
     kpis.push({
@@ -659,7 +645,8 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       prisma.accountMovement.findMany({
         where: {
           tenantId: ctx.tenantId,
-          status: "CONFIRMED",
+          status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
+          account: treasuryReportAccountScope(ctx.tenantId),
           // Tesorería es tenant-wide (ver getTreasurySummaryByTenant): no auto-filtramos
           // por ctx.companyId; así los movimientos recientes coinciden con las cuentas mostradas.
         },
@@ -682,7 +669,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       movementDate: isoDate(m.movementDate) ?? m.movementDate.toISOString().slice(0, 10),
       description: m.description,
       amount: serializeMoneyDecimal(m.amount),
-      currency: m.currency,
+      currency: cashPositionCurrency(m.currency),
       type: m.type,
       accountName: m.account.name,
       href: buildFinancialHref("AccountMovement", m.id, { accountId: m.accountId }),

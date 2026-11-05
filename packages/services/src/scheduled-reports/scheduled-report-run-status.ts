@@ -17,5 +17,6 @@ export function deriveScheduledReportRunStatus(
     // No successful delivery: skipped/duplicate, or zero recipients attempted.
     return "SKIPPED";
   }
+  if (outcome.recipientsSkipped > 0) return "PARTIAL";
   return "SUCCESS";
 }

@@ -1,4 +1,5 @@
 import { Prisma } from "@bloqer/database";
+import { compareDecimal } from "@bloqer/utils";
 import {
   getProjectCostControl,
   type CostControlFilters,
@@ -20,6 +21,7 @@ export type ProjectWbsProgressRow = {
 };
 
 export type ProjectWbsProgressAlerts = {
+  currency: string;
   nearCompletion: ProjectWbsProgressRow[];
   favorableAtCompletion: ProjectWbsProgressRow[];
   unfavorableAtCompletion: ProjectWbsProgressRow[];
@@ -106,13 +108,14 @@ export async function getProjectWbsProgressAlerts(
 
   nearCompletion.sort((a, b) => parseFloat(b.progressPct) - parseFloat(a.progressPct));
   favorableAtCompletion.sort(
-    (a, b) => parseFloat(b.varianceAmount) - parseFloat(a.varianceAmount),
+    (a, b) => compareDecimal(b.varianceAmount, a.varianceAmount),
   );
   unfavorableAtCompletion.sort(
-    (a, b) => parseFloat(a.varianceAmount) - parseFloat(b.varianceAmount),
+    (a, b) => compareDecimal(a.varianceAmount, b.varianceAmount),
   );
 
   return {
+    currency: cc.currency,
     nearCompletion: nearCompletion.slice(0, 5),
     favorableAtCompletion: favorableAtCompletion.slice(0, 5),
     unfavorableAtCompletion: unfavorableAtCompletion.slice(0, 5),

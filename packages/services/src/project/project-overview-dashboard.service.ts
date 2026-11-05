@@ -21,7 +21,9 @@ import { canViewProjectCostControlReport } from "../cost-control/cost-control.se
 import { getProjectProfitabilityKpi } from "../reports/project-profitability.service";
 import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 import { compareDecimal } from "@bloqer/utils";
-import { computeProjectScheduleProgressPct } from "../schedule/schedule-workspace.service";
+import { getProjectScheduleSummary } from "../schedule/schedule-workspace.service";
+import { canViewScheduleArea } from "../schedule/schedule-access";
+import { companyScopeFilter } from "../company-scope";
 import { canViewArProjectArea } from "../ar/ar-access";
 import {
   canEditPurchaseOrders,
@@ -187,6 +189,9 @@ export async function getProjectOverviewDashboard(
   const gate = await getTenantModuleGate(ctx);
   const shell = await getProjectShellInfo(projectId, ctx);
   const base = `/proyectos/${projectId}`;
+  const projectWhere = { tenantId: ctx.tenantId, projectId };
+  // These operational roots have mandatory companyId; nullable roots use companyScopeFilter.
+  const companyProjectWhere = { ...projectWhere, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
   const sectionsExcluded: ProjectOverviewSectionExcluded[] = [];
   const alerts: ProjectOverviewAlert[] = [];
 
@@ -276,17 +281,19 @@ export async function getProjectOverviewDashboard(
     }
   }
 
-  if (gate.isEnabled("SCHEDULE") && can(ctx.roles, "VIEW", "SCHEDULE")) {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-    const delayedCount = await prisma.scheduleItem.count({
-      where: {
-        tenantId: ctx.tenantId,
-        schedule: { projectId },
-        status: { notIn: ["COMPLETED", "CANCELLED"] },
-        endDate: { lt: today },
-      },
-    });
+  let scheduleProgress = computeScheduleProgress(startDate, estimatedEndDate);
+  const canOpenSchedule = gate.isEnabled("PROJECTS") && gate.isEnabled("SCHEDULE") && canViewScheduleArea(ctx.roles);
+  let hasScheduleProgress = false;
+  if (canOpenSchedule) {
+    const schedule = await getProjectScheduleSummary(projectId, ctx);
+    const delayedCount = schedule.delayedItems;
+    if (schedule.scheduleProgressPct !== null) {
+      hasScheduleProgress = true;
+      scheduleProgress = {
+        percent: Math.round(Number(schedule.scheduleProgressPct)),
+        note: "Avance ponderado de tareas del cronograma (distinto del certificado).",
+      };
+    }
     if (delayedCount > 0) {
       alerts.push({
         label: "Tareas de cronograma atrasadas",
@@ -384,7 +391,7 @@ export async function getProjectOverviewDashboard(
   if (gate.isEnabled("CERTIFICATIONS") && can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
     try {
       certificationsCount = await prisma.certification.count({
-        where: { tenantId: ctx.tenantId, projectId },
+        where: { ...projectWhere, ...companyScopeFilter(ctx) },
       });
     } catch {
       certificationsCount = null;
@@ -407,10 +414,10 @@ export async function getProjectOverviewDashboard(
   let purchaseRequestsAwaitingQuotesCount: number | null = null;
   if (gate.isEnabled("PROCUREMENT") && canViewPurchaseRequests(ctx.roles)) {
     purchaseRequestsCount = await prisma.purchaseRequest.count({
-      where: { tenantId: ctx.tenantId, projectId, status: { not: "CANCELLED" } },
+      where: { ...companyProjectWhere, status: { not: "CANCELLED" } },
     });
     purchaseRequestsAwaitingQuotesCount = await prisma.purchaseRequest.count({
-      where: { tenantId: ctx.tenantId, projectId, status: "SUBMITTED" },
+      where: { ...companyProjectWhere, status: "SUBMITTED" },
     });
     if (
       purchaseRequestsAwaitingQuotesCount > 0 &&
@@ -440,7 +447,7 @@ export async function getProjectOverviewDashboard(
   let purchaseOrdersCount: number | null = null;
   if (gate.isEnabled("PROCUREMENT") && canViewProcurementProjectArea(ctx.roles)) {
     purchaseOrdersCount = await prisma.purchaseOrder.count({
-      where: { tenantId: ctx.tenantId, projectId },
+      where: companyProjectWhere,
     });
   } else if (!gate.isEnabled("PROCUREMENT")) {
     sectionsExcluded.push({ module: "PROCUREMENT", section: "activity_po", reason: "TENANT_MODULE_DISABLED" });
@@ -451,7 +458,7 @@ export async function getProjectOverviewDashboard(
   let subcontractsCount: number | null = null;
   if (gate.isEnabled("SUBCONTRACTS") && canViewSubcontractsArea(ctx.roles)) {
     subcontractsCount = await prisma.subcontract.count({
-      where: { tenantId: ctx.tenantId, projectId },
+      where: companyProjectWhere,
     });
   } else if (!gate.isEnabled("SUBCONTRACTS")) {
     sectionsExcluded.push({
@@ -470,7 +477,7 @@ export async function getProjectOverviewDashboard(
   let documentsCount: number | null = null;
   if (gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS")) {
     documentsCount = await prisma.documentAttachment.count({
-      where: { tenantId: ctx.tenantId, projectId, status: "ACTIVE" },
+      where: { ...projectWhere, ...companyScopeFilter(ctx), status: "ACTIVE" },
     });
   } else {
     sectionsExcluded.push({ module: "PROJECTS", section: "activity_documents", reason: "MISSING_PERMISSION" });
@@ -481,7 +488,7 @@ export async function getProjectOverviewDashboard(
     try {
       await assertJobsiteLogTenantModule(ctx);
       jobsiteLogsCount = await prisma.jobsiteLog.count({
-        where: { tenantId: ctx.tenantId, projectId },
+        where: companyProjectWhere,
       });
     } catch {
       jobsiteLogsCount = null;
@@ -495,7 +502,7 @@ export async function getProjectOverviewDashboard(
   let stockMovementsCount: number | null = null;
   if (gate.isEnabled("INVENTORY") && can(ctx.roles, "VIEW", "INVENTORY")) {
     stockMovementsCount = await prisma.stockMovement.count({
-      where: { tenantId: ctx.tenantId, projectId },
+      where: companyProjectWhere,
     });
   } else if (!gate.isEnabled("INVENTORY")) {
     sectionsExcluded.push({ module: "INVENTORY", section: "activity_stock", reason: "TENANT_MODULE_DISABLED" });
@@ -514,40 +521,14 @@ export async function getProjectOverviewDashboard(
     stockMovementsCount,
   };
 
-  let scheduleProgress = computeScheduleProgress(startDate, estimatedEndDate);
-  if (gate.isEnabled("SCHEDULE")) {
-    try {
-      const pct = await computeProjectScheduleProgressPct(projectId, ctx);
-      if (pct != null) {
-        scheduleProgress = {
-          percent: Math.round(Number(pct)),
-          note: "Avance ponderado de tareas del cronograma (distinto del certificado).",
-        };
-      }
-    } catch {
-      // fallback: tiempo transcurrido del proyecto
-    }
-  }
-
   const compactKpis: DashboardKpi[] = [];
-
-  if (scheduleProgress.percent !== null) {
-    compactKpis.push({
-      key:   "schedule_progress",
-      label: "Avance de cronograma",
-      value: `${scheduleProgress.percent}%`,
-      tone:  scheduleProgress.percent >= 100 ? "warning" : "default",
-      href:  gate.isEnabled("SCHEDULE") ? `${base}/cronograma` : undefined,
-    });
-  } else {
-    compactKpis.push({
-      key:   "schedule_progress",
-      label: "Avance de cronograma",
-      value: "—",
-      tone:  "muted",
-      href:  gate.isEnabled("SCHEDULE") ? `${base}/cronograma` : undefined,
-    });
-  }
+  compactKpis.push({
+    key: "schedule_progress",
+    label: hasScheduleProgress ? "Avance de cronograma" : "Avance temporal de la obra",
+    value: scheduleProgress.percent === null ? "—" : `${scheduleProgress.percent}%`,
+    tone: scheduleProgress.percent === null ? "muted" : scheduleProgress.percent >= 100 ? "warning" : "default",
+    href: canOpenSchedule ? `${base}/cronograma` : undefined,
+  });
 
   if (budget) {
     pushMoneyRowsKpi(compactKpis, "budget_sale", "Presupuesto (venta)", budget.amountByCurrency, budget.href);

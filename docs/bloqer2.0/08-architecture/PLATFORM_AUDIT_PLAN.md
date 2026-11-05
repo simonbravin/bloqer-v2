@@ -3,7 +3,7 @@
 > Preparado: **03/11/2026**. Alcance de esta entrega: plan y herramientas reutilizables.
 > La inspección inicial fue de documentación, estructura y configuración. **No acredita que la plataforma esté auditada ni que se hayan ejecutado sus suites.**
 > Este plan organiza trabajo de calidad; no cambia decisiones de producto, estados, arquitectura ni el roadmap de implementación.
-> **Avance al 05/11/2026.** AG-00 a AG-10 publicadas. [Publicación AG-10](./platform-audit/2026-11-05-ag-10-publication.md) con el PR #8, Production y las dos migraciones verificadas. [AG-11 cerrada localmente](./platform-audit/2026-11-05-ag-11-field-jobsite.md) con 20 grupos corregidos, 2.706 pruebas generales, 49 casos SQL distintos y muestra en escritorio, tablet y teléfono. La revisión integral de UX/UI se mantiene como etapa posterior.
+> **Avance al 05/11/2026.** AG-00 a AG-11 publicadas. [Publicación AG-11](./platform-audit/2026-11-05-ag-11-publication.md) con PR #9 y Production verificada. [AG-12 cerrada localmente](./platform-audit/2026-11-05-ag-12-reporting.md) con 2.733 pruebas generales, 32 casos SQL y una muestra de escritorio, tablet y teléfono. La revisión integral de UX/UI se mantiene como etapa posterior.
 
 ## 1. Resultado buscado
 

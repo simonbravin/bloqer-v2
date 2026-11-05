@@ -158,7 +158,7 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
               dayOfMonth: detail.dayOfMonth ?? undefined,
               timeOfDay: detail.timeOfDay,
               timezone: detail.timezone,
-              reportKeys: detail.items.map((i) => i.reportKey),
+              reports: detail.items,
               recipientUserIds: detail.recipients.map((r) => r.recipientUserId),
               params: detail.params,
             }}

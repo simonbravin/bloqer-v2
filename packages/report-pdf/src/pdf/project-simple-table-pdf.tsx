@@ -16,9 +16,31 @@ type Props = {
   warnings?: string[];
   maxRows?: number;
   footerNote?: string;
+  additionalTable?: { title: string; columns: SimpleTableColumn[]; rows: Record<string, string>[] };
 };
 
 export function ProjectSimpleTablePdfDocument(props: Props) {
+  const tables = [
+    { title: props.title, columns: props.columns, rows: props.rows },
+    ...(props.additionalTable ? [props.additionalTable] : []),
+  ];
+  return (
+    <Document>
+      {tables.map((table, index) => (
+        <SimpleTablePage
+          key={index}
+          {...props}
+          {...table}
+          subtitle={index === 0 ? props.subtitle : undefined}
+          totalsLine={index === 0 ? props.totalsLine : undefined}
+          warnings={index === 0 ? props.warnings : undefined}
+        />
+      ))}
+    </Document>
+  );
+}
+
+function SimpleTablePage(props: Props) {
   const rowLimit = props.maxRows ?? MAX_PROJECT_REPORT_PDF_ROWS;
   const slice = props.rows.slice(0, rowLimit);
   const truncated = props.rows.length > rowLimit;
@@ -30,7 +52,6 @@ export function ProjectSimpleTablePdfDocument(props: Props) {
       : undefined);
 
   return (
-    <Document>
       <Page size="A4" orientation="landscape" style={reportPdfStyles.page}>
         <PdfReportHeader
           branding={props.branding}
@@ -67,6 +88,5 @@ export function ProjectSimpleTablePdfDocument(props: Props) {
         ))}
         <PdfReportFooter branding={props.branding} extraNote={footerNote} />
       </Page>
-    </Document>
   );
 }

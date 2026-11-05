@@ -29,7 +29,7 @@ import {
   FinanceLayerBadge,
 } from "@/features/finance/components/project-finance-layers-guide";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
-import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, formatMoneyDisplay, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
 function warningText(w: { module: string; section: string; reason: string }): string {
   if (w.reason === "TENANT_MODULE_DISABLED") return `Módulo ${w.module} deshabilitado (${w.section}).`;
@@ -115,11 +115,13 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               <>
                 <KpiStatCard
                   label={`Balance (${dashboard.monthBalance.periodLabel})`}
-                  value={formatMoneyAmount(
+                  value={formatMoneyDisplay(
                     dashboard.monthBalance.grossMarginAccrued,
                     dashboard.monthBalance.currency,
                   )}
-                  helper="MB devengado de este mes"
+                  helper={dashboard.monthBalance.grossMarginAccrued === null
+                    ? "Margen no calculable con las fuentes disponibles"
+                    : "MB devengado de este mes"}
                   tone={
                     isZeroMoneyAmount(dashboard.monthBalance.grossMarginAccrued)
                       ? "muted"
@@ -128,20 +130,20 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                         : "danger"
                   }
                 />
-                <KpiStatCard
+                {dashboard.incomeExpense?.sourcesAvailable.certifications ? <KpiStatCard
                   label="Certificado"
                   value={formatMoneyAmount(
                     dashboard.monthBalance.certifiedAmount,
                     dashboard.monthBalance.currency,
                   )}
-                />
-                <KpiStatCard
+                /> : null}
+                {dashboard.incomeExpense?.sourcesAvailable.ap ? <KpiStatCard
                   label="Costo devengado"
                   value={formatMoneyAmount(
                     dashboard.monthBalance.costAccrued,
                     dashboard.monthBalance.currency,
                   )}
-                />
+                /> : null}
               </>
             ) : null}
             {dashboard.monthCashFlow ? (
@@ -176,8 +178,15 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
           </div>
         </CardHeader>
         <CardContent className="min-w-0 pt-4">
-          {dashboard.incomeExpense && dashboard.incomeExpense.series.length > 0 ? (
-            <IncomeExpenseChart series={dashboard.incomeExpense.series} embedded />
+          {dashboard.incomeExpense && dashboard.incomeExpense.byCurrency.some((slice) => slice.series.length > 0) ? (
+            <div className="space-y-4">
+              {dashboard.incomeExpense.byCurrency.filter((slice) => slice.series.length > 0).map((slice) => (
+                <section key={slice.currency} aria-label={`Tendencia mensual en ${slice.currency}`}>
+                  <p className="text-sm font-medium">{slice.currency}</p>
+                  <IncomeExpenseChart series={slice.series} currency={slice.currency} sourcesAvailable={dashboard.incomeExpense?.sourcesAvailable} embedded />
+                </section>
+              ))}
+            </div>
           ) : (
             <p className="py-8 text-center text-sm text-muted-foreground">
               Sin tendencia de ingresos vs gastos.{" "}
@@ -348,10 +357,10 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
                     <TableRow key={s.supplierContactId}>
                       <TableCell className="font-medium">{s.supplierName}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatMoneyAmount(s.accruedCost, moneyCurrency)}
+                        {formatMoneyAmount(s.accruedCost, s.currency)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {formatMoneyAmount(s.paidCost, moneyCurrency)}
+                        {formatMoneyAmount(s.paidCost, s.currency)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -385,7 +394,7 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               title="Sobre presupuesto al 100%"
               rows={wbs.unfavorableAtCompletion}
               valueColumn="varianceAmount"
-              moneyCurrency={moneyCurrency}
+              moneyCurrency={wbs.currency}
               tone="destructive"
             />
           ) : null}
@@ -394,7 +403,7 @@ export function ProjectFinanceDashboardView({ dashboard }: { dashboard: ProjectF
               title="Bajo presupuesto al 100%"
               rows={wbs.favorableAtCompletion}
               valueColumn="varianceAmount"
-              moneyCurrency={moneyCurrency}
+              moneyCurrency={wbs.currency}
             />
           ) : null}
         </div>

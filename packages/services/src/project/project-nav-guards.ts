@@ -20,12 +20,7 @@ export function canViewProjectScheduleArea(roles: UserRole[]): boolean {
 
 /** Project-scoped cash flow report (Phase 7D): not tenant-wide treasury; allows finance roles without VIEW PROJECTS. */
 export function canViewProjectCashFlowReport(roles: UserRole[]): boolean {
-  return (
-    can(roles, "VIEW", "PROJECTS") ||
-    can(roles, "VIEW", "AR") ||
-    can(roles, "VIEW", "AP") ||
-    can(roles, "VIEW", "TREASURY")
-  );
+  return canViewArProjectArea(roles) || canViewApProjectArea(roles);
 }
 
 /**

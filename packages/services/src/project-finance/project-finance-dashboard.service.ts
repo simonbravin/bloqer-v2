@@ -1,3 +1,4 @@
+import { compareDecimal } from "@bloqer/utils";
 import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { fmtDecimalEs } from "../dashboard/kpi-helpers";
 import {
@@ -32,10 +33,10 @@ import {
   type ProjectCashFlowReport,
 } from "../project-cash-flow/project-cash-flow.service";
 import {
-  monthKey,
   monthLabel,
   parseTrendMonths,
   pickCurrentMonthItem,
+  productMonthKey,
   trendDateRange,
   type TrendMonths,
 } from "../reports/report-month";
@@ -45,10 +46,10 @@ export type ProjectFinanceMonthBalance = {
   periodLabel: string;
   certifiedAmount: string;
   costAccrued: string;
-  grossMarginAccrued: string;
+  grossMarginAccrued: string | null;
   collectedAmount: string;
   costPaid: string;
-  grossMarginCash: string;
+  grossMarginCash: string | null;
   currency: string;
 };
 
@@ -63,6 +64,7 @@ export type ProjectFinanceMonthCashFlow = {
 export type ProjectFinanceTopSupplier = {
   supplierContactId: string;
   supplierName: string;
+  currency: string;
   accruedCost: string;
   paidCost: string;
   openCommitted: string;
@@ -115,11 +117,11 @@ export async function getProjectFinanceDashboard(
   ] = await Promise.all([
     getProjectFinanceOverview(ctx, projectId, { gate }),
     attributedCashPromise,
-    safeIncomeExpense(projectId, range, ctx),
+    safeIncomeExpense(projectId, { ...range, ...budgetFilter }, ctx),
     safeCashFlow(projectId, range, ctx),
     safeCashProjection(projectId, ctx),
     safeProcurement(projectId, budgetFilter, ctx),
-    safeProfitability(projectId, ctx),
+    getProjectProfitabilityKpi(projectId, ctx, opts?.budgetId),
     safeCostComposition(projectId, budgetFilter, ctx),
     safeWbsAlerts(projectId, budgetFilter, ctx),
   ]);
@@ -166,13 +168,14 @@ export async function getProjectFinanceDashboard(
   }
 
   const topSuppliers =
-    procurement && procurement.type === "REPORT"
+    procurement?.type === "REPORT" && procurement.apAvailable
       ? [...procurement.bySupplier]
-          .sort((a, b) => parseFloat(b.accruedCost) - parseFloat(a.accruedCost))
+          .sort((a, b) => compareDecimal(b.accruedCost, a.accruedCost))
           .slice(0, 5)
           .map((s) => ({
             supplierContactId: s.supplierContactId,
             supplierName: s.supplierName,
+            currency: procurement.currency,
             accruedCost: s.accruedCost,
             paidCost: s.paidCost,
             openCommitted: s.openCommitted,
@@ -226,17 +229,17 @@ function buildSnapshotPreloadFromOverview(
 
 function deriveMonthBalance(report: IncomeExpenseReport | null): ProjectFinanceMonthBalance | null {
   if (!report) return null;
-  const currentKey = monthKey(new Date());
+  const currentKey = productMonthKey();
   const point = pickCurrentMonthItem(report.series);
   if (!point) {
     return {
       periodLabel: monthLabel(currentKey),
       certifiedAmount: "0",
       costAccrued: "0",
-      grossMarginAccrued: "0",
+      grossMarginAccrued: report.marginAvailability.accrued ? "0" : null,
       collectedAmount: "0",
       costPaid: "0",
-      grossMarginCash: "0",
+      grossMarginCash: report.marginAvailability.cash ? "0" : null,
       currency: report.displayCurrency,
     };
   }
@@ -256,7 +259,7 @@ function deriveMonthCashFlow(report: ProjectCashFlowReport | null): ProjectFinan
   if (!report) return null;
   const cur = report.currencies.find((c) => c.currency === "ARS") ?? report.currencies[0];
   if (!cur) return null;
-  const currentKey = monthKey(new Date());
+  const currentKey = productMonthKey();
   const point = pickCurrentMonthItem(cur.periods);
   if (!point) {
     return {
@@ -294,13 +297,13 @@ async function safeCashFlow(
 
 async function safeIncomeExpense(
   projectId: string,
-  range: { dateFrom: string; dateTo: string },
+  filters: { dateFrom: string; dateTo: string; budgetId?: string },
   ctx: ServiceContext,
 ): Promise<IncomeExpenseReport | null> {
   try {
     return await getProjectIncomeExpenseReport(
       projectId,
-      { dateFrom: range.dateFrom, dateTo: range.dateTo },
+      { ...filters, currencyView: "original" },
       ctx,
     );
   } catch {
@@ -326,14 +329,6 @@ async function safeProcurement(
 ): Promise<ProcurementReportResult | null> {
   try {
     return await getProcurementDeviationReport(projectId, filters, ctx);
-  } catch {
-    return null;
-  }
-}
-
-async function safeProfitability(projectId: string, ctx: ServiceContext) {
-  try {
-    return await getProjectProfitabilityKpi(projectId, ctx);
   } catch {
     return null;
   }

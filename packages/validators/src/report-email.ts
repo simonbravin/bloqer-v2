@@ -51,10 +51,17 @@ export const sendReportByEmailInputSchema = z
         path: ["format"],
       });
     }
-    if (REPORT_TYPES_NEED_PROJECT_ID.has(data.reportType) && !data.projectId) {
+    const isProjectReport = REPORT_TYPES_NEED_PROJECT_ID.has(data.reportType);
+    if (isProjectReport && !data.projectId) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "projectId es obligatorio para este reporte",
+        message: "Seleccioná una obra para este reporte",
+        path: ["projectId"],
+      });
+    } else if (!isProjectReport && data.projectId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Este reporte de empresa no admite una obra",
         path: ["projectId"],
       });
     }

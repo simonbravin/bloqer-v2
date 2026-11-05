@@ -17,6 +17,7 @@ type Props = {
   canInventory: boolean;
   canProcurement: boolean;
   canOverhead: boolean;
+  canProfitability: boolean;
 };
 
 export function TenantReportsHub({
@@ -27,14 +28,15 @@ export function TenantReportsHub({
   canInventory,
   canProcurement,
   canOverhead,
+  canProfitability,
 }: Props) {
   const financial: ReportHubCard[] = [
     {
       title: "Rentabilidad multi-obra",
-      description: "Margen bruto por proyecto y consolidado total del tenant.",
+      description: "Margen bruto de las obras a las que tenés acceso, con consolidado por moneda.",
       href: "/reportes/rentabilidad-multi-obra",
       icon: <LineChart className="h-5 w-5" />,
-      available: canProjects,
+      available: canProfitability,
     },
     {
       title: "Aging CxC",

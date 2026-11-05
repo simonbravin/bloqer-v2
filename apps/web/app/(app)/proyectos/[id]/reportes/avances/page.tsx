@@ -38,7 +38,7 @@ export default async function ReporteAvancesPage({ params, searchParams }: PageP
   const { id: projectId } = await params;
   const sp = await searchParams;
   const queryParams = Object.fromEntries(
-    Object.entries(sp).map(([key, value]) => [key, Array.isArray(value) ? value[0] : value]),
+    Object.entries(sp).map(([key, value]) => [key, Array.isArray(value) ? value.at(-1) : value]),
   );
   const ctx = {
     actorUserId: current.session.user.id!,

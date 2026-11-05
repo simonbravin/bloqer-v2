@@ -39,8 +39,8 @@ export function ScheduledReportRunActions({ scheduleId, status, failedDeliveryCo
             <p>
               ¿Reintentar {failedDeliveryCount} envío
               {failedDeliveryCount === 1 ? "" : "s"} fallido
-              {failedDeliveryCount === 1 ? "" : "s"} de los últimos 7 días? Solo se reenvía a
-              destinatarios con estado FAILED.
+              {failedDeliveryCount === 1 ? "" : "s"} de los últimos 7 días? Se usa la fecha de
+              cada envío original y se omiten las entregas que ya se completaron.
             </p>
             {error ? (
               <p className="text-destructive" role="alert">

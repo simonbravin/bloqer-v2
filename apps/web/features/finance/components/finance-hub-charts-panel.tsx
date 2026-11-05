@@ -107,10 +107,14 @@ export function FinanceHubChartsPanel({ charts, defaultTab }: Props) {
           )
         ) : charts.economic && hasEconomic ? (
           <div className="min-w-0 space-y-3">
+            <p className="text-xs text-muted-foreground">Moneda de la tendencia: {charts.economic.displayCurrency}</p>
             {charts.economic.consolidationNote ? (
               <p className="text-xs text-amber-800 dark:text-amber-200">{charts.economic.consolidationNote}</p>
             ) : null}
-            <IncomeExpenseChart series={charts.economic.series} embedded />
+            {charts.economic.warnings.map((warning) => (
+              <p key={warning} className="text-xs text-amber-800 dark:text-amber-200">{warning}</p>
+            ))}
+            <IncomeExpenseChart series={charts.economic.series} currency={charts.economic.displayCurrency ?? undefined} sourcesAvailable={charts.economic.sourcesAvailable} embedded />
           </div>
         ) : (
           <p className="py-8 text-center text-sm text-muted-foreground">

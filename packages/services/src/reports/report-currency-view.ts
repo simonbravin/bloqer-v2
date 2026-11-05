@@ -33,7 +33,7 @@ export function canConsolidateInvoicesToArs(
 export type ProfitabilityCurrencySlice = {
   currency: string;
   revenue: string;
-  directCost: string;
-  grossMargin: string;
+  directCost: string | null;
+  grossMargin: string | null;
   grossMarginPct: string | null;
 };

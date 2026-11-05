@@ -1,4 +1,5 @@
 import { prisma } from "@bloqer/database";
+import type { PermissionModule } from "@bloqer/domain";
 import { isEmailConfigured } from "@bloqer/config";
 import {
   sendEmail,
@@ -13,13 +14,58 @@ import {
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
 import { PRODUCT_TIMEZONE, toIsoDateInTimeZone } from "@bloqer/utils";
+import { getSoleActiveCompanyIdForTenant } from "../company/company.service";
 import { canViewJobsiteLogArea } from "../jobsite-log/jobsite-log-access";
 import { loadNotificationIdentityFacts } from "../notifications/notification-email-context";
-import { filterUserIdsByProjectAccess } from "../security/access";
-import { ServiceContext } from "../types";
+import {
+  filterUserIdsByProjectAccess,
+  requireProjectAccess,
+  resolveAccessibleProjectScope,
+  type ProjectAccessScope,
+} from "../security/access";
+import { getTenantEnabledModules } from "../tenant-modules/tenant-module.service";
+import { ServiceContext, ServiceError } from "../types";
 import type { ScheduledReportAttachment } from "./scheduled-report-attachment.service";
 
 export type ScheduledReportDeliveryKind = "scheduled" | "manual" | "retry";
+
+export type ScheduledReportRecipientAccess = Pick<ServiceContext, "companyId" | "roles"> & {
+  email: string;
+};
+
+export async function loadScheduledReportRecipientAccess(
+  tenantId: string,
+  userId: string,
+): Promise<ScheduledReportRecipientAccess | null> {
+  const membership = await prisma.userMembership.findUnique({
+    where: { userId_tenantId: { userId, tenantId } },
+    select: {
+      status: true,
+      roles: true,
+      companyId: true,
+      company: { select: { tenantId: true, status: true } },
+      user: { select: { email: true, status: true } },
+    },
+  });
+  if (
+    membership?.status !== "ACTIVE" || membership.user.status !== "ACTIVE" ||
+    (membership.companyId &&
+      (membership.company?.status !== "ACTIVE" || membership.company.tenantId !== tenantId))
+  ) return null;
+  return {
+    companyId: membership.companyId ?? await getSoleActiveCompanyIdForTenant(tenantId),
+    roles: membership.roles,
+    email: membership.user.email,
+  };
+}
+
+function sameRecipientAccess(
+  previous: ScheduledReportRecipientAccess,
+  current: ScheduledReportRecipientAccess,
+): boolean {
+  return previous.companyId === current.companyId && previous.email === current.email &&
+    previous.roles.length === current.roles.length && previous.roles.every((role) => current.roles.includes(role));
+}
 
 export function buildScheduledReportIdempotencyKey(
   scheduleId: string,
@@ -55,6 +101,10 @@ export type DeliverScheduledReportBundleInput = {
   runId: string;
   recipientUserId: string;
   recipientEmail: string;
+  recipientAccess: ScheduledReportRecipientAccess | null;
+  generatedWithModules: ReadonlySet<PermissionModule>;
+  generatedWithProjectScope?: ProjectAccessScope;
+  reportCompanyId?: string | null;
   attachments: ScheduledReportAttachment[];
   deliveryKind?: ScheduledReportDeliveryKind;
   projectId?: string | null;
@@ -119,13 +169,16 @@ function asOfFromRunWindow(runWindow: string, deliveryKind: ScheduledReportDeliv
 export async function deliverScheduledReportBundle(
   input: DeliverScheduledReportBundleInput,
   ctx: ServiceContext,
-  jobsiteAudience?: JobsiteAttachmentAudience,
 ): Promise<DeliverScheduledReportBundleResult> {
   const deliveryKind = input.deliveryKind ?? "scheduled";
+  const currentAccess = input.recipientAccess
+    ? await loadScheduledReportRecipientAccess(ctx.tenantId, input.recipientUserId)
+    : null;
+  const recipientEmail = currentAccess?.email ?? input.recipientEmail;
   const idempotencyKey = buildScheduledReportIdempotencyKey(
     input.scheduleId,
     input.runWindow,
-    input.recipientEmail,
+    recipientEmail,
     deliveryKind,
   );
 
@@ -137,9 +190,12 @@ export async function deliverScheduledReportBundle(
     asOfFromRunWindow(input.runWindow, deliveryKind),
     input.timezone?.trim() || PRODUCT_TIMEZONE,
   );
+  const companyId = currentAccess?.companyId && ctx.companyId !== currentAccess.companyId
+    ? null
+    : ctx.companyId;
   const facts = await loadNotificationIdentityFacts({
     tenantId: ctx.tenantId,
-    companyId: ctx.companyId,
+    companyId,
     projectId: input.projectId ?? null,
   });
   const subject = formatNotificationEmailSubject(
@@ -147,24 +203,19 @@ export async function deliverScheduledReportBundle(
     facts.organizationName,
   );
 
-  const membership = await prisma.userMembership.findUnique({
-    where: { userId_tenantId: { userId: input.recipientUserId, tenantId: ctx.tenantId } },
-    select: { status: true },
-  });
-  const attachments = input.attachments.filter(
-    (attachment) =>
-      attachment.reportKey !== "TENANT_JOBSITE_DAILY_LOGS" ||
-      jobsiteAudience?.get(attachment)?.has(input.recipientUserId),
-  );
+  const attachments = currentAccess && input.recipientAccess && currentAccess.roles.length > 0 &&
+    sameRecipientAccess(input.recipientAccess, currentAccess)
+    ? await revalidateRecipientAttachments(input, ctx.tenantId, currentAccess)
+    : [];
   const skipReason =
-    membership?.status !== "ACTIVE"
+    currentAccess === null
       ? "recipient_inactive"
       : attachments.length === 0
         ? "no_authorized_attachments"
         : null;
   const { id: logId } = await createEmailDeliveryLog(
     {
-      recipientEmail: input.recipientEmail,
+      recipientEmail,
       recipientUserId: input.recipientUserId,
       subject,
       emailType: "REPORT_SCHEDULED",
@@ -217,7 +268,7 @@ export async function deliverScheduledReportBundle(
   const text = renderNotificationEmailText(templateInput);
 
   const sendResult = await sendEmail({
-    to: input.recipientEmail,
+    to: recipientEmail,
     subject,
     html,
     text,
@@ -240,4 +291,41 @@ export async function deliverScheduledReportBundle(
 
   await markEmailDeliverySent(logId, sendResult.messageId, ctx);
   return { outcome: "sent", messageId: sendResult.messageId };
+}
+
+async function revalidateRecipientAttachments(
+  input: DeliverScheduledReportBundleInput,
+  tenantId: string,
+  access: ScheduledReportRecipientAccess,
+): Promise<ScheduledReportAttachment[]> {
+  if (input.attachments.length === 0) return [];
+  const ctx: ServiceContext = {
+    tenantId,
+    actorUserId: input.recipientUserId,
+    companyId: input.reportCompanyId === undefined ? access.companyId : input.reportCompanyId,
+    roles: access.roles,
+  };
+  if (input.projectId) {
+    try {
+      await requireProjectAccess(input.projectId, ctx);
+    } catch (error) {
+      if (!(error instanceof ServiceError) || !["FORBIDDEN", "NOT_FOUND"].includes(error.code)) throw error;
+      return [];
+    }
+  }
+  if (input.generatedWithProjectScope) {
+    const currentScope = await resolveAccessibleProjectScope(ctx);
+    if (currentScope !== "ALL") {
+      const currentIds = new Set(currentScope.projectIds);
+      if (input.generatedWithProjectScope === "ALL" ||
+        !input.generatedWithProjectScope.projectIds.every((id) => currentIds.has(id))) return [];
+    }
+  }
+  const jobsiteAudience = await resolveScheduledJobsiteAttachmentAudience(tenantId, input.attachments, [input.recipientUserId]);
+  const enabledModules = await getTenantEnabledModules(ctx);
+  // Optional report sections also use module gates, so a changed gate can affect an entire rendered file.
+  if ([...input.generatedWithModules].some((module) => !enabledModules.has(module))) return [];
+  return input.attachments.filter((attachment) => attachment.reportKey !== "TENANT_JOBSITE_DAILY_LOGS" ||
+    jobsiteAudience.get(attachment)?.has(input.recipientUserId),
+  );
 }

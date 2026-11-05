@@ -1,7 +1,6 @@
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import type {
   MembershipStatus,
-  Prisma,
   ScheduledReportFormat,
   ScheduledReportFrequency,
   ScheduledReportRunStatus,
@@ -54,6 +53,7 @@ export type ScheduledReportListRow = {
 
 export type ScheduledReportItemRow = {
   reportKey: ScheduledReportKey;
+  labelEs: string;
   sortOrder: number;
 };
 
@@ -183,6 +183,16 @@ export async function canReadScheduledReport(id: string, ctx: ServiceContext): P
   return row !== null && (await filterScheduledReportsByJobsiteScope([row], ctx)).length > 0;
 }
 
+/** Include deleted configurations for their authorized delivery history. */
+export async function listReadableScheduledReportIds(ctx: ServiceContext): Promise<string[]> {
+  if (!canManageScheduledReports(ctx)) return [];
+  const rows = await prisma.scheduledReport.findMany({
+    where: await scheduledReportWhereForContext(ctx),
+    select: { id: true, params: true, items: { select: { reportKey: true } } },
+  });
+  return (await filterScheduledReportsByJobsiteScope(rows, ctx)).map(({ id }) => id);
+}
+
 async function requireScheduledReportForMutation(id: string, ctx: ServiceContext) {
   // The cron uses the stored company scope. A company-bound actor cannot change
   // a shared configuration that the cron will execute with tenant-wide access.
@@ -198,7 +208,24 @@ async function requireScheduledReportForMutation(id: string, ctx: ServiceContext
   if (!row || (await filterScheduledReportsByJobsiteScope([row], ctx)).length === 0) {
     throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
   }
-  return { row, where: { ...where, updatedAt: row.updatedAt } };
+  const now = new Date();
+  if (row.runLockUntil && row.runLockUntil > now) {
+    throw new ServiceError("CONFLICT", "Hay una ejecución en curso. Volvé a intentar cuando termine.");
+  }
+  return {
+    row,
+    where: {
+      id,
+      updatedAt: row.updatedAt,
+      AND: [where, { OR: [{ runLockUntil: null }, { runLockUntil: { lte: now } }] }],
+    },
+  };
+}
+
+function assertScheduledReportMutationSucceeded(count: number) {
+  if (count !== 1) {
+    throw new ServiceError("CONFLICT", "El envío cambió o empezó a ejecutarse. Actualizá e intentá de nuevo.");
+  }
 }
 
 async function assertRecipientUsers(
@@ -399,6 +426,7 @@ export async function getScheduledReportById(
     params,
     items: row.items.map((i) => ({
       reportKey: i.reportKey as ScheduledReportKey,
+      labelEs: SCHEDULED_REPORT_KEY_META[i.reportKey as ScheduledReportKey]?.labelEs ?? i.reportKey,
       sortOrder: i.sortOrder,
     })),
     recipients: row.recipients.map((r) => ({
@@ -510,7 +538,7 @@ export async function updateScheduledReport(
   const { nextRunAt, dayOfWeek, dayOfMonth } = buildTimingFromInput(input, timezone);
 
   await prisma.$transaction(async (tx) => {
-    await tx.scheduledReport.update({
+    const updated = await tx.scheduledReport.updateMany({
       where,
       data: {
         projectId: input.scope === "PROJECT" ? input.projectId! : null,
@@ -522,10 +550,11 @@ export async function updateScheduledReport(
         timeOfDay: input.timeOfDay,
         timezone,
         format: input.format,
-        params: mapParams(input.params),
+        params: mapParams(input.params) ?? Prisma.DbNull,
         nextRunAt,
       },
     });
+    assertScheduledReportMutationSucceeded(updated.count);
 
     await tx.scheduledReportItem.deleteMany({
       where: { scheduledReportId: input.id, tenantId: ctx.tenantId },
@@ -556,14 +585,15 @@ export async function updateScheduledReport(
 
 export async function deactivateScheduledReport(ctx: ServiceContext, id: string): Promise<void> {
   assertCanManageScheduledReports(ctx);
-  const { where } = await requireScheduledReportForMutation(id, ctx);
+  const { row, where } = await requireScheduledReportForMutation(id, ctx);
+  if (row.status !== "ACTIVE") {
+    throw new ServiceError("CONFLICT", "Solo se puede pausar un envío activo");
+  }
   const updated = await prisma.scheduledReport.updateMany({
     where: { ...where, status: "ACTIVE" },
     data: { status: "PAUSED" },
   });
-  if (updated.count === 0) {
-    throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado o ya está inactivo");
-  }
+  assertScheduledReportMutationSucceeded(updated.count);
 }
 
 export async function reactivateScheduledReport(ctx: ServiceContext, id: string): Promise<void> {
@@ -582,22 +612,24 @@ export async function reactivateScheduledReport(ctx: ServiceContext, id: string)
     dayOfMonth: row.dayOfMonth,
   });
 
-  await prisma.scheduledReport.update({
+  const updated = await prisma.scheduledReport.updateMany({
     where: { ...where, status: "PAUSED" },
     data: { status: "ACTIVE", nextRunAt },
   });
+  assertScheduledReportMutationSucceeded(updated.count);
 }
 
 export async function deleteScheduledReport(ctx: ServiceContext, id: string): Promise<void> {
   assertCanManageScheduledReports(ctx);
-  const { where } = await requireScheduledReportForMutation(id, ctx);
+  const { row, where } = await requireScheduledReportForMutation(id, ctx);
+  if (row.status === "DELETED") {
+    throw new ServiceError("CONFLICT", "El envío ya está eliminado");
+  }
   const updated = await prisma.scheduledReport.updateMany({
     where: { ...where, status: { not: "DELETED" } },
     data: { status: "DELETED" },
   });
-  if (updated.count === 0) {
-    throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
-  }
+  assertScheduledReportMutationSucceeded(updated.count);
 }
 
 export type ScheduledReportCatalogEntry = {

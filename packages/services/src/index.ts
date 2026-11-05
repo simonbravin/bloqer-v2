@@ -180,7 +180,19 @@ export * from "./finance/finance-hub-charts.service";
 export * from "./finance/finance-corporate-kpis.service";
 export * from "./finance/finance-hub-overview.service";
 export * from "./finance/project-overhead.service";
-export * from "./finance/overhead-auto-weight.service";
+export {
+  AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
+  getAutoWeightOverheadPreviewForPeriod,
+  getCorporateGgPoolForPeriod,
+  listCorporateGgPeriods,
+  sumAutoWeightOverheadForProject,
+} from "./finance/overhead-auto-weight.service";
+export type {
+  AutoWeightPeriodPreview,
+  AutoWeightProjectRow,
+  BuildAutoWeightContextOpts,
+  CorporateGgPoolResult,
+} from "./finance/overhead-auto-weight.service";
 export * from "./finance/overhead-period-freeze.service";
 export * from "./finance/overhead-period";
 export * from "./finance/period-lock.service";

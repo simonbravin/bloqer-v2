@@ -4,7 +4,7 @@ import { getMultiProjectProcurementReport, ServiceError } from "@bloqer/services
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { ReportExportActions, ReportSubnav } from "@/features/reports";
+import { ReportDateFilters, ReportExportActions, ReportSubnav } from "@/features/reports";
 import { formatMoneyAmount } from "@/lib/format-money";
 import {
   Table,
@@ -33,6 +33,7 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
   };
 
   let report;
+  let filterError: string | null = null;
   try {
     report = await getMultiProjectProcurementReport(ctx, {
       dateFrom: sp.dateFrom,
@@ -40,10 +41,12 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
     });
   } catch (err) {
     if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/reportes");
-    throw err;
+    if (err instanceof ServiceError && err.code === "VALIDATION") {
+      filterError = err.message;
+    } else {
+      throw err;
+    }
   }
-
-  const top = report.topSuppliers.slice(0, 25);
 
   return (
     <PageShell variant="default" className="space-y-6">
@@ -51,10 +54,12 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Compras multi-obra</h1>
           <p className="text-sm text-muted-foreground">
-            Top proveedores (comprometido neto) y OC abiertas en todas las obras.
+            Proveedores por comprometido neto y OC abiertas de las obras disponibles, separados por moneda.
           </p>
         </div>
-        <ReportExportActions exportPath="/api/reports/compras-multi-obra.csv" params={sp} pdf xlsx />
+        {report ? (
+          <ReportExportActions exportPath="/api/reports/compras-multi-obra.csv" params={sp} pdf xlsx />
+        ) : null}
       </div>
 
       <ReportSubnav>
@@ -66,6 +71,12 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
         </Button>
       </ReportSubnav>
 
+      <ReportDateFilters showBudget={false} />
+
+      {!report ? (
+        <p role="alert" className="rounded-lg border bg-card p-4 text-sm">{filterError}</p>
+      ) : (
+      <>
       {report.warnings.length > 0 ? (
         <div className="rounded-lg border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 p-3 space-y-1">
           {report.warnings.map((w) => (
@@ -78,7 +89,7 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
 
       <section className="space-y-2">
         <h2 className="text-sm font-semibold">Top proveedores</h2>
-        {top.length === 0 ? (
+        {report.topSuppliers.length === 0 ? (
           <div className="rounded-lg border bg-card p-8 text-center text-sm text-muted-foreground">
             Sin compras confirmadas en el período.
           </div>
@@ -88,18 +99,20 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
               <TableHeader>
                 <TableRow>
                   <TableHead>Proveedor</TableHead>
+                  <TableHead>Moneda</TableHead>
                   <TableHead className="text-right">Comprometido</TableHead>
                   <TableHead className="text-right">Devengado</TableHead>
                   <TableHead className="text-right">Pagado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {top.map((row) => (
-                  <TableRow key={row.supplierContactId}>
+                {report.topSuppliers.map((row) => (
+                  <TableRow key={`${row.supplierContactId}-${row.currency}`}>
                     <TableCell className="font-medium">{row.supplierName}</TableCell>
-                    <TableCell className="text-right">{formatMoneyAmount(row.committedCost)}</TableCell>
-                    <TableCell className="text-right">{formatMoneyAmount(row.accruedCost)}</TableCell>
-                    <TableCell className="text-right">{formatMoneyAmount(row.paidCost)}</TableCell>
+                    <TableCell>{row.currency}</TableCell>
+                    <TableCell className="text-right">{formatMoneyAmount(row.committedCost, row.currency)}</TableCell>
+                    <TableCell className="text-right">{report.apAvailable ? formatMoneyAmount(row.accruedCost, row.currency) : "—"}</TableCell>
+                    <TableCell className="text-right">{report.apAvailable ? formatMoneyAmount(row.paidCost, row.currency) : "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -123,6 +136,7 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
                   <TableHead>OC</TableHead>
                   <TableHead>Proveedor</TableHead>
                   <TableHead>Estado</TableHead>
+                  <TableHead>Moneda</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -145,7 +159,8 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
                     <TableCell className="font-mono">{row.poNumber}</TableCell>
                     <TableCell>{row.supplierName}</TableCell>
                     <TableCell>{row.status}</TableCell>
-                    <TableCell className="text-right">{formatMoneyAmount(row.totalAmount)}</TableCell>
+                    <TableCell>{row.currency}</TableCell>
+                    <TableCell className="text-right">{formatMoneyAmount(row.totalAmount, row.currency)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -153,6 +168,8 @@ export default async function ComprasMultiObraPage({ searchParams }: PageProps) 
           </TableScroll>
         )}
       </section>
+      </>
+      )}
     </PageShell>
   );
 }

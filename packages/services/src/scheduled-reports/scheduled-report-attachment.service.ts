@@ -394,7 +394,7 @@ export async function assertReportKeyEnabledAtRun(
   const gate = await getTenantModuleGate(ctx);
   const meta = SCHEDULED_REPORT_KEY_META[reportKey];
   if (!meta.requiredModules.every((m) => gate.isEnabled(m))) {
-    throw new ServiceError("VALIDATION", `Módulo deshabilitado para ${reportKey}`);
+    throw new ServiceError("FORBIDDEN", `Módulo deshabilitado para ${reportKey}`);
   }
 }
 

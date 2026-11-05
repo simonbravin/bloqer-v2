@@ -104,6 +104,7 @@ test("cash flow and extracts share the valid company scope, and legacy ARS amoun
     tenantId: ctx.tenantId,
     OR: [{ companyId: null }, { company: { tenantId: ctx.tenantId } }],
   };
+  const validAccountId = "valid-account";
   let movementReads = 0;
   stub(t, prisma.tenantModuleSetting, "findMany", async () => []);
   stub(t, prisma.treasuryAccount, "findFirst", async (query: { where: Prisma.TreasuryAccountWhereInput }) => {
@@ -112,18 +113,24 @@ test("cash flow and extracts share the valid company scope, and legacy ARS amoun
   });
   stub(t, prisma.accountMovement, "findMany", async (query: { where: Prisma.AccountMovementWhereInput; include?: unknown }) => {
     movementReads += 1;
+    if (query.where.accountId === validAccountId) return []; // Opening balance before the period.
     assert.deepEqual(query.where.account, accountScope);
-    return [{ ...movement("legacy-ars", "2026-11-05", null, "10.25"), currency: query.include ? " ars " : "ARS" }];
+    if (!query.include) assert.deepEqual(query.where.accountId, { in: [validAccountId] });
+    return [{ ...movement("legacy-ars", "2026-11-05", null, "10.25"), accountId: validAccountId, currency: " ars " }];
   });
   stub(t, prisma.treasuryAccount, "findMany", async (query: { where: Prisma.TreasuryAccountWhereInput }) => {
     assert.deepEqual(query.where, accountScope);
-    return [];
+    return [{ id: validAccountId, currency: "ARS" }];
   });
+  stub(t, prisma.treasuryAccount, "findUnique", async () => ({ tenantId: ctx.tenantId, openingBalance: new Prisma.Decimal(5) }));
+  stub(t, prisma.accountMovement, "findFirst", async () => null);
 
   await assert.rejects(getAccountMovementReport({ accountId }, ctx), { code: "FORBIDDEN" });
   assert.equal(movementReads, 0);
   const extract = await getAccountMovementReport({}, ctx);
   assert.deepEqual(extract.rows.map(({ currency, fxRate, amountArs }) => [currency, fxRate, amountArs]), [["ARS", null, "10.25"]]);
-  const flow = await getCashFlowReport({ dateFrom: "2026-11-01", dateTo: "2026-11-30" }, ctx);
-  assert.equal(flow[0]?.closingBalance, "10.25");
+  const flow = await getCashFlowReport({ dateFrom: "2026-11-01", dateTo: "2026-11-30", currency: "ARS" }, ctx);
+  assert.equal(flow.length, 1);
+  assert.equal(flow[0]?.openingBalance, "5.00");
+  assert.equal(flow[0]?.closingBalance, "15.25");
 });

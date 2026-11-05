@@ -19,9 +19,10 @@ const DOC_LABELS: Record<ProcurementUnallocatedRow["documentType"], string> = {
 
 type Props = {
   rows: ProcurementUnallocatedRow[];
+  currency: string;
 };
 
-export function ProcurementUnallocatedTable({ rows }: Props) {
+export function ProcurementUnallocatedTable({ rows, currency }: Props) {
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4 text-center">
@@ -53,7 +54,7 @@ export function ProcurementUnallocatedTable({ rows }: Props) {
               <TableCell className="max-w-[min(16rem,30vw)] truncate" title={row.description}>
                 {row.description}
               </TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.amount)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.amount, currency)}</TableCell>
             </TableRow>
           ))}
         </TableBody>

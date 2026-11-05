@@ -20,9 +20,14 @@ import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-la
 type Props = {
   buckets: CashProjectionBucket[];
   currency: string;
+  inflowsAvailable?: boolean;
+  outflowsAvailable?: boolean;
 };
 
-export function CashProjectionChart({ buckets, currency }: Props) {
+export function CashProjectionChart({
+  buckets, currency, inflowsAvailable = true, outflowsAvailable = true,
+}: Props) {
+  const netLabel = inflowsAvailable && outflowsAvailable ? "Neto" : "Saldo visible";
   const data = useMemo(
     () =>
       buckets.map((b) => ({
@@ -65,9 +70,9 @@ export function CashProjectionChart({ buckets, currency }: Props) {
               <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
               <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Bar dataKey="Cobros" fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Pagos" fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Neto" fill={CHART_SERIES.margin} radius={[2, 2, 0, 0]} />
+              {inflowsAvailable ? <Bar dataKey="Cobros" fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} /> : null}
+              {outflowsAvailable ? <Bar dataKey="Pagos" fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} /> : null}
+              <Bar dataKey="Neto" name={netLabel} fill={CHART_SERIES.margin} radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>

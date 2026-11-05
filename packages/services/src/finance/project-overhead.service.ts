@@ -1,13 +1,16 @@
 import { Prisma, prisma } from "@bloqer/database";
 import type { OverheadAllocationMode } from "@bloqer/database";
 import { sumAutoWeightOverheadForProject } from "./overhead-auto-weight.service";
-import { assertOverheadEdit, assertOverheadView } from "./overhead-access";
+import { assertOverheadCompanyScope, assertOverheadEdit, assertOverheadView } from "./overhead-access";
 import {
   assertValidOverheadPeriod,
   type OverheadPeriodFilter,
 } from "./overhead-period";
 import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
+import { companyScopeFilter } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
+import { projectRowIdWhereForScope, requireProjectAccess, resolveAccessibleProjectScope } from "../security/access";
+import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 
 export { assertValidOverheadPeriod } from "./overhead-period";
 
@@ -41,6 +44,7 @@ async function resolveProjectBudgetCurrency(projectId: string, ctx: ServiceConte
     where: {
       projectId,
       tenantId: ctx.tenantId,
+      ...companyScopeFilter(ctx),
       status: { in: ["APPROVED", "CLOSED"] },
     },
     select: { currency: true, status: true, versionNumber: true, parentBudgetId: true },
@@ -60,9 +64,9 @@ export type ProjectOverheadBreakdown = {
   manualTotal: string;
   calculatedPct: string;
   calculatedAmount: string;
-  autoWeightAmount: string;
+  autoWeightAmount: string | null;
   autoWeightPct: string | null;
-  totalOverhead: string;
+  totalOverhead: string | null;
   currency: string;
   manualRowsExcluded: number;
   autoWeightWarnings: string[];
@@ -77,29 +81,29 @@ export async function getProjectOverheadAmount(
   targetCurrency = "ARS",
   periodFilter?: ProjectOverheadPeriodFilter,
 ): Promise<ProjectOverheadBreakdown> {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { tenantId: true, companyId: true },
-  });
-  if (!project || project.tenantId !== ctx.tenantId) {
-    throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
-  }
+  assertOverheadView(ctx);
+  const project = await requireProjectAccess(projectId, ctx);
 
   const cid = companyId || project.companyId;
   if (!cid) {
     return emptyBreakdown(targetCurrency, "MANUAL");
   }
+  assertOverheadCompanyScope(cid, ctx);
+  if (project.companyId !== null && project.companyId !== cid) {
+    throw new ServiceError("FORBIDDEN", "La empresa no coincide con la obra");
+  }
 
-  const company = await prisma.company.findUnique({
-    where: { id: cid },
+  const company = await prisma.company.findFirst({
+    where: { id: cid, tenantId: ctx.tenantId },
     select: { overheadAllocationPct: true, overheadAllocationMode: true },
   });
+  if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
 
   const mode = company?.overheadAllocationMode ?? "MANUAL";
 
   if (mode === "AUTO_WEIGHT") {
     const auto = await sumAutoWeightOverheadForProject(projectId, cid, periodFilter, ctx);
-    const amountStr = auto.amount.toFixed(2);
+    const amountStr = auto.amount?.toFixed(2) ?? null;
     return {
       allocationMode: "AUTO_WEIGHT",
       manualTotal: "0.00",
@@ -115,7 +119,7 @@ export async function getProjectOverheadAmount(
   }
 
   const manualRows = await prisma.projectOverheadAllocation.findMany({
-    where: { tenantId: ctx.tenantId, projectId },
+    where: { tenantId: ctx.tenantId, companyId: cid, projectId },
     select: { amount: true, currency: true, period: true },
   });
 
@@ -162,6 +166,7 @@ export async function listActiveProjectsForOverhead(
   ctx: ServiceContext,
 ): Promise<{ id: string; code: string; name: string; currency: string }[]> {
   assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { tenantId: true },
@@ -169,10 +174,12 @@ export async function listActiveProjectsForOverhead(
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
   if (company.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
+  const scope = await resolveAccessibleProjectScope(ctx);
   const projects = await prisma.project.findMany({
     where: {
       tenantId: ctx.tenantId,
       companyId,
+      ...projectRowIdWhereForScope(scope),
       status: { in: ["ACTIVE", "ON_HOLD", "DRAFT"] },
     },
     select: { id: true, code: true, name: true },
@@ -184,6 +191,7 @@ export async function listActiveProjectsForOverhead(
     where: {
       tenantId: ctx.tenantId,
       projectId: { in: projects.map((p) => p.id) },
+      ...companyScopeFilter({ ...ctx, companyId }),
       status: { in: ["APPROVED", "CLOSED"] },
     },
     select: {
@@ -217,12 +225,17 @@ export async function listProjectOverheadAllocations(
   ctx: ServiceContext,
 ): Promise<ProjectOverheadAllocationView[]> {
   assertOverheadView(ctx);
+  const companyId = filters.companyId ?? ctx.companyId;
+  if (companyId) assertOverheadCompanyScope(companyId, ctx);
+  if (filters.projectId) await requireProjectAccess(filters.projectId, ctx);
+  const scope = await resolveAccessibleProjectScope(ctx);
 
   const rows = await prisma.projectOverheadAllocation.findMany({
     where: {
       tenantId: ctx.tenantId,
-      ...(filters.companyId ? { companyId: filters.companyId } : {}),
+      ...(companyId ? { companyId } : {}),
       ...(filters.projectId ? { projectId: filters.projectId } : {}),
+      project: { tenantId: ctx.tenantId, ...projectRowIdWhereForScope(scope) },
     },
     include: {
       project: { select: { code: true, name: true } },
@@ -249,6 +262,7 @@ export async function getCompanyOverheadSettings(
   ctx: ServiceContext,
 ): Promise<CompanyOverheadSettings> {
   assertOverheadView(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: {
@@ -275,6 +289,8 @@ export async function updateCompanyOverheadAllocationPct(
   ctx: ServiceContext,
 ): Promise<CompanyOverheadSettings> {
   assertOverheadEdit(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   const existing = await prisma.company.findUnique({
     where: { id: companyId },
     select: { tenantId: true, overheadAllocationMode: true },
@@ -316,6 +332,8 @@ export async function updateCompanyOverheadAllocationMode(
   ctx: ServiceContext,
 ): Promise<CompanyOverheadSettings> {
   assertOverheadEdit(ctx);
+  assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   const existing = await prisma.company.findUnique({
     where: { id: companyId },
     select: { tenantId: true },
@@ -347,6 +365,9 @@ export async function deleteProjectOverheadAllocation(id: string, ctx: ServiceCo
   const row = await prisma.projectOverheadAllocation.findUnique({ where: { id } });
   if (!row) throw new ServiceError("NOT_FOUND", "Imputación no encontrada");
   if (row.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  assertOverheadCompanyScope(row.companyId, ctx);
+  await assertApTenantModule(ctx);
+  await requireProjectAccess(row.projectId, ctx);
   await prisma.projectOverheadAllocation.delete({ where: { id } });
 }
 
@@ -362,6 +383,8 @@ export async function createProjectOverheadAllocation(
   ctx: ServiceContext,
 ) {
   assertOverheadEdit(ctx);
+  assertOverheadCompanyScope(input.companyId, ctx);
+  await assertApTenantModule(ctx);
   assertValidOverheadPeriod(input.period);
   let amount: Prisma.Decimal;
   try {
@@ -374,18 +397,14 @@ export async function createProjectOverheadAllocation(
   }
 
   const [project, company] = await Promise.all([
-    prisma.project.findUnique({
-      where: { id: input.projectId },
-      select: { tenantId: true, companyId: true },
-    }),
+    requireProjectAccess(input.projectId, ctx),
     prisma.company.findUnique({
       where: { id: input.companyId },
       select: { tenantId: true, overheadAllocationMode: true },
     }),
   ]);
-  if (!project) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
   if (!company) throw new ServiceError("NOT_FOUND", "Empresa no encontrada");
-  if (project.tenantId !== ctx.tenantId || company.tenantId !== ctx.tenantId) {
+  if (company.tenantId !== ctx.tenantId) {
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   }
   if (company.overheadAllocationMode === "AUTO_WEIGHT") {
@@ -398,7 +417,7 @@ export async function createProjectOverheadAllocation(
     throw new ServiceError("VALIDATION", "El proyecto no pertenece a esa empresa");
   }
 
-  const budgetCurrency = await resolveProjectBudgetCurrency(input.projectId, ctx);
+  const budgetCurrency = await resolveProjectBudgetCurrency(input.projectId, { ...ctx, companyId: input.companyId });
   const currency = (input.currency ?? budgetCurrency).toUpperCase();
   if (currency !== budgetCurrency) {
     throw new ServiceError(

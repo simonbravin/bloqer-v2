@@ -19,16 +19,21 @@ import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-la
 
 type Props = {
   series: CertificationEvolutionPoint[];
+  currency: string;
+  arAvailable: boolean;
 };
 
-export function CertificationEvolutionChart({ series }: Props) {
+export function CertificationEvolutionChart({ series, currency, arAvailable }: Props) {
+  const description = arAvailable
+    ? "Certificado (fin del período) · Facturado (emisión) · Cobrado (cobranza)"
+    : "Certificado (fin del período)";
   const data = useMemo(
     () =>
       series.map((p) => ({
         name: p.periodLabel,
         Certificado: parseFloat(p.certifiedAmount),
-        Facturado: parseFloat(p.invoicedAmount),
-        Cobrado: parseFloat(p.collectedAmount),
+        Facturado: p.invoicedAmount === null ? null : Number(p.invoicedAmount),
+        Cobrado: p.collectedAmount === null ? null : Number(p.collectedAmount),
       })),
     [series],
   );
@@ -38,7 +43,7 @@ export function CertificationEvolutionChart({ series }: Props) {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Evolución mensual</CardTitle>
-          <CardDescription>Certificado, facturado y cobrado por período</CardDescription>
+          <CardDescription>{description} · {currency}</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground py-8 text-center">
           Sin datos en el rango seleccionado.
@@ -51,7 +56,7 @@ export function CertificationEvolutionChart({ series }: Props) {
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Evolución mensual</CardTitle>
-        <CardDescription>Certificado (emisión) · facturado (AR) · cobrado (caja)</CardDescription>
+        <CardDescription>{description} · {currency}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className={REPORT_CHART_FRAME_CLASS}>
@@ -65,11 +70,11 @@ export function CertificationEvolutionChart({ series }: Props) {
                 tickLine={false}
                 width={REPORT_CHART_Y_AXIS_WIDTH}
               />
-              <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
+              <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Certificado" fill={CHART_SERIES.certified} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Facturado" fill={CHART_SERIES.invoiced} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Cobrado" fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} />
+              {arAvailable && <Bar dataKey="Facturado" fill={CHART_SERIES.invoiced} radius={[2, 2, 0, 0]} />}
+              {arAvailable && <Bar dataKey="Cobrado" fill={CHART_SERIES.collected} radius={[2, 2, 0, 0]} />}
             </BarChart>
           </ResponsiveContainer>
         </div>

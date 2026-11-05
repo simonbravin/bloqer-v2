@@ -71,3 +71,26 @@ test("company payment action rejects a project source before creating cash", asy
   const result = await actions.createCompanyPaymentAction!({ payableId: ids.obligation, accountId: ids.account, paymentDate: "2026-11-05", payFullBalance: true, idempotencyKey: "11111111-1111-4111-8111-111111111111" });
   assert.ok(result.error); assert.equal(writes, 0); assert.deepEqual(env.invalidated, []);
 });
+
+test("overhead preview retains closed periods without recalculating them", async () => {
+  const preview = { period: "2026-11", calculationBlocked: true };
+  let status = "FROZEN";
+  let reads = 0;
+  const env = environment({
+    getOverheadPeriodCloseStatus: async () => status,
+    getAutoWeightOverheadPreviewForPeriod: async () => { reads += 1; return preview; },
+  });
+  const actions = load("../../../app/(app)/finanzas/gastos-generales/actions.ts", env.dependencies);
+  const input = { companyId: ids.project, period: preview.period };
+
+  const closed = await actions.fetchAutoWeightPreviewAction!(input);
+  assert.equal(closed.ok, true);
+  assert.equal((closed as Result & { preview: unknown }).preview, null);
+  assert.equal(reads, 0);
+
+  status = "OPEN";
+  const opened = await actions.fetchAutoWeightPreviewAction!(input);
+  assert.equal(opened.ok, true);
+  assert.equal((opened as Result & { preview: unknown }).preview, preview);
+  assert.equal(reads, 1);
+});

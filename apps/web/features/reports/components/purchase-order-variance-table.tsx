@@ -37,6 +37,7 @@ export function PurchaseOrderVarianceTable({
             <TableHead>Línea</TableHead>
             <TableHead>EDT</TableHead>
             <TableHead>Motivo</TableHead>
+            <TableHead>Moneda OC</TableHead>
             <TableHead className="text-right">Desvío %</TableHead>
             <TableHead className="text-right">P. unit.</TableHead>
             <TableHead className="text-right">Desc. %</TableHead>
@@ -61,6 +62,7 @@ export function PurchaseOrderVarianceTable({
                   ? purchaseVarianceTierLabel(r.varianceTier)
                   : (r.varianceJustification ?? "—")}
               </TableCell>
+              <TableCell>{r.currency}</TableCell>
               <TableCell
                 className={cn(
                   "text-right tabular-nums font-medium",

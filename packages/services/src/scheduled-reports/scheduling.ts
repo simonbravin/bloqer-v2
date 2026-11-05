@@ -82,34 +82,24 @@ export function localDateTimeToUtc(
   minute: number,
   timeZone: string,
 ): Date {
-  let candidate = new Date(Date.UTC(year, month - 1, day, hour, minute, 0, 0));
+  const wallClock = Date.UTC(year, month - 1, day, hour, minute);
+  let candidate = new Date(wallClock);
   for (let i = 0; i < 96; i++) {
     const p = partsInTimezone(candidate, timeZone);
-    if (
-      p.year === year &&
-      p.month === month &&
-      p.day === day &&
-      p.hour === hour &&
-      p.minute === minute
-    ) {
-      return candidate;
-    }
-    const targetMin = hour * 60 + minute;
-    const actualMin = p.hour * 60 + p.minute;
-    let deltaMin = targetMin - actualMin;
-    if (p.day !== day) deltaMin += (day - p.day) * 24 * 60;
-    if (p.month !== month || p.year !== year) {
-      const target = Date.UTC(year, month - 1, day);
-      const actual = Date.UTC(p.year, p.month - 1, p.day);
-      deltaMin += Math.round((target - actual) / 60_000);
-    }
-    candidate = new Date(candidate.getTime() + deltaMin * 60_000);
+    const delta = wallClock - Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute);
+    if (delta === 0) return candidate;
+    candidate = new Date(candidate.getTime() + delta);
   }
   return candidate;
 }
 
+function shiftCalendarDay(parts: Pick<LocalParts, "year" | "month" | "day">, days: number) {
+  const shifted = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + days));
+  return { year: shifted.getUTCFullYear(), month: shifted.getUTCMonth() + 1, day: shifted.getUTCDate() };
+}
+
 function daysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
 }
 
 function clampDayOfMonth(year: number, month: number, dayOfMonth: number): number {
@@ -126,34 +116,23 @@ function candidateLocalDate(
 ): { year: number; month: number; day: number; hour: number; minute: number } {
   const { hour, minute } = parseTimeOfDay(timeOfDay);
   const base = partsInTimezone(after, timeZone);
-  let { year, month, day } = base;
+  const { year, month, day } = base;
 
   if (frequency === "DAILY") {
     const todayRun = localDateTimeToUtc(year, month, day, hour, minute, timeZone);
     if (todayRun.getTime() <= after.getTime()) {
-      const next = new Date(after.getTime() + 24 * 60 * 60_000);
-      const p = partsInTimezone(next, timeZone);
-      year = p.year;
-      month = p.month;
-      day = p.day;
+      return { ...shiftCalendarDay(base, 1), hour, minute };
     }
     return { year, month, day, hour, minute };
   }
 
   if (frequency === "WEEKLY") {
     const targetDow = dayOfWeek ?? 1;
-    let cursor = new Date(after.getTime());
-    for (let i = 0; i < 370; i++) {
-      const p = partsInTimezone(cursor, timeZone);
-      if (p.weekday === targetDow) {
-        const runAt = localDateTimeToUtc(p.year, p.month, p.day, hour, minute, timeZone);
-        if (runAt.getTime() > after.getTime()) {
-          return { year: p.year, month: p.month, day: p.day, hour, minute };
-        }
-      }
-      cursor = new Date(cursor.getTime() + 24 * 60 * 60_000);
+    let days = (targetDow - base.weekday + 7) % 7;
+    if (days === 0 && localDateTimeToUtc(year, month, day, hour, minute, timeZone) <= after) {
+      days = 7;
     }
-    return { year, month, day, hour, minute };
+    return { ...shiftCalendarDay(base, days), hour, minute };
   }
 
   const dom = dayOfMonth ?? 1;

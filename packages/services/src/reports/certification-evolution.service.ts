@@ -1,5 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
+import { companyScopeFilter } from "../company-scope";
+import { assertBudgetCostGraph } from "../budget/budget-cost-graph";
+import { assertBudgetCurrency } from "../cost-control/comparison-currency";
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { computeObligationBalanceDue } from "../finance/obligation-balance";
@@ -8,9 +11,11 @@ import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
 import { sortByWbsCode } from "../budget/wbs-code-rules";
-import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { certificationWeightedPhysicalPct } from "./certification-physical-pct";
+import { inDateRange, monthKey, monthLabel } from "./report-month";
+import { validateResourceVarianceDates } from "../resources/resource-variance-filters";
 
 export type CertificationReportFilters = {
   budgetId?: string;
@@ -22,15 +27,15 @@ export type CertificationEvolutionPoint = {
   periodKey: string;
   periodLabel: string;
   certifiedAmount: string;
-  invoicedAmount: string;
-  collectedAmount: string;
+  invoicedAmount: string | null;
+  collectedAmount: string | null;
 };
 
 export type CertificationProgressPoint = {
   periodKey: string;
   periodLabel: string;
   economicPct: string;
-  financialPct: string;
+  financialPct: string | null;
   physicalPct: string;
 };
 
@@ -49,9 +54,9 @@ export type CertificationPortfolioRow = {
   periodEnd: string;
   status: string;
   totalAmount: string;
-  invoicedAmount: string;
-  collectedAmount: string;
-  paymentStatus: CertificationDerivedPaymentStatus;
+  invoicedAmount: string | null;
+  collectedAmount: string | null;
+  paymentStatus: CertificationDerivedPaymentStatus | null;
 };
 
 export type CertificationVsBudgetRow = {
@@ -71,6 +76,8 @@ export type CertificationEvolutionReport = {
   budgetName: string;
   budgetStatus: string;
   budgetTotalSale: string;
+  currency: string;
+  arAvailable: boolean;
   monthlySeries: CertificationEvolutionPoint[];
   progressSeries: CertificationProgressPoint[];
   portfolio: CertificationPortfolioRow[];
@@ -86,40 +93,16 @@ export type CertificationReportEmpty = {
 
 export type CertificationReportResult = CertificationEvolutionReport | CertificationReportEmpty;
 
-function monthKey(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-
-function monthLabel(key: string): string {
-  const [y, m] = key.split("-");
-  return new Date(Date.UTC(+y!, +m! - 1, 1)).toLocaleDateString("es-AR", {
-    month: "short",
-    year: "numeric",
-  });
-}
-
-function parseFilterDate(s: string, endOfDay: boolean): Date {
-  return new Date(`${s}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}Z`);
-}
-
-function inDateRange(d: Date, dateFrom?: string, dateTo?: string): boolean {
-  if (dateFrom && d < parseFilterDate(dateFrom, false)) return false;
-  if (dateTo && d > parseFilterDate(dateTo, true)) return false;
-  return true;
-}
-
 function derivePaymentStatus(
   invoiced: Prisma.Decimal,
-  collected: Prisma.Decimal,
+  applied: Prisma.Decimal,
   hasInvoice: boolean,
   overdue: boolean,
 ): CertificationDerivedPaymentStatus {
   if (!hasInvoice || invoiced.isZero()) return "NOT_INVOICED";
   if (overdue) return "OVERDUE";
-  if (collected.greaterThanOrEqualTo(invoiced) && !invoiced.isZero()) return "PAID";
-  if (collected.greaterThan(0)) return "PARTIAL";
+  if (applied.greaterThanOrEqualTo(invoiced)) return "PAID";
+  if (applied.greaterThan(0)) return "PARTIAL";
   return "UNPAID";
 }
 
@@ -127,13 +110,15 @@ async function resolveBudget(
   projectId: string,
   budgetId: string | undefined,
   ctx: ServiceContext,
-): Promise<{ id: string; name: string; status: string; totalSalePrice: Prisma.Decimal } | null> {
+) {
   const budgets = await prisma.budget.findMany({
-    where: { projectId, tenantId: ctx.tenantId, status: { in: ["APPROVED", "CLOSED"] } },
+    where: { projectId, tenantId: ctx.tenantId, ...companyScopeFilter(ctx), status: { in: ["APPROVED", "CLOSED"] } },
     select: {
       id: true,
       name: true,
       status: true,
+      companyId: true,
+      currency: true,
       totalSalePrice: true,
       versionNumber: true,
       parentBudgetId: true,
@@ -143,13 +128,7 @@ async function resolveBudget(
   const picked = budgetId
     ? budgets.find((b) => b.id === budgetId)
     : pickPrincipalContractualBudget(budgets);
-  if (!picked) return null;
-  return {
-    id: picked.id,
-    name: picked.name,
-    status: picked.status,
-    totalSalePrice: picked.totalSalePrice,
-  };
+  return picked ?? null;
 }
 
 export async function getCertificationEvolutionReport(
@@ -157,76 +136,78 @@ export async function getCertificationEvolutionReport(
   filters: CertificationReportFilters,
   ctx: ServiceContext,
 ): Promise<CertificationReportResult> {
-  if (!can(ctx.roles, "VIEW", "CERTIFICATIONS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
+  if (!can(ctx.roles, "VIEW", "CERTIFICATIONS")) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver reportes de certificaciones");
   }
 
-  await requireProjectAccess(projectId, ctx);
-
-  const budget = await resolveBudget(projectId, filters.budgetId, ctx);
-  if (!budget) return { type: "NO_APPROVED_BUDGETS" };
-
+  validateResourceVarianceDates(filters);
+  const project = await requireProjectAccess(projectId, ctx);
+  const companyId = project.companyId ?? ctx.companyId;
+  const scopeCtx = { ...ctx, companyId };
+  const scope = { tenantId: ctx.tenantId, projectId, ...(companyId ? { companyId } : {}) };
   const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "CERTIFICATIONS");
+  assertTenantModuleEnabledWithGate(gate, "BUDGETS");
+
+  const budget = await resolveBudget(projectId, filters.budgetId, scopeCtx);
+  if (!budget) return { type: "NO_APPROVED_BUDGETS" };
+  await assertBudgetCostGraph(budget.id);
+
   const warnings: string[] = [];
   const sectionsExcluded: TenantModuleSectionExcludedWarning[] = [];
 
-  const certsEnabled = gate.isEnabled("CERTIFICATIONS");
-  if (!certsEnabled) {
-    sectionsExcluded.push({
-      module: "CERTIFICATIONS",
-      section: "Certificaciones cliente",
-      reason: "TENANT_MODULE_DISABLED",
-    });
-    warnings.push("Módulo de certificaciones deshabilitado: series de avance en cero.");
-  }
-
-  const arEnabled = gate.isEnabled("AR");
-  if (!arEnabled) {
+  const arAvailable = gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR");
+  if (!gate.isEnabled("AR")) {
     sectionsExcluded.push({
       module: "AR",
       section: "Facturado y cobrado",
       reason: "TENANT_MODULE_DISABLED",
     });
-    warnings.push("Módulo de cobranzas (AR) deshabilitado: facturado y cobrado en cero.");
   }
+  if (!arAvailable) warnings.push("Facturación, cobranza y estado de cobro no disponibles para este reporte.");
+  const certWhere = {
+    tenantId: ctx.tenantId, projectId, budgetId: budget.id,
+    ...companyScopeFilter({ ...scopeCtx, companyId: budget.companyId ?? companyId }),
+    status: { in: ["ISSUED", "APPROVED"] as Array<"ISSUED" | "APPROVED"> },
+  };
+  const invoiceWhere = { ...scope, status: "ISSUED" as const, documentKind: "INVOICE" as const };
 
   const budgetTotalSale = budget.totalSalePrice;
 
-  const certifications = certsEnabled
-    ? await prisma.certification.findMany({
-        where: {
-          projectId,
-          tenantId: ctx.tenantId,
-          budgetId: budget.id,
-          status: { in: ["ISSUED", "APPROVED"] },
-        },
+  const certifications = await prisma.certification.findMany({
+        where: certWhere,
         select: {
           id: true,
+          companyId: true,
           number: true,
           periodStart: true,
           periodEnd: true,
           status: true,
           totalAmount: true,
           salesInvoices: {
-            where: { status: "ISSUED" },
+            where: arAvailable ? invoiceWhere : { id: { in: [] } },
             select: {
+              id: true, companyId: true, currency: true,
+              issueDate: true,
               totalAmount: true,
               receivable: {
                 select: {
                   originalAmount: true,
+                  tenantId: true, companyId: true, projectId: true, currency: true,
                   paidAmount: true,
                   creditedAmount: true,
                   dueDate: true,
                   status: true,
                   collections: {
-                    where: { status: "CONFIRMED" },
-                    select: { amount: true },
+                    where: { ...scope, status: "CONFIRMED" },
+                    select: { amount: true, currency: true, companyId: true, salesInvoiceId: true, collectionDate: true },
                   },
                 },
               },
             },
           },
           lines: {
+            where: { wbsNode: { budgetId: budget.id, type: "ITEM" } },
             select: {
               wbsNodeId: true,
               periodAmount: true,
@@ -236,32 +217,25 @@ export async function getCertificationEvolutionReport(
           },
         },
         orderBy: { number: "asc" },
-      })
-    : [];
+      });
 
-  const invoices = arEnabled
-    ? await prisma.salesInvoice.findMany({
-        where: {
-          projectId,
-          tenantId: ctx.tenantId,
-          status: "ISSUED",
-          certification: { budgetId: budget.id },
-        },
-        select: { issueDate: true, totalAmount: true },
-      })
-    : [];
-
-  const collections = arEnabled
-    ? await prisma.collection.findMany({
-        where: {
-          projectId,
-          tenantId: ctx.tenantId,
-          status: "CONFIRMED",
-          salesInvoice: { certification: { budgetId: budget.id } },
-        },
-        select: { collectionDate: true, amount: true },
-      })
-    : [];
+  const invoiceRows = certifications.flatMap((cert) => cert.salesInvoices.filter((invoice) =>
+    (cert.companyId === null || invoice.companyId === cert.companyId) &&
+    (budget.companyId === null || invoice.companyId === budget.companyId),
+  ));
+  const invoices = invoiceRows.map((invoice) => {
+    assertBudgetCurrency(budget.currency, invoice.currency);
+    const ar = invoice.receivable;
+    const receivable = ar?.tenantId === ctx.tenantId && ar.companyId === invoice.companyId &&
+      ar.projectId === projectId && ar.currency === invoice.currency ? ar : null;
+    const collections = receivable?.collections.filter((collection) =>
+      collection.companyId === invoice.companyId && collection.salesInvoiceId === invoice.id,
+    ) ?? [];
+    for (const collection of collections) assertBudgetCurrency(budget.currency, collection.currency);
+    return { ...invoice, receivable, collections };
+  });
+  const invoiceById = new Map(invoices.map((invoice) => [invoice.id, invoice]));
+  const collections = invoices.flatMap((invoice) => invoice.collections);
 
   const monthlyMap = new Map<
     string,
@@ -304,8 +278,8 @@ export async function getCertificationEvolutionReport(
       periodKey,
       periodLabel: monthLabel(periodKey),
       certifiedAmount: v.certified.toFixed(2),
-      invoicedAmount: v.invoiced.toFixed(2),
-      collectedAmount: v.collected.toFixed(2),
+      invoicedAmount: arAvailable ? v.invoiced.toFixed(2) : null,
+      collectedAmount: arAvailable ? v.collected.toFixed(2) : null,
     }));
 
   let cumCertified = new Prisma.Decimal(0);
@@ -315,7 +289,7 @@ export async function getCertificationEvolutionReport(
 
   const progressSeries: CertificationProgressPoint[] = monthlySeries.map((p) => {
     cumCertified = cumCertified.add(p.certifiedAmount);
-    cumCollected = cumCollected.add(p.collectedAmount);
+    if (p.collectedAmount !== null) cumCollected = cumCollected.add(p.collectedAmount);
 
     const certsInMonth = certifications.filter(
       (c) =>
@@ -334,9 +308,8 @@ export async function getCertificationEvolutionReport(
     const economicPct = budgetTotalSale.isZero()
       ? "0.00"
       : cumCertified.div(budgetTotalSale).times(100).toFixed(2);
-    const financialPct = budgetTotalSale.isZero()
-      ? "0.00"
-      : cumCollected.div(budgetTotalSale).times(100).toFixed(2);
+    const financialPct = !arAvailable ? null : budgetTotalSale.isZero()
+      ? "0.00" : cumCollected.div(budgetTotalSale).times(100).toFixed(2);
     const physicalPct = certificationWeightedPhysicalPct(
       physicalWeighted.toString(),
       physicalWeight.toString(),
@@ -354,15 +327,21 @@ export async function getCertificationEvolutionReport(
   const portfolio: CertificationPortfolioRow[] = certifications.map((cert) => {
     let invoiced = new Prisma.Decimal(0);
     let collected = new Prisma.Decimal(0);
+    let credits = new Prisma.Decimal(0);
+    let invoiceCount = 0;
     let overdue = false;
 
-    for (const inv of cert.salesInvoices) {
+    for (const source of cert.salesInvoices) {
+      const inv = invoiceById.get(source.id);
+      if (!inv) continue;
+      invoiceCount += 1;
       invoiced = invoiced.add(inv.totalAmount);
       const ar = inv.receivable;
       if (!ar) continue;
-      for (const c of ar.collections) {
+      for (const c of inv.collections) {
         collected = collected.add(c.amount);
       }
+      credits = credits.add(ar.creditedAmount);
       const balance = computeObligationBalanceDue(ar.originalAmount, ar.paidAmount, ar.creditedAmount);
       if (ar.status !== "PAID" && hasOpenObligationBalance(balance) && isObligationOverdue(ar.dueDate)) {
         overdue = true;
@@ -377,14 +356,14 @@ export async function getCertificationEvolutionReport(
       periodEnd: cert.periodEnd.toISOString().slice(0, 10),
       status: cert.status,
       totalAmount: serializeMoneyDecimal(cert.totalAmount),
-      invoicedAmount: invoiced.toFixed(2),
-      collectedAmount: collected.toFixed(2),
-      paymentStatus: derivePaymentStatus(
+      invoicedAmount: arAvailable ? invoiced.toFixed(2) : null,
+      collectedAmount: arAvailable ? collected.toFixed(2) : null,
+      paymentStatus: arAvailable ? derivePaymentStatus(
         invoiced,
-        collected,
-        cert.salesInvoices.length > 0,
+        collected.add(credits),
+        invoiceCount > 0,
         overdue,
-      ),
+      ) : null,
     };
   });
 
@@ -433,6 +412,8 @@ export async function getCertificationEvolutionReport(
     budgetName: budget.name,
     budgetStatus: budget.status,
     budgetTotalSale: budgetTotalSale.toFixed(2),
+    currency: budget.currency,
+    arAvailable,
     monthlySeries,
     progressSeries,
     portfolio,

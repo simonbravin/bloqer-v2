@@ -5,6 +5,8 @@ import type { ServiceContext } from "../types";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
 import { canReadScheduledReport } from "./scheduled-report.service";
 
+const RETRY_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
+
 export type ScheduledReportEmailDeliveryRow = {
   id: string;
   createdAt: Date;
@@ -112,22 +114,85 @@ export async function listScheduledReportEmailDeliveries(
 export async function countRecentFailedScheduledReportDeliveries(
   ctx: ServiceContext,
   scheduleId: string,
-  lookbackMs = 7 * 24 * 60 * 60 * 1000,
+  lookbackMs = RETRY_LOOKBACK_MS,
 ): Promise<number> {
   assertCanManageScheduledReports(ctx);
   if (!await canReadScheduledReport(scheduleId, ctx)) return 0;
+  const recipients = await prisma.scheduledReportRecipient.findMany({
+    where: { tenantId: ctx.tenantId, scheduledReportId: scheduleId },
+    select: { recipientUserId: true },
+  });
+  const pending = await listPendingScheduledReportRetries(
+    ctx,
+    scheduleId,
+    recipients.map(({ recipientUserId }) => recipientUserId),
+    lookbackMs,
+  );
+  return pending.reduce((count, batch) => count + batch.recipientIds.size, 0);
+}
+
+type ScheduledReportRetryWindow = {
+  runWindow: string;
+  originalDate: Date;
+  recipientIds: Set<string>;
+};
+
+/** Keep the original slot and stable user identity across all attempts of one delivery. */
+export async function listPendingScheduledReportRetries(
+  ctx: ServiceContext,
+  scheduleId: string,
+  recipientIds: string[],
+  lookbackMs = RETRY_LOOKBACK_MS,
+): Promise<ScheduledReportRetryWindow[]> {
+  if (recipientIds.length === 0) return [];
   const since = new Date(Date.now() - lookbackMs);
-  return prisma.emailDeliveryLog.count({
+  const logs = await prisma.emailDeliveryLog.findMany({
     where: {
       tenantId: ctx.tenantId,
       ...await scheduledReportEmailCompanyScope(ctx),
       emailType: "REPORT_SCHEDULED",
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: scheduleId,
-      status: "FAILED",
+      recipientUserId: { in: recipientIds },
+      status: { in: ["FAILED", "SENT"] },
       createdAt: { gte: since },
     },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    select: { recipientUserId: true, metadata: true, status: true },
   });
+
+  const pendingByWindow = new Map<string, ScheduledReportRetryWindow>();
+  const deliveredByWindow = new Map<string, Set<string>>();
+  for (const log of logs) {
+    if (!log.recipientUserId) continue;
+    const { runWindow } = parseDeliveryMetadata(log.metadata);
+    if (!runWindow) continue;
+    const iso = runWindow.replace(/^manual:/, "");
+    const originalDate = new Date(iso);
+    // Legacy retry timestamps carry no original slot. Keep them in history,
+    // but do not generate an unrelated daily report from their attempt date.
+    if (Number.isNaN(originalDate.getTime()) || originalDate.toISOString() !== iso) continue;
+
+    if (log.status === "SENT") {
+      const delivered = deliveredByWindow.get(runWindow) ?? new Set<string>();
+      delivered.add(log.recipientUserId);
+      deliveredByWindow.set(runWindow, delivered);
+    } else if (log.status === "FAILED") {
+      const pending = pendingByWindow.get(runWindow) ?? {
+        runWindow,
+        originalDate,
+        recipientIds: new Set<string>(),
+      };
+      pending.recipientIds.add(log.recipientUserId);
+      pendingByWindow.set(runWindow, pending);
+    }
+  }
+  for (const [window, pending] of pendingByWindow) {
+    for (const recipientId of deliveredByWindow.get(window) ?? []) {
+      pending.recipientIds.delete(recipientId);
+    }
+  }
+  return [...pendingByWindow.values()].filter(({ recipientIds: pending }) => pending.size > 0);
 }
 
 export function groupScheduledReportDeliveriesIntoRuns(

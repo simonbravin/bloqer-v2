@@ -39,6 +39,7 @@ type Exporters = {
   exportProjectCostControlCsv: (id: string, filters: object, ctx: ServiceContext) => Promise<ReportCsvPayload>;
   exportMaterialVarianceCsv: (id: string, filters: object, ctx: ServiceContext) => Promise<ReportCsvPayload>;
   exportResourceVarianceCsv: (id: string, category: string, filters: object, ctx: ServiceContext) => Promise<ReportCsvPayload>;
+  exportProcurementDeviationCsv: (id: string, filters: object, ctx: ServiceContext) => Promise<ReportCsvPayload>;
 };
 
 /** Isolate only the report read; exercise the public CSV mapping and real CSV encoder. */
@@ -52,6 +53,25 @@ function exporters(failRead = false): Exporters {
   const dependencies: Record<string, unknown> = {
     "../cost-control/cost-control.service": { getProjectCostControl: readCost, sliceCostControlReportByCostType },
     "../reports/material-variance.service": { getMaterialVarianceReport: async () => material },
+    "../reports/procurement-deviation.service": {
+      getProcurementDeviationReport: async () => ({
+        type: "REPORT", currency: "ARS", apAvailable: true, budgetName: "Synthetic baseline",
+        byWbs: [],
+        unallocated: [{ documentType: "OC", documentCode: "OC-002", description: "Flete", supplierName: "Proveedor", amount: "20.00" }],
+        bySupplier: [{ supplierName: "Proveedor", committedCost: "100.00", accruedCost: "30.00", paidCost: "15.00", openCommitted: "70.00" }],
+        warnings: [],
+      }),
+    },
+    "../reports/purchase-order-variance-report.service": {
+      getPurchaseOrderVarianceReport: async () => ({
+        rows: [{
+          purchaseOrderCode: "OC-001", purchaseOrderStatus: "CONFIRMED", description: "Yeso",
+          wbsCode: "1.2", currency: "USD", unit: "kg", unitPrice: "11.00", discountPct: "0.00",
+          budgetUnitCostSnapshot: "10.00", variancePct: "10.00", varianceTier: "NOTE_REQUIRED",
+          varianceJustification: "Cambio de precio",
+        }],
+      }),
+    },
     "../resources/resource-variance.service": { getResourceVarianceReport: async () => ({ type: "REPORT", currency: "USD", budgetName: "Synthetic baseline", byWbs: [], totals: { budgetCost: "100.00", accruedCost: "0.00", variance: "100.00" }, warnings: ["Sin permiso AP: facturas excluidas; reporte parcial."] }) },
     "../resources/resource-board-pure": { RESOURCE_BOARD_LABELS_ES: { LABOR: "Mano de obra" }, RESOURCE_BOARD_ROUTE_SEGMENT: { LABOR: "mano-obra" } },
     "../types": { ServiceError },
@@ -101,4 +121,21 @@ test("resource CSV preserves restricted-source warnings instead of hiding the re
   const { headers, rows } = parseBuiltCsv(result.content);
   assert.ok(rows.some((entry) => entry[0] === "__AVISO__" && entry[1]!.includes("reporte parcial")));
   assert.ok(rows.every((entry) => entry.length === headers.length && entry.at(-1) === "USD"));
+});
+
+test("purchase analysis CSV keeps paid and unallocated amounts under their headings and preserves historical OC currency", async () => {
+  const result = await exporters().exportProcurementDeviationCsv("project", {}, ctx);
+  const { headers, rows } = parseBuiltCsv(result.content);
+  assert.ok(rows.every((row) => row.length === headers.length));
+  const find = (type: string) => Object.fromEntries(headers.map((header, index) => [
+    header,
+    rows.find((row) => row[0] === type)?.[index],
+  ]));
+  assert.equal(find("PROVEEDOR").Pagado, "15.00");
+  assert.equal(find("PROVEEDOR").ComprometidoAbierto, "70.00");
+  assert.equal(find("PROVEEDOR").VariacionPct, "");
+  assert.equal(find("OC").ImporteSinImputacion, "20.00");
+  assert.equal(find("OC").Devengado, "");
+  assert.equal(find("DESVIO_OC").Moneda, "USD");
+  assert.equal(find("DESVIO_OC").CostoUnitarioReferencia, "10.00");
 });

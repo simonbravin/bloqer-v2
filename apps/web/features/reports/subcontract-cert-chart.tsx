@@ -19,9 +19,12 @@ import { REPORT_CHART_FRAME_CLASS, REPORT_CHART_Y_AXIS_WIDTH } from "./report-la
 
 type Props = {
   series: SubcontractCertEvolutionPoint[];
+  currency: string;
+  apAvailable: boolean;
 };
 
-export function SubcontractCertChart({ series }: Props) {
+export function SubcontractCertChart({ series, currency, apAvailable }: Props) {
+  const heading = apAvailable ? "Certificado vs pagado" : "Certificado";
   const data = useMemo(
     () =>
       series.map((p) => ({
@@ -36,7 +39,7 @@ export function SubcontractCertChart({ series }: Props) {
     return (
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Certificado vs pagado</CardTitle>
+          <CardTitle className="text-base">{heading}</CardTitle>
           <CardDescription>Evolución mensual de subcontratos</CardDescription>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground py-8 text-center">
@@ -49,8 +52,8 @@ export function SubcontractCertChart({ series }: Props) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">Certificado vs pagado</CardTitle>
-        <CardDescription>Montos mensuales de certificaciones y pagos a subcontratos</CardDescription>
+        <CardTitle className="text-base">{heading}</CardTitle>
+        <CardDescription>Evolución mensual de subcontratos · {currency}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className={REPORT_CHART_FRAME_CLASS}>
@@ -59,10 +62,10 @@ export function SubcontractCertChart({ series }: Props) {
               <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
               <XAxis dataKey="name" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
               <YAxis tick={{ fontSize: 11 }} tickFormatter={formatChartAxis} width={REPORT_CHART_Y_AXIS_WIDTH} />
-              <Tooltip formatter={(v) => formatChartMoney(Number(v))} />
+              <Tooltip formatter={(v) => formatChartMoney(Number(v), currency)} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Bar dataKey="Certificado" fill={CHART_SERIES.certified} radius={[2, 2, 0, 0]} />
-              <Bar dataKey="Pagado" fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} />
+              {apAvailable ? <Bar dataKey="Pagado" fill={CHART_SERIES.costPaid} radius={[2, 2, 0, 0]} /> : null}
             </BarChart>
           </ResponsiveContainer>
         </div>

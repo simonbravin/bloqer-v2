@@ -22,7 +22,7 @@ XLSX preferido para análisis; PDF para reunión de obra.
 
 ## R-002 — Avance del proyecto (D-120)
 
-**Fecha:** 2026-10-28. **Estado:** disponible en código, con foco en dirección, según [D-120](../00-product/DECISION_LOG.md); **sin publicación**. Q-066 y el tratamiento de Q-005b para este reporte quedan resueltos; no cambia D-003/D-045/D-116/D-119 ni autoriza normalizar datos históricos. Fórmulas canónicas: [PROGRESS_FORMULAS](../04-formulas/PROGRESS_FORMULAS.md).
+**Fecha:** 2026-10-28. **Estado:** publicado el 2026-11-05 con [AG-11](../08-architecture/platform-audit/2026-11-05-ag-11-publication.md), con foco en dirección según [D-120](../00-product/DECISION_LOG.md). Q-066 y el tratamiento de Q-005b para este reporte quedan resueltos. Fórmulas canónicas: [PROGRESS_FORMULAS](../04-formulas/PROGRESS_FORMULAS.md).
 
 ### Objetivo y ubicación
 

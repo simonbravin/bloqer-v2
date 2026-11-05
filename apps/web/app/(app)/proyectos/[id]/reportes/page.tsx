@@ -9,6 +9,7 @@ import {
   canViewApProjectArea,
   canManageScheduledReports,
   canViewProjectCostControlReport,
+  canViewProjectProfitabilityReport,
   canViewProjectCashFlowReport,
   canViewProcurementProjectArea,
   canViewSubcontractsArea,
@@ -55,7 +56,7 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     gate.isEnabled("BUDGETS") &&
     gate.isEnabled("CERTIFICATIONS") &&
     (can(ctx.roles, "VIEW", "CERTIFICATIONS") || can(ctx.roles, "VIEW", "PROJECTS"));
-  const canCash = gate.isEnabled("PROJECTS") && canViewProjectCashFlowReport(ctx.roles);
+  const canCash = gate.isEnabled("PROJECTS") && (canAr || canAp) && canViewProjectCashFlowReport(ctx.roles);
   const canProcurement =
     gate.isEnabled("PROJECTS") &&
     gate.isEnabled("BUDGETS") &&
@@ -67,7 +68,8 @@ export default async function ProjectReportesPage({ params }: PageProps) {
     gate.isEnabled("SUBCONTRACTS") &&
     (canViewSubcontractsArea(ctx.roles) || can(ctx.roles, "VIEW", "PROJECTS"));
 
-  const canProfitability = canCost;
+  const canProfitability = gate.isEnabled("PROJECTS") && gate.isEnabled("BUDGETS")
+    && canViewProjectProfitabilityReport(ctx.roles);
   const canInventory =
     gate.isEnabled("PROJECTS") &&
     gate.isEnabled("BUDGETS") &&

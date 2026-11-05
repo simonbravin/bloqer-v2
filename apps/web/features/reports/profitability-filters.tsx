@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ export function ProfitabilityFilters({
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
+  const [resetVersion, setResetVersion] = useState(0);
 
   function apply(form: {
     budgetId?: string;
@@ -54,13 +56,14 @@ export function ProfitabilityFilters({
 
   return (
     <form
+      key={JSON.stringify([currentBudgetId, currentCostLayer, currentRevenueBasis, currentCurrencyView, resetVersion])}
       className={REPORT_FILTER_FORM_CLASS}
       onSubmit={(e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         apply({
           budgetId: (fd.get("budgetId") as string) || undefined,
-          costLayer: (fd.get("costLayer") as string) || "accrued",
+          costLayer: (fd.get("costLayer") as string) || "exposure",
           revenueBasis: (fd.get("revenueBasis") as string) || "certified",
           currencyView: (fd.get("currencyView") as string) || "ARS",
         });
@@ -68,13 +71,13 @@ export function ProfitabilityFilters({
     >
         {budgets.length > 1 && (
           <div className={REPORT_FILTER_FIELD_CLASS}>
-            <Label className="text-xs">Presupuesto</Label>
+            <Label className="text-xs" htmlFor="profitability-budget">Presupuesto</Label>
             <Select
               key={currentBudgetId ?? "principal"}
               name="budgetId"
               defaultValue={defaultContractualBudgetId(budgets, currentBudgetId)}
             >
-              <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-72`}>
+              <SelectTrigger id="profitability-budget" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-72`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -88,9 +91,9 @@ export function ProfitabilityFilters({
           </div>
         )}
         <div className={REPORT_FILTER_FIELD_CLASS}>
-          <Label className="text-xs">Capa de costo</Label>
-          <Select name="costLayer" defaultValue={currentCostLayer ?? "accrued"}>
-            <SelectTrigger className={REPORT_FILTER_CONTROL_CLASS}>
+          <Label className="text-xs" htmlFor="profitability-cost-layer">Capa de costo</Label>
+          <Select name="costLayer" defaultValue={currentCostLayer ?? "exposure"}>
+            <SelectTrigger id="profitability-cost-layer" className={REPORT_FILTER_CONTROL_CLASS}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -102,21 +105,21 @@ export function ProfitabilityFilters({
           </Select>
         </div>
         <div className={REPORT_FILTER_FIELD_CLASS}>
-          <Label className="text-xs">Base ingresos</Label>
+          <Label className="text-xs" htmlFor="profitability-revenue-basis">Base de ingresos</Label>
           <Select name="revenueBasis" defaultValue={currentRevenueBasis ?? "certified"}>
-            <SelectTrigger className={REPORT_FILTER_CONTROL_CLASS}>
+            <SelectTrigger id="profitability-revenue-basis" className={REPORT_FILTER_CONTROL_CLASS}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="certified">Certificado</SelectItem>
-              <SelectItem value="invoiced">Facturado</SelectItem>
+              <SelectItem value="invoiced">Facturado neto</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className={REPORT_FILTER_FIELD_CLASS}>
-          <Label className="text-xs">Moneda</Label>
+          <Label className="text-xs" htmlFor="profitability-currency">Moneda</Label>
           <Select name="currencyView" defaultValue={currentCurrencyView ?? "ARS"}>
-            <SelectTrigger className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-36`}>
+            <SelectTrigger id="profitability-currency" className={`${REPORT_FILTER_CONTROL_CLASS} sm:w-36`}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -128,7 +131,10 @@ export function ProfitabilityFilters({
         <Button type="submit" size="sm" className="h-8">
           Aplicar
         </Button>
-        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => router.push(pathname)}>
+        <Button type="button" variant="ghost" size="sm" className="h-8" onClick={() => {
+          setResetVersion((version) => version + 1);
+          router.push(pathname);
+        }}>
           Restablecer
         </Button>
     </form>

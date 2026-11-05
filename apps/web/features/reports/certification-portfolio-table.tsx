@@ -11,23 +11,26 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { TableScroll } from "@/components/ui/table-scroll";
+import { certificationStatusLabel } from "@/features/certifications/components/certification-status-badge";
+import { formatDbDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { cn } from "@/lib/utils";
 
-const PAYMENT_LABEL: Record<CertificationPortfolioRow["paymentStatus"], string> = {
+const PAYMENT_LABEL: Record<NonNullable<CertificationPortfolioRow["paymentStatus"]>, string> = {
   NOT_INVOICED: "Sin facturar",
   UNPAID: "Impago",
-  PARTIAL: "Cobro parcial",
-  PAID: "Cobrado",
+  PARTIAL: "Saldo parcial",
+  PAID: "Saldado",
   OVERDUE: "Vencido",
 };
 
 type Props = {
   rows: CertificationPortfolioRow[];
   projectId: string;
+  currency: string;
 };
 
-export function CertificationPortfolioTable({ rows, projectId }: Props) {
+export function CertificationPortfolioTable({ rows, projectId, currency }: Props) {
   if (rows.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-8 rounded-lg border bg-card">
@@ -62,15 +65,15 @@ export function CertificationPortfolioTable({ rows, projectId }: Props) {
                 </Link>
               </TableCell>
               <TableCell className="text-muted-foreground whitespace-nowrap">
-                {row.periodStart} → {row.periodEnd}
+                {formatDbDate(row.periodStart)} → {formatDbDate(row.periodEnd)}
               </TableCell>
-              <TableCell>{row.status}</TableCell>
-              <TableCell className="text-right font-mono">{formatMoneyAmount(row.totalAmount)}</TableCell>
+              <TableCell>{certificationStatusLabel(row.status)}</TableCell>
+              <TableCell className="text-right font-mono">{formatMoneyAmount(row.totalAmount, currency)}</TableCell>
               <TableCell className="text-right font-mono text-muted-foreground">
-                {formatMoneyAmount(row.invoicedAmount)}
+                {row.invoicedAmount === null ? "—" : formatMoneyAmount(row.invoicedAmount, currency)}
               </TableCell>
               <TableCell className="text-right font-mono text-muted-foreground">
-                {formatMoneyAmount(row.collectedAmount)}
+                {row.collectedAmount === null ? "—" : formatMoneyAmount(row.collectedAmount, currency)}
               </TableCell>
               <TableCell>
                 <span
@@ -81,7 +84,7 @@ export function CertificationPortfolioTable({ rows, projectId }: Props) {
                     row.paymentStatus === "NOT_INVOICED" && "text-amber-600",
                   )}
                 >
-                  {PAYMENT_LABEL[row.paymentStatus]}
+                  {row.paymentStatus === null ? "No disponible" : PAYMENT_LABEL[row.paymentStatus]}
                 </span>
               </TableCell>
             </TableRow>

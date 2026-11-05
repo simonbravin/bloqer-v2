@@ -18,6 +18,8 @@ import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
 
 type Props = {
   rows: ProjectSupplierReportRow[];
+  currency: string;
+  apAvailable: boolean;
 };
 
 function formatIsoDate(iso: string | null) {
@@ -27,7 +29,7 @@ function formatIsoDate(iso: string | null) {
   return `${d}/${m}/${y}`;
 }
 
-export function ProjectSupplierTable({ rows }: Props) {
+export function ProjectSupplierTable({ rows, currency, apAvailable }: Props) {
   const accessors = useMemo(
     () => ({
       name: (r: ProjectSupplierReportRow) => r.supplierName,
@@ -173,31 +175,31 @@ export function ProjectSupplierTable({ rows }: Props) {
                   <span className="ml-1 text-muted-foreground">({row.openPoCount} ab.)</span>
                 ) : null}
               </TableCell>
-              <TableCell className="text-right font-mono tabular-nums">{row.invoiceCount}</TableCell>
+              <TableCell className="text-right font-mono tabular-nums">{apAvailable ? row.invoiceCount : "—"}</TableCell>
               <TableCell className="text-right font-mono tabular-nums">{row.receiptCount}</TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {formatMoneyAmount(row.committedCost)}
+                {formatMoneyAmount(row.committedCost, currency)}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {formatMoneyAmount(row.accruedCost)}
+                {apAvailable ? formatMoneyAmount(row.accruedCost, currency) : "—"}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {formatMoneyAmount(row.paidCost)}
+                {apAvailable ? formatMoneyAmount(row.paidCost, currency) : "—"}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {formatMoneyAmount(row.openCommitted)}
+                {apAvailable ? formatMoneyAmount(row.openCommitted, currency) : "—"}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums font-medium">
-                {formatMoneyAmount(row.expectedExposure)}
+                {apAvailable ? formatMoneyAmount(row.expectedExposure, currency) : "—"}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {row.shareOfExposurePct ? `${row.shareOfExposurePct}%` : "—"}
+                {apAvailable && row.shareOfExposurePct ? `${row.shareOfExposurePct}%` : "—"}
               </TableCell>
               <TableCell className="text-right font-mono tabular-nums">
-                {formatMoneyAmount(row.payableBalance)}
-                {isPositiveMoneyAmount(row.overduePayable) ? (
+                {apAvailable ? formatMoneyAmount(row.payableBalance, currency) : "—"}
+                {apAvailable && isPositiveMoneyAmount(row.overduePayable) ? (
                   <span className="mt-0.5 block text-[10px] text-destructive">
-                    venc. {formatMoneyAmount(row.overduePayable)}
+                    venc. {formatMoneyAmount(row.overduePayable, currency)}
                   </span>
                 ) : null}
               </TableCell>

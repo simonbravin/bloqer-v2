@@ -14,9 +14,10 @@ import { formatMoneyAmount, formatRatePctWithSymbol, isPositiveMoneyAmount } fro
 
 type Props = {
   rows: CertificationVsBudgetRow[];
+  currency: string;
 };
 
-export function CertificationVsBudgetTable({ rows }: Props) {
+export function CertificationVsBudgetTable({ rows, currency }: Props) {
   const pending = rows.filter((r) => isPositiveMoneyAmount(r.pendingCertify));
 
   return (
@@ -45,13 +46,13 @@ export function CertificationVsBudgetTable({ rows }: Props) {
                 <TableCell className="max-w-[min(18rem,35vw)] truncate" title={row.wbsName}>
                   {row.wbsName}
                 </TableCell>
-                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSale)}</TableCell>
-                <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCumulative)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.budgetSale, currency)}</TableCell>
+                <TableCell className="text-right font-mono">{formatMoneyAmount(row.certifiedCumulative, currency)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {formatRatePctWithSymbol(row.certifiedPct)}
                 </TableCell>
                 <TableCell className="text-right font-mono">
-                  {isPositiveMoneyAmount(row.pendingCertify) ? formatMoneyAmount(row.pendingCertify) : "—"}
+                  {isPositiveMoneyAmount(row.pendingCertify) ? formatMoneyAmount(row.pendingCertify, currency) : "—"}
                 </TableCell>
               </TableRow>
             ))}

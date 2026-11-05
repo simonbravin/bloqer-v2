@@ -2,6 +2,7 @@ import { Prisma, prisma } from "@bloqer/database";
 import { assertOverheadCompanyScope, assertOverheadEdit, assertOverheadView } from "./overhead-access";
 import {
   AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
+  getAutoWeightAmountsForClose,
   getAutoWeightOverheadPreviewForPeriod,
   listCorporateGgPeriods,
 } from "./overhead-auto-weight.service";
@@ -9,15 +10,18 @@ import { getCompanyOverheadSettings } from "./project-overhead.service";
 import { assertValidOverheadPeriod, currentOverheadPeriod } from "./overhead-period";
 import { assertOptimisticRowUpdate } from "./optimistic-lock";
 import { ServiceContext, ServiceError } from "../types";
+import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 
 export type OverheadPeriodSummary = {
   period: string;
   status: "OPEN" | "FROZEN";
   poolArs: string;
-  totalCdArs: string;
+  totalCdArs: string | null;
   invoiceCount: number;
   excludedNonArsCount: number;
   projectRowCount: number;
+  calculationBlocked: boolean;
+  warnings: string[];
   frozenAt: string | null;
 };
 
@@ -28,6 +32,7 @@ export async function getOverheadPeriodCloseStatus(
 ): Promise<"OPEN" | "FROZEN"> {
   assertOverheadView(ctx);
   assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   const row = await prisma.overheadPeriodClose.findUnique({
     where: {
       tenantId_companyId_period: {
@@ -48,6 +53,7 @@ export async function listOverheadPeriodSummaries(
 ): Promise<OverheadPeriodSummary[]> {
   assertOverheadView(ctx);
   assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   const settings = await getCompanyOverheadSettings(companyId, ctx);
   if (settings.overheadAllocationMode !== "AUTO_WEIGHT") {
     return [];
@@ -122,6 +128,8 @@ export async function listOverheadPeriodSummaries(
         invoiceCount: 0,
         excludedNonArsCount: 0,
         projectRowCount: snapshotCountByPeriod.get(period) ?? 0,
+        calculationBlocked: false,
+        warnings: [],
         frozenAt: close.frozenAt?.toISOString() ?? null,
       });
       continue;
@@ -137,7 +145,9 @@ export async function listOverheadPeriodSummaries(
       totalCdArs: preview.totalAccruedCd,
       invoiceCount: preview.invoiceCount,
       excludedNonArsCount: preview.excludedNonArsCount,
-      projectRowCount: preview.rows.length,
+      projectRowCount: preview.projectCount,
+      calculationBlocked: preview.calculationBlocked,
+      warnings: preview.warnings,
       frozenAt: null,
     });
   }
@@ -152,6 +162,7 @@ export async function closeOverheadPeriod(
 ): Promise<void> {
   assertOverheadEdit(ctx);
   assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   assertValidOverheadPeriod(period);
 
   const settings = await getCompanyOverheadSettings(companyId, ctx);
@@ -162,38 +173,15 @@ export async function closeOverheadPeriod(
     );
   }
 
-  const existing = await prisma.overheadPeriodClose.findUnique({
-    where: {
-      tenantId_companyId_period: {
-        tenantId: ctx.tenantId,
-        companyId,
-        period,
-      },
-    },
-  });
-  if (existing?.status === "FROZEN") {
-    throw new ServiceError("CONFLICT", "El período ya está cerrado. Reabrilo antes de volver a cerrar.");
-  }
-
-  const preview = await getAutoWeightOverheadPreviewForPeriod(
-    companyId,
-    period,
-    ctx,
-    AUTO_WEIGHT_PERIOD_CLOSE_OPTS,
-  );
-
-  const pool = new Prisma.Decimal(preview.poolArs);
-  const totalCd = new Prisma.Decimal(preview.totalAccruedCd);
-
-  if (pool.greaterThan(0) && totalCd.lessThanOrEqualTo(0)) {
-    throw new ServiceError(
-      "CONFLICT",
-      "No se puede cerrar: hay gastos corporativos en el período pero ningún proyecto con costo devengado",
-    );
-  }
-
   await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const company = await tx.company.findFirst({
+      where: { id: companyId, tenantId: ctx.tenantId },
+      select: { overheadAllocationMode: true },
+    });
+    if (company?.overheadAllocationMode !== "AUTO_WEIGHT") {
+      throw new ServiceError("CONFLICT", "La empresa ya no está en modo de imputación automática.");
+    }
 
     const existingRow = await tx.overheadPeriodClose.findUnique({
       where: {
@@ -207,6 +195,23 @@ export async function closeOverheadPeriod(
     if (existingRow?.status === "FROZEN") {
       throw new ServiceError("CONFLICT", "El período ya está cerrado. Reabrilo antes de volver a cerrar.");
     }
+
+    const preview = await getAutoWeightAmountsForClose(companyId, period, ctx, tx);
+    if (preview.calculationBlocked || preview.totalAccruedCd === null) {
+      throw new ServiceError("CONFLICT", `No se puede cerrar el período. ${preview.warnings.join(" ")}`);
+    }
+    const pool = new Prisma.Decimal(preview.poolArs);
+    const totalCd = new Prisma.Decimal(preview.totalAccruedCd);
+    const snapshotRows = preview.rows.map((row) => {
+      if (row.allocatedAmount === null || row.weightPct === null) {
+        throw new ServiceError("CONFLICT", "Falta el importe o peso de una obra para cerrar el período.");
+      }
+      return {
+        tenantId: ctx.tenantId, companyId, period, projectId: row.projectId,
+        allocatedAmount: new Prisma.Decimal(row.allocatedAmount),
+        weightPct: new Prisma.Decimal(row.weightPct),
+      };
+    });
 
     const frozenAt = new Date();
     let periodCloseId: string;
@@ -246,20 +251,12 @@ export async function closeOverheadPeriod(
       where: { periodCloseId },
     });
 
-    if (preview.rows.length > 0) {
+    if (snapshotRows.length > 0) {
       await tx.overheadAutoPeriodSnapshot.createMany({
-        data: preview.rows.map((row) => ({
-          tenantId: ctx.tenantId,
-          companyId,
-          period,
-          projectId: row.projectId,
-          periodCloseId,
-          allocatedAmount: new Prisma.Decimal(row.allocatedAmount),
-          weightPct: new Prisma.Decimal(row.weightPct),
-        })),
+        data: snapshotRows.map((row) => ({ ...row, periodCloseId })),
       });
     }
-  });
+  }, { timeout: 30_000 });
 }
 
 export async function reopenOverheadPeriod(
@@ -269,6 +266,7 @@ export async function reopenOverheadPeriod(
 ): Promise<void> {
   assertOverheadEdit(ctx);
   assertOverheadCompanyScope(companyId, ctx);
+  await assertApTenantModule(ctx);
   assertValidOverheadPeriod(period);
 
   const existing = await prisma.overheadPeriodClose.findUnique({

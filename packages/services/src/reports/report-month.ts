@@ -45,13 +45,12 @@ export function defaultReportDateRange(
 ): { dateFrom: string; dateTo: string } {
   const parts = calendarPartsInTimeZone(now);
   const dateTo = formatCalendarDate(parts);
-  const pivot = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12, 0, 0));
-  pivot.setUTCMonth(pivot.getUTCMonth() - monthsBack);
+  const targetMonthEnd = new Date(Date.UTC(parts.year, parts.month - monthsBack, 0));
   return {
     dateFrom: formatCalendarDate({
-      year: pivot.getUTCFullYear(),
-      month: pivot.getUTCMonth() + 1,
-      day: pivot.getUTCDate(),
+      year: targetMonthEnd.getUTCFullYear(),
+      month: targetMonthEnd.getUTCMonth() + 1,
+      day: Math.min(parts.day, targetMonthEnd.getUTCDate()),
     }),
     dateTo,
   };

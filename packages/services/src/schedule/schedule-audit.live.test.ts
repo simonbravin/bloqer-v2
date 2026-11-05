@@ -8,7 +8,7 @@ import { prisma, type Prisma } from "@bloqer/database";
 import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
-import { listEmailDeliveryLogs } from "../email-delivery/email-delivery-log.service";
+import { getEmailDeliveryLogById, listEmailDeliveryLogs } from "../email-delivery/email-delivery-log.service";
 import {
   approveJobsiteLog,
   createJobsiteLog,
@@ -28,6 +28,7 @@ import {
   countRecentFailedScheduledReportDeliveries,
   listScheduledReportEmailDeliveries,
 } from "../scheduled-reports/scheduled-report-execution.service";
+import { runDueScheduledReportsForTenant } from "../scheduled-reports/scheduled-report-runner.service";
 import {
   addScheduleDependency,
   assertScheduleEntityProject,
@@ -115,7 +116,7 @@ describe(
             ],
           });
           await tx.user.create({
-            data: { id: actorId, email: `audit-ag05-schedule-${actorId}@example.test` },
+            data: { id: actorId, email: `audit-ag05-schedule-${actorId}@example.test`, status: "ACTIVE" },
           });
           await tx.contact.create({
             data: { id: contactId, tenantId, legalName: "Synthetic AG05 supplier/client" },
@@ -884,6 +885,11 @@ describe(
           },
         });
         await prisma.userMembership.create({ data: { tenantId, companyId, userId: actorId, roles: ["OWNER"] } });
+        await prisma.scheduledReportRecipient.create({
+          data: { tenantId, scheduledReportId: ids.shared, recipientUserId: actorId },
+        });
+        const runWindow = new Date(Date.now() - 60_000).toISOString();
+        const otherRunWindow = new Date(Date.now() - 120_000).toISOString();
         const delivery = {
           tenantId,
           subject: "Synthetic daily report",
@@ -895,8 +901,8 @@ describe(
         } as const;
         await prisma.emailDeliveryLog.createMany({
           data: [
-            { ...delivery, companyId, recipientUserId: actorId, recipientEmail: "own@example.test" },
-            { ...delivery, companyId: null, recipientUserId: actorId, recipientEmail: "shared-verified@example.test" },
+            { ...delivery, companyId, recipientUserId: actorId, recipientEmail: "own@example.test", metadata: { runWindow } },
+            { ...delivery, companyId: null, recipientUserId: actorId, recipientEmail: "shared-verified@example.test", metadata: { runWindow: otherRunWindow } },
             { ...delivery, companyId: null, recipientEmail: "shared-unknown@example.test" },
             { ...delivery, companyId: otherCompanyId, recipientUserId: actorId, recipientEmail: "foreign@example.test" },
             { ...delivery, companyId, relatedEntityId: ids.sharedForeignSelection, recipientEmail: "foreign-project@example.test" },
@@ -928,6 +934,17 @@ describe(
             .map((row) => row.recipientEmail).sort(),
           visibleEmails,
         );
+        assert.deepEqual(
+          (await listEmailDeliveryLogs({}, ctx))
+            .filter((row) => row.emailType === "REPORT_SCHEDULED")
+            .map((row) => row.recipientEmail).sort(),
+          visibleEmails,
+        );
+        const foreignDelivery = await prisma.emailDeliveryLog.findFirstOrThrow({
+          where: { tenantId, recipientEmail: "foreign@example.test" },
+          select: { id: true },
+        });
+        await assert.rejects(getEmailDeliveryLogById(foreignDelivery.id, ctx), isCode("NOT_FOUND"));
         assert.equal(await countRecentFailedScheduledReportDeliveries(ctx, ids.shared), 2);
         await assert.rejects(deactivateScheduledReport(ctx, ids.shared), isCode("NOT_FOUND"));
         await assert.rejects(deactivateScheduledReport(ctx, ids.foreign), isCode("NOT_FOUND"));
@@ -935,10 +952,33 @@ describe(
         const tenantCtx = { ...ctx, companyId: null };
         assert.equal((await listScheduledReportEmailDeliveries(tenantCtx, ids.shared)).length, 4);
         assert.equal((await getScheduledReportById(tenantCtx, ids.sharedForeignSelection)).status, "ACTIVE");
+
+        await prisma.scheduledReport.update({
+          where: { id: ids.foreignProject, tenantId },
+          data: { nextRunAt: new Date(Date.now() - 60_000) },
+        });
+        await prisma.scheduledReportItem.create({
+          data: { tenantId, scheduledReportId: ids.foreignProject, reportKey: "PROJECT_PROGRESS" },
+        });
+        await prisma.scheduledReportRecipient.create({
+          data: { tenantId, scheduledReportId: ids.foreignProject, recipientUserId: actorId },
+        });
+        const runs = await runDueScheduledReportsForTenant(tenantId, async () =>
+          assert.fail("must not generate attachments for a recipient outside the project's company"),
+        );
+        assert.equal(runs.length, 1);
+        assert.equal(runs[0]?.runStatus, "SKIPPED");
+        assert.equal(runs[0]?.recipientsSkipped, 1);
+        const [deniedDelivery] = await listScheduledReportEmailDeliveries(tenantCtx, ids.foreignProject);
+        assert.equal(deniedDelivery?.status, "SKIPPED");
+        assert.equal(deniedDelivery?.skippedReason, "no_authorized_attachments");
+        assert.equal(deniedDelivery?.attachmentCount, 0);
+
         await deactivateScheduledReport(tenantCtx, ids.shared);
         assert.equal((await getScheduledReportById(ctx, ids.shared)).status, "PAUSED");
       } finally {
         await prisma.emailDeliveryLog.deleteMany({ where: { tenantId, relatedEntityId: { in: Object.values(ids) } } });
+        await prisma.scheduledReportRecipient.deleteMany({ where: { tenantId, scheduledReportId: { in: Object.values(ids) } } });
         await prisma.userMembership.deleteMany({ where: { tenantId, userId: actorId } });
         await prisma.scheduledReportItem.deleteMany({ where: { tenantId, scheduledReportId: { in: Object.values(ids) } } });
         await prisma.scheduledReport.deleteMany({ where: { tenantId, id: { in: Object.values(ids) } } });
