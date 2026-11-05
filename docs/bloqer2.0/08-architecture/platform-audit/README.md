@@ -4,7 +4,7 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Estado vigente al 05/11/2026
 
-**AG-00 a AG-09 publicadas.** [Publicación AG-09](./2026-11-05-ag-09-publication.md), PR #7 y Production 75ab1729. [AG-10 cerrada localmente](./2026-11-05-ag-10-treasury-accounting.md) con 31 grupos corregidos, 2.678 pruebas generales y 21 casos SQL aislados. Revisión integral de UX/UI prevista después.
+**AG-00 a AG-10 publicadas.** [Publicación AG-10](./2026-11-05-ag-10-publication.md), PR #8 y Production 77c9596c. [AG-11 cerrada localmente](./2026-11-05-ag-11-field-jobsite.md) con 20 grupos corregidos, 2.706 pruebas generales, 49 casos SQL distintos y muestra en escritorio, tablet y teléfono. La revisión integral de UX/UI se mantiene como etapa posterior.
 
 ## Corte inicial: 03/11/2026
 
@@ -116,8 +116,8 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-07 — Publicada.** [Cierre](./2026-11-04-ag-07-inventory.md), [publicación](./2026-11-05-ag-07-publication.md): PR #5, Production d897aa7f, CI y acceso público comprobados.
 - **AG-08 — Corregida y verificada localmente, sin publicar.** [Cierre](./2026-11-05-ag-08-certifications-subcontracts.md), [JSON](./2026-11-05-ag-08-certifications-subcontracts.json): 30 grupos, D-131/D-132, 2.528 pruebas/90 SQL, tipos/lint/compilación/visual e independencia. AG-09 espera indicación.
 - **AG-09 — Ventas y obligaciones. Corregida y verificada localmente.** [Cierre](./2026-11-05-ag-09-ar-ap-payments.md), [JSON](./2026-11-05-ag-09-ar-ap-payments.json).
-- **AG-10 — Tesorería y contabilidad. Pendiente.** Cuentas, movimientos, transferencias, conciliación, cierre de períodos y GL.
-- **AG-11 — Operación de campo. Pendiente.** Field, libro de obra, captura de evidencias y avance físico conectado con los demás módulos.
+- **AG-10 — Tesorería y contabilidad. Publicada.** [Cierre](./2026-11-05-ag-10-treasury-accounting.md) y [publicación](./2026-11-05-ag-10-publication.md).
+- **AG-11 — Operación de campo. Cerrada localmente.** [Informe](./2026-11-05-ag-11-field-jobsite.md) y [registro estructurado](./2026-11-05-ag-11-field-jobsite.json).
 - **AG-12 — Información y exportaciones. Pendiente.** Reportes, dashboards, filtros, agregados, exportaciones y PDF.
 - **AG-13 — Servicios transversales e interfaces de ayuda. Pendiente.** Documentos, avisos, email, crons, centro de ayuda y Bloqer AI.
 - **AG-14 — Regresión y preparación de release. Pendiente.** Workflows cruzados, performance, seguridad, observabilidad y verificación del despliegue correspondiente.
@@ -186,3 +186,10 @@ Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08
 - [Informe](./2026-11-05-ag-10-treasury-accounting.md) y [registro estructurado](./2026-11-05-ag-10-treasury-accounting.json). 31 grupos en Tesorería, conciliación, períodos y Contabilidad.
 - D-134 a D-139 aprobadas. Dos migraciones aditivas probadas en base aislada. 2.678 pruebas generales y 21 casos SQL distintos aprobados, tipos, lint, compilación y revisión independiente.
 - Muestra de escritorio, tablet y teléfono. Cierre local. AG-11 espera indicación del Owner.
+- [Publicación AG-10](./2026-11-05-ag-10-publication.md) posterior al cierre local. PR #8, Production `77c9596c`, 73 migraciones terminadas, cuatro columnas nuevas comprobadas y acceso público aprobado.
+
+## Corrida AG-11 del 05/11/2026
+
+- [Informe](./2026-11-05-ag-11-field-jobsite.md) y [registro estructurado](./2026-11-05-ag-11-field-jobsite.json). 20 grupos corregidos en Libro de obra, Field, inventario, cronograma, evidencia, R-002 y reporte diario D-100.
+- 2.706 pruebas generales, 49 casos SQL distintos, tipos en 13 tareas, lint, compilación y revisión independiente. Guía, Ayuda e índice AI actualizados con 587 fragmentos.
+- Muestra aislada de OWNER y PROJECT_VIEWER en escritorio, tablet y teléfono. AG-11 queda local. AG-12 espera indicación del Owner.

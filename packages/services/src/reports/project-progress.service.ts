@@ -444,6 +444,11 @@ export async function getProjectProgressReport(
     access,
   );
   const nodes = data.nodes.sort((a, b) => compareWbsCodes(a.code, b.code));
+  if (nodes.some((node) => node.costItem && node.costItem.budgetId !== node.budgetId))
+    throw new ServiceError(
+      "CONFLICT",
+      "Hay partidas con costos vinculados a otro presupuesto. Revisá su trazabilidad antes de consultar los avances.",
+    );
   const ids = new Set(nodes.map((node) => node.id));
   const costData = projectProgressCostEvents(data, ids, currency);
   const costAvailabilityAt = (cut: string) => {
@@ -464,6 +469,11 @@ export async function getProjectProgressReport(
     "Los pendientes comerciales son acciones actuales: descuentan certificaciones y facturas vigentes incluso posteriores al corte; no reconstruyen una bandeja histórica.",
   ];
   const warnings: string[] = [];
+  const excludedDirectSalesHref = data.hasDirectSales ? `/proyectos/${projectId}/facturas` : null;
+  if (excludedDirectSalesHref)
+    warnings.push(
+      "Hay facturas de venta directa sin certificación vinculada. Se consultan en Facturas y quedan fuera de la comparación contractual.",
+    );
   if (costData.incompleteCount)
     warnings.push(
       "Hay notas de crédito o débito sin un vínculo inequívoco al compromiso de la factura de origen. El devengado con EDT se conserva; la exposición afectada no se calcula hasta revisar la trazabilidad.",
@@ -513,15 +523,20 @@ export async function getProjectProgressReport(
         });
         measurements.set(p.wbsNodeId, entries);
       }
-  const tasksByWbs = new Map<string, typeof data.scheduleItems>();
-  const scheduleParentIds = new Set(data.scheduleItems.map((i) => i.parentId).filter(Boolean));
-  for (const item of data.scheduleItems)
-    if (item.type === "TASK" && !scheduleParentIds.has(item.id))
-      for (const link of item.wbsLinks) {
-        const entries = tasksByWbs.get(link.wbsNodeId) ?? [];
-        entries.push(item);
-        tasksByWbs.set(link.wbsNodeId, entries);
-      }
+  const activeSchedule = data.scheduleItems.filter((item) => item.status !== "CANCELLED");
+  const activeParentIds = new Set(activeSchedule.map((item) => item.parentId));
+  const allParentIds = new Set(data.scheduleItems.map((item) => item.parentId));
+  const leaves = activeSchedule.filter((item) => !activeParentIds.has(item.id));
+  const tasks = leaves.filter((item) => item.type === "TASK");
+  const tasksByWbs = new Map<string, typeof tasks>();
+  for (const task of tasks) {
+    if (allParentIds.has(task.id)) continue; // Former container dates are stale rollups.
+    for (const link of task.wbsLinks) {
+      const entries = tasksByWbs.get(link.wbsNodeId) ?? [];
+      entries.push(task);
+      tasksByWbs.set(link.wbsNodeId, entries);
+    }
+  }
   const budgetCost = nodes.reduce(
     (sum, node) => sum.plus(node.costItem?.totalCostDirect ?? ZERO),
     ZERO,
@@ -588,6 +603,7 @@ export async function getProjectProgressReport(
         cost: node.costItem == null ? null : node.costItem.totalCostDirect.toFixed(4),
         ...value,
       })),
+      access.jobsite,
     );
   const financialAt = (cut: string): ProjectProgressFinancial => {
     const { costsAvailable, exposureAvailable } = costAvailabilityAt(cut);
@@ -642,7 +658,7 @@ export async function getProjectProgressReport(
     };
   };
   const physical = coverageAt(dateTo);
-  const plan = aggregateProjectProgressCoverage(planAt(dateTo));
+  const plan = aggregateProjectProgressCoverage(planAt(dateTo), access.schedule);
   if (physical.hasLegacy)
     warnings.push(
       "Hay porcentajes físicos anteriores al 01/06/2026 con semántica ambigua: requieren revisión y no integran el avance validado.",
@@ -655,11 +671,11 @@ export async function getProjectProgressReport(
     warnings.push(
       `${physical.zeroCostCount} partida(s) sin peso de costo directo; visibles en detalle, no aportan al porcentaje ponderado.`,
     );
-  if (physical.pct == null)
+  if (access.jobsite && physical.pct == null)
     warnings.push(
       "El físico global no está validado: revisá cobertura y base. El avance observado conserva el alcance sin medir en el denominador.",
     );
-  if (plan.pct == null)
+  if (access.schedule && plan.pct == null)
     warnings.push(
       "Referencia del plan incompleta: se requiere una tarea primaria inequívoca y fechas válidas por partida con peso.",
     );
@@ -702,7 +718,7 @@ export async function getProjectProgressReport(
           })
         : null;
     const rowCost = costs.get(node.id);
-    const issues = [...value.issues];
+    const issues = access.jobsite ? [...value.issues] : [];
     if (!ci) issues.push("Sin base presupuestaria de costo/cantidad.");
     if (ci?.totalCostDirect.isZero())
       issues.push("Partida sin peso en el avance global (costo directo cero).");
@@ -715,7 +731,7 @@ export async function getProjectProgressReport(
             dateTo,
           )
         : null;
-    if (planPct == null)
+    if (access.schedule && planPct == null)
       issues.push("Sin tarea primaria inequívoca con fechas para el plan comparable.");
     const href = `/proyectos/${projectId}/control-costos/${node.id}`;
     if (exposureAvailable && ci && rowCost?.exposure.gt(ci.totalCostDirect))
@@ -742,7 +758,7 @@ export async function getProjectProgressReport(
         kind: "PHYSICAL_REMAINING",
         title: `${node.code} · ${node.name}`,
         detail: `Pendiente físico: ${rate(new Prisma.Decimal(100).minus(value.pct))}%.`,
-        href: `/proyectos/${projectId}/cronograma`,
+        href: `/proyectos/${projectId}/${access.schedule ? "cronograma" : "libro-obra"}`,
       });
     if (suggestion && new Prisma.Decimal(suggestion.quantity).gt(0))
       pending.push({
@@ -818,9 +834,13 @@ export async function getProjectProgressReport(
       });
   }
   const today = formatCalendarDate(calendarPartsInTimeZone());
-  const parentIds = new Set(data.scheduleItems.map((i) => i.parentId).filter(Boolean));
-  const leaves = data.scheduleItems.filter((i) => !parentIds.has(i.id));
-  const tasks = leaves.filter((i) => i.type === "TASK");
+  const delayedTasks = tasks.filter(
+    (task): task is typeof task & { endDate: Date } =>
+      !allParentIds.has(task.id) &&
+      task.endDate != null &&
+      dateKey(task.endDate) < today &&
+      task.status !== "COMPLETED",
+  );
   for (const task of tasks) {
     if (task.status === "BLOCKED")
       pending.push({
@@ -830,16 +850,16 @@ export async function getProjectProgressReport(
         detail: task.blockReason ?? "Tarea bloqueada.",
         href: `/proyectos/${projectId}/cronograma`,
       });
-    if (task.endDate && dateKey(task.endDate) < today && task.status !== "COMPLETED")
-      pending.push({
-        id: `late-${task.id}`,
-        kind: "SCHEDULE_DELAYED",
-        title: task.name,
-        detail: "Tarea vigente con fecha fin vencida y todavía sin completar.",
-        date: dateKey(task.endDate),
-        href: `/proyectos/${projectId}/cronograma`,
-      });
   }
+  for (const task of delayedTasks)
+    pending.push({
+      id: `late-${task.id}`,
+      kind: "SCHEDULE_DELAYED",
+      title: task.name,
+      detail: "Tarea vigente con fecha fin vencida y todavía sin completar.",
+      date: dateKey(task.endDate),
+      href: `/proyectos/${projectId}/cronograma`,
+    });
   const financial = financialAt(dateTo);
   if (financial.overdueBalance && new Prisma.Decimal(financial.overdueBalance).gt(0))
     pending.push({
@@ -872,7 +892,7 @@ export async function getProjectProgressReport(
     const cut = dateKey(end) < dateTo ? dateKey(end) : dateTo;
     const f = financialAt(cut);
     const p = coverageAt(cut);
-    const planPoint = aggregateProjectProgressCoverage(planAt(cut));
+    const planPoint = aggregateProjectProgressCoverage(planAt(cut), access.schedule);
     series.push({
       periodKey: cursor.slice(0, 7),
       periodLabel: monthLabel(cursor.slice(0, 7)),
@@ -931,17 +951,14 @@ export async function getProjectProgressReport(
       : null,
     costs: costsAvailable ? latest(costData.events.map((event) => event.date)) : null,
   };
-  const durationWeight = leaves.reduce(
-    (sum, item) => sum.plus(item.durationDays && item.durationDays > 0 ? item.durationDays : 1),
-    ZERO,
-  );
-  const scheduleWeighted = leaves.reduce(
-    (sum, item) =>
-      sum.plus(
-        item.progressPct.mul(item.durationDays && item.durationDays > 0 ? item.durationDays : 1),
-      ),
-    ZERO,
-  );
+  let durationWeight = ZERO;
+  let scheduleWeighted = ZERO;
+  for (const item of leaves) {
+    const duration = !allParentIds.has(item.id) ? item.durationDays : null;
+    const weight = duration && duration > 0 ? duration : 1;
+    durationWeight = durationWeight.plus(weight);
+    scheduleWeighted = scheduleWeighted.plus(item.progressPct.mul(weight));
+  }
   return {
     type: "REPORT",
     projectId,
@@ -959,15 +976,15 @@ export async function getProjectProgressReport(
     budgetIds,
     budgetName:
       budgets.length === 1 ? budgets[0]!.name : `Alcance vigente · ${budgets.length} presupuestos`,
+    sourceAccess: access,
+    excludedDirectSalesHref,
     physical,
     plan,
     schedule: {
       progressPct: durationWeight.gt(0) ? rate(scheduleWeighted.div(durationWeight)) : null,
       totalTasks: tasks.length,
       completedTasks: tasks.filter((t) => t.status === "COMPLETED").length,
-      delayedTasks: tasks.filter(
-        (t) => t.endDate && dateKey(t.endDate) < today && t.status !== "COMPLETED",
-      ).length,
+      delayedTasks: delayedTasks.length,
       blockedTasks: tasks.filter((t) => t.status === "BLOCKED").length,
     },
     financial,

@@ -31,9 +31,9 @@ import { OPERATIONAL_NOTIFICATION_TYPES } from "./operational-alerts.service";
 import { resolveNotificationEmailContext, notificationLeadBody } from "./notification-email-context";
 import { shouldSendNotificationEmailForRecipient } from "./notification-email-preference.service";
 
-const OPERATIONAL_NOTIFICATION_TYPE_SET: ReadonlySet<NotificationType> = new Set(
-  OPERATIONAL_NOTIFICATION_TYPES,
-);
+function isOperationalNotificationType(type: NotificationType): boolean {
+  return (OPERATIONAL_NOTIFICATION_TYPES as readonly NotificationType[]).includes(type);
+}
 
 const SKIP_LOG_PLACEHOLDER_EMAIL = "skipped@internal.bloqer";
 
@@ -183,7 +183,7 @@ export async function sendOperationalAlertEmailAsSystem(
   if (!n) {
     throw new ServiceError("NOT_FOUND", "Notificación no encontrada");
   }
-  if (!OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type)) {
+  if (!isOperationalNotificationType(n.type)) {
     throw new ServiceError("VALIDATION", "Esta notificación no es una alerta operativa");
   }
   return dispatchNotificationEmail(notificationId, ctx, {
@@ -205,7 +205,7 @@ async function dispatchNotificationEmail(
   // operational, log it as OPERATIONAL_ALERT so it shows up in the activity card.
   const emailType: EmailDeliveryType =
     options.emailType ??
-    (OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type) ? "OPERATIONAL_ALERT" : "NOTIFICATION");
+    (isOperationalNotificationType(n.type) ? "OPERATIONAL_ALERT" : "NOTIFICATION");
   if (!n.recipientUserId) {
     throw new ServiceError("VALIDATION", "Notificación sin destinatario");
   }
@@ -302,7 +302,7 @@ async function dispatchNotificationEmail(
       ? `${base}${n.actionUrl}`
       : null;
 
-  const isOperational = OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type);
+  const isOperational = isOperationalNotificationType(n.type);
   const templateInput = {
     title: n.title,
     body: notificationLeadBody(n.body),
@@ -370,7 +370,7 @@ export async function sendOperationalAlertEmail(
   if (!n) {
     throw new ServiceError("NOT_FOUND", "Notificación no encontrada");
   }
-  if (!OPERATIONAL_NOTIFICATION_TYPE_SET.has(n.type)) {
+  if (!isOperationalNotificationType(n.type)) {
     throw new ServiceError("VALIDATION", "Esta notificación no es una alerta operativa");
   }
   return sendNotificationEmail(notificationId, ctx, { emailType: "OPERATIONAL_ALERT" });

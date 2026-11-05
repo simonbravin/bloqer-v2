@@ -107,8 +107,9 @@ test("prepareProgressLinesForSubmit: partida without qty or budget is an error, 
 });
 
 test("suggestedPctFromQty is the inverse of qty = budget × %", () => {
-  assert.equal(suggestedPctFromQty("50", "5.0000"), "10.00");
-  assert.equal(suggestedPctFromQty("1.0000", "1.0000"), "100.00");
+  assert.equal(suggestedPctFromQty("50", "5.0000"), "10.0000");
+  assert.equal(suggestedPctFromQty("1.0000", "1.0000"), "100.0000");
+  assert.equal(suggestedPctFromQty("100", "0.0049"), "0.0049");
   assert.equal(suggestedPctFromQty(undefined, "5"), "");
 });
 
@@ -121,7 +122,7 @@ test("fillProgressPhysicalPct derives % when only qty is present", () => {
     },
     "1.0000",
   );
-  assert.equal(filled.physicalPct, "10.00");
+  assert.equal(filled.physicalPct, "10.0000");
 });
 
 test("prepareProgressLinesForSubmit fills % from qty (Casa Hogar gl partidas)", () => {
@@ -139,7 +140,7 @@ test("prepareProgressLinesForSubmit fills % from qty (Casa Hogar gl partidas)", 
   );
   assert.equal("payload" in prepared, true);
   if (!("payload" in prepared)) return;
-  assert.equal(prepared.payload[0]?.physicalPct, "10.00");
+  assert.equal(prepared.payload[0]?.physicalPct, "10.0000");
   assert.equal(prepared.payload[0]?.quantityCompleted, "0.1000");
 });
 
@@ -173,7 +174,7 @@ test("editing qty rewrites % del día from budget", () => {
     },
     "50",
   );
-  assert.equal(next.physicalPct, "10.00");
+  assert.equal(next.physicalPct, "10.0000");
   assert.equal(next.quantityCompleted, "5");
 });
 
@@ -228,4 +229,44 @@ test("prepareMaterialLinesForSubmit does not silently drop a started row", () =>
   assert.equal(ok.payload.length, 1);
   assert.equal(ok.payload[0]?.quantity, "2.50");
   assert.equal(ok.payload[0]?.productId, "11111111-1111-4111-8111-111111111111");
+});
+
+test("editing a material line retains its existing EDT attribution", () => {
+  const wbsNodeId = "22222222-2222-4222-8222-222222222222";
+  const result = prepareMaterialLinesForSubmit([{
+    productId: "11111111-1111-4111-8111-111111111111",
+    warehouseId: "__none__",
+    wbsNodeId,
+    description: "Cal hidratada",
+    quantity: "2.50",
+    notes: "",
+  }]);
+  assert.ok("payload" in result);
+  assert.equal(result.payload[0]?.wbsNodeId, wbsNodeId);
+});
+
+test("the material EDT picker preserves automatic attribution without sending a synthetic ID", () => {
+  const row = {
+    productId: "__none__", warehouseId: "__none__", wbsNodeId: "__none__",
+    description: "Cal hidratada", quantity: "2.50", notes: "",
+  };
+  const result = prepareMaterialLinesForSubmit([row]);
+  assert.ok("payload" in result);
+  assert.equal(result.payload[0]?.wbsNodeId, undefined);
+  assert.ok("error" in prepareMaterialLinesForSubmit([{
+    ...row, description: "", quantity: "", wbsNodeId: "22222222-2222-4222-8222-222222222222",
+  }]));
+});
+
+test("a stock-linked line must stay positive at the saved quantity precision", () => {
+  const material = {
+    productId: "11111111-1111-4111-8111-111111111111",
+    warehouseId: "22222222-2222-4222-8222-222222222222",
+    description: "Cal hidratada",
+    quantity: "0.00001",
+    notes: "",
+  };
+  assert.ok("error" in prepareMaterialLinesForSubmit([material]));
+  assert.ok("payload" in prepareMaterialLinesForSubmit([{ ...material, quantity: "0.0001" }]));
+  assert.ok("payload" in prepareMaterialLinesForSubmit([{ ...material, warehouseId: "__none__" }]));
 });

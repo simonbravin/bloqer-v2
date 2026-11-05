@@ -74,9 +74,10 @@ test("Obra marks the projects index active, retains the current route, and respe
   assert.equal(descendants(bottomNav("/dashboard", false), "link").some((node) => node.props["aria-label"] === "Obra"), false);
 });
 
-test("Registrar reuses a saved project only when the current visible list includes it", () => {
-  for (const visible of [false, true]) {
-    const state: unknown[] = [false, null, visible ? [{ id: staleProject }] : [], false, null, 0];
+test("Registrar reuses a path or saved project only if the eligible list includes it", () => {
+  for (const [pathProjectId, visible] of [[null, false], [null, true], [currentProject, false], [currentProject, true]] as const) {
+    const preferred = pathProjectId ?? staleProject;
+    const state: unknown[] = [false, null, visible ? [{ id: preferred }] : [], false, null, 0];
     let stateIndex = 0;
     const pushed: string[] = [];
     const component = loadComponent<{ FieldPlusSheet: (props: unknown) => unknown }>("./field-plus-sheet.tsx", {
@@ -93,7 +94,7 @@ test("Registrar reuses a saved project only when the current visible list includ
         Sheet: "sheet", SheetContent: "sheet-content", SheetDescription: "description", SheetHeader: "header", SheetTitle: "title",
       },
       "@/features/projects/tenant-gate-from-snapshot": { tenantGateFromSnapshot: () => ({ isEnabled: () => true }) },
-      "@/lib/field-project-context": { useFieldProjectContext: () => ({ pathProjectId: null }) },
+      "@/lib/field-project-context": { useFieldProjectContext: () => ({ pathProjectId }) },
       "@/lib/field-quick-actions": { fieldQuickActionHref, listFieldQuickActions },
       "./field-project-picker": { FieldProjectPickerSheet: "picker" },
     });
@@ -101,7 +102,7 @@ test("Registrar reuses a saved project only when the current visible list includ
     const button = descendants(tree, "button").find((node) => node.props.children === "Nuevo parte");
     assert.ok(button);
     (button.props.onClick as () => void)();
-    assert.deepEqual(pushed, visible ? [`/proyectos/${staleProject}/libro-obra/nuevo`] : []);
+    assert.deepEqual(pushed, visible ? [`/proyectos/${preferred}/libro-obra/nuevo`] : []);
     assert.equal(state[0], !visible);
   }
 });

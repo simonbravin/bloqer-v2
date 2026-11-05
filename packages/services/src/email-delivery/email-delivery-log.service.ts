@@ -7,6 +7,8 @@ import type {
 } from "@bloqer/database";
 import { prisma, type Prisma } from "@bloqer/database";
 import { canRunOperationalAlerts } from "../notifications/operational-alerts-runner.service";
+import { scheduledReportEmailCompanyScope } from "../scheduled-reports/scheduled-report-execution.service";
+import { canReadScheduledReport } from "../scheduled-reports/scheduled-report.service";
 import { ServiceContext, ServiceError } from "../types";
 
 const ERROR_MESSAGE_MAX = 512;
@@ -228,6 +230,12 @@ export async function listEmailDeliveryLogs(
   }
   if (filters.relatedEntityType) where.relatedEntityType = filters.relatedEntityType;
   if (filters.relatedEntityId) where.relatedEntityId = filters.relatedEntityId;
+  if (filters.relatedEntityId && (
+    filters.relatedEntityType === "SCHEDULED_REPORT" || filters.emailType === "REPORT_SCHEDULED"
+  )) {
+    if (!(await canReadScheduledReport(filters.relatedEntityId, ctx))) return [];
+    Object.assign(where, await scheduledReportEmailCompanyScope(ctx));
+  }
   if (filters.dateFrom || filters.dateTo) {
     const createdAt: Prisma.DateTimeFilter = {};
     if (filters.dateFrom) {

@@ -37,6 +37,8 @@ test("unavailable sections omit confidential columns and absent measurements sta
   }
   report.physical.pct = null;
   report.physical.observedPct = null;
+  report.sourceAccess.schedule = false;
+  report.sourceAccess.jobsite = false;
   report.rows[0]!.physicalPct = null;
   report.sectionsExcluded = ["Costos: sin permisos"];
   // Deliberately retain row amounts to verify column filtering is based on the authorized section.
@@ -46,8 +48,34 @@ test("unavailable sections omit confidential columns and absent measurements sta
   assert.ok(!sheets[2]!.headers.includes("Facturado acumulado"));
   assert.ok(!sheets[2]!.headers.includes("Devengado acumulado"));
   assert.ok(!sheets[0]!.rows.some((r) => r[0] === "Venta presupuestada"));
+  assert.ok(!sheets[0]!.rows.some((r) => r[0] === "Tareas atrasadas"));
+  assert.ok(sheets[0]!.rows.some((r) => r[0] === "Partidas sin medición" && r[1] === ""));
+  assert.ok(
+    sheets[0]!.preamble?.some(
+      (r) => r[0] === "Última medición aprobada" && r[1] === "Fuente no disponible",
+    ),
+  );
   assert.equal(sheets[1]!.rows[0]![5], "");
   assert.ok(sheets[4]!.rows.some((r) => r[1] === "Costos: sin permisos"));
+});
+
+test("progress exports preserve current schedule values and the direct sales source", () => {
+  const report = projectProgressExportFixture();
+  report.schedule.progressPct = "32.0000";
+  report.schedule.totalTasks = 4;
+  report.schedule.completedTasks = 1;
+  report.excludedDirectSalesHref = "/proyectos/proyecto/facturas";
+  const sheets = buildProjectProgressExportSheets(report);
+  assert.ok(
+    sheets[0]!.rows.some((r) => r[0] === "Real · cronograma completo actual" && r[1] === "32.0000"),
+  );
+  assert.ok(sheets[0]!.rows.some((r) => r[0] === "Tareas actuales" && r[1] === "4"));
+  assert.ok(sheets[0]!.rows.some((r) => r[0] === "Tareas completadas" && r[1] === "1"));
+  assert.ok(
+    sheets[4]!.rows.some(
+      (r) => r[0] === "Acceso a ventas directas" && r[1] === report.excludedDirectSalesHref,
+    ),
+  );
 });
 
 test("historical series remain exportable when the last cut is not comparable", () => {

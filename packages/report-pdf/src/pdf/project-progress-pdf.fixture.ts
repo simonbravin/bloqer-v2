@@ -26,6 +26,16 @@ export function projectProgressExportFixture(): ProjectProgressReport {
     ],
     budgetIds: ["budget-test"],
     budgetName: "Principal y adenda",
+    sourceAccess: {
+      jobsite: true,
+      schedule: true,
+      certifications: true,
+      ar: true,
+      costs: true,
+      procurement: true,
+      subcontracts: true,
+    },
+    excludedDirectSalesHref: null,
     physical: { ...coverage },
     plan: { ...coverage, pct: "65.0000", observedPct: "65.0000" },
     schedule: {

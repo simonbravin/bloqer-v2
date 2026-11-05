@@ -15,6 +15,7 @@ import {
 } from "../notifications/notification-copy";
 import { filterUserIdsByProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
+import { canViewJobsiteLogArea } from "./jobsite-log-access";
 
 type JobsiteLogNotifyBase = {
   ctx: ServiceContext;
@@ -49,6 +50,7 @@ async function fanOut(params: {
     params.ctx.tenantId,
     params.projectId,
     unique,
+    { companyId: params.companyId, canView: canViewJobsiteLogArea },
   );
 
   for (const recipientUserId of scoped) {

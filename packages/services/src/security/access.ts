@@ -273,11 +273,13 @@ export async function requireProjectAccessIfPresent(
  * - No projectId (company-level) → unchanged (company permission already gated audience).
  * - Project recipients must have an active tenant membership in the project's company scope.
  * - MEMBERSHIP_SCOPED → additionally require tenant-wide roles or explicit ProjectMembership.
+ * - For a company-scoped document in a shared project, also enforce the document's company.
  */
 export async function filterUserIdsByProjectAccess(
   tenantId: string,
   projectId: string | null | undefined,
   userIds: string[],
+  document?: { companyId: string; canView: (roles: UserRole[]) => boolean },
 ): Promise<string[]> {
   if (!projectId || userIds.length === 0) return userIds;
   const project = await requireProjectInTenant(projectId, tenantId);
@@ -310,12 +312,16 @@ export async function filterUserIdsByProjectAccess(
   return unique.filter((userId) => {
     const membership = membershipByUser.get(userId);
     if (!membership) return false;
-    if (isCrossCompany(project.companyId, {
+    const ctx = {
       tenantId,
       actorUserId: userId,
       companyId: membership.companyId ?? soleCompanyId,
       roles: membership.roles,
-    })) return false;
+    };
+    if (isCrossCompany(project.companyId, ctx)) return false;
+    if (document && (isCrossCompany(document.companyId, ctx) || !document.canView(ctx.roles))) {
+      return false;
+    }
     if (mode === "TENANT_WIDE" || hasTenantWideProjectAccess(membership.roles)) return true;
     return memberSet.has(userId);
   });

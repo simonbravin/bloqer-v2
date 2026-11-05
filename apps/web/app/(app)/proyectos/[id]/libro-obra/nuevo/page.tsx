@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  canMutateJobsiteLogAsContributor,
   getJobsiteLogFormPickList,
   getProjectOperationalMutationBlockReason,
   getProjectShellInfo,
@@ -35,10 +36,9 @@ export default async function NuevoParteObraPage({ params }: PageProps) {
     shell = await getProjectShellInfo(projectId, ctx);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
-  if (getProjectOperationalMutationBlockReason(shell.status)) {
+  if (getProjectOperationalMutationBlockReason(shell.status) || !canMutateJobsiteLogAsContributor(ctx.roles)) {
     redirect(`/proyectos/${projectId}/libro-obra`);
   }
 
@@ -53,7 +53,6 @@ export default async function NuevoParteObraPage({ params }: PageProps) {
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
-    if (err instanceof ServiceError && err.code === "FORBIDDEN") redirect("/dashboard");
     throw err;
   }
 

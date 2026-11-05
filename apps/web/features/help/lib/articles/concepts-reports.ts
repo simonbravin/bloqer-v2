@@ -271,7 +271,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Leé Ejecutado · libro aprobado junto con su cobertura: el físico pondera por costo directo presupuestado de partidas hoja. Sin medición no significa 0% validado; la parte sin medir conserva su peso y el indicador parcial dice Ejecutado observado. Sin ninguna medición válida no se calcula un porcentaje.",
       "Compará Plan y ejecución registrada solo cuando haya base y cobertura. El plan usa las mismas partidas y pesos. Real · cronograma completo actual y Tareas actuales · proyecto completo muestran toda la obra hoy, sin recorte por presupuesto o corte pasado; no se suman al libro.",
       "Revisá Certificado sobre venta, Costo devengado y exposición sobre presupuesto de costo, y Cobrado sobre facturado. Cada porcentaje tiene su propio denominador y última evidencia: Última medición, Último certificado, Último registro de costo o Última cobranza. Sin evidencia al corte no confirma cero ni un atraso.",
-      "En Pendientes para avanzar elegí Tipo de pendiente y abrí la evidencia y su operación. Las tareas muestran su situación actual del proyecto completo; la sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte. En Detalle por partida buscá por código/nombre o usá Sólo con pendientes; conserva unidad, cantidad, físico y saldo, según tus permisos.",
+      "En Pendientes para avanzar elegí Tipo de pendiente y abrí la evidencia y su operación. Las tareas muestran su situación actual del proyecto completo; la sugerencia por certificar descuenta todos los certificados vigentes, incluso posteriores al corte. En Detalle por partida buscá por código/nombre o usá Sólo con pendientes. Por ejecutar según % se calcula con el físico y el presupuesto; Cantidad ejecutada muestra lo registrado.",
       "Exportar ofrece CSV, Excel y PDF con el mismo alcance y corte. La búsqueda local del detalle no recorta la descarga. Enviar por email y Envíos programados usan CSV/PDF.",
     ],
     effects: [
@@ -283,7 +283,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Porcentajes de partes anteriores a junio de 2026 pueden ser ambiguos; se conserva la evidencia y no se presenta ese físico como validado.",
       "Base cero es no calculable. Si falta la base de costo de alguna partida, global, observado y cobertura ponderada quedan sin calcular; los conteos siguen disponibles. Costo cero conocido no pesa y se advierte. Las unidades distintas no se suman.",
       "Presupuesto menos exposición no es el costo necesario para terminar. El reporte no calcula EAC ni fecha estimada de finalización.",
-      "Una venta directa sin vínculo al presupuesto o una fuente en otra moneda no se distribuye automáticamente entre partidas.",
+      "Una fuente restringida queda sin cobertura ni conteo de faltantes. Una venta directa sin vínculo queda fuera del ratio contractual. Ver facturas de la obra abre el listado de facturación con el permiso correspondiente.",
       "Una nota de crédito aplicada reduce el saldo por cobrar; no cuenta como una cobranza real de caja.",
       "Una incidencia de moneda o trazabilidad posterior no borra los puntos anteriores comparables de la evolución, tampoco en Excel o PDF. Las cantidades sin base se muestran sin dato. Los avisos indican si Compras o Subcontratos están deshabilitados y sus fuentes no se incluyen en costos.",
     ],
@@ -831,9 +831,9 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     steps: [
       "Configuración → Reportes programados. Arriba ves el catálogo: Empresa general vs Un proyecto.",
       "Nuevo envío → elegí alcance con las dos tarjetas (Empresa general / Un proyecto), reportes (máx. 5), destinatarios, frecuencia y formato.",
-      "Libro de obra — parte del día solo aparece en alcance empresa: marcá obras ACTIVE; solo PDF; el día es el de la corrida.",
+      "Libro de obra — parte del día aparece en alcance empresa. Seleccioná obras activas autorizadas. Se genera PDF con el día de la corrida.",
       "Desde una obra (Planificación → Reportes → Envíos programados) el catálogo es solo de proyecto; el parte diario se crea desde Configuración → Reportes programados (empresa).",
-      "En el detalle de un envío Activo: **Enviar ahora** (junto a Volver / Pausar / Eliminar) → confirmá en el diálogo → genera y manda ya.",
+      "En el detalle de un envío Activo, usá **Enviar ahora** y confirmá. Una configuración compartida de alcance global se modifica desde una sesión con alcance global.",
       "Presupuesto vs real ya no se programa: usá EDT y costos.",
     ],
     effects: [
@@ -842,7 +842,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "Los reportes que no ves faltan por módulo deshabilitado (inventario, tesorería, libro de obra, etc.).",
-      "No hay destinatarios externos: solo usuarios ACTIVE del tenant.",
+      "La entrega programada requiere que el destinatario conserve su membresía activa. En Libro de obra se incluyen solo los partes que puede consultar.",
       "El parte diario no usa el filtro Desde/Hasta: el día lo define la hora de la corrida.",
       "Próxima ejecución se muestra en la zona del envío (ej. 23:00 Buenos Aires), no en UTC del servidor.",
       "En Vercel Hobby el cron de programados corre una vez al día (05:05 UTC): un envío vencido puede demorar hasta esa pasada. Usá Enviar ahora para no esperar.",

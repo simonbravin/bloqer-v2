@@ -30,6 +30,7 @@ test("progress PDF renders missing/legacy measurements and restricted financial 
   report.physical.pct = null;
   report.physical.hasLegacy = true;
   report.physical.coveragePct = "60.0000";
+  report.sourceAccess.schedule = false;
   report.series[1]!.physicalPct = null;
   for (const key of Object.keys(report.financial) as (keyof typeof report.financial)[])
     report.financial[key] = null;

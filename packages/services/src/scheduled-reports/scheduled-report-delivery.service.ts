@@ -13,7 +13,9 @@ import {
   markEmailDeliverySkipped,
 } from "../email-delivery/email-delivery-log.service";
 import { PRODUCT_TIMEZONE, toIsoDateInTimeZone } from "@bloqer/utils";
+import { canViewJobsiteLogArea } from "../jobsite-log/jobsite-log-access";
 import { loadNotificationIdentityFacts } from "../notifications/notification-email-context";
+import { filterUserIdsByProjectAccess } from "../security/access";
 import { ServiceContext } from "../types";
 import type { ScheduledReportAttachment } from "./scheduled-report-attachment.service";
 
@@ -65,11 +67,41 @@ export type DeliverScheduledReportBundleResult =
   | { outcome: "failed"; error: string }
   | { outcome: "duplicate" };
 
+type JobsiteAttachmentAudience = ReadonlyMap<ScheduledReportAttachment, ReadonlySet<string>>;
+
+/** Share each company/project ACL lookup across parts and recipients in the same run. */
+export async function resolveScheduledJobsiteAttachmentAudience(
+  tenantId: string,
+  attachments: ScheduledReportAttachment[],
+  recipientIds: string[],
+): Promise<JobsiteAttachmentAudience> {
+  const audienceByScope = new Map<string, Promise<Set<string>>>();
+  const entries = await Promise.all(
+    attachments.flatMap((attachment) => {
+      const scope = attachment.jobsiteScope;
+      if (
+        attachment.reportKey !== "TENANT_JOBSITE_DAILY_LOGS" ||
+        !scope?.projectId ||
+        !scope.companyId
+      )
+        return [];
+      const key = `${scope.projectId}/${scope.companyId}`;
+      let audience = audienceByScope.get(key);
+      if (!audience) {
+        audience = filterUserIdsByProjectAccess(tenantId, scope.projectId, recipientIds, {
+          companyId: scope.companyId,
+          canView: canViewJobsiteLogArea,
+        }).then((userIds) => new Set(userIds));
+        audienceByScope.set(key, audience);
+      }
+      return [audience.then((userIds) => [attachment, userIds] as const)];
+    }),
+  );
+  return new Map(entries);
+}
+
 /** Prefer the schedule slot instant encoded in runWindow over wall-clock `now` (late cron / retries). */
-function asOfFromRunWindow(
-  runWindow: string,
-  deliveryKind: ScheduledReportDeliveryKind,
-): Date {
+function asOfFromRunWindow(runWindow: string, deliveryKind: ScheduledReportDeliveryKind): Date {
   if (deliveryKind === "scheduled") {
     const d = new Date(runWindow);
     if (!Number.isNaN(d.getTime())) return d;
@@ -87,6 +119,7 @@ function asOfFromRunWindow(
 export async function deliverScheduledReportBundle(
   input: DeliverScheduledReportBundleInput,
   ctx: ServiceContext,
+  jobsiteAudience?: JobsiteAttachmentAudience,
 ): Promise<DeliverScheduledReportBundleResult> {
   const deliveryKind = input.deliveryKind ?? "scheduled";
   const idempotencyKey = buildScheduledReportIdempotencyKey(
@@ -114,17 +147,33 @@ export async function deliverScheduledReportBundle(
     facts.organizationName,
   );
 
+  const membership = await prisma.userMembership.findUnique({
+    where: { userId_tenantId: { userId: input.recipientUserId, tenantId: ctx.tenantId } },
+    select: { status: true },
+  });
+  const attachments = input.attachments.filter(
+    (attachment) =>
+      attachment.reportKey !== "TENANT_JOBSITE_DAILY_LOGS" ||
+      jobsiteAudience?.get(attachment)?.has(input.recipientUserId),
+  );
+  const skipReason =
+    membership?.status !== "ACTIVE"
+      ? "recipient_inactive"
+      : attachments.length === 0
+        ? "no_authorized_attachments"
+        : null;
   const { id: logId } = await createEmailDeliveryLog(
     {
       recipientEmail: input.recipientEmail,
       recipientUserId: input.recipientUserId,
       subject,
       emailType: "REPORT_SCHEDULED",
+      ...(skipReason ? { status: "SKIPPED", skippedReason: skipReason } : {}),
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: input.scheduleId,
-      reportFormat: input.attachments.some((a) => a.contentType.includes("pdf"))
+      reportFormat: attachments.some((a) => a.contentType.includes("pdf"))
         ? "pdf"
-        : input.attachments[0]
+        : attachments[0]
           ? "csv"
           : null,
       idempotencyKey,
@@ -132,12 +181,14 @@ export async function deliverScheduledReportBundle(
         runId: input.runId,
         runWindow: input.runWindow,
         deliveryKind: deliveryKind,
-        attachmentCount: input.attachments.length,
-        reportKeys: input.attachments.map((a) => a.reportKey).join(","),
+        attachmentCount: attachments.length,
+        reportKeys: attachments.map((a) => a.reportKey).join(","),
       },
     },
     ctx,
   );
+
+  if (skipReason) return { outcome: "skipped", reason: skipReason };
 
   if (!isEmailConfigured()) {
     await markEmailDeliverySkipped(logId, "email_not_configured", ctx);
@@ -146,7 +197,7 @@ export async function deliverScheduledReportBundle(
 
   const templateInput = {
     title: input.scheduleName,
-    body: `Envío programado. Adjuntamos ${input.attachments.length} reporte(s).`,
+    body: `Envío programado. Adjuntamos ${attachments.length} reporte(s).`,
     actionUrlAbsolute: null as string | null,
     organizationName: facts.organizationName,
     contextFields: [
@@ -157,9 +208,9 @@ export async function deliverScheduledReportBundle(
       ...(facts.projectLabel ? [{ label: "Proyecto", value: facts.projectLabel }] : []),
       { label: "Programa", value: input.scheduleName },
       { label: "Fecha", value: dateLabel },
-      { label: "Archivos", value: String(input.attachments.length) },
+      { label: "Archivos", value: String(attachments.length) },
     ],
-    items: input.attachments.map((a) => a.filename),
+    items: attachments.map((a) => a.filename),
     itemsHeading: "Adjuntos",
   };
   const html = renderNotificationEmailHtml(templateInput);
@@ -170,7 +221,7 @@ export async function deliverScheduledReportBundle(
     subject,
     html,
     text,
-    attachments: input.attachments.map((a) => ({
+    attachments: attachments.map((a) => ({
       filename: a.filename,
       content: a.content,
       contentType: a.contentType,

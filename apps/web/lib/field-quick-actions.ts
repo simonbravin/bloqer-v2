@@ -23,7 +23,7 @@ export function fieldQuickActionHref(projectId: string, id: FieldQuickActionId):
     case "purchaseRequest":
       return `/proyectos/${projectId}/solicitudes-compra/nueva`;
     case "consumption":
-      return `/proyectos/${projectId}/consumos`;
+      return `/proyectos/${projectId}/consumos?create=1`;
     case "document":
       return `/proyectos/${projectId}/documentos`;
   }

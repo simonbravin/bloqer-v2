@@ -5,13 +5,19 @@ import { randomUUID } from "crypto";
 import { ServiceContext, ServiceError } from "../types";
 import { calculateNextRunAt, calendarDateInTimezone } from "./scheduling";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
+import {
+  assertActiveJobsiteProjectsForSchedule,
+  scheduledReportWhereForContext,
+} from "./scheduled-report.service";
 import { buildScheduledReportsCronServiceContext } from "./scheduled-report-cron-context";
 import type { BuildScheduledReportAttachmentFn } from "./scheduled-report-attachment.service";
 import { isPartialScheduledAttachmentsError } from "./scheduled-report-attachment.service";
 import {
   deliverScheduledReportBundle,
+  resolveScheduledJobsiteAttachmentAudience,
   type ScheduledReportDeliveryKind,
 } from "./scheduled-report-delivery.service";
+import { scheduledReportEmailCompanyScope } from "./scheduled-report-execution.service";
 import { deriveScheduledReportRunStatus } from "./scheduled-report-run-status";
 
 const RUN_LOCK_MS = 10 * 60 * 1000;
@@ -52,6 +58,7 @@ type ScheduleRow = {
   format: "CSV" | "PDF";
   params: unknown;
   nextRunAt: Date;
+  updatedAt: Date;
   items: { reportKey: string; sortOrder: number }[];
   recipients: { recipientUserId: string; recipient: { email: string } }[];
 };
@@ -71,6 +78,7 @@ const scheduleSelect = {
   format: true,
   params: true,
   nextRunAt: true,
+  updatedAt: true,
   items: { orderBy: { sortOrder: "asc" as const }, select: { reportKey: true, sortOrder: true } },
   recipients: {
     select: {
@@ -85,6 +93,7 @@ type RunOneOptions = {
   advanceNextRunAt?: boolean;
   deliveryKind?: ScheduledReportDeliveryKind;
   recipientEmails?: Set<string> | null;
+  executionContext?: ServiceContext;
   /** When set, overrides calendar date for TENANT_JOBSITE_DAILY_LOGS (retry of an older slot). */
   jobsiteLogDateSource?: Date;
 };
@@ -98,15 +107,19 @@ function instantFromStoredRunWindow(runWindow: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-async function loadScheduledReportRow(
-  tenantId: string,
-  scheduleId: string,
-): Promise<ScheduleRow | null> {
+async function loadManualExecution(ctx: ServiceContext, scheduleId: string) {
   const row = await prisma.scheduledReport.findFirst({
-    where: { id: scheduleId, tenantId },
+    where: { ...(await scheduledReportWhereForContext(ctx)), id: scheduleId },
     select: scheduleSelect,
   });
-  return row as ScheduleRow | null;
+  if (!row) throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  const executionContext = { ...ctx, companyId: row.companyId ?? ctx.companyId };
+  await assertActiveJobsiteProjectsForSchedule(
+    row.items,
+    paramsFromJson(row.params),
+    executionContext,
+  );
+  return { row, executionContext };
 }
 
 export async function runDueScheduledReportsForTenant(
@@ -139,8 +152,7 @@ export async function runScheduledReportNow(
   buildAttachment: BuildScheduledReportAttachmentFn,
 ): Promise<ScheduledReportRunSummary> {
   assertCanManageScheduledReports(ctx);
-  const row = await loadScheduledReportRow(ctx.tenantId, scheduleId);
-  if (!row) throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  const { row, executionContext } = await loadManualExecution(ctx, scheduleId);
   if (row.status !== "ACTIVE") {
     throw new ServiceError("CONFLICT", "Solo se puede ejecutar un envío activo");
   }
@@ -149,15 +161,13 @@ export async function runScheduledReportNow(
   }
   const now = new Date();
   const summary = await runOneScheduledReport(row, now, buildAttachment, {
+    executionContext,
     runWindowOverride: `manual:${now.toISOString()}`,
     advanceNextRunAt: false,
     deliveryKind: "manual",
   });
   if (summary.runStatus === "LOCKED") {
-    throw new ServiceError(
-      "CONFLICT",
-      "Hay otra ejecución en curso. Reintentá en unos minutos.",
-    );
+    throw new ServiceError("CONFLICT", "Hay otra ejecución en curso. Reintentá en unos minutos.");
   }
   return summary;
 }
@@ -170,8 +180,7 @@ export async function retryScheduledReportFailedDeliveries(
   buildAttachment: BuildScheduledReportAttachmentFn,
 ): Promise<ScheduledReportRunSummary> {
   assertCanManageScheduledReports(ctx);
-  const row = await loadScheduledReportRow(ctx.tenantId, scheduleId);
-  if (!row) throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  const { row, executionContext } = await loadManualExecution(ctx, scheduleId);
   if (row.status === "DELETED") {
     throw new ServiceError("CONFLICT", "No se puede reintentar un envío eliminado");
   }
@@ -180,6 +189,7 @@ export async function retryScheduledReportFailedDeliveries(
   const failedLogs = await prisma.emailDeliveryLog.findMany({
     where: {
       tenantId: ctx.tenantId,
+      ...(await scheduledReportEmailCompanyScope(executionContext)),
       emailType: "REPORT_SCHEDULED",
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: scheduleId,
@@ -219,6 +229,7 @@ export async function retryScheduledReportFailedDeliveries(
 
   const now = new Date();
   const summary = await runOneScheduledReport(row, now, buildAttachment, {
+    executionContext,
     runWindowOverride: `retry:${now.toISOString()}`,
     advanceNextRunAt: false,
     deliveryKind: "retry",
@@ -226,10 +237,7 @@ export async function retryScheduledReportFailedDeliveries(
     jobsiteLogDateSource,
   });
   if (summary.runStatus === "LOCKED") {
-    throw new ServiceError(
-      "CONFLICT",
-      "Hay otra ejecución en curso. Reintentá en unos minutos.",
-    );
+    throw new ServiceError("CONFLICT", "Hay otra ejecución en curso. Reintentá en unos minutos.");
   }
   return summary;
 }
@@ -250,6 +258,7 @@ async function runOneScheduledReport(
     where: {
       id: row.id,
       tenantId: row.tenantId,
+      updatedAt: row.updatedAt,
       status: { in: [...lockStatuses] },
       OR: [{ runLockUntil: null }, { runLockUntil: { lt: now } }],
     },
@@ -273,7 +282,9 @@ async function runOneScheduledReport(
   try {
     const runWindow = options.runWindowOverride ?? row.nextRunAt.toISOString();
     const runId = randomUUID();
-    const ctx = buildScheduledReportsCronServiceContext(row.tenantId, row.companyId);
+    const ctx =
+      options.executionContext ??
+      buildScheduledReportsCronServiceContext(row.tenantId, row.companyId);
     const params = paramsFromJson(row.params);
     const attachmentErrors: string[] = [];
     const attachments: Awaited<ReturnType<BuildScheduledReportAttachmentFn>> = [];
@@ -352,10 +363,18 @@ async function runOneScheduledReport(
       };
     }
 
-    for (const rec of row.recipients) {
-      const emailNorm = rec.recipient.email.trim().toLowerCase();
-      if (recipientFilter && !recipientFilter.has(emailNorm)) continue;
+    const recipients = recipientFilter
+      ? row.recipients.filter(({ recipient }) =>
+          recipientFilter.has(recipient.email.trim().toLowerCase()),
+        )
+      : row.recipients;
+    const jobsiteAudience = await resolveScheduledJobsiteAttachmentAudience(
+      ctx.tenantId,
+      attachments,
+      recipients.map(({ recipientUserId }) => recipientUserId),
+    );
 
+    for (const rec of recipients) {
       const result = await deliverScheduledReportBundle(
         {
           scheduleId: row.id,
@@ -370,6 +389,7 @@ async function runOneScheduledReport(
           timezone: row.timezone,
         },
         ctx,
+        jobsiteAudience,
       );
 
       switch (result.outcome) {

@@ -58,7 +58,9 @@ Agrupado en **Financieros** / **Operativos** (mismo criterio que los hubs). `PRO
 - **Empresa:** Aging CxC/CxP, tesorería (posición, movimientos, flujo consolidado), CxP corporativo, facturas proveedor corporativas, rentabilidad multi-obra, GG por proyecto, portafolio, compras multi-obra, inventario (stock / movimientos), **Libro de obra — parte del día** (`TENANT_JOBSITE_DAILY_LOGS`, [D-100]: multi-obra ACTIVE, PDF only, N adjuntos).
 - **Proyecto:** Caja y proyección, ingresos vs gastos, rentabilidad, EDT y costos, **Avances del proyecto** (`PROJECT_PROGRESS`, D-120), certificaciones, análisis de compras, subcontratos, materiales. Avances comparte servicio/filtros/permisos con pantalla y descarga; programación conserva formatos CSV/PDF y no agrega una tabla de snapshots.
 
-**Parte diario ([D-100]):** params `jobsiteProjectIds`; día = timezone del envío; sin partes → `SKIPPED`; fotos embebidas en el mismo PDF que el export del detalle.
+**Parte diario ([D-100]).** Las obras seleccionadas en `jobsiteProjectIds` se verifican contra el acceso efectivo. El día se obtiene de la zona horaria del envío. Sin partes, la corrida queda `SKIPPED`. Las fotos usan el mismo PDF que el detalle. Cada destinatario con membresía activa recibe únicamente los partes de las empresas y obras que puede consultar. Si no quedan adjuntos autorizados, su entrega queda omitida.
+
+Una configuración compartida con alcance global se consulta desde los contextos autorizados. Los cambios que afectan sus corridas programadas requieren alcance global. **Enviar ahora** aplica el alcance efectivo de la sesión. El historial y los reintentos comprueban también el alcance de cada entrega.
 
 ## Checklist de prueba manual (pre-producción)
 

@@ -16,9 +16,10 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
   const base = `/proyectos/${report.projectId}`;
   const physicalIncomplete = report.physical.pct === null;
   const executed = report.physical.pct ?? report.physical.observedPct;
+  const access = report.sourceAccess;
   const cards = [
     {
-      title: physicalIncomplete ? "Ejecutado observado" : "Ejecutado · libro aprobado",
+      title: access.jobsite && physicalIncomplete ? "Ejecutado observado" : "Ejecutado · libro aprobado",
       icon: HardHat,
       value: formatRatePctWithSymbol(executed),
       pct: executed,
@@ -27,6 +28,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
         ? "Contribución conocida; el avance total todavía no está disponible."
         : "Mediciones aprobadas, ponderadas por costo presupuestado.",
       href: `${base}/libro-obra`,
+      available: access.jobsite,
       color: "bg-indigo-500",
       accent: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
       sourceDate: report.sourceDates.jobsite,
@@ -40,6 +42,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
       detail: formatMoneyDisplay(report.financial.certified, report.currency),
       note: `Sobre venta presupuestada: ${formatMoneyDisplay(report.financial.budgetSale, report.currency)}.`,
       href: `${base}/certificaciones`,
+      available: access.certifications,
       color: "bg-sky-500",
       accent: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
       sourceDate: report.sourceDates.certifications,
@@ -53,6 +56,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
       detail: formatMoneyDisplay(report.financial.costAccrued, report.currency),
       note: `Sobre costo presupuestado: ${formatMoneyDisplay(report.financial.budgetCost, report.currency)}.`,
       href: `${base}/control-costos`,
+      available: access.costs,
       color: "bg-amber-500",
       accent: "bg-amber-500/10 text-amber-700 dark:text-amber-400",
       sourceDate: report.sourceDates.costs,
@@ -66,6 +70,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
       detail: formatMoneyDisplay(report.financial.collected, report.currency),
       note: `Sobre facturación emitida: ${formatMoneyDisplay(report.financial.invoiced, report.currency)}.`,
       href: `${base}/cuentas-por-cobrar`,
+      available: access.ar,
       color: "bg-emerald-500",
       accent: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",
       sourceDate: report.sourceDates.collections,
@@ -88,7 +93,9 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
                 </span>
               </div>
               <div className="text-3xl font-semibold tracking-tight tabular-nums">{card.value}</div>
-              <p className="mt-2 min-h-5 text-sm font-medium tabular-nums">{card.detail}</p>
+              <p className="mt-2 min-h-5 text-sm font-medium tabular-nums">
+                {card.available ? card.detail : "Fuente no disponible"}
+              </p>
               <div className="my-4 h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
                 {card.pct !== null ? (
                   <div
@@ -97,24 +104,22 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
                   />
                 ) : null}
               </div>
-              <p className="min-h-10 text-xs leading-relaxed text-muted-foreground">{card.note}</p>
-              <p className="mt-2 text-[11px] text-muted-foreground">
-                {card.sourceDate
-                  ? `${card.sourceDateLabel}: ${formatDate(`${card.sourceDate}T12:00:00.000Z`)}`
-                  : "Sin evidencia al corte"}
-              </p>
-              {card.pct !== null ? (
+              {card.available ? (
+                <>
+                <p className="min-h-10 text-xs leading-relaxed text-muted-foreground">{card.note}</p>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  {card.sourceDate
+                    ? `${card.sourceDateLabel}: ${formatDate(`${card.sourceDate}T12:00:00.000Z`)}`
+                    : "Sin evidencia al corte"}
+                </p>
                 <Link
                   href={card.href}
                   className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                 >
                   Ver origen <ArrowUpRight className="h-3 w-3" aria-hidden />
                 </Link>
-              ) : (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Sin base completa o sin acceso a la fuente.
-                </p>
-              )}
+                </>
+              ) : null}
             </CardContent>
           </Card>
         ))}
@@ -129,7 +134,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
               {formatRatePctWithSymbol(report.plan.pct)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Cobertura {formatRatePctWithSymbol(report.plan.coveragePct)}
+              {access.schedule ? `Cobertura ${formatRatePctWithSymbol(report.plan.coveragePct)}` : "Cronograma no disponible"}
             </p>
           </div>
         </div>
@@ -139,7 +144,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
             {formatRatePctWithSymbol(report.schedule.progressPct)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Puede incluir ajustes manuales; no se suma al libro.
+              {access.schedule ? "Puede incluir ajustes manuales; no se suma al libro." : "Cronograma no disponible"}
           </p>
         </div>
         <div>
@@ -150,9 +155,9 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
               : "—"}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {report.schedule.totalTasks > 0
-              ? `${report.schedule.completedTasks} de ${report.schedule.totalTasks} completadas`
-              : "Sin tareas disponibles en este alcance."}
+              {access.schedule
+                ? `${report.schedule.completedTasks} de ${report.schedule.totalTasks} completadas`
+                : "Cronograma no disponible"}
           </p>
         </div>
         <div>
@@ -161,7 +166,7 @@ export function ProjectProgressSummary({ report }: { report: ProjectProgressRepo
             {formatMoneyDisplay(report.financial.receivableBalance, report.currency)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Vencido: {formatMoneyDisplay(report.financial.overdueBalance, report.currency)}
+            {access.ar ? `Vencido: ${formatMoneyDisplay(report.financial.overdueBalance, report.currency)}` : "Cuentas por cobrar no disponibles"}
           </p>
         </div>
       </div>

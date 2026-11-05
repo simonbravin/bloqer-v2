@@ -1,6 +1,6 @@
 import type { ScheduledReportKey } from "@bloqer/validators";
 import { parseJobsiteProjectIdsParam } from "@bloqer/validators";
-import type { ServiceContext } from "@bloqer/services";
+import type { ScheduledReportAttachment, ServiceContext } from "@bloqer/services";
 import {
   parseAgingFilters,
   parseBudgetVarianceFilters,
@@ -56,6 +56,7 @@ export type ScheduledReportPdfAttachment = {
   filename: string;
   content: Buffer;
   contentType: "application/pdf";
+  jobsiteScope?: ScheduledReportAttachment["jobsiteScope"];
 };
 
 function asFilterRecord(
@@ -138,7 +139,10 @@ async function buildJobsiteDailyLogPdfAttachments(
         `_${code}` +
         (log.shift ? `_${slugPart(log.shift)}` : "") +
         `_${log.id.slice(0, 8)}.pdf`;
-      out.push(toPdfAttachment(uniqueName, buffer));
+      out.push({
+        ...toPdfAttachment(uniqueName, buffer),
+        jobsiteScope: { projectId: log.projectId, companyId: log.companyId },
+      });
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Error al generar PDF del parte";
       errors.push(`${log.projectCode}: ${msg}`);
@@ -151,13 +155,12 @@ async function buildJobsiteDailyLogPdfAttachments(
   if (out.length > 0 && errors.length > 0) {
     throw new PartialScheduledAttachmentsError(
       out.map((pdf) => ({
+        ...pdf,
         reportKey: "TENANT_JOBSITE_DAILY_LOGS" as const,
         filename: prefixScheduledReportAttachmentFilename(
           "TENANT_JOBSITE_DAILY_LOGS",
           pdf.filename,
         ),
-        content: pdf.content,
-        contentType: pdf.contentType,
       })),
       errors.map((e) => `TENANT_JOBSITE_DAILY_LOGS: ${e}`),
     );

@@ -27,6 +27,7 @@ type Props = {
   stockPreviewAction?: (warehouseId: string, productId: string) => Promise<{ balance?: string; error?: string }>;
   action: (fd: FormData) => Promise<{ error: string } | { id: string }>;
   onCancel?: () => void;
+  onSavingChange?: (saving: boolean) => void;
   onSuccess?: (id: string) => void;
 };
 
@@ -79,9 +80,9 @@ export function JobsiteLogCreateComposer({
       onCancel={onCancel}
       onSuccess={onSuccess}
       onCreated={evidence.handleCreated}
-      extraSections={
-        <JobsiteLogEvidencePicker files={evidence.files} onChange={evidence.setFiles} />
-      }
+      extraSections={(saving) => (
+        <JobsiteLogEvidencePicker files={evidence.files} onChange={evidence.setFiles} disabled={saving} />
+      )}
       {...formProps}
     />
   );

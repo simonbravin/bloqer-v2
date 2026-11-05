@@ -15,6 +15,10 @@ const PENDING_LABELS: Record<string, string> = {
   COST_OVERRUN: "Costo excedido",
 };
 
+function sourceDate(available: boolean, date: string | null): string {
+  return available ? (date ?? "Sin evidencia al corte") : "Fuente no disponible";
+}
+
 /** Tables share the already-authorized report DTO; no financial calculations here. */
 export function buildProjectProgressExportSheets(report: ProjectProgressReport): XlsxSheetInput[] {
   const meta = [
@@ -29,11 +33,17 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
       "Criterio temporal",
       "Fecha de ejecución/documento con estado actual; sin línea base histórica congelada",
     ],
-    ["Última medición aprobada", report.sourceDates.jobsite ?? "Sin evidencia al corte"],
-    ["Último certificado", report.sourceDates.certifications ?? "Sin evidencia al corte"],
-    ["Última factura", report.sourceDates.invoices ?? "Sin evidencia al corte"],
-    ["Última cobranza", report.sourceDates.collections ?? "Sin evidencia al corte"],
-    ["Último registro de costo", report.sourceDates.costs ?? "Sin evidencia al corte"],
+    [
+      "Última medición aprobada",
+      sourceDate(report.sourceAccess.jobsite, report.sourceDates.jobsite),
+    ],
+    [
+      "Último certificado",
+      sourceDate(report.sourceAccess.certifications, report.sourceDates.certifications),
+    ],
+    ["Última factura", sourceDate(report.sourceAccess.ar, report.sourceDates.invoices)],
+    ["Última cobranza", sourceDate(report.sourceAccess.ar, report.sourceDates.collections)],
+    ["Último registro de costo", sourceDate(report.sourceAccess.costs, report.sourceDates.costs)],
   ];
   const summary: string[][] = [
     ["Físico validado", report.physical.pct ?? "", "% del alcance físico ponderado"],
@@ -49,30 +59,42 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
     ],
     [
       "Partidas con medición válida",
-      String(report.physical.coveredCount),
+      report.sourceAccess.jobsite ? String(report.physical.coveredCount) : "",
       `de ${report.physical.totalCount}`,
     ],
-    ["Partidas sin medición", String(report.physical.missingCount), "partidas"],
-    ["Partidas con anomalías", String(report.physical.invalidCount), "partidas"],
+    [
+      "Partidas sin medición",
+      report.sourceAccess.jobsite ? String(report.physical.missingCount) : "",
+      "partidas",
+    ],
+    [
+      "Partidas con anomalías",
+      report.sourceAccess.jobsite ? String(report.physical.invalidCount) : "",
+      "partidas",
+    ],
     ["Partidas sin peso de costo", String(report.physical.zeroCostCount), "partidas"],
     [
       "Datos legacy ambiguos",
-      report.physical.hasLegacy ? "Sí" : "No",
+      report.sourceAccess.jobsite ? (report.physical.hasLegacy ? "Sí" : "No") : "",
       "Porcentajes anteriores a junio de 2026",
     ],
     ["Plan vigente comparable", report.plan.pct ?? "", "% del mismo alcance y ponderación"],
     ["Cobertura del plan", report.plan.coveragePct ?? "", "% con vínculo y fechas inequívocos"],
-    [
-      "Tareas atrasadas",
-      String(report.schedule.delayedTasks),
-      "Situación actual · proyecto completo",
-    ],
-    [
-      "Tareas bloqueadas",
-      String(report.schedule.blockedTasks),
-      "Situación actual · proyecto completo",
-    ],
   ];
+  if (report.sourceAccess.schedule) {
+    summary.push([
+      "Real · cronograma completo actual",
+      report.schedule.progressPct ?? "",
+      "% ponderado por duración",
+    ]);
+    for (const [label, count] of [
+      ["Tareas actuales", report.schedule.totalTasks],
+      ["Tareas completadas", report.schedule.completedTasks],
+      ["Tareas atrasadas", report.schedule.delayedTasks],
+      ["Tareas bloqueadas", report.schedule.blockedTasks],
+    ] as const)
+      summary.push([label, String(count), "Situación actual · proyecto completo"]);
+  }
   const moneyFields = [
     ["Venta presupuestada", "budgetSale"],
     ["Costo presupuestado", "budgetCost"],
@@ -130,7 +152,7 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
     "Cantidad contractual",
     "Físico (%)",
     "Cantidad ejecutada",
-    "Por ejecutar",
+    "Por ejecutar según %",
     "Plan vigente (%)",
   ];
   if (showCert)
@@ -240,6 +262,9 @@ export function buildProjectProgressExportSheets(report: ProjectProgressReport):
         ],
         ...report.notes.map((n) => ["Criterio", n]),
         ...report.warnings.map((w) => ["Aviso", w]),
+        ...(report.excludedDirectSalesHref
+          ? [["Acceso a ventas directas", report.excludedDirectSalesHref]]
+          : []),
         ...report.sectionsExcluded.map((s) => ["Sección no disponible", s]),
       ],
       preamble: meta,

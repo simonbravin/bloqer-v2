@@ -26,9 +26,8 @@ export const buildScheduledReportAttachment: BuildScheduledReportAttachmentFn = 
   // (prefixed filenames); do not wrap — runner duck-types and sends what succeeded.
   const pdfs = await buildScheduledReportPdfAttachments(reportKey, projectId, params, ctx);
   return pdfs.map((pdf) => ({
+    ...pdf,
     reportKey,
     filename: prefixScheduledReportAttachmentFilename(reportKey, pdf.filename),
-    content: pdf.content,
-    contentType: pdf.contentType,
   }));
 };

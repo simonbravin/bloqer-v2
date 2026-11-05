@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FieldHomeProject } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ type Props = {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
-  showAllProjectsLink?: boolean;
   onCloseAutoFocus?: (event: Event) => void;
   afterSelectHref?: (projectId: string) => string;
 };
@@ -32,7 +30,6 @@ export function FieldProjectPickerSheet({
   loading = false,
   error = null,
   onRetry,
-  showAllProjectsLink = true,
   onCloseAutoFocus,
   afterSelectHref,
 }: Props) {
@@ -72,10 +69,10 @@ export function FieldProjectPickerSheet({
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-auto min-h-11 w-full justify-start py-3 text-left"
+                  className="h-auto min-h-11 w-full justify-start whitespace-normal py-3 text-left"
                   onClick={() => select(project.id)}
                 >
-                  <span className="flex flex-col">
+                  <span className="min-w-0 break-words">
                     <span className="font-medium">
                       {project.code} · {project.name}
                     </span>
@@ -85,13 +82,6 @@ export function FieldProjectPickerSheet({
             ))}
           </ul>
         )}
-        {showAllProjectsLink ? (
-          <Button asChild variant="ghost" className="mt-4 min-h-11 w-full">
-            <Link href="/proyectos" onClick={() => onOpenChange(false)}>
-              Ver todas las obras
-            </Link>
-          </Button>
-        ) : null}
       </SheetContent>
     </Sheet>
   );

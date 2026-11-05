@@ -66,18 +66,25 @@ export default async function ReporteAvancesPage({ params, searchParams }: PageP
   } catch (error) {
     if (error instanceof ServiceError && error.code === "NOT_FOUND") notFound();
     if (error instanceof ServiceError && error.code === "FORBIDDEN") redirect("/dashboard");
-    if (error instanceof ServiceError && error.code === "VALIDATION") {
+    if (error instanceof ServiceError && (error.code === "VALIDATION" || error.code === "CONFLICT")) {
+      const invalidFilters = error.code === "VALIDATION";
       return (
         <PageShell className="space-y-6">
           <ProjectPageHeader title="Avances del proyecto" />
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Revisá los filtros del reporte</CardTitle>
+              <CardTitle className="text-base">
+                {invalidFilters ? "Revisá los filtros del reporte" : "No se pudo calcular el reporte"}
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">{error.message}</p>
+              <p role="alert" className="text-sm text-muted-foreground">{error.message}</p>
               <Button variant="outline" asChild>
-                <Link href={`${base}/reportes/avances`}>Restablecer filtros</Link>
+                {invalidFilters ? (
+                  <Link href={`${base}/reportes/avances`}>Restablecer filtros</Link>
+                ) : (
+                  <Link href={`${base}/reportes`}>Volver a reportes</Link>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -155,9 +162,11 @@ export default async function ReporteAvancesPage({ params, searchParams }: PageP
         <Button variant="ghost" size="sm" asChild>
           <Link href={`${base}/reportes`}>← Reportes</Link>
         </Button>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`${base}/cronograma`}>Cronograma</Link>
-        </Button>
+        {report.sourceAccess.schedule && (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`${base}/cronograma`}>Cronograma</Link>
+          </Button>
+        )}
         <Button variant="ghost" size="sm" asChild>
           <Link href="#pendientes">Pendientes</Link>
         </Button>
@@ -222,6 +231,14 @@ export default async function ReporteAvancesPage({ params, searchParams }: PageP
               </ul>
             </details>
           ) : null}
+          {report.excludedDirectSalesHref && (
+            <Link
+              href={report.excludedDirectSalesHref}
+              className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              Ver facturas de la obra <ArrowUpRight className="h-3 w-3" aria-hidden />
+            </Link>
+          )}
         </div>
       ) : null}
       {report.sectionsExcluded.length > 0 ? (

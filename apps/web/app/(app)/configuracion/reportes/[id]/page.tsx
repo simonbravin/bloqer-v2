@@ -46,8 +46,9 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
     notFound();
   }
 
+  const canEdit = detail.canEditConfiguration && detail.status !== "DELETED";
   const [formData, deliveries, failedDeliveryCount] = await Promise.all([
-    loadScheduledReportFormData(ctx),
+    canEdit ? loadScheduledReportFormData(ctx) : null,
     listScheduledReportEmailDeliveries(ctx, id, 80),
     countRecentFailedScheduledReportDeliveries(ctx, id),
   ]);
@@ -98,20 +99,20 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
               recipientCount={detail.recipientCount}
             />
           ) : null}
-          {detail.status === "ACTIVE" ? (
+          {canEdit && detail.status === "ACTIVE" ? (
             <form action={deactivateScheduledReportAction.bind(null, id)}>
               <Button type="submit" variant="secondary">
                 Pausar
               </Button>
             </form>
-          ) : detail.status === "PAUSED" ? (
+          ) : canEdit && detail.status === "PAUSED" ? (
             <form action={reactivateScheduledReportAction.bind(null, id)}>
               <Button type="submit" variant="secondary">
                 Reactivar
               </Button>
             </form>
           ) : null}
-          {detail.status !== "DELETED" ? <ScheduledReportDeleteButton id={id} /> : null}
+          {canEdit ? <ScheduledReportDeleteButton id={id} /> : null}
         </div>
       </div>
 
@@ -133,7 +134,7 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
 
       {detail.status === "DELETED" ? (
         <p className="text-sm text-muted-foreground">Este envío fue eliminado y no se puede editar.</p>
-      ) : (
+      ) : formData ? (
         <>
           <h2 className="text-lg font-semibold tracking-tight">Editar configuración</h2>
           <ScheduledReportForm
@@ -163,6 +164,10 @@ export default async function EditarReporteProgramadoPage({ params, searchParams
             }}
           />
         </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Configuración compartida. Solo una sesión con alcance global puede modificarla.
+        </p>
       )}
     </PageShell>
   );

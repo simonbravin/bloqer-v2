@@ -63,6 +63,7 @@ export function aggregateProjectProgressCoverage(
     hasLegacy?: boolean;
     invalid?: boolean;
   }[],
+  sourceAvailable = true,
 ): ProjectProgressCoverage {
   let totalCost = ZERO;
   let coveredCost = ZERO;
@@ -100,12 +101,14 @@ export function aggregateProjectProgressCoverage(
         : null,
     observedPct,
     coveragePct:
-      baseComplete && totalCost.gt(0)
+      sourceAvailable && baseComplete && totalCost.gt(0)
         ? serializeRatePctDecimal(coveredCost.div(totalCost).mul(100))
         : null,
     coveredCount,
     totalCount: items.length,
-    missingCount: items.filter((i) => i.pct == null && !i.invalid && !i.hasLegacy).length,
+    missingCount: sourceAvailable
+      ? items.filter((i) => i.pct == null && !i.invalid && !i.hasLegacy).length
+      : 0,
     invalidCount: items.filter((i) => i.invalid || i.hasLegacy).length,
     zeroCostCount,
     hasLegacy: items.some((i) => i.hasLegacy),

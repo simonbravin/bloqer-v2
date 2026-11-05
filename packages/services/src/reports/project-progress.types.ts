@@ -1,3 +1,5 @@
+import type { ProjectProgressSourceAccess } from "@bloqer/database";
+
 export type ProjectProgressFilters = {
   dateFrom?: string;
   dateTo?: string;
@@ -102,6 +104,8 @@ export type ProjectProgressReport = {
   availableBudgets: { id: string; name: string; status: string; currency: string }[];
   budgetIds: string[];
   budgetName: string;
+  sourceAccess: ProjectProgressSourceAccess;
+  excludedDirectSalesHref: string | null;
   physical: ProjectProgressCoverage;
   plan: ProjectProgressCoverage;
   schedule: {

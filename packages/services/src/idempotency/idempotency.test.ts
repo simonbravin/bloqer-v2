@@ -1069,4 +1069,57 @@ describe("jobsiteLogReplayMatches", () => {
       false,
     );
   });
+
+  const wbsNodeId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+  const stored = {
+    ...base,
+    progress: [{ wbsNodeId, quantityCompleted: "3", physicalPct: "10", notes: "Llueve", sortOrder: 0 }],
+    labor: [{ contactId: null, subcontractId: null, workersCount: 2, hoursWorked: "8", crewDescription: "Equipo A", sortOrder: 0 }],
+    materials: [{ productId: "product", warehouseId: "warehouse", quantity: "3", description: "Cemento", sortOrder: 0 }],
+    issues: [{ type: "OTHER", severity: "LOW", description: "Faltan planos", status: "OPEN", sortOrder: 0 }],
+  };
+  const payload = {
+    ...stored,
+    logDate: "2026-08-20",
+    progress: [{ wbsNodeId, quantityCompleted: "3.0000", physicalPct: "10.00", notes: "Llueve" }],
+    labor: [{ workersCount: 2, hoursWorked: "8.0000", crewDescription: "Equipo A" }],
+    materials: [{ productId: "product", warehouseId: "warehouse", quantity: "3.0000", description: "Cemento" }],
+    issues: [{ type: "OTHER", severity: "LOW", description: "Faltan planos" }],
+  };
+
+  it("matches decimal and default spellings after database round trip", () => {
+    assert.equal(jobsiteLogReplayMatches(stored, payload), true);
+  });
+
+  it("rejects changed progress notes, labor description, material EDT or issue state", () => {
+    assert.equal(jobsiteLogReplayMatches(stored, {
+      ...payload,
+      progress: [{ ...payload.progress[0]!, notes: "Otro texto" }],
+    }), false);
+    assert.equal(jobsiteLogReplayMatches(stored, {
+      ...payload,
+      labor: [{ ...payload.labor[0]!, crewDescription: "Equipo B" }],
+    }), false);
+    assert.equal(jobsiteLogReplayMatches(stored, {
+      ...payload,
+      materials: [{ ...payload.materials[0]!, wbsNodeId }],
+    }), false);
+    assert.equal(jobsiteLogReplayMatches(stored, {
+      ...payload,
+      issues: [{ ...payload.issues[0]!, status: "RESOLVED" }],
+    }), false);
+  });
+
+  it("replays a part after approval filled the material EDT through D-055", () => {
+    const approved = {
+      ...stored,
+      status: "APPROVED",
+      materials: [{ ...stored.materials[0]!, wbsNodeId }],
+    };
+    assert.equal(jobsiteLogReplayMatches(approved, payload), true);
+    assert.equal(jobsiteLogReplayMatches(approved, {
+      ...payload,
+      materials: [{ ...payload.materials[0]!, wbsNodeId: "other" }],
+    }), false);
+  });
 });

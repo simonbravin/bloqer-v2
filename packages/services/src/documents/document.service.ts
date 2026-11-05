@@ -42,7 +42,7 @@ import {
   canViewPurchaseRequests,
 } from "../procurement/procurement-access";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
-import { canMutateJobsiteLogAsContributor } from "../jobsite-log/jobsite-log-access";
+import { canMutateJobsiteLogAsContributor, canViewJobsiteLogArea } from "../jobsite-log/jobsite-log-access";
 import {
   documentReplayMatches,
   requireIdempotencyKey,
@@ -526,24 +526,30 @@ async function notifyDocumentUploadConfirmed(
   },
   ctx: ServiceContext,
 ): Promise<void> {
-  let recipients: string[] = [];
+  let scopedRecipients: string[];
+  let companyId = doc.companyId;
   try {
-    recipients = await resolveNotificationAudience({
+    const recipients = await resolveNotificationAudience({
       tenantId: ctx.tenantId,
       primaryUserIds: doc.uploadedBy?.trim() ? [doc.uploadedBy.trim()] : [],
       excludeUserId: ctx.actorUserId,
     });
+    if (recipients.length === 0) return;
+
+    if (doc.linkedEntityType === "JOBSITE_LOG") {
+      companyId = await requireDocumentProjectAccess(doc, ctx);
+    }
+    scopedRecipients = await filterUserIdsByProjectAccess(
+      ctx.tenantId,
+      doc.projectId,
+      recipients,
+      doc.linkedEntityType === "JOBSITE_LOG" && companyId
+        ? { companyId, canView: canViewJobsiteLogArea }
+        : undefined,
+    );
   } catch {
     return;
   }
-
-  if (recipients.length === 0) return;
-
-  const scopedRecipients = await filterUserIdsByProjectAccess(
-    ctx.tenantId,
-    doc.projectId,
-    recipients,
-  );
   if (scopedRecipients.length === 0) return;
 
   const actionUrl = doc.projectId
@@ -566,7 +572,7 @@ async function notifyDocumentUploadConfirmed(
     try {
       await createSystemNotification({
         tenantId: ctx.tenantId,
-        companyId: doc.companyId,
+        companyId,
         recipientUserId,
         type: "DOCUMENT_UPLOAD_CONFIRMED",
         title,
@@ -865,6 +871,7 @@ export async function confirmDocumentUpload(
   if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para confirmar subida");
   }
+  await requireDocumentProjectAccess(doc, ctx);
   if (doc.status === "ACTIVE" && doc.storageProvider === "R2") {
     return;
   }
@@ -956,7 +963,7 @@ export async function getDocumentDownloadUrl(
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
-  await requireProjectAccessIfPresent(doc.projectId, ctx);
+  await requireDocumentProjectAccess(doc, ctx);
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
   if (doc.storageProvider !== "R2") {
@@ -1001,7 +1008,7 @@ export async function getDocumentFileBytes(
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para descargar documentos");
   }
-  await requireProjectAccessIfPresent(doc.projectId, ctx);
+  await requireDocumentProjectAccess(doc, ctx);
   if (doc.status === "DELETED") throw new ServiceError("FORBIDDEN", "El documento ha sido eliminado");
   if (doc.status === "UPLOADING") throw new ServiceError("CONFLICT", "El documento todavía se está subiendo");
   if (doc.storageProvider !== "R2") {
@@ -1107,7 +1114,7 @@ export async function getDocumentById(id: string, ctx: ServiceContext): Promise<
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx, { projectId: doc.projectId })) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver documentos");
   }
-  await requireProjectAccessIfPresent(doc.projectId, ctx);
+  await requireDocumentProjectAccess(doc, ctx);
   const gate = await getTenantModuleGate(ctx);
   return serialize(doc, ctx, gate);
 }
@@ -1176,8 +1183,25 @@ export async function listProjectDocuments(
     orderBy: { createdAt: "desc" },
   });
 
+  const jobsiteLogIds = docs.flatMap((doc) =>
+    doc.linkedEntityType === "JOBSITE_LOG" && doc.linkedEntityId ? [doc.linkedEntityId] : [],
+  );
+  const jobsiteLogs = jobsiteLogIds.length === 0 ? [] : await prisma.jobsiteLog.findMany({
+    where: {
+      id: { in: [...new Set(jobsiteLogIds)] },
+      tenantId: ctx.tenantId,
+      projectId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    },
+    select: { id: true, companyId: true },
+  });
+  const jobsiteCompanies = new Map(jobsiteLogs.map((part) => [part.id, part.companyId]));
   const gate = await getTenantModuleGate(ctx);
-  return docs.map((d) => serialize(d, ctx, gate));
+  return docs.filter((doc) => {
+    if (doc.linkedEntityType !== "JOBSITE_LOG") return true;
+    const companyId = doc.linkedEntityId ? jobsiteCompanies.get(doc.linkedEntityId) : undefined;
+    return companyId !== undefined && (doc.companyId === null || doc.companyId === companyId);
+  }).map((doc) => serialize(doc, ctx, gate));
 }
 
 export async function listEntityDocuments(
@@ -1209,12 +1233,13 @@ export async function listEntityDocuments(
   }
 
   let entityDocScope: { projectId?: string | null } = {};
+  let jobsiteCompanyId: string | undefined;
 
   if (entityType === "JOBSITE_LOG") {
     if (!can(ctx.roles, "VIEW", "JOBSITE_LOG") && !can(ctx.roles, "VIEW", "PROJECTS")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos del libro de obra");
     }
-    await assertJobsiteLogDocumentTarget(options!.projectId!, entityId, ctx);
+    jobsiteCompanyId = await assertJobsiteLogDocumentTarget(options!.projectId!, entityId, ctx);
   } else if (entityType === "CERTIFICATION") {
     if (!can(ctx.roles, "VIEW", "CERTIFICATIONS") && !can(ctx.roles, "VIEW", "PROJECTS")) {
       throw new ServiceError("FORBIDDEN", "Sin permisos para ver adjuntos de la certificación");
@@ -1298,6 +1323,7 @@ export async function listEntityDocuments(
       linkedEntityId:   entityId,
       status:           { not: "DELETED" },
       ...entityDocScope,
+      ...(jobsiteCompanyId ? { OR: [{ companyId: null }, { companyId: jobsiteCompanyId }] } : {}),
       ...(needsProject && options?.projectId ? { projectId: options.projectId } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -1386,8 +1412,26 @@ async function getOwned(id: string, ctx: ServiceContext, gate: TenantModuleGate)
   if (!canMutateDocumentByLink(doc.linkedEntityType, ctx)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para modificar documentos");
   }
-  await requireProjectAccessIfPresent(doc.projectId, ctx);
+  await requireDocumentProjectAccess(doc, ctx);
   return doc;
+}
+
+async function requireDocumentProjectAccess(
+  doc: { projectId: string | null; companyId: string | null; linkedEntityType: string | null; linkedEntityId: string | null },
+  ctx: ServiceContext,
+): Promise<string | null> {
+  if (doc.linkedEntityType !== "JOBSITE_LOG") {
+    await requireProjectAccessIfPresent(doc.projectId, ctx);
+    return doc.companyId;
+  }
+  if (!doc.projectId || !doc.linkedEntityId) {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
+  const companyId = await assertJobsiteLogDocumentTarget(doc.projectId, doc.linkedEntityId, ctx);
+  if (doc.companyId !== null && doc.companyId !== companyId) {
+    throw new ServiceError("NOT_FOUND", "Documento no encontrado");
+  }
+  return companyId;
 }
 
 async function assertBudgetDocumentTarget(
@@ -1407,15 +1451,16 @@ async function assertBudgetDocumentTarget(
   }
 }
 
-/** Jobsite log must exist, match tenant, and belong to the given project. */
+/** Attachments inherit the part's project and company, including historical attachments without companyId. */
 async function assertJobsiteLogDocumentTarget(
   projectId:    string,
   jobsiteLogId: string,
   ctx:          ServiceContext,
-): Promise<void> {
+): Promise<string> {
+  await requireProjectAccess(projectId, ctx);
   const jl = await prisma.jobsiteLog.findUnique({
     where:  { id: jobsiteLogId },
-    select: { id: true, tenantId: true, projectId: true },
+    select: { tenantId: true, projectId: true, companyId: true },
   });
   if (!jl || jl.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Parte de obra no encontrado");
@@ -1423,6 +1468,10 @@ async function assertJobsiteLogDocumentTarget(
   if (jl.projectId !== projectId) {
     throw new ServiceError("FORBIDDEN", "El parte no pertenece a este proyecto");
   }
+  if (isCrossCompany(jl.companyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "El parte no pertenece a la empresa activa");
+  }
+  return jl.companyId;
 }
 
 /** Certification must exist, match tenant, and belong to the given project. */

@@ -35,6 +35,8 @@ export async function cleanupScheduleAuditFixture(
       await tx.scheduleItemWbsLink.deleteMany({ where: { tenantId } });
       await tx.scheduleItem.deleteMany({ where: { tenantId } });
       await tx.schedule.deleteMany({ where: { tenantId } });
+      await tx.scheduledReport.deleteMany({ where: { tenantId } });
+      await tx.emailDeliveryLog.deleteMany({ where: { tenantId } });
       await tx.auditLog.deleteMany({ where: { tenantId } });
       await tx.tenantModuleSetting.deleteMany({ where: { tenantId } });
       await tx.companyProcurementSettings.deleteMany({ where: { company: { tenantId } } });
@@ -43,6 +45,7 @@ export async function cleanupScheduleAuditFixture(
       await tx.budget.deleteMany({ where: { tenantId } });
       await tx.project.deleteMany({ where: { tenantId } });
       await tx.contact.deleteMany({ where: { tenantId } });
+      await tx.userMembership.deleteMany({ where: { tenantId } });
       await tx.company.deleteMany({ where: { tenantId } });
       await tx.tenant.delete({ where: { id: tenantId } });
       await tx.user.delete({ where: { id: actorId } });

@@ -49,12 +49,15 @@ export function FieldPlusSheet({
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [projectsError, setProjectsError] = useState<string | null>(null);
   const [retryVersion, setRetryVersion] = useState(0);
-  // A remembered UUID is a preference. Only reuse it after checking the current visible list.
-  const actionProjectId = pathProjectId ??
-    (projects.some((project) => project.id === convenienceProjectId) ? convenienceProjectId : null);
+  // Both path and remembered IDs must still be in the active, authorized registration list.
+  const preferredProjectId = pathProjectId ?? convenienceProjectId;
+  const actionProjectId = projects.some((project) => project.id === preferredProjectId)
+    ? preferredProjectId
+    : null;
 
+  const selectingProject = open || pickerOpen;
   useEffect(() => {
-    if ((!open && !pickerOpen) || pathProjectId) return;
+    if (!selectingProject) return;
     let cancelled = false;
     setProjects([]);
     setProjectsLoading(true);
@@ -76,7 +79,7 @@ export function FieldPlusSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, pickerOpen, pathProjectId, retryVersion]);
+  }, [selectingProject, pathProjectId, retryVersion]);
 
   function run(id: FieldQuickActionId) {
     if (actionProjectId) {
@@ -159,7 +162,6 @@ export function FieldPlusSheet({
         loading={projectsLoading}
         error={projectsError}
         onRetry={() => setRetryVersion((version) => version + 1)}
-        showAllProjectsLink={gate.isEnabled("PROJECTS")}
         onCloseAutoFocus={onCloseAutoFocus}
         afterSelectHref={
           pendingAction ? (projectId) => fieldQuickActionHref(projectId, pendingAction) : undefined

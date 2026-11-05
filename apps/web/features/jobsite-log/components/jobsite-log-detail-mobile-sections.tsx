@@ -3,6 +3,7 @@ import { formatDateLong } from "@/lib/format";
 import Link from "next/link";
 import {
   JobsiteLogIssueSeverityBadge,
+  JobsiteLogIssueStatusBadge,
   JobsiteLogIssueTypeBadge,
 } from "./jobsite-log-issue-badge";
 import type { JobsiteLogView } from "@bloqer/services";
@@ -13,10 +14,12 @@ export function JobsiteLogDetailMobileSections({
   log,
   progressRows,
   stockMovementByMaterialId,
+  canViewInventory,
 }: {
   log: JobsiteLogView;
   progressRows: ProgressRow[];
   stockMovementByMaterialId: Map<string, { movementDate: Date }>;
+  canViewInventory: boolean;
 }) {
   return (
     <div className="space-y-4 md:hidden">
@@ -37,6 +40,7 @@ export function JobsiteLogDetailMobileSections({
                 <p className="text-xs tabular-nums text-muted-foreground">
                   Acumulado {formatRatePctDisplay(p.cumulativePct)} / 100
                 </p>
+                {p.notes && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{p.notes}</p>}
               </li>
             ))}
           </ul>
@@ -49,7 +53,7 @@ export function JobsiteLogDetailMobileSections({
           <ul className="space-y-2">
             {log.labor.map((lb) => (
               <li key={lb.id} className="rounded-lg border bg-card p-3 text-sm">
-                <p className="font-medium">{lb.contactName ?? lb.subcontractCode ?? lb.crewDescription ?? "Cuadrilla"}</p>
+                <p className="font-medium">{[lb.contactName, lb.subcontractCode].filter(Boolean).join(" · ") || lb.crewDescription || "Cuadrilla"}</p>
                 {lb.crewDescription && (lb.contactName || lb.subcontractCode) ? (
                   <p className="text-muted-foreground">{lb.crewDescription}</p>
                 ) : null}
@@ -57,6 +61,7 @@ export function JobsiteLogDetailMobileSections({
                   {lb.workersCount} {lb.workersCount === 1 ? "trabajador" : "trabajadores"}
                   {lb.hoursWorked ? ` · ${formatQtyFromString(lb.hoursWorked)} h` : ""}
                 </p>
+                {lb.notes && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{lb.notes}</p>}
               </li>
             ))}
           </ul>
@@ -69,12 +74,13 @@ export function JobsiteLogDetailMobileSections({
           <ul className="space-y-2">
             {log.materials.map((m) => {
               const movement = stockMovementByMaterialId.get(m.id);
-              const showConsumption = m.productId && m.warehouseId;
+              const showConsumption = canViewInventory && m.productId && m.warehouseId && log.status !== "CANCELLED";
               return (
                 <li key={m.id} className="rounded-lg border bg-card p-3 text-sm">
                   <p className="font-medium">{m.description}</p>
                   <p className="text-muted-foreground">
-                    {m.productName ?? "—"} · {formatQtyFromString(m.quantity)}
+                    {m.productName ? `${m.productName} · ` : ""}{formatQtyFromString(m.quantity)}
+                    {m.productUnit ? ` ${m.productUnit}` : ""}
                   </p>
                   {m.warehouseName ? (
                     <p className="text-xs text-muted-foreground">{m.warehouseName}</p>
@@ -83,7 +89,7 @@ export function JobsiteLogDetailMobileSections({
                     <p className="mt-1 text-xs text-muted-foreground">
                       {log.status === "APPROVED" ? (
                         movement ? (
-                          <Link href="/inventario/movimientos" className="text-primary hover:underline">
+                          <Link href={`/proyectos/${log.projectId}/consumos`} className="text-primary hover:underline">
                             Registrado · {formatDateLong(new Date(movement.movementDate))}
                           </Link>
                         ) : (
@@ -94,6 +100,7 @@ export function JobsiteLogDetailMobileSections({
                       )}
                     </p>
                   ) : null}
+                  {m.notes && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{m.notes}</p>}
                 </li>
               );
             })}
@@ -109,13 +116,15 @@ export function JobsiteLogDetailMobileSections({
               <li key={iss.id} className="rounded-lg border bg-card p-3 text-sm">
                 <div className="flex flex-wrap gap-1.5">
                   <JobsiteLogIssueTypeBadge
-                    type={iss.type as "INCIDENT" | "BLOCKER" | "SAFETY" | "OTHER"}
+                    type={iss.type}
                   />
                   <JobsiteLogIssueSeverityBadge
-                    severity={iss.severity as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"}
+                    severity={iss.severity}
                   />
                 </div>
                 <p className="mt-2">{iss.description}</p>
+                <JobsiteLogIssueStatusBadge status={iss.status} />
+                {iss.notes && <p className="mt-1 whitespace-pre-wrap text-xs text-muted-foreground">{iss.notes}</p>}
               </li>
             ))}
           </ul>

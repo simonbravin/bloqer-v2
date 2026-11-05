@@ -158,6 +158,11 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 - **Si se solicita:** definir previamente autorización, acumulados, estados, vínculo con facturas/NC/CxC y trazabilidad; someter las nuevas reglas o campos a aprobación. La aprobación actual solo separa el alcance.
 - **Fuentes:** [propuesta aprobada](./platform-audit/2026-11-05-ag-08-negative-certification-scope-proposal.md), [CERTIFICATIONS §13](../02-modules/CERTIFICATIONS.md).
 
+## P-AG12-01 — Alcance de los archivos que recibe cada destinatario
+
+- **Estado:** revisar en AG-12. AG-11 protege las configuraciones por empresa y obra y comprueba que los destinatarios programados conserven una membresía activa al momento del envío.
+- **Contrato por definir:** el envío programado construye un archivo con el alcance autorizado de la configuración y lo distribuye a sus destinatarios. Falta explicitar si cada archivo debe recortarse según los permisos del destinatario, y cómo se relaciona eso con el envío manual a una dirección ingresada por quien genera el reporte. La revisión de AG-12 debe contrastar D-120 y D-100 con el contrato general de envíos antes de cambiarlo.
+
 ## AG-00 — Aislamiento: reconciliación documental resuelta
 
 Diagnóstico inicial del 03/11/2026: [subanálisis de arquitectura](./platform-audit/2026-11-03-ag-00-architecture.md). El usuario confirmó explícitamente la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), formalizada en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md). El cierre siguiente es documental/arquitectónico; no equivale a comprobar SQL ni autorización de todos los recorridos y no introduce schema, migraciones o middleware.
