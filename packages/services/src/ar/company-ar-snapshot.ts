@@ -6,12 +6,15 @@ import { ServiceError } from "../types";
 import type { ReceivablesProjectSummary } from "./receivable.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { canViewCompanyAr } from "./ar-access";
+import { computeObligationBalanceDue } from "../finance/obligation-balance";
+import { arReceivableParents, assertArReceivableParents } from "./ar-integrity";
 
 export type CompanyReceivableSnapshotRow = {
   currency: string;
   dueDate: Date;
   originalAmount: Prisma.Decimal;
   paidAmount: Prisma.Decimal;
+  creditedAmount: Prisma.Decimal;
   status: string;
 };
 
@@ -25,26 +28,25 @@ export async function fetchCompanyReceivableSnapshotRows(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
   }
 
-  return prisma.receivable.findMany({
+  const rows = await prisma.receivable.findMany({
     where: {
       tenantId: ctx.tenantId,
       status: { notIn: ["PAID", "CANCELLED"] },
       // Receivable.companyId es NOT NULL → scope directo por empresa (no hay filas compartidas).
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
-    select: {
-      currency: true,
-      dueDate: true,
-      originalAmount: true,
-      paidAmount: true,
-      status: true,
-    },
+    include: arReceivableParents,
+  });
+  return rows.map((row) => {
+    assertArReceivableParents(row, ctx);
+    return { currency: row.currency, dueDate: row.dueDate, originalAmount: row.originalAmount,
+      paidAmount: row.paidAmount, creditedAmount: row.creditedAmount, status: row.status };
   });
 }
 
 function openBalance(row: CompanyReceivableSnapshotRow): Prisma.Decimal | null {
   if (row.status === "CANCELLED") return null;
-  const bal = row.originalAmount.minus(row.paidAmount);
+  const bal = computeObligationBalanceDue(row.originalAmount, row.paidAmount, row.creditedAmount);
   if (!hasOpenObligationBalance(bal, OBLIGATION_OPEN_BALANCE_EPSILON)) return null;
   return bal;
 }

@@ -79,6 +79,9 @@ export const unitPriceString = z
   .trim()
   .transform((v) => {
     if (v === "") return "0";
+    // Services and DecimalInput send canonical decimal strings. Do not reinterpret
+    // a three-digit fractional part (0.025 / 1.234) as thousands during revalidation.
+    if (LOOSE_DECIMAL.test(v)) return v;
     const parsed = tryParseUserDecimal(v, "commit");
     return parsed == null || parsed === "" ? v : parsed;
   })
@@ -97,12 +100,18 @@ export const ratePctString = z
   .regex(LOOSE_DECIMAL, "Porcentaje inválido")
   .transform((v) => roundRatePct(v));
 
+/** IVA/perception invoice rate (D-133); zero is valid, no new upper bound. */
+export const nonNegativeRatePctString = ratePctString.refine(
+  (v) => !v.startsWith("-"), "El impuesto no puede ser negativo",
+);
+
 /** Line commercial discount % ([D-093]): 0–100 inclusive, 4 dp. Empty → 0. Accepts es-AR commas. */
 export const discountPctString = z
   .string()
   .trim()
   .transform((v) => {
     if (v === "") return "0";
+    if (LOOSE_DECIMAL.test(v)) return v;
     const parsed = tryParseUserDecimal(v, "commit");
     return parsed == null || parsed === "" ? v : parsed;
   })

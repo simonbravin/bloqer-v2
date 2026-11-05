@@ -22,6 +22,7 @@ import { isStorageConfigured } from "@bloqer/config";
 import {
   getReceivableBySalesInvoiceId,
   getSalesInvoiceById,
+  getTenantModuleGate,
   listCreditDebitNotesForSalesInvoice,
   listEntityDocuments,
   ServiceError,
@@ -33,7 +34,7 @@ import {
   issueSalesDebitNoteAction,
   cancelSalesCreditNoteAction,
 } from "../actions";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,7 @@ import { formatMoneyAmount, formatQtyFromString, formatRatePctFromString, format
 import { CreateFiscalNoteDialog } from "@/features/finance/components/create-fiscal-note-dialog";
 import { RelatedFiscalNotesPanel } from "@/features/finance/components/related-fiscal-notes-panel";
 import { compareDecimal } from "@bloqer/utils";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 
 interface PageProps {
   params: Promise<{ id: string; invoiceId: string }>;
@@ -103,12 +105,12 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
   const canEditAttachments = canEditAr;
 
-  const returnPath = `/proyectos/${id}/facturas/${invoiceId}`;
   const kind = invoice.documentKind ?? "INVOICE";
   const isInvoice = kind === "INVOICE";
   const isCreditNote = kind === "CREDIT_NOTE";
   const isDebitNote = kind === "DEBIT_NOTE";
   const canCollect =
+    (await getTenantModuleGate(ctx)).isEnabled("TREASURY") &&
     canEditAr &&
     !isCreditNote &&
     receivable &&
@@ -155,42 +157,21 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
                 <Link href={`/proyectos/${id}/facturas/${invoiceId}/editar`}>Editar</Link>
               </Button>
               {isInvoice ? (
-              <form
-                action={async () => {
-                  "use server";
-                  const result = await issueSalesInvoiceAction(invoiceId, id);
-                  if ("error" in result) redirectWithActionError(returnPath, result.error);
-                  redirect(returnPath);
-                }}
-              >
-                <Button size="sm">Emitir</Button>
-              </form>
+              <ConfirmActionButton label="Emitir" title={`Emitir ${invoice.code}`} variant="default"
+                description="Se emite el comprobante y se crea la cuenta por cobrar. Este paso no registra un cobro."
+                confirmLabel="Emitir" action={issueSalesInvoiceAction.bind(null, invoiceId, id)} />
               ) : null}
             </>
           )}
           {canEditAr && invoice.status === "DRAFT" && isCreditNote && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await issueSalesCreditNoteAction(invoiceId, id);
-                if ("error" in result) redirectWithActionError(returnPath, result.error);
-                redirect(returnPath);
-              }}
-            >
-              <Button size="sm">Emitir nota de crédito</Button>
-            </form>
+            <ConfirmActionButton label="Emitir nota de crédito" title={`Emitir ${invoice.code}`} variant="default"
+              description="Se aplica el crédito al saldo de la factura de referencia, sin movimiento de caja."
+              confirmLabel="Emitir nota de crédito" action={issueSalesCreditNoteAction.bind(null, invoiceId, id)} />
           )}
           {canEditAr && invoice.status === "DRAFT" && isDebitNote && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await issueSalesDebitNoteAction(invoiceId, id);
-                if ("error" in result) redirectWithActionError(returnPath, result.error);
-                redirect(returnPath);
-              }}
-            >
-              <Button size="sm">Emitir nota de débito</Button>
-            </form>
+            <ConfirmActionButton label="Emitir nota de débito" title={`Emitir ${invoice.code}`} variant="default"
+              description="Se emite la nota y se crea una cuenta por cobrar adicional, sin movimiento de caja."
+              confirmLabel="Emitir nota de débito" action={issueSalesDebitNoteAction.bind(null, invoiceId, id)} />
           )}
           {canIssueNc ? (
             <CreateFiscalNoteDialog
@@ -212,20 +193,10 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
             />
           ) : null}
           {canEditAr && invoice.status !== "CANCELLED" && (
-            <form
-              action={async () => {
-                "use server";
-                const result = isCreditNote
-                  ? await cancelSalesCreditNoteAction(invoiceId, id)
-                  : await cancelSalesInvoiceAction(invoiceId, id);
-                if ("error" in result) redirectWithActionError(returnPath, result.error);
-                redirect(returnPath);
-              }}
-            >
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Anular
-              </Button>
-            </form>
+            <ReasonActionButton label="Anular" title={`Anular ${invoice.code}`} confirmLabel="Anular comprobante"
+              requiresReason={invoice.status === "ISSUED"}
+              description="La anulación conserva el documento y revierte su efecto financiero cuando los controles lo permiten."
+              action={isCreditNote ? cancelSalesCreditNoteAction.bind(null, invoiceId, id) : cancelSalesInvoiceAction.bind(null, invoiceId, id)} />
           )}
         </div>
       </div>
@@ -269,7 +240,9 @@ export default async function FacturaDetailPage({ params, searchParams }: PagePr
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
           <p className="font-medium">Nota de crédito</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {invoice.status === "DRAFT"
+            {invoice.status === "CANCELLED"
+              ? "Nota de crédito anulada. Su crédito ya no reduce el saldo de la factura de referencia."
+              : invoice.status === "DRAFT"
               ? "Al emitir, reduce el saldo de la factura de referencia sin movimiento de caja."
               : "Aplicada a la CxC de la factura de referencia (sin cobranza)."}
           </p>

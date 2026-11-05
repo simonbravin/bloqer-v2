@@ -999,13 +999,13 @@ describe("AG-08 subcontracts on isolated SQL", { skip: !live, concurrency: false
       s.project.id,
     );
     assert.equal((await getSubcontractCertificationById(d.id, ctx)).settlementStatus, "SETTLED");
-    await cancelPayment(final.id, ctx, s.project.id);
+    await cancelPayment(final.id, ctx, s.project.id, "Synthetic settlement reversal");
     assert.equal(
       (await getSubcontractCertificationById(d.id, ctx)).settlementStatus,
       "PARTIALLY_SETTLED",
     );
-    await cancelPayment(payment.id, ctx, s.project.id);
-    await cancelSupplierInvoice(d.supplierInvoiceId!, ctx, s.project.id);
+    await cancelPayment(payment.id, ctx, s.project.id, "Synthetic settlement reversal");
+    await cancelSupplierInvoice(d.supplierInvoiceId!, ctx, s.project.id, "Synthetic invoice reversal");
     assert.equal((await getSubcontractCertificationById(d.id, ctx)).settlementStatus, "UNSETTLED");
     await cancelSubcontractCertification(d.id, ctx, "Synthetic correction");
     assert.equal((await effects(c)).lines[0]!.certifiedQuantity.toFixed(4), "0.0000");
@@ -1315,7 +1315,7 @@ describe("AG-08 subcontracts on isolated SQL", { skip: !live, concurrency: false
       s.project.id,
     );
     assert.equal((await getSubcontractCertificationById(d.id, ctx)).settlementStatus, "SETTLED");
-    await cancelPayment(final.id, ctx, s.project.id);
+    await cancelPayment(final.id, ctx, s.project.id, "Synthetic settlement reversal");
     assert.equal(
       (await getSubcontractCertificationById(d.id, ctx)).settlementStatus,
       "PARTIALLY_SETTLED",

@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { computeObligationBalanceDue, normalizeObligationBalanceDue } from "../finance/obligation-balance";
 import { canViewProjectCashFlowReport, resolveProjectCashFlowDateRange } from "../project-cash-flow/project-cash-flow.service";
 import {
   assertTenantModuleEnabledWithGate,
@@ -96,6 +97,7 @@ export async function getProjectCashProjectionReport(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: { in: [...OPEN_OBLIGATION] },
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
@@ -104,6 +106,7 @@ export async function getProjectCashProjectionReport(
             dueDate: true,
             originalAmount: true,
             paidAmount: true,
+            creditedAmount: true,
           },
         })
       : Promise.resolve([]),
@@ -112,6 +115,7 @@ export async function getProjectCashProjectionReport(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: { in: [...OPEN_OBLIGATION] },
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
@@ -120,6 +124,7 @@ export async function getProjectCashProjectionReport(
             dueDate: true,
             originalAmount: true,
             paidAmount: true,
+            creditedAmount: true,
           },
         })
       : Promise.resolve([]),
@@ -142,7 +147,7 @@ export async function getProjectCashProjectionReport(
 
     let recvCount = 0;
     for (const r of receivables.filter((x) => x.currency === cur)) {
-      const balance = r.originalAmount.minus(r.paidAmount);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount));
       if (balance.lessThanOrEqualTo(0)) continue;
       const key = projectionBucketKey(r.dueDate, range.dateFrom, range.dateTo);
       if (!key) continue;
@@ -152,7 +157,7 @@ export async function getProjectCashProjectionReport(
 
     let payCount = 0;
     for (const p of payables.filter((x) => x.currency === cur)) {
-      const balance = p.originalAmount.minus(p.paidAmount);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount));
       if (balance.lessThanOrEqualTo(0)) continue;
       const key = projectionBucketKey(p.dueDate, range.dateFrom, range.dateTo);
       if (!key) continue;

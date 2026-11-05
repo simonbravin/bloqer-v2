@@ -66,6 +66,11 @@ export async function registerCorporateTreasuryInflow(
     create: async () => {
       const movementId = randomUUID();
       await prisma.$transaction(async (tx) => {
+        await assertPeriodOpenUnderCompanyLock(tx, {
+          tenantId: ctx.tenantId,
+          companyId: ctx.companyId!,
+          date: input.movementDate,
+        });
         await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
         const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
         if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
@@ -81,12 +86,6 @@ export async function registerCorporateTreasuryInflow(
             "La cuenta de tesorería no pertenece a la empresa activa.",
           );
         }
-
-        await assertPeriodOpenUnderCompanyLock(tx, {
-          tenantId: ctx.tenantId,
-          companyId: ctx.companyId!,
-          date: input.movementDate,
-        });
 
         if (counterpartyContactId) {
           const contact = await tx.contact.findUnique({

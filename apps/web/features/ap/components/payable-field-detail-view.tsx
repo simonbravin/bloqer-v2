@@ -12,6 +12,7 @@ export type PayableFieldPaymentItem = {
   accountName: string;
   reference: string | null;
   href: string;
+  status: "CONFIRMED" | "CANCELLED";
 };
 
 export function PayableFieldDetailView({
@@ -24,6 +25,7 @@ export function PayableFieldDetailView({
   currency,
   originalAmount,
   paidAmount,
+  creditedAmount = "0",
   balanceDue,
   status,
   payments,
@@ -40,6 +42,7 @@ export function PayableFieldDetailView({
   currency: string;
   originalAmount: string;
   paidAmount: string;
+  creditedAmount?: string;
   balanceDue: string;
   status: string;
   payments: PayableFieldPaymentItem[];
@@ -101,6 +104,7 @@ export function PayableFieldDetailView({
             <span className="text-muted-foreground">Total pagado</span>
             <span className="tabular-nums">{formatMoneyAmount(paidAmount, currency)}</span>
           </div>
+          {Number(creditedAmount) > 0 ? <div className="flex justify-between gap-2"><span className="text-muted-foreground">Créditos NC (sin caja)</span><span className="tabular-nums">{formatMoneyAmount(creditedAmount, currency)}</span></div> : null}
           <div className="flex justify-between gap-2 font-semibold">
             <span>Saldo pendiente</span>
             <span className="tabular-nums" data-testid="payables-field-balance">
@@ -145,6 +149,7 @@ export function PayableFieldDetailView({
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{p.accountName}</p>
+                  <p className="mt-1 text-xs font-medium">{p.status === "CANCELLED" ? "Cancelado · sin efecto en el saldo" : "Confirmado"}</p>
                   {p.reference ? (
                     <p className="mt-1 text-xs text-muted-foreground">Ref. {p.reference}</p>
                   ) : null}

@@ -1,4 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
+import { computeObligationBalanceDue } from "../finance/obligation-balance";
 import { canViewProcurementProjectArea } from "../procurement/procurement-access";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
@@ -148,6 +149,7 @@ export async function getProjectSupplierReport(
           select: {
             originalAmount: true,
             paidAmount: true,
+            creditedAmount: true,
             dueDate: true,
             supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
           },
@@ -187,7 +189,7 @@ export async function getProjectSupplierReport(
       receiptDate: r.receiptDate,
     })),
     payables: payables.map((p) => {
-      const raw = p.originalAmount.minus(p.paidAmount);
+      const raw = computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount);
       const balance = hasOpenObligationBalance(raw) ? raw : new Prisma.Decimal(0);
       const overdue = isObligationOverdue(p.dueDate) && hasOpenObligationBalance(balance);
       return {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, evaluateInvoiceLetterTaxConsistency, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, classifySalesInvoice, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
@@ -25,6 +25,7 @@ import {
 } from "@/app/(app)/proyectos/[id]/facturas/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { cn } from "@/lib/utils";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 export type ClientOption = {
   id: string;
@@ -53,6 +54,7 @@ interface Props {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
 const INVOICE_CURRENCY = "ARS";
@@ -68,10 +70,11 @@ export function ManualInvoiceForm({
   variant = "card",
   onCancel,
   onSuccess,
+  onPendingChange,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError, onPendingChange });
   const [clientContactId, setClientContactId] = useState("");
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
   const [letterTouched, setLetterTouched] = useState(false);
@@ -152,7 +155,7 @@ export function ManualInvoiceForm({
       linkedEntityId: invoiceId,
       idempotencyKey: attachmentKey,
       revalidatePaths: [detailPath],
-    });
+    }).catch(() => ({ error: "Se perdió la conexión durante la subida" }));
   }
 
   function notifyAttachFailure(uploadError: string, collected: boolean) {
@@ -165,6 +168,7 @@ export function ManualInvoiceForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     if (!clientContactId) { setError("Debe seleccionar un cliente"); return; }
     if (showLetter && !invoiceLetter) {
       setError("Seleccioná la letra del comprobante (A, B, C o E)");
@@ -175,7 +179,8 @@ export function ManualInvoiceForm({
       return;
     }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    void run(async () => {
+      setError(null);
       if (collectNow && showCollectNow) {
         const issueDate = fd.get("issueDate") as string;
         const collectionDate = (fd.get("collectionDate") as string) || issueDate;
@@ -268,8 +273,9 @@ export function ManualInvoiceForm({
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-5 sm:p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
         {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -351,17 +357,17 @@ export function ManualInvoiceForm({
             </div>
             <div className="space-y-1">
               <Label htmlFor="quantity">Cantidad</Label>
-              <DecimalInput id="quantity" name="quantity" required value={quantity} onValueChange={setQuantity} placeholder="1,00" />
+              <DecimalInput id="quantity" name="quantity" precision={4} required value={quantity} onValueChange={setQuantity} placeholder="1,00" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="unitPrice">
                 {pricesIncludeTax ? "Precio unitario (c/IVA)" : "Precio unitario"}
               </Label>
-              <DecimalInput id="unitPrice" name="unitPrice" required value={unitPrice} onValueChange={setUnitPrice} placeholder="0,00" />
+              <DecimalInput id="unitPrice" name="unitPrice" precision={4} required value={unitPrice} onValueChange={setUnitPrice} placeholder="0,00" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="discountPct">Desc. %</Label>
-              <DecimalInput id="discountPct" name="discountPct" value={discountPct} onValueChange={setDiscountPct} placeholder="0" />
+              <DecimalInput id="discountPct" name="discountPct" precision={4} value={discountPct} onValueChange={setDiscountPct} placeholder="0" />
             </div>
             <div className="space-y-1">
               <TaxRateSelect
@@ -467,7 +473,8 @@ export function ManualInvoiceForm({
           <Button
             type="button"
             variant="outline"
-            onClick={onCancel ?? (() => router.back())}
+            disabled={isPending}
+            onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}
           >
             Cancelar
           </Button>
@@ -486,6 +493,7 @@ export function ManualInvoiceForm({
                 : "Crear factura"}
           </Button>
         </div>
+        </fieldset>
       </form>
     </div>
   );

@@ -76,7 +76,7 @@ export function ReceivableTable({
             </Suspense>
             {showInvoiceColumn ? <TableHead>Factura</TableHead> : null}
             <TableHead>Clase</TableHead>
-            <TableHead>Cobrada</TableHead>
+            <TableHead title="Saldo saldado por cobranzas o créditos; no confirma un ingreso de caja">Saldada</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="text-right">Original</TableHead>
             <TableHead className="text-right">Saldo</TableHead>

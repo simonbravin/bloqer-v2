@@ -1,7 +1,10 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { can, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
+import { registerArSaleSchema } from "@bloqer/validators";
 import type { RegisterArSaleInput } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
+import { arInvoiceParents, assertArInvoiceParents, assertArDateRange, parseArInput, assertArTransactionModules } from "./ar-integrity";
+import { assertContactRoleInTenant } from "../contact/assert-contact-role";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import {
@@ -101,6 +104,12 @@ function buildArSaleTraceChain(outcome: ArSaleOutcome): FinancialTraceLink[] {
 
 type ArSaleReplay = {
   outcome: ArSaleOutcome;
+  fxRate: Prisma.Decimal;
+  iibbPerceptionRate: Prisma.Decimal;
+  iibbPerceptionAmount: Prisma.Decimal;
+  subtotal: Prisma.Decimal;
+  notes: string | null;
+  internalNotes: string | null;
   status: string;
   clientContactId: string;
   projectId: string | null;
@@ -122,28 +131,41 @@ type ArSaleReplay = {
   }>;
   collections: Array<{
     id: string;
+    idempotencyKey: string | null;
     receivableId: string;
     accountId: string;
     collectionDate: Date;
     amount: Prisma.Decimal;
+    currency: string;
+    fxRate: Prisma.Decimal;
+    paymentMethod: string | null;
+    reference: string | null;
+    notes: string | null;
     status: string;
     createdAt: Date;
   }>;
 };
 
 async function loadArSaleReplay(
-  tenantId: string,
+  ctx: ServiceContext,
   idempotencyKey: string,
   collectNow?: {
     accountId: string;
     collectionDate: string;
     collectFullBalance?: boolean;
     amount?: string | null;
+    idempotencyKey?: string;
+    fxRate?: string;
+    paymentMethod?: string | null;
+    reference?: string | null;
+    notes?: string | null;
   },
 ): Promise<ArSaleReplay | null> {
+  const tenantId = ctx.tenantId;
   const invoice = await prisma.salesInvoice.findFirst({
     where: { tenantId, idempotencyKey },
     include: {
+      ...arInvoiceParents,
       lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
       receivable: { select: { id: true } },
       collections: {
@@ -151,10 +173,16 @@ async function loadArSaleReplay(
         orderBy: { createdAt: "asc" },
         select: {
           id: true,
+          idempotencyKey: true,
           receivableId: true,
           accountId: true,
           collectionDate: true,
           amount: true,
+          currency: true,
+          fxRate: true,
+          paymentMethod: true,
+          reference: true,
+          notes: true,
           status: true,
           createdAt: true,
         },
@@ -162,6 +190,7 @@ async function loadArSaleReplay(
     },
   });
   if (!invoice) return null;
+  assertArInvoiceParents(invoice, ctx);
 
   let collectionId: string | undefined;
   let movementId: string | undefined;
@@ -198,6 +227,12 @@ async function loadArSaleReplay(
       movementId,
       collectAccountId,
     },
+    fxRate: invoice.fxRate,
+    iibbPerceptionRate: invoice.iibbPerceptionRate,
+    iibbPerceptionAmount: invoice.iibbPerceptionAmount,
+    subtotal: invoice.subtotal,
+    notes: invoice.notes,
+    internalNotes: invoice.internalNotes,
     status: invoice.status,
     clientContactId: invoice.clientContactId,
     projectId: invoice.projectId,
@@ -221,6 +256,7 @@ async function notifyArSaleCreated(outcome: ArSaleOutcome, ctx: ServiceContext):
       status: true,
       originalAmount: true,
       paidAmount: true,
+      creditedAmount: true,
       currency: true,
     },
   });
@@ -228,7 +264,7 @@ async function notifyArSaleCreated(outcome: ArSaleOutcome, ctx: ServiceContext):
     receivable &&
     receivable.status !== "CANCELLED" &&
     receivable.status !== "PAID" &&
-    receivable.paidAmount.lt(receivable.originalAmount)
+    computeObligationBalanceDue(receivable.originalAmount, receivable.paidAmount, receivable.creditedAmount).gt(0)
   ) {
     await notifyReceivableReadyToCollect({
       ctx,
@@ -237,7 +273,7 @@ async function notifyArSaleCreated(outcome: ArSaleOutcome, ctx: ServiceContext):
       projectId: outcome.projectId,
       companyId: outcome.companyId,
       invoiceNumber: outcome.number,
-      amountLabel: `${serializeMoneyDecimal(receivable.originalAmount.minus(receivable.paidAmount))} ${receivable.currency}`,
+      amountLabel: `${serializeMoneyDecimal(computeObligationBalanceDue(receivable.originalAmount, receivable.paidAmount, receivable.creditedAmount))} ${receivable.currency}`,
     }).catch(() => undefined);
   }
 }
@@ -261,6 +297,9 @@ export async function registerArSale(
   input: RegisterArSaleInput,
   ctx: ServiceContext,
 ): Promise<RegisterTransactionResult> {
+  input = parseArInput(registerArSaleSchema, input);
+  assertArDateRange(input.issueDate, input.dueDate);
+  const inputFx = computeDocumentFxAmounts(input.currency, new Prisma.Decimal(0), input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined);
   await assertArTenantModule(ctx);
   if (!canEditArArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para registrar ventas");
@@ -338,15 +377,18 @@ export async function registerArSale(
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
   const replay = await withIdempotentCreate({
-    findExisting: () => loadArSaleReplay(ctx.tenantId, idempotencyKey, input.collectNow),
+    findExisting: () => loadArSaleReplay(ctx, idempotencyKey, input.collectNow),
     payloadsMatch: (existing) => registerArSaleReplayMatches(existing, input),
     create: async () => {
       let createdOutcome!: ArSaleOutcome;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
-        await lockProjectForOperationalMutation(tx, projectId, ctx);
+        const lockedProject = await lockProjectForOperationalMutation(tx, projectId, ctx);
+        if (lockedProject.companyId !== null && lockedProject.companyId !== companyId) throw new ServiceError("CONFLICT", "La empresa de la obra cambió. Recargá e intentá de nuevo.");
         await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
+        await assertArTransactionModules(tx, ctx, Boolean(input.collectNow));
+        await assertContactRoleInTenant(input.clientContactId, "CLIENT", ctx.tenantId, { tx });
         const maxNum = await tx.salesInvoice.aggregate({
           where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
           _max: { number: true },
@@ -364,6 +406,7 @@ export async function registerArSale(
             issueDate: new Date(input.issueDate),
             dueDate: new Date(input.dueDate),
             currency: input.currency ?? "ARS",
+            fxRate: inputFx.fxRate,
             invoiceLetter: input.invoiceLetter ?? null,
             iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT),
             notes: input.notes ?? null,
@@ -462,6 +505,7 @@ export async function registerArSale(
             );
           }
 
+          await assertPeriodOpenUnderCompanyLock(tx, { tenantId: ctx.tenantId, companyId: receivable.companyId, date: input.collectNow.collectionDate });
           await lockTreasuryAccountRow(tx, input.collectNow.accountId, ctx.tenantId);
           const account = await tx.treasuryAccount.findUnique({ where: { id: input.collectNow.accountId } });
           if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
@@ -484,14 +528,15 @@ export async function registerArSale(
             );
           }
 
-          const collectionCompanyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+          if (account.companyId !== null && account.companyId !== receivable.companyId) throw new ServiceError("FORBIDDEN", "La cuenta de tesorería pertenece a otra empresa que la cuenta por cobrar");
+          const collectionCompanyId = receivable.companyId;
           if (!collectionCompanyId) {
             throw new ServiceError(
               "VALIDATION",
               "La cobranza requiere una empresa activa en el contexto, la cuenta o la CxC",
             );
           }
-          const collectionFx = computeDocumentFxAmounts(receivable.currency, collectAmount);
+          const collectionFx = computeDocumentFxAmounts(receivable.currency, collectAmount, input.collectNow.fxRate ? new Prisma.Decimal(input.collectNow.fxRate) : undefined);
           await assertPeriodOpenUnderCompanyLock(tx, {
             tenantId: ctx.tenantId,
             companyId: collectionCompanyId,
@@ -623,7 +668,7 @@ export async function registerArSale(
 
       await notifyArSaleCreated(createdOutcome, ctx);
 
-      const row = await loadArSaleReplay(ctx.tenantId, idempotencyKey, input.collectNow);
+      const row = await loadArSaleReplay(ctx, idempotencyKey, input.collectNow);
       if (!row) {
         throw new ServiceError("CONFLICT", "No se pudo recargar la factura registrada");
       }

@@ -19,12 +19,23 @@ EDT y costos y Varianza ($) de Mano de obra/Equipos usan la moneda original del 
 
 Ejemplo: USD 1 = ARS 1200 → `fx_rate = 1200`.
 
-## Cobranza/pago en moneda distinta a factura
-- Documentar ambos montos.
-- `amount_ars` por lado (cobranza y factura) puede diferir → pendiente contable puente en Fase 2.
+## Moneda de factura, deuda y cobro/pago
+
+El flujo AR/AP actual exige la **misma moneda** para la deuda y la cuenta de caja compatible con su empresa. En moneda extranjera se ingresa FX manual del comprobante y de cada cobro/pago; no se reutiliza implícitamente FX 1 ni el tipo de cambio de la factura. Los snapshots pueden diferir entre hechos económicos ([D-008]); no se calcula automáticamente una diferencia de cambio.
+
+Cobrar/pagar una deuda mediante una cuenta de otra moneda no está habilitado. La representación de ambos montos y eventual cuenta puente es un diseño futuro, no un procedimiento operativo actual.
 
 ## Transferencias entre cuentas de distinta moneda
-- Generar **dos movimientos** con FX explícito en cada pierna o un movimiento “FX adjustment” documentado ([`INTERNAL_TRANSFERS.md`](../02-modules/INTERNAL_TRANSFERS.md)).
+
+El flujo actual de transferencias propias admite cuentas de la misma moneda. Un eventual circuito entre monedas debe definir ambos montos y FX explícito; no se simula con un “FX adjustment” ni se presenta como disponible. La revisión integral de tesorería corresponde a AG-10 ([`INTERNAL_TRANSFERS.md`](../02-modules/INTERNAL_TRANSFERS.md)).
+
+## Lecturas por moneda
+
+Aging AR/AP, sus resúmenes y herramientas AI separan totales por moneda; el campo de total único no representa una suma de monedas diferentes. Esto no convierte un snapshot de deuda en un consolidado ARS ni modifica D-008.
+
+## Hallazgo — AG-09: regla FX y representación física pendientes
+
+Las frases anteriores de cobro/pago o transferencia entre monedas describían un circuito no implementado. Se aclara la limitación vigente, sin habilitar conversiones. La exigencia D-008 de snapshots se conserva; `AccountMovement` e `InternalTransfer` todavía no tienen columnas de snapshot FX. Esa brecha física se registra en [P-AG10-01](../08-architecture/PENDING_ARCHITECTURE_ITEMS.md) para diseño y aprobación específicos, sin migrar históricos ni declarar completada AG-10.
 
 ## Validaciones
 - `fx_rate > 0`.

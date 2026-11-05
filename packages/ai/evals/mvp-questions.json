@@ -1,5 +1,44 @@
 [
   {
+    "id": "help-nonnegative-invoice-tax-ag09",
+    "category": "help",
+    "question": "¿Puedo cargar IVA o percepción IIBB negativos en una factura o nota para descontar una retención?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["no negativos", "negativos", "cero", "retención"],
+    "notes": "D133: rechazar impuestos/percepción/override negativos, permitir cero, sin máximo nuevo ni cambios históricos. Las retenciones no se simulan reduciendo el IVA y NC/ND conservan su signo por tipo."
+  },
+  {
+    "id": "help-settled-credit-not-cash-ag09",
+    "category": "help",
+    "question": "La CxP figura Saldada, pero apliqué una nota de crédito. ¿Eso significa que pagué todo con plata?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["crédito", "credito", "caja", "pagos"],
+    "notes": "D115: saldo = original − pagado − crédito; Saldada puede incluir NC sin caja. No confundir creditedAmount con paidAmount."
+  },
+  {
+    "id": "help-payment-fx-ag09",
+    "category": "help",
+    "question": "Tengo una cuenta por pagar en USD. ¿Qué tipo de cambio uso al registrar el pago?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["manual", "ARS por 1", "misma moneda", "tipo de cambio"],
+    "notes": "D008: FX manual del pago, hasta 6 decimales, snapshot propio; cuenta/deuda de la misma moneda compatible. No usar FX 1 ni inventar conversión entre cuentas."
+  },
+  {
+    "id": "help-corporate-collection-cancel-ag09",
+    "category": "help",
+    "question": "¿Dónde anulo una cobranza confirmada de una CxC de empresa y tengo que indicar motivo?",
+    "expectTools": ["search_bloqer_knowledge"],
+    "expectContainsAny": ["historial", "motivo", "Cancelar cobranza"],
+    "notes": "CxC corporativa, historial del detalle: requiere motivo, permisos y módulo Tesorería; conserva el cobro anulado. No borrar el movimiento ni registrar un egreso nuevo."
+  },
+  {
+    "id": "single-payables-currencies-ag09",
+    "category": "single_tool",
+    "question": "Mostrame mis cuentas por pagar separadas por moneda; no sumes las de ARS con las de USD.",
+    "expectTools": ["get_payables"],
+    "notes": "Usar byCurrency. Si totals es null por varias monedas, no inventar un total único ni FX; sin datos informar la ausencia sin crear saldos."
+  },
+  {
     "id": "help-po-payment-perception-ag06",
     "category": "help",
     "question": "Pagué el neto y el IVA, pero falta la percepción de la factura. ¿La OC puede figurar sin saldo?",

@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   canRegisterApPayment,
+  getTenantModuleGate,
   getCompanyPayableById,
   listSelectableTreasuryAccounts,
   ServiceError,
@@ -41,6 +42,7 @@ export default async function FinanzasPagarPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  if (!(await getTenantModuleGate(ctx)).isEnabled("TREASURY")) redirect(detailHref);
   let payable;
   let allAccounts;
   try {

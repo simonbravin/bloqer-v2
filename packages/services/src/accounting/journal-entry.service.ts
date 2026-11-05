@@ -33,6 +33,36 @@ export function isSourcedJournalEntry(entry: {
   return entry.sourceType !== "MANUAL" && entry.sourceId != null;
 }
 
+const AR_AP_JOURNAL_SOURCES = new Set<JournalEntrySourceType>([
+  "PAYMENT", "COLLECTION", "SALES_INVOICE", "SALES_CREDIT_NOTE", "SALES_DEBIT_NOTE",
+  "SUPPLIER_INVOICE", "SUPPLIER_CREDIT_NOTE", "SUPPLIER_DEBIT_NOTE",
+]);
+
+/** D-061/D-063: an operational cancellation cannot leave a new/postable AR/AP journal. */
+export async function assertArApJournalSourceCurrent(
+  tx: Prisma.TransactionClient,
+  entry: Pick<JournalEntry, "tenantId" | "companyId" | "sourceType" | "sourceId">,
+): Promise<void> {
+  if (!entry.sourceId || !AR_AP_JOURNAL_SOURCES.has(entry.sourceType)) return;
+  const where = { id: entry.sourceId, tenantId: entry.tenantId, companyId: entry.companyId };
+  let allowed = false;
+  if (entry.sourceType === "PAYMENT") {
+    const source = await tx.payment.findFirst({ where, select: { status: true } });
+    allowed = source?.status === "CONFIRMED";
+  } else if (entry.sourceType === "COLLECTION") {
+    const source = await tx.collection.findFirst({ where, select: { status: true } });
+    allowed = source?.status === "CONFIRMED";
+  } else {
+    const expectedKind = entry.sourceType.endsWith("CREDIT_NOTE") ? "CREDIT_NOTE"
+      : entry.sourceType.endsWith("DEBIT_NOTE") ? "DEBIT_NOTE" : "INVOICE";
+    const source = entry.sourceType.startsWith("SUPPLIER_")
+      ? await tx.supplierInvoice.findFirst({ where, select: { status: true, documentKind: true } })
+      : await tx.salesInvoice.findFirst({ where, select: { status: true, documentKind: true } });
+    allowed = source?.status === "ISSUED" && source.documentKind === expectedKind;
+  }
+  if (!allowed) throw new ServiceError("CONFLICT", "El origen operativo ya no permite crear o contabilizar este asiento. Revisá su estado.");
+}
+
 /**
  * Sourced DRAFT lines: structure + money/currency immutable; accounts/descriptions may change [D-063].
  * Pure helper for unit tests + `updateJournalEntry`.
@@ -205,8 +235,9 @@ async function loadJournalEntryView(
   id: string,
   tenantId: string,
   companyId: string,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ): Promise<JournalEntryView> {
-  const entry = await prisma.journalEntry.findFirst({
+  const entry = await db.journalEntry.findFirst({
     where: { id, tenantId, companyId },
     include: {
       lines: { include: { account: true }, orderBy: { id: "asc" } },
@@ -522,6 +553,10 @@ async function persistJournalEntryCreate(
 
   try {
     const { entry: created, wasExisting } = await prisma.$transaction(async (tx) => {
+      if (sourceId && AR_AP_JOURNAL_SOURCES.has(sourceType)) {
+        await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+        await assertArApJournalSourceCurrent(tx, { tenantId: ctx.tenantId, companyId, sourceType, sourceId });
+      }
       if (sourceId) {
         const existing = await tx.journalEntry.findFirst({
           where: {
@@ -568,7 +603,7 @@ async function persistJournalEntryCreate(
         include: { lines: { include: { account: true }, orderBy: { id: "asc" } } },
       });
       return { entry: row, wasExisting: false };
-    });
+    }, sourceId && AR_AP_JOURNAL_SOURCES.has(sourceType) ? { maxWait: 10_000, timeout: 30_000 } : undefined);
 
     if (!wasExisting) {
       await log({
@@ -801,17 +836,22 @@ export async function postJournalEntry(id: string, ctx: ServiceContext): Promise
   // Serialize vs period close: company row FOR UPDATE + re-check period inside the same txn.
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT id FROM companies WHERE id = ${existing.companyId} FOR UPDATE`;
+    const fresh = await tx.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId, companyId: existing.companyId }, include: { lines: true } });
+    if (!fresh || fresh.status !== "DRAFT") throw new ServiceError("CONFLICT", "El asiento ya no está en borrador. Recargá e intentá de nuevo.");
+    assertBalancedJournalEntry(fresh.lines.map(line => ({ accountId: line.accountId, projectId: line.projectId,
+      description: line.description, debit: line.debit, credit: line.credit, currency: line.currency })));
+    await assertArApJournalSourceCurrent(tx, fresh);
     await assertFinancialPeriodOpen(
       {
         tenantId: ctx.tenantId,
         companyId: existing.companyId,
-        date: existing.entryDate,
+        date: fresh.entryDate,
       },
       tx,
     );
 
     const flipped = await tx.journalEntry.updateMany({
-      where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
+      where: { id, tenantId: ctx.tenantId, companyId: existing.companyId, status: "DRAFT", updatedAt: fresh.updatedAt },
       data: {
         status:          "POSTED",
         postedAt:        new Date(),
@@ -835,7 +875,7 @@ export async function postJournalEntry(id: string, ctx: ServiceContext): Promise
       },
       tx,
     );
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return loadJournalEntryView(id, ctx.tenantId, existing.companyId);
 }
@@ -844,7 +884,7 @@ async function cancelDraftJournalEntryCore(
   id: string,
   ctx: ServiceContext,
   existing: JournalEntry,
-  opts?: { skipPeriodLock?: boolean },
+  opts?: { skipPeriodLock?: boolean; tx?: Prisma.TransactionClient },
 ): Promise<JournalEntryView> {
   if (existing.status !== "DRAFT") {
     throw new ServiceError("CONFLICT", "Solo se pueden anular borradores");
@@ -852,7 +892,7 @@ async function cancelDraftJournalEntryCore(
 
   // Operational cancel-sync [D-061] must still clear DRAFT after cash/doc cancel even if
   // the period was closed in the gap (cleanup must not leave a postable orphan).
-  await prisma.$transaction(async (tx) => {
+  const cancel = async (tx: Prisma.TransactionClient) => {
     if (!opts?.skipPeriodLock) {
       await assertPeriodOpenUnderCompanyLock(tx, {
         tenantId: ctx.tenantId,
@@ -886,9 +926,11 @@ async function cancelDraftJournalEntryCore(
       },
       tx,
     );
-  });
+  };
+  if (opts?.tx) await cancel(opts.tx);
+  else await prisma.$transaction(cancel);
 
-  return loadJournalEntryView(id, ctx.tenantId, existing.companyId);
+  return loadJournalEntryView(id, ctx.tenantId, existing.companyId, opts?.tx);
 }
 
 export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promise<JournalEntryView> {
@@ -906,9 +948,9 @@ export async function cancelJournalEntry(id: string, ctx: ServiceContext): Promi
 export async function cancelJournalEntryAsAutomation(
   id: string,
   ctx: ServiceContext,
-  opts?: { skipPeriodLock?: boolean },
+  opts?: { skipPeriodLock?: boolean; tx?: Prisma.TransactionClient },
 ): Promise<JournalEntryView> {
-  const existing = await prisma.journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
+  const existing = await (opts?.tx ?? prisma).journalEntry.findFirst({ where: { id, tenantId: ctx.tenantId } });
   if (!existing) throw new ServiceError("NOT_FOUND", "Asiento no encontrado");
   return cancelDraftJournalEntryCore(id, ctx, existing, opts);
 }

@@ -42,11 +42,28 @@ describe("payment and collection access boundaries", { concurrency: false }, () 
       id: "project", tenantId, companyId, status: "ACTIVE", country: "AR",
     }));
     stub(prisma.projectMembership, "findUnique", async () => membership);
-    const document = () => ({
-      id: "document", tenantId, companyId, projectId, status,
+    const document = () => {
+      const base = { tenantId, companyId, projectId, currency: "ARS",
+        supplierContactId: "supplier", clientContactId: "client",
+        company: { id: companyId, tenantId },
+        project: projectId ? { id: projectId, tenantId, companyId, code: "P", name: "Project" } : null,
+        supplierContact: { id: "supplier", tenantId, legalName: "Supplier", fantasyName: null },
+        clientContact: { id: "client", tenantId, legalName: "Client", fantasyName: null },
+      };
+      const invoice = { ...base, id: "invoice", documentKind: "INVOICE", status: "ISSUED", number: 1,
+        certificationId: null, certification: null, totalAmount: new Prisma.Decimal(10),
+      };
+      const obligation = { ...base, id: "obligation", supplierInvoiceId: invoice.id, salesInvoiceId: invoice.id,
+        supplierInvoice: invoice, salesInvoice: invoice, status: "OPEN", originalAmount: new Prisma.Decimal(10),
+        paidAmount: new Prisma.Decimal(0), creditedAmount: new Prisma.Decimal(0),
+      };
+      return { ...base, id: "document", status, payableId: obligation.id, receivableId: obligation.id,
+      supplierInvoiceId: invoice.id, salesInvoiceId: invoice.id, supplierInvoice: invoice, salesInvoice: invoice,
+      payable: obligation, receivable: obligation, accountId: "account", fxRate: new Prisma.Decimal(1), amountArs: new Prisma.Decimal(10),
       paymentDate: new Date("2026-10-08"), collectionDate: new Date("2026-10-08"),
-      amount: new Prisma.Decimal("10"), account: { name: "Bank" },
-    });
+      amount: new Prisma.Decimal("10"), account: { id: "account", tenantId, companyId: null, currency: "ARS", name: "Bank" },
+      };
+    };
     stub(prisma.payment, "findUnique", async () => document());
     stub(prisma.collection, "findUnique", async () => document());
     stub(prisma.payable, "findUnique", async () => document());
@@ -79,16 +96,16 @@ describe("payment and collection access boundaries", { concurrency: false }, () 
     });
     it(`${name}: a member reaches the existing financial safeguards`, async () => {
       membership = { id: "membership" };
-      await assert.rejects(() => cancel("document", ctx, "project"), error => error === financialGuard);
+      await assert.rejects(() => cancel("document", ctx, "project", "Synthetic correction"), error => error === financialGuard);
       assert.equal(financialChecks, 1);
     });
     it(`${name}: preserves tenant-wide administrator access`, async () => {
-      await assert.rejects(() => cancel("document", { ...ctx, roles: ["ADMIN"] }), error => error === financialGuard);
+      await assert.rejects(() => cancel("document", { ...ctx, roles: ["ADMIN"] }, undefined, "Synthetic correction"), error => error === financialGuard);
       assert.equal(financialChecks, 1);
     });
     it(`${name}: preserves corporate finance access without project membership`, async () => {
       projectId = null;
-      await assert.rejects(() => cancel("document", ctx), error => error === financialGuard);
+      await assert.rejects(() => cancel("document", ctx, undefined, "Synthetic correction"), error => error === financialGuard);
       assert.equal(financialChecks, 1);
     });
   }

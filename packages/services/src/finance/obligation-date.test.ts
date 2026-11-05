@@ -160,6 +160,15 @@ describe("obligationDaysOverdue", () => {
 });
 
 describe("parseObligationAsOfDate", () => {
+  it("derives PARTIAL for an obligation partly settled with a credit note and no cash", () => {
+    assert.equal(deriveObligationDisplayStatus("OPEN", new Prisma.Decimal("70"), new Date("2026-12-01"), new Date("2026-11-05"), new Prisma.Decimal("0"), new Prisma.Decimal("30")), "PARTIAL");
+  });
+  it("rejects impossible, malformed and empty cut-off dates instead of rolling them over", () => {
+    for (const value of ["2026-02-30", "2025-02-29", "2026-13-01", "2026-11-05T00:00:00Z", "", "no-date"]) {
+      assert.throws(() => parseObligationAsOfDate(value), { code: "VALIDATION" });
+    }
+    assert.equal(parseObligationAsOfDate("2024-02-29").toISOString(), "2024-02-29T00:00:00.000Z");
+  });
   it("parses explicit as-of as UTC midnight", () => {
     assert.equal(parseObligationAsOfDate("2026-07-22").toISOString(), "2026-07-22T00:00:00.000Z");
   });

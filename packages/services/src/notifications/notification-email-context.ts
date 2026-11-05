@@ -1,6 +1,7 @@
 import type { LinkedEntityType, NotificationType, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
 import { formatDbDate } from "@bloqer/utils";
+import { computeObligationBalanceDue, normalizeObligationBalanceDue } from "../finance/obligation-balance";
 import type { EmailContextField } from "@bloqer/email";
 import { serializeMoneyDecimal, serializeQtyDecimal } from "../finance/money-decimal";
 import { resolveUserDisplayNames, userDisplayNameFromMap } from "../user/resolve-user-display-names";
@@ -448,7 +449,7 @@ async function appendSalesInvoiceFields(
       issueDate: true,
       createdBy: true,
       clientContact: { select: { legalName: true, fantasyName: true } },
-      receivable: { select: { originalAmount: true, paidAmount: true, dueDate: true } },
+      receivable: { select: { originalAmount: true, paidAmount: true, creditedAmount: true, dueDate: true } },
     },
   });
   if (!inv) return;
@@ -457,7 +458,7 @@ async function appendSalesInvoiceFields(
   pushField(fields, "Cliente", contactLabel(inv.clientContact));
   pushField(fields, "Total", moneyLabel(inv.totalAmount, inv.currency));
   if (inv.receivable) {
-    const balance = inv.receivable.originalAmount.minus(inv.receivable.paidAmount);
+    const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(inv.receivable.originalAmount, inv.receivable.paidAmount, inv.receivable.creditedAmount));
     pushField(fields, "Saldo", moneyLabel(balance, inv.currency));
     pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.receivable.dueDate));
   } else {
@@ -485,7 +486,7 @@ async function appendSupplierInvoiceFields(
       createdBy: true,
       purchaseOrder: { select: { number: true } },
       supplierContact: { select: { legalName: true, fantasyName: true } },
-      payable: { select: { originalAmount: true, paidAmount: true, dueDate: true } },
+      payable: { select: { originalAmount: true, paidAmount: true, creditedAmount: true, dueDate: true } },
     },
   });
   if (!inv) return;
@@ -497,7 +498,7 @@ async function appendSupplierInvoiceFields(
   }
   pushField(fields, "Total", moneyLabel(inv.totalAmount, inv.currency));
   if (inv.payable) {
-    const balance = inv.payable.originalAmount.minus(inv.payable.paidAmount);
+    const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(inv.payable.originalAmount, inv.payable.paidAmount, inv.payable.creditedAmount));
     pushField(fields, "Saldo", moneyLabel(balance, inv.currency));
     pushField(fields, "Vencimiento", formatEmailCalendarDate(inv.payable.dueDate));
   } else {

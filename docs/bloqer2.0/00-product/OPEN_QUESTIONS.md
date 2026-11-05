@@ -710,6 +710,14 @@
 - **Propuesta:** [desarrollo separado con diseño previo, conservando y corrigiendo el flujo actual](../08-architecture/platform-audit/2026-11-05-ag-08-negative-certification-scope-proposal.md). Alternativa: diseñar/implementar esa funcionalidad completa antes de cerrar AG-08.
 - **Continuación:** aplicar y verificar el contrato no negativo vigente. Cualquier rectificación requiere diseño previo separado; no se promete una función de certificación negativa. Sin autorizaciones, signos o cambios históricos inferidos.
 
+### Q-080 — Signo de IVA y percepción en facturas AR/AP
+
+- **Fecha:** 05/11/2026.
+- **Estado:** RESUELTA → D-133, aprobación explícita del Owner de la propuesta recomendada: rechazar negativos sin alterar históricos.
+- **Hallazgo:** los schemas aceptan alícuotas negativas y pueden reducir el total de factura sin NC ni retención explícita. BR-TAX-002/003 separan los conceptos, pero falta expresar el signo permitido de los campos de factura.
+- **Propuesta aprobada:** [IVA/percepción no negativos, cero permitido, sin máximos nuevos ni cambios históricos](../08-architecture/platform-audit/2026-11-05-ag-09-nonnegative-invoice-tax-proposal.md). Incluye altas/ediciones/emisión de borradores AR/AP y NC/ND.
+- **Continuación:** implementar D-133 en schemas y service layer, verificar llamadas directas y emisión de borradores persistidos, y actualizar guía/ayuda/AI en AG-09. La aprobación de la regla no sustituye la evidencia de implementación.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

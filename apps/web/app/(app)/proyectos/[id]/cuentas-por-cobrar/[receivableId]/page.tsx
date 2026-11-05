@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import {
   canMutateArForScope,
+  getTenantModuleGate,
   getProjectShellInfo,
   getReceivableById,
   getSalesInvoiceById,
@@ -17,7 +18,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { cancelReceivableAction } from "../../facturas/actions";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -78,10 +79,10 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
 
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 
-  const returnPath = `/proyectos/${id}/cuentas-por-cobrar/${receivableId}`;
-  const canCollectDesktop = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const treasuryEnabled = (await getTenantModuleGate(ctx)).isEnabled("TREASURY");
+  const canCollectDesktop = treasuryEnabled && canEditAr && OPEN_STATUSES.has(receivable.status);
   const canCollectField =
-    canMutateArForScope(ctx.roles, receivable.projectId) && OPEN_STATUSES.has(receivable.status);
+    treasuryEnabled && canMutateArForScope(ctx.roles, receivable.projectId) && OPEN_STATUSES.has(receivable.status);
   const canCancel =
     canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
 
@@ -98,6 +99,7 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
           currency={receivable.currency}
           originalAmount={receivable.originalAmount}
           paidAmount={receivable.paidAmount}
+          creditedAmount={receivable.creditedAmount}
           balanceDue={receivable.balanceDue}
           status={receivable.status}
           collections={collections.map((c) => ({
@@ -107,6 +109,7 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
             currency: c.currency,
             accountName: c.accountName,
             reference: c.reference ?? null,
+            status: c.status,
             href: `/proyectos/${id}/cobranzas/${c.id}`,
           }))}
           canCollect={canCollectField}
@@ -157,18 +160,9 @@ export default async function ReceivableDetailPage({ params, searchParams }: Pag
             </Button>
           )}
           {canCancel && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await cancelReceivableAction(receivableId, id);
-                if ("error" in result) redirectWithActionError(returnPath, result.error);
-                redirect(returnPath);
-              }}
-            >
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Cancelar
-              </Button>
-            </form>
+            <ReasonActionButton label="Cancelar CxC" title="Cancelar cuenta por cobrar" confirmLabel="Cancelar CxC"
+              description="Se cancela la obligación cuando sus documentos y los controles financieros lo permiten."
+              action={cancelReceivableAction.bind(null, receivableId, id)} />
           )}
         </div>
       </div>

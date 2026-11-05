@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { parsePage } from "@/lib/parse-page";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { Pagination } from "@/components/ui/pagination";
@@ -23,6 +24,7 @@ import {
   listProjects,
   listTreasuryAccounts,
   parseMovementReportFilters,
+  resolvePagination,
   ServiceError,
   type MovementReportRow,
 } from "@bloqer/services";
@@ -111,7 +113,7 @@ export default async function FinanzasTransaccionesPage({ searchParams }: PagePr
   if (!current?.tenantCtx) redirect("/login");
 
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const { page } = resolvePagination({ page: parsePage(sp.page), pageSize: DEFAULT_PAGE_SIZE });
 
   const ctx = {
     actorUserId: current.session.user.id!,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,8 @@ export function NewCompanySupplierInvoiceDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const pendingRef = useRef(false);
+  function onPendingChange(pending: boolean) { pendingRef.current = pending; }
 
   useEffect(() => {
     if (defaultOpen) setOpen(true);
@@ -45,6 +47,7 @@ export function NewCompanySupplierInvoiceDialog({
   }
 
   function closeDialog() {
+    if (pendingRef.current) return;
     setOpen(false);
     clearCreateQueryParam();
   }
@@ -58,6 +61,7 @@ export function NewCompanySupplierInvoiceDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && pendingRef.current) return;
         setOpen(next);
         if (!next) clearCreateQueryParam();
       }}
@@ -80,6 +84,7 @@ export function NewCompanySupplierInvoiceDialog({
             variant="plain"
             onCancel={closeDialog}
             onSuccess={handleSuccess}
+            onPendingChange={onPendingChange}
           />
         ) : null}
       </DialogContent>

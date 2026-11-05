@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { parsePage } from "@/lib/parse-page";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -16,11 +17,13 @@ import { AgingSummaryCards, AgingFilters, AgingTable } from "@/features/aging";
 import { ReportExportActions } from "@/features/reports";
 import { ReportEmailSendDialog } from "@/features/reports/report-email-send-dialog";
 import { getCurrentUser } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
 import {
   getReceivableAgingReport,
   listCompanyReceivables,
   listReceivablesFieldBoard,
   parseAgingFilters,
+  resolvePagination,
   ServiceError,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
@@ -54,7 +57,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
   if (!current?.tenantCtx) redirect("/login");
 
   const sp = await searchParams;
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const { page } = resolvePagination({ page: parsePage(sp.page), pageSize: PAGE_SIZE });
   const showAllStates = sp.status === "ALL";
   const status =
     sp.status && !showAllStates && (STATUSES as readonly string[]).includes(sp.status)
@@ -151,7 +154,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
   const statusLabel: Record<string, string> = {
     OPEN: "Abiertas",
     PARTIAL: "Parcial",
-    PAID: "Cobradas",
+    PAID: "Saldadas",
     OVERDUE: "Vencidas",
     CANCELLED: "Canceladas",
   };
@@ -162,7 +165,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
-          <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
+          <p className="text-xs text-muted-foreground">Al {formatDate(agingReport.asOfDate)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ReportExportActions exportPath="/api/reports/finanzas/ar-aging.csv" params={sp} pdf />

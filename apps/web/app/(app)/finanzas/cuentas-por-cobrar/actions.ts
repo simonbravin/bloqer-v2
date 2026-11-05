@@ -3,6 +3,8 @@
 import {
   assertCompanyReceivableMutable,
   createCollection,
+  getCollectionById,
+  cancelCollection,
   cancelReceivable,
   ServiceError,
 } from "@bloqer/services";
@@ -10,6 +12,7 @@ import { createCollectionSchema, type CreateCollectionInput } from "@bloqer/vali
 import { getCurrentUser } from "@/lib/auth";
 import {
   revalidateProjectCostAndFinancePaths,
+  revalidateOperationalFinancePaths,
   revalidateTreasuryPaths,
 } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
@@ -42,6 +45,7 @@ export async function createCompanyCollectionAction(
   try {
     await assertCompanyReceivableMutable(parsed.data.receivableId, ctx);
     const collection = await createCollection(parsed.data, ctx);
+    revalidateOperationalFinancePaths(collection.projectId);
     revalidatePath(FIN_AR);
     revalidatePath(`${FIN_AR}/${data.receivableId}`);
     revalidatePath("/finanzas/transacciones");
@@ -55,16 +59,38 @@ export async function createCompanyCollectionAction(
 
 export async function cancelCompanyReceivableAction(
   receivableId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
     await assertCompanyReceivableMutable(receivableId, ctx);
-    const receivable = await cancelReceivable(receivableId, ctx);
+    const receivable = await cancelReceivable(receivableId, ctx, undefined, reason);
+    revalidateOperationalFinancePaths(receivable.projectId);
     revalidatePath(FIN_AR);
     revalidatePath(`${FIN_AR}/${receivableId}`);
     revalidatePath("/finanzas/transacciones");
     revalidateTreasuryPaths();
     if (receivable.projectId) revalidateProjectCostAndFinancePaths(receivable.projectId);
+    return { ok: true };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
+export async function cancelCompanyCollectionAction(
+  receivableId: string,
+  collectionId: string,
+  reason: string,
+): Promise<{ ok: true } | { error: string }> {
+  const ctx = await getCtx();
+  try {
+    await assertCompanyReceivableMutable(receivableId, ctx);
+    const collection = await getCollectionById(collectionId, ctx);
+    if (collection.receivableId !== receivableId || collection.projectId !== null) {
+      return { error: "La cobranza no pertenece a esta cuenta por cobrar de empresa" };
+    }
+    await cancelCollection(collectionId, ctx, undefined, reason);
+    revalidateOperationalFinancePaths();
     return { ok: true };
   } catch (err) {
     return handle(err);

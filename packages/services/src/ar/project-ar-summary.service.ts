@@ -21,7 +21,7 @@ export async function summarizeProjectBillingVsCollections(
   }
   await requireProjectAccess(projectId, ctx);
 
-  const baseWhere = { projectId, tenantId: ctx.tenantId };
+  const baseWhere = { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
 
   const [invoicedGroups, collectedGroups] = await Promise.all([
     prisma.salesInvoice.groupBy({

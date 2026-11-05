@@ -62,6 +62,17 @@ export async function registerManualTreasuryAdjustment(
     create: async () => {
       const movementId = randomUUID();
       await prisma.$transaction(async (tx) => {
+        // Match composite invoice settlements: company before account, then re-read the account.
+        const preview = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
+        if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
+        assertResourceTenant(preview.tenantId, ctx.tenantId);
+        const lockedCompanyId = ctx.companyId ?? preview.companyId ?? null;
+        if (!lockedCompanyId) throw new ServiceError("VALIDATION", "El ajuste requiere una empresa activa en el contexto o en la cuenta");
+        await assertPeriodOpenUnderCompanyLock(tx, {
+          tenantId: ctx.tenantId,
+          companyId: lockedCompanyId,
+          date: input.movementDate,
+        });
         await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
         const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
         if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
@@ -83,11 +94,7 @@ export async function registerManualTreasuryAdjustment(
             "El ajuste requiere una empresa activa en el contexto o en la cuenta",
           );
         }
-        await assertPeriodOpenUnderCompanyLock(tx, {
-          tenantId: ctx.tenantId,
-          companyId,
-          date: input.movementDate,
-        });
+        if (companyId !== lockedCompanyId) throw new ServiceError("CONFLICT", "La empresa de la cuenta cambió. Recargá e intentá de nuevo.");
 
         if (movementType === "OUTFLOW") {
           const balance = await getAccountBalance(account.id, tx);

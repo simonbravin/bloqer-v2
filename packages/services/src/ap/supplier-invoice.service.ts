@@ -1,9 +1,12 @@
 import { Prisma, prisma, SupplierInvoice, type CostCategory } from "@bloqer/database";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
-import type { CreateSupplierInvoiceInput, UpdateSupplierInvoiceInput } from "@bloqer/validators";
+import { createSupplierInvoiceSchema, updateSupplierInvoiceSchema, type CreateSupplierInvoiceInput, type UpdateSupplierInvoiceInput } from "@bloqer/validators";
+import { parseApInput, requireApCancellationReason } from "./ap-input";
+import { apInvoiceParents, apInvoiceLineParents, assertApInvoiceLineParents, assertApReadRoot, assertApInvoiceParents, assertApPayeeInTransaction, assertApPayableMatchesInvoice, assertApTransactionModules, stripApParents } from "./ap-integrity";
 import { auditAp } from "./ap-audit";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { assertNonnegativeInvoiceTaxes } from "../finance/invoice-tax-guards";
 import { resolveSuggestedApInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
@@ -25,7 +28,7 @@ import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
+import { serializeFxRateDecimal, serializeMoneyDecimal, serializeQtyDecimal, serializeRatePctDecimal, serializeUnitPriceDecimal } from "../finance/money-decimal";
 import { getCompanyProcurementSettingsForProject } from "../procurement/company-procurement-settings.service";
 import { assertProjectApDirectSpendAllowed } from "../procurement/procurement-policy.service";
 import { assertCostAnalysisLineForWbs, assertWbsLineForProject, assertPurchaseOrderRelations, procurementOrderParentScopeInclude } from "../procurement/procurement-wbs";
@@ -212,8 +215,10 @@ export type SupplierInvoiceLineView = {
 
 export type SupplierInvoiceView = Omit<
   SupplierInvoice,
-  "subtotal" | "taxAmount" | "totalAmount" | "iibbPerceptionRate" | "iibbPerceptionAmount"
+  "subtotal" | "taxAmount" | "totalAmount" | "iibbPerceptionRate" | "iibbPerceptionAmount" | "fxRate" | "amountArs"
 > & {
+  fxRate: string;
+  amountArs: string;
   subtotal: string;
   taxAmount: string;
   iibbPerceptionRate: string;
@@ -239,6 +244,7 @@ export async function assertSupplierInvoiceLinesWbs(
   projectId: string | null,
   lines: Array<{ wbsNodeId?: string | null }>,
   tenantId: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<void> {
   if (!projectId) {
     for (const line of lines) {
@@ -258,7 +264,7 @@ export async function assertSupplierInvoiceLinesWbs(
         "Cada línea de factura de proyecto debe imputar a una partida EDT",
       );
     }
-    await assertWbsLineForProject(line.wbsNodeId, projectId, tenantId);
+    await assertWbsLineForProject(line.wbsNodeId, projectId, tenantId, { db });
   }
 }
 
@@ -270,6 +276,7 @@ export async function assertSupplierInvoiceLinesApu(
   projectId: string | null,
   lines: Array<{ costAnalysisLineId?: string | null; wbsNodeId?: string | null }>,
   tenantId: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<void> {
   for (const line of lines) {
     if (!line.costAnalysisLineId) continue;
@@ -285,7 +292,7 @@ export async function assertSupplierInvoiceLinesApu(
         "El insumo APU requiere una partida EDT en la misma línea",
       );
     }
-    await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, tenantId);
+    await assertCostAnalysisLineForWbs(line.costAnalysisLineId, line.wbsNodeId, tenantId, { db });
   }
 }
 
@@ -314,6 +321,7 @@ export async function assertSupplierInvoiceLinesPoLink(
   purchaseOrderId: string | null | undefined,
   lines: Array<{ purchaseOrderLineId?: string | null; wbsNodeId?: string | null }>,
   tenantId: string,
+  db: Prisma.TransactionClient = prisma,
 ): Promise<void> {
   const hasPoLineRef = lines.some((l) => l.purchaseOrderLineId);
   if (!hasPoLineRef) return;
@@ -331,7 +339,7 @@ export async function assertSupplierInvoiceLinesPoLink(
     );
   }
 
-  const po = await prisma.purchaseOrder.findUnique({
+  const po = await db.purchaseOrder.findUnique({
     where: { id: purchaseOrderId },
     select: {
       id: true,
@@ -366,7 +374,7 @@ export async function assertSupplierInvoiceLinesPoLink(
 }
 
 /** The linked OC is a financial parent, including for manual invoices without line links. */
-async function assertInvoicePurchaseOrderScope(
+export async function assertInvoicePurchaseOrderScope(
   invoice: { purchaseOrderId?: string | null; tenantId: string; companyId: string; projectId: string | null; supplierContactId: string; currency: string },
   db: Prisma.TransactionClient = prisma,
 ): Promise<void> {
@@ -407,14 +415,8 @@ export async function getSupplierInvoiceById(
   const inv = await prisma.supplierInvoice.findUnique({
     where: { id },
     include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-      subcontractCertification: {
-        select: {
-          number: true,
-          subcontractId: true,
-        },
-      },
+      ...apInvoiceParents,
+      lines: { orderBy: { sortOrder: "asc" }, include: apInvoiceLineParents },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
@@ -429,6 +431,8 @@ export async function getSupplierInvoiceById(
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
   await requireProjectAccessIfPresent(inv.projectId, ctx);
+  assertApReadRoot(inv, ctx);
+  assertApInvoiceLineParents(inv, inv.lines);
   return serializeInvoice(inv);
 }
 
@@ -523,7 +527,7 @@ export async function listSupplierInvoicesByProject(
     prisma.supplierInvoice.findMany({
       where,
       include: {
-        supplierContact: { select: { legalName: true, fantasyName: true } },
+        ...apInvoiceParents,
         payable: { select: { id: true, status: true } },
         lines: {
           where: { purchaseOrderLineId: { not: null } },
@@ -538,6 +542,7 @@ export async function listSupplierInvoicesByProject(
     prisma.supplierInvoice.count({ where }),
   ]);
 
+  invoices.forEach(invoice => assertApReadRoot(invoice, ctx));
   return { data: invoices.map(serializeInvoiceListRow), total };
 }
 
@@ -625,7 +630,7 @@ export async function listCompanySupplierInvoices(
     prisma.supplierInvoice.findMany({
       where,
       include: {
-        supplierContact: { select: { legalName: true, fantasyName: true } },
+        ...apInvoiceParents,
         payable: { select: { id: true, status: true } },
         lines: {
           where: { purchaseOrderLineId: { not: null } },
@@ -640,6 +645,7 @@ export async function listCompanySupplierInvoices(
     prisma.supplierInvoice.count({ where }),
   ]);
 
+  invoices.forEach(invoice => assertApReadRoot(invoice, ctx));
   const data = invoices.map(serializeInvoiceListRow);
   return { data, total };
 }
@@ -659,14 +665,8 @@ export async function getCompanySupplierInvoiceById(
   const inv = await prisma.supplierInvoice.findUnique({
     where: { id },
     include: {
-      lines: { orderBy: { sortOrder: "asc" } },
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-      subcontractCertification: {
-        select: {
-          number: true,
-          subcontractId: true,
-        },
-      },
+      ...apInvoiceParents,
+      lines: { orderBy: { sortOrder: "asc" }, include: apInvoiceLineParents },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
@@ -677,6 +677,8 @@ export async function getCompanySupplierInvoiceById(
   if (isCrossCompany(inv.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
+  assertApReadRoot(inv, ctx);
+  assertApInvoiceLineParents(inv, inv.lines);
   return serializeInvoice(inv);
 }
 
@@ -729,6 +731,7 @@ export async function createSupplierInvoice(
   if (!systemBypass && !canMutateApForScope(ctx.roles, projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas de proveedor");
   }
+  input = parseApInput(createSupplierInvoiceSchema, input);
 
   if (projectId) {
     await assertProjectAllowsOperationalMutation(projectId, ctx);
@@ -821,9 +824,15 @@ export async function createSupplierInvoice(
 
   const writeInvoice = async (tx: Prisma.TransactionClient) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
-    await assertInvoicePurchaseOrderScope(invoiceOrderScope, tx);
-    // INVOICE numbering is company-wide, shared with automatic subcontract drafts.
     await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
+    await assertApInvoiceParents(invoiceOrderScope, tx);
+    await assertApPayeeInTransaction(tx, input.supplierContactId, ctx.tenantId, Boolean(input.purchaseOrderId));
+    await assertInvoicePurchaseOrderScope(invoiceOrderScope, tx);
+    await assertSupplierInvoiceLinesWbs(projectId, input.lines, ctx.tenantId, tx);
+    await assertSupplierInvoiceLinesApu(projectId, input.lines, ctx.tenantId, tx);
+    await assertSupplierInvoiceLinesPoLink(projectId, input.purchaseOrderId, input.lines, ctx.tenantId, tx);
+    // INVOICE numbering is company-wide, shared with automatic subcontract drafts.
     const maxNum = await tx.supplierInvoice.aggregate({
       where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
       _max: { number: true },
@@ -958,6 +967,7 @@ export async function updateSupplierInvoice(
     }
   }
   assertSupplierInvoiceEditable(existing);
+  input = parseApInput(updateSupplierInvoiceSchema, input);
 
   if (input.purchaseOrderId !== undefined) {
     assertAutoFromPoKeepsPurchaseOrderLink({
@@ -1088,6 +1098,17 @@ export async function updateSupplierInvoice(
 
   const inv = await prisma.$transaction(async (tx) => {
     if (existing.projectId) await lockProjectForOperationalMutation(tx, existing.projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${existing.companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
+    const nextScope = { ...existing, supplierContactId: input.supplierContactId ?? existing.supplierContactId,
+      purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId };
+    await assertApInvoiceParents(nextScope, tx);
+    await assertApPayeeInTransaction(tx, nextScope.supplierContactId, ctx.tenantId, Boolean(nextScope.purchaseOrderId));
+    if (input.lines) {
+      await assertSupplierInvoiceLinesWbs(existing.projectId, input.lines, ctx.tenantId, tx);
+      await assertSupplierInvoiceLinesApu(existing.projectId, input.lines, ctx.tenantId, tx);
+      await assertSupplierInvoiceLinesPoLink(existing.projectId, nextScope.purchaseOrderId, input.lines, ctx.tenantId, tx);
+    }
     await assertInvoicePurchaseOrderScope({ ...existing,
       supplierContactId: input.supplierContactId ?? existing.supplierContactId,
       purchaseOrderId: input.purchaseOrderId !== undefined ? input.purchaseOrderId : existing.purchaseOrderId,
@@ -1194,7 +1215,7 @@ export async function updateSupplierInvoice(
       } else if (isCreditNote || input.iibbPerceptionRate !== undefined) {
         await recalcSupplierInvoiceTotals(tx, id);
       }
-    } else if (isCreditNote || input.iibbPerceptionRate !== undefined) {
+    } else if (isCreditNote || input.iibbPerceptionRate !== undefined || input.fxRate !== undefined) {
       await recalcSupplierInvoiceTotals(tx, id);
     }
 
@@ -1317,6 +1338,8 @@ export async function issueSupplierInvoice(
 
   const result = await prisma.$transaction(async (tx) => {
     if (invPreview.projectId) await lockProjectForOperationalMutation(tx, invPreview.projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${invPreview.companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -1342,6 +1365,8 @@ export async function issueSupplierInvoice(
     }
 
     await assertInvoicePurchaseOrderScope(inv, tx);
+    await assertApInvoiceParents(inv, tx);
+    await assertApPayeeInTransaction(tx, inv.supplierContactId, ctx.tenantId, Boolean(inv.purchaseOrderId));
 
     assertInvoiceLetterOnIssue({
       invoiceLetter: inv.invoiceLetter,
@@ -1352,23 +1377,28 @@ export async function issueSupplierInvoice(
 
     const lines = await tx.supplierInvoiceLine.findMany({
       where: { invoiceId: id },
-      select: { wbsNodeId: true, purchaseOrderLineId: true },
+      select: { wbsNodeId: true, purchaseOrderLineId: true, costAnalysisLineId: true, taxRate: true, lineTax: true },
     });
     if (lines.length === 0) {
       throw new ServiceError("CONFLICT", "La factura debe tener al menos una línea");
     }
     assertAutomaticInvoiceLineLinks(inv, lines);
-    await assertSupplierInvoiceLinesWbs(inv.projectId, lines, ctx.tenantId);
+    await assertSupplierInvoiceLinesWbs(inv.projectId, lines, ctx.tenantId, tx);
+    await assertSupplierInvoiceLinesApu(inv.projectId, lines, ctx.tenantId, tx);
     await assertSupplierInvoiceLinesPoLink(
       inv.projectId,
       inv.purchaseOrderId,
       lines,
       ctx.tenantId,
+      tx,
     );
 
+    // D-133 requires explicit draft correction before recalculation can replace stored components.
+    assertNonnegativeInvoiceTaxes({ ...inv, lines });
     // Re-fetch totals
     await recalcSupplierInvoiceTotals(tx, id);
     const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id } });
+    assertNonnegativeInvoiceTaxes({ ...refreshed, lines });
     if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
     }
@@ -1478,12 +1508,13 @@ export async function cancelSupplierInvoice(
   ctx: ServiceContext,
   /** When set, rejects corporate invoices and cross-project cancel (project workspace). */
   projectScopeId?: string,
+  reason?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
 
   const invPreview = await prisma.supplierInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true, companyId: true, status: true },
+    select: { tenantId: true, projectId: true, companyId: true, status: true, documentKind: true },
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -1500,15 +1531,16 @@ export async function cancelSupplierInvoice(
 
   const glParams = {
     companyId: invPreview.companyId,
-    sourceType: "SUPPLIER_INVOICE" as const,
+    sourceType: invPreview.documentKind === "DEBIT_NOTE" ? "SUPPLIER_DEBIT_NOTE" as const : "SUPPLIER_INVOICE" as const,
     sourceId: id,
     sourceLabel: "la factura de proveedor",
   };
 
   if (invPreview.status === "CANCELLED") {
     await cancelDraftJournalOnOperationalCancel(ctx, glParams);
-    throw new ServiceError("CONFLICT", "La factura ya está cancelada");
+    return getSupplierInvoiceById(id, ctx, projectScopeId);
   }
+  const cancellationReason = requireApCancellationReason(invPreview.status, reason);
 
   if (invPreview.status === "ISSUED") {
     await assertJournalAllowsOperationalCancel(ctx, glParams);
@@ -1516,6 +1548,8 @@ export async function cancelSupplierInvoice(
 
   const result = await prisma.$transaction(async (tx) => {
     if (invPreview.projectId) await lockProjectForMutation(tx, invPreview.projectId, ctx.tenantId);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${invPreview.companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
     const inv = await tx.supplierInvoice.findUnique({ where: { id } });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -1523,21 +1557,19 @@ export async function cancelSupplierInvoice(
       throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
     }
     if (inv.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "La factura ya está cancelada");
+      return tx.supplierInvoice.findUniqueOrThrow({ where: { id }, include: {
+        lines: { orderBy: { sortOrder: "asc" } }, supplierContact: { select: { legalName: true, fantasyName: true } },
+      } });
     }
+    requireApCancellationReason(inv.status, reason);
 
     // BR-AP-003 / [D-115]: if ISSUED, cancel linked Payable only if no payments/credits/child notes
     if (inv.status === "ISSUED") {
       const payable = await tx.payable.findUnique({
         where: { supplierInvoiceId: id },
-        select: {
-          id: true,
-          paidAmount: true,
-          creditedAmount: true,
-          projectId: true,
-          companyId: true,
-        },
       });
+      await assertApInvoiceParents(inv, tx);
+      if (payable) assertApPayableMatchesInvoice(payable, inv);
       const activePaymentCount = payable
         ? await tx.payment.count({
             where: { payableId: payable.id, status: "CONFIRMED", tenantId: ctx.tenantId },
@@ -1567,6 +1599,7 @@ export async function cancelSupplierInvoice(
         const payableCancel = await tx.payable.updateMany({
           where: {
             id: payable.id,
+            tenantId: ctx.tenantId,
             status: { not: "CANCELLED" },
             paidAmount: payable.paidAmount,
             creditedAmount: payable.creditedAmount,
@@ -1626,11 +1659,12 @@ export async function cancelSupplierInvoice(
       "SupplierInvoice",
       id,
       { projectId: result.projectId, companyId: result.companyId },
-      { after: { number: inv.number, status: "CANCELLED" }, tx },
+      { after: { number: inv.number, status: "CANCELLED", cancellationReason }, tx },
     );
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams, tx);
 
     return result;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
@@ -1675,7 +1709,9 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     subcontractCertificationId: inv.subcontractCertificationId,
   });
   return {
-    ...inv,
+    ...stripApParents(inv),
+    fxRate: serializeFxRateDecimal(inv.fxRate),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     subtotal:    serializeMoneyDecimal(inv.subtotal),
     taxAmount:   serializeMoneyDecimal(inv.taxAmount),
     iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),
@@ -1718,7 +1754,9 @@ function serializeInvoice(inv: RawInvoice): SupplierInvoiceView {
         ? "ND"
         : "FP";
   return {
-    ...inv,
+    ...stripApParents(inv),
+    fxRate: serializeFxRateDecimal(inv.fxRate),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     subtotal:    serializeMoneyDecimal(inv.subtotal),
     taxAmount:   serializeMoneyDecimal(inv.taxAmount),
     iibbPerceptionRate: serializeRatePctDecimal(inv.iibbPerceptionRate),

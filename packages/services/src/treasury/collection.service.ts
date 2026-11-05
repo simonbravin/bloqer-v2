@@ -1,7 +1,8 @@
 import { Prisma, prisma, Collection } from "@bloqer/database";
 import { canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
-import type { CreateCollectionInput } from "@bloqer/validators";
+import { createCollectionSchema, type CreateCollectionInput } from "@bloqer/validators";
 import { auditAr } from "../ar/ar-audit";
+import { arCollectionParents, arReceivableParents, assertArCollectionParents, assertArReceivableParents, arCancellationReason, parseArInput, stripArParents, assertArTransactionModules, collectionMovementForCancellation } from "../ar/ar-integrity";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import {
@@ -12,7 +13,7 @@ import {
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { resolvePagination } from "../finance/pagination";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
-import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { assertArTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertTreasuryAccountCurrencyMatches } from "./treasury-currency-guards";
 import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { isCrossCompany } from "../company-scope";
@@ -30,6 +31,7 @@ import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
 import {
   assertPeriodOpenUnderCompanyLock,
   lockTreasuryAccountRow,
+  lockCompanyForFinancialWrite,
 } from "./treasury-write-locks";
 import { assertResourceTenant } from "../security/tenant-isolation";
 import {
@@ -39,8 +41,10 @@ import {
 } from "../idempotency/idempotency";
 import { formatSalesInvoiceCode } from "../notifications/notification-copy";
 
-export type CollectionView = Omit<Collection, "amount"> & {
+export type CollectionView = Omit<Collection, "amount" | "fxRate" | "amountArs"> & {
   amount: string;
+  fxRate: string;
+  amountArs: string;
   accountName: string;
 };
 
@@ -58,7 +62,7 @@ export async function getCollectionById(
   }
   const c = await prisma.collection.findUnique({
     where: { id },
-    include: { account: { select: { name: true } } },
+    include: arCollectionParents,
   });
   if (!c) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (c.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -68,7 +72,9 @@ export async function getCollectionById(
   if (projectScopeId !== undefined && c.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
+  if (c.projectId === null && !canViewCompanyAr(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos para ver cobranzas a nivel empresa");
   await requireProjectAccessIfPresent(c.projectId, ctx);
+  assertArCollectionParents(c, ctx);
   return serialize(c);
 }
 
@@ -93,18 +99,19 @@ export async function listCollectionsByProject(
     pageSize: filters?.pageSize,
   });
 
-  const where = { projectId, tenantId: ctx.tenantId };
+  const where = { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
 
   const [rows, total] = await Promise.all([
     prisma.collection.findMany({
       where,
-      include: { account: { select: { name: true } } },
+      include: arCollectionParents,
       orderBy: [{ collectionDate: "desc" }, { id: "desc" }],
       skip,
       take,
     }),
     prisma.collection.count({ where }),
   ]);
+  rows.forEach((row) => assertArCollectionParents(row, ctx));
   return { data: rows.map(serialize), total };
 }
 
@@ -117,10 +124,10 @@ export async function listCollectionsByReceivable(
 
   const receivable = await prisma.receivable.findUnique({
     where: { id: receivableId },
-    select: { tenantId: true, projectId: true, companyId: true },
+    include: arReceivableParents,
   });
   if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
-  assertResourceTenant(receivable.tenantId, ctx.tenantId);
+  assertArReceivableParents(receivable, ctx);
   if (isCrossCompany(receivable.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a la empresa activa");
   }
@@ -142,10 +149,11 @@ export async function listCollectionsByReceivable(
   }
 
   const rows = await prisma.collection.findMany({
-    where: { receivableId, tenantId: ctx.tenantId },
-    include: { account: { select: { name: true } } },
+    where: { receivableId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) },
+    include: arCollectionParents,
     orderBy: { collectionDate: "desc" },
   });
+  rows.forEach((row) => assertArCollectionParents(row, ctx));
   return rows.map(serialize);
 }
 
@@ -156,7 +164,9 @@ export async function createCollection(
   ctx: ServiceContext,
   projectScopeId?: string,
 ): Promise<CollectionView> {
+  input = parseArInput(createCollectionSchema, input);
   await assertArTenantModule(ctx);
+  await assertTreasuryTenantModule(ctx);
 
   const receivablePreview = await prisma.receivable.findUnique({
     where: { id: input.receivableId },
@@ -178,7 +188,7 @@ export async function createCollection(
   }
 
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
-  const collectionInclude = { account: { select: { name: true } } } as const;
+  const collectionInclude = arCollectionParents;
 
   const collection = await withIdempotentCreate({
     findExisting: () =>
@@ -186,22 +196,27 @@ export async function createCollection(
         where: { tenantId: ctx.tenantId, idempotencyKey },
         include: collectionInclude,
       }),
-    payloadsMatch: (existing) =>
-      collectionReplayMatches(existing, {
+    payloadsMatch: (existing) => {
+      assertArCollectionParents(existing, ctx);
+      return collectionReplayMatches(existing, {
+        ...input,
         receivableId: input.receivableId,
         accountId: input.accountId,
         collectionDate: input.collectionDate,
         collectFullBalance: Boolean(input.collectFullBalance),
         amount: input.amount,
         fxRate: input.fxRate,
-      }),
+      });
+    },
     create: async () => {
       return prisma.$transaction(async (tx) => {
         if (receivablePreview.projectId) await lockProjectForOperationalMutation(tx, receivablePreview.projectId, ctx);
         // Load receivable inside txn for consistency
-        const receivable = await tx.receivable.findUnique({ where: { id: input.receivableId } });
+        const receivable = await tx.receivable.findUnique({ where: { id: input.receivableId }, include: arReceivableParents });
         if (!receivable) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
-        assertResourceTenant(receivable.tenantId, ctx.tenantId);
+        assertArReceivableParents(receivable, ctx);
+        await assertArTransactionModules(tx, ctx, true);
+        if (receivable.projectId !== receivablePreview.projectId || receivable.companyId !== receivablePreview.companyId) throw new ServiceError("CONFLICT", "La cuenta por cobrar cambió. Recargá e intentá de nuevo.");
         if (receivable.status === "CANCELLED") {
           throw new ServiceError("CONFLICT", "No se puede cobrar una cuenta por cobrar cancelada");
         }
@@ -216,7 +231,7 @@ export async function createCollection(
         if (!salesInvoice) {
           throw new ServiceError("CONFLICT", "La factura de venta asociada no existe");
         }
-        if (salesInvoice.status === "CANCELLED") {
+        if (salesInvoice.status !== "ISSUED") {
           throw new ServiceError("CONFLICT", "No se puede cobrar una factura de venta cancelada");
         }
 
@@ -246,6 +261,8 @@ export async function createCollection(
           );
         }
 
+        // Company precedes Account in every composite/standalone writer.
+        await assertPeriodOpenUnderCompanyLock(tx, { tenantId: ctx.tenantId, companyId: receivable.companyId, date: input.collectionDate });
         // Currency + company scope guard (mirror AP payment)
         await lockTreasuryAccountRow(tx, input.accountId, ctx.tenantId);
         const account = await tx.treasuryAccount.findUnique({ where: { id: input.accountId } });
@@ -272,7 +289,7 @@ export async function createCollection(
         }
         assertTreasuryAccountCurrencyMatches(account.currency, receivable.currency);
 
-        const companyId = ctx.companyId ?? account.companyId ?? receivable.companyId;
+        const companyId = receivable.companyId;
         if (!companyId) {
           throw new ServiceError(
             "VALIDATION",
@@ -286,6 +303,7 @@ export async function createCollection(
           date: input.collectionDate,
         });
         const fx = computeDocumentFxAmounts(receivable.currency, amount, input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined);
+        await assertArTransactionModules(tx, ctx, true);
 
         // Create Collection
         const created = await tx.collection.create({
@@ -392,18 +410,14 @@ export async function cancelCollection(
   id: string,
   ctx: ServiceContext,
   projectScopeId?: string,
+  reason?: string,
 ): Promise<Collection> {
   await assertArTenantModule(ctx);
+  await assertTreasuryTenantModule(ctx);
 
   const collectionPreview = await prisma.collection.findUnique({
     where: { id },
-    select: {
-      tenantId: true,
-      projectId: true,
-      companyId: true,
-      collectionDate: true,
-      status: true,
-    },
+    include: arCollectionParents,
   });
   if (!collectionPreview) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
   if (collectionPreview.tenantId !== ctx.tenantId) {
@@ -418,6 +432,7 @@ export async function cancelCollection(
   if (projectScopeId !== undefined && collectionPreview.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
   }
+  assertArCollectionParents(collectionPreview, ctx);
   await requireProjectAccessIfPresent(collectionPreview.projectId, ctx);
 
   const glParams = {
@@ -429,7 +444,7 @@ export async function cancelCollection(
 
   if (collectionPreview.status === "CANCELLED") {
     await cancelDraftJournalOnOperationalCancel(ctx, glParams);
-    throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
+    return prisma.collection.findUniqueOrThrow({ where: { id } });
   }
 
   await assertFinancialPeriodOpen({
@@ -454,15 +469,17 @@ export async function cancelCollection(
 
   const updated = await prisma.$transaction(async (tx) => {
     if (collectionPreview.projectId) await lockProjectForMutation(tx, collectionPreview.projectId, ctx.tenantId);
-    const c = await tx.collection.findUnique({ where: { id } });
+    await lockCompanyForFinancialWrite(tx, collectionPreview.companyId);
+    await assertArTransactionModules(tx, ctx, true);
+    const c = await tx.collection.findUnique({ where: { id }, include: arCollectionParents });
     if (!c) throw new ServiceError("NOT_FOUND", "Cobranza no encontrada");
     if (c.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (projectScopeId !== undefined && c.projectId !== projectScopeId) {
       throw new ServiceError("FORBIDDEN", "La cobranza no pertenece a este proyecto");
     }
-    if (c.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "La cobranza ya está cancelada");
-    }
+    assertArCollectionParents(c, ctx);
+    if (c.status === "CANCELLED") return c;
+    const cancellationReason = arCancellationReason(c.status, reason);
 
     await assertPeriodOpenUnderCompanyLock(tx, {
       tenantId: ctx.tenantId,
@@ -470,15 +487,18 @@ export async function cancelCollection(
       date: c.collectionDate,
     });
 
-    const linkedMovement = await tx.accountMovement.findFirst({
-      where: { sourceType: "COLLECTION", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
-      select: { id: true, status: true },
-    });
-    if (linkedMovement?.status === "RECONCILED") {
-      throw new ServiceError(
-        "CONFLICT",
-        "El movimiento de tesorería está conciliado. Desconciliá antes de cancelar la cobranza.",
-      );
+    await lockTreasuryAccountRow(tx, c.accountId, ctx.tenantId);
+    const account = await tx.treasuryAccount.findUnique({ where: { id: c.accountId } });
+    if (!account) throw new ServiceError("CONFLICT", "La cuenta de la cobranza no existe");
+    assertArCollectionParents({ ...c, account }, ctx);
+    const movements = await tx.accountMovement.findMany({ where: { sourceType: "COLLECTION", sourceId: id } });
+    const linkedMovement = collectionMovementForCancellation(c, movements);
+    await assertArTransactionModules(tx, ctx, true);
+    const receivable = await tx.receivable.findUnique({ where: { id: c.receivableId }, include: arReceivableParents });
+    if (!receivable) throw new ServiceError("CONFLICT", "La cobranza no tiene cuenta por cobrar asociada");
+    assertArReceivableParents(receivable, ctx);
+    if (receivable.status === "CANCELLED" || c.amount.lte(0) || receivable.paidAmount.lt(c.amount)) {
+      throw new ServiceError("CONFLICT", "La cobranza no concilia con el importe cobrado de la cuenta");
     }
 
     const collectionCancel = await tx.collection.updateMany({
@@ -490,14 +510,21 @@ export async function cancelCollection(
       "La cobranza ya fue cancelada o modificada. Revisá e intentá de nuevo.",
     );
 
-    // Cancel linked AccountMovement (tenant + optimistic claim if present)
-    if (linkedMovement) {
+    // Claim the exact validated cash leg; reconciliation or metadata drift rolls back both effects.
+    {
       const movementCancel = await tx.accountMovement.updateMany({
         where: {
           id: linkedMovement.id,
           tenantId: ctx.tenantId,
           sourceType: "COLLECTION",
           sourceId: id,
+          companyId: c.companyId,
+          projectId: c.projectId,
+          accountId: c.accountId,
+          currency: c.currency,
+          amount: c.amount,
+          movementDate: c.collectionDate,
+          type: "INFLOW",
           status: "CONFIRMED",
         },
         data: { status: "CANCELLED" },
@@ -509,9 +536,9 @@ export async function cancelCollection(
     }
 
     // Reverse Receivable.paidAmount
-    const receivable = await tx.receivable.findUnique({ where: { id: c.receivableId } });
-    if (receivable && receivable.status !== "CANCELLED") {
-      const newPaid = Prisma.Decimal.max(receivable.paidAmount.minus(c.amount), new Prisma.Decimal(0));
+    {
+      const newPaid = receivable.paidAmount.minus(c.amount);
+      if (newPaid.lt(0)) throw new ServiceError("CONFLICT", "La cobranza no concilia con el importe cobrado de la cuenta");
       const newStatus = resolveObligationStoredStatus(
         newPaid,
         receivable.originalAmount,
@@ -520,6 +547,7 @@ export async function cancelCollection(
       const receivableReverse = await tx.receivable.updateMany({
         where: {
           id: receivable.id,
+          tenantId: ctx.tenantId,
           paidAmount: receivable.paidAmount,
           creditedAmount: receivable.creditedAmount,
           status: { not: "CANCELLED" },
@@ -545,11 +573,12 @@ export async function cancelCollection(
       "Collection",
       id,
       { projectId: updated.projectId, companyId: updated.companyId },
-      { after: { status: "CANCELLED", number: invoice?.number ?? null }, tx },
+      { after: { status: "CANCELLED", number: invoice?.number ?? null, cancellationReason }, tx },
     );
 
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams, tx);
     return updated;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
@@ -561,5 +590,5 @@ export async function cancelCollection(
 type RawCollection = Collection & { account: { name: string } };
 
 function serialize(c: RawCollection): CollectionView {
-  return { ...c, amount: serializeMoneyDecimal(c.amount), accountName: c.account.name };
+  return { ...stripArParents(c), amount: serializeMoneyDecimal(c.amount), fxRate: c.fxRate.toFixed(6), amountArs: serializeMoneyDecimal(c.amountArs), accountName: c.account.name };
 }

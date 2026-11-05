@@ -1,0 +1,2724 @@
+{
+  "schemaVersion": 1,
+  "stage": "AG-09",
+  "title": "Ventas, cobranzas, CxC, CxP y pagos",
+  "date": "2026-11-05",
+  "status": "closed_local",
+  "lastUpdatedAt": "2026-11-05T16:47:18.916Z",
+  "authorization": {
+    "mode": "global_stage_audit_fix_verify",
+    "request": "Publicar cambios cerrados de AG-08; auditar/corregir/verificar AG-09 y avisar antes de continuar.",
+    "nextStageAuthorized": false,
+    "scopeStop": "No iniciar AG-10."
+  },
+  "base": {
+    "branch": "codex/pruebas",
+    "sha": "4f5b672e74bb9df133b1dc83f68918fa2b32555e",
+    "tree": "0e6a71495af4bb28142686b458fbd1dc312c4682",
+    "initialWorktreeClean": true,
+    "initialUntrackedFiles": [],
+    "initialEvidence": "output/platform-audit/ag-09-2026-11-05/baseline.json",
+    "finalRevision": null,
+    "diff": "HEAD(base) → worktree, incluidos archivos nuevos; el manifiesto final se completará al congelar las correcciones."
+  },
+  "previousPublication": {
+    "stage": "AG-08",
+    "status": "published",
+    "pr": 6,
+    "url": "https://github.com/simonbravin/bloqer-v2/pull/6",
+    "deliverySha": "4f5b672e74bb9df133b1dc83f68918fa2b32555e",
+    "mergeSha": "e817d82f1ce68eb4da77b118d5aec3994443ca34",
+    "changedFiles": 94,
+    "tree": "0e6a71495af4bb28142686b458fbd1dc312c4682",
+    "evidence": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-05-ag-08-publication.md",
+    "ag09Included": false
+  },
+  "environment": {
+    "sqlTarget": {
+      "database": "bloqer_audit_ag01_20261103",
+      "host": "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+      "guard": "assertAuditDatabaseIdentity antes de las escrituras; ambas URLs explícitas.",
+      "data": "UUID y datos sintéticos por suite, teardown propio; fixture AR retenido por flag para muestra visual."
+    },
+    "externalProvidersDisabled": true,
+    "productionMutatingTests": false,
+    "credentialsInReport": false,
+    "localBrowserAuthorization": "Autorización explícita de entorno local aislado otorgada durante AG-02 y conservada por la campaña."
+  },
+  "contributors": [
+    {
+      "name": "/root",
+      "role": "Coordinación; helpers compartidos, reportes/CSV/AI, Guide/help, ejecución SQL y verificaciones generales/finales."
+    },
+    {
+      "name": "/root/ag09_ar",
+      "role": "Contratos y recorridos AR, Collection, validators AR y suites; restauración focal de política NC AR/AP y test heredado."
+    },
+    {
+      "name": "/root/ag09_ap",
+      "role": "AP, integridad, pago/composiciones, validators AP y frontera compartida de cancelación/posting GL."
+    },
+    {
+      "name": "/root/ag09_frontend",
+      "role": "UI/Actions/invalidación de obra/empresa, precisión, razones/confirmaciones, RSC; revisión independiente de consumidores de motivos."
+    },
+    {
+      "name": "/root/ag09_verify",
+      "role": "Revisión independiente de causas, selección offline y contraste de política NC con base/documentación."
+    },
+    {
+      "name": "/root/ag09_docs_ai",
+      "role": "Armonización funcional, D-133/Q-080, workflows, evals y prueba de knowledge."
+    },
+    {
+      "name": "/root/ag09_report",
+      "role": "Consolidación de evidencia existente en este reporte; sin ejecución SQL/UI/build ni cambios de producto."
+    }
+  ],
+  "sources": [
+    "docs/bloqer2.0/02-modules/SALES_AND_COLLECTIONS.md",
+    "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
+    "docs/bloqer2.0/03-finance/ACCOUNTS_RECEIVABLE.md",
+    "docs/bloqer2.0/03-finance/ACCOUNTS_PAYABLE.md",
+    "docs/bloqer2.0/03-finance/MONEY_MODEL.md",
+    "docs/bloqer2.0/03-finance/MULTI_CURRENCY_RULES.md",
+    "docs/bloqer2.0/03-finance/TAXES_AND_WITHHOLDINGS.md",
+    "docs/bloqer2.0/05-workflows/CERTIFY_TO_COLLECT.md",
+    "docs/bloqer2.0/05-workflows/PURCHASE_TO_PAY.md",
+    "docs/bloqer2.0/05-workflows/REGISTER_PAYMENT.md",
+    "docs/bloqer2.0/01-domain/STATE_MACHINES.md",
+    "docs/bloqer2.0/01-domain/BUSINESS_RULES.md",
+    "docs/bloqer2.0/00-product/PERMISSIONS_MATRIX.md",
+    "docs/bloqer2.0/08-architecture/TECHNICAL_ERD.md",
+    "docs/bloqer2.0/08-architecture/TENANT_ISOLATION_MODEL.md",
+    "docs/bloqer2.0/08-architecture/TENANT_COMPANY_SCOPING.md",
+    "docs/bloqer2.0/CHANGE_IMPACT_POLICY.md",
+    "packages/database/prisma/schema.prisma"
+  ],
+  "decisions": [
+    {
+      "id": "D-133",
+      "question": "Q-080",
+      "status": "approved",
+      "date": "2026-11-05",
+      "proposal": "docs/bloqer2.0/08-architecture/platform-audit/2026-11-05-ag-09-nonnegative-invoice-tax-proposal.md",
+      "effect": "Rechazar IVA/percepción/ajuste de percepción negativos en nuevos efectos de AR/AP; cero permitido, sin máximo nuevo, sin reescritura de históricos."
+    }
+  ],
+  "inventories": [
+    {
+      "id": "AG09-R01",
+      "journey": "Factura de venta de obra, manual o desde certificación",
+      "documented": [
+        "02-modules/SALES_AND_COLLECTIONS.md §§8–11",
+        "05-workflows/CERTIFY_TO_COLLECT.md",
+        "D-053/D-077/D-084/D-115/D-117/D-119"
+      ],
+      "implemented": {
+        "entry": [
+          "apps/web/features/sales-invoices/components/manual-invoice-form.tsx",
+          "apps/web/features/sales-invoices/components/certification-invoice-form.tsx",
+          "apps/web/app/(app)/proyectos/[id]/facturas/actions.ts"
+        ],
+        "validators": [
+          "packages/validators/src/sales-invoice.ts"
+        ],
+        "services": [
+          "ar/sales-invoice.service.ts:createSalesInvoice/createInvoiceFromCertification/updateSalesInvoice/issueSalesInvoice/cancelSalesInvoice",
+          "ar/register-ar-sale.service.ts:registerArSale"
+        ],
+        "persistence": [
+          "Prisma SalesInvoice/SalesInvoiceLine",
+          "Receivable",
+          "Collection/AccountMovement opcionales",
+          "AuditLog"
+        ],
+        "readback": [
+          "Detalle/lista de factura y CxC",
+          "Estado financiero derivado de certificación",
+          "Snapshots/aging/reportes",
+          "Invalidación del proyecto financiero autorizado"
+        ]
+      },
+      "exposed": {
+        "routes": [
+          "/proyectos/[id]/facturas",
+          "/proyectos/[id]/facturas/nueva",
+          "/proyectos/[id]/facturas/[invoiceId]",
+          "/proyectos/[id]/facturas/[invoiceId]/editar"
+        ],
+        "access": [
+          "AR VIEW/EDIT según operación",
+          "ACL de obra",
+          "AR y Tesorería para collectNow"
+        ],
+        "notes": "El alta normal conserva borrador; D-077 permite emitir y cobrar inmediatamente con autorización. No se agregó una entidad de anticipo."
+      },
+      "tested": {
+        "previous": "AG-08 cubría conexiones certificación→factura y numeración, no toda AR.",
+        "current": [
+          "output/platform-audit/ag-09-2026-11-05/sql-ar-third.log",
+          "packages/services/src/ar/certification-invoice-status.test.ts",
+          "apps/web/lib/certification-ar-invalidation.test.ts",
+          "output/platform-audit/ag-09-2026-11-05/sql-ag08-connections-regression.log"
+        ]
+      },
+      "findings": [
+        "GA-AG-09-001",
+        "GA-AG-09-002",
+        "GA-AG-09-003",
+        "GA-AG-09-004",
+        "GA-AG-09-005",
+        "GA-AG-09-006",
+        "GA-AG-09-007",
+        "GA-AG-09-008",
+        "GA-AG-09-013",
+        "GA-AG-09-015",
+        "GA-AG-09-017",
+        "GA-AG-09-022",
+        "GA-AG-09-024",
+        "GA-AG-09-025",
+        "GA-AG-09-026",
+        "GA-AG-09-029"
+      ]
+    },
+    {
+      "id": "AG09-R02",
+      "journey": "Ingreso corporativo y anticipo/venta rápida",
+      "documented": [
+        "02-modules/SALES_AND_COLLECTIONS.md §§9/13",
+        "D-008/D-051/D-077/D-084",
+        "D-056 ámbito corporativo"
+      ],
+      "implemented": {
+        "entry": [
+          "apps/web/features/finance/components/new-transaction-dialog.tsx",
+          "apps/web/features/sales-invoices/components/advance-invoice-form.tsx",
+          "Actions corporativas de Transacciones/CxC y Actions de facturas de obra"
+        ],
+        "validators": [
+          "registerTransactionSchema/registerArIncomeSchema",
+          "registerArAdvanceSchema"
+        ],
+        "services": [
+          "finance/register-transaction.service.ts:registerTransaction",
+          "ar/register-ar-income.service.ts:registerArIncome",
+          "ar/register-ar-advance.service.ts:registerArAdvance→registerArSale"
+        ],
+        "persistence": [
+          "SalesInvoice(projectId=null para empresa)",
+          "Receivable",
+          "Collection/AccountMovement",
+          "AuditLog"
+        ],
+        "readback": [
+          "CxC empresa y detalle de factura corporativa",
+          "Historial de cobros",
+          "KPI de finanzas/aging"
+        ]
+      },
+      "exposed": {
+        "routes": [
+          "/finanzas/transacciones",
+          "/finanzas/cuentas-por-cobrar",
+          "/finanzas/cuentas-por-cobrar/[receivableId]",
+          "/finanzas/facturas/[invoiceId]",
+          "/proyectos/[id]/facturas/anticipo/nueva"
+        ],
+        "access": [
+          "Company finance + permiso de operación para empresa",
+          "AR/ACL de obra para anticipo",
+          "Tesorería cuando crea o cancela caja"
+        ],
+        "notes": "El anticipo actual genera factura/CxC/cobranza; letra sugerida en servidor y FX manual extranjero. Solo caja es otra variante y su modelo FX físico queda en AG-10."
+      },
+      "tested": {
+        "previous": "Cobro inmediato corporativo existía; falta de letra/FX de anticipo impedía su uso argentino/extranjero.",
+        "current": [
+          "output/platform-audit/ag-09-2026-11-05/sql-ar-third.log",
+          "apps/web/features/finance/lib/financial-actions.test.ts",
+          "apps/web/features/finance/lib/financial-interactions.test.ts"
+        ],
+        "limit": "Anticipo cubierto por SQL e interacción; fuera de la muestra de navegador."
+      },
+      "findings": [
+        "GA-AG-09-001",
+        "GA-AG-09-003",
+        "GA-AG-09-015",
+        "GA-AG-09-016",
+        "GA-AG-09-017",
+        "GA-AG-09-021",
+        "GA-AG-09-024",
+        "GA-AG-09-025",
+        "GA-AG-09-027"
+      ]
+    },
+    {
+      "id": "AG09-R03",
+      "journey": "Factura/gasto AP corporativo y de obra, contra OC o subcontrato",
+      "documented": [
+        "02-modules/EXPENSES_AND_PAYMENTS.md",
+        "03-finance/ACCOUNTS_PAYABLE.md",
+        "05-workflows/PURCHASE_TO_PAY.md",
+        "D-052/D-055/D-066/D-089/D-110/D-112/D-131"
+      ],
+      "implemented": {
+        "entry": [
+          "apps/web/features/ap/components/supplier-invoice-form.tsx",
+          "apps/web/features/ap/components/supplier-invoice-edit-form.tsx",
+          "apps/web/features/finance/components/new-transaction-dialog.tsx",
+          "Actions de facturas-proveedor de empresa/obra"
+        ],
+        "validators": [
+          "packages/validators/src/ap.ts"
+        ],
+        "services": [
+          "ap/supplier-invoice.service.ts:create/update/issue/cancelSupplierInvoice",
+          "ap/register-ap-expense.service.ts:registerApExpense",
+          "ap/supplier-invoice-from-po.service.ts",
+          "ap/supplier-invoice-po-reconciliation.service.ts"
+        ],
+        "persistence": [
+          "Prisma SupplierInvoice/SupplierInvoiceLine",
+          "Payable",
+          "Payment/AccountMovement opcionales",
+          "OC/recepción/subcert como padres existentes",
+          "AuditLog"
+        ],
+        "readback": [
+          "Factura/CxP/Field/Payment DTO",
+          "Cobertura de OC y liquidación de subcert",
+          "Aging/proyección/snapshot corporativo",
+          "Layouts financieros invalidados"
+        ]
+      },
+      "exposed": {
+        "routes": [
+          "/proyectos/[id]/facturas-proveedor",
+          "/proyectos/[id]/facturas-proveedor/nueva",
+          "/proyectos/[id]/facturas-proveedor/[supplierInvoiceId]",
+          "/finanzas/facturas-proveedor",
+          "/finanzas/transacciones"
+        ],
+        "access": [
+          "AP VIEW/EDIT y ámbito de empresa/obra",
+          "ACL de proyecto",
+          "canRegisterApPayment y Tesorería para payNow"
+        ],
+        "notes": "Aprobar subcert habilita factura DRAFT; emitir factura genera CxP. No se agrega APPROVED a SupplierInvoice ni se simula un pago sin deuda."
+      },
+      "tested": {
+        "previous": "AG-06/08 cubrían vínculo OC/recepción/subcert y settlement; sus casos afectados se revalidan por selección.",
+        "current": [
+          "output/platform-audit/ag-09-2026-11-05/sql-ap-second.log",
+          "packages/services/src/ap/ap-platform-audit.test.ts",
+          "output/platform-audit/ag-09-2026-11-05/sql-ag08-settlement-regression.log",
+          "output/platform-audit/ag-09-2026-11-05/visual-checks.json"
+        ]
+      },
+      "findings": [
+        "GA-AG-09-001",
+        "GA-AG-09-002",
+        "GA-AG-09-003",
+        "GA-AG-09-004",
+        "GA-AG-09-005",
+        "GA-AG-09-007",
+        "GA-AG-09-008",
+        "GA-AG-09-013",
+        "GA-AG-09-015",
+        "GA-AG-09-017",
+        "GA-AG-09-019",
+        "GA-AG-09-022",
+        "GA-AG-09-024",
+        "GA-AG-09-025",
+        "GA-AG-09-026",
+        "GA-AG-09-028",
+        "GA-AG-09-029"
+      ]
+    },
+    {
+      "id": "AG09-R04",
+      "journey": "Notas de crédito y débito AR/AP",
+      "documented": [
+        "D-115",
+        "01-domain/STATE_MACHINES.md",
+        "D-042/BR-PROJ-003",
+        "D-053/D-093/D-117",
+        "D-133/Q-080"
+      ],
+      "implemented": {
+        "entry": [
+          "apps/web/features/finance/components/create-fiscal-note-dialog.tsx",
+          "Editores y detalles de factura AR/AP de obra/empresa",
+          "Actions contextuales AR/AP"
+        ],
+        "validators": [
+          "createSalesNoteSchema/createSupplierFiscalNoteSchema",
+          "Schemas de edición de factura"
+        ],
+        "services": [
+          "ar/credit-debit-note.service.ts:createNoteDraft/issue/cancel",
+          "ap/credit-debit-note.service.ts:createNoteDraft/issue/cancel"
+        ],
+        "persistence": [
+          "SalesInvoice/SupplierInvoice documentKind=CREDIT_NOTE o DEBIT_NOTE",
+          "ReceivableCreditApplication/PayableCreditApplication",
+          "Receivable/Payable nueva para ND",
+          "AuditLog/GL DRAFT vinculado"
+        ],
+        "readback": [
+          "Notas vinculadas",
+          "Saldo neto y estado derivado",
+          "NC anulada sin crédito activo",
+          "Series y códigos NC/ND correctos"
+        ]
+      },
+      "exposed": {
+        "routes": [
+          "Detalles de factura /proyectos/[id]/facturas y /facturas-proveedor",
+          "Detalles corporativos /finanzas/facturas y /finanzas/facturas-proveedor"
+        ],
+        "access": [
+          "Permiso de edición correspondiente",
+          "Padre y todas las relaciones del mismo ámbito",
+          "NC de obra conserva ACTIVE en preflight y TX"
+        ],
+        "notes": "NC reduce deuda sin caja; ND crea deuda propia. No se habilitan notas sin padre ni crédito abierto. No se extendió una excepción de proyecto por analogía."
+      },
+      "tested": {
+        "previous": "Numeración/conexiones parciales AG-08.",
+        "current": [
+          "output/platform-audit/ag-09-2026-11-05/sql-ar-third.log",
+          "output/platform-audit/ag-09-2026-11-05/sql-ap-second.log",
+          "output/platform-audit/ag-09-2026-11-05/nc-project-policy-restoration.json",
+          "packages/services/src/idempotency/idempotency.test.ts",
+          "output/platform-audit/ag-09-2026-11-05/independent-freeze05-review.json"
+        ],
+        "limit": "Notas verificadas por pruebas generales y SQL."
+      },
+      "findings": [
+        "GA-AG-09-002",
+        "GA-AG-09-003",
+        "GA-AG-09-004",
+        "GA-AG-09-005",
+        "GA-AG-09-006",
+        "GA-AG-09-011",
+        "GA-AG-09-012",
+        "GA-AG-09-013",
+        "GA-AG-09-018",
+        "GA-AG-09-022",
+        "GA-AG-09-023",
+        "GA-AG-09-027",
+        "GA-AG-09-029",
+        "GA-AG-09-030"
+      ]
+    },
+    {
+      "id": "AG09-R05",
+      "journey": "Cobros/pagos parciales, totales e inmediatos y su reversión",
+      "documented": [
+        "03-finance/ACCOUNTS_RECEIVABLE.md",
+        "03-finance/ACCOUNTS_PAYABLE.md",
+        "05-workflows/REGISTER_PAYMENT.md",
+        "D-008/D-010/D-052/D-061/D-069/D-115",
+        "BR-TRZ-003/004/005"
+      ],
+      "implemented": {
+        "entry": [
+          "apps/web/features/collections/components/collection-form.tsx",
+          "apps/web/features/ap/components/payment-form.tsx",
+          "Historial corporativo de CxC",
+          "Actions de caja de obra/empresa"
+        ],
+        "validators": [
+          "createCollectionSchema/createPaymentSchema",
+          "collectNow/payNow"
+        ],
+        "services": [
+          "treasury/collection.service.ts:createCollection/cancelCollection",
+          "ap/payment.service.ts:createPayment/cancelPayment",
+          "ap/apply-payment-to-payable.ts",
+          "accounting/accounting-cancel-sync.service.ts",
+          "accounting/journal-entry.service.ts"
+        ],
+        "persistence": [
+          "Receivable/Payable paidAmount",
+          "Collection/Payment",
+          "AccountMovement INFLOW/OUTFLOW",
+          "AuditLog",
+          "JournalEntry/Line cuando corresponde"
+        ],
+        "readback": [
+          "Historial con estado de cada movimiento",
+          "Saldo original−caja−crédito",
+          "Trazabilidad de factura/deuda/pago",
+          "Reportes de caja y GL enlazado"
+        ]
+      },
+      "exposed": {
+        "routes": [
+          "/proyectos/[id]/cuentas-por-cobrar/[receivableId]/cobrar",
+          "/proyectos/[id]/cuentas-por-pagar/[payableId]/pagar",
+          "/proyectos/[id]/cobranzas/[collectionId]",
+          "/proyectos/[id]/pagos/[paymentId]",
+          "/finanzas/cuentas-por-cobrar/[receivableId]",
+          "/finanzas/pagos-proveedor/[paymentId]"
+        ],
+        "access": [
+          "AR/AP según operación y D-069 para pago",
+          "Ámbito de empresa/obra y ACL",
+          "Tesorería en preview y TX",
+          "Período/reconciliación/GL como límites existentes"
+        ],
+        "notes": "Pagar/Cobrar saldo total usa saldo almacenado en servidor. No se agrega una regla nueva de fondos para cancelar un ingreso. La reversión neutral de factura/pago/cobranza conserva la base; NC conserva su guard ACTIVE."
+      },
+      "tested": {
+        "previous": "Matriz de acceso e invalidación AG-08.",
+        "current": [
+          "output/platform-audit/ag-09-2026-11-05/sql-ar-third.log",
+          "output/platform-audit/ag-09-2026-11-05/sql-ap-second.log",
+          "packages/services/src/finance/payment-collection-access.test.ts",
+          "packages/services/src/accounting/accounting-ar-ap-cancel-atomic.test.ts",
+          "apps/web/features/ap/lib/payment-detail-rsc.test.mjs",
+          "output/platform-audit/ag-09-2026-11-05/sql-ag08-settlement-regression.log",
+          "output/platform-audit/ag-09-2026-11-05/visual-checks.json"
+        ]
+      },
+      "findings": [
+        "GA-AG-09-001",
+        "GA-AG-09-002",
+        "GA-AG-09-004",
+        "GA-AG-09-008",
+        "GA-AG-09-013",
+        "GA-AG-09-014",
+        "GA-AG-09-015",
+        "GA-AG-09-017",
+        "GA-AG-09-020",
+        "GA-AG-09-021",
+        "GA-AG-09-022",
+        "GA-AG-09-023",
+        "GA-AG-09-024",
+        "GA-AG-09-026",
+        "GA-AG-09-027"
+      ]
+    },
+    {
+      "id": "AG09-R06",
+      "journey": "Aging, snapshots, proyecciones, reportes, CSV, avisos y tools AI",
+      "documented": [
+        "MONEY_MODEL",
+        "MULTI_CURRENCY_RULES",
+        "D-008/D-053/D-115",
+        "TENANT_COMPANY_SCOPING",
+        "CHANGE_IMPACT_POLICY"
+      ],
+      "implemented": {
+        "entry": [
+          "features/aging",
+          "features/project-cash-flow",
+          "Finanzas de obra/empresa",
+          "Exportadores CSV",
+          "AI get_payables/get_receivables"
+        ],
+        "validators": [
+          "parseObligationAsOfDate",
+          "Filtros existentes de reportes"
+        ],
+        "services": [
+          "aging/aging.service.ts",
+          "project-cash-flow/project-cash-flow.service.ts",
+          "project-cash-flow/project-cash-position-projection.service.ts",
+          "project-finance/project-attributed-cash.service.ts",
+          "reports/project-cash-projection.service.ts",
+          "reports/project-supplier-report.service.ts",
+          "reports/certification-evolution.service.ts",
+          "notifications/operational-alerts.service.ts",
+          "notifications/notification-email-context.ts",
+          "report-exports/report-export.service.ts",
+          "ai/tools/finance-tools.ts"
+        ],
+        "persistence": [
+          "Prisma read de obligaciones y caja confirmada",
+          "Snapshots derivados sin segunda fuente operativa",
+          "CAS de estado overdue sin alterar importes"
+        ],
+        "readback": [
+          "byCurrency y totales no mezclados",
+          "creditedAmount visible/exportado",
+          "Deuda neta en proyección/KPI/aviso",
+          "Contexto/ACL del mismo service también para AI"
+        ]
+      },
+      "exposed": {
+        "routes": [
+          "/finanzas/cuentas-por-cobrar",
+          "/finanzas/cuentas-por-pagar",
+          "/proyectos/[id]/cuentas-por-cobrar",
+          "/proyectos/[id]/cuentas-por-pagar",
+          "Reportes y exportaciones financieros existentes"
+        ],
+        "access": [
+          "Capacidad financiera de proyecto o corporativa según vista",
+          "ACL del proyecto",
+          "Filtro explícito de empresa dentro del anclaje autorizado",
+          "Gates AR/AP de cada sección"
+        ],
+        "notes": "Los filtros del bloque Antigüedad de saldos no se prometen como filtros de otros listados. No disponible no equivale a cero/vacío. La IA reutiliza services; no se agregó escritura AI."
+      },
+      "tested": {
+        "previous": "Selecciones históricas no sustituyen los casos AR/AP actuales.",
+        "current": [
+          "output/platform-audit/ag-09-2026-11-05/sql-ar-consumers-first.log",
+          "packages/services/src/finance/obligation-date.test.ts",
+          "packages/services/src/notifications/financial-notification-balance.test.ts",
+          "apps/web/features/finance/lib/financial-interactions.test.ts",
+          "output/platform-audit/ag-09-2026-11-05/sql-ar-consumers-final.log",
+          "output/platform-audit/ag-09-2026-11-05/visual-checks.json"
+        ]
+      },
+      "findings": [
+        "GA-AG-09-001",
+        "GA-AG-09-002",
+        "GA-AG-09-003",
+        "GA-AG-09-008",
+        "GA-AG-09-009",
+        "GA-AG-09-010",
+        "GA-AG-09-021",
+        "GA-AG-09-026",
+        "GA-AG-09-027",
+        "GA-AG-09-028"
+      ]
+    }
+  ],
+  "coverageDimensions": [
+    {
+      "dimension": "Contrato completo",
+      "status": "verified_in_scope",
+      "scope": "Forms/Actions → schemas → services → Prisma real → efectos → DTO → invalidación/listas/reportes."
+    },
+    {
+      "dimension": "Schema/relaciones",
+      "status": "reviewed_in_scope",
+      "scope": "Modelos operativos AR/AP/Collection/Payment y FKs simples; guards de padre y referencias adicionales. Sin cambio de schema/migración."
+    },
+    {
+      "dimension": "Tenant/empresa/proyecto/RBAC/gates",
+      "status": "reviewed_with_SQL",
+      "scope": "Tenants y empresas sintéticos, obra compartida, ACL, corporativo, URL/Action directa y gate después de preflight; no se revisa toda identidad de plataforma."
+    },
+    {
+      "dimension": "Finanzas/estados/concurrencia",
+      "status": "reviewed_with_SQL",
+      "scope": "Dinero2/FX6/qty4, impuestos, cash vs credit, idempotencia, CAS, series, locks, rollback/GL y fuente fresca."
+    },
+    {
+      "dimension": "Consumidores",
+      "status": "reviewed_with_SQL",
+      "scope": "Aging, snapshot, cash projection, proveedor, evolución, avisos/email, CSV y tools AI. La selección final de ocho casos aprobó, incluida la herramienta AI sin modelo externo."
+    },
+    {
+      "dimension": "UI/UX/visual/a11y",
+      "status": "interaction_RSC_and_browser_sample_verified",
+      "scope": "Controles, etiquetas, error/pending, confirmaciones, Field/RSC y límites de filtros; viewport/temas/foco y capturas quedan a coordinador."
+    },
+    {
+      "dimension": "Archivos/proveedores",
+      "status": "bounded_static",
+      "scope": "Recuperación create-then-upload; no envío real de email, R2, AI modelo ni proveedor externo."
+    },
+    {
+      "dimension": "Ayuda/Guide/AI",
+      "status": "updated_index_checked",
+      "scope": "D-090 y policy: Guide§12, help finance, módulos/workflows, D-133; índice583chunks/check0 y6 pruebas knowledge en general.5evals preparados sinmodelo."
+    },
+    {
+      "dimension": "Rendimiento/observabilidad",
+      "status": "bounded_evidence_only",
+      "scope": "P2028 real y tiempos transaccionales acotados; no benchmark de volumen, carga o producción."
+    }
+  ],
+  "findings": [
+    {
+      "id": "GA-AG-09-001",
+      "title": "Ámbito de empresa, obra y acceso corporativo",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-ACCESS",
+        "FE-corporate-scope",
+        "ap-cancellation-permissions-audit-and-identifiers"
+      ],
+      "rule": [
+        "ADR-018",
+        "D-056",
+        "D-111",
+        "TENANT_COMPANY_SCOPING"
+      ],
+      "locations": [
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ar/receivable.service.ts",
+        "packages/services/src/ar/project-ar-summary.service.ts",
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ap/payable.service.ts",
+        "apps/web/app/(app)/finanzas/cuentas-por-cobrar/actions.ts",
+        "apps/web/app/(app)/finanzas/cuentas-por-pagar/actions.ts"
+      ],
+      "reproduction": "Consultar empresa A con una obra compartida y documentos de B; llamar un ID corporativo con capacidad solo de proyecto; cancelar una deuda sin asignación a la obra.",
+      "observed": "Algunas listas y getters no comprobaban empresa/capacidad corporativa y ciertas cancelaciones carecían de ACL de obra.",
+      "expected": "Solo devolver o mutar documentos de empresa/obra autorizada; un contexto de proyecto no obtiene capacidad corporativa por conocer un ID.",
+      "correction": "Aplicar filtros no nullable, guards por ámbito, ACL antes de mutación o replay y wrappers corporativos que rechazan fuentes de proyecto.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/finance/payment-collection-access.test.ts",
+        "apps/web/features/finance/lib/financial-actions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-002",
+      "title": "Pertenencia de padres y referencias adicionales",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-PARENTS",
+        "ap-parent-and-line-integrity"
+      ],
+      "rule": [
+        "ADR-018",
+        "D-055",
+        "D-066",
+        "D-110",
+        "D-115"
+      ],
+      "locations": [
+        "packages/services/src/ar/ar-integrity.ts",
+        "packages/services/src/ap/ap-integrity.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/ap/corporate-ap-snapshot.ts",
+        "packages/services/src/ar/company-ar-snapshot.ts",
+        "packages/services/src/finance/obligation-read-integrity.ts",
+        "packages/services/src/aging/aging.service.ts"
+      ],
+      "reproduction": "Usar una FK simple válida hacia contacto, factura, WBS, APU, OC o subcert de otro ámbito; alterar un padre de una obligación antes de leerla o pagarla.",
+      "observed": "La FK aislada no garantizaba coherencia tenant/empresa/obra entre ambos extremos; algunas lecturas podían exponer etiquetas o utilizar dinero con padre incoherente.",
+      "expected": "Cada relación utilizada pertenece al tenant y conserva empresa/obra/contacto y trazabilidad monetaria coherentes.",
+      "correction": "Validar raíces y grafos unidos, líneas WBS/APU/OC y obligación-factura antes de serializar o mutar; revalidar dentro de TX y retirar joins internos de DTO. El pago valida también líneas históricas antes de crear caja.",
+      "tests": [
+        "packages/services/src/ar/ar-integrity.test.ts",
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/finance/obligation-read-integrity.test.ts",
+        "packages/services/src/ar/ar-finance-consumers-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-003",
+      "title": "Validación de servicios, fechas reales y borrado explícito",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-INPUTS",
+        "ap-decimal-contracts-and-input-validation"
+      ],
+      "rule": [
+        "API_STRUCTURE",
+        "D-084",
+        "D-117"
+      ],
+      "locations": [
+        "packages/validators/src/sales-invoice.ts",
+        "packages/validators/src/ap.ts",
+        "packages/validators/src/ar-advance.ts",
+        "packages/validators/src/treasury.ts",
+        "packages/services/src/ar/ar-integrity.ts",
+        "packages/services/src/ap/ap-input.ts",
+        "packages/services/src/finance/obligation-date.ts",
+        "packages/services/src/finance/pagination.ts",
+        "packages/services/src/finance/pagination.test.ts",
+        "apps/web/app/(app)/finanzas/cuentas-por-cobrar/page.tsx",
+        "apps/web/app/(app)/finanzas/cuentas-por-pagar/page.tsx",
+        "apps/web/app/(app)/finanzas/transacciones/page.tsx"
+      ],
+      "reproduction": "Invocar un service directamente con 2026-02-30, datos no válidos o notes=null; pedir un aging con fecha de corte imposible. Probar además page/pageSize NaN, Infinity o fraccionarios y parámetros de URL no numéricos.",
+      "observed": "Se confiaba en el transporte o en tipos TypeScript; regex de fecha normalizaba días inexistentes y null podía no limpiar notas. La paginación podía pasar valores no enteros o skip fuera del rango de Prisma y terminar en error de consulta.",
+      "expected": "Una llamada directa al service respeta el mismo contrato que la Action; fechas imposibles se rechazan y null limpia el campo nullable. La paginación usa valores enteros seguros y vuelve a la primera página ante una URL inválida.",
+      "correction": "Parsear schemas en la frontera del service, validar calendario y orden manual de fechas, conservar vencimientos heredados de notas y respetar null explícito. La fecha de corte inválida se rechaza. Normalizar enteros y límites en resolvePagination y reutilizar parsePage en las tres páginas corporativas afectadas, sin cambiar el flujo válido.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ar/ar-integrity.test.ts",
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/finance/obligation-date.test.ts",
+        "packages/services/src/finance/pagination.test.ts",
+        "Muestra de URL con page fuera de rango, §6."
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La robustez de paginación y su prueba visual de URL inválida son posteriores al snapshot general de 2.647 casos; requieren repetición final."
+    },
+    {
+      "id": "GA-AG-09-004",
+      "title": "DTO financieros serializables en RSC y cliente",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "ap-decimal-contracts-and-input-validation",
+        "AR-NOTE-MONEY"
+      ],
+      "rule": [
+        "D-053",
+        "FRONTEND_ARCHITECTURE"
+      ],
+      "locations": [
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ar/receivable.service.ts",
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts"
+      ],
+      "reproduction": "Pasar vistas que extendían un modelo Prisma con fxRate/amountArs Decimal hacia un formulario o React Flight.",
+      "observed": "Parte del dinero/FX quedaba como objeto Decimal, aunque otros importes ya estaban convertidos a string.",
+      "expected": "Las props y DTO contienen strings monetarios/FX o valores JSON planos, nunca Prisma.Decimal ni joins internos.",
+      "correction": "Serializar money a 2 dp y FX a 6 dp, devolver contratos planos y preservar la identidad/código documental de deuda y pago.",
+      "tests": [
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "apps/web/features/ap/lib/payment-detail-rsc.test.mjs"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-005",
+      "title": "Redondeo y conservación de líneas en NC/ND",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-NOTE-MONEY",
+        "ap-notes-money-kernel"
+      ],
+      "rule": [
+        "D-053",
+        "D-086",
+        "D-093",
+        "D-117"
+      ],
+      "locations": [
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts"
+      ],
+      "reproduction": "Crear dos líneas con importes pequeños e IVA o copiar una ND sin cambiar los datos monetarios guardados.",
+      "observed": "Las notas sumaban componentes Decimal crudos antes de redondear; la copia podía recalcular snapshots y la edición podía omitir precios con IVA incluido.",
+      "expected": "Redondear cada componente antes de sumar y conservar los componentes guardados cuando los datos monetarios no cambian.",
+      "correction": "Usar resolveInvoiceLineMoney por componente, conservar snapshots cuando corresponde y honrar la captura bruto/neto al editar.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-006",
+      "title": "Decimales canónicos reinterpretados como miles",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo en el validator compartido; expuesto y amplificado por la nueva validación de servicios de AG-09",
+      "aliases": [
+        "ROOT-CANONICAL-DECIMAL",
+        "AR-NOTE-MONEY"
+      ],
+      "rule": [
+        "D-053",
+        "D-093",
+        "API_STRUCTURE"
+      ],
+      "locations": [
+        "packages/validators/src/money.ts",
+        "packages/validators/src/money-unit-price.test.ts",
+        "packages/validators/src/inventory-inputs.test.ts"
+      ],
+      "reproduction": "Revalidar unitPrice='0.025' o discountPct='0.025' recibido como decimal técnico canónico.",
+      "observed": "El parser localizado transformaba 0.025 en 25; 1.255 se convertía en 1255 o se rechazaba como descuento superior a 100.",
+      "expected": "El string técnico 0.025 conserva ese valor en cada parseo; la captura localizada se normaliza en su borde correspondiente.",
+      "correction": "Priorizar el decimal canónico antes del parser de entrada localizada; conservar 1.234,56 explícito y el parser de teclado es-AR. Parsear repetidamente mantiene el importe.",
+      "tests": [
+        "packages/validators/src/money-unit-price.test.ts",
+        "packages/validators/src/inventory-inputs.test.ts",
+        "packages/services/src/finance/discount-pct-string.test.ts",
+        "packages/utils/src/money.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-007",
+      "title": "Captura y edición con precisión de cuatro decimales",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-precision"
+      ],
+      "rule": [
+        "D-053",
+        "MONEY_MODEL"
+      ],
+      "locations": [
+        "apps/web/features/sales-invoices/components/manual-invoice-form.tsx",
+        "apps/web/features/sales-invoices/components/invoice-edit-form.tsx",
+        "apps/web/features/ap/components/invoice-lines-editor.tsx"
+      ],
+      "reproduction": "Editar cantidad, precio unitario o descuento con más de dos decimales o usar coma decimal en una nota.",
+      "observed": "Algunos controles recortaban a 2 dp o enviaban texto localizado sin normalización.",
+      "expected": "Capturar y conservar hasta 4 dp donde el contrato los permite, sin alterar la presentación monetaria 2 dp.",
+      "correction": "Reutilizar DecimalInput con precisión 4 y labels coherentes; mantener presentación es-AR y dinero operativo a 2 dp.",
+      "tests": [
+        "apps/web/features/finance/lib/financial-interactions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-008",
+      "title": "Las lecturas no deben crear caja ni regularizar históricos",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-NC-SNAPSHOT",
+        "ap-read-must-not-invent-cash"
+      ],
+      "rule": [
+        "D-053",
+        "D-115",
+        "D-117"
+      ],
+      "locations": [
+        "packages/services/src/ar/receivable.service.ts",
+        "packages/services/src/ap/payable.service.ts"
+      ],
+      "reproduction": "Leer una deuda 100 con pago 40 y crédito 60, o un legado con paidAmount=49.999 y creditedAmount=50.",
+      "observed": "La reconciliación en lectura escribía paidAmount/status; podía convertir crédito o polvo subcentavo en caja persistida sin una operación de tesorería.",
+      "expected": "Una consulta no modifica dinero, estado persistido ni timestamp; la proyección puede derivar saldada sin crear caja.",
+      "correction": "Derivar saldo y estado solo en DTO. Conservar original, paid, credited, status y updatedAt persistidos durante la consulta. No hay reparación masiva de históricos.",
+      "tests": [
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-009",
+      "title": "Créditos omitidos en saldos, proyecciones y avisos",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-NC-SNAPSHOT",
+        "ROOT-CREDIT-CONSUMERS"
+      ],
+      "rule": [
+        "D-115",
+        "ACCOUNTS_RECEIVABLE",
+        "ACCOUNTS_PAYABLE"
+      ],
+      "locations": [
+        "packages/services/src/ar/company-ar-snapshot.ts",
+        "packages/services/src/project-cash-flow/project-cash-position-projection.service.ts",
+        "packages/services/src/reports/project-cash-projection.service.ts",
+        "packages/services/src/reports/project-supplier-report.service.ts",
+        "packages/services/src/reports/certification-evolution.service.ts",
+        "packages/services/src/notifications/operational-alerts.service.ts",
+        "packages/services/src/notifications/notification-email-context.ts",
+        "packages/services/src/finance/obligation-date.ts"
+      ],
+      "reproduction": "Aplicar una NC parcial y consultar snapshot, proyección, vencimientos, evolución, email o estado con paid=0.",
+      "observed": "Algunos consumidores usaban original-paid y mostraban deuda excesiva; un crédito parcial podía verse OPEN. El job podía marcar OVERDUE desde un saldo ya cambiado.",
+      "expected": "Todos los consumidores descuentan créditos; caja y crédito parcial explican correctamente saldo/estado y avisos.",
+      "correction": "Usar original-paid-credited, derivar PARTIAL por caja o crédito y proteger el cambio a OVERDUE con CAS de los importes leídos. Los emails muestran el saldo neto.",
+      "tests": [
+        "packages/services/src/ar/ar-finance-consumers-audit.live.test.ts",
+        "packages/services/src/finance/obligation-date.test.ts",
+        "packages/services/src/notifications/financial-notification-balance.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-010",
+      "title": "Aging, CSV y herramientas AI sin sumar monedas distintas",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-currency-aging",
+        "ROOT-AGING-CURRENCY"
+      ],
+      "rule": [
+        "D-008",
+        "D-053",
+        "MONEY_MODEL"
+      ],
+      "locations": [
+        "packages/services/src/aging/aging.service.ts",
+        "packages/services/src/ai/tools/finance-tools.ts",
+        "packages/services/src/report-exports/report-export.service.ts",
+        "apps/web/features/aging/components/aging-summary-cards.tsx",
+        "apps/web/features/aging/components/aging-table.tsx"
+      ],
+      "reproduction": "Consultar aging de ARS 100 y USD 10 sin filtro de moneda.",
+      "observed": "El total general sumaba unidades originales incompatibles y podía presentarse en UI/AI como un único importe.",
+      "expected": "No existe una suma escalar ARS+USD original; UI/CSV/AI identifican y agrupan cada moneda.",
+      "correction": "Usar byCurrency; totals=null con más de una moneda. Mostrar moneda explícita, agregar creditedAmount al detalle/CSV y conservar separadas las fuentes de dashboard/AI.",
+      "tests": [
+        "packages/services/src/ar/ar-finance-consumers-audit.live.test.ts",
+        "apps/web/features/finance/lib/financial-interactions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-011",
+      "title": "Numeración NC/ND simultánea entre obras y corporativo",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-NUMBER-RACE",
+        "ap-note-numbering-and-cancel-races"
+      ],
+      "rule": [
+        "D-115",
+        "ENTITY_ID_STRATEGY"
+      ],
+      "locations": [
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts",
+        "packages/services/src/treasury/treasury-write-locks.ts"
+      ],
+      "reproduction": "Crear notas del mismo tipo y empresa al mismo tiempo desde distintas obras o sin proyecto.",
+      "observed": "max(number)+1 sin bloqueo de empresa podía producir P2002; el bloqueo de una sola obra no protegía la serie común.",
+      "expected": "Cada creador obtiene un número distinto de la serie de su empresa y tipo, incluso desde obras distintas o corporativo.",
+      "correction": "Tomar Company tras Project cuando existe, calcular dentro de TX y conservar series separadas por documentKind.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-012",
+      "title": "Transiciones de notas y padre bajo datos frescos y CAS",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-NUMBER-RACE",
+        "ap-note-numbering-and-cancel-races"
+      ],
+      "rule": [
+        "D-115",
+        "STATE_MACHINES"
+      ],
+      "locations": [
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts"
+      ],
+      "reproduction": "Competir emisión de NC con anulación del padre o emisión/anulación de la misma NC borrador.",
+      "observed": "Lecturas anteriores al lock y updates incondicionales podían dejar un documento cancelado con crédito confirmado o una nota emitida sobre padre cancelado.",
+      "expected": "Documento, padre y aplicación permanecen coherentes cualquiera sea el ganador de la carrera.",
+      "correction": "Serializar por empresa/documento, releer padre/saldo dentro de TX y reclamar estados con CAS; conservar documento y aplicación coherentes.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-013",
+      "title": "Motivo, confirmación y repetición segura de anulaciones",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-CANCELLATION",
+        "ap-cancellation-permissions-audit-and-identifiers",
+        "FE-cancellation-confirmation"
+      ],
+      "rule": [
+        "BR-AUD-002",
+        "BR-AUD-003",
+        "D-115"
+      ],
+      "locations": [
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ar/receivable.service.ts",
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/ap/payable.service.ts",
+        "apps/web/components/feedback/reason-action-button.tsx"
+      ],
+      "reproduction": "Anular un emitido/confirmado sin motivo, hacerlo desde un botón directo o repetir después de perder la respuesta.",
+      "observed": "Faltaba trazabilidad del motivo y el reintento podía devolver conflicto pese al primer éxito.",
+      "expected": "Anular emitido/confirmado conserva motivo auditado y el replay autorizado no duplica efectos.",
+      "correction": "Exigir motivo en emitidos/confirmados, conservar confirmación de borrador sin motivo obligatorio, auditar y devolver el resultado de un replay ya cancelado solo después de comprobar acceso.",
+      "tests": [
+        "packages/services/src/finance/payment-collection-access.test.ts",
+        "apps/web/features/finance/lib/financial-actions.test.ts",
+        "apps/web/features/ap/lib/payment-detail-rsc.test.mjs",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-014",
+      "title": "Reversión de caja con un único movimiento exacto",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-CANCELLATION",
+        "ap-parent-and-line-integrity",
+        "ROOT-COLLECTION-CASH-LEG"
+      ],
+      "rule": [
+        "D-010",
+        "D-115",
+        "BR-TRZ-003",
+        "BR-TRZ-005"
+      ],
+      "locations": [
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ar/ar-integrity.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/ap/ap-integrity.ts"
+      ],
+      "reproduction": "Eliminar, duplicar o alterar el movimiento vinculado; intentar revertir un importe mayor a la caja aplicada a la deuda.",
+      "observed": "Una reversión podía bajar paidAmount aunque no existiera un movimiento correspondiente, o normalizar un resultado inválido mediante clamp.",
+      "expected": "Revertir una aplicación solo con su movimiento único y exacto, sin caja/deuda parcial ni clamp que esconda inconsistencias.",
+      "correction": "Exigir un movimiento compatible en tenant/empresa/obra/cuenta/moneda/importe/estado y saldo aplicado suficiente; bloquear Company→Account, releer y reclamar por CAS sin efectos parciales.",
+      "tests": [
+        "packages/services/src/ar/ar-integrity.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-015",
+      "title": "FX manual en comprobantes y aplicaciones no ARS",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-FX-ADVANCE",
+        "ap-payment-manual-fx",
+        "FE-fx-consumer"
+      ],
+      "rule": [
+        "D-008",
+        "MULTI_CURRENCY_RULES",
+        "D-052"
+      ],
+      "locations": [
+        "packages/validators/src/sales-invoice.ts",
+        "packages/validators/src/ap.ts",
+        "packages/validators/src/ar-advance.ts",
+        "packages/services/src/ar/register-ar-sale.service.ts",
+        "packages/services/src/ar/register-ar-income.service.ts",
+        "packages/services/src/ap/apply-payment-to-payable.ts",
+        "apps/web/features/ap/components/payment-form.tsx",
+        "apps/web/features/sales-invoices/components/advance-invoice-form.tsx"
+      ],
+      "reproduction": "Pagar una deuda USD con cuenta USD o crear un anticipo extranjero sin posibilidad de aportar el FX.",
+      "observed": "Unos caminos fallaban por ausencia de FX y otros podían usar el default 1 de factura extranjera.",
+      "expected": "Un comprobante/pago/cobro extranjero conserva el FX manual y su equivalente ARS, con cuenta/moneda compatibles.",
+      "correction": "Capturar FX de hasta 6 dp en los campos persistidos existentes; exigirlo para moneda extranjera y calcular amountArs. ARS conserva 1. La cuenta debe ser compatible y no hay conversión entre monedas.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts",
+        "apps/web/features/finance/lib/financial-interactions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-016",
+      "title": "Anticipo argentino sin letra de comprobante",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-FX-ADVANCE"
+      ],
+      "rule": [
+        "D-084",
+        "SALES_AND_COLLECTIONS"
+      ],
+      "locations": [
+        "packages/services/src/ar/register-ar-advance.service.ts",
+        "packages/services/src/finance/resolve-suggested-invoice-letter.ts"
+      ],
+      "reproduction": "Crear un anticipo con empresa o cliente de Argentina.",
+      "observed": "La composición no aportaba invoiceLetter y fallaba el guard obligatorio al emitir.",
+      "expected": "Un anticipo argentino resuelve una letra válida conforme D-084 antes de emitir.",
+      "correction": "Resolver en servidor la sugerencia ya documentada desde datos fiscales y conservar el circuito factura→CxC→cobranza.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-017",
+      "title": "Reintento de la misma operación con datos financieros distintos",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-REPLAY",
+        "ap-composite-policy-and-replay"
+      ],
+      "rule": [
+        "D-008",
+        "D-112",
+        "D-115",
+        "API_STRUCTURE"
+      ],
+      "locations": [
+        "packages/services/src/idempotency/idempotency.ts",
+        "packages/services/src/ar/register-ar-sale.service.ts",
+        "packages/services/src/ar/register-ar-income.service.ts",
+        "packages/services/src/ap/register-ap-expense.service.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/treasury/collection.service.ts"
+      ],
+      "reproduction": "Reusar una clave desde otra empresa, cambiar FX/IIBB/método/referencia/notas o intentar adoptar un pago independiente posterior como hijo de una composición.",
+      "observed": "Los fingerprints y loaders omitían parte del ámbito/dato económico y la heurística temporal podía seleccionar otro cobro/pago.",
+      "expected": "La misma clave devuelve la misma operación solo con ámbito y payload económico/documental compatibles.",
+      "correction": "Validar primero el grafo autorizado; comparar FX, IIBB, override y metadata; usar child idempotencyKey exacta cuando se aporta. Conservar compatibilidad del camino legado sin esa clave.",
+      "tests": [
+        "packages/services/src/idempotency/idempotency.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-018",
+      "title": "Replays de líneas empatadas y atributos de costo",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "ROOT-REPLAY-LINE-MULTISET"
+      ],
+      "rule": [
+        "D-110",
+        "D-117",
+        "API_STRUCTURE"
+      ],
+      "locations": [
+        "packages/services/src/idempotency/idempotency.ts",
+        "packages/services/src/ap/register-ap-expense.service.ts"
+      ],
+      "reproduction": "Reintentar dos renglones con igual descripción/sortOrder cargados en distinto orden por UUID, o cambiar APU/tipo de costo explícito.",
+      "observed": "La posición física podía producir un conflicto falso; atributos de costo relevantes no se comparaban.",
+      "expected": "Un replay idéntico conserva igualdad aunque cambie el orden físico de líneas empatadas y rechaza atributos explícitos diferentes.",
+      "correction": "Comparar un multiconjunto de huellas canónicas conservando sortOrder, APU exacta y tipo explícito; mantener el snapshot del tipo derivado en servidor cuando el input lo omite.",
+      "tests": [
+        "packages/services/src/idempotency/idempotency.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-019",
+      "title": "Umbral de gasto calculado antes de percepción IIBB",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "ap-composite-policy-and-replay"
+      ],
+      "rule": [
+        "BR-APR-005",
+        "D-112"
+      ],
+      "locations": [
+        "packages/services/src/ap/register-ap-expense.service.ts"
+      ],
+      "reproduction": "Registrar neto 980 con IIBB 3% ante un umbral ARS 1000.",
+      "observed": "El control anterior al impuesto evaluaba 980 aunque el total final era 1009.40.",
+      "expected": "El umbral compara el importe final con impuestos y no persiste una operación rechazada.",
+      "correction": "Evaluar autorización y política sobre el importe final con percepción, dentro de la transacción y sin crear documentos al rechazar.",
+      "tests": [
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-020",
+      "title": "Orden común de locks y fondos bajo bloqueo de cuenta",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "AR-LOCK-TIMEOUT",
+        "ap-company-account-order-and-fresh-gates"
+      ],
+      "rule": [
+        "BR-TRZ-004",
+        "D-052",
+        "D-111"
+      ],
+      "locations": [
+        "packages/services/src/treasury/treasury-write-locks.ts",
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ar/register-ar-sale.service.ts",
+        "packages/services/src/ar/register-ar-income.service.ts",
+        "packages/services/src/ap/apply-payment-to-payable.ts",
+        "packages/services/src/treasury/internal-transfer.service.ts",
+        "packages/services/src/treasury/register-corporate-treasury-inflow.service.ts",
+        "packages/services/src/treasury/register-manual-treasury-adjustment.service.ts"
+      ],
+      "reproduction": "Competir una aplicación normal Account→Company con una composición que ya retiene Company→Account; dos empresas pagan desde una cuenta compartida.",
+      "observed": "Se podía interbloquear escritores o comprobar fondos sin la serialización común necesaria.",
+      "expected": "Todos los escritores relacionados usan el mismo orden de locks y los fondos se comprueban con la cuenta bloqueada.",
+      "correction": "Unificar Project→Company→Contact/Account donde corresponde, ordenar IDs de múltiples cuentas y releer la cuenta bloqueada. Las ampliaciones de tesorería se limitan a esta frontera.",
+      "tests": [
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-021",
+      "title": "Tesorería deshabilitada y consulta de obligaciones",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-treasury-gate",
+        "ROOT-COLLECTION-TREASURY-GATE",
+        "ap-company-account-order-and-fresh-gates"
+      ],
+      "rule": [
+        "D-056",
+        "D-111",
+        "TENANT_MODULES"
+      ],
+      "locations": [
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ar/ar-integrity.ts",
+        "packages/services/src/ap/ap-integrity.ts",
+        "apps/web/app/(app)/finanzas/cuentas-por-cobrar/[receivableId]/page.tsx"
+      ],
+      "reproduction": "Con AR activo y TREASURY desactivado, enviar una cobranza directamente; consultar una CxC abierta sin Tesorería.",
+      "observed": "El servicio de cobranza no cerraba el gate de caja y la pantalla de consulta podía fallar al cargar las cuentas.",
+      "expected": "Desactivar Tesorería bloquea nuevas mutaciones de caja también en llamadas directas, sin impedir consultar deuda AR/AP.",
+      "correction": "Exigir AR/AP y Tesorería en la mutación y revalidarlos dentro de TX; mantener la consulta de deuda disponible sin cargar cuentas ni ofrecer acciones de caja deshabilitadas.",
+      "tests": [
+        "packages/services/src/ar/ar-integrity.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.test.ts",
+        "apps/web/features/finance/lib/financial-interactions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-022",
+      "title": "Anulación operativa y asiento contable en una misma transacción",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "ar-ap-gl-cancellation-atomicity"
+      ],
+      "rule": [
+        "D-061",
+        "D-063",
+        "ACCOUNTING",
+        "STATE_MACHINES"
+      ],
+      "locations": [
+        "packages/services/src/accounting/accounting-cancel-sync.service.ts",
+        "packages/services/src/accounting/journal-entry.service.ts",
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts"
+      ],
+      "reproduction": "Contabilizar entre el preflight y la anulación, fallar la auditoría GL durante la reversión o generar un auto-DRAFT atrasado tras cancelar la fuente.",
+      "observed": "El guard fuera de TX y la limpieza DRAFT posterior al commit dejaban una ventana con documento/caja cancelado y asiento posteable o POSTED.",
+      "expected": "Fuente operativa y GL se cancelan/auditan atómicamente; no se postea ni nace un DRAFT operativo tardío sobre fuente cancelada.",
+      "correction": "Componer guard, cancelación DRAFT y auditoría en la TX operativa bajo Company. Crear/postear asientos AR/AP revalida estado de la fuente, líneas, fecha y revisión. Conservar los orígenes correctos de ND.",
+      "tests": [
+        "packages/services/src/accounting/accounting-ar-ap-cancel-atomic.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-023",
+      "title": "Transacciones financieras con tiempo implícito insuficiente",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "timeout implícito previo; reproducción y ampliación de trabajo transaccional durante el diff AG-09",
+      "aliases": [
+        "AR-LOCK-TIMEOUT",
+        "ap-bounded-financial-transactions"
+      ],
+      "rule": [
+        "D-061",
+        "SERVICE_LAYER"
+      ],
+      "locations": [
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/treasury/collection.service.ts",
+        "packages/services/src/ap/payment.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts",
+        "packages/services/src/ap/payable.service.ts",
+        "packages/services/src/accounting/journal-entry.service.ts"
+      ],
+      "reproduction": "Ejecutar en SQL aislado las nuevas comprobaciones de grafo y auditoría junto con emisión/reversión.",
+      "observed": "Transacciones con timeout implícito de 5 s expiraban; se observó P2028/Transaction not found antes de completar efectos.",
+      "expected": "La transacción financiera puede completar las comprobaciones acotadas dentro de su límite explícito y falla sin efectos parciales.",
+      "correction": "Usar maxWait 10 s y timeout 30 s en los caminos financieros afectados; no modificar un ajuste global ni ocultar el fallo como una prueba aprobada.",
+      "tests": [
+        "sql-ar-first.log",
+        "sql-ap-first.log",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-024",
+      "title": "Formularios con doble envío o respuesta de transporte incierta",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-uncertain-action",
+        "FE-issue-feedback"
+      ],
+      "rule": [
+        "PLATFORM_AUDIT_RUNBOOK §6",
+        "Patrón AG-08 useOperationalAction"
+      ],
+      "locations": [
+        "apps/web/hooks/use-operational-action.ts",
+        "apps/web/features/sales-invoices/components/manual-invoice-form.tsx",
+        "apps/web/features/ap/components/supplier-invoice-form.tsx",
+        "apps/web/features/collections/components/collection-form.tsx",
+        "apps/web/features/finance/components/new-transaction-dialog.tsx",
+        "apps/web/features/finance/components/create-fiscal-note-dialog.tsx"
+      ],
+      "reproduction": "Enviar dos veces antes del próximo render, cerrar un diálogo mientras guarda o perder la respuesta de una Action.",
+      "observed": "Faltaba mutex inmediato/catch y podían desmontarse inputs durante una mutación; botones de emitir no mostraban confirmación/pending recuperable.",
+      "expected": "El usuario recibe pending/error/éxito coherentes y no puede duplicar ni desmontar accidentalmente una operación en curso.",
+      "correction": "Reutilizar el hook y confirmaciones existentes, bloquear controles/cierre durante pending, conservar inputs y claves en incertidumbre y mostrar el efecto de emitir.",
+      "tests": [
+        "apps/web/features/finance/lib/financial-interactions.test.ts",
+        "apps/web/features/finance/lib/financial-actions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-025",
+      "title": "Adjunto fallido después de crear la factura",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-upload-postcommit"
+      ],
+      "rule": [
+        "D-052",
+        "PLATFORM_AUDIT_RUNBOOK §6"
+      ],
+      "locations": [
+        "apps/web/features/sales-invoices/components/manual-invoice-form.tsx",
+        "apps/web/features/ap/components/supplier-invoice-form.tsx",
+        "apps/web/features/finance/components/new-transaction-dialog.tsx"
+      ],
+      "reproduction": "Crear una factura correctamente y fallar el transporte del upload posterior.",
+      "observed": "El error genérico retenía el formulario de alta y podía invitar a crear otra factura.",
+      "expected": "Un fallo de adjunto posterior no se presenta como fallo de la factura ya creada.",
+      "correction": "Mostrar advertencia específica del adjunto y navegar al documento ya creado para recuperarlo; no simular fallo de la factura ni repetirla.",
+      "tests": [
+        "Inspección estática del contrato create-then-upload; proveedores externos no ejecutados"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-026",
+      "title": "Invalidación del recorrido financiero después de mutar",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-invalidation"
+      ],
+      "rule": [
+        "PLATFORM_AUDIT_RUNBOOK §6",
+        "D-115"
+      ],
+      "locations": [
+        "apps/web/lib/revalidate-project-paths.ts",
+        "apps/web/app/(app)/proyectos/[id]/cobranzas/actions.ts",
+        "apps/web/app/(app)/proyectos/[id]/cuentas-por-pagar/actions.ts",
+        "apps/web/app/(app)/finanzas/cuentas-por-cobrar/actions.ts"
+      ],
+      "reproduction": "Cobrar, pagar, emitir una nota o anular y volver a factura/CxC/CxP/certificado/subcontrato/OC relacionado sin recargar manualmente.",
+      "observed": "Algunas Actions invalidaban solo listados o resúmenes; el detalle derivado podía conservar datos viejos.",
+      "expected": "Los consumidores del mismo recorrido se actualizan tras la mutación sin una nueva lectura financiera después del commit.",
+      "correction": "Invalidar descendientes del proyecto autorizado y layouts financieros/tesorería/contabilidad/reportes después del éxito, sin lecturas financieras de descubrimiento posteriores al commit.",
+      "tests": [
+        "apps/web/features/finance/lib/financial-actions.test.ts",
+        "apps/web/lib/certification-ar-invalidation.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-027",
+      "title": "Estado saldado, crédito aplicado y caja anulada en pantalla",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-settlement-vs-cash",
+        "FE-cancelled-note-narrative"
+      ],
+      "rule": [
+        "D-115",
+        "STATE_MACHINES"
+      ],
+      "locations": [
+        "apps/web/features/finance/components/related-fiscal-notes-panel.tsx",
+        "apps/web/features/collections",
+        "apps/web/features/ap",
+        "apps/web/app/(app)/finanzas/cuentas-por-cobrar/[receivableId]/page.tsx"
+      ],
+      "reproduction": "Saldar una obligación solo con NC o consultar su historial después de anular un cobro/pago/nota.",
+      "observed": "Pagada/Cobrada podía afirmar caja inexistente; movimientos anulados parecían vigentes y toda NC no borrador podía describirse como aplicada.",
+      "expected": "Saldada no afirma ingreso/egreso de caja; anulados y créditos se distinguen del movimiento confirmado.",
+      "correction": "Usar Saldada/Saldadas para la deuda, separar crédito de caja y mostrar el estado real de notas y movimientos. Conectar la cancelación corporativa existente de cobranza con motivo.",
+      "tests": [
+        "apps/web/features/finance/lib/financial-interactions.test.ts",
+        "apps/web/features/finance/lib/financial-actions.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-028",
+      "title": "Identidad documental, datos no disponibles y alcance de filtros",
+      "priority": "P2",
+      "type": "confirmed_bug",
+      "origin": "previo a la base; confirmado durante AG-09",
+      "aliases": [
+        "FE-source-projections"
+      ],
+      "rule": [
+        "D-102",
+        "D-115",
+        "PLATFORM_AUDIT_RUNBOOK §6"
+      ],
+      "locations": [
+        "apps/web/app/(app)/proyectos/[id]/cuentas-por-cobrar/page.tsx",
+        "apps/web/app/(app)/proyectos/[id]/cuentas-por-pagar/page.tsx",
+        "apps/web/features/aging/components/aging-filters.tsx",
+        "packages/services/src/ap/payable.service.ts"
+      ],
+      "reproduction": "Ver NC/ND recientes, el vínculo de factura AP, un fallo de lectura relacionada o filtrar el bloque de aging.",
+      "observed": "Se perdía documentKind/código de factura, un fallo se presentaba como lista vacía y los filtros parecían afectar otros bloques.",
+      "expected": "Identidad, estado de disponibilidad y alcance de filtros se describen según los datos y consultas reales.",
+      "correction": "Mapear identidad y código, distinguir indisponibilidad de vacío, delimitar Antigüedad de saldos y mantener el alcance de listas documentales; limpiar filtros reinicia su paginación.",
+      "tests": [
+        "apps/web/features/finance/lib/financial-interactions.test.ts",
+        "Tipos web y regresión general"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    },
+    {
+      "id": "GA-AG-09-029",
+      "title": "IVA y percepción negativos en nuevos efectos de factura",
+      "priority": "P1",
+      "type": "approved_rule_gap",
+      "origin": "brecha de contrato previa; definición financiera aprobada expresamente durante AG-09",
+      "aliases": [
+        "ap-nonnegative-tax-d133",
+        "ROOT-D133"
+      ],
+      "rule": [
+        "D-133",
+        "Q-080 aprobada",
+        "BR-TAX-002",
+        "BR-TAX-003",
+        "D-115"
+      ],
+      "locations": [
+        "packages/validators/src/money.ts",
+        "packages/validators/src/sales-invoice.ts",
+        "packages/validators/src/ap.ts",
+        "packages/services/src/finance/invoice-tax-guards.ts",
+        "packages/services/src/ar/sales-invoice.service.ts",
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/ap/supplier-invoice.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts"
+      ],
+      "reproduction": "Enviar IVA o percepción negativos, o emitir un borrador legado que los conserva.",
+      "observed": "Los contratos podían reducir el total mediante un impuesto negativo; la semántica no estaba expresada con precisión suficiente para decidir sin Owner. La revisión final detectó además que recalcular la cabecera antes del guard podía reemplazar un componente monetario legado negativo con tasas positivas.",
+      "expected": "D-133 aplica signo no negativo en nuevas operaciones/emisiones sin un máximo nuevo ni alteración de históricos emitidos.",
+      "correction": "Implementar D-133 aprobada: IVA/percepción y ajuste explícito no negativos, cero permitido y sin máximo nuevo; validar altas/ediciones/emisión de borradores y notas. No reescribir emitidos históricos ni copiar su impuesto negativo a un nuevo documento. Se agrega la validación previa al recálculo y se conserva la posterior; el borrador debe corregirse explícitamente antes de emitir.",
+      "tests": [
+        "packages/validators/src/invoice-tax-inputs.test.ts",
+        "packages/services/src/finance/invoice-tax-guards.test.ts",
+        "packages/services/src/ar/ar-audit.live.test.ts",
+        "packages/services/src/ap/ap-platform-audit.live.test.ts"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "Adenda de revisión final: repetir casos dirigidos de cabecera legada negativa antes/después del recálculo en AR/AP, tipos/lint y la compilación. No se acredita por la corrida anterior."
+    },
+    {
+      "id": "GA-AG-09-030",
+      "title": "Regresión local de cancelación NC fuera de obra ACTIVE",
+      "priority": "P1",
+      "type": "confirmed_bug",
+      "origin": "introducido por el diff AG-09, detectado por revisión independiente y restaurado antes de cierre",
+      "aliases": [
+        "NC-PROJECT-POLICY-RESTORATION"
+      ],
+      "rule": [
+        "D-042 §5",
+        "BR-PROJ-003",
+        "D-115"
+      ],
+      "locations": [
+        "packages/services/src/ar/credit-debit-note.service.ts",
+        "packages/services/src/ap/credit-debit-note.service.ts",
+        "packages/services/src/finance/project-lifecycle-interleaving.test.ts"
+      ],
+      "reproduction": "Comparar base4f5b672e con el cambio intermedio e intentar anular una NC cuya obra está DRAFT/ON_HOLD/COMPLETED/CANCELLED.",
+      "observed": "El diff había extendido por analogía la reversión neutral de factura/pago/cobranza a NC; la política previa exigía ACTIVE. La adaptación intermedia de 53 tests no acreditaba esa excepción.",
+      "expected": "NC conserva la exigencia ACTIVE original en preflight y TX; no se extiende una excepción por analogía.",
+      "correction": "Restaurar guard ACTIVE en preflight y TX para NC AR/AP, conservar ACL/CAS/motivos/GL y devolver los casos a su expectativa original. Las otras reversiones mantienen solo su comportamiento previo.",
+      "tests": [
+        "packages/services/src/finance/project-lifecycle-interleaving.test.ts",
+        "output/platform-audit/ag-09-2026-11-05/nc-project-policy-restoration.json"
+      ],
+      "status": "fixed_verified",
+      "verificationLimit": "La implementación local y sus pruebas dirigidas no sustituyen el SQL final, el manifiesto y las verificaciones de cierre del coordinador."
+    }
+  ],
+  "regression": {
+    "trigger": "Diff financiero compartido desde 4f5b672e y contratos locales nuevos.",
+    "includedNeighbors": [
+      "AG-08 certificación→factura/CxC y subcontrato→factura/CxP/settlement",
+      "AG-06 OC/recepción/AP y política de gasto",
+      "Tesorería solo consumidores demostrados por lock order y aplicaciones de caja",
+      "Contabilidad solo frontera AR/AP de creación/posting/cancelación",
+      "AI/CSV/avisos que consumen saldos modificados"
+    ],
+    "excluded": [
+      "Auditoría íntegra AG-10: cuentas, transferencias, conciliación, cierres, plan de cuentas/libros y otras fuentes GL",
+      "Conversión entre monedas y diferencias de cambio automáticas",
+      "TaxLine fino, cuenta puente/anticipos sin factura, pagos batch",
+      "Revisión exhaustiva de todos los históricos productivos",
+      "Certificación WCAG/carga de plataforma completa"
+    ],
+    "invalidatedHistoricalEvidence": [
+      "No se usa AG-08 verde como prueba automática del diff AG-09.",
+      "Prueba intermedia de NC neutral de53 casos queda superada por restauración de política61.",
+      "Corridas SQL fallidas conservadas; se verifica por caso/revisión sin sumar repeticiones."
+    ]
+  },
+  "changeImpact": {
+    "guide": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md §12",
+    "help": "apps/web/features/help/lib/articles/finance.ts",
+    "functionalDocs": "Módulos AR/AP, AR/AP financieros, moneda, impuestos y workflows actualizados en el mismo lote.",
+    "ai": {
+      "knowledge": "packages/ai/knowledge/generated/docs-index.json",
+      "chunks": 583,
+      "indexCheckExitCode": 0,
+      "toolImplementation": "packages/services/src/ai/tools/finance-tools.ts:totals nullable + byCurrency",
+      "knowledgeTests": "packages/ai/src/knowledge/financial-audit-knowledge.test.ts",
+      "knowledgeCases": 6,
+      "knowledgeIncludedInGeneral": true,
+      "evalsAdded": 5,
+      "evalIdsTotal": 201,
+      "liveModelEvalsExecuted": false,
+      "policyChanged": false,
+      "writeCapabilityAdded": false
+    },
+    "internalOnly": "Tests, guards/locks y refactors internos se explican por invariantes afectados; el lote global sí tiene impacto documental/AI.",
+    "finalPresentation": {
+      "scope": "Cuatro informes con fecha de corte en es-AR, dos detalles AP con Cantidad, rótulos CxP en español, Guía/Ayuda e índice de conocimiento.",
+      "validation": "9 pruebas existentes de fechas, tipos/lint web, índice vigente, 51 pruebas AI, compilación y muestra visual focal."
+    }
+  },
+  "verification": {
+    "snapshotStatus": "verified; freeze 05",
+    "general": {
+      "status": "passed",
+      "tests": 2650,
+      "passed": 2650,
+      "failed": 0,
+      "skippedLiveSuites": 39,
+      "command": "pnpm run test --force --concurrency=2",
+      "artifact": "output/platform-audit/ag-09-2026-11-05/workspace-test-source-final.log",
+      "result": "output/platform-audit/ag-09-2026-11-05/workspace-test-source-final.result.json",
+      "note": "39 suites SQL opt-in omitidas; las selecciones focales no se suman a 2.650. Índice y paginación web revalidados después."
+    },
+    "types": {
+      "status": "passed",
+      "tasks": 13,
+      "command": "pnpm run typecheck --force --concurrency=2",
+      "artifact": "output/platform-audit/ag-09-2026-11-05/workspace-types-source-final.log",
+      "result": "output/platform-audit/ag-09-2026-11-05/workspace-types-source-final.result.json",
+      "finalWebDeltaResult": "output/platform-audit/ag-09-2026-11-05/web-presentation-types-final.result.json",
+      "paginationDeltaResult": "output/platform-audit/ag-09-2026-11-05/web-pagination-types-final.result.json"
+    },
+    "lint": {
+      "status": "passed",
+      "command": "pnpm run lint",
+      "artifact": "output/platform-audit/ag-09-2026-11-05/workspace-lint-source-final.log",
+      "result": "output/platform-audit/ag-09-2026-11-05/workspace-lint-source-final.result.json",
+      "finalWebDeltaResult": "output/platform-audit/ag-09-2026-11-05/web-presentation-lint-final.result.json",
+      "paginationDeltaResult": "output/platform-audit/ag-09-2026-11-05/web-pagination-lint-final.result.json"
+    },
+    "sql": {
+      "status": "passed",
+      "uniquePassed": 49,
+      "failedUnresolved": 0,
+      "selectionCurrent": {
+        "ar": 24,
+        "ap": 17,
+        "consumers": 8
+      },
+      "attempts": [
+        {
+          "name": "sql-ar-first",
+          "file": "packages/services/src/ar/ar-audit.live.test.ts",
+          "status": "failed",
+          "tests": 14,
+          "passed": 6,
+          "failed": 8,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ar-first.log",
+          "reason": "Cinco colisiones de nombre de cuenta del fixture y tres P2028 de TX5s; corregidos y repetidos."
+        },
+        {
+          "name": "sql-ar-second",
+          "file": "packages/services/src/ar/ar-audit.live.test.ts",
+          "status": "failed",
+          "tests": 14,
+          "passed": 13,
+          "failed": 1,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ar-second.log",
+          "reason": "El caso NC0.06 produjo50.00; hallazgo canónico0.025→25. Validator compartido corregido, expectativa financiera conservada."
+        },
+        {
+          "name": "sql-ar-consumers-first",
+          "file": "packages/services/src/ar/ar-finance-consumers-audit.live.test.ts",
+          "status": "passed",
+          "tests": 7,
+          "passed": 7,
+          "failed": 0,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ar-consumers-first.log",
+          "limit": "La fuente actual agregó un octavo caso de tool AI después de esta corrida."
+        },
+        {
+          "name": "sql-ar-third",
+          "file": "packages/services/src/ar/ar-audit.live.test.ts",
+          "status": "passed",
+          "tests": 23,
+          "passed": 23,
+          "failed": 0,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ar-third.log",
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ar-third-result.json",
+          "limit": "Se verificó la política NC restaurada con 61 focales, regresión AG-08 y D-133 final."
+        },
+        {
+          "name": "sql-ap-first",
+          "file": "packages/services/src/ap/ap-platform-audit.live.test.ts",
+          "status": "failed",
+          "tests": 15,
+          "passed": 12,
+          "failed": 3,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ap-first.log",
+          "reason": "Expiración de TX5s en pago/NC/auto-DRAFT tardío; timeout por camino corregido; pruebas de carrera reforzadas para no aceptar ambos rechazos como éxito."
+        },
+        {
+          "name": "sql-ap-second",
+          "file": "packages/services/src/ap/ap-platform-audit.live.test.ts",
+          "status": "passed",
+          "tests": 16,
+          "passed": 16,
+          "failed": 0,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ap-second.log",
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ap-second-result.json"
+        },
+        {
+          "name": "sql-ar-consumers-final",
+          "file": "packages/services/src/ar/ar-finance-consumers-audit.live.test.ts",
+          "status": "passed",
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ar-consumers-final.log",
+          "tests": 8,
+          "passed": 8,
+          "failed": 0,
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ar-consumers-final-result.json"
+        },
+        {
+          "name": "sql-ag08-connections-regression",
+          "status": "passed",
+          "passed": 17,
+          "failed": 0,
+          "skipped": 0,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ag08-connections-regression.log",
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ag08-connections-regression-result.json"
+        },
+        {
+          "name": "sql-ag08-settlement-regression",
+          "status": "passed",
+          "passed": 9,
+          "failed": 0,
+          "skipped": 0,
+          "notSelectedByPattern": 31,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ag08-settlement-regression.log",
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ag08-settlement-regression-result.json"
+        },
+        {
+          "name": "sql-ar-d133-header-final",
+          "status": "passed",
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ar-d133-header-final.log",
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ar-d133-header-final-result.json"
+        },
+        {
+          "name": "sql-ap-d133-header-final",
+          "status": "passed",
+          "passed": 1,
+          "failed": 0,
+          "skipped": 0,
+          "artifact": "output/platform-audit/ag-09-2026-11-05/sql-ap-d133-header-final.log",
+          "result": "output/platform-audit/ag-09-2026-11-05/sql-ap-d133-header-final-result.json"
+        }
+      ],
+      "aggregationRule": "Consolidar casos vigentes por archivo/título o alias semántico cuando cambió el nombre; conservar fallos históricos resueltos y no sumar intentos, fixtures ni skips.",
+      "uniquePassedBeforeAdenda": 47,
+      "selectionAtPriorGreenSnapshot": {
+        "ar": 23,
+        "ap": 16,
+        "consumers": 8
+      },
+      "regressionPassed": 26,
+      "totalDistinctPassed": 75,
+      "ledger": "output/platform-audit/ag-09-2026-11-05/sql-deduplicated-results.json"
+    },
+    "failedAttempts": [
+      {
+        "artifact": "output/platform-audit/ag-09-2026-11-05/workspace-test-first.log",
+        "cause": "Diez fallos del test heredado de lifecycle: fixtures insuficientes y regresión de política NC. No todos son configuración; NC está registrada como regresión introducida.",
+        "resolution": "Fixtures completados conservando checkpoints y guardACTIVE restaurado;61casos focales y general final aprobados."
+      },
+      {
+        "artifact": "output/platform-audit/ag-09-2026-11-05/workspace-lint-first.log",
+        "cause": "Dos argumentos_ctx sin uso tras convertir reconciliación en lectura pura.",
+        "resolution": "Eliminados wrappers identidad; tipos, general y lint final repetidos con exit0."
+      },
+      {
+        "artifact": "output/platform-audit/ag-09-2026-11-05/root-decimal-replay-third.log",
+        "cause": "Un test heredado de inventario esperaba agrupación localizada para un string de API canónico.",
+        "resolution": "Caso ajustado al contrato API y agrupación explícita conservada; prueba independiente32/32 y general final."
+      },
+      {
+        "artifact": "output/platform-audit/ag-09-2026-11-05/root-tax-notifications-first.log",
+        "cause": "MockTracker.method no encuentra los métodos dinámicos del proxy Prisma en dos nuevas pruebas de email.",
+        "resolution": "Fixture de stub local restaurable, sin cambiar el contrato financiero; repetición7/7 y general final."
+      }
+    ],
+    "independent": {
+      "status": "passed",
+      "reviewer": "/root/ag09_verify",
+      "selections": [
+        {
+          "status": "passed",
+          "cases": 144,
+          "components": {
+            "services": 109,
+            "web": 32,
+            "rsc": 3
+          },
+          "limit": "Selecciones parciales durante correcciones; solapan con general."
+        },
+        {
+          "status": "passed",
+          "cases": 32,
+          "suites": 9,
+          "scope": "Decimales canónicos/backend y parser de teclado sin cambio.",
+          "limit": "No sumar al general ni presumir cobertura completa."
+        }
+      ],
+      "confirmedResiduals": [
+        "Precio/descuento canónico como miles",
+        "Gate Tesorería de cobranza",
+        "Movimiento de caja vinculado incompleto",
+        "Lectura AR con escritura histórica",
+        "Replay de líneas empatadas",
+        "Snapshot AR sin padres",
+        "Regresión NC fueraACTIVE"
+      ],
+      "resolution": "Política ACTIVE de NC, guard D-133 antes/después de recálculo, paginación coherente y delta de presentación, verificados.",
+      "policyProof": {
+        "artifact": "output/platform-audit/ag-09-2026-11-05/nc-project-policy-restoration.json",
+        "tests": 61,
+        "passed": 61,
+        "failed": 0,
+        "supersedes": "Prueba intermedia53neutral; no era evidencia válida de una excepción de negocio."
+      },
+      "confirmedPending": [],
+      "finalManifest": "output/platform-audit/ag-09-2026-11-05/independent-freeze05-review.json",
+      "manifestSha256": "e73081e44e01a2b9f7422263b674e1c479e99cfe3627c9a20eb960de4660df1b",
+      "sourceCount": 139
+    },
+    "agentReportedSelections": [
+      {
+        "owner": "AR",
+        "passed": 92,
+        "artifact": "output/platform-audit/ag-09-2026-11-05/ar-offline-adenda-final.log"
+      },
+      {
+        "owner": "AP/GL",
+        "passed": 150,
+        "artifact": "output/platform-audit/ag-09-2026-11-05/ap-gl-offline-final.tap"
+      },
+      {
+        "owner": "Frontend",
+        "passed": 32,
+        "rsc": 3,
+        "artifact": "output/platform-audit/ag-09-2026-11-05/frontend-review.json"
+      }
+    ],
+    "build": {
+      "status": "passed",
+      "artifact": "output/platform-audit/ag-09-2026-11-05/workspace-build-presentation-final.log",
+      "result": "output/platform-audit/ag-09-2026-11-05/workspace-build-presentation-final.result.json",
+      "sourceMatch": "output/platform-audit/ag-09-2026-11-05/build-source-match-final.json",
+      "sourceCount": 139,
+      "providersEnabled": false,
+      "productionMigrations": false
+    },
+    "visual": {
+      "at": "2026-11-05T16:47:12.714Z",
+      "status": "passed",
+      "summary": "Con un Owner sintético se anuló un cobro USD con motivo obligatorio, se verificó saldo reabierto por US$ 10,00, antigüedad separada ARS/USD y página 1 para una URL fuera de rango. En teléfono se registró el cobro con FX 1260.123456 y la cuenta quedó Saldada. En escritorio se guardó una Factura C con cantidad 1,2345 y precio 3,3333 al editar; el servidor guardó ARS 4,23. Emitir creó la CxP y pagar confirmó ARS 4,23 con saldo final cero. Esas operaciones se probaron en freeze 04. En freeze 05 se confirmaron fecha de corte dd/mm/aaaa, columna Cantidad, Exportar antigüedad y paginación, sin repetir operaciones sobre la misma deuda. Escritorio 1280×720 y teléfono 390×844, temas claro y oscuro; sin desborde horizontal en las capturas. Sesión, dos pestañas y ambos servidores de prueba cerrados.",
+      "actor": "Owner sintético",
+      "databaseIsolated": true,
+      "realProviderCalls": false,
+      "productionMutations": false,
+      "viewports": [
+        [
+          1280,
+          720
+        ],
+        [
+          390,
+          844
+        ]
+      ],
+      "themes": [
+        "light",
+        "dark"
+      ],
+      "routes": [
+        "/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cobranzas/d31f576e-5add-4b79-ad2a-17c8517cbb8e",
+        "/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cuentas-por-cobrar/80a7119d-af5f-4a36-965d-a82db3c0393c",
+        "/finanzas/cuentas-por-cobrar",
+        "/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cuentas-por-cobrar/80a7119d-af5f-4a36-965d-a82db3c0393c/cobrar",
+        "/finanzas/facturas-proveedor",
+        "/finanzas/pagos-proveedor/4cca79a5-93ba-46d6-953c-861af5282b84",
+        "/finanzas/cuentas-por-pagar/6a48337e-f415-4035-9eef-e816b55dd21f",
+        "/finanzas/facturas-proveedor/fae4e2e0-e1e0-4e0b-aac9-9b6a54f361d1",
+        "/finanzas/cuentas-por-pagar"
+      ],
+      "screenshots": [
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ar-motivo-escritorio.jpg",
+          "url": "http://localhost:3100/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cobranzas/d31f576e-5add-4b79-ad2a-17c8517cbb8e",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "light",
+          "width": 1280,
+          "check": "Motivo obligatorio; confirmación deshabilitada si está vacío."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ar-saldo-reabierto-escritorio.jpg",
+          "url": "http://localhost:3100/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cuentas-por-cobrar/80a7119d-af5f-4a36-965d-a82db3c0393c",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "light",
+          "width": 1280,
+          "check": "Cobranza cancelada en historial; cobrado US$0, saldo pendiente US$10."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ar-antiguedad-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/cuentas-por-cobrar?page=999999999",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "light",
+          "width": 1280,
+          "check": "URL page=999999999 se normaliza a Página 1 de 2; informe separado por moneda."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ar-confirmar-cobro-telefono.jpg",
+          "url": "http://localhost:3100/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cuentas-por-cobrar/80a7119d-af5f-4a36-965d-a82db3c0393c/cobrar",
+          "height": 844,
+          "scrollWidth": 390,
+          "theme": "dark",
+          "width": 390,
+          "check": "Confirmación móvil: US$10 y FX 1260.123456 ARS/USD, sin desborde de página."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ar-cobro-saldado-telefono.jpg",
+          "url": "http://localhost:3100/proyectos/202a4b47-6806-4f70-b81c-04f6748853a7/cuentas-por-cobrar/80a7119d-af5f-4a36-965d-a82db3c0393c?collected=1",
+          "height": 844,
+          "scrollWidth": 390,
+          "theme": "dark",
+          "width": 390,
+          "check": "Cobro registrado, cuenta Saldada, historial muestra la nueva cobranza Confirmada."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ap-gasto-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/facturas-proveedor",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "dark",
+          "width": 1280,
+          "check": "Factura C: cantidad 1,2345 y precio 3,3333 al enfocar; vista previa ARS 4,23 con percepción 0,12."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ap-pago-confirmado-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/pagos-proveedor/4cca79a5-93ba-46d6-953c-861af5282b84",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "dark",
+          "width": 1280,
+          "check": "Pago de empresa Confirmado por ARS 4,23, links a CxP y factura."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/ap-obligacion-saldada-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/cuentas-por-pagar/6a48337e-f415-4035-9eef-e816b55dd21f",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "dark",
+          "width": 1280,
+          "check": "CxP Saldada por pago Confirmado; original/pagado ARS 4,23 y saldo ARS 0."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/final-ap-factura-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/facturas-proveedor/fae4e2e0-e1e0-4e0b-aac9-9b6a54f361d1",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "dark",
+          "width": 1280,
+          "check": "Detalle de proveedor con columna Cantidad, total ARS 4,23 y cuenta Saldada."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/final-ap-antiguedad-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/cuentas-por-pagar",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "dark",
+          "width": 1280,
+          "check": "Fecha de corte dd/mm/aaaa y botón Exportar antigüedad."
+        },
+        {
+          "path": "output/platform-audit/ag-09-2026-11-05/screenshots/final-ar-fecha-corte-escritorio.jpg",
+          "url": "http://localhost:3100/finanzas/cuentas-por-cobrar?page=999999999&field=pending",
+          "height": 720,
+          "scrollWidth": 1280,
+          "theme": "light",
+          "width": 1280,
+          "check": "Fecha de corte dd/mm/aaaa y página 1 tras URL fuera de rango."
+        }
+      ],
+      "rounds": [
+        {
+          "freeze": "04",
+          "artifact": "output/platform-audit/ag-09-2026-11-05/visual-browser-round1.json",
+          "scope": "flujos AR/AP, montos y saldos, controles e informe"
+        },
+        {
+          "freeze": "05",
+          "artifact": "output/platform-audit/ag-09-2026-11-05/visual-browser-round2.json",
+          "scope": "copy/formato y paginación de la compilación final"
+        }
+      ],
+      "cleanup": {
+        "logoutObserved": true,
+        "viewportReset": true,
+        "temporaryTabsClosed": 2,
+        "previewProcessEnded": true,
+        "port3100ListenerAbsent": true,
+        "syntheticFixturesRetained": true
+      },
+      "limit": "Muestra con un rol y datos sintéticos. Notas, anticipos, roles negativos y concurrencia se validaron por pruebas, sin cobertura visual exhaustiva.",
+      "artifact": "output/platform-audit/ag-09-2026-11-05/visual-checks.json"
+    },
+    "notExecuted": [
+      "Pruebas mutantes productivas, envíos/adjuntos reales y proveedores externos",
+      "Evals con modeloAI real",
+      "Auditoría completa de AG-10 y reconciliación histórica total",
+      "Pruebas de carga y accesibilidad exhaustiva"
+    ],
+    "knowledge": {
+      "status": "passed",
+      "chunks": 583,
+      "tests": 51,
+      "retrievalTests": 6,
+      "evaluationsPrepared": 5,
+      "modelEvaluationsExecuted": 0,
+      "result": "output/platform-audit/ag-09-2026-11-05/ai-tests-presentation-final.result.json"
+    }
+  },
+  "knownBoundaries": [
+    {
+      "id": "P-AG10-01",
+      "status": "registered_for_future_stage",
+      "source": "docs/bloqer2.0/08-architecture/PENDING_ARCHITECTURE_ITEMS.md",
+      "description": "AccountMovement/InternalTransfer no representan snapshots FX propios; requiere diseño y aprobación de campos/migración. No se añade un input que no pueda persistirse ni se presume FX1 extranjero.",
+      "blocksGlobalPlatformClaim": true,
+      "stageStarted": false
+    },
+    {
+      "id": "D-133-historical-tax",
+      "description": "Históricos emitidos se conservan. Crear una nueva nota desde impuestos heredados negativos se rechaza; no se agrega override ni saneamiento automático."
+    }
+  ],
+  "handoffArtifacts": [
+    "output/platform-audit/ag-09-2026-11-05/ar-handoff.json",
+    "output/platform-audit/ag-09-2026-11-05/ap-result.json",
+    "output/platform-audit/ag-09-2026-11-05/frontend-review.json",
+    "output/platform-audit/ag-09-2026-11-05/docs-ai-handoff.json",
+    "output/platform-audit/ag-09-2026-11-05/nc-project-policy-restoration.json",
+    "output/platform-audit/ag-09-2026-11-05/cancellation-reason-consumers-review.json"
+  ],
+  "finalSourceManifest": {
+    "artifact": "output/platform-audit/ag-09-2026-11-05/final-source-manifest.json",
+    "runtimeFreeze": "output/platform-audit/ag-09-2026-11-05/source-freeze-05.json",
+    "manifestSha256": "e73081e44e01a2b9f7422263b674e1c479e99cfe3627c9a20eb960de4660df1b",
+    "sourceCount": 139,
+    "sources": [
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-cobrar/[receivableId]/cobrar/page.tsx",
+        "sha256": "26a4957cd4c162904e79d8c47c75b07183b90fcc53f9125c6f963f3f8ff60ca7"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-cobrar/[receivableId]/page.tsx",
+        "sha256": "d6fafae5ab02a846f861a64d7b0697cdfbd688a0fe4507e732bd5afda7186bae"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-cobrar/actions.ts",
+        "sha256": "e3a5f108497a72a4c573ea3328e905df1cf8eb95759c60828c528008e74c9209"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-cobrar/page.tsx",
+        "sha256": "0d66c474dd74ab2196d8a986bb50eac00332f37fd046443025316fab5c0ac79f"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-pagar/[payableId]/pagar/page.tsx",
+        "sha256": "7b20d0c83ad7b60aa899b6ad63158551b4b25819ac5e8addd1b15b7849054c77"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-pagar/[payableId]/page.tsx",
+        "sha256": "83bcb293d52283367870eb092725241915dc9c929edb9699b481e472e64f97f1"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-pagar/actions.ts",
+        "sha256": "c0abfcb027197ef5c9e75bd00812ada8ce052d02c7c310c8164aa9bc4939a527"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/cuentas-por-pagar/page.tsx",
+        "sha256": "c2499674f352e24eaa25fb64c463ee1330244f10db21367ccfab157c7b3b0191"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/facturas-proveedor/[invoiceId]/page.tsx",
+        "sha256": "04149a65b8a7135f8ba3428bd8c05a1fcc83fa5c8bd60fb0e7fe7b5f743b0746"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/facturas-proveedor/actions.ts",
+        "sha256": "efbe93633f1028a31e6c0fd143fd9d13bb105a8ecf8f17c64e12d206b880ed1a"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/facturas/[invoiceId]/editar/page.tsx",
+        "sha256": "8b0afffa0af9bfee5a900ced884e21bc3c68ccd6b36bc0aa1d31214656d30c99"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/facturas/[invoiceId]/page.tsx",
+        "sha256": "a3b30d654b897d6d8b97c72b7a68267628163980433d0a1c8eb4462c6cfc9f28"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/facturas/actions.ts",
+        "sha256": "404c359041d0bd35b23707ef9f9e0e71a8d95be78deaa68ed00f55c09fa501da"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/pagos-proveedor/[paymentId]/page.tsx",
+        "sha256": "b1c9c31e3ada3e870f84839ca975605fdafc44f3c4142b2256715216d2b80aab"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/transacciones/actions.ts",
+        "sha256": "b3756a9695085dd7d7c734dc0c1d87e90193fe97c33cf30c3af3d6237e759e20"
+      },
+      {
+        "path": "apps/web/app/(app)/finanzas/transacciones/page.tsx",
+        "sha256": "fae5b58aba304d6db2dcf98007d992f52face66a7860953e64f44a5e80e2e313"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cobranzas/[collectionId]/page.tsx",
+        "sha256": "549100ff7315f96f97aa99c6e2fd500c141bfbfc6ea7a54a6dfcad9d1fc73c9b"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cobranzas/actions.ts",
+        "sha256": "4fe5980fc246bb5b5e285181bffc7e8ad374c9601d9f47e46cf8bb0dd4bad0bf"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-cobrar/[receivableId]/cobrar/page.tsx",
+        "sha256": "dcf18c8b1992c7b0eb3505eca7c7a10eb6e7e12e9759f7ea1f487230ede50fa7"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-cobrar/[receivableId]/page.tsx",
+        "sha256": "27a51f77303937ddb7a247272c1e1132e68c167e6bb9b5305c9238bb1c263b7e"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-cobrar/page.tsx",
+        "sha256": "ec0a2e1ca2704edf68e1af5e43440616239910909dbe7a0df41b63ec93e895ca"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-pagar/[payableId]/pagar/page.tsx",
+        "sha256": "49f8d0709ce6135b4f6ccdc16cd0a1f3b0578eb18f4523567251f3d5b6567a5d"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-pagar/[payableId]/page.tsx",
+        "sha256": "66906ded5835759c6c2aced64fdd98a7e0db477411681c986fdd8301e0f0fc3c"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-pagar/actions.ts",
+        "sha256": "84c8714e4f684faa163a45b467421bf65158229489e32574a912992c0d3b8a4e"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/cuentas-por-pagar/page.tsx",
+        "sha256": "30eb77306f58f0b6cd34a713fa9f02c563d8ae004f147ca9f6a90bdf8913b969"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/facturas-proveedor/[supplierInvoiceId]/page.tsx",
+        "sha256": "6aaaeaf805db210c71afae27df5ce7b8b4ae1f0a97eef0542a2ca21ea92f15d8"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/facturas-proveedor/actions.ts",
+        "sha256": "a229f3cb476eedee9516ddb3f17260e9ec9487a6919cc41ce87765c6493dd3dd"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/facturas/[invoiceId]/editar/page.tsx",
+        "sha256": "ab73434fb32dcd03f8bfd02ce58d481f6ab6672d4a833bf51b3b04250814ad8d"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/facturas/[invoiceId]/page.tsx",
+        "sha256": "77e231640859eada99e76acb1f39e2a72265f1a6c6c8082c074800702bc858a6"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/facturas/actions.ts",
+        "sha256": "386c2a23cd1846588991c03a6c6f2406f60e940f94c855a621cf9b2ade4acc9a"
+      },
+      {
+        "path": "apps/web/app/(app)/proyectos/[id]/pagos/[paymentId]/page.tsx",
+        "sha256": "2e8b33ff7c05096dab774ce8c40e9c44f2c93a51b3757b4b6ec92d850bc53f94"
+      },
+      {
+        "path": "apps/web/features/aging/components/aging-filters.tsx",
+        "sha256": "88af35d5886d226ce6a6732b368908ec81bdd853ee7472b8f5e436def09c2a1f"
+      },
+      {
+        "path": "apps/web/features/aging/components/aging-summary-cards.tsx",
+        "sha256": "5312a57574a0769248abe0bb17350db39503ee13056f94f1a8f25888c507e381"
+      },
+      {
+        "path": "apps/web/features/aging/components/aging-table.tsx",
+        "sha256": "67a09b5571ebd014ed9a775612956dd02f75beb27231ea2aa88864a01f8b4537"
+      },
+      {
+        "path": "apps/web/features/ap/components/new-company-supplier-invoice-dialog.tsx",
+        "sha256": "069c45d6b238d5a68bf5e3cdf0b808b6e29f6bdde30bd7160fdcc4d7fdabd89f"
+      },
+      {
+        "path": "apps/web/features/ap/components/new-project-supplier-invoice-dialog.tsx",
+        "sha256": "ee95ba8e691e245548c3025fb99f7b8f7a4cd0378c0b8505238b975fc892d85a"
+      },
+      {
+        "path": "apps/web/features/ap/components/payable-cards.tsx",
+        "sha256": "671e5c5acdbeb91c62ee36a894fe0812895ec28cc850981a7001df21904cf249"
+      },
+      {
+        "path": "apps/web/features/ap/components/payable-field-detail-view.tsx",
+        "sha256": "5ee1d6f7c92687f2256e39edb322d29678405fc56d6b91e7e272a0c11c67b32d"
+      },
+      {
+        "path": "apps/web/features/ap/components/payable-status-badge.tsx",
+        "sha256": "b9b640c0e8789a8dc32cccc4dfd0b6fb72590e5e179f5c1a0ee3e350c6443e0c"
+      },
+      {
+        "path": "apps/web/features/ap/components/payable-table.tsx",
+        "sha256": "88f9ba4e5139cc29d385b38f158e5da7599543a5035d52a5430c7cb11e8da3dd"
+      },
+      {
+        "path": "apps/web/features/ap/components/payables-field-view.tsx",
+        "sha256": "5fec1dbbafbbe365dd4abf09bac420374d8ce32aca4612242f53e6cbd696587e"
+      },
+      {
+        "path": "apps/web/features/ap/components/payment-form.tsx",
+        "sha256": "2ccac0f87a034909539090ca4d75e9b2f6106069a30de10ec168296dc4bb7696"
+      },
+      {
+        "path": "apps/web/features/ap/components/register-company-payment-dialog.tsx",
+        "sha256": "7b01eeded6c5c2f2b4bd8b0c5d969c4f9ffc710809343766461d3f3b698eb378"
+      },
+      {
+        "path": "apps/web/features/ap/components/supplier-invoice-edit-form.tsx",
+        "sha256": "6b5042f14ded8f6f12c28614d04f63e4c75ad55289743d1f1beb7f3ca3fec2b6"
+      },
+      {
+        "path": "apps/web/features/ap/components/supplier-invoice-form.tsx",
+        "sha256": "b7cbf2effe6c59c5821722d48c452a616303b0cb890be15bd98628bf5a575dc9"
+      },
+      {
+        "path": "apps/web/features/ap/lib/payment-detail-rsc.test.mjs",
+        "sha256": "29508b123a7c1f75ead7e3a8dd3127b33c72e1d02f3a9324a3474e1301b28ac7"
+      },
+      {
+        "path": "apps/web/features/collections/components/collection-form.tsx",
+        "sha256": "651bcad80cd3a309c9c2d71f18203d8f0c97136bdc1cfa47a750dc180c657ef0"
+      },
+      {
+        "path": "apps/web/features/collections/components/register-company-collection-dialog.tsx",
+        "sha256": "60a94b2c2da0cecce8cee6d257eac4b6f3a8d83f3ef11a029f3bbd4106d8164d"
+      },
+      {
+        "path": "apps/web/features/finance/components/create-fiscal-note-dialog.tsx",
+        "sha256": "877c3fb9933bcb3aec6ef8127b4e2a808f1737f3e8ff1fe83142b906be560132"
+      },
+      {
+        "path": "apps/web/features/finance/components/new-transaction-dialog.tsx",
+        "sha256": "495f70578a8ce405ba830350c57d5dd5f2e58bed54f53ff73150a6b38083ea8d"
+      },
+      {
+        "path": "apps/web/features/finance/components/obligation-settled-cell.tsx",
+        "sha256": "2a44b2dc1ec699711884a12d0a6ec885c52a3791283d030de5e3f26a67cb5cfc"
+      },
+      {
+        "path": "apps/web/features/finance/lib/financial-actions.test.ts",
+        "sha256": "7cc22d31c2ef016f7b8d33807444b1750a03dfd172d3ed371262f71828c5a78f"
+      },
+      {
+        "path": "apps/web/features/finance/lib/financial-interactions.test.ts",
+        "sha256": "bdcaa0307ac5bdb1310d70d0fe4dfaeb5f058e317f34be5815e828af1c89cf86"
+      },
+      {
+        "path": "apps/web/features/help/lib/articles/finance.ts",
+        "sha256": "93a1cafeb7227af1340f53ec4bfb373a59de8f5c6cfabcb6bdfe68c7d5de7c39"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/advance-invoice-form.tsx",
+        "sha256": "2aab2809572e6f9ba53d325b5c4bc584b1bfc1d7cbf58b40a3ce7ffb0f635a46"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/invoice-edit-form.tsx",
+        "sha256": "1a0b182101a1ebf25bae80956dc37e0a5d42a78d88ea725ceb46bef9814625a1"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/manual-invoice-form.tsx",
+        "sha256": "4d782e15aaae2df0bf06fb7dd408b2b792c35e8b058a551fa75e013df35a49d0"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/new-project-sales-invoice-dialog.tsx",
+        "sha256": "ee391ad8bf9bbf1364d2bad36466f9fda572166b31b4da37bb38e23d0804ddcc"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/receivable-cards.tsx",
+        "sha256": "ffea214f427b545566a7c33530aafa9beee9737127a3be8174bbe553bdf18f84"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/receivable-field-detail-view.tsx",
+        "sha256": "49591d126e58c8d53934fd882b51441bb4871c755862a6e9794b2e836e073988"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/receivable-status-badge.tsx",
+        "sha256": "4ab5ce30d87b26f2081f01c0695081855ffde271fdad1e5110f8821aaf80997e"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/receivable-table.tsx",
+        "sha256": "2dced145d33e2c8de47e112feff182adee3357daa7154a2c731ac57208d4e229"
+      },
+      {
+        "path": "apps/web/features/sales-invoices/components/receivables-field-view.tsx",
+        "sha256": "7d1fe059f8c10b987800d3939185d772d52459d2be0f8abdb8c677e43c4b73b0"
+      },
+      {
+        "path": "apps/web/lib/certification-ar-invalidation.test.ts",
+        "sha256": "454eda4df6f3548f3a4c023d6f6d710c6dd08e505f5fc6ee80ef1a00e5fd87ed"
+      },
+      {
+        "path": "apps/web/lib/revalidate-project-paths.ts",
+        "sha256": "69dc05e8fd76e452bfc18cae41fb7adb7dcc607379a098c6f79a815466c456ca"
+      },
+      {
+        "path": "packages/ai/evals/mvp-questions.json",
+        "sha256": "622427c4db05d790b8225fa0f5df8a16617c8d7a84d307c27feff30350abe456"
+      },
+      {
+        "path": "packages/ai/knowledge/generated/docs-index.json",
+        "sha256": "e2c669f828c4baf4241bedf81b057e0a79b02e28c92cc8c25bd97d6cf86e3f5d"
+      },
+      {
+        "path": "packages/ai/src/knowledge/financial-audit-knowledge.test.ts",
+        "sha256": "e21bb790a166ebd01e788ee2b22897af6432c5f96008f65fb61716fbd4cd8385"
+      },
+      {
+        "path": "packages/services/src/accounting/accounting-ar-ap-cancel-atomic.test.ts",
+        "sha256": "c6cb011e05bcfbe3bfaddda9a32a71ee1c78ac401c3e448f79b6be43ad84041b"
+      },
+      {
+        "path": "packages/services/src/accounting/accounting-cancel-sync.service.ts",
+        "sha256": "49a708a363a0f7c03b7c075375ed28a358ee29ae6a430f1c8df5ff1e2fd27714"
+      },
+      {
+        "path": "packages/services/src/accounting/journal-entry.service.ts",
+        "sha256": "7074309b10d8923c6ce233d19a33ff5d203d7c08b865f2822627c11c4f33939d"
+      },
+      {
+        "path": "packages/services/src/aging/aging.service.ts",
+        "sha256": "29929324143dd5484c4a75b79ce55de528801d4e72ace88fd24b8c2095107ff4"
+      },
+      {
+        "path": "packages/services/src/ai/d111-scoped-live.test.ts",
+        "sha256": "1c690bb70b0475b85cca744b0daa60f221f1c7cd6f04e588cb16ba1f742705bf"
+      },
+      {
+        "path": "packages/services/src/ai/tools/finance-tools.ts",
+        "sha256": "850cd88423224507e26722a9fd17fd6d9f3840f412769b129287649bd3a84b26"
+      },
+      {
+        "path": "packages/services/src/ap/ap-input.ts",
+        "sha256": "e57d3d614cdbefb45f826fdf4a4114641f539fb9503d2ee03b8b0a2993be05e5"
+      },
+      {
+        "path": "packages/services/src/ap/ap-integrity.ts",
+        "sha256": "2d49475b419d97bb7104fc660feb47dfa07115817fa3f2881af2dd26bdfe4de6"
+      },
+      {
+        "path": "packages/services/src/ap/ap-notifications.service.ts",
+        "sha256": "bc84f383b53389873953ac2a0dcf5eb42ff0a095983a125ac33549365f1951a8"
+      },
+      {
+        "path": "packages/services/src/ap/ap-platform-audit.live.test.ts",
+        "sha256": "96e32e59de1c856b30d8614715e3e77a439c7e987d4146f3c37d520369e4d589"
+      },
+      {
+        "path": "packages/services/src/ap/ap-platform-audit.test.ts",
+        "sha256": "d5990ad4d395dd204ee724d3470009de106498c10e044cf7260ae3fd5c0f104e"
+      },
+      {
+        "path": "packages/services/src/ap/apply-payment-to-payable.ts",
+        "sha256": "8385bb390d2f070997c69919e2ad3fb8228497d3dce71c4abd8d15645522765f"
+      },
+      {
+        "path": "packages/services/src/ap/company-document-access.test.ts",
+        "sha256": "e2c8a9e5407ffa3127fed909824e1bc761c3750e2e2f78a911d7af90f9b2d272"
+      },
+      {
+        "path": "packages/services/src/ap/corporate-ap-snapshot.ts",
+        "sha256": "ec062e7b82561c4a561e6c7314eae53c236ea3a5283c523698925982f61ad00b"
+      },
+      {
+        "path": "packages/services/src/ap/credit-debit-note.service.ts",
+        "sha256": "24bd74ba2bb384d0838704720fc8dac366a6584060cda6f76163707fcd41d6c9"
+      },
+      {
+        "path": "packages/services/src/ap/payable-cancel-guards.ts",
+        "sha256": "c3e14c3252ecb95fb166e38a29a5d16e6711e1bc3b4cab4e988ff4a2320f87d1"
+      },
+      {
+        "path": "packages/services/src/ap/payable.service.ts",
+        "sha256": "2c9ecd94af14df915db488e8a6d8c7249e684a47ec82b9177d8f179d83d199db"
+      },
+      {
+        "path": "packages/services/src/ap/payment.service.ts",
+        "sha256": "12de1b4d04272f0d50bdea8dbaa68231bab7caaeb0a2adf69989a71b709ee49a"
+      },
+      {
+        "path": "packages/services/src/ap/register-ap-expense.service.ts",
+        "sha256": "fd0fc238b644b4533de17b62ac93126f721fc86fe6f5a25fc1ae9325fc5a2106"
+      },
+      {
+        "path": "packages/services/src/ap/supplier-invoice-integrity.live.test.ts",
+        "sha256": "c905a855080ba0a7695f7b0f919c24b376a8dfd7651f2101a0d70f11d47f3919"
+      },
+      {
+        "path": "packages/services/src/ap/supplier-invoice.service.ts",
+        "sha256": "21bbc8b44d399bf6de50ba1c9e0525f4da32c3d4ee5edf4105db3e87a654f5eb"
+      },
+      {
+        "path": "packages/services/src/ar/ar-audit.live.test.ts",
+        "sha256": "ce9b0b0f3fe0ff355af6c45df72e3fb54702b8b68345d60e70d8ff385f7a3a05"
+      },
+      {
+        "path": "packages/services/src/ar/ar-finance-consumers-audit.live.test.ts",
+        "sha256": "702ef1edbc939c6c5b9977e21f82024b385d788f16b3c1a72de48f1fbcca89c1"
+      },
+      {
+        "path": "packages/services/src/ar/ar-integrity.test.ts",
+        "sha256": "43baf011e1cdeab29546429cf0ba78b82d0b19b63893e41cf0a50a07226f6c76"
+      },
+      {
+        "path": "packages/services/src/ar/ar-integrity.ts",
+        "sha256": "a2f38de7650581c5fc988d92e5e98b26972b4173117fdba282e3f982baa40406"
+      },
+      {
+        "path": "packages/services/src/ar/company-ar-snapshot.ts",
+        "sha256": "17e4ea15c137d8f4b4f88632803c3fa26f338dadb9ee2536e23ca44b073b583c"
+      },
+      {
+        "path": "packages/services/src/ar/credit-debit-note.service.ts",
+        "sha256": "93ef6271191ec1b0489fc079fd174a16c1ddbd521cb5d7bcdd08b13cc604cd6f"
+      },
+      {
+        "path": "packages/services/src/ar/project-ar-summary.service.ts",
+        "sha256": "937f629ccc9c13831417de58b35e50a9b2d09a88ddd258ee7ec423bce1216d48"
+      },
+      {
+        "path": "packages/services/src/ar/receivable.service.ts",
+        "sha256": "d00ea5400cad7b4d5590ffe57a0f5e6541c45892412216d71a259f822e01a48a"
+      },
+      {
+        "path": "packages/services/src/ar/register-ar-advance.service.ts",
+        "sha256": "fff44a173ef8dedb1cffb6740aaaab01190ad307e0aa893fcf10ad6d9d393e7c"
+      },
+      {
+        "path": "packages/services/src/ar/register-ar-income.service.ts",
+        "sha256": "0c2e59c6e59b1d36f0789c296b5efe05a0ba790f7008e106d591a833a0610727"
+      },
+      {
+        "path": "packages/services/src/ar/register-ar-sale.service.ts",
+        "sha256": "95857654fb1687afa756e24f09ce1447d84b774f1c05b054f3d0ec99923319da"
+      },
+      {
+        "path": "packages/services/src/ar/sales-invoice.service.ts",
+        "sha256": "8bd8ddd9b4ba0c526da754e0d0700798b913107973913c613131c6b0fe811e26"
+      },
+      {
+        "path": "packages/services/src/dashboard/tenant-dashboard.service.ts",
+        "sha256": "e51fcebae82db0d9cdfb1b6ff699f582fa06649487cd4006eb12269b93ab9269"
+      },
+      {
+        "path": "packages/services/src/finance/finance-hub-overview.service.ts",
+        "sha256": "e157658491b9a60bd7751fad62f354c21bc2e0c793764aee51af0cf230544eca"
+      },
+      {
+        "path": "packages/services/src/finance/invoice-tax-guards.test.ts",
+        "sha256": "0f7fa702666b20fecaf969c1e89c7e5ff4b7f25fb3b99bd6370e66814ef190ac"
+      },
+      {
+        "path": "packages/services/src/finance/invoice-tax-guards.ts",
+        "sha256": "d201f03442dc8a319e87f9afc651974f3c2791ef42f914d51ce85468ca4873c6"
+      },
+      {
+        "path": "packages/services/src/finance/obligation-date.test.ts",
+        "sha256": "ddd2b3ef8e2325a1939b125bdc77bb406a00c76a5a7d04ee8789654ec60849ff"
+      },
+      {
+        "path": "packages/services/src/finance/obligation-date.ts",
+        "sha256": "cc8a42548324cb3210f4c28d52d61ec894aa0d8d1b073dfb354ea2f5d6383ea0"
+      },
+      {
+        "path": "packages/services/src/finance/obligation-read-integrity.test.ts",
+        "sha256": "fe6b3f734eb86f9f426709a529160bd4ea7dad4469ee7bff409705e1290edeaa"
+      },
+      {
+        "path": "packages/services/src/finance/obligation-read-integrity.ts",
+        "sha256": "5566c29a5135796a57883f5346c563ef3ea13186aa8bdb48e47b8114ead7052c"
+      },
+      {
+        "path": "packages/services/src/finance/pagination.test.ts",
+        "sha256": "75b79f34123a6b3b5f5bb679737d89cfd2a141797def13ad36419c2c698e586e"
+      },
+      {
+        "path": "packages/services/src/finance/pagination.ts",
+        "sha256": "6f4c41f3bd7f2867b31c9f6ae04cd6840bd312e3b5505f9377e3e3d99d98f720"
+      },
+      {
+        "path": "packages/services/src/finance/payment-collection-access.test.ts",
+        "sha256": "ba4ad34019725f1931e899d1184a3d0c68f966b25c85c888cfbde6db28624bde"
+      },
+      {
+        "path": "packages/services/src/finance/project-lifecycle-interleaving.test.ts",
+        "sha256": "f7d6a2f9232d671650ce0fe6869762def4ef938ff9e9760da29ce4c9652309a8"
+      },
+      {
+        "path": "packages/services/src/idempotency/idempotency.test.ts",
+        "sha256": "60b1f118d0638efde87c7ba302c4c65d0cfdfb10a4a9709570b8f17d19f3d4c9"
+      },
+      {
+        "path": "packages/services/src/idempotency/idempotency.ts",
+        "sha256": "e5028954d64e4da72caed47496d838be444ce5fa85094f2a4a767ebedd8c2ffb"
+      },
+      {
+        "path": "packages/services/src/notifications/financial-notification-balance.test.ts",
+        "sha256": "c498901d683e5aa76bd0be353b311eb3f0ab93fea40ecc9bd6b3f923091391d9"
+      },
+      {
+        "path": "packages/services/src/notifications/notification-email-context.ts",
+        "sha256": "a06c9b5b7522a52b16faafca19e47e28953a131d54e1f918cd115fcf8212babe"
+      },
+      {
+        "path": "packages/services/src/notifications/operational-alerts.service.ts",
+        "sha256": "13c567e00515fdeb9ad39c787abb178a619a1ac3eb7e32f786ffaf353c2a3962"
+      },
+      {
+        "path": "packages/services/src/project-cash-flow/project-cash-flow.service.ts",
+        "sha256": "7fc780be7ed37e712ce05faa6c0b4c94623f9f608ead86dbe045a9023b0d7873"
+      },
+      {
+        "path": "packages/services/src/project-cash-flow/project-cash-position-projection.service.ts",
+        "sha256": "97a3f026adf6d0239634e4818060d7e77c2e8c5e88279fac8d6d7906836795f6"
+      },
+      {
+        "path": "packages/services/src/project-finance/project-attributed-cash.service.ts",
+        "sha256": "3effd81d7138a036a0fd08c7b43f4984d1e31e832edfbbce0385c7a5465266f3"
+      },
+      {
+        "path": "packages/services/src/report-exports/report-export.service.ts",
+        "sha256": "cd38280df70e666db9b902d49b93145ddf11633cca40893a7ed986fbd6419a57"
+      },
+      {
+        "path": "packages/services/src/reports/certification-evolution.service.ts",
+        "sha256": "4e52fd7524259d42e2afad81a16e2212710a5f1787be337696152f6a4fef7e21"
+      },
+      {
+        "path": "packages/services/src/reports/project-cash-projection.service.ts",
+        "sha256": "7d634bf905380fd17ea2fd2a8ebd643cc827a7629fc1db603f6501b01543cfbf"
+      },
+      {
+        "path": "packages/services/src/reports/project-supplier-report.service.ts",
+        "sha256": "22799b61bab0d23aea602012372b8e7b17df690a522e71075a6da767eee7efa3"
+      },
+      {
+        "path": "packages/services/src/subcontracts/subcontracts-audit.live.test.ts",
+        "sha256": "04903d612a58cbe77a9fd039fb0546e776a0d48b495ce98b7acd1733115b85ae"
+      },
+      {
+        "path": "packages/services/src/treasury/collection.service.ts",
+        "sha256": "e90a977e090b3b76fb657367d26369c0c2512368a77d403318398142367d3d0f"
+      },
+      {
+        "path": "packages/services/src/treasury/internal-transfer.service.ts",
+        "sha256": "93d3baa9e24abb3d144d6212fd8d974d179f5d2b7364a72f41c25ac591409621"
+      },
+      {
+        "path": "packages/services/src/treasury/register-corporate-treasury-inflow.service.ts",
+        "sha256": "87eb11401db774a1ded593556ffd337a93ba0c00427b72e9c1c0a120bffde78b"
+      },
+      {
+        "path": "packages/services/src/treasury/register-manual-treasury-adjustment.service.ts",
+        "sha256": "03e38da8a7a73065159f308ba3b9d662c9563961a89cf0e4e284a2c5d8949831"
+      },
+      {
+        "path": "packages/services/src/treasury/treasury-write-locks.ts",
+        "sha256": "717c66f8abd5d6258157c1f7a88c1dd1258da02a21a76e91d193971e1bef2b48"
+      },
+      {
+        "path": "packages/validators/src/ap.ts",
+        "sha256": "951421bc3cb4c39be1c7df9de003765ee91509fcc0f074512de9cef105e840cb"
+      },
+      {
+        "path": "packages/validators/src/ar-advance.ts",
+        "sha256": "757f01dab46d3fb276c76f1b32588363a2d8dbd3630027bb54f6a5f34b7b68aa"
+      },
+      {
+        "path": "packages/validators/src/inventory-inputs.test.ts",
+        "sha256": "a9af6e22d51be18c7ddae5ce939cb17ee7cad3270fbd63337c42cc8e50462cab"
+      },
+      {
+        "path": "packages/validators/src/invoice-tax-inputs.test.ts",
+        "sha256": "40acedf22e8e34834477c937d18b9b4f0d72f88ebfb25cbc34e6c2ac25cc9cb6"
+      },
+      {
+        "path": "packages/validators/src/money-unit-price.test.ts",
+        "sha256": "4f7d2cd988824b3d8e5451ff74d73d4e19f5eea8fb48cf73bcf4e25bee144b6f"
+      },
+      {
+        "path": "packages/validators/src/money.ts",
+        "sha256": "a4d82ee4cd015f87fe0a4cc0036d65e777679d0db9c32dd60e864567e8183d3f"
+      },
+      {
+        "path": "packages/validators/src/sales-invoice.ts",
+        "sha256": "b2d5b3bc5275da81f2c08adb269d1cdbb8b2934f7d52b94feacdef5c036650f1"
+      },
+      {
+        "path": "packages/validators/src/treasury.ts",
+        "sha256": "17ed207aaab1c90ff72ce1b3903b0d8efceef3bc9dd8e342bb41df2c5b3d586c"
+      }
+    ]
+  },
+  "sourceFreezeStatus": "Freeze 05 verificado independientemente; coincide con la compilación final. Flujos verificados en freeze 04; presentación final revalidada en freeze 05.",
+  "selfHashNotEmbedded": true,
+  "closure": {
+    "status": "closed_local",
+    "confirmedGroups": 30,
+    "finalVerificationPending": false,
+    "published": false,
+    "ag10Started": false,
+    "nextActions": [],
+    "confirmedPending": []
+  }
+}

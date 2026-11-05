@@ -16,6 +16,7 @@ import {
 import { CollectionListSection, type CollectionListItem } from "@/features/collections";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
 import {
   getProjectShellInfo,
   getReceivableAgingReport,
@@ -24,6 +25,7 @@ import {
   listReceivablesByProject,
   listReceivablesFieldBoard,
   parseAgingFilters,
+  getTenantModuleGate,
   ServiceError,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
@@ -134,7 +136,8 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     classLabel: r.classLabel,
     classFamily: r.classFamily,
   }));
-  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+  const treasuryOn = (await getTenantModuleGate(ctx)).isEnabled("TREASURY");
+  const canEditAr = treasuryOn && can(current.tenantCtx.roles, "EDIT", "AR");
   const invoices: SalesInvoiceListItem[] = invoicesResult.data.map((inv) => ({
     id: inv.id,
     projectId: inv.projectId,
@@ -146,6 +149,7 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
     currency: inv.currency,
     clientName: inv.clientName,
     invoiceLetter: inv.invoiceLetter,
+    documentKind: inv.documentKind,
     classLabel: inv.classLabel,
     classFamily: inv.classFamily,
   }));
@@ -173,8 +177,10 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
         }
       />
 
-      <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
+      <p className="text-xs text-muted-foreground">Al {formatDate(agingReport.asOfDate)}</p>
 
+      <h2 className="text-lg font-semibold">Antigüedad de saldos</h2>
+      <p className="text-xs text-muted-foreground">Estos filtros se aplican al resumen y detalle de antigüedad. El listado de cuentas y las transacciones recientes conservan su alcance.</p>
       <AgingFilters />
       <AgingSummaryCards report={agingReport} currency={sp.currency} />
       <AgingTable report={agingReport} />
@@ -186,16 +192,18 @@ export default async function CuentasPorCobrarPage({ params, searchParams }: Pag
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Facturas recientes</h3>
-            <Suspense fallback={<ListSectionSkeleton />}>
+            {invoicesRes.status === "rejected" ? <p role="status" className="text-sm text-muted-foreground">No se pudieron consultar las facturas recientes. El resumen de cuentas sigue disponible.</p> : null}
+            {invoicesRes.status === "fulfilled" ? <Suspense fallback={<ListSectionSkeleton />}>
               <SalesInvoiceListSection invoices={invoices} projectId={id} />
-            </Suspense>
+            </Suspense> : null}
           </div>
 
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Cobranzas recientes</h3>
-            <Suspense fallback={<ListSectionSkeleton />}>
+            {collectionsRes.status === "rejected" ? <p role="status" className="text-sm text-muted-foreground">No se pudieron consultar las cobranzas recientes. El resumen de cuentas sigue disponible.</p> : null}
+            {collectionsRes.status === "fulfilled" ? <Suspense fallback={<ListSectionSkeleton />}>
               <CollectionListSection collections={collections} projectId={id} />
-            </Suspense>
+            </Suspense> : null}
           </div>
         </CardContent>
       </Card>

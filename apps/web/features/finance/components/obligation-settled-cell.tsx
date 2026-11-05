@@ -1,7 +1,7 @@
 /** MONEY_MODEL § Redondeo: saldo ≤ 0.01 ARS se considera saldado en UI. */
 const SETTLED_BALANCE_EPSILON = 0.01;
 
-/** Etiqueta Pagada/Cobrada derivada del estado de la obligación (es-AR). */
+/** Indica saldo saldado; los créditos NC también saldan sin movimiento de caja. */
 export function obligationSettledLabel(
   status: string,
   balanceDue?: string | number | null,

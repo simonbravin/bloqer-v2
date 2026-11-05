@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   requiresArInvoiceLetter,
@@ -19,6 +19,9 @@ import {
 } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { DecimalInput } from "@/components/ui/decimal-input";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { Label } from "@/components/ui/label";
 import { InvoiceLetterSelect } from "@/features/finance/components/invoice-letter-fields";
 import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
@@ -57,6 +60,7 @@ interface Props {
     invoiceLetter: InvoiceLetterCode | null;
     iibbPerceptionRate?: string;
     subtotal?: string;
+    fxRate?: string;
     lines?: SalesNoteLineDraft[];
   };
 }
@@ -73,8 +77,9 @@ export function InvoiceEditForm({
   defaults,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [fxRate, setFxRate] = useState(defaults.fxRate ?? "");
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(
     defaults.invoiceLetter,
   );
@@ -124,6 +129,8 @@ export function InvoiceEditForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
+    setError(null);
     if (showLetter && !invoiceLetter) {
       setError("Seleccioná la letra del comprobante (A, B, C o E) antes de guardar");
       return;
@@ -151,6 +158,7 @@ export function InvoiceEditForm({
     }
     const fd = new FormData(e.currentTarget);
     const payload = {
+      fxRate: currency === "ARS" ? undefined : fxRate,
       issueDate: (fd.get("issueDate") as string) || undefined,
       dueDate: (fd.get("dueDate") as string) || undefined,
       ...(showLetter ? { invoiceLetter } : {}),
@@ -171,7 +179,7 @@ export function InvoiceEditForm({
           }
         : {}),
     };
-    startTransition(async () => {
+    void run(async () => {
       const res =
         companyFinanzas || !projectId
           ? await updateCompanySalesInvoiceAction(invoiceId, payload)
@@ -186,8 +194,9 @@ export function InvoiceEditForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
       {error && (
-        <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+        <p role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
       )}
 
       {isFiscalNote ? (
@@ -222,7 +231,7 @@ export function InvoiceEditForm({
         />
       ) : null}
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="issueDate">Fecha de emisión</Label>
           <Input
@@ -263,37 +272,41 @@ export function InvoiceEditForm({
               className="grid gap-2 rounded-md border p-3 sm:grid-cols-2 lg:grid-cols-5"
             >
               <div className="space-y-1 sm:col-span-2 lg:col-span-2">
-                <Label className="text-xs text-muted-foreground">Descripción</Label>
+                <Label htmlFor={`note-description-${index}`} className="text-xs text-muted-foreground">Descripción</Label>
                 <Input
+                  id={`note-description-${index}`}
                   value={line.description}
                   onChange={(e) => updateLine(index, { description: e.target.value })}
                   required
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Cant.</Label>
-                <Input
+                <Label htmlFor={`note-quantity-${index}`} className="text-xs text-muted-foreground">Cant.</Label>
+                <DecimalInput
+                  id={`note-quantity-${index}`}
+                  precision={4}
                   value={line.quantity}
-                  onChange={(e) => updateLine(index, { quantity: e.target.value })}
-                  inputMode="decimal"
+                  onValueChange={(quantity) => updateLine(index, { quantity })}
                   required
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Precio</Label>
-                <Input
+                <Label htmlFor={`note-unit-price-${index}`} className="text-xs text-muted-foreground">Precio</Label>
+                <DecimalInput
+                  id={`note-unit-price-${index}`}
+                  precision={4}
                   value={line.unitPrice}
-                  onChange={(e) => updateLine(index, { unitPrice: e.target.value })}
-                  inputMode="decimal"
+                  onValueChange={(unitPrice) => updateLine(index, { unitPrice })}
                   required
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">IVA %</Label>
-                <Input
+                <Label htmlFor={`note-tax-rate-${index}`} className="text-xs text-muted-foreground">IVA %</Label>
+                <DecimalInput
+                  id={`note-tax-rate-${index}`}
+                  precision={4}
                   value={line.taxRate}
-                  onChange={(e) => updateLine(index, { taxRate: e.target.value })}
-                  inputMode="decimal"
+                  onValueChange={(taxRate) => updateLine(index, { taxRate })}
                   disabled={invoiceLetter === "C" || invoiceLetter === "E"}
                 />
               </div>
@@ -302,6 +315,7 @@ export function InvoiceEditForm({
         </div>
       ) : null}
 
+      <ManualFxField currency={currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
       <ExpandableNotesField label="Notas" defaultValue={defaults.notes} />
 
       <ExpandableNotesField
@@ -312,13 +326,14 @@ export function InvoiceEditForm({
       />
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
+        <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) router.back(); }}>
           Cancelar
         </Button>
         <Button type="submit" disabled={isPending}>
           {isPending ? "Guardando…" : "Guardar cambios"}
         </Button>
       </div>
+      </fieldset>
     </form>
   );
 }

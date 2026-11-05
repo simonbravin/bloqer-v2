@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compareDecimal, roundMoney, serializeMoney, toIsoDateLocal } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-m
 import { createPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
 import { createCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 
 interface AccountOption {
   id: string;
@@ -38,6 +40,7 @@ interface Props {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
   /** Field: confirmation step + return to the obligation. Desktop default unchanged. */
   fieldMode?: boolean;
   supplierName?: string;
@@ -54,13 +57,14 @@ export function PaymentForm({
   variant = "card",
   onCancel,
   onSuccess,
+  onPendingChange,
   fieldMode = false,
   supplierName,
   successHref,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: (message) => { setError(message); setStep("form"); }, onPendingChange });
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
   const [step, setStep] = useState<"form" | "confirm">("form");
@@ -69,6 +73,7 @@ export function PaymentForm({
   const matchingAccounts = accounts.filter((a) => a.currency === payableCurrency);
   const balanceSerialized = serializeMoney(payableBalance);
   const [amount, setAmount] = useState(balanceSerialized);
+  const [fxRate, setFxRate] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => (fieldMode ? toIsoDateLocal() : ""));
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,6 +94,7 @@ export function PaymentForm({
   }
 
   function goConfirm() {
+    if (isBusy()) return;
     if (!accountId) {
       setError("Seleccioná una cuenta de tesorería");
       return;
@@ -99,7 +105,15 @@ export function PaymentForm({
       return;
     }
     try {
+      if (payableCurrency !== "ARS" && (!fxRate || compareDecimal(fxRate, "0") <= 0)) {
+        setError("Ingresá un tipo de cambio mayor a 0.");
+        return;
+      }
       const rounded = roundMoney(amount);
+      if (compareDecimal(rounded, "0") <= 0) {
+        setError("Ingresá un monto mayor a cero");
+        return;
+      }
       if (compareDecimal(rounded, balanceSerialized) > 0) {
         setError("El monto supera el saldo pendiente");
         return;
@@ -114,6 +128,8 @@ export function PaymentForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
+    setError(null);
     if (!accountId) { setError("Seleccioná una cuenta de tesorería"); return; }
     const fd = new FormData(e.currentTarget);
     const rawAmount = String(fd.get("amount") ?? "").trim() || amount.trim();
@@ -134,6 +150,7 @@ export function PaymentForm({
     const rawRef = String(fd.get("reference") ?? "").trim();
     const payload = {
       payableId,
+      fxRate: payableCurrency === "ARS" ? undefined : fxRate,
       accountId,
       paymentDate: (fd.get("paymentDate") as string) || paymentDate,
       amount: payFullBalance ? undefined : rounded,
@@ -143,7 +160,7 @@ export function PaymentForm({
       notes: (fd.get("notes") as string) || null,
       idempotencyKey,
     };
-    startTransition(async () => {
+    void run(async () => {
       if (companyFinanzas) {
         const res = await createCompanyPaymentAction(payload);
         if ("error" in res) {
@@ -213,8 +230,9 @@ export function PaymentForm({
       data-testid={fieldMode ? "payables-field-payment-form" : undefined}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
 
         {fieldMode ? (
@@ -224,8 +242,8 @@ export function PaymentForm({
         ) : null}
 
         <div className={step === "confirm" ? "hidden" : undefined}>
-          <div className={fieldMode ? "space-y-4" : "grid grid-cols-2 gap-4"}>
-            <div className={fieldMode ? "space-y-1" : "col-span-2 space-y-1"}>
+          <div className={fieldMode ? "space-y-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2"}>
+            <div className={fieldMode ? "space-y-1" : "sm:col-span-2 space-y-1"}>
               <Label htmlFor="payment-account">Cuenta de tesorería ({payableCurrency})</Label>
               <Select onValueChange={setAccountId} value={accountId}>
                 <SelectTrigger id="payment-account">
@@ -292,6 +310,7 @@ export function PaymentForm({
             </div>
           </div>
 
+          <ManualFxField currency={payableCurrency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
           <SettlementFields
             idPrefix="payment"
             paymentMethod={paymentMethod}
@@ -327,6 +346,7 @@ export function PaymentForm({
                 <dt className="text-muted-foreground">Fecha</dt>
                 <dd className="font-medium">{formatDate(paymentDate)}</dd>
               </div>
+              {payableCurrency !== "ARS" ? <div className="flex justify-between gap-2"><dt className="text-muted-foreground">Tipo de cambio</dt><dd>{fxRate} ARS por 1 {payableCurrency}</dd></div> : null}
             </dl>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setStep("form")} disabled={isPending}>
@@ -339,7 +359,7 @@ export function PaymentForm({
           </div>
         ) : (
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
+            <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}>
               Cancelar
             </Button>
             {fieldMode ? (
@@ -358,6 +378,7 @@ export function PaymentForm({
             )}
           </div>
         )}
+        </fieldset>
       </form>
     </div>
   );

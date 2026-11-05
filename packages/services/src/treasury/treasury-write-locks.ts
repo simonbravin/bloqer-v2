@@ -6,7 +6,11 @@ type TxClient = Omit<
   "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
-/** Serialize balance checks vs concurrent OUTFLOWs on the same account. */
+/**
+ * Serialize balance checks vs concurrent OUTFLOWs on the same account.
+ * Writers acquire project (when present), company, then account locks in that order.
+ * Multiple accounts are locked by sorted id; never acquire a company after an account.
+ */
 export async function lockTreasuryAccountRow(
   tx: TxClient,
   accountId: string,

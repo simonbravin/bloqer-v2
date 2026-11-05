@@ -22,13 +22,6 @@ function fmt(v: string) {
   return formatMoneyAmount(v);
 }
 
-function resolveTotals(report: AgingReport, currency?: string): AgingTotals {
-  if (currency) {
-    return report.byCurrency[currency] ?? EMPTY_TOTALS;
-  }
-  return report.totals;
-}
-
 type AgingCard = {
   label: string;
   value: string;
@@ -60,8 +53,7 @@ function AgingCardRow({ cards, columns }: { cards: AgingCard[]; columns: 3 | 4 }
   );
 }
 
-export function AgingSummaryCards({ report, currency }: Props) {
-  const totals = resolveTotals(report, currency);
+function AgingCurrencyCards({ totals, currency }: { totals: AgingTotals; currency?: string }) {
   const overdueAmount = Number(totals.totalOverdue);
 
   const primaryRow: AgingCard[] = [
@@ -120,8 +112,17 @@ export function AgingSummaryCards({ report, currency }: Props) {
 
   return (
     <section className="space-y-3">
+      {currency ? <h2 className="text-sm font-semibold">Saldos en {currency}</h2> : null}
       <AgingCardRow cards={primaryRow} columns={3} />
       <AgingCardRow cards={bucketRow} columns={4} />
     </section>
   );
+}
+
+export function AgingSummaryCards({ report, currency }: Props) {
+  const groups: [string | undefined, AgingTotals][] = currency
+    ? [[currency, report.byCurrency[currency] ?? EMPTY_TOTALS]]
+    : Object.entries(report.byCurrency);
+  if (groups.length === 0) groups.push([undefined, report.totals ?? EMPTY_TOTALS]);
+  return <div className="space-y-5">{groups.map(([code, totals]) => <AgingCurrencyCards key={code ?? "empty"} totals={totals} currency={code} />)}</div>;
 }

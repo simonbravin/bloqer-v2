@@ -7,8 +7,14 @@ export const MAX_EXPORT_ROWS = 10_000;
 export const MAX_CORPORATE_PAYMENT_FILTER_IDS = 10_000;
 
 export function resolvePagination(opts?: { page?: number; pageSize?: number }) {
-  const page = Math.max(1, opts?.page ?? 1);
-  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, opts?.pageSize ?? DEFAULT_PAGE_SIZE));
+  const requestedPage = opts?.page ?? 1;
+  const requestedSize = opts?.pageSize ?? DEFAULT_PAGE_SIZE;
+  let page = Number.isSafeInteger(requestedPage) ? Math.max(1, requestedPage) : 1;
+  const pageSize = Number.isSafeInteger(requestedSize)
+    ? Math.min(MAX_PAGE_SIZE, Math.max(1, requestedSize))
+    : DEFAULT_PAGE_SIZE;
+  // Prisma's skip is a signed 32-bit Int; malformed URLs must not reach the query.
+  if ((page - 1) * pageSize > 2_147_483_647) page = 1;
   return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }
 

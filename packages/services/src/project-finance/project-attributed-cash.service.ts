@@ -1,7 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { startOfDayUtc } from "../finance/obligation-date";
 import { canViewProjectCashFlowReport } from "../project-cash-flow/project-cash-flow.service";
-import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { assertTenantModuleEnabledWithGate, getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import { requireProjectAccess } from "../security/access";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
@@ -51,6 +52,7 @@ export function resolveEffectiveInceptionDate(
 async function findEarliestConfirmedMovementDate(
   projectId: string,
   tenantId: string,
+  companyId: string | null | undefined,
   includeAr: boolean,
   includeAp: boolean,
 ): Promise<Date | null> {
@@ -58,7 +60,7 @@ async function findEarliestConfirmedMovementDate(
 
   if (includeAr) {
     const firstCollection = await prisma.collection.findFirst({
-      where: { tenantId, projectId, status: "CONFIRMED" },
+      where: { tenantId, projectId, status: "CONFIRMED", ...(companyId ? { companyId } : {}) },
       orderBy: { collectionDate: "asc" },
       select: { collectionDate: true },
     });
@@ -67,7 +69,7 @@ async function findEarliestConfirmedMovementDate(
 
   if (includeAp) {
     const firstPayment = await prisma.payment.findFirst({
-      where: { tenantId, projectId, status: "CONFIRMED" },
+      where: { tenantId, projectId, status: "CONFIRMED", ...(companyId ? { companyId } : {}) },
       orderBy: { paymentDate: "asc" },
       select: { paymentDate: true },
     });
@@ -86,6 +88,7 @@ export async function getProjectAttributedCashBalance(
   if (!canViewProjectCashFlowReport(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver flujo de caja del proyecto");
   }
+  await requireProjectAccess(projectId, ctx);
 
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -95,6 +98,7 @@ export async function getProjectAttributedCashBalance(
   if (project.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
 
   const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
   const includeAr = gate.isEnabled("AR");
   const includeAp = gate.isEnabled("AP");
 
@@ -106,6 +110,7 @@ export async function getProjectAttributedCashBalance(
   const earliestMovement = await findEarliestConfirmedMovementDate(
     projectId,
     ctx.tenantId,
+    ctx.companyId,
     includeAr,
     includeAp,
   );
@@ -120,6 +125,7 @@ export async function getProjectAttributedCashBalance(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: "CONFIRMED",
             collectionDate: { gte: inceptionDate },
           },
@@ -131,6 +137,7 @@ export async function getProjectAttributedCashBalance(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: "CONFIRMED",
             paymentDate: { gte: inceptionDate },
           },

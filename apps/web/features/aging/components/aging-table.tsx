@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<string, string> = {
   OPEN: "Abierta",
   PARTIAL: "Parcial",
   OVERDUE: "Vencida",
-  PAID: "Pagada",
+  PAID: "Saldada",
   CANCELLED: "Cancelada",
 };
 
@@ -48,6 +48,7 @@ function ItemRows({ items }: { items: AgingItem[] }) {
                 <TableHead className="font-normal">Vencimiento</TableHead>
                 <TableHead className="text-right font-normal">Original</TableHead>
                 <TableHead className="text-right font-normal">Pagado</TableHead>
+                <TableHead className="text-right font-normal">Créditos NC</TableHead>
                 <TableHead className="text-right font-normal">Saldo</TableHead>
                 <TableHead className="font-normal">Estado</TableHead>
               </TableRow>
@@ -57,7 +58,7 @@ function ItemRows({ items }: { items: AgingItem[] }) {
                 <TableRow key={item.id} className="hover:bg-muted/20">
                   <TableCell className="font-mono">#{item.invoiceNumber}</TableCell>
                   <TableCell className="max-w-[160px] truncate">
-                    {item.projectName || "—"}
+                    {item.projectName || "Empresa"}
                   </TableCell>
                   <TableCell>{formatDate(item.issueDate)}</TableCell>
                   <TableCell>
@@ -71,6 +72,9 @@ function ItemRows({ items }: { items: AgingItem[] }) {
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {formatAmount(item.paidAmount)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-muted-foreground">
+                    {formatAmount(item.creditedAmount)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums font-medium">
                     {formatAmount(item.balanceDue)}
@@ -164,8 +168,6 @@ export function AgingTable({ report }: Props) {
     return null;
   }
 
-  const t = report.totals;
-
   return (
     <div className="space-y-0">
       <TableScroll stickyFirstColumn>
@@ -202,8 +204,8 @@ export function AgingTable({ report }: Props) {
             })}
           </TableBody>
           <TableFooter className="bg-muted/50 font-semibold">
-            <TableRow>
-              <TableCell colSpan={2}>Total general</TableCell>
+            {Object.entries(report.byCurrency).map(([currency, t]) => <TableRow key={currency}>
+              <TableCell colSpan={2}>Total {currency}</TableCell>
               <TableCell className="text-right tabular-nums">{formatAmount(t.current)}</TableCell>
               <TableCell className="text-right tabular-nums">
                 {formatAmount(t.bucket1_30)}
@@ -220,7 +222,7 @@ export function AgingTable({ report }: Props) {
               <TableCell className="text-right tabular-nums">
                 {formatAmount(t.totalBalance)}
               </TableCell>
-            </TableRow>
+            </TableRow>)}
           </TableFooter>
         </Table>
       </TableScroll>

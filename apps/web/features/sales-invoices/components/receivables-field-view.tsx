@@ -19,14 +19,14 @@ const CHIPS: { id: ReceivablesFieldFilterId; label: string }[] = [
   { id: "pending", label: "Pendientes" },
   { id: "overdue", label: "Vencidas" },
   { id: "upcoming", label: "Próximas" },
-  { id: "paid", label: "Cobradas" },
+  { id: "paid", label: "Saldadas" },
 ];
 
 const EMPTY: Record<ReceivablesFieldFilterId, string> = {
   pending: "No hay cuentas con saldo pendiente.",
   overdue: "No hay cuentas vencidas.",
   upcoming: "No hay cuentas próximas a vencer.",
-  paid: "No hay cuentas cobradas.",
+  paid: "No hay cuentas saldadas.",
 };
 
 export function ReceivablesFieldView({
@@ -83,7 +83,7 @@ export function ReceivablesFieldView({
           onClick={() => onFilterChange("upcoming")}
         />
         <FieldKpi
-          label="Cobradas"
+          label="Saldadas"
           value={kpis.paid}
           active={filter === "paid"}
           onClick={() => onFilterChange("paid")}

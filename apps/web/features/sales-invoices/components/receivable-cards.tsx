@@ -55,7 +55,7 @@ export function ReceivableCards({
             <div className="flex shrink-0 flex-col items-end gap-1">
               <ReceivableStatusBadge status={r.status} />
               <span className="text-xs text-muted-foreground">
-                Cobrada: <ObligationSettledCell status={r.status} balanceDue={r.balanceDue} />
+                Saldada: <ObligationSettledCell status={r.status} balanceDue={r.balanceDue} />
               </span>
             </div>
           </div>

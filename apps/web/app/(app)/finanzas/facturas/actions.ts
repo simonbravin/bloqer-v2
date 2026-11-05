@@ -19,6 +19,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
 
 type Ok = { ok: true };
 type Err = { error: string };
@@ -43,6 +44,7 @@ const FIN_LIST = "/finanzas/facturas";
 const CXC_LIST = "/finanzas/cuentas-por-cobrar";
 
 function revalidateCompanyArPaths(invoiceId?: string, extra?: string[]) {
+  revalidateOperationalFinancePaths();
   revalidatePath(FIN_LIST);
   if (invoiceId) revalidatePath(`${FIN_LIST}/${invoiceId}`);
   revalidatePath(CXC_LIST);
@@ -161,11 +163,12 @@ export async function issueCompanySalesDebitNoteAction(
 
 export async function cancelCompanySalesCreditNoteAction(
   invoiceId: string,
+  reason?: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await cancelSalesCreditNote(invoiceId, ctx);
+    await cancelSalesCreditNote(invoiceId, ctx, undefined, reason);
     revalidateCompanyArPaths(invoiceId);
     return { ok: true };
   } catch (err) {
@@ -175,11 +178,12 @@ export async function cancelCompanySalesCreditNoteAction(
 
 export async function cancelCompanySalesInvoiceAction(
   invoiceId: string,
+  reason?: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await cancelSalesInvoice(invoiceId, ctx);
+    await cancelSalesInvoice(invoiceId, ctx, undefined, reason);
     revalidateCompanyArPaths(invoiceId);
     return { ok: true };
   } catch (err) {

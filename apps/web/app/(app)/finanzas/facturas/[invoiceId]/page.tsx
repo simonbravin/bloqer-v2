@@ -22,6 +22,7 @@ import { isStorageConfigured } from "@bloqer/config";
 import {
   canEditCompanyAr,
   getCompanySalesInvoiceById,
+  getTenantModuleGate,
   getReceivableBySalesInvoiceId,
   listCreditDebitNotesForSalesInvoice,
   listEntityDocuments,
@@ -34,7 +35,7 @@ import {
   issueCompanySalesDebitNoteAction,
   issueCompanySalesInvoiceAction,
 } from "../actions";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,6 +47,7 @@ import {
 import { CreateFiscalNoteDialog } from "@/features/finance/components/create-fiscal-note-dialog";
 import { RelatedFiscalNotesPanel } from "@/features/finance/components/related-fiscal-notes-panel";
 import { compareDecimal } from "@bloqer/utils";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 
 interface PageProps {
   params: Promise<{ invoiceId: string }>;
@@ -119,6 +121,7 @@ export default async function FinanzasFacturaVentaDetailPage({
   const isCreditNote = kind === "CREDIT_NOTE";
   const isDebitNote = kind === "DEBIT_NOTE";
   const canCollect =
+    (await getTenantModuleGate(ctx)).isEnabled("TREASURY") &&
     canEditAr &&
     !isCreditNote &&
     receivable &&
@@ -163,40 +166,19 @@ export default async function FinanzasFacturaVentaDetailPage({
                 <Link href={`/finanzas/facturas/${invoiceId}/editar`}>Editar</Link>
               </Button>
               {isInvoice ? (
-                <form
-                  action={async () => {
-                    "use server";
-                    const result = await issueCompanySalesInvoiceAction(invoiceId);
-                    if ("error" in result) redirectWithActionError(detailPath, result.error);
-                    redirect(detailPath);
-                  }}
-                >
-                  <Button size="sm">Emitir</Button>
-                </form>
+                <ConfirmActionButton label="Emitir" title={`Emitir ${invoice.code}`} variant="default"
+                  description="Se emite el comprobante y se crea la cuenta por cobrar. Este paso no registra un cobro."
+                  confirmLabel="Emitir" action={issueCompanySalesInvoiceAction.bind(null, invoiceId)} />
               ) : null}
               {isCreditNote ? (
-                <form
-                  action={async () => {
-                    "use server";
-                    const result = await issueCompanySalesCreditNoteAction(invoiceId);
-                    if ("error" in result) redirectWithActionError(detailPath, result.error);
-                    redirect(detailPath);
-                  }}
-                >
-                  <Button size="sm">Emitir nota de crédito</Button>
-                </form>
+                <ConfirmActionButton label="Emitir nota de crédito" title={`Emitir ${invoice.code}`} variant="default"
+                  description="Se aplica el crédito al saldo de la factura de referencia, sin movimiento de caja."
+                  confirmLabel="Emitir nota de crédito" action={issueCompanySalesCreditNoteAction.bind(null, invoiceId)} />
               ) : null}
               {isDebitNote ? (
-                <form
-                  action={async () => {
-                    "use server";
-                    const result = await issueCompanySalesDebitNoteAction(invoiceId);
-                    if ("error" in result) redirectWithActionError(detailPath, result.error);
-                    redirect(detailPath);
-                  }}
-                >
-                  <Button size="sm">Emitir nota de débito</Button>
-                </form>
+                <ConfirmActionButton label="Emitir nota de débito" title={`Emitir ${invoice.code}`} variant="default"
+                  description="Se emite la nota y se crea una cuenta por cobrar adicional, sin movimiento de caja."
+                  confirmLabel="Emitir nota de débito" action={issueCompanySalesDebitNoteAction.bind(null, invoiceId)} />
               ) : null}
             </>
           ) : null}
@@ -220,20 +202,10 @@ export default async function FinanzasFacturaVentaDetailPage({
             />
           ) : null}
           {canEditAr && invoice.status !== "CANCELLED" ? (
-            <form
-              action={async () => {
-                "use server";
-                const result = isCreditNote
-                  ? await cancelCompanySalesCreditNoteAction(invoiceId)
-                  : await cancelCompanySalesInvoiceAction(invoiceId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Anular
-              </Button>
-            </form>
+            <ReasonActionButton label="Anular" title={`Anular ${invoice.code}`} confirmLabel="Anular comprobante"
+              requiresReason={invoice.status === "ISSUED"}
+              description="La anulación conserva el documento y revierte su efecto financiero cuando los controles lo permiten."
+              action={isCreditNote ? cancelCompanySalesCreditNoteAction.bind(null, invoiceId) : cancelCompanySalesInvoiceAction.bind(null, invoiceId)} />
           ) : null}
         </div>
       </div>
@@ -277,7 +249,9 @@ export default async function FinanzasFacturaVentaDetailPage({
         <div className="rounded-lg border bg-muted/30 px-4 py-3 text-sm">
           <p className="font-medium">Nota de crédito</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {invoice.status === "DRAFT"
+            {invoice.status === "CANCELLED"
+              ? "Nota de crédito anulada. Su crédito ya no reduce el saldo de la factura de referencia."
+              : invoice.status === "DRAFT"
               ? "Al emitir, reduce el saldo de la factura de referencia sin movimiento de caja."
               : "Aplicada a la CxC de la factura de referencia (sin cobranza)."}
           </p>

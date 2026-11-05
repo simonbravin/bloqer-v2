@@ -5,6 +5,7 @@ import { registerTransactionSchema, type RegisterTransactionInput } from "@bloqe
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
 
 async function getCtx() {
   const current = await getCurrentUser();
@@ -47,6 +48,7 @@ export async function registerTransactionAction(
   }
   try {
     const result = await registerTransaction(parsed.data, ctx);
+    revalidateOperationalFinancePaths();
     for (const path of REVALIDATE_PATHS) revalidatePath(path);
     return {
       ok: true,

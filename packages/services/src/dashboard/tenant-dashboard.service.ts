@@ -519,7 +519,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       } else if (curKeys.length > 1) {
         financeSummary!.receivablesTotal = null;
       } else {
-        financeSummary!.receivablesTotal = ar.totals.totalBalance;
+        financeSummary!.receivablesTotal = ar.totals?.totalBalance ?? "0.00";
         financeSummary!.receivablesCurrency = "ARS";
       }
       financeSummary!.overdueReceivablesCount = countOverdueFromAgingReport(ar);
@@ -563,7 +563,7 @@ export async function getTenantDashboard(ctx: ServiceContext): Promise<TenantDas
       } else if (curKeys.length > 1) {
         financeSummary!.payablesTotal = null;
       } else {
-        financeSummary!.payablesTotal = ap.totals.totalBalance;
+        financeSummary!.payablesTotal = ap.totals?.totalBalance ?? "0.00";
         financeSummary!.payablesCurrency = "ARS";
       }
       financeSummary!.overduePayablesCount = countOverdueFromAgingReport(ap);

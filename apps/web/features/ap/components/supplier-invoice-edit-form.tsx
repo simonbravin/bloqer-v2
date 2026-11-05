@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   defaultTaxRateForInvoiceLetter,
@@ -37,6 +37,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions } from "@/lib/searchable-options";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 
 interface Props {
   /** Required when `companyFinanzas` is false */
@@ -68,8 +70,9 @@ export function SupplierInvoiceEditForm({
   maxCreditAmount = null,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
+  const [fxRate, setFxRate] = useState(String(invoice.fxRate ?? ""));
   const [supplierContactId, setSupplierContactId] = useState(invoice.supplierContactId);
   const [letterTouched, setLetterTouched] = useState(Boolean(invoice.invoiceLetter));
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(
@@ -264,6 +267,8 @@ export function SupplierInvoiceEditForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
+    setError(null);
     if (showLetter && !invoiceLetter) {
       setError("Seleccioná el comprobante (A, B, C o E) antes de guardar");
       return;
@@ -333,6 +338,7 @@ export function SupplierInvoiceEditForm({
       return;
     }
     const payload = {
+      fxRate: invoice.currency === "ARS" ? undefined : fxRate,
       supplierContactId: supplierLocked ? invoice.supplierContactId : supplierContactId,
       issueDate:       fd.get("issueDate") as string,
       dueDate:         fd.get("dueDate")   as string,
@@ -362,7 +368,7 @@ export function SupplierInvoiceEditForm({
         sortOrder: i,
       })),
     };
-    startTransition(async () => {
+    void run(async () => {
       const res = companyFinanzas
         ? await updateCompanySupplierInvoiceAction(invoice.id, payload)
         : await updateSupplierInvoiceAction(invoice.id, projectId!, payload);
@@ -391,8 +397,9 @@ export function SupplierInvoiceEditForm({
   return (
     <div className="rounded-lg border bg-card p-5 sm:p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
         {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
@@ -602,14 +609,16 @@ export function SupplierInvoiceEditForm({
           />
         </div>
 
+        <ManualFxField currency={invoice.currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
         <ExpandableNotesField defaultValue={invoice.notes ?? ""} />
 
         <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) router.back(); }}>Cancelar</Button>
           <Button type="submit" disabled={isPending}>
             {isPending ? "Guardando…" : "Guardar cambios"}
           </Button>
         </div>
+        </fieldset>
       </form>
     </div>
   );

@@ -4,6 +4,7 @@
  * DEBIT_NOTE: new Receivable 1:1 (increases AR).
  */
 import { Prisma, prisma, type SalesInvoice, type SalesInvoiceStatus } from "@bloqer/database";
+import { createSalesNoteSchema } from "@bloqer/validators";
 import { productCalendarDateUtc } from "@bloqer/utils";
 import {
   computeObligationBalanceDue,
@@ -14,6 +15,7 @@ import { resolveObligationStoredStatus } from "../finance/obligation-stored-stat
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { assertNonnegativeInvoiceTaxes } from "../finance/invoice-tax-guards";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
@@ -26,8 +28,11 @@ import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcemen
 import { ServiceContext, ServiceError } from "../types";
 import { canMutateArForScope, canViewArProjectArea, canViewCompanyAr } from "./ar-access";
 import { auditAr } from "./ar-audit";
+import { arInvoiceParents, arReceivableParents, assertArInvoiceParents, assertArReceivableParents, arCancellationReason, parseArInput, stripArParents, assertArTransactionModules } from "./ar-integrity";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import {
   assertInvoiceEditable,
+  lockInvoiceNumberCompany,
   type SalesInvoiceWithLines,
 } from "./sales-invoice.service";
 import { lockSalesInvoiceRow, recalcInvoiceTotals } from "./sales-invoice-calc.service";
@@ -98,10 +103,11 @@ async function loadIssuedParentInvoice(parentId: string, ctx: ServiceContext) {
   const parent = await prisma.salesInvoice.findUnique({
     where: { id: parentId },
     include: {
-      receivable: true,
+      ...arInvoiceParents,
+      receivable: { include: arReceivableParents },
       lines: { orderBy: { sortOrder: "asc" } },
-      clientContact: { select: { legalName: true, fantasyName: true, country: true } },
-      company: { select: { country: true } },
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true, country: true } },
+      company: { select: { id: true, tenantId: true, country: true } },
     },
   });
   if (!parent) throw new ServiceError("NOT_FOUND", "Factura de referencia no encontrada");
@@ -111,6 +117,8 @@ async function loadIssuedParentInvoice(parentId: string, ctx: ServiceContext) {
   if (isCrossCompany(parent.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
+  assertArInvoiceParents(parent, ctx);
+  if (parent.receivable) assertArReceivableParents(parent.receivable, ctx);
   if (parent.documentKind !== "INVOICE") {
     throw new ServiceError(
       "VALIDATION",
@@ -148,6 +156,7 @@ async function createNoteDraft(
   ctx: ServiceContext,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
+  input = parseArInput(createSalesNoteSchema, input);
   const parent = await loadIssuedParentInvoice(input.parentSalesInvoiceId, ctx);
   if (!canMutateArForScope(ctx.roles, parent.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear notas de crédito/débito");
@@ -179,6 +188,12 @@ async function createNoteDraft(
 
   const created = await prisma.$transaction(async (tx) => {
     if (parent.projectId) await lockProjectForOperationalMutation(tx, parent.projectId, ctx);
+    await lockInvoiceNumberCompany(tx, parent.companyId, ctx.tenantId);
+    await lockSalesInvoiceRow(tx, parent.id, ctx.tenantId);
+    await assertArTransactionModules(tx, ctx);
+    const currentParent = await tx.salesInvoice.findUniqueOrThrow({ where: { id: parent.id }, include: { ...arInvoiceParents, receivable: { include: arReceivableParents } } });
+    assertArInvoiceParents(currentParent, ctx);
+    if (currentParent.status !== "ISSUED") throw new ServiceError("CONFLICT", "La factura de referencia ya no está emitida");
     const number = await nextSalesDocumentNumber(tx, {
       tenantId: ctx.tenantId,
       companyId: parent.companyId,
@@ -230,12 +245,12 @@ async function createNoteDraft(
         discountPct: new Prisma.Decimal(l.discountPct ?? "0"),
         sortOrder: l.sortOrder ?? i,
       }));
-    } else if (kind === "CREDIT_NOTE" && parent.receivable) {
+    } else if (kind === "CREDIT_NOTE" && currentParent.receivable) {
       const balance = normalizeObligationBalanceDue(
         computeObligationBalanceDue(
-          parent.receivable.originalAmount,
-          parent.receivable.paidAmount,
-          parent.receivable.creditedAmount,
+          currentParent.receivable.originalAmount,
+          currentParent.receivable.paidAmount,
+          currentParent.receivable.creditedAmount,
         ),
       );
       sourceLines = [
@@ -259,12 +274,12 @@ async function createNoteDraft(
       }));
     }
 
-    for (const line of sourceLines) {
-      const lineSubtotal = line.quantity
-        .mul(line.unitPrice)
-        .mul(new Prisma.Decimal(1).minus(line.discountPct.div(100)));
-      const lineTax = lineSubtotal.mul(line.taxRate.div(100));
-      const lineTotal = lineSubtotal.plus(lineTax);
+    for (const [index, line] of sourceLines.entries()) {
+      const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+        quantity: line.quantity, unitPrice: line.unitPrice, taxRate: line.taxRate,
+        discountPct: line.discountPct,
+        previous: !input.lines && kind === "DEBIT_NOTE" ? parent.lines[index] : undefined,
+      });
       await tx.salesInvoiceLine.create({
         data: {
           invoiceId: note.id,
@@ -283,12 +298,12 @@ async function createNoteDraft(
 
     await recalcInvoiceTotals(tx as never, note.id);
 
-    if (kind === "CREDIT_NOTE" && parent.receivable) {
+    if (kind === "CREDIT_NOTE" && currentParent.receivable) {
       const balance = normalizeObligationBalanceDue(
         computeObligationBalanceDue(
-          parent.receivable.originalAmount,
-          parent.receivable.paidAmount,
-          parent.receivable.creditedAmount,
+          currentParent.receivable.originalAmount,
+          currentParent.receivable.paidAmount,
+          currentParent.receivable.creditedAmount,
         ),
       );
       const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id: note.id } });
@@ -303,10 +318,19 @@ async function createNoteDraft(
     const full = await tx.salesInvoice.findUniqueOrThrow({
       where: { id: note.id },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
     });
+    try {
+      assertNonnegativeInvoiceTaxes({ ...full, lines: full.lines });
+    } catch (error) {
+      if (error instanceof ServiceError && error.code === "VALIDATION") {
+        throw new ServiceError("VALIDATION", "Los nuevos comprobantes requieren IVA y percepción IIBB no negativos. Revisá los valores de la nota; el documento histórico se conserva.");
+      }
+      throw error;
+    }
 
     await auditAr(
       ctx,
@@ -325,7 +349,7 @@ async function createNoteDraft(
     );
 
     return full;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   return mapNoteView(created);
 }
@@ -356,7 +380,9 @@ function mapNoteView(
         ? "ND"
         : "FAC";
   return {
-    ...inv,
+    ...stripArParents(inv),
+    fxRate: inv.fxRate.toFixed(6),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     code: `${prefix}-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),
@@ -409,13 +435,17 @@ export async function issueSalesCreditNote(
 
   const result = await prisma.$transaction(async (tx) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    const scope = await tx.salesInvoice.findUniqueOrThrow({ where: { id }, select: { companyId: true } });
+    await lockInvoiceNumberCompany(tx, scope.companyId, ctx.tenantId, false);
+    await assertArTransactionModules(tx, ctx);
     await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
       include: {
+        ...arInvoiceParents,
         lines: true,
-        clientContact: { select: { legalName: true, fantasyName: true, country: true } },
-        company: { select: { country: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true, country: true } },
+        company: { select: { id: true, tenantId: true, country: true } },
       },
     });
     if (!inv) throw new ServiceError("NOT_FOUND", "Nota de crédito no encontrada");
@@ -430,6 +460,8 @@ export async function issueSalesCreditNote(
       throw new ServiceError("FORBIDDEN", "Sin permisos para emitir notas de crédito");
     }
     await assertProjectGuardIfPresent(inv.projectId, ctx);
+    assertArInvoiceParents(inv, ctx);
+    await assertArTransactionModules(tx, ctx);
     assertInvoiceEditable(inv);
     if (inv.documentKind !== "CREDIT_NOTE") {
       throw new ServiceError("VALIDATION", "El comprobante no es una nota de crédito.");
@@ -447,8 +479,11 @@ export async function issueSalesCreditNote(
       counterpartyCountry: inv.clientContact.country,
       documentLabel: "nota de crédito",
     });
+    // D-133 requires explicit draft correction; recalculation must not erase a stored negative component.
+    assertNonnegativeInvoiceTaxes(inv);
     await recalcInvoiceTotals(tx as never, id);
     const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
+    assertNonnegativeInvoiceTaxes({ ...refreshed, lines: inv.lines });
     if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El total de la NC debe ser mayor a 0");
     }
@@ -457,13 +492,16 @@ export async function issueSalesCreditNote(
       taxAmount: refreshed.taxAmount,
     });
 
+    await lockSalesInvoiceRow(tx, inv.referencedSalesInvoiceId, ctx.tenantId);
     const parent = await tx.salesInvoice.findUnique({
       where: { id: inv.referencedSalesInvoiceId },
-      include: { receivable: true },
+      include: { ...arInvoiceParents, receivable: { include: arReceivableParents } },
     });
     if (!parent || parent.tenantId !== ctx.tenantId) {
       throw new ServiceError("NOT_FOUND", "Factura de referencia no encontrada");
     }
+    assertArInvoiceParents(parent, ctx);
+    if (parent.receivable) assertArReceivableParents(parent.receivable, ctx);
     if (parent.documentKind !== "INVOICE" || parent.status !== "ISSUED") {
       throw new ServiceError("CONFLICT", "La factura de referencia no está emitida.");
     }
@@ -554,8 +592,9 @@ export async function issueSalesCreditNote(
     const issued = await tx.salesInvoice.findUniqueOrThrow({
       where: { id },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
     });
 
@@ -593,13 +632,17 @@ export async function issueSalesDebitNote(
 
   const result = await prisma.$transaction(async (tx) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    const scope = await tx.salesInvoice.findUniqueOrThrow({ where: { id }, select: { companyId: true } });
+    await lockInvoiceNumberCompany(tx, scope.companyId, ctx.tenantId, false);
+    await assertArTransactionModules(tx, ctx);
     await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
       include: {
+        ...arInvoiceParents,
         lines: true,
-        clientContact: { select: { legalName: true, fantasyName: true, country: true } },
-        company: { select: { country: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true, country: true } },
+        company: { select: { id: true, tenantId: true, country: true } },
       },
     });
     if (!inv) throw new ServiceError("NOT_FOUND", "Nota de débito no encontrada");
@@ -614,6 +657,8 @@ export async function issueSalesDebitNote(
       throw new ServiceError("FORBIDDEN", "Sin permisos para emitir notas de débito");
     }
     await assertProjectGuardIfPresent(inv.projectId, ctx);
+    assertArInvoiceParents(inv, ctx);
+    await assertArTransactionModules(tx, ctx);
     assertInvoiceEditable(inv);
     if (inv.documentKind !== "DEBIT_NOTE") {
       throw new ServiceError("VALIDATION", "El comprobante no es una nota de débito.");
@@ -631,8 +676,11 @@ export async function issueSalesDebitNote(
       counterpartyCountry: inv.clientContact.country,
       documentLabel: "nota de débito",
     });
+    // D-133 requires explicit draft correction; recalculation must not erase a stored negative component.
+    assertNonnegativeInvoiceTaxes(inv);
     await recalcInvoiceTotals(tx as never, id);
     const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
+    assertNonnegativeInvoiceTaxes({ ...refreshed, lines: inv.lines });
     if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El total de la ND debe ser mayor a 0");
     }
@@ -641,12 +689,15 @@ export async function issueSalesDebitNote(
       taxAmount: refreshed.taxAmount,
     });
 
+    await lockSalesInvoiceRow(tx, inv.referencedSalesInvoiceId, ctx.tenantId);
     const parent = await tx.salesInvoice.findUnique({
       where: { id: inv.referencedSalesInvoiceId },
+      include: arInvoiceParents,
     });
     if (!parent || parent.tenantId !== ctx.tenantId) {
       throw new ServiceError("NOT_FOUND", "Factura de referencia no encontrada");
     }
+    assertArInvoiceParents(parent, ctx);
     if (parent.documentKind !== "INVOICE" || parent.status !== "ISSUED") {
       throw new ServiceError("CONFLICT", "La factura de referencia no está emitida.");
     }
@@ -693,8 +744,9 @@ export async function issueSalesDebitNote(
     const issued = await tx.salesInvoice.findUniqueOrThrow({
       where: { id },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
     });
 
@@ -718,17 +770,23 @@ export async function cancelSalesCreditNote(
   id: string,
   ctx: ServiceContext,
   projectScopeId?: string,
+  reason?: string,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para anular notas de crédito");
 
   const result = await prisma.$transaction(async (tx) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    const scope = await tx.salesInvoice.findUniqueOrThrow({ where: { id }, select: { companyId: true } });
+    await lockInvoiceNumberCompany(tx, scope.companyId, ctx.tenantId, false);
+    await assertArTransactionModules(tx, ctx);
+    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
     const inv = await tx.salesInvoice.findUnique({
       where: { id },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
         creditApplicationAsNote: true,
       },
     });
@@ -747,16 +805,16 @@ export async function cancelSalesCreditNote(
     if (inv.documentKind !== "CREDIT_NOTE") {
       throw new ServiceError("VALIDATION", "El comprobante no es una nota de crédito.");
     }
-    if (inv.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "La nota de crédito ya está anulada.");
-    }
+    assertArInvoiceParents(inv, ctx);
+    if (inv.status === "CANCELLED") return inv;
+    const cancellationReason = arCancellationReason(inv.status, reason);
     if (inv.status === "DRAFT") {
       const cancelled = await tx.salesInvoice.update({
         where: { id },
         data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
         include: {
           lines: { orderBy: { sortOrder: "asc" } },
-          clientContact: { select: { legalName: true, fantasyName: true } },
+          clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
         },
       });
       await auditAr(
@@ -765,8 +823,9 @@ export async function cancelSalesCreditNote(
         "SalesInvoice",
         id,
         { projectId: cancelled.projectId, companyId: cancelled.companyId },
-        { before: { status: "DRAFT" }, after: { status: "CANCELLED" }, tx },
+        { before: { status: "DRAFT" }, after: { status: "CANCELLED", cancellationReason }, tx },
       );
+      await cancelDraftJournalOnOperationalCancel(ctx, { companyId: cancelled.companyId, sourceType: "SALES_CREDIT_NOTE", sourceId: id, sourceLabel: "la nota de crédito" }, tx);
       return cancelled;
     }
 
@@ -785,11 +844,13 @@ export async function cancelSalesCreditNote(
       );
     }
 
-    const receivable = await tx.receivable.findUnique({ where: { id: app.receivableId } });
+    const receivable = await tx.receivable.findUnique({ where: { id: app.receivableId }, include: arReceivableParents });
     if (!receivable || receivable.tenantId !== ctx.tenantId) {
       throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
     }
 
+    assertArReceivableParents(receivable, ctx);
+    if (app.tenantId !== ctx.tenantId || app.companyId !== inv.companyId || app.creditNoteSalesInvoiceId !== inv.id || receivable.salesInvoiceId !== inv.referencedSalesInvoiceId || app.amount.lte(0)) throw new ServiceError("CONFLICT", "La aplicación de crédito es inconsistente");
     const newCredited = receivable.creditedAmount.minus(app.amount);
     if (newCredited.lessThan(0)) {
       throw new ServiceError("CONFLICT", "Inconsistencia de creditedAmount al anular NC.");
@@ -825,8 +886,9 @@ export async function cancelSalesCreditNote(
       where: { id },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
     });
 
@@ -838,13 +900,14 @@ export async function cancelSalesCreditNote(
       { projectId: cancelled.projectId, companyId: cancelled.companyId },
       {
         before: { status: "ISSUED" },
-        after: { status: "CANCELLED", creditedAmount: serializeMoneyDecimal(newCredited) },
+        after: { status: "CANCELLED", creditedAmount: serializeMoneyDecimal(newCredited), cancellationReason },
         tx,
       },
     );
 
+    await cancelDraftJournalOnOperationalCancel(ctx, { companyId: cancelled.companyId, sourceType: "SALES_CREDIT_NOTE", sourceId: id, sourceLabel: "la nota de crédito" }, tx);
     return cancelled;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await cancelDraftJournalOnOperationalCancel(ctx, {
     companyId: result.companyId,
@@ -891,7 +954,7 @@ export async function listCreditDebitNotesForSalesInvoice(
   await assertArTenantModule(ctx);
   const parent = await prisma.salesInvoice.findUnique({
     where: { id: salesInvoiceId },
-    select: { id: true, tenantId: true, companyId: true, projectId: true },
+    include: arInvoiceParents,
   });
   if (!parent || parent.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Factura no encontrada");
@@ -910,6 +973,7 @@ export async function listCreditDebitNotesForSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas");
   }
   await requireProjectAccessIfPresent(parent.projectId, ctx);
+  assertArInvoiceParents(parent, ctx);
 
   const notes = await prisma.salesInvoice.findMany({
     where: {
@@ -918,18 +982,15 @@ export async function listCreditDebitNotesForSalesInvoice(
       documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
     },
     orderBy: [{ issueDate: "desc" }, { number: "desc" }],
-    select: {
-      id: true,
-      number: true,
-      documentKind: true,
-      status: true,
-      totalAmount: true,
-      currency: true,
-      issueDate: true,
-    },
+    include: arInvoiceParents,
   });
 
   return notes.map((n) => {
+    assertArInvoiceParents(n, ctx);
+    if (n.companyId !== parent.companyId || n.projectId !== parent.projectId ||
+        n.clientContactId !== parent.clientContactId || n.currency !== parent.currency) {
+      throw new ServiceError("CONFLICT", "La nota no coincide con la factura de referencia");
+    }
     const prefix = n.documentKind === "CREDIT_NOTE" ? "NC" : "ND";
     return {
       id: n.id,

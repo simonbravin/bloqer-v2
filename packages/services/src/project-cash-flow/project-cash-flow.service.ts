@@ -6,6 +6,9 @@ import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenan
 
 import { canViewProjectCashFlowReport } from "../project/project-nav-guards";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { requireProjectAccess } from "../security/access";
+import { arCollectionParents, assertArCollectionParents } from "../ar/ar-integrity";
+import { apPaymentParents, assertApPaymentReadParents } from "../ap/ap-integrity";
 
 export { canViewProjectCashFlowReport };
 
@@ -164,6 +167,7 @@ export async function getProjectCashFlowReport(
   if (!canViewProjectCashFlowReport(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver flujo de caja del proyecto");
   }
+  await requireProjectAccess(projectId, ctx);
 
   const project = await prisma.project.findUnique({
     where:  { id: projectId },
@@ -205,14 +209,14 @@ export async function getProjectCashFlowReport(
           where: {
             tenantId:  ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status:    "CONFIRMED",
             collectionDate: { gte: dateFrom, lte: dateTo },
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
           include: {
-            clientContact: { select: { fantasyName: true, legalName: true } },
-            salesInvoice:  { select: { number: true } },
-            account:       { select: { name: true } },
+            ...arCollectionParents,
+            clientContact: { select: { id: true, tenantId: true, fantasyName: true, legalName: true } },
           },
           orderBy: { collectionDate: "asc" },
         })
@@ -222,27 +226,19 @@ export async function getProjectCashFlowReport(
           where: {
             tenantId:  ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status:    "CONFIRMED",
             paymentDate: { gte: dateFrom, lte: dateTo },
             ...(filters.currency ? { currency: filters.currency } : {}),
           },
-          include: {
-            payable: {
-              select: {
-                supplierInvoice: {
-                  select: {
-                    number:          true,
-                    supplierContact: { select: { fantasyName: true, legalName: true } },
-                  },
-                },
-              },
-            },
-            account: { select: { name: true } },
-          },
+          include: apPaymentParents,
           orderBy: { paymentDate: "asc" },
         })
       : Promise.resolve([]),
   ]);
+
+  for (const collection of collections) assertArCollectionParents(collection, ctx);
+  for (const payment of payments) assertApPaymentReadParents(payment, ctx);
 
   const allCurrencies = new Set([
     ...collections.map((c) => c.currency),

@@ -1,5 +1,6 @@
 import { Prisma } from "@bloqer/database";
 import { productCalendarDateUtc } from "@bloqer/utils";
+import { ServiceError } from "../types";
 
 /** Minimum open balance to count in KPIs/alerts (avoids sub-cent false positives). */
 export const OBLIGATION_OPEN_BALANCE_EPSILON = new Prisma.Decimal("0.01");
@@ -17,7 +18,13 @@ export function startOfDayUtc(d: Date): Date {
  * stored as UTC midnight of that calendar day (matches Prisma `@db.Date`).
  */
 export function parseObligationAsOfDate(asOfDate?: string): Date {
-  if (asOfDate) return startOfDayUtc(new Date(asOfDate));
+  if (asOfDate !== undefined) {
+    const date = new Date(`${asOfDate}T00:00:00.000Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(asOfDate) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== asOfDate) {
+      throw new ServiceError("VALIDATION", "La fecha de corte debe ser una fecha válida");
+    }
+    return date;
+  }
   return productCalendarDateUtc();
 }
 
@@ -54,11 +61,12 @@ export function deriveObligationDisplayStatus(
   dueDate: Date,
   asOf: Date = productCalendarDateUtc(),
   paidAmount?: Prisma.Decimal,
+  creditedAmount?: Prisma.Decimal,
 ): ObligationDisplayStatus {
   if (storedStatus === "CANCELLED") return "CANCELLED";
   if (storedStatus === "PAID") return "PAID";
   if (!hasOpenObligationBalance(balanceDue)) return "PAID";
   if (isObligationOverdue(dueDate, asOf)) return "OVERDUE";
-  if (paidAmount?.greaterThan(0)) return "PARTIAL";
+  if (paidAmount?.greaterThan(0) || creditedAmount?.greaterThan(0)) return "PARTIAL";
   return "OPEN";
 }

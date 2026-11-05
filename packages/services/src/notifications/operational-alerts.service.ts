@@ -18,6 +18,7 @@ import {
   staleDocumentUploadCopy,
 } from "./notification-copy";
 import { filterUserIdsByProjectAccess } from "../security/access";
+import { computeObligationBalanceDue } from "../finance/obligation-balance";
 
 /** Re-export recipient helpers for existing call sites. */
 export {
@@ -142,6 +143,7 @@ export async function runOverdueReceivablesAlert(
       companyId: true,
       originalAmount: true,
       paidAmount: true,
+      creditedAmount: true,
       dueDate: true,
       clientContact: { select: { legalName: true, fantasyName: true } },
       salesInvoiceId: true,
@@ -149,7 +151,7 @@ export async function runOverdueReceivablesAlert(
   });
 
   for (const r of rows) {
-    const balanceDue = r.originalAmount.minus(r.paidAmount);
+    const balanceDue = computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount);
     if (!hasOpenObligationBalance(balanceDue)) continue;
     if (!isObligationOverdue(r.dueDate)) continue;
 
@@ -157,16 +159,21 @@ export async function runOverdueReceivablesAlert(
 
     if (r.status === "OPEN" || r.status === "PARTIAL") {
       try {
-        await prisma.receivable.updateMany({
+        const changed = await prisma.receivable.updateMany({
           where: {
             id: r.id,
             tenantId: ctx.tenantId,
+            originalAmount: r.originalAmount,
+            paidAmount: r.paidAmount,
+            creditedAmount: r.creditedAmount,
             status: { in: ["OPEN", "PARTIAL"] },
           },
           data: { status: "OVERDUE", updatedBy: ctx.actorUserId },
         });
+        if (changed.count === 0) continue;
       } catch (e) {
         summary.errors.push(e instanceof Error ? e.message : String(e));
+        continue;
       }
     }
 
@@ -230,6 +237,7 @@ export async function runOverduePayablesAlert(
       companyId: true,
       originalAmount: true,
       paidAmount: true,
+      creditedAmount: true,
       dueDate: true,
       supplierContact: { select: { legalName: true, fantasyName: true } },
       supplierInvoiceId: true,
@@ -237,7 +245,7 @@ export async function runOverduePayablesAlert(
   });
 
   for (const p of rows) {
-    const balanceDue = p.originalAmount.minus(p.paidAmount);
+    const balanceDue = computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount);
     if (!hasOpenObligationBalance(balanceDue)) continue;
     if (!isObligationOverdue(p.dueDate)) continue;
 
@@ -245,16 +253,21 @@ export async function runOverduePayablesAlert(
 
     if (p.status === "OPEN" || p.status === "PARTIAL") {
       try {
-        await prisma.payable.updateMany({
+        const changed = await prisma.payable.updateMany({
           where: {
             id: p.id,
             tenantId: ctx.tenantId,
+            originalAmount: p.originalAmount,
+            paidAmount: p.paidAmount,
+            creditedAmount: p.creditedAmount,
             status: { in: ["OPEN", "PARTIAL"] },
           },
           data: { status: "OVERDUE", updatedBy: ctx.actorUserId },
         });
+        if (changed.count === 0) continue;
       } catch (e) {
         summary.errors.push(e instanceof Error ? e.message : String(e));
+        continue;
       }
     }
 

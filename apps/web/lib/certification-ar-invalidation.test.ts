@@ -105,6 +105,7 @@ function environment({ note = false, linked = true, failRead = false, failWrite 
       }),
     },
     "@/lib/revalidate-project-paths": {
+      revalidateOperationalFinancePaths: (projectId?: string) => invalidated.push({ path: `operational-finance:${projectId ?? "company"}` }),
       revalidateProjectCostAndFinancePaths: (projectId: string) =>
         invalidated.push({ path: `finance:${projectId}` }),
       revalidateTreasuryPaths: () => invalidated.push({ path: "treasury" }),
@@ -181,9 +182,8 @@ for (const action of [
     if (note && action === "issueSalesInvoiceAction") continue;
     test(`${action} invalidates a ${note ? "note parent certificate" : "direct certificate"} without post-commit reads`, async () => {
       const env = environment({ note });
-      const result = await env.actions[action]!(env.document.id, ids.project, {
-        notes: "Synthetic edit",
-      });
+      const result = await env.actions[action]!(env.document.id, ids.project,
+        action === "updateSalesInvoiceAction" ? { notes: "Synthetic edit" } : "Synthetic cancellation");
       assert.equal(result.ok, true);
       assertCertificateInvalidation(env.invalidated);
       const reads = env.calls.filter((call) => call.name === "getSalesInvoiceById");
@@ -193,7 +193,7 @@ for (const action of [
       );
       const mutation = env.calls.at(-1)!;
       assert.equal(mutation.args[0], env.document.id);
-      assert.equal(mutation.args.at(-1), ids.project);
+      assert.equal(mutation.args[action === "updateSalesInvoiceAction" ? 3 : 2], ids.project);
       assert.ok(
         env.invalidated.some(
           (entry) => entry.path === `/proyectos/${ids.project}/facturas/${env.document.id}`,

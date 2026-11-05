@@ -6,6 +6,8 @@ import {
 } from "../tenant-modules/tenant-module.service";
 import type { TenantModuleSectionExcludedWarning } from "../tenant-modules/tenant-module-report-warnings";
 import { ACTIVE_OBLIGATION_STATUSES } from "../finance/obligation-status";
+import { computeObligationBalanceDue, normalizeObligationBalanceDue } from "../finance/obligation-balance";
+import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { canViewProjectCashFlowReport } from "./project-cash-flow.service";
@@ -103,6 +105,7 @@ export async function getProjectCashPositionProjection(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: "CONFIRMED",
             collectionDate: { lte: asOf },
             ...(filters.currency ? { currency: filters.currency } : {}),
@@ -115,6 +118,7 @@ export async function getProjectCashPositionProjection(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: "CONFIRMED",
             paymentDate: { lte: asOf },
             ...(filters.currency ? { currency: filters.currency } : {}),
@@ -127,6 +131,7 @@ export async function getProjectCashPositionProjection(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: { in: [...OPEN_OBLIGATION] },
             dueDate: { lte: asOf },
             ...(filters.currency ? { currency: filters.currency } : {}),
@@ -135,6 +140,7 @@ export async function getProjectCashPositionProjection(
             currency: true,
             originalAmount: true,
             paidAmount: true,
+            creditedAmount: true,
           },
         })
       : Promise.resolve([]),
@@ -143,6 +149,7 @@ export async function getProjectCashPositionProjection(
           where: {
             tenantId: ctx.tenantId,
             projectId,
+            ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
             status: { in: [...OPEN_OBLIGATION] },
             dueDate: { lte: asOf },
             ...(filters.currency ? { currency: filters.currency } : {}),
@@ -151,6 +158,7 @@ export async function getProjectCashPositionProjection(
             currency: true,
             originalAmount: true,
             paidAmount: true,
+            creditedAmount: true,
           },
         })
       : Promise.resolve([]),
@@ -177,7 +185,7 @@ export async function getProjectCashPositionProjection(
     let receivablesDue = new Prisma.Decimal(0);
     let receivableOpenCount = 0;
     for (const r of receivables.filter((x) => x.currency === cur)) {
-      const balance = r.originalAmount.minus(r.paidAmount);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount));
       if (balance.lessThanOrEqualTo(0)) continue;
       receivablesDue = receivablesDue.plus(balance);
       receivableOpenCount += 1;
@@ -186,7 +194,7 @@ export async function getProjectCashPositionProjection(
     let payablesDue = new Prisma.Decimal(0);
     let payableOpenCount = 0;
     for (const p of payables.filter((x) => x.currency === cur)) {
-      const balance = p.originalAmount.minus(p.paidAmount);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount));
       if (balance.lessThanOrEqualTo(0)) continue;
       payablesDue = payablesDue.plus(balance);
       payableOpenCount += 1;
@@ -201,11 +209,11 @@ export async function getProjectCashPositionProjection(
 
     currencyRows.push({
       currency: cur,
-      collectionsReceived: collectionsReceived.toFixed(2),
-      paymentsMade: paymentsMade.toFixed(2),
-      receivablesDue: receivablesDue.toFixed(2),
-      payablesDue: payablesDue.toFixed(2),
-      projectedCapital: projectedCapital.toFixed(2),
+      collectionsReceived: serializeMoneyDecimal(collectionsReceived),
+      paymentsMade: serializeMoneyDecimal(paymentsMade),
+      receivablesDue: serializeMoneyDecimal(receivablesDue),
+      payablesDue: serializeMoneyDecimal(payablesDue),
+      projectedCapital: serializeMoneyDecimal(projectedCapital),
       receivableOpenCount,
       payableOpenCount,
     });

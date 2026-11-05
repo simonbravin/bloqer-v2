@@ -7,10 +7,10 @@ import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { settlementMethodLabel } from "@/features/treasury/lib/settlement-method-label";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
-import { getPaymentById, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import { getPaymentById, getTenantModuleGate, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { can, classifyAccountMovement } from "@bloqer/domain";
 import { cancelPaymentAction } from "@/app/(app)/proyectos/[id]/cuentas-por-pagar/actions";
-import { ConfirmActionButton } from "@/components/feedback/confirm-action-button";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
@@ -44,7 +44,7 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
 
   const isConfirmed = payment.status === "CONFIRMED";
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
-  const canCancelPayment = canRegisterApPayment(current.tenantCtx.roles);
+  const canCancelPayment = (await getTenantModuleGate(ctx)).isEnabled("TREASURY") && canRegisterApPayment(current.tenantCtx.roles);
   const returnPath = `/proyectos/${id}/pagos/${paymentId}`;
   const paymentClass = classifyAccountMovement({ type: "OUTFLOW", sourceType: "PAYMENT" });
 
@@ -140,12 +140,11 @@ export default async function PaymentDetailPage({ params, searchParams }: PagePr
       )}
 
       {canCancelPayment && isConfirmed && (
-        <ConfirmActionButton
+        <ReasonActionButton
           label="Cancelar pago"
           title="Cancelar pago"
           description="Se anula el pago y se revierte el impacto en la CxP y en tesorería (si el período lo permite)."
           confirmLabel="Cancelar pago"
-          size="default"
           successMessage="Pago cancelado"
           action={cancelPaymentAction.bind(null, paymentId, id)}
         />

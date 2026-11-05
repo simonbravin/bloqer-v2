@@ -63,11 +63,12 @@ describe("Inventory inputs preserve canonical quantity precision and calendar da
       false,
     );
   });
-  it("distinguishes grouped thousands from canonical four-place transfer prices", () => {
+  it("preserves canonical transfer fractions and explicit localized grouping", () => {
     assert.equal(
       createWarehouseTransferSchema.parse({ ...transfer(), unitCost: "1.255" }).unitCost,
-      "1255.0000",
+      "1.2550",
     );
+    assert.equal(createWarehouseTransferSchema.parse({ ...transfer(), unitCost: "1.255,00" }).unitCost, "1255.0000");
     const canonical = createWarehouseTransferSchema.parse({ ...transfer(), unitCost: "1.2550" });
     assert.equal(canonical.unitCost, "1.2550");
     assert.equal(createWarehouseTransferSchema.parse(canonical).unitCost, "1.2550");

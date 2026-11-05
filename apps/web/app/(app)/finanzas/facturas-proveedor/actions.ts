@@ -22,6 +22,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
 
 async function getCtx() {
   const current = await getCurrentUser();
@@ -42,6 +43,7 @@ function handle(err: unknown): { error: string } {
 const FIN_LIST = "/finanzas/facturas-proveedor";
 
 function revalidateCompanyApPaths(invoiceId?: string, extra?: string[]) {
+  revalidateOperationalFinancePaths();
   revalidatePath(FIN_LIST);
   if (invoiceId) revalidatePath(`${FIN_LIST}/${invoiceId}`);
   revalidatePath("/finanzas/cuentas-por-pagar");
@@ -58,7 +60,7 @@ export async function createCompanySupplierInvoiceAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const inv = await createSupplierInvoice(parsed.data, ctx);
-    revalidatePath(FIN_LIST);
+    revalidateCompanyApPaths(inv.id);
     return { id: inv.id };
   } catch (err) {
     return handle(err);
@@ -75,9 +77,7 @@ export async function updateCompanySupplierInvoiceAction(
   try {
     await getCompanySupplierInvoiceById(invoiceId, ctx);
     const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx);
-    revalidatePath(FIN_LIST);
-    revalidatePath(`${FIN_LIST}/${invoiceId}`);
-    revalidatePath("/finanzas/transacciones");
+    revalidateCompanyApPaths(inv.id);
     return { id: inv.id };
   } catch (err) {
     return handle(err);
@@ -89,6 +89,7 @@ export async function issueCompanySupplierInvoiceAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getCompanySupplierInvoiceById(invoiceId, ctx);
     await issueSupplierInvoice(invoiceId, ctx);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
@@ -99,10 +100,12 @@ export async function issueCompanySupplierInvoiceAction(
 
 export async function cancelCompanySupplierInvoiceAction(
   invoiceId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelSupplierInvoice(invoiceId, ctx);
+    await getCompanySupplierInvoiceById(invoiceId, ctx);
+    await cancelSupplierInvoice(invoiceId, ctx, undefined, reason);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {
@@ -116,6 +119,7 @@ export async function createCompanySupplierCreditNoteFromInvoiceAction(
 ): Promise<{ id: string } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getCompanySupplierInvoiceById(parentInvoiceId, ctx);
     const note = await createSupplierCreditNoteFromInvoice(
       {
         parentSupplierInvoiceId: parentInvoiceId,
@@ -147,6 +151,7 @@ export async function createCompanySupplierDebitNoteFromInvoiceAction(
 ): Promise<{ id: string } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getCompanySupplierInvoiceById(parentInvoiceId, ctx);
     const note = await createSupplierDebitNoteFromInvoice(
       { parentSupplierInvoiceId: parentInvoiceId },
       ctx,
@@ -163,6 +168,7 @@ export async function issueCompanySupplierCreditNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getCompanySupplierInvoiceById(invoiceId, ctx);
     await issueSupplierCreditNote(invoiceId, ctx);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
@@ -176,6 +182,7 @@ export async function issueCompanySupplierDebitNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
+    await getCompanySupplierInvoiceById(invoiceId, ctx);
     await issueSupplierDebitNote(invoiceId, ctx);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
@@ -186,10 +193,12 @@ export async function issueCompanySupplierDebitNoteAction(
 
 export async function cancelCompanySupplierCreditNoteAction(
   invoiceId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelSupplierCreditNote(invoiceId, ctx);
+    await getCompanySupplierInvoiceById(invoiceId, ctx);
+    await cancelSupplierCreditNote(invoiceId, ctx, undefined, reason);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {

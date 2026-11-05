@@ -4,7 +4,7 @@ import {
   optionalMoneyAmountString,
   optionalFxRateString,
   qtyString,
-  ratePctString,
+  nonNegativeRatePctString,
   discountPctString,
   unitPriceString,
 } from "./money";
@@ -17,7 +17,7 @@ const invoiceLineSchema = z.object({
   description: z.string().min(1),
   quantity:    qtyString,
   unitPrice:   unitPriceString,
-  taxRate:     ratePctString.optional().default("0.0000"),
+  taxRate:     nonNegativeRatePctString.optional().default("0.0000"),
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   certificationLineId: z.string().uuid().optional().nullable(),
@@ -28,8 +28,9 @@ export const createSalesInvoiceSchema = z.object({
   projectId:           z.string().uuid().optional().nullable(),
   clientContactId:     z.string().uuid(),
   certificationId:     z.string().uuid().optional().nullable(),
-  issueDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  dueDate:             z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  issueDate:           z.string().date("Fecha inválida"),
+  dueDate:             z.string().date("Fecha inválida"),
+  fxRate:             optionalFxRateString,
   currency:            z.string().length(3).default("ARS"),
   /** Letra A/B/C/E ([D-084]); required on issue when AR. */
   invoiceLetter:       invoiceLetterSchema.optional().nullable(),
@@ -39,7 +40,7 @@ export const createSalesInvoiceSchema = z.object({
    */
   pricesIncludeTax:    z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate:  ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
+  iibbPerceptionRate:  nonNegativeRatePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   notes:               z.string().optional().nullable(),
   internalNotes:       z.string().optional().nullable(),
   externalInvoiceRef:  z
@@ -57,25 +58,35 @@ export const createInvoiceFromCertificationSchema = z.object({
   fxRate: optionalFxRateString,
   issueDate:       z.string().date("Fecha inválida"),
   dueDate:         z.string().date("Fecha inválida"),
-  taxRate:         ratePctString.optional().default("0.0000"),
+  taxRate:         nonNegativeRatePctString.optional().default("0.0000"),
   invoiceLetter:   invoiceLetterSchema.optional().nullable(),
   /** Gross certification amount already embeds tax; usually leave false. */
   pricesIncludeTax: z.boolean().optional(),
-  iibbPerceptionRate: ratePctString.optional().default("0.0000"),
+  iibbPerceptionRate: nonNegativeRatePctString.optional().default("0.0000"),
   notes:           z.string().optional().nullable(),
   internalNotes:   z.string().optional().nullable(),
 });
 
 export const updateSalesInvoiceSchema = z.object({
-  issueDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  dueDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  issueDate:     z.string().date("Fecha inválida").optional(),
+  dueDate:       z.string().date("Fecha inválida").optional(),
+  fxRate:        optionalFxRateString,
   invoiceLetter: invoiceLetterSchema.optional().nullable(),
   pricesIncludeTax: z.boolean().optional(),
-  iibbPerceptionRate: ratePctString.optional(),
+  iibbPerceptionRate: nonNegativeRatePctString.optional(),
   notes:         z.string().optional().nullable(),
   internalNotes: z.string().optional().nullable(),
   /** Line edits allowed only on DRAFT credit/debit notes ([D-115]). */
   lines:         z.array(invoiceLineSchema).min(1).optional(),
+});
+
+/** NC/ND inputs share the same decimal/calendar boundary as invoices (D-115). */
+export const createSalesNoteSchema = z.object({
+  parentSalesInvoiceId: z.string().uuid(),
+  issueDate: z.string().date("Fecha inválida").optional(),
+  dueDate: z.string().date("Fecha inválida").optional(),
+  notes: z.string().optional().nullable(),
+  lines: z.array(invoiceLineSchema).min(1).optional(),
 });
 
 
@@ -83,7 +94,8 @@ export const updateSalesInvoiceSchema = z.object({
 export const collectNowSchema = z
   .object({
     accountId:            z.string().uuid(),
-    collectionDate:       z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    collectionDate:       z.string().date("Fecha inválida"),
+    fxRate:               optionalFxRateString,
     amount:               optionalMoneyAmountString,
     /** When true or amount omitted, server collects stored total ([D-053]). */
     collectFullBalance:   z.boolean().optional(),
