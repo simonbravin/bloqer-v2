@@ -29,6 +29,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import {
   revalidateProjectCostAndFinancePaths,
+  revalidateOperationalFinancePaths,
   revalidateTreasuryPaths,
 } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
@@ -51,6 +52,7 @@ function handle(err: unknown): { error: string } {
 }
 
 function revalidateProjectApPaths(projectId: string, extra?: string[]) {
+  revalidateOperationalFinancePaths(projectId);
   revalidatePath(`/proyectos/${projectId}/facturas-proveedor`);
   revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
   revalidatePath(`/proyectos/${projectId}/ordenes-compra`);
@@ -188,10 +190,11 @@ export async function issueSupplierInvoiceAction(
 export async function cancelSupplierInvoiceAction(
   invoiceId: string,
   projectId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelSupplierInvoice(invoiceId, ctx, projectId);
+    await cancelSupplierInvoice(invoiceId, ctx, projectId, reason);
     revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
     return { ok: true };
   } catch (err) {
@@ -286,10 +289,11 @@ export async function issueSupplierDebitNoteAction(
 export async function cancelSupplierCreditNoteAction(
   invoiceId: string,
   projectId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelSupplierCreditNote(invoiceId, ctx, projectId);
+    await cancelSupplierCreditNote(invoiceId, ctx, projectId, reason);
     revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
     return { ok: true };
   } catch (err) {

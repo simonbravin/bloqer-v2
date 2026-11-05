@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@bloqer/database";
-import { isUuid, normalizeRichNote } from "@bloqer/utils";
+import { calcDocumentHeaderTaxTotals, DEFAULT_IIBB_PERCEPTION_RATE_PCT, isUuid, normalizeRichNote } from "@bloqer/utils";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
@@ -52,33 +52,55 @@ export function sha256Hex(content: Buffer): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
+type SettlementReplayExisting = {
+  currency?: string;
+  paymentMethod?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+};
+type SettlementReplayInput = {
+  paymentMethod?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+};
+function settlementReplayDetailsMatch(existing: SettlementReplayExisting, input: SettlementReplayInput & { fxRate?: string }): boolean {
+  if (existing.currency && existing.currency !== "ARS" && input.fxRate == null) return false;
+  return (existing.paymentMethod ?? null) === (input.paymentMethod ?? null) &&
+    (existing.reference ?? null) === (input.reference ?? null) &&
+    (existing.notes ?? null) === (input.notes ?? null);
+}
+
 export function paymentReplayMatches(
-  existing: {
+  existing: SettlementReplayExisting & {
     payableId: string;
     accountId: string;
     paymentDate: Date;
     amount: { toString(): string };
+    fxRate?: { toString(): string };
     status: string;
   },
-  input: {
+  input: SettlementReplayInput & {
     payableId: string;
     accountId: string;
     paymentDate: string;
     payFullBalance: boolean;
     amount: string | null | undefined;
+    fxRate?: string;
   },
 ): boolean {
   if (existing.status !== "CONFIRMED") return false;
+  if (!settlementReplayDetailsMatch(existing, input)) return false;
   if (existing.payableId !== input.payableId) return false;
   if (existing.accountId !== input.accountId) return false;
   if (dateOnlyFingerprint(existing.paymentDate) !== input.paymentDate) return false;
+  if (input.fxRate != null && (!existing.fxRate || serializeFxRateDecimal(existing.fxRate) !== serializeFxRateDecimal(input.fxRate))) return false;
   if (input.payFullBalance) return true;
   if (input.amount == null) return false;
   return moneyFingerprint(existing.amount) === moneyFingerprint(input.amount);
 }
 
 export function collectionReplayMatches(
-  existing: {
+  existing: SettlementReplayExisting & {
     receivableId: string;
     accountId: string;
     collectionDate: Date;
@@ -86,7 +108,7 @@ export function collectionReplayMatches(
     fxRate?: { toString(): string };
     status: string;
   },
-  input: {
+  input: SettlementReplayInput & {
     receivableId: string;
     accountId: string;
     collectionDate: string;
@@ -96,6 +118,7 @@ export function collectionReplayMatches(
   },
 ): boolean {
   if (existing.status !== "CONFIRMED") return false;
+  if (!settlementReplayDetailsMatch(existing, input)) return false;
   if (existing.receivableId !== input.receivableId) return false;
   if (existing.accountId !== input.accountId) return false;
   if (dateOnlyFingerprint(existing.collectionDate) !== input.collectionDate) return false;
@@ -231,6 +254,8 @@ export type InvoiceLineReplayInput = {
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
   certificationLineId?: string | null;
+  costAnalysisLineId?: string | null;
+  costType?: string | null;
 };
 
 type InvoiceLineReplayExisting = {
@@ -243,6 +268,8 @@ type InvoiceLineReplayExisting = {
   wbsNodeId?: string | null;
   purchaseOrderLineId?: string | null;
   certificationLineId?: string | null;
+  costAnalysisLineId?: string | null;
+  costType?: string | null;
 };
 
 function invoiceLinesReplayMatch(
@@ -251,15 +278,16 @@ function invoiceLinesReplayMatch(
   opts: { forceZeroTax: boolean; pricesIncludeTax: boolean; kind: "ap" | "ar" },
 ): boolean {
   if (existing.length !== input.length) return false;
-  const sortedExisting = [...existing].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.description.localeCompare(b.description),
-  );
-  const sortedInput = [...input].sort(
-    (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.description.localeCompare(b.description),
-  );
-  for (let i = 0; i < sortedExisting.length; i++) {
-    const line = sortedInput[i]!;
-    const got = sortedExisting[i]!;
+  const fingerprint = (line: InvoiceLineReplayExisting) => JSON.stringify([
+    line.sortOrder, line.description, qtyFingerprint(line.quantity),
+    serializeUnitPriceDecimal(line.unitPrice), serializeRatePctDecimal(line.taxRate),
+    serializeRatePctDecimal(line.discountPct ?? "0"),
+    ...(opts.kind === "ap"
+      ? [line.wbsNodeId ?? null, line.purchaseOrderLineId ?? null, line.costAnalysisLineId ?? null]
+      : [line.certificationLineId ?? null]),
+  ]);
+  const expectedEntries: Array<{ key: string; costType?: string | null }> = [];
+  for (const line of input) {
     const qty = new Prisma.Decimal(line.quantity);
     const price = new Prisma.Decimal(line.unitPrice);
     const rate = new Prisma.Decimal(opts.forceZeroTax ? "0" : (line.taxRate ?? "0"));
@@ -271,24 +299,23 @@ function invoiceLinesReplayMatch(
       discountPct,
       pricesIncludeTax: opts.pricesIncludeTax,
     });
-    if (got.description !== line.description) return false;
-    if (qtyFingerprint(got.quantity) !== qtyFingerprint(qty)) return false;
-    if (serializeUnitPriceDecimal(got.unitPrice) !== serializeUnitPriceDecimal(expected.unitPriceNet)) {
-      return false;
-    }
-    if (serializeRatePctDecimal(got.taxRate) !== serializeRatePctDecimal(rate)) return false;
-    if (
-      serializeRatePctDecimal(got.discountPct ?? 0) !== serializeRatePctDecimal(discountPct)
-    ) {
-      return false;
-    }
-    if (got.sortOrder !== (line.sortOrder ?? 0)) return false;
-    if (opts.kind === "ap") {
-      if ((got.wbsNodeId ?? null) !== (line.wbsNodeId ?? null)) return false;
-      if ((got.purchaseOrderLineId ?? null) !== (line.purchaseOrderLineId ?? null)) return false;
-    } else if ((got.certificationLineId ?? null) !== (line.certificationLineId ?? null)) {
-      return false;
-    }
+    expectedEntries.push({ key: fingerprint({ ...line, sortOrder: line.sortOrder ?? 0, quantity: qty, unitPrice: expected.unitPriceNet, taxRate: rate, discountPct }), costType: opts.kind === "ap" ? line.costType : undefined });
+  }
+  const buckets = new Map<string, InvoiceLineReplayExisting[]>();
+  for (const line of existing) {
+    const key = fingerprint(line);
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(line); buckets.set(key, bucket);
+  }
+  // Match explicit cost types first; omitted types are derived on the server and
+  // retain their saved snapshot when the same operation is retried.
+  expectedEntries.sort((a, b) => Number(Boolean(b.costType)) - Number(Boolean(a.costType)));
+  for (const entry of expectedEntries) {
+    const bucket = buckets.get(entry.key);
+    if (!bucket?.length) return false;
+    const index = entry.costType ? bucket.findIndex(line => line.costType === entry.costType) : 0;
+    if (index < 0) return false;
+    bucket.splice(index, 1);
   }
   return true;
 }
@@ -312,27 +339,33 @@ export function pickSameTransactionRow<T extends { createdAt: Date }>(
   );
 }
 
-type PayNowReplayInput = {
+type PayNowReplayInput = SettlementReplayInput & {
   accountId: string;
   paymentDate: string;
   payFullBalance?: boolean;
   amount?: string | null;
+  fxRate?: string;
+  idempotencyKey?: string;
 };
 
-type CollectNowReplayInput = {
+type CollectNowReplayInput = SettlementReplayInput & {
   accountId: string;
   collectionDate: string;
   collectFullBalance?: boolean;
   amount?: string | null;
+  fxRate?: string;
+  idempotencyKey?: string;
 };
 
 /** Composite payNow: same-txn window, then payload match (retry after clock skew). */
 export function pickCompositePayment<
-  T extends {
+  T extends SettlementReplayExisting & {
     payableId: string;
     accountId: string;
     paymentDate: Date;
     amount: { toString(): string };
+    fxRate?: { toString(): string };
+    idempotencyKey?: string | null;
     status: string;
     createdAt: Date;
   },
@@ -352,18 +385,25 @@ export function pickCompositePayment<
       paymentDate: payNow.paymentDate,
       payFullBalance: Boolean(payNow.payFullBalance),
       amount: payNow.amount,
+      fxRate: payNow.fxRate,
+      paymentMethod: payNow.paymentMethod,
+      reference: payNow.reference,
+      notes: payNow.notes,
     });
+  if (payNow.idempotencyKey) return rows.find(row => row.idempotencyKey === payNow.idempotencyKey && matches(row));
   if (immediate && matches(immediate)) return immediate;
   return rows.find(matches);
 }
 
 /** Composite collectNow: same-txn window, then payload match (retry after clock skew). */
 export function pickCompositeCollection<
-  T extends {
+  T extends SettlementReplayExisting & {
     receivableId: string;
     accountId: string;
     collectionDate: Date;
     amount: { toString(): string };
+    fxRate?: { toString(): string };
+    idempotencyKey?: string | null;
     status: string;
     createdAt: Date;
   },
@@ -383,9 +423,51 @@ export function pickCompositeCollection<
       collectionDate: collectNow.collectionDate,
       collectFullBalance: Boolean(collectNow.collectFullBalance),
       amount: collectNow.amount,
+      fxRate: collectNow.fxRate,
+      paymentMethod: collectNow.paymentMethod,
+      reference: collectNow.reference,
+      notes: collectNow.notes,
     });
+  if (collectNow.idempotencyKey) return rows.find(row => row.idempotencyKey === collectNow.idempotencyKey && matches(row));
   if (immediate && matches(immediate)) return immediate;
   return rows.find(matches);
+}
+
+type DocumentFinancialReplayExisting = {
+  currency: string;
+  fxRate?: { toString(): string };
+  subtotal?: { toString(): string };
+  iibbPerceptionRate?: { toString(): string };
+  iibbPerceptionAmount?: { toString(): string };
+};
+
+type DocumentFinancialReplayInput = {
+  fxRate?: string;
+  iibbPerceptionRate?: string;
+  iibbPerceptionAmountOverride?: string | null;
+};
+
+/** D-008/D-112: a retry must preserve the original FX and document perception. */
+function documentFinancialReplayMatches(
+  existing: DocumentFinancialReplayExisting,
+  input: DocumentFinancialReplayInput,
+): boolean {
+  const expectedFx = existing.currency === "ARS" ? "1" : input.fxRate;
+  if (!expectedFx || serializeFxRateDecimal(existing.fxRate ?? "1") !== serializeFxRateDecimal(expectedFx)) return false;
+  const rate = input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT;
+  if (serializeRatePctDecimal(existing.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT) !== serializeRatePctDecimal(rate)) return false;
+  if (existing.subtotal && existing.iibbPerceptionAmount) {
+    const expected = calcDocumentHeaderTaxTotals({
+      subtotal: moneyFingerprint(existing.subtotal),
+      taxAmount: "0",
+      iibbPerceptionRatePercent: rate,
+      iibbPerceptionAmountOverride: input.iibbPerceptionAmountOverride,
+    }).iibbPerceptionAmount;
+    if (moneyFingerprint(existing.iibbPerceptionAmount) !== expected) return false;
+  } else if (input.iibbPerceptionAmountOverride != null) {
+    return false;
+  }
+  return true;
 }
 
 export function registerApExpenseReplayMatches(
@@ -396,16 +478,22 @@ export function registerApExpenseReplayMatches(
     issueDate: Date;
     dueDate: Date;
     currency: string;
+    fxRate?: { toString(): string };
+    subtotal?: { toString(): string };
+    iibbPerceptionRate?: { toString(): string };
+    iibbPerceptionAmount?: { toString(): string };
     invoiceLetter: string | null;
     purchaseOrderId: string | null;
     createdAt: Date;
     payableId: string | null;
     lines: InvoiceLineReplayExisting[];
-    payments: Array<{
+    payments: Array<SettlementReplayExisting & {
       payableId: string;
       accountId: string;
       paymentDate: Date;
       amount: { toString(): string };
+      fxRate?: { toString(): string };
+      idempotencyKey?: string | null;
       status: string;
       createdAt: Date;
     }>;
@@ -416,15 +504,20 @@ export function registerApExpenseReplayMatches(
     issueDate: string;
     dueDate: string;
     currency?: string;
+    fxRate?: string;
+    iibbPerceptionRate?: string;
+    iibbPerceptionAmountOverride?: string | null;
     invoiceLetter?: string | null;
     purchaseOrderId?: string | null;
     pricesIncludeTax?: boolean;
     lines: InvoiceLineReplayInput[];
-    payNow?: {
+    payNow?: SettlementReplayInput & {
       accountId: string;
       paymentDate: string;
       payFullBalance?: boolean;
       amount?: string | null;
+      fxRate?: string;
+      idempotencyKey?: string;
     };
   },
 ): boolean {
@@ -435,6 +528,7 @@ export function registerApExpenseReplayMatches(
   if (dateOnlyFingerprint(existing.issueDate) !== input.issueDate) return false;
   if (dateOnlyFingerprint(existing.dueDate) !== input.dueDate) return false;
   if (existing.currency !== (input.currency ?? "ARS")) return false;
+  if (!documentFinancialReplayMatches(existing, input)) return false;
   if ((existing.invoiceLetter ?? null) !== (input.invoiceLetter ?? null)) return false;
   if ((existing.purchaseOrderId ?? null) !== (input.purchaseOrderId ?? null)) return false;
   const forceZeroTax = input.invoiceLetter === "C" || input.invoiceLetter === "E";
@@ -459,16 +553,22 @@ export function registerArSaleReplayMatches(
     issueDate: Date;
     dueDate: Date;
     currency: string;
+    fxRate?: { toString(): string };
+    subtotal?: { toString(): string };
+    iibbPerceptionRate?: { toString(): string };
+    iibbPerceptionAmount?: { toString(): string };
     invoiceLetter: string | null;
     externalInvoiceRef: string | null;
     createdAt: Date;
     receivableId: string | null;
     lines: InvoiceLineReplayExisting[];
-    collections: Array<{
+    collections: Array<SettlementReplayExisting & {
       receivableId: string;
       accountId: string;
       collectionDate: Date;
       amount: { toString(): string };
+      fxRate?: { toString(): string };
+      idempotencyKey?: string | null;
       status: string;
       createdAt: Date;
     }>;
@@ -479,15 +579,20 @@ export function registerArSaleReplayMatches(
     issueDate: string;
     dueDate: string;
     currency?: string;
+    fxRate?: string;
+    iibbPerceptionRate?: string;
+    iibbPerceptionAmountOverride?: string | null;
     invoiceLetter?: string | null;
     externalInvoiceRef?: string | null;
     pricesIncludeTax?: boolean;
     lines: InvoiceLineReplayInput[];
-    collectNow?: {
+    collectNow?: SettlementReplayInput & {
       accountId: string;
       collectionDate: string;
       collectFullBalance?: boolean;
       amount?: string | null;
+      fxRate?: string;
+      idempotencyKey?: string;
     };
   },
 ): boolean {
@@ -498,6 +603,7 @@ export function registerArSaleReplayMatches(
   if (dateOnlyFingerprint(existing.issueDate) !== input.issueDate) return false;
   if (dateOnlyFingerprint(existing.dueDate) !== input.dueDate) return false;
   if (existing.currency !== (input.currency ?? "ARS")) return false;
+  if (!documentFinancialReplayMatches(existing, input)) return false;
   if ((existing.invoiceLetter ?? null) !== (input.invoiceLetter ?? null)) return false;
   if ((existing.externalInvoiceRef ?? null) !== (input.externalInvoiceRef ?? null)) return false;
   const forceZeroTax = input.invoiceLetter === "C" || input.invoiceLetter === "E";

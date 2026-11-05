@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 const MAP = {
   OPEN:      { label: "Pendiente",      variant: "secondary" },
   PARTIAL:   { label: "Pago parcial",   variant: "default" },
-  PAID:      { label: "Pagado",         variant: "outline" },
+  PAID:      { label: "Saldada",        variant: "outline" },
   OVERDUE:   { label: "Vencido",        variant: "destructive" },
   CANCELLED: { label: "Cancelado",      variant: "destructive" },
 } as const;

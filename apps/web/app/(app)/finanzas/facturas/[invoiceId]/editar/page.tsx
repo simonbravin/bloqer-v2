@@ -110,6 +110,7 @@ export default async function EditarFacturaVentaCorporativaPage({ params }: Page
             invoiceLetter: (invoice.invoiceLetter as InvoiceLetterCode | null) ?? null,
             iibbPerceptionRate: invoice.iibbPerceptionRate,
             subtotal: invoice.subtotal,
+            fxRate: invoice.fxRate,
             lines: invoice.lines.map((l) => ({
               id: l.id,
               originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct ?? "0", lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },

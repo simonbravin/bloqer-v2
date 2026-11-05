@@ -53,12 +53,33 @@ function setup(t: TestContext, lockedStatus: ProjectStatus = "CANCELLED") {
   t.after(clearProjectAccessModeCache);
   const state = { lockedStatus, invoiceStatus: "DRAFT", transactions: 0, locks: [] as string[], projectChecked: false };
   const project = () => ({ id: projectId, tenantId, companyId, status: "ACTIVE", country: "AR", clientContactId: contactId });
-  const obligation = { id: documentId, tenantId, companyId, projectId, status: "OPEN", originalAmount: new Prisma.Decimal(10), paidAmount: new Prisma.Decimal(0), creditedAmount: new Prisma.Decimal(0) };
-  const invoice = () => ({
+  const parents = () => ({
+    company: { id: companyId, tenantId, country: "AR" },
+    project: project(),
+    clientContact: { id: contactId, tenantId, status: "ACTIVE", country: "AR", legalName: "Synthetic client", fantasyName: null },
+    supplierContact: { id: contactId, tenantId, status: "ACTIVE", country: "AR", legalName: "Synthetic supplier", fantasyName: null },
+  });
+  const invoiceCore = () => ({
+    ...parents(),
     id: documentId, tenantId, companyId, projectId, status: state.invoiceStatus, documentKind: "INVOICE", number: 1,
     clientContactId: contactId, supplierContactId: contactId, invoiceLetter: "C", currency: "ARS", fxRate: new Prisma.Decimal(1),
-    totalAmount: new Prisma.Decimal(10), taxAmount: new Prisma.Decimal(0), dueDate: new Date(date),
-    receivable: obligation, payable: obligation, lines: [], notes: null, internalNotes: null, purchaseOrderId: null,
+    subtotal: new Prisma.Decimal(10), totalAmount: new Prisma.Decimal(10), taxAmount: new Prisma.Decimal(0),
+    iibbPerceptionRate: new Prisma.Decimal(0), iibbPerceptionAmount: new Prisma.Decimal(0), amountArs: new Prisma.Decimal(10),
+    issueDate: new Date(date), dueDate: new Date(date), certificationId: null, certification: null,
+    referencedSalesInvoiceId: null, referencedSalesInvoice: null, referencedSupplierInvoiceId: null, referencedSupplierInvoice: null,
+    purchaseOrderId: null, purchaseOrder: null, subcontractCertificationId: null, subcontractCertification: null,
+    lines: [], notes: null, internalNotes: null,
+  });
+  const obligation = (confirmedCash = false) => ({
+    ...parents(), id: documentId, tenantId, companyId, projectId, currency: "ARS",
+    clientContactId: contactId, supplierContactId: contactId, salesInvoiceId: documentId, supplierInvoiceId: documentId,
+    salesInvoice: { ...invoiceCore(), ...(confirmedCash ? { status: "ISSUED" } : {}) },
+    supplierInvoice: { ...invoiceCore(), ...(confirmedCash ? { status: "ISSUED" } : {}) },
+    status: confirmedCash ? "PAID" : "OPEN", originalAmount: new Prisma.Decimal(10),
+    paidAmount: new Prisma.Decimal(confirmedCash ? 10 : 0), creditedAmount: new Prisma.Decimal(0),
+  });
+  const invoice = () => ({
+    ...invoiceCore(), receivable: obligation(), payable: obligation(),
   });
   stub(t, prisma.tenantModuleSetting, "findMany", async () => []);
   stub(t, prisma.tenant, "findUnique", async () => ({ projectAccessMode: "TENANT_WIDE" }));
@@ -77,10 +98,18 @@ function setup(t: TestContext, lockedStatus: ProjectStatus = "CANCELLED") {
     stub(t, model, "aggregate", async () => ({ _max: { number: 1 } }));
     stub(t, model, "findFirst", async () => null);
   }
-  for (const model of [prisma.payable, prisma.receivable]) stub(t, model, "findUnique", async () => obligation);
+  for (const model of [prisma.payable, prisma.receivable]) stub(t, model, "findUnique", async () => obligation());
   for (const model of [prisma.payment, prisma.collection]) {
     stub(t, model, "findFirst", async () => null);
-    stub(t, model, "findUnique", async () => ({ tenantId, companyId, projectId, status: "CONFIRMED", paymentDate: new Date(date), collectionDate: new Date(date) }));
+    stub(t, model, "findUnique", async () => ({
+      ...parents(), id: documentId, tenantId, companyId, projectId, status: "CONFIRMED", currency: "ARS",
+      clientContactId: contactId, supplierContactId: contactId, salesInvoiceId: documentId, supplierInvoiceId: documentId,
+      receivableId: documentId, payableId: documentId, receivable: obligation(true), payable: obligation(true),
+      salesInvoice: { ...invoiceCore(), status: "ISSUED" }, supplierInvoice: { ...invoiceCore(), status: "ISSUED" },
+      accountId: companyId, account: { id: companyId, tenantId, companyId, currency: "ARS", name: "Synthetic bank" },
+      amount: new Prisma.Decimal(10), fxRate: new Prisma.Decimal(1), amountArs: new Prisma.Decimal(10),
+      paymentDate: new Date(date), collectionDate: new Date(date),
+    }));
   }
   stub(t, prisma.period, "findFirst", async () => null);
   stub(t, prisma.journalEntry, "findFirst", async () => null);
@@ -148,15 +177,28 @@ const operations: Operation[] = [
   { name: "AR debit draft", issuedParent: true, run: () => createSalesDebitNoteFromInvoice({ parentSalesInvoiceId: documentId }, ctx) },
   { name: "AR credit issue", run: () => issueSalesCreditNote(documentId, ctx) },
   { name: "AR debit issue", run: () => issueSalesDebitNote(documentId, ctx) },
-  { name: "AR credit cancellation", run: () => cancelSalesCreditNote(documentId, ctx) },
+  { name: "AR credit cancellation", run: () => cancelSalesCreditNote(documentId, ctx, undefined, "Synthetic lifecycle correction") },
   { name: "AP credit draft", issuedParent: true, run: () => createSupplierCreditNoteFromInvoice({ parentSupplierInvoiceId: documentId }, ctx) },
   { name: "AP debit draft", issuedParent: true, run: () => createSupplierDebitNoteFromInvoice({ parentSupplierInvoiceId: documentId }, ctx) },
   { name: "AP credit issue", run: () => issueSupplierCreditNote(documentId, ctx) },
   { name: "AP debit issue", run: () => issueSupplierDebitNote(documentId, ctx) },
-  { name: "AP credit cancellation", run: () => cancelSupplierCreditNote(documentId, ctx) },
+  { name: "AP credit cancellation", run: () => cancelSupplierCreditNote(documentId, ctx, undefined, "Synthetic lifecycle correction") },
 ];
 
 describe("AG-03 financial mutations serialize with the project lifecycle (no database)", { concurrency: false }, () => {
+  for (const [name, cancel] of [["AR", cancelSalesCreditNote], ["AP", cancelSupplierCreditNote]] as const) {
+    for (const status of ["DRAFT", "ON_HOLD", "COMPLETED", "CANCELLED"] as const) {
+      it(`${name} credit cancellation rejects ${status} Project during preflight without a transaction`, async (t) => {
+        const { state } = setup(t);
+        stub(t, prisma.project, "findUnique", async () => ({ id: projectId, tenantId, companyId, country: "AR", status }));
+        await assert.rejects(() => cancel(documentId, ctx, undefined, "Synthetic correction"),
+          (error: unknown) => error instanceof ServiceError && error.code === "CONFLICT");
+        assert.equal(state.transactions, 0);
+        assert.equal(state.projectChecked, false);
+        assert.deepEqual(state.locks, []);
+      });
+    }
+  }
   for (const operation of operations) {
     it(`${operation.name} rejects a cancellation committed after its ACTIVE preflight`, async (t) => {
       const { state } = setup(t);
@@ -178,15 +220,18 @@ describe("AG-03 financial mutations serialize with the project lifecycle (no dat
   for (const [name, run] of [
     ["AR invoice cancellation", () => cancelSalesInvoice(documentId, ctx)],
     ["AP invoice cancellation", () => cancelSupplierInvoice(documentId, ctx)],
-    ["payment cancellation", () => cancelPayment(documentId, ctx)],
-    ["collection cancellation", () => cancelCollection(documentId, ctx)],
+    ["payment cancellation", () => cancelPayment(documentId, ctx, undefined, "Synthetic lifecycle reversal")],
+    ["collection cancellation", () => cancelCollection(documentId, ctx, undefined, "Synthetic lifecycle reversal")],
   ] as const) {
-    it(`${name} locks Project while preserving its existing status-neutral reversal rule`, async (t) => {
-      const { state } = setup(t, "CANCELLED");
-      await assert.rejects(run, (error: unknown) => error === checkpoint);
-      assert.equal(state.projectChecked, true);
-      assert.match(state.locks[0] ?? "", /FROM projects.*FOR NO KEY UPDATE/);
-    });
+    for (const status of ["ACTIVE", "CANCELLED"] as const) {
+      it(`${name} locks ${status} Project while preserving its status-neutral reversal rule`, async (t) => {
+        const { state } = setup(t, status);
+        await assert.rejects(run, (error: unknown) => error === checkpoint);
+        assert.equal(state.transactions, 1);
+        assert.equal(state.projectChecked, true);
+        assert.match(state.locks[0] ?? "", /FROM projects.*FOR NO KEY UPDATE/);
+      });
+    }
   }
 
   it("an inherited AP transaction repeats the Project lock before writing its invoice", async (t) => {

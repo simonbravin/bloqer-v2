@@ -5,9 +5,13 @@ export type CancelPayableGuardInput = {
   supplierInvoiceStatus: string | null | undefined;
   activePaymentCount: number;
   paidAmount: Prisma.Decimal;
+  creditedAmount?: Prisma.Decimal;
 };
 
 export function assertCanCancelPayableDirect(input: CancelPayableGuardInput): void {
+  if (input.creditedAmount?.greaterThan(0)) {
+    throw new ServiceError("CONFLICT", "No se puede cancelar una cuenta con notas de crédito aplicadas. Anulá las notas primero.");
+  }
   if (input.supplierInvoiceStatus === "ISSUED") {
     throw new ServiceError(
       "CONFLICT",

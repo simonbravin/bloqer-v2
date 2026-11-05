@@ -3,6 +3,15 @@
 > Lista viva de **decisiones técnicas pendientes** y mejoras sugeridas. Completar antes o durante Phase 0 / implementación.  
 > **No** sustituye [`../00-product/OPEN_QUESTIONS.md`](../00-product/OPEN_QUESTIONS.md) (producto); aquí predomina **cómo** modelar o implementar.
 
+## Fronteras detectadas por la auditoría global
+
+## P-AG10-01 — FX de movimientos manuales y transferencias
+
+- **Origen:** frontera detectada en AG-09 al contrastar el alta Solo caja con D-008/MONEY_MODEL. La auditoría completa de cuentas, movimientos y transferencias corresponde a AG-10, aún no iniciada.
+- **Evidencia:** AccountMovement conserva amount/currency pero no tiene columnas fxRate/amountArs; InternalTransfer tampoco representa un snapshot FX. Payment/Collection y facturas sí lo tienen y se corrigen/verifican en AG-09. Agregar un campo visible sin persistencia perdería el dato ingresado.
+- **Pendiente:** diseñar representación, todos sus escritores/lectores/GL, tratamiento explícito de históricos desconocidos y migración. Requiere propuesta y autorización de nuevos campos conforme AGENTS §5; no se presume FX 1 para moneda extranjera ni se regularizan históricos automáticamente.
+- **Estado:** registrado para AG-10. En AG-09 solo se corrige el orden de locks de los consumidores compartidos para que no inviertan Company/Account respecto de pagos/cobros compuestos. No se declara auditada ni resuelta esta función de tesorería.
+
 ## INDARI / Casa Hogar — auditoría del 21/10/2026
 
 Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md). Los siguientes pendientes no autorizan cambios de datos ni nuevos modelos.

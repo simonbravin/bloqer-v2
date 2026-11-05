@@ -1,9 +1,13 @@
+import { registerArAdvanceSchema } from "@bloqer/validators";
 import type { RegisterArAdvanceInput } from "@bloqer/validators";
 import { prisma } from "@bloqer/database";
 import type { RegisterTransactionResult } from "../finance/register-transaction.types";
 import { isCrossCompany } from "../company-scope";
 import type { ServiceContext } from "../types";
 import { ServiceError } from "../types";
+import { resolveSuggestedArInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
+import { resolveCompanyIdForAr } from "./sales-invoice.service";
+import { parseArInput } from "./ar-integrity";
 import { registerArSale } from "./register-ar-sale.service";
 import { assertProjectAllowsOperationalMutation } from "../project/project-operational-guard";
 
@@ -14,6 +18,7 @@ export async function registerArAdvance(
   input: RegisterArAdvanceInput,
   ctx: ServiceContext,
 ): Promise<RegisterTransactionResult> {
+  input = parseArInput(registerArAdvanceSchema, input);
   if (!input.collectNow?.accountId) {
     throw new ServiceError("VALIDATION", "El anticipo requiere cuenta de tesorería y fecha de cobro");
   }
@@ -65,6 +70,8 @@ export async function registerArAdvance(
     );
   }
 
+  const companyId = await resolveCompanyIdForAr(input.projectId, ctx);
+  const invoiceLetter = await resolveSuggestedArInvoiceLetter({ companyId, clientContactId: input.clientContactId, tenantId: ctx.tenantId });
   return registerArSale(
     {
       projectId: input.projectId,
@@ -73,6 +80,8 @@ export async function registerArAdvance(
       issueDate: input.issueDate,
       dueDate: input.dueDate ?? input.issueDate,
       currency,
+      invoiceLetter,
+      fxRate: input.fxRate,
       iibbPerceptionRate: "0",
       notes: input.notes ?? "Anticipo de cliente — imputado a obra",
       internalNotes: "Registrado vía flujo de anticipo",
@@ -91,6 +100,7 @@ export async function registerArAdvance(
       collectNow: {
         accountId: input.collectNow.accountId,
         collectionDate: input.collectNow.collectionDate,
+        fxRate: input.collectNow.fxRate ?? input.fxRate,
         collectFullBalance: true,
         notes: input.collectNow.notes ?? "Cobro de anticipo",
         paymentMethod: input.collectNow.paymentMethod ?? null,

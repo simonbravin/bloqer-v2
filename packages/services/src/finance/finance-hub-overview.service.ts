@@ -182,7 +182,7 @@ function buildMoneyCardFromAging(
     totalBalance = null;
     currency = null;
   } else {
-    totalBalance = report.totals.totalBalance;
+    totalBalance = report.totals?.totalBalance ?? "0.00";
     currency = "ARS";
   }
   const displayTotal = multicurrency

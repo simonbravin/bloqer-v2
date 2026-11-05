@@ -5,7 +5,7 @@ import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { can } from "@bloqer/domain";
-import { getCompanyReceivableById, listTreasuryAccounts, ServiceError } from "@bloqer/services";
+import { getCompanyReceivableById, getTenantModuleGate, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
 import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
@@ -28,15 +28,16 @@ export default async function FinanzasCobrarReceivablePage({ params }: PageProps
     roles: current.tenantCtx.roles,
   };
 
+  if (!(await getTenantModuleGate(ctx)).isEnabled("TREASURY")) redirect(`/finanzas/cuentas-por-cobrar/${receivableId}`);
   let receivable;
   let allAccounts;
   try {
     const [receivableResult, accountsResult] = await Promise.all([
       getCompanyReceivableById(receivableId, ctx),
-      listTreasuryAccounts(ctx),
+      listSelectableTreasuryAccounts(ctx),
     ]);
     receivable = receivableResult;
-    allAccounts = accountsResult.data;
+    allAccounts = accountsResult;
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
       notFound();
@@ -45,7 +46,7 @@ export default async function FinanzasCobrarReceivablePage({ params }: PageProps
   }
 
   const activeAccounts = allAccounts
-    .filter((a) => a.status === "ACTIVE")
+    .filter((a) => a.status === "ACTIVE" && (!a.companyId || a.companyId === receivable.companyId))
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const isBlocked = receivable.status === "PAID" || receivable.status === "CANCELLED";
@@ -70,7 +71,7 @@ export default async function FinanzasCobrarReceivablePage({ params }: PageProps
         <div className="rounded-lg border bg-card p-6">
           <p className="text-sm text-muted-foreground">
             Esta cuenta por cobrar está en estado{" "}
-            <strong>{receivable.status === "PAID" ? "cobrada" : "cancelada"}</strong> y no admite
+            <strong>{receivable.status === "PAID" ? "saldada" : "cancelada"}</strong> y no admite
             nuevos cobros.{" "}
             <Link
               href={`/finanzas/cuentas-por-cobrar/${receivableId}`}

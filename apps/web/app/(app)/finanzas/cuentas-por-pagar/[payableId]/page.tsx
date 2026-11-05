@@ -20,6 +20,7 @@ import {
   listPaymentsByPayable,
   listSelectableTreasuryAccounts,
   canRegisterApPayment,
+  getTenantModuleGate,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ export default async function FinanzasPayableDetailPage({ params, searchParams }
   }
 
   const canPay =
+    (await getTenantModuleGate(ctx)).isEnabled("TREASURY") &&
     canRegisterApPayment(ctx.roles) &&
     (payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE");
 
@@ -88,6 +90,7 @@ export default async function FinanzasPayableDetailPage({ params, searchParams }
           currency={payable.currency}
           originalAmount={payable.originalAmount}
           paidAmount={payable.paidAmount}
+          creditedAmount={payable.creditedAmount}
           balanceDue={payable.balanceDue}
           status={payable.status}
           payments={payments.map((p) => ({
@@ -97,6 +100,7 @@ export default async function FinanzasPayableDetailPage({ params, searchParams }
             currency: p.currency,
             accountName: p.accountName,
             reference: p.reference ?? null,
+            status: p.status,
             href: `/finanzas/pagos-proveedor/${p.id}`,
           }))}
           canPay={canPay}

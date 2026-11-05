@@ -52,8 +52,7 @@ export default async function EditarFacturaPage({ params }: PageProps) {
           <h1 className="text-2xl font-bold tracking-tight">Editar {kindLabel.toLowerCase()}</h1>
         </div>
         <p className="rounded border bg-card p-4 text-sm text-muted-foreground">
-          Solo se pueden editar comprobantes en estado <strong>Borrador</strong>. Este está en
-          estado &quot;{invoice.status}&quot;.
+          Solo se pueden editar comprobantes en estado <strong>Borrador</strong>. Este comprobante ya no está en borrador.
         </p>
       </PageShell>
     );
@@ -110,6 +109,7 @@ export default async function EditarFacturaPage({ params }: PageProps) {
             invoiceLetter: (invoice.invoiceLetter as InvoiceLetterCode | null) ?? null,
             iibbPerceptionRate: invoice.iibbPerceptionRate,
             subtotal: invoice.subtotal,
+            fxRate: invoice.fxRate,
             lines: invoice.lines.map((l) => ({
               id: l.id,
               originalMoney: { quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate, discountPct: l.discountPct ?? "0", lineSubtotal: l.lineSubtotal, lineTax: l.lineTax, lineTotal: l.lineTotal },

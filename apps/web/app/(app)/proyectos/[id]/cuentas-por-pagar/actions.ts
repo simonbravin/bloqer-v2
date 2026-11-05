@@ -12,6 +12,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import {
   revalidateProjectCostAndFinancePaths,
+  revalidateOperationalFinancePaths,
   revalidateTreasuryPaths,
 } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
@@ -42,6 +43,7 @@ export async function createPaymentAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const payment = await createPayment(parsed.data, ctx, projectId);
+    revalidateOperationalFinancePaths(projectId);
     revalidatePath(`/proyectos/${projectId}/pagos`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar/${parsed.data.payableId}`);
@@ -56,10 +58,12 @@ export async function createPaymentAction(
 export async function cancelPaymentAction(
   paymentId: string,
   projectId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelPayment(paymentId, ctx, projectId);
+    await cancelPayment(paymentId, ctx, projectId, reason);
+    revalidateOperationalFinancePaths(projectId);
     revalidatePath(`/proyectos/${projectId}/pagos`);
     revalidatePath(`/proyectos/${projectId}/cuentas-por-pagar`);
     revalidateProjectCostAndFinancePaths(projectId);

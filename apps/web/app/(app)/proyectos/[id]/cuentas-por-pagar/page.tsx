@@ -17,6 +17,7 @@ import {
 } from "@/features/ap";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
+import { formatDate } from "@/lib/format";
 import {
   getPayableAgingReport,
   getProjectShellInfo,
@@ -126,6 +127,8 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
   const items: PayableListItem[] = payables.map((p) => ({
     id: p.id,
     supplierName: p.supplierName,
+    supplierInvoiceId: p.supplierInvoiceId,
+    supplierInvoiceCode: p.supplierInvoiceCode,
     dueDate: p.dueDate,
     status: p.status,
     originalAmount: p.originalAmount,
@@ -172,8 +175,10 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
         }
       />
 
-      <p className="text-xs text-muted-foreground">Al {agingReport.asOfDate}</p>
+      <p className="text-xs text-muted-foreground">Al {formatDate(agingReport.asOfDate)}</p>
 
+      <h2 className="text-lg font-semibold">Antigüedad de saldos</h2>
+      <p className="text-xs text-muted-foreground">Estos filtros se aplican al resumen y detalle de antigüedad. El listado de cuentas y las transacciones recientes conservan su alcance.</p>
       <AgingFilters />
       <AgingSummaryCards report={agingReport} currency={sp.currency} />
       <AgingTable report={agingReport} />
@@ -184,20 +189,22 @@ export default async function CuentasPorPagarPage({ params, searchParams }: Page
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <h3 className="text-sm font-medium">Facturas proveedor recientes</h3>
-            <Suspense fallback={<ListSectionSkeleton />}>
+            <h3 className="text-sm font-medium">Facturas recientes de proveedor</h3>
+            {supplierInvoicesRes.status === "rejected" ? <p role="status" className="text-sm text-muted-foreground">No se pudieron consultar las facturas recientes. El resumen de cuentas sigue disponible.</p> : null}
+            {supplierInvoicesRes.status === "fulfilled" ? <Suspense fallback={<ListSectionSkeleton />}>
               <SupplierInvoiceListSection
                 invoices={supplierInvoices}
                 hrefPrefix={`/proyectos/${id}/facturas-proveedor`}
               />
-            </Suspense>
+            </Suspense> : null}
           </div>
 
           <div className="space-y-2">
             <h3 className="text-sm font-medium">Pagos recientes</h3>
-            <Suspense fallback={<ListSectionSkeleton />}>
+            {paymentsRes.status === "rejected" ? <p role="status" className="text-sm text-muted-foreground">No se pudieron consultar los pagos recientes. El resumen de cuentas sigue disponible.</p> : null}
+            {paymentsRes.status === "fulfilled" ? <Suspense fallback={<ListSectionSkeleton />}>
               <PaymentListSection payments={payments} hrefPrefix={`/proyectos/${id}/pagos`} />
-            </Suspense>
+            </Suspense> : null}
           </div>
         </CardContent>
       </Card>

@@ -8,6 +8,7 @@ IVA, IIBB, Ganancias, SUSS, percepciones — **sin motor fiscal automático** ([
 > Ver también [D-086]: en Factura B (u otras) se puede ingresar **precio unitario con IVA incluido**; al guardar se persiste neto + IVA.
 > Ver también [D-093]: descuento comercial % por línea **antes de IVA**; el precio unitario persistido es list net.
 > Ver también [D-112]: **Percepción IIBB** a nivel documento (`iibbPerceptionRate` / `iibbPerceptionAmount`) sobre el neto; default 3% en altas; no es costo de obra.
+> Ver también [D-133]: IVA y percepción IIBB no negativos en facturas y notas AR/AP, con cero permitido y conservación de históricos.
 
 ## Modelo TaxLine
 Por cada documento o movimiento:
@@ -21,6 +22,12 @@ En la implementación actual:
 - el **IVA** operativo vive como `taxRate` / `lineTax` en líneas (AR/AP/OC/cotización) → header `taxAmount`;
 - la **Percepción IIBB** vive como cabecera `iibbPerceptionRate` / `iibbPerceptionAmount` ([D-112]);
 - el modelo `TaxLine` polimórfico fino sigue pendiente (P-ERD-05).
+
+## Signo de impuestos en facturas y notas ([D-133])
+
+Las nuevas altas y ediciones AR/AP, incluidas NC/ND y composiciones con cobro/pago inmediato, rechazan IVA de línea, alícuota IIBB y ajustes explícitos de percepción negativos. **Cero está permitido**; esta protección no agrega un máximo de 100 ni un motor fiscal. Un borrador persistido con esos valores debe corregirse antes de emitir.
+
+Los documentos NC/ND conservan importes positivos; su tipo define la reducción o aumento de deuda ([D-115]). Una retención no se representa como IVA o percepción negativa de factura ([BR-TAX-002/003]). No se migran, recalculan ni regularizan automáticamente documentos históricos emitidos, pagos, créditos o movimientos.
 
 ## Percepción IIBB ([D-112])
 
@@ -65,7 +72,7 @@ Sin las cuentas necesarias o sin montos de impuesto/percepción → asiento de 2
 
 ## Aplicación típica
 - En **factura venta**: discrimina IVA en líneas.
-- En **pago proveedor**: retenciones reducen neto pagado sin cambiar total factura ([BR-TAX-003]).
+- En el **modelo de retenciones** previsto para pagos: reducen neto pagado sin cambiar total factura ([BR-TAX-003]); no implica que exista un wizard operativo `TaxLine` en el flujo actual.
 
 ## Reportes
 Agregados por período, jurisdicción, proveedor ([`FINANCIAL_REPORTS.md`](./FINANCIAL_REPORTS.md)). Libro IVA / DDJJ = futuro (ver OPEN_QUESTIONS).

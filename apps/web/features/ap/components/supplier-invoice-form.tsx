@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
@@ -29,6 +29,7 @@ import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { classifySupplierInvoice } from "@bloqer/domain";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { cn } from "@/lib/utils";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 export type SupplierOption = {
   id: string;
@@ -59,6 +60,7 @@ interface Props {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
   /** Prefill from Mano de obra / Equipos boards ([D-099] / [D-110]). */
   initialLine?: {
     wbsNodeId?: string;
@@ -128,11 +130,12 @@ export function SupplierInvoiceForm({
   variant = "card",
   onCancel,
   onSuccess,
+  onPendingChange,
   initialLine,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError, onPendingChange });
   const [supplierContactId, setSupplierContactId] = useState("");
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
   const [letterTouched, setLetterTouched] = useState(false);
@@ -209,6 +212,9 @@ export function SupplierInvoiceForm({
         if (cancelled) return;
         setPoPreview("error" in res ? null : res);
       })
+      .catch(() => {
+        if (!cancelled) setError("No se pudo consultar la orden de compra. Volvé a seleccionarla para reintentar.");
+      })
       .finally(() => {
         if (!cancelled) setPreviewLoading(false);
       });
@@ -245,7 +251,7 @@ export function SupplierInvoiceForm({
   }
 
   const filteredPOs = poOptions.filter(
-    (po) => !supplierContactId || po.supplierContactId === supplierContactId,
+    (po) => po.currency === INVOICE_CURRENCY && (!supplierContactId || po.supplierContactId === supplierContactId),
   );
 
   // Al cambiar de proveedor, descartar una OC vinculada que ya no le pertenece.
@@ -324,7 +330,7 @@ export function SupplierInvoiceForm({
       linkedEntityId: invoiceId,
       idempotencyKey: attachmentKey,
       revalidatePaths: [detailPath],
-    });
+    }).catch(() => ({ error: "Se perdió la conexión durante la subida" }));
   }
 
   function notifyAttachFailure(uploadError: string, paid: boolean) {
@@ -337,6 +343,7 @@ export function SupplierInvoiceForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     setError(null);
     if (!supplierContactId) { setError("Debe seleccionar a quién se le paga"); return; }
     if (showLetter && !invoiceLetter) {
@@ -368,7 +375,7 @@ export function SupplierInvoiceForm({
     const letterPayload = showLetter ? invoiceLetter : null;
     const forceZeroTax = letterPayload === "C" || letterPayload === "E";
     const pricesIncludeTaxPayload = forceZeroTax ? false : pricesIncludeTax;
-    startTransition(async () => {
+    void run(async () => {
       if (companyFinanzas) {
         const res = await createCompanySupplierInvoiceAction({
           supplierContactId,
@@ -487,8 +494,10 @@ export function SupplierInvoiceForm({
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-5 sm:p-6" : undefined}>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
+        <p className="text-xs text-muted-foreground">Esta alta manual se registra en ARS.{supportsPoPreview ? " Para facturar una OC en otra moneda, abrí esa orden y usá su panel de facturación." : ""}</p>
         {error && (
-          <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
@@ -752,7 +761,7 @@ export function SupplierInvoiceForm({
         )}
 
         <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}>
             Cancelar
           </Button>
           <Button
@@ -770,6 +779,7 @@ export function SupplierInvoiceForm({
                 : "Crear factura"}
           </Button>
         </div>
+        </fieldset>
       </form>
     </div>
   );

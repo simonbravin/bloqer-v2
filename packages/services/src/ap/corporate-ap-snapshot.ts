@@ -9,6 +9,7 @@ import { ServiceError } from "../types";
 import { canViewCompanyAp } from "./ap-access";
 import type { PayablesProjectSummary } from "./payable.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { apPayableParents, assertApPayableReadParents } from "./ap-integrity";
 
 export type CorporatePayableSnapshotRow = {
   currency: string;
@@ -44,7 +45,7 @@ export async function fetchCorporatePayableSnapshotRows(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por pagar a nivel empresa");
   }
 
-  return prisma.payable.findMany({
+  const rows = await prisma.payable.findMany({
     where: {
       tenantId: ctx.tenantId,
       projectId: null,
@@ -52,15 +53,10 @@ export async function fetchCorporatePayableSnapshotRows(
       // Payable.companyId es NOT NULL → scope directo por empresa (no hay filas compartidas).
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
-    select: {
-      currency: true,
-      dueDate: true,
-      originalAmount: true,
-      paidAmount: true,
-      creditedAmount: true,
-      status: true,
-    },
+    include: apPayableParents,
   });
+  rows.forEach(row => assertApPayableReadParents(row, ctx));
+  return rows;
 }
 
 export async function countCorporateDraftInvoices(ctx: ServiceContext): Promise<number> {

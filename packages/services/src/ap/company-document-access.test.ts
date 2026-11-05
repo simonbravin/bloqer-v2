@@ -38,16 +38,24 @@ describe("shared AP/AR reads enforce corporate scope", { concurrency: false }, (
     stub(prisma.tenant, "findUnique", async () => ({ projectAccessMode: "MEMBERSHIP_SCOPED" }));
     stub(prisma.project, "findUnique", async () => ({ id: "project", tenantId: "tenant", companyId, status: "ACTIVE", country: "AR" }));
     stub(prisma.projectMembership, "findUnique", async () => membership);
-    const document = () => ({
+    const document = () => {
+      const base = {
       id: "document", tenantId: "tenant", companyId, projectId, number: 1, documentKind: "INVOICE",
+      currency: "ARS", supplierContactId: "supplier", clientContactId: "client",
+      supplierInvoiceId: "document", certificationId: null, certification: null,
+      company: { id: companyId, tenantId: "tenant" },
+      project: projectId ? { id: projectId, tenantId: "tenant", companyId } : null,
       subtotal: new Prisma.Decimal("8.26"), taxAmount: new Prisma.Decimal("1.74"),
       totalAmount: new Prisma.Decimal("10.00"), iibbPerceptionRate: new Prisma.Decimal(0),
+      fxRate: new Prisma.Decimal(1), amountArs: new Prisma.Decimal(10),
       iibbPerceptionAmount: new Prisma.Decimal(0), lines: [],
-      supplierContact: { legalName: "Supplier", fantasyName: null },
-      clientContact: { legalName: "Client", fantasyName: null },
+      supplierContact: { id: "supplier", tenantId: "tenant", legalName: "Supplier", fantasyName: null },
+      clientContact: { id: "client", tenantId: "tenant", legalName: "Client", fantasyName: null },
       originalAmount: new Prisma.Decimal("10"), paidAmount: new Prisma.Decimal(0),
       creditedAmount: new Prisma.Decimal(0), status: "OPEN", dueDate: new Date("2099-01-01"),
-    });
+      };
+      return { ...base, supplierInvoice: { ...base, status: "ISSUED" } };
+    };
     stub(prisma.supplierInvoice, "findUnique", async () => document());
     stub(prisma.salesInvoice, "findUnique", async () => document());
     stub(prisma.payable, "findUnique", async () => document());

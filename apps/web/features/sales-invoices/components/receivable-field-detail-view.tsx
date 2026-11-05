@@ -13,6 +13,7 @@ export type ReceivableFieldCollectionItem = {
   accountName: string;
   reference: string | null;
   href: string | null;
+  status: "CONFIRMED" | "CANCELLED";
 };
 
 export function ReceivableFieldDetailView({
@@ -25,6 +26,7 @@ export function ReceivableFieldDetailView({
   currency,
   originalAmount,
   paidAmount,
+  creditedAmount = "0",
   balanceDue,
   status,
   collections,
@@ -41,6 +43,7 @@ export function ReceivableFieldDetailView({
   currency: string;
   originalAmount: string;
   paidAmount: string;
+  creditedAmount?: string;
   balanceDue: string;
   status: string;
   collections: ReceivableFieldCollectionItem[];
@@ -102,6 +105,7 @@ export function ReceivableFieldDetailView({
             <span className="text-muted-foreground">Total cobrado</span>
             <span className="tabular-nums">{formatMoneyAmount(paidAmount, currency)}</span>
           </div>
+          {Number(creditedAmount) > 0 ? <div className="flex justify-between gap-2"><span className="text-muted-foreground">Créditos NC (sin caja)</span><span className="tabular-nums">{formatMoneyAmount(creditedAmount, currency)}</span></div> : null}
           <div className="flex justify-between gap-2 font-semibold">
             <span>Saldo pendiente</span>
             <span className="tabular-nums" data-testid="receivables-field-balance">
@@ -142,6 +146,7 @@ export function ReceivableFieldDetailView({
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{c.accountName}</p>
+                  <p className="mt-1 text-xs font-medium">{c.status === "CANCELLED" ? "Cancelada · sin efecto en el saldo" : "Confirmada"}</p>
                   {c.reference ? (
                     <p className="mt-1 text-xs text-muted-foreground">Ref. {c.reference}</p>
                   ) : null}

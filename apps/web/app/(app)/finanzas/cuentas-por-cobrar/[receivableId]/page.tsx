@@ -18,12 +18,13 @@ import {
   getCompanyReceivableById,
   listCollectionsByReceivable,
   listEntityDocuments,
-  listTreasuryAccounts,
+  listSelectableTreasuryAccounts,
+  getTenantModuleGate,
   ServiceError,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
-import { cancelCompanyReceivableAction } from "../actions";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
+import { cancelCompanyReceivableAction, cancelCompanyCollectionAction } from "../actions";
 import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
 
@@ -65,13 +66,15 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
   const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
   const loadField = isReceivablesFieldViewport(hint);
   const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
-  const canCollect = canEditAr && OPEN_STATUSES.has(receivable.status);
+  const gate = await getTenantModuleGate(ctx);
+  const treasuryEnabled = gate.isEnabled("TREASURY");
+  const canCollect = canEditAr && treasuryEnabled && OPEN_STATUSES.has(receivable.status);
   const canCancel =
     canEditAr && receivable.status !== "CANCELLED" && receivable.status !== "PAID";
 
   if (loadField) {
     const canCollectField =
-      canMutateArForScope(ctx.roles, receivable.projectId) && OPEN_STATUSES.has(receivable.status);
+      treasuryEnabled && canMutateArForScope(ctx.roles, receivable.projectId) && OPEN_STATUSES.has(receivable.status);
     return (
       <PageShell variant="detail" className="space-y-6" breadcrumbLabel={receivable.clientName}>
         <ReceivableFieldDetailView
@@ -84,6 +87,7 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
           currency={receivable.currency}
           originalAmount={receivable.originalAmount}
           paidAmount={receivable.paidAmount}
+          creditedAmount={receivable.creditedAmount}
           balanceDue={receivable.balanceDue}
           status={receivable.status}
           collections={collections.map((c) => ({
@@ -93,6 +97,7 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
             currency: c.currency,
             accountName: c.accountName,
             reference: c.reference ?? null,
+            status: c.status,
             href: null,
           }))}
           canCollect={canCollectField}
@@ -117,10 +122,14 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
 
   let activeAccounts: Array<{ id: string; name: string; currency: string }> = [];
   if (canCollect) {
-    const accounts = await listTreasuryAccounts(ctx);
-    activeAccounts = accounts.data
-      .filter((a) => a.status === "ACTIVE")
-      .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
+    try {
+      const accounts = await listSelectableTreasuryAccounts(ctx);
+      activeAccounts = accounts
+        .filter((a) => a.status === "ACTIVE" && (!a.companyId || a.companyId === receivable.companyId))
+        .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
+    } catch (err) {
+      if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
+    }
   }
 
   return (
@@ -149,23 +158,15 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
             </Suspense>
           ) : null}
           {canCancel && (
-            <form
-              action={async () => {
-                "use server";
-                const result = await cancelCompanyReceivableAction(receivableId);
-                if ("error" in result) redirectWithActionError(detailPath, result.error);
-                redirect(detailPath);
-              }}
-            >
-              <Button variant="ghost" size="sm" className="text-muted-foreground">
-                Cancelar
-              </Button>
-            </form>
+            <ReasonActionButton label="Cancelar CxC" title="Cancelar cuenta por cobrar" confirmLabel="Cancelar CxC"
+              description="Se cancela la obligación cuando sus documentos y los controles financieros lo permiten."
+              action={cancelCompanyReceivableAction.bind(null, receivableId)} />
           )}
         </div>
       </div>
 
       <ActionErrorBanner message={sp.actionError} />
+      {!treasuryEnabled && OPEN_STATUSES.has(receivable.status) ? <p className="rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">Tesorería no está disponible. Podés consultar la cuenta por cobrar; para registrar o cancelar cobranzas necesitás habilitar ese módulo.</p> : null}
 
       <div className="rounded-lg border bg-card p-6 space-y-4">
         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -243,10 +244,12 @@ export default async function FinanzasReceivableDetailPage({ params, searchParam
                 <div>
                   <p className="font-medium">{formatDate(c.collectionDate)}</p>
                   <p className="text-muted-foreground">{c.accountName}</p>
+                  <p className="text-xs font-medium">{c.status === "CANCELLED" ? "Cancelada · sin efecto en el saldo" : "Confirmada"}</p>
                 </div>
                 <p className="font-medium tabular-nums">
                   {formatMoneyAmount(c.amount, c.currency)}
                 </p>
+                {canEditAr && treasuryEnabled && c.status === "CONFIRMED" ? <ReasonActionButton label="Cancelar cobranza" title="Cancelar cobranza" confirmLabel="Cancelar cobranza" description="Se revierte el cobro en la CxC y tesorería, si los controles lo permiten." action={cancelCompanyCollectionAction.bind(null, receivableId, c.id)} /> : null}
               </li>
             ))}
           </ul>

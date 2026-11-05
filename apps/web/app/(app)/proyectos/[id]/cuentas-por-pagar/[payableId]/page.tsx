@@ -10,6 +10,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import {
   canRegisterApPayment,
+  getTenantModuleGate,
   getPayableById,
   getProjectShellInfo,
   getPurchaseOrderCodeForApLink,
@@ -76,7 +77,7 @@ export default async function PayableDetailPage({ params, searchParams }: PagePr
 
   const canPayStatus =
     payable.status === "OPEN" || payable.status === "PARTIAL" || payable.status === "OVERDUE";
-  const canPay = canPayStatus && canRegisterApPayment(ctx.roles);
+  const canPay = (await getTenantModuleGate(ctx)).isEnabled("TREASURY") && canPayStatus && canRegisterApPayment(ctx.roles);
 
   if (loadField) {
     return (
@@ -91,6 +92,7 @@ export default async function PayableDetailPage({ params, searchParams }: PagePr
           currency={payable.currency}
           originalAmount={payable.originalAmount}
           paidAmount={payable.paidAmount}
+          creditedAmount={payable.creditedAmount}
           balanceDue={payable.balanceDue}
           status={payable.status}
           payments={payments.map((p) => ({
@@ -100,6 +102,7 @@ export default async function PayableDetailPage({ params, searchParams }: PagePr
             currency: p.currency,
             accountName: p.accountName,
             reference: p.reference ?? null,
+            status: p.status,
             href: `/proyectos/${id}/pagos/${p.id}`,
           }))}
           canPay={canPay}

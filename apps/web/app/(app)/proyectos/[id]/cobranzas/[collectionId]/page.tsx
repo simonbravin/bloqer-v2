@@ -6,10 +6,10 @@ import { CollectionStatusBadge } from "@/features/collections";
 import { settlementMethodLabel } from "@/features/treasury/lib/settlement-method-label";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromCollectionAction } from "@/app/(app)/contabilidad/source-draft-actions";
-import { getCollectionById, ServiceError } from "@bloqer/services";
+import { getCollectionById, getTenantModuleGate, ServiceError } from "@bloqer/services";
 import { can, classifyAccountMovement } from "@bloqer/domain";
 import { cancelCollectionAction } from "../actions";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
     throw err;
   }
 
-  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
+  const canEditAr = (await getTenantModuleGate(ctx)).isEnabled("TREASURY") && can(current.tenantCtx.roles, "EDIT", "AR");
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
   const returnPath = `/proyectos/${id}/cobranzas/${collectionId}`;
 
@@ -66,18 +66,9 @@ export default async function CollectionDetailPage({ params, searchParams }: Pag
         </div>
 
         {canEditAr && collection.status === "CONFIRMED" && (
-          <form
-            action={async () => {
-              "use server";
-              const result = await cancelCollectionAction(collectionId, id);
-              if ("error" in result) redirectWithActionError(returnPath, result.error);
-              redirect(returnPath);
-            }}
-          >
-            <Button variant="ghost" size="sm" className="text-muted-foreground">
-              Cancelar
-            </Button>
-          </form>
+          <ReasonActionButton label="Cancelar cobranza" title="Cancelar cobranza" confirmLabel="Cancelar cobranza"
+            description="Se revierte el cobro y su impacto en la CxC y tesorería, si los controles lo permiten."
+            successMessage="Cobranza cancelada" action={cancelCollectionAction.bind(null, collectionId, id)} />
         )}
       </div>
 

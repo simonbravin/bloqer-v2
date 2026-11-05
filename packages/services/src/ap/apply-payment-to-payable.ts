@@ -19,6 +19,7 @@ import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { requireIdempotencyKey } from "../idempotency/idempotency";
 import { formatSupplierInvoiceCode } from "../notifications/notification-copy";
+import { assertApTransactionModules } from "./ap-integrity";
 
 type TxClient = Omit<
   typeof prisma,
@@ -44,12 +45,14 @@ export type ApplyPaymentToPayableInput = {
   amount: Prisma.Decimal;
   /** YYYY-MM-DD */
   paymentDate: string;
+  fxRate?: string;
   notes?: string | null;
   paymentMethod?: "CASH" | "BANK_TRANSFER" | "CHECK" | "CARD" | "OTHER" | null;
   reference?: string | null;
   idempotencyKey: string;
   /** Internal supplier invoice number for movement description (FP-#####). */
   supplierInvoiceNumber: number;
+  supplierInvoiceDocumentKind?: string;
 };
 
 export type ApplyPaymentToPayableResult = {
@@ -96,6 +99,15 @@ export async function applyPaymentToPayable(
     );
   }
 
+  const paymentCompanyId = payable.companyId;
+  if (isCrossCompany(paymentCompanyId, ctx)) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a la empresa activa");
+  }
+  // Global order: Project → Company → TreasuryAccount. Composite AP already holds Company.
+  await assertPeriodOpenUnderCompanyLock(tx, {
+    tenantId: ctx.tenantId, companyId: paymentCompanyId, date: paymentDate,
+  });
+
   await lockTreasuryAccountRow(tx, accountId, ctx.tenantId);
   const account = await tx.treasuryAccount.findUnique({ where: { id: accountId } });
   if (!account) throw new ServiceError("NOT_FOUND", "Cuenta de tesorería no encontrada");
@@ -122,8 +134,8 @@ export async function applyPaymentToPayable(
     );
   }
   assertTreasuryAccountCurrencyMatches(account.currency, payable.currency);
+  await assertApTransactionModules(tx, ctx, true);
 
-  const paymentCompanyId = ctx.companyId ?? account.companyId ?? payable.companyId;
   const movementCompanyId = account.companyId ?? ctx.companyId ?? payable.companyId;
   if (!paymentCompanyId) {
     throw new ServiceError(
@@ -131,13 +143,6 @@ export async function applyPaymentToPayable(
       "El pago requiere una empresa activa en el contexto, la cuenta o la CxP",
     );
   }
-
-  // Serialize vs period close, then balance under the account row lock.
-  await assertPeriodOpenUnderCompanyLock(tx, {
-    tenantId: ctx.tenantId,
-    companyId: paymentCompanyId,
-    date: paymentDate,
-  });
 
   // BR-TRZ-004 / D-052: block negative balance on payment source account
   const sourceBalance = await getAccountBalance(account.id, tx);
@@ -148,8 +153,11 @@ export async function applyPaymentToPayable(
     );
   }
 
-  const fx = computeDocumentFxAmounts(payable.currency, amountToApply);
-  const invoiceCode = formatSupplierInvoiceCode(input.supplierInvoiceNumber);
+  const fx = computeDocumentFxAmounts(payable.currency, amountToApply,
+    input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined);
+  const invoiceCode = input.supplierInvoiceDocumentKind === "DEBIT_NOTE"
+    ? `ND-${String(input.supplierInvoiceNumber).padStart(5, "0")}`
+    : formatSupplierInvoiceCode(input.supplierInvoiceNumber);
 
   const payment = await tx.payment.create({
     data: {

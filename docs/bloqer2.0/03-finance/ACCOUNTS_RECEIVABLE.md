@@ -16,18 +16,25 @@ Obligación del **cliente** hacia la empresa por facturas/certificaciones emitid
 - **NC** (`documentKind = CREDIT_NOTE`): al emitir aplica crédito a la Receivable de la factura referenciada (`creditedAmount`); no crea Receivable ni movimiento de caja.
 
 ## Estados derivados
-Ver máquina Receivable ([`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md)); `OVERDUE` por job diario.
+Ver máquina Receivable ([`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md)); vencimiento derivado al consultar y detección por job diario. **Saldada** (`PAID`) significa sin saldo pendiente: puede resultar de caja, créditos NC o ambos. `paidAmount` contiene solo caja; `creditedAmount` contiene crédito. Consultar una deuda no regulariza esos importes históricos.
 
 ## Cobranzas parciales
-**Collection** con líneas `applies_to`: cada línea `(receivable_id, amount)` ([D-010]).
+Una deuda puede recibir varias cobranzas parciales ([D-010]). La implementación actual vincula cada `Collection` con una `Receivable`; no existe una tabla de aplicaciones múltiples ni una selección batch de deudas por cobranza. **Cobrar saldo total** aplica el saldo almacenado en el servidor ([D-053]).
 
 ## Relación con tesorería
-Al confirmar cobranza → un único evento **`collection.confirmed`** con efectos consolidados ([`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md) §3.3, [D-029]): **AccountMovement INCOME**, aplicación a AR, **`receivable.payment_status_recalculated`** en certificaciones vinculadas (**no** cambia `Certification.status`). Vencimientos: **`receivable.overdue_detected`** + recálculo derivado (§3.3b, [D-031]).
+Al confirmar cobranza → un único evento **`collection.confirmed`** con efectos consolidados ([`EVENTS_AND_AUTOMATIONS.md`](../01-domain/EVENTS_AND_AUTOMATIONS.md) §3.3, [D-029]): **AccountMovement INFLOW**, aplicación a AR, **`receivable.payment_status_recalculated`** en certificaciones vinculadas (**no** cambia `Certification.status`). Vencimientos: **`receivable.overdue_detected`** + recálculo derivado (§3.3b, [D-031]).
 
 ## Reglas
 - AR sin proyecto permitido ([D-009], [D-051], [BR-AR-003]).
 - Anulación factura → anular AR ([BR-AR-004]).
 - Aging / listado empresa etiquetan filas sin obra como **“Empresa”**.
+- Cuenta y deuda en la misma moneda y ámbito compatible; FX manual del cobro extranjero, independiente del snapshot de la factura ([D-008]). Consultar CxC no requiere Tesorería activa; crear o revertir caja exige el módulo y los permisos correspondientes.
+- Anular una cobranza confirmada exige motivo; el historial identifica las anuladas. Anular una NC restaura crédito pendiente sin simular una salida de caja.
+- Facturas/NC/ND usan IVA y percepción no negativos conforme D-133; no se recalculan documentos históricos.
 
 ## Reportes
-Aging por buckets ([`FINANCIAL_REPORTS.md`](./FINANCIAL_REPORTS.md)).
+Aging por buckets ([`FINANCIAL_REPORTS.md`](./FINANCIAL_REPORTS.md)) y totales **por moneda**. No sumar ARS con USD. Detalle y CSV separan original, caja aplicada, crédito y saldo; snapshots y proyecciones descuentan las NC aplicadas.
+
+## Hallazgo — AG-09: saldo derivado y aplicación real
+
+Se aclara la relación física `Collection → Receivable`, el enum `INFLOW` y la separación D-115 entre caja/crédito. La lectura de saldo puede derivar **Saldada** sin escribir dinero ni estado sobre históricos; los totales multimoneda se presentan separados.

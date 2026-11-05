@@ -87,10 +87,14 @@ if (isCrossCompany(entity.companyId, ctx)) {
 where: { tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) }
 ```
 
-**Filtro explícito de UI + scope de sesión:** el filtro explícito tiene prioridad.
+**Filtro explícito de UI + scope de sesión:** validar primero que el filtro esté dentro del ámbito autorizado. Con `ctx.companyId` anclado, un `filters.companyId` distinto se rechaza; un parámetro de URL nunca amplía el acceso de la sesión. Dentro de ese ámbito, el filtro explícito tiene prioridad.
 ```ts
 ...(filters.companyId ? { companyId: filters.companyId } : companyScopeFilter(ctx)) // nullable
 ```
+
+## Hallazgo — AG-09: prioridad de filtro dentro del ámbito autorizado
+
+La redacción anterior sobre prioridad del filtro podía interpretarse como permiso para reemplazar el anclaje de sesión. Se aclara su precondición conforme al aislamiento y al cierre AG-01: un filtro explícito acota, no amplía empresas autorizadas. Aging AR/AP ahora rechaza el filtro de otra empresa antes de consultar. No cambia D-092 ni el tratamiento de filas compartidas.
 
 ## 4. Prohibiciones
 

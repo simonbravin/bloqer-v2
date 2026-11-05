@@ -13,6 +13,17 @@ import { AI_DENY_MESSAGES } from "../policy/access";
 import { minimizeAgingTopItem, minimizeCashPosition } from "../policy/minimize";
 import { ServiceError } from "../../types";
 
+function agingToolTotals(report: Awaited<ReturnType<typeof getPayableAgingReport>>) {
+  return {
+    totals: report.totals == null ? null : {
+      totalBalance: report.totals.totalBalance,
+      totalOverdue: report.totals.totalOverdue,
+      current: report.totals.current,
+    },
+    byCurrency: report.byCurrency,
+  };
+}
+
 function flattenAgingTop(
   report: Awaited<ReturnType<typeof getPayableAgingReport>>,
   limit: number,
@@ -44,7 +55,7 @@ const payablesSchema = z.object({
 export const getPayablesTool = defineBloqerAiTool({
   name: "get_payables",
   description:
-    "Cuentas por pagar: resumen y top obligaciones (aging). Con projectId limita a la obra; sin proyecto usa vista empresa si el rol lo permite.",
+    "Cuentas por pagar: resumen y top obligaciones (aging). Totales separados por moneda; totals es null con varias monedas, nunca sumar ARS con USD. Con projectId limita a la obra; sin proyecto usa vista empresa si el rol lo permite.",
   risk: "READ",
   requiredModules: ["AP"],
   policy: {
@@ -79,11 +90,7 @@ export const getPayablesTool = defineBloqerAiTool({
             totalByCurrency: summary.totalByCurrency,
             overdueByCurrency: summary.overdueByCurrency,
           },
-          totals: {
-            totalBalance: aging.totals.totalBalance,
-            totalOverdue: aging.totals.totalOverdue,
-            current: aging.totals.current,
-          },
+          ...agingToolTotals(aging),
           top,
         },
         provenance: {
@@ -113,11 +120,7 @@ export const getPayablesTool = defineBloqerAiTool({
     return {
       data: {
         scope: "company",
-        totals: {
-          totalBalance: aging.totals.totalBalance,
-          totalOverdue: aging.totals.totalOverdue,
-          current: aging.totals.current,
-        },
+        ...agingToolTotals(aging),
         top,
       },
       provenance: { sourceType: "bloqer_data", route: href, asOf: nowIso() },
@@ -138,7 +141,7 @@ const receivablesSchema = z.object({
 
 export const getReceivablesTool = defineBloqerAiTool({
   name: "get_receivables",
-  description: "Cuentas por cobrar: resumen y top (aging). Proyecto o empresa según contexto/permiso.",
+  description: "Cuentas por cobrar: resumen y top (aging), por moneda. totals es null con varias monedas; no sumar ARS con USD. Proyecto o empresa según contexto/permiso.",
   risk: "READ",
   requiredModules: ["AR"],
   policy: {
@@ -173,11 +176,7 @@ export const getReceivablesTool = defineBloqerAiTool({
             totalByCurrency: summary.totalByCurrency,
             overdueByCurrency: summary.overdueByCurrency,
           },
-          totals: {
-            totalBalance: aging.totals.totalBalance,
-            totalOverdue: aging.totals.totalOverdue,
-            current: aging.totals.current,
-          },
+          ...agingToolTotals(aging),
           top,
         },
         provenance: {
@@ -207,11 +206,7 @@ export const getReceivablesTool = defineBloqerAiTool({
     return {
       data: {
         scope: "company",
-        totals: {
-          totalBalance: aging.totals.totalBalance,
-          totalOverdue: aging.totals.totalOverdue,
-          current: aging.totals.current,
-        },
+        ...agingToolTotals(aging),
         top,
       },
       provenance: { sourceType: "bloqer_data", route: href, asOf: nowIso() },

@@ -2,6 +2,8 @@
 
 import {
   createPayment,
+  getCompanyPayableById,
+  getCompanyPaymentById,
   cancelPayment,
   ServiceError,
 } from "@bloqer/services";
@@ -12,6 +14,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import {
   revalidateProjectCostAndFinancePaths,
+  revalidateOperationalFinancePaths,
   revalidateTreasuryPaths,
 } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
@@ -42,7 +45,9 @@ export async function createCompanyPaymentAction(
   const parsed = createPaymentSchema.safeParse(data);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
+    await getCompanyPayableById(parsed.data.payableId, ctx);
     const payment = await createPayment(parsed.data, ctx);
+    revalidateOperationalFinancePaths(payment.projectId);
     revalidatePath(FIN_AP);
     revalidatePath(`${FIN_AP}/${data.payableId}`);
     revalidatePath("/finanzas/transacciones");
@@ -56,10 +61,13 @@ export async function createCompanyPaymentAction(
 
 export async function cancelCompanyPaymentAction(
   paymentId: string,
+  reason?: string,
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    const payment = await cancelPayment(paymentId, ctx);
+    await getCompanyPaymentById(paymentId, ctx);
+    const payment = await cancelPayment(paymentId, ctx, undefined, reason);
+    revalidateOperationalFinancePaths(payment.projectId);
     revalidatePath(FIN_AP);
     revalidatePath(`/finanzas/pagos-proveedor/${paymentId}`);
     revalidatePath("/finanzas/transacciones");

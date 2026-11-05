@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { compareDecimal, roundMoney, serializeMoney, toIsoDateLocal } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,7 @@ import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-m
 import { createCollectionAction } from "@/app/(app)/proyectos/[id]/cobranzas/actions";
 import { createCompanyCollectionAction } from "@/app/(app)/finanzas/cuentas-por-cobrar/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 interface AccountOption {
   id: string;
@@ -43,6 +44,7 @@ interface Props {
   variant?: "card" | "plain";
   onCancel?: () => void;
   onSuccess?: () => void;
+  onPendingChange?: (pending: boolean) => void;
 }
 
 export function CollectionForm({
@@ -58,10 +60,11 @@ export function CollectionForm({
   variant = "card",
   onCancel,
   onSuccess,
+  onPendingChange,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: (message) => { setError(message); setStep("form"); }, onPendingChange });
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
   const [step, setStep] = useState<"form" | "confirm">("form");
@@ -91,6 +94,7 @@ export function CollectionForm({
   }
 
   function goConfirm() {
+    if (isBusy()) return;
     if (!accountId) {
       setError("Seleccioná una cuenta de tesorería");
       return;
@@ -110,6 +114,10 @@ export function CollectionForm({
         return;
       }
       const rounded = roundMoney(amount);
+      if (compareDecimal(rounded, "0") <= 0) {
+        setError("Ingresá un monto mayor a cero");
+        return;
+      }
       if (compareDecimal(rounded, balanceSerialized) > 0) {
         setError("El monto supera el saldo pendiente");
         return;
@@ -124,6 +132,8 @@ export function CollectionForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
+    setError(null);
     if (!accountId) { setError("Seleccioná una cuenta de tesorería"); return; }
     if (!companyFinanzas && !projectId) {
       setError("Falta el proyecto");
@@ -160,7 +170,7 @@ export function CollectionForm({
       notes: (fd.get("notes") as string) || null,
       idempotencyKey,
     };
-    startTransition(async () => {
+    void run(async () => {
       const res = companyFinanzas
         ? await createCompanyCollectionAction(payload)
         : await createCollectionAction(projectId!, payload);
@@ -211,8 +221,9 @@ export function CollectionForm({
       data-testid={fieldMode ? "receivables-field-collection-form" : undefined}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         )}
 
         {fieldMode ? (
@@ -222,8 +233,8 @@ export function CollectionForm({
         ) : null}
 
         <div className={step === "confirm" ? "hidden" : undefined}>
-          <div className={fieldMode ? "space-y-4" : "grid grid-cols-2 gap-4"}>
-            <div className={fieldMode ? "space-y-1" : "col-span-2 space-y-1"}>
+          <div className={fieldMode ? "space-y-4" : "grid grid-cols-1 gap-4 sm:grid-cols-2"}>
+            <div className={fieldMode ? "space-y-1" : "sm:col-span-2 space-y-1"}>
               <Label htmlFor="collection-account">Cuenta de tesorería ({receivableCurrency})</Label>
               <Select onValueChange={setAccountId} value={accountId}>
                 <SelectTrigger id="collection-account">
@@ -341,7 +352,7 @@ export function CollectionForm({
           </div>
         ) : (
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onCancel ?? (() => router.back())}>
+            <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}>
               Cancelar
             </Button>
             {fieldMode ? (
@@ -360,6 +371,7 @@ export function CollectionForm({
             )}
           </div>
         )}
+        </fieldset>
       </form>
     </div>
   );

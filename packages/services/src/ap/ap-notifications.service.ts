@@ -158,10 +158,12 @@ export async function notifyPaymentConfirmed(params: {
   projectId: string | null;
   companyId: string;
   invoiceNumber: number;
+  invoiceDocumentKind?: string;
   amountLabel: string;
   accountName: string;
 }): Promise<void> {
-  const invCode = formatSupplierInvoiceCode(params.invoiceNumber);
+  const invCode = params.invoiceDocumentKind === "DEBIT_NOTE"
+    ? `ND-${String(params.invoiceNumber).padStart(5, "0")}` : formatSupplierInvoiceCode(params.invoiceNumber);
   const actionUrl = params.projectId
     ? `/proyectos/${params.projectId}/facturas-proveedor/${params.supplierInvoiceId}`
     : `/finanzas/facturas-proveedor/${params.supplierInvoiceId}`;

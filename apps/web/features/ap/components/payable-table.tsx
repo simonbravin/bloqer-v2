@@ -63,7 +63,7 @@ export function PayableTable({
             <TableHead>Factura</TableHead>
             <TableHead>Clase</TableHead>
             <TableHead className="text-right">Saldo</TableHead>
-            <TableHead>Pagada</TableHead>
+            <TableHead title="Saldo saldado por pagos o créditos; no confirma un egreso de caja">Saldada</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead className="w-20" />
           </TableRow>

@@ -7,10 +7,10 @@ import { ActionErrorBanner } from "@/components/feedback/action-error-banner";
 import { settlementMethodLabel } from "@/features/treasury/lib/settlement-method-label";
 import { getCurrentUser } from "@/lib/auth";
 import { generateJournalFromPaymentAction } from "@/app/(app)/contabilidad/source-draft-actions";
-import { getCompanyPaymentById, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import { getCompanyPaymentById, getTenantModuleGate, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { can, classifyAccountMovement } from "@bloqer/domain";
 import { cancelCompanyPaymentAction } from "@/app/(app)/finanzas/cuentas-por-pagar/actions";
-import { redirectWithActionError } from "@/lib/procurement-action-redirect";
+import { ReasonActionButton } from "@/components/feedback/reason-action-button";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 import { DocumentClassBadge } from "@/features/finance/components/document-class-badge";
@@ -45,7 +45,7 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
 
   const isConfirmed = payment.status === "CONFIRMED";
   const canEditAccounting = can(current.tenantCtx.roles, "EDIT", "ACCOUNTING");
-  const canCancelPayment = canRegisterApPayment(current.tenantCtx.roles);
+  const canCancelPayment = (await getTenantModuleGate(ctx)).isEnabled("TREASURY") && canRegisterApPayment(current.tenantCtx.roles);
   const returnPath = `/finanzas/pagos-proveedor/${paymentId}`;
   const paymentClass = classifyAccountMovement({ type: "OUTFLOW", sourceType: "PAYMENT" });
 
@@ -143,18 +143,9 @@ export default async function FinanzasPagoProveedorDetailPage({ params, searchPa
       )}
 
       {canCancelPayment && isConfirmed && (
-        <form
-          action={async () => {
-            "use server";
-            const result = await cancelCompanyPaymentAction(paymentId);
-            if ("error" in result) redirectWithActionError(returnPath, result.error);
-            redirect(returnPath);
-          }}
-        >
-          <Button type="submit" variant="destructive">
-            Cancelar pago
-          </Button>
-        </form>
+        <ReasonActionButton label="Cancelar pago" title="Cancelar pago" confirmLabel="Cancelar pago"
+          description="Se anula el pago y se revierte el impacto en la CxP y tesorería, si los controles lo permiten."
+          successMessage="Pago cancelado" action={cancelCompanyPaymentAction.bind(null, paymentId)} />
       )}
     </PageShell>
   );

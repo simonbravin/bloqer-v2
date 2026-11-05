@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { compareDecimal, serializeMoney } from "@bloqer/utils";
 import { FISCAL_DOCUMENT_KIND_LABELS } from "@bloqer/domain";
@@ -18,6 +18,7 @@ import { DecimalInput } from "@/components/ui/decimal-input";
 import { FillableAmount } from "@/components/ui/fillable-amount";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { createSalesCreditNoteFromInvoiceAction, createSalesDebitNoteFromInvoiceAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import {
   createCompanySalesCreditNoteFromInvoiceAction,
   createCompanySalesDebitNoteFromInvoiceAction,
@@ -65,8 +66,8 @@ export function CreateFiscalNoteDialog({
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const isCredit = kind === "CREDIT_NOTE";
   const balanceSerialized = openBalance ? serializeMoney(openBalance) : "0.00";
   const [amount, setAmount] = useState(balanceSerialized);
@@ -110,6 +111,7 @@ export function CreateFiscalNoteDialog({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isBusy()) return;
     setError(null);
     if (isCredit) {
       const normalized = serializeMoney(amount);
@@ -123,7 +125,7 @@ export function CreateFiscalNoteDialog({
         );
         return;
       }
-      startTransition(async () => {
+      void run(async () => {
         const result = await runCreate(normalized);
         if ("error" in result) {
           setError(result.error);
@@ -134,7 +136,7 @@ export function CreateFiscalNoteDialog({
       });
       return;
     }
-    startTransition(async () => {
+    void run(async () => {
       const result = await runCreate();
       if ("error" in result) {
         setError(result.error);
@@ -149,6 +151,7 @@ export function CreateFiscalNoteDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (!next && isBusy()) return;
         setOpen(next);
         if (next) {
           setError(null);
@@ -171,8 +174,9 @@ export function CreateFiscalNoteDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
           {error ? (
-            <p className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+            <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           ) : null}
           {isCredit ? (
             <div className="space-y-2">
@@ -221,6 +225,7 @@ export function CreateFiscalNoteDialog({
               {isPending ? "Creando…" : "Crear borrador"}
             </Button>
           </div>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

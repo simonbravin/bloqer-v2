@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { PaymentForm } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
-import { getPayableById, listSelectableTreasuryAccounts, canRegisterApPayment, ServiceError } from "@bloqer/services";
+import { getPayableById, listSelectableTreasuryAccounts, getTenantModuleGate, canRegisterApPayment, ServiceError } from "@bloqer/services";
 import { isPayablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
@@ -27,6 +27,7 @@ export default async function PagarPage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  if (!(await getTenantModuleGate(ctx)).isEnabled("TREASURY")) redirect(`/proyectos/${id}/cuentas-por-pagar/${payableId}`);
   let payable;
   let allAccounts;
   try {

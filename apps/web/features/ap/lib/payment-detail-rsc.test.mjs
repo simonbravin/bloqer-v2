@@ -32,10 +32,10 @@ async function renderPayment({ status = "CONFIRMED", canCancel = true } = {}) {
     "payment-actions",
     "cancelPaymentAction",
   );
-  const ConfirmActionButton = registerClientReference(
+  const ReasonActionButton = registerClientReference(
     () => {},
-    "confirm-action-button",
-    "ConfirmActionButton",
+    "reason-action-button",
+    "ReasonActionButton",
   );
   const container = ({ children }) => React.createElement("div", null, children);
   const ctx = { actorUserId: "user", tenantId: "tenant", companyId: "company", roles: ["FINANCE"] };
@@ -72,6 +72,7 @@ async function renderPayment({ status = "CONFIRMED", canCancel = true } = {}) {
         return payment;
       },
       canRegisterApPayment: () => canCancel,
+      getTenantModuleGate: async () => ({ isEnabled: () => true }),
       ServiceError: class extends Error {},
     },
     "@bloqer/domain": {
@@ -87,7 +88,7 @@ async function renderPayment({ status = "CONFIRMED", canCancel = true } = {}) {
         "generateJournalFromPaymentAction",
       ),
     },
-    "@/components/feedback/confirm-action-button": { ConfirmActionButton },
+    "@/components/feedback/reason-action-button": { ReasonActionButton },
     "@/components/feedback/action-error-banner": { ActionErrorBanner: () => null },
     "@/components/ui/badge": { Badge: container },
     "@/components/ui/button": { Button: container },
@@ -114,10 +115,10 @@ async function renderPayment({ status = "CONFIRMED", canCancel = true } = {}) {
   const stream = await renderToReadableStream(
     tree,
     {
-      "confirm-action-button#ConfirmActionButton": {
-        id: "confirm-action-button",
+      "reason-action-button#ReasonActionButton": {
+        id: "reason-action-button",
         chunks: [],
-        name: "ConfirmActionButton",
+        name: "ReasonActionButton",
       },
     },
     {
@@ -134,7 +135,7 @@ async function renderPayment({ status = "CONFIRMED", canCancel = true } = {}) {
 
   function findCancel(node) {
     if (!node || typeof node !== "object") return undefined;
-    if (node.type === ConfirmActionButton) return node;
+    if (node.type === ReasonActionButton) return node;
     return React.Children.toArray(node.props?.children).map(findCancel).find(Boolean);
   }
   return { button: findCancel(tree), cancelCalls };
@@ -143,8 +144,8 @@ async function renderPayment({ status = "CONFIRMED", canCancel = true } = {}) {
 test("confirmed payment renders and its cancellation keeps payment/project scope", async () => {
   const { button, cancelCalls } = await renderPayment();
   assert.ok(button, "Authorized users retain the cancellation confirmation");
-  assert.deepEqual(await button.props.action(), { ok: true });
-  assert.deepEqual(cancelCalls, [["payment", "project"]]);
+  assert.deepEqual(await button.props.action("Pago duplicado"), { ok: true });
+  assert.deepEqual(cancelCalls, [["payment", "project", "Pago duplicado"]]);
 });
 
 test("confirmed payment renders for a reader without cancellation permission", async () => {

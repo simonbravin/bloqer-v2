@@ -239,7 +239,7 @@ describe("D-111 MEMBERSHIP_SCOPED live matrix (Neon DEV)", { skip: !live }, () =
     assert.equal(projects.length, 0, "FINANCE must not see projects without membership");
 
     const aging = await getPayableAgingReport({}, ctx);
-    const total = Number(aging.totals.totalBalance);
+    const total = Number(aging.byCurrency.ARS?.totalBalance ?? "0");
     // Company aging includes both project payables
     assert.ok(total >= fx.payableA1Amount + fx.payableA2Amount - 1, `aging total ${total}`);
     mark("company_finance_finance_role", true);

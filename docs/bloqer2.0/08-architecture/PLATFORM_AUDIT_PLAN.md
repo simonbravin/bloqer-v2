@@ -3,7 +3,7 @@
 > Preparado: **03/11/2026**. Alcance de esta entrega: plan y herramientas reutilizables.
 > La inspección inicial fue de documentación, estructura y configuración. **No acredita que la plataforma esté auditada ni que se hayan ejecutado sus suites.**
 > Este plan organiza trabajo de calidad; no cambia decisiones de producto, estados, arquitectura ni el roadmap de implementación.
-> **Avance al 05/11/2026:** AG-00 a AG-07 publicadas. [AG-07: PR #5 / Production d897aa7f](./platform-audit/2026-11-05-ag-07-publication.md), CI PR/main y acceso público comprobados. **AG-08 cerrada y verificada localmente:** 30 grupos corregidos, D-131/D-132 implementadas, 2.528 pruebas generales y 90 casos SQL distintos aprobados, tipos/lint/compilación y muestra visual aislada en ambos temas/escritorio/teléfono. [Cierre AG-08](./platform-audit/2026-11-05-ag-08-certifications-subcontracts.md). AG-08 sin publicar; **AG-09 no iniciada**, esperar indicación. D-083/D-124/D-128 conservan sus diferimientos.
+> **Avance al 05/11/2026:** AG-00 a AG-08 publicadas. [AG-08: PR #6 / Production e817d82f](./platform-audit/2026-11-05-ag-08-publication.md), CI PR/main y acceso público comprobados. [Cierre AG-08](./platform-audit/2026-11-05-ag-08-certifications-subcontracts.md): 30 grupos corregidos, D-131/D-132 implementadas, 2.528 pruebas generales y 90 casos SQL distintos aprobados, tipos/lint/compilación y muestra visual aislada en ambos temas/escritorio/teléfono. **AG-09 cerrada localmente**, [30 grupos corregidos](./platform-audit/2026-11-05-ag-09-ar-ap-payments.md), 2.650 pruebas generales y 75 casos SQL distintos, tipos/lint, compilación y muestra visual. AG-10 no iniciada. D-083/D-124/D-128 conservan sus diferimientos.
 
 ## 1. Resultado buscado
 

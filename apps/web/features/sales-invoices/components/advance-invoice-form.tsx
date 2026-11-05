@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -17,6 +17,8 @@ import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { ExpandableNotesField } from "@/features/finance/components/expandable-notes-field";
 import type { ClientOption } from "./manual-invoice-form";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 
 type TreasuryAccountOption = {
   id: string;
@@ -38,8 +40,9 @@ export function AdvanceInvoiceForm({
   defaultClientId,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
+  const [fxRate, setFxRate] = useState("");
   const [clientContactId, setClientContactId] = useState(defaultClientId ?? "");
   const [accountId, setAccountId] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<SettlementMethodValue | "">("");
@@ -56,6 +59,8 @@ export function AdvanceInvoiceForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
+    setError(null);
     if (!clientContactId) {
       setError("Debe seleccionar un cliente");
       return;
@@ -73,17 +78,19 @@ export function AdvanceInvoiceForm({
     const collectionDate = fd.get("collectionDate") as string;
     const amount = fd.get("amount") as string;
 
-    startTransition(async () => {
+    void run(async () => {
       const res = await registerArAdvanceAction(projectId, {
         projectId,
         clientContactId,
         issueDate,
         dueDate: issueDate,
         currency: selectedAccount.currency,
+        fxRate: selectedAccount.currency === "ARS" ? undefined : fxRate,
         amount,
         notes: (fd.get("notes") as string) || null,
         idempotencyKey: saleKey,
         collectNow: {
+          fxRate: selectedAccount.currency === "ARS" ? undefined : fxRate,
           accountId,
           collectionDate,
           collectFullBalance: true,
@@ -112,8 +119,9 @@ export function AdvanceInvoiceForm({
         Mejora la caja imputada del proyecto desde el inicio de la obra.
       </p>
       <form onSubmit={handleSubmit} className="space-y-4">
+        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
         {error ? (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
         ) : null}
 
         <DocumentClassCreateHint
@@ -209,12 +217,14 @@ export function AdvanceInvoiceForm({
           </div>
         </div>
 
+        <ManualFxField currency={currency} value={fxRate} onValueChange={setFxRate} disabled={isPending} />
         <Button
           type="submit"
           disabled={isPending || clients.length === 0 || accounts.length === 0 || !accountId}
         >
           {isPending ? "Registrando…" : "Registrar anticipo y cobro"}
         </Button>
+        </fieldset>
       </form>
     </div>
   );

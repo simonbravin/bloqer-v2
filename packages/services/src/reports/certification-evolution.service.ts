@@ -2,6 +2,8 @@ import { Prisma, prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
+import { computeObligationBalanceDue } from "../finance/obligation-balance";
+import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
 import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
@@ -213,6 +215,7 @@ export async function getCertificationEvolutionReport(
                 select: {
                   originalAmount: true,
                   paidAmount: true,
+                  creditedAmount: true,
                   dueDate: true,
                   status: true,
                   collections: {
@@ -360,8 +363,8 @@ export async function getCertificationEvolutionReport(
       for (const c of ar.collections) {
         collected = collected.add(c.amount);
       }
-      const balance = ar.originalAmount.minus(ar.paidAmount);
-      if (ar.status !== "PAID" && balance.greaterThan(0) && ar.dueDate < new Date()) {
+      const balance = computeObligationBalanceDue(ar.originalAmount, ar.paidAmount, ar.creditedAmount);
+      if (ar.status !== "PAID" && hasOpenObligationBalance(balance) && isObligationOverdue(ar.dueDate)) {
         overdue = true;
       }
     }

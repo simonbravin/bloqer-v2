@@ -1,8 +1,10 @@
 import { Prisma, prisma, Payment } from "@bloqer/database";
-import type { CreatePaymentInput } from "@bloqer/validators";
+import { createPaymentSchema, type CreatePaymentInput } from "@bloqer/validators";
+import { parseApInput, requireApCancellationReason } from "./ap-input";
+import { apPaymentParents, apInvoiceLineParents, assertApInvoiceLineParents, assertApPaymentReadParents, assertApInvoiceParents, assertApPayableMatchesInvoice, assertApTransactionModules, stripApParents } from "./ap-integrity";
 import { auditAp } from "./ap-audit";
 import { applyPaymentToPayable } from "./apply-payment-to-payable";
-import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
+import { serializeFxRateDecimal, serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal";
 import { resolveObligationStoredStatus } from "../finance/obligation-stored-status";
 import { computeObligationBalanceDue } from "../finance/obligation-balance";
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
@@ -30,8 +32,10 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 
-export type PaymentView = Omit<Payment, "amount"> & {
+export type PaymentView = Omit<Payment, "amount" | "fxRate" | "amountArs"> & {
   amount: string;
+  fxRate: string;
+  amountArs: string;
   accountName: string;
 };
 
@@ -49,7 +53,7 @@ export async function getPaymentById(
   }
   const p = await prisma.payment.findUnique({
     where: { id },
-    include: { account: { select: { name: true } } },
+    include: apPaymentParents,
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -63,6 +67,7 @@ export async function getPaymentById(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver pagos a nivel empresa");
   }
   await requireProjectAccessIfPresent(p.projectId, ctx);
+  assertApPaymentReadParents(p, ctx);
   return serialize(p);
 }
 
@@ -74,7 +79,7 @@ export async function getCompanyPaymentById(id: string, ctx: ServiceContext): Pr
   }
   const p = await prisma.payment.findUnique({
     where: { id },
-    include: { account: { select: { name: true } } },
+    include: apPaymentParents,
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -84,6 +89,7 @@ export async function getCompanyPaymentById(id: string, ctx: ServiceContext): Pr
   if (isCrossCompany(p.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "El pago no pertenece a la empresa activa");
   }
+  assertApPaymentReadParents(p, ctx);
   return serialize(p);
 }
 
@@ -113,14 +119,14 @@ export async function listPaymentsByProject(
   const [rows, total] = await Promise.all([
     prisma.payment.findMany({
       where,
-      include: { account: { select: { name: true } } },
+      include: apPaymentParents,
       orderBy: [{ paymentDate: "desc" }, { id: "desc" }],
       skip,
       take,
     }),
     prisma.payment.count({ where }),
   ]);
-  return { data: rows.map(serialize), total };
+  return { data: rows.map(p => { assertApPaymentReadParents(p, ctx); return serialize(p); }), total };
 }
 
 export async function listPaymentsByPayable(
@@ -151,10 +157,10 @@ export async function listPaymentsByPayable(
 
   const rows = await prisma.payment.findMany({
     where: { payableId, tenantId: ctx.tenantId },
-    include: { account: { select: { name: true } } },
+    include: apPaymentParents,
     orderBy: { paymentDate: "desc" },
   });
-  return rows.map(serialize);
+  return rows.map(p => { assertApPaymentReadParents(p, ctx); return serialize(p); });
 }
 
 export type CompanyPaymentListFilters = {
@@ -199,7 +205,7 @@ export async function listCompanyPayments(
   const [rows, total] = await Promise.all([
     prisma.payment.findMany({
       where,
-      include: { account: { select: { name: true } } },
+      include: apPaymentParents,
       orderBy: [{ paymentDate: "desc" }, { id: "desc" }],
       skip,
       take,
@@ -207,7 +213,7 @@ export async function listCompanyPayments(
     prisma.payment.count({ where }),
   ]);
 
-  const data = rows.map(serialize);
+  const data = rows.map(p => { assertApPaymentReadParents(p, ctx); return serialize(p); });
   return { data, total };
 }
 
@@ -244,15 +250,20 @@ export async function createPayment(
     await assertProjectAllowsOperationalMutation(payablePreview.projectId, ctx);
   }
 
+  input = parseApInput(createPaymentSchema, input);
+
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
-  const paymentInclude = { account: { select: { name: true } } } as const;
+  const paymentInclude = apPaymentParents;
 
   const payment = await withIdempotentCreate({
-    findExisting: () =>
-      prisma.payment.findFirst({
+    findExisting: async () => {
+      const existing = await prisma.payment.findFirst({
         where: { tenantId: ctx.tenantId, idempotencyKey },
         include: paymentInclude,
-      }),
+      });
+      if (existing) assertApPaymentReadParents(existing, ctx);
+      return existing;
+    },
     payloadsMatch: (existing) =>
       paymentReplayMatches(existing, {
         payableId: input.payableId,
@@ -260,6 +271,10 @@ export async function createPayment(
         paymentDate: input.paymentDate,
         payFullBalance: Boolean(input.payFullBalance),
         amount: input.amount,
+        fxRate: input.fxRate,
+        paymentMethod: input.paymentMethod,
+        reference: input.reference,
+        notes: input.notes,
       }),
     create: async () => {
       const created = await prisma.$transaction(async (tx) => {
@@ -298,7 +313,7 @@ export async function createPayment(
 
         const supplierInvoice = await tx.supplierInvoice.findUnique({
           where: { id: payable.supplierInvoiceId },
-          select: { status: true, number: true },
+          include: { lines: { include: apInvoiceLineParents } },
         });
         if (!supplierInvoice) {
           throw new ServiceError("CONFLICT", "La factura de proveedor asociada no existe");
@@ -306,6 +321,9 @@ export async function createPayment(
         if (supplierInvoice.status === "CANCELLED") {
           throw new ServiceError("CONFLICT", "No se puede pagar una factura de proveedor cancelada");
         }
+        assertApPayableMatchesInvoice(payable, supplierInvoice);
+        await assertApInvoiceParents(supplierInvoice, tx);
+        assertApInvoiceLineParents(supplierInvoice, supplierInvoice.lines);
 
         const applied = await applyPaymentToPayable(
           tx,
@@ -314,11 +332,13 @@ export async function createPayment(
             accountId: input.accountId,
             amount,
             paymentDate: input.paymentDate,
+            fxRate: input.fxRate,
             notes: input.notes ?? null,
             paymentMethod: input.paymentMethod ?? null,
             reference: input.reference ?? null,
             idempotencyKey,
             supplierInvoiceNumber: supplierInvoice.number,
+            supplierInvoiceDocumentKind: supplierInvoice.documentKind,
           },
           ctx,
         );
@@ -327,6 +347,7 @@ export async function createPayment(
           where: { id: applied.paymentId },
           include: paymentInclude,
         });
+        assertApPaymentReadParents(result, ctx);
 
         await auditAp(
           ctx,
@@ -355,6 +376,7 @@ export async function createPayment(
         projectId: created.result.projectId,
         companyId: created.result.companyId,
         invoiceNumber: created.supplierInvoice.number,
+        invoiceDocumentKind: created.supplierInvoice.documentKind,
         amountLabel: `${serializeMoneyDecimal(created.result.amount)} ${created.result.currency}`,
         accountName: created.result.account.name,
       }).catch(() => undefined);
@@ -372,6 +394,7 @@ export async function cancelPayment(
   ctx: ServiceContext,
   /** When set, rejects cancelling corporate payments from a project workspace action. */
   projectScopeId?: string,
+  reason?: string,
 ): Promise<Payment> {
   await assertApTenantModule(ctx);
   await assertTreasuryTenantModule(ctx);
@@ -411,8 +434,9 @@ export async function cancelPayment(
 
   if (paymentPreview.status === "CANCELLED") {
     await cancelDraftJournalOnOperationalCancel(ctx, glParams);
-    throw new ServiceError("CONFLICT", "El pago ya está cancelado");
+    return prisma.payment.findUniqueOrThrow({ where: { id } });
   }
+  const cancellationReason = requireApCancellationReason(paymentPreview.status, reason);
 
   await assertFinancialPeriodOpen({
     tenantId: ctx.tenantId,
@@ -443,7 +467,7 @@ export async function cancelPayment(
       throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
     }
     if (p.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "El pago ya está cancelado");
+      return p;
     }
 
     await assertPeriodOpenUnderCompanyLock(tx, {
@@ -451,10 +475,10 @@ export async function cancelPayment(
       companyId: p.companyId,
       date: p.paymentDate,
     });
+    await assertApTransactionModules(tx, ctx, true);
 
     const linkedMovement = await tx.accountMovement.findFirst({
       where: { sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
-      select: { id: true, status: true },
     });
     if (linkedMovement?.status === "RECONCILED") {
       throw new ServiceError(
@@ -462,6 +486,21 @@ export async function cancelPayment(
         "El movimiento de tesorería está conciliado. Desconciliá antes de cancelar el pago.",
       );
     }
+    const payable = await tx.payable.findUnique({ where: { id: p.payableId } });
+    const invoice = await tx.supplierInvoice.findUnique({ where: { id: p.supplierInvoiceId } });
+    if (!payable) throw new ServiceError("CONFLICT", "El pago no tiene cuenta por pagar asociada");
+    assertApPayableMatchesInvoice(payable, invoice);
+    if (p.tenantId !== payable.tenantId || p.companyId !== payable.companyId || p.projectId !== payable.projectId ||
+        p.supplierContactId !== payable.supplierContactId || p.supplierInvoiceId !== payable.supplierInvoiceId ||
+        p.currency !== payable.currency || !p.amount.greaterThan(0) || payable.status === "CANCELLED" ||
+        payable.paidAmount.lessThan(p.amount) || !linkedMovement || linkedMovement.tenantId !== p.tenantId ||
+        linkedMovement.accountId !== p.accountId || linkedMovement.projectId !== p.projectId ||
+        linkedMovement.currency !== p.currency || !linkedMovement.amount.equals(p.amount) ||
+        linkedMovement.type !== "OUTFLOW" ||
+        (linkedMovement.companyId !== null && linkedMovement.companyId !== p.companyId)) {
+      throw new ServiceError("CONFLICT", "El pago y sus documentos o movimiento de tesorería tienen relaciones o importes inconsistentes");
+    }
+    await assertApInvoiceParents(payable, tx);
 
     const paymentCancel = await tx.payment.updateMany({
       where: { id, tenantId: ctx.tenantId, status: "CONFIRMED" },
@@ -491,9 +530,8 @@ export async function cancelPayment(
     }
 
     // Reverse Payable.paidAmount
-    const payable = await tx.payable.findUnique({ where: { id: p.payableId } });
-    if (payable && payable.status !== "CANCELLED") {
-      const newPaid    = Prisma.Decimal.max(payable.paidAmount.minus(p.amount), new Prisma.Decimal(0));
+    {
+      const newPaid    = payable.paidAmount.minus(p.amount);
       const newStatus  = resolveObligationStoredStatus(
         newPaid,
         payable.originalAmount,
@@ -502,6 +540,7 @@ export async function cancelPayment(
       const payableReverse = await tx.payable.updateMany({
         where: {
           id: payable.id,
+          tenantId: ctx.tenantId,
           paidAmount: payable.paidAmount,
           creditedAmount: payable.creditedAmount,
           status: { not: "CANCELLED" },
@@ -514,11 +553,6 @@ export async function cancelPayment(
       );
     }
 
-    const invoice = await tx.supplierInvoice.findUnique({
-      where: { id: p.supplierInvoiceId },
-      select: { number: true },
-    });
-
     const updated = await tx.payment.findUniqueOrThrow({ where: { id } });
 
     await auditAp(
@@ -527,11 +561,12 @@ export async function cancelPayment(
       "Payment",
       id,
       { projectId: updated.projectId, companyId: updated.companyId },
-      { after: { status: "CANCELLED", number: invoice?.number ?? null }, tx },
+      { after: { status: "CANCELLED", number: invoice?.number ?? null, cancellationReason }, tx },
     );
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams, tx);
 
     return updated;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
@@ -543,5 +578,6 @@ export async function cancelPayment(
 type RawPayment = Payment & { account: { name: string } };
 
 function serialize(p: RawPayment): PaymentView {
-  return { ...p, amount: serializeMoneyDecimal(p.amount), accountName: p.account.name };
+  return { ...stripApParents(p), amount: serializeMoneyDecimal(p.amount),
+    fxRate: serializeFxRateDecimal(p.fxRate), amountArs: serializeMoneyDecimal(p.amountArs), accountName: p.account.name };
 }

@@ -242,6 +242,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "En el detalle de la factura padre aparecen las Notas vinculadas. Las acciones (NC/ND, Emitir, Anular) están en el encabezado.",
       "En listados podés buscar por código (FAC-/NC-/ND-) y filtrar por Tipo de documento (Factura / NC / ND).",
       "Para anular la factura padre primero anulá las NC/ND emitidas.",
+      "Anular un documento emitido pide motivo. Una NC anulada deja de aplicar crédito; el detalle muestra su estado y no la presenta como aplicada.",
     ],
     effects: [
       "Saldo = original − cobrado/pagado − créditos NC.",
@@ -250,6 +251,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "La NC no puede superar el saldo pendiente.",
+      "IVA y percepción IIBB deben ser cero o positivos también en NC/ND. Corregí los valores negativos de un borrador antes de emitir; no se reescriben documentos históricos. Una retención no se simula con IVA negativo.",
       "No hay NC/ND sin factura de referencia (crédito abierto fuera de v1).",
       "No uses anular factura si solo necesitás corregir un monto: usá NC.",
     ],
@@ -286,13 +288,17 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "project", suffix: "/cuentas-por-cobrar", label: "Cuentas por cobrar" }],
     steps: [
       "CxC del proyecto → detalle → Cobrar.",
-      "Cuenta, fecha, monto (2 decimales; usá el saldo que muestra el sistema), método y referencia.",
+      "Cuenta, fecha, monto (2 decimales), método y referencia. Cobrar saldo total usa el saldo guardado en servidor.",
       "Para moneda extranjera ingresá el tipo de cambio de este cobro (ARS por 1 unidad). La cuenta debe tener la misma moneda y pertenecer a la empresa de la deuda. El cobro mantiene su proyecto para los reportes.",
       "Confirmá. Solo la cobranza confirmada mueve caja.",
+      "Para cancelar un cobro confirmado abrí su detalle y elegí Cancelar cobranza con motivo. En CxC empresa la misma acción está en el historial. Se conservan los registros anulados.",
     ],
     pitfalls: [
       "Sin saldo pendiente en una certificación no prueba que se haya cobrado efectivo: puede incluir NC aplicadas. Revisá las cobranzas confirmadas y las Notas vinculadas de la factura.",
       "Saldo no disponible indica una fuente que no se pudo comprobar; no confirma que la deuda sea cero.",
+      "Saldada puede incluir crédito NC sin ingreso de dinero. Revisá por separado cobros confirmados, créditos y saldo.",
+      "La fecha de corte se muestra en el encabezado Al (día/mes/año). Los totales de antigüedad se muestran por moneda; no sumes ARS y USD. Sus filtros afectan ese bloque, separado del listado de obligaciones.",
+      "Consultar CxC no requiere tener Tesorería activa; registrar o cancelar caja sí exige el módulo y los permisos de la operación.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "ingreso-corporativo-con-factura"],
     keywords: [
@@ -318,7 +324,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     steps: [
       "Entrá a la obra → Facturas emitidas.",
       "Alta de anticipo / venta rápida (`/facturas/anticipo/nueva`).",
-      "Completá cliente (buscá por razón social o nombre fantasía) y líneas; cobro opcional si tenés permiso de tesorería.",
+      "Completá cliente, fechas, cuenta y monto. La cuenta determina la moneda; para moneda extranjera ingresá el FX manual. Se resuelve la letra con los datos fiscales de empresa y cliente.",
       "Para facturar una certificación aprobada abrí su detalle → Crear borrador de factura; si ya tiene borrador, Emitir factura abre el documento vinculado.",
     ],
     relatedSlugs: ["facturar-una-certificacion", "cobrar-una-cxc-de-obra"],
@@ -343,6 +349,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Finanzas → Transacciones → Registrar → tab Ingreso / cobro.",
       "Modo Factura / cuenta por cobrar: cliente, líneas (precio, Desc. % opcional, IVA), vencimiento. El chip Clase muestra Ingreso corporativo.",
       "Opcional: Cobrar ahora (ingreso a caja) si tenés permiso de tesorería.",
+      "Desde el detalle de CxC empresa podés cancelar una cobranza confirmada con motivo y permisos; el historial identifica las anuladas.",
       "Para NC/ND: CxC → abrí la factura → Nota de crédito / Nota de débito.",
     ],
     relatedSlugs: [
@@ -480,7 +487,7 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Facturas proveedor → Nueva → modo Costo directo. ¿Cada línea tiene partida hoja EDT? Si no → no se guarda. Con adenda, la partida muestra el presupuesto entre paréntesis.",
       "Payee: Proveedor o Empleado. Tipo de costo en cada línea. Desde Mano de obra / Equipos → Factura llega tipado + insumo APU ([D-110]).",
       "Crear → Emitir = Devengado + CxP. En el pie de totales ajustá **Percepción IIBB** (default 3% sobre el neto) si aplica. ¿Pagar ahora? Si sí, hace falta fondos y mes abierto; si no, Bloqer bloquea. Si no pagás ahora, queda CxP.",
-      "En el detalle ves una pista de proceso (Borrador → Emitir → Pagar) además del badge de estado; el paso Pagar sigue la CxP (parcial / vencida / pagada).",
+      "En el detalle, Cantidad identifica las unidades de cada línea. También ves una pista de proceso (Borrador → Emitir → Pagar) además del badge de estado; el paso Pagar sigue la CxP (parcial / vencida / pagada).",
     ],
     figure: {
       src: "/help/mapa-flujo-costo-obra-si-no.png",
@@ -634,7 +641,7 @@ export const AP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Al crear/emitir, activá Emitir y pagar ahora (egreso de caja) / Pagar ahora.",
-      "Elegí cuenta y fecha.",
+      "Elegí cuenta y fecha; si el comprobante está en moneda extranjera, ingresá el FX manual del pago (ARS por 1 unidad, hasta 6 decimales). La cuenta debe ser compatible con moneda y empresa de la deuda.",
       "Si no hay fondos suficientes, el sistema bloquea.",
     ],
     effects: ["Devengado + pagado + OUTFLOW; asientos DRAFT de factura y pago."],
@@ -657,10 +664,10 @@ export const AP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Abrí la CxP → Registrar pago / Pagar.",
-      "Cuenta, fecha, monto (click en el saldo para autocompletar; no reescribas «a ojo»).",
+      "Cuenta, fecha y monto. Pagar saldo total usa el saldo guardado en servidor; para moneda extranjera ingresá el tipo de cambio manual del pago (ARS por 1 unidad, hasta 6 decimales).",
       "Método de liquidación y referencia opcionales.",
       "Confirmá. Bloquea si fondos insuficientes o período cerrado.",
-      "En el detalle del pago podés consultar monto, fecha y cuenta, y volver a la CxP o a la factura. En obra, Cancelar pago pide confirmación y requiere permiso.",
+      "En el detalle del pago podés consultar monto, fecha y cuenta, y volver a la CxP o a la factura. Cancelar pago pide motivo y requiere permiso; el historial distingue pagos confirmados y anulados.",
     ],
     effects: [
       "Pagado (o parcial) + movimiento OUTFLOW. Se intenta generar el asiento DRAFT según la configuración contable.",
@@ -669,6 +676,8 @@ export const AP_ARTICLES: HelpArticle[] = [
       "Si falla la carga del detalle después de confirmar, revisá la CxP y Transacciones antes de registrar otro pago: el pago puede haber quedado confirmado. Si ya figura, volvé a abrirlo; no lo dupliques.",
       "Si falta el borrador contable, revisá Contabilidad: una falla al generarlo no invalida el pago confirmado. No repitas el pago para generar el asiento.",
       "Consultar pagos de una CxP o cancelar pagos/cobranzas de obra exige acceso a esa obra además del permiso de la operación. PROJECT_FINANCE no habilita pagos corporativos.",
+      "Saldada puede combinar pagos y créditos NC. El detalle y el CSV separan caja aplicada, crédito y saldo; las proyecciones usan ese saldo neto.",
+      "La fecha de corte aparece en el encabezado Al (día/mes/año). En CxP empresa, Exportar antigüedad descarga el informe. Los totales se presentan por moneda. Los filtros de ese bloque no reemplazan los filtros del listado de obligaciones.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",

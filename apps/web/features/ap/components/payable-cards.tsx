@@ -56,7 +56,7 @@ export function PayableCards({
             <div className="flex shrink-0 flex-col items-end gap-1">
               <PayableStatusBadge status={p.status} />
               <span className="text-xs text-muted-foreground">
-                Pagada: <ObligationSettledCell status={p.status} balanceDue={p.balanceDue} />
+                Saldada: <ObligationSettledCell status={p.status} balanceDue={p.balanceDue} />
               </span>
             </div>
           </div>

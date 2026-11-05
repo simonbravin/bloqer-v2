@@ -36,14 +36,17 @@ export function AgingFilters({ preserveParams = [] }: AgingFiltersProps) {
   function update(key: string, value: string) {
     const params = new URLSearchParams(sp.toString());
     if (value) params.set(key, value); else params.delete(key);
+    params.delete("page");
     router.push(`${pathname}?${params.toString()}`);
   }
 
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="min-w-[200px] flex-1">
-        <Label className="text-xs text-muted-foreground mb-1 block">Buscar</Label>
+        <Label htmlFor="aging-search" className="text-xs text-muted-foreground mb-1 block">Buscar</Label>
         <Input
+          id="aging-search"
+          key={sp.get("search") ?? ""}
           placeholder="Cliente / factura / proyecto"
           defaultValue={sp.get("search") ?? ""}
           onBlur={(e) => update("search", e.target.value)}
@@ -60,9 +63,9 @@ export function AgingFilters({ preserveParams = [] }: AgingFiltersProps) {
       </div>
 
       <div className="min-w-[160px]">
-        <Label className="text-xs text-muted-foreground mb-1 block">Vencimiento</Label>
+        <Label htmlFor="aging-bucket" className="text-xs text-muted-foreground mb-1 block">Vencimiento</Label>
         <Select value={sp.get("bucket") ?? "_all"} onValueChange={(v) => update("bucket", v === "_all" ? "" : v)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger id="aging-bucket"><SelectValue /></SelectTrigger>
           <SelectContent>
             {BUCKET_OPTIONS.map((o) => (
               <SelectItem key={o.value || "_all"} value={o.value || "_all"}>{o.label}</SelectItem>
@@ -72,11 +75,12 @@ export function AgingFilters({ preserveParams = [] }: AgingFiltersProps) {
       </div>
 
       <div className="min-w-[160px]">
-        <Label className="text-xs text-muted-foreground mb-1 block">Al día</Label>
+        <Label htmlFor="aging-as-of" className="text-xs text-muted-foreground mb-1 block">Al día</Label>
         <Input
+          id="aging-as-of"
+          key={sp.get("asOfDate") ?? ""}
           type="date"
           defaultValue={sp.get("asOfDate") ?? ""}
-          onBlur={(e) => update("asOfDate", e.target.value)}
           onChange={(e) => update("asOfDate", e.target.value)}
         />
       </div>

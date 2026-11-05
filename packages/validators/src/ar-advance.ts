@@ -1,13 +1,14 @@
 import { z } from "zod";
-import { moneyAmountString } from "./money";
+import { moneyAmountString, optionalFxRateString } from "./money";
 import { collectNowSchema } from "./sales-invoice";
 import { idempotencyKeySchema } from "./idempotency";
 
 export const registerArAdvanceSchema = z.object({
   projectId: z.string().uuid(),
   clientContactId: z.string().uuid(),
-  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  issueDate: z.string().date("Fecha inválida"),
+  dueDate: z.string().date("Fecha inválida").optional(),
+  fxRate: optionalFxRateString,
   currency: z.string().length(3).default("ARS"),
   amount: moneyAmountString,
   notes: z.string().optional().nullable(),

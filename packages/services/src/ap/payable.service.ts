@@ -1,5 +1,8 @@
 import { prisma, Payable, Prisma } from "@bloqer/database";
 import { auditAp } from "./ap-audit";
+import { requireApCancellationReason } from "./ap-input";
+import { apInvoiceParents, apPayableParents, assertApPayableReadParents, assertApTransactionModules, stripApParents } from "./ap-integrity";
+import { lockProjectForMutation } from "../project/project-write-lock";
 import { assertApTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -38,20 +41,19 @@ export type PayableView = Omit<Payable, "originalAmount" | "paidAmount" | "credi
   creditedAmount: string;
   balanceDue: string;
   supplierName: string;
+  supplierInvoiceCode: string | null;
 } & FinancialClassFields;
 
-const PAYABLE_INVOICE_CLASS_INCLUDE = {
-  projectId: true,
-  purchaseOrderId: true,
-  subcontractCertificationId: true,
-  lines: {
-    where: { purchaseOrderLineId: { not: null } },
-    select: { id: true },
-    take: 1,
-  },
-} as const;
+const payableReadInclude = {
+  ...apPayableParents,
+  supplierInvoice: { include: { ...apInvoiceParents,
+    lines: { where: { purchaseOrderLineId: { not: null } }, select: { id: true }, take: 1 },
+  } },
+} as const satisfies Prisma.PayableInclude;
 
 type PayableInvoiceClassSelect = {
+  number?: number;
+  documentKind?: string;
   projectId: string | null;
   purchaseOrderId: string | null;
   subcontractCertificationId: string | null;
@@ -72,10 +74,7 @@ export async function getPayableById(
   }
   const p = await prisma.payable.findUnique({
     where: { id },
-    include: {
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-      supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
-    },
+    include: payableReadInclude,
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -89,7 +88,8 @@ export async function getPayableById(
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
   await requireProjectAccessIfPresent(p.projectId, ctx);
-  const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
+  assertApPayableReadParents(p, ctx);
+  const reconciled = p;
   const { supplierInvoice, ...rest } = { ...p, ...reconciled };
   return serializePayable({
     ...rest,
@@ -108,10 +108,7 @@ export async function getPayableBySupplierInvoiceId(
   }
   const p = await prisma.payable.findUnique({
     where: { supplierInvoiceId },
-    include: {
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-      supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
-    },
+    include: payableReadInclude,
   });
   if (!p) return null;
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -125,7 +122,8 @@ export async function getPayableBySupplierInvoiceId(
     throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
   }
   await requireProjectAccessIfPresent(p.projectId, ctx);
-  const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
+  assertApPayableReadParents(p, ctx);
+  const reconciled = p;
   const { supplierInvoice, ...rest } = { ...p, ...reconciled };
   return serializePayable({ ...rest, supplierInvoice });
 }
@@ -156,17 +154,15 @@ export async function listPayablesByProject(
   const [rows, total] = await Promise.all([
     prisma.payable.findMany({
       where,
-      include: {
-        supplierContact: { select: { legalName: true, fantasyName: true } },
-        supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
-      },
+      include: payableReadInclude,
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       skip,
       take,
     }),
     prisma.payable.count({ where }),
   ]);
-  const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
+  rows.forEach(row => assertApPayableReadParents(row, ctx));
+  const reconciled = rows;
   return {
     data: reconciled.map((p, i) => {
       const row = rows[i]!;
@@ -195,15 +191,10 @@ export async function summarizePayablesByProject(
 
   const rows = await prisma.payable.findMany({
     where: { projectId, tenantId: ctx.tenantId },
-    select: {
-      currency: true,
-      originalAmount: true,
-      paidAmount: true,
-      creditedAmount: true,
-      dueDate: true,
-      status: true,
-    },
+    include: apPayableParents,
   });
+
+  rows.forEach(row => assertApPayableReadParents(row, ctx));
 
   return aggregateOpenPayableBalances(rows);
 }
@@ -317,12 +308,7 @@ export async function listCompanyPayables(
   const [rows, total] = await Promise.all([
     prisma.payable.findMany({
       where,
-      include: {
-        supplierContact: { select: { legalName: true, fantasyName: true } },
-        supplierInvoice: {
-          select: { number: true, ...PAYABLE_INVOICE_CLASS_INCLUDE },
-        },
-      },
+      include: payableReadInclude,
       orderBy: [{ dueDate: dueDir }, { id: dueDir }],
       skip,
       take,
@@ -330,7 +316,8 @@ export async function listCompanyPayables(
     prisma.payable.count({ where }),
   ]);
 
-  const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
+  rows.forEach(row => assertApPayableReadParents(row, ctx));
+  const reconciled = rows;
   const data: CompanyPayableListRow[] = reconciled.map((p, i) => {
     const row = rows[i]!;
     const { supplierInvoice, ...payableWithContact } = row;
@@ -348,7 +335,7 @@ export async function listCompanyPayables(
     });
     return {
       ...base,
-      supplierInvoiceCode: number != null ? `FP-${String(number).padStart(5, "0")}` : null,
+      supplierInvoiceCode: number != null ? `${supplierInvoice?.documentKind === "DEBIT_NOTE" ? "ND" : "FP"}-${String(number).padStart(5, "0")}` : null,
     };
   });
 
@@ -390,23 +377,15 @@ export async function listPayablesFieldBoard(
   const [rows, total] = await Promise.all([
     prisma.payable.findMany({
       where,
-      include: {
-        supplierContact: { select: { legalName: true, fantasyName: true } },
-        supplierInvoice: {
-          select: {
-            number: true,
-            ...PAYABLE_INVOICE_CLASS_INCLUDE,
-          },
-        },
-        project: { select: { name: true } },
-      },
+      include: payableReadInclude,
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       take: PAYABLES_FIELD_FETCH_LIMIT,
     }),
     prisma.payable.count({ where }),
   ]);
 
-  const reconciled = await Promise.all(rows.map((r) => reconcilePayableStatusIfSettled(r, ctx)));
+  rows.forEach(row => assertApPayableReadParents(row, ctx));
+  const reconciled = rows;
   const mapped: PayablesFieldRow[] = reconciled.map((p, i) => {
     const row = rows[i]!;
     const { supplierInvoice, project, ...payableWithContact } = row;
@@ -426,7 +405,7 @@ export async function listPayablesFieldBoard(
       id: base.id,
       supplierName: base.supplierName,
       supplierInvoiceId: base.supplierInvoiceId,
-      supplierInvoiceCode: formatSupplierInvoiceCode(number),
+      supplierInvoiceCode: number != null ? `${supplierInvoice?.documentKind === "DEBIT_NOTE" ? "ND" : "FP"}-${String(number).padStart(5, "0")}` : formatSupplierInvoiceCode(number),
       projectId: base.projectId,
       projectName: project?.name ?? null,
       issueDateIso: utcIsoDate(base.issueDate),
@@ -456,10 +435,7 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
   }
   const p = await prisma.payable.findUnique({
     where: { id },
-    include: {
-      supplierContact: { select: { legalName: true, fantasyName: true } },
-      supplierInvoice: { select: PAYABLE_INVOICE_CLASS_INCLUDE },
-    },
+    include: payableReadInclude,
   });
   if (!p) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
   if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -469,12 +445,13 @@ export async function getCompanyPayableById(id: string, ctx: ServiceContext): Pr
   if (isCrossCompany(p.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
-  const reconciled = await reconcilePayableStatusIfSettled(p, ctx);
+  assertApPayableReadParents(p, ctx);
+  const reconciled = p;
   const { supplierInvoice, ...rest } = { ...p, ...reconciled };
   return serializePayable({ ...rest, supplierInvoice });
 }
 
-export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Payable> {
+export async function cancelPayable(id: string, ctx: ServiceContext, projectScopeId?: string, reason?: string): Promise<Payable> {
   await assertApTenantModule(ctx);
 
   const preview = await prisma.payable.findUnique({
@@ -489,12 +466,20 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
   if (!canMutateApForScope(ctx.roles, preview.projectId)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por pagar");
   }
+  if (projectScopeId !== undefined && preview.projectId !== projectScopeId) {
+    throw new ServiceError("FORBIDDEN", "La cuenta por pagar no pertenece a este proyecto");
+  }
+  await requireProjectAccessIfPresent(preview.projectId, ctx);
 
   const updated = await prisma.$transaction(async (tx) => {
+    if (preview.projectId) await lockProjectForMutation(tx, preview.projectId, ctx.tenantId);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${preview.companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
     const row = await tx.payable.findUnique({ where: { id } });
     if (!row) throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
     if (row.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (row.status === "CANCELLED") throw new ServiceError("CONFLICT", "La cuenta ya está cancelada");
+    if (row.status === "CANCELLED") return row;
+    const cancellationReason = requireApCancellationReason("ISSUED", reason);
 
     const supplierInvoice = await tx.supplierInvoice.findUnique({
       where: { id: row.supplierInvoiceId },
@@ -507,10 +492,11 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
       supplierInvoiceStatus: supplierInvoice?.status,
       activePaymentCount: activePayments,
       paidAmount: row.paidAmount,
+      creditedAmount: row.creditedAmount,
     });
 
     const payableCancel = await tx.payable.updateMany({
-      where: { id, status: { not: "CANCELLED" }, paidAmount: row.paidAmount },
+      where: { id, tenantId: ctx.tenantId, status: { not: "CANCELLED" }, paidAmount: row.paidAmount, creditedAmount: row.creditedAmount },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
     assertOptimisticRowUpdate(
@@ -525,46 +511,18 @@ export async function cancelPayable(id: string, ctx: ServiceContext): Promise<Pa
       "Payable",
       id,
       { projectId: updated.projectId, companyId: updated.companyId },
-      { after: { status: "CANCELLED", number: supplierInvoice?.number ?? null }, tx },
+      { after: { status: "CANCELLED", number: supplierInvoice?.number ?? null, cancellationReason }, tx },
     );
 
     return updated;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   return updated;
 }
 
 // ─── Serialization ────────────────────────────────────────────────────────────
 
-async function reconcilePayableStatusIfSettled(
-  payable: Payable,
-  ctx: ServiceContext,
-): Promise<Payable> {
-  if (payable.status === "PAID" || payable.status === "CANCELLED") return payable;
-  const balanceDue = computeObligationBalanceDue(
-    payable.originalAmount,
-    payable.paidAmount,
-    payable.creditedAmount,
-  );
-  if (hasOpenObligationBalance(balanceDue)) return payable;
 
-  const updated = await prisma.payable.updateMany({
-    where: {
-      id: payable.id,
-      tenantId: ctx.tenantId,
-      status: { notIn: ["PAID", "CANCELLED"] },
-      paidAmount: payable.paidAmount,
-      originalAmount: payable.originalAmount,
-    },
-    data: {
-      status: "PAID",
-      paidAmount: payable.originalAmount,
-      updatedBy: ctx.actorUserId,
-    },
-  });
-  if (updated.count === 0) return payable;
-  return { ...payable, status: "PAID", paidAmount: payable.originalAmount };
-}
 
 type RawPayable = Payable & {
   supplierContact: { legalName: string; fantasyName: string | null };
@@ -574,7 +532,7 @@ type RawPayable = Payable & {
 export function serializePayable(p: RawPayable): PayableView {
   const rawBalance = computeObligationBalanceDue(p.originalAmount, p.paidAmount, p.creditedAmount);
   const balanceDue = normalizeObligationBalanceDue(rawBalance);
-  const status = deriveObligationDisplayStatus(p.status, rawBalance, p.dueDate, undefined, p.paidAmount);
+  const status = deriveObligationDisplayStatus(p.status, rawBalance, p.dueDate, undefined, p.paidAmount, p.creditedAmount);
   const inv = p.supplierInvoice;
   const classFields = classFieldsForSupplierInvoice({
     projectId: inv?.projectId ?? p.projectId,
@@ -583,13 +541,14 @@ export function serializePayable(p: RawPayable): PayableView {
     subcontractCertificationId: inv?.subcontractCertificationId,
   });
   return {
-    ...p,
+    ...stripApParents(p),
     status,
     originalAmount: serializeMoneyDecimal(p.originalAmount),
     paidAmount:     serializeMoneyDecimal(p.paidAmount),
     creditedAmount: serializeMoneyDecimal(p.creditedAmount),
     balanceDue:     serializeMoneyDecimal(balanceDue),
     supplierName:   p.supplierContact.fantasyName ?? p.supplierContact.legalName,
+    supplierInvoiceCode: inv?.number != null ? `${inv.documentKind === "DEBIT_NOTE" ? "ND" : "FP"}-${String(inv.number).padStart(5, "0")}` : null,
     ...classFields,
   };
 }

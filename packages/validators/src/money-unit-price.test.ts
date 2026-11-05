@@ -1,8 +1,19 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { unitPriceString } from "./money";
+import { discountPctString, unitPriceString } from "./money";
 
 describe("unitPriceString", () => {
+  it("preserves canonical three-decimal fractions through repeated service validation", () => {
+    for (const [input, expected] of [["0.025", "0.0250"], ["1.234", "1.2340"], ["1234.567", "1234.5670"]]) {
+      assert.equal(unitPriceString.parse(input), expected);
+      assert.equal(unitPriceString.parse(unitPriceString.parse(input)), expected);
+    }
+  });
+  it("preserves canonical fractional discounts while keeping localized comma input", () => {
+    assert.equal(discountPctString.parse("1.234"), "1.2340");
+    assert.equal(discountPctString.parse("1,234"), "1.2340");
+    assert.equal(discountPctString.parse(discountPctString.parse("1.234")), "1.2340");
+  });
   it("accepts empty as zero (cleared DecimalInput)", () => {
     const r = unitPriceString.safeParse("");
     assert.equal(r.success, true);

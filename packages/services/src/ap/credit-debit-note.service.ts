@@ -5,6 +5,10 @@
  */
 import { Prisma, prisma, type CostCategory, type SupplierInvoice } from "@bloqer/database";
 import { productCalendarDateUtc } from "@bloqer/utils";
+import { createSupplierFiscalNoteSchema } from "@bloqer/validators";
+import { parseApInput, requireApCancellationReason } from "./ap-input";
+import { apInvoiceParents, assertApReadRoot, assertApInvoiceParents, assertApPayableMatchesInvoice, assertApTransactionModules, stripApParents } from "./ap-integrity";
+import { resolveInvoiceLineMoney } from "../finance/invoice-line-money";
 import {
   computeObligationBalanceDue,
   effectiveObligationCreditedAfterCredit,
@@ -14,11 +18,13 @@ import { resolveObligationStoredStatus } from "../finance/obligation-stored-stat
 import { assertOptimisticRowUpdate } from "../finance/optimistic-lock";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { assertNonnegativeInvoiceTaxes } from "../finance/invoice-tax-guards";
 import {
   serializeMoneyDecimal,
   serializeQtyDecimal,
   serializeRatePctDecimal,
   serializeUnitPriceDecimal,
+  serializeFxRateDecimal,
 } from "../finance/money-decimal";
 import { classFieldsForSupplierInvoice } from "../finance/document-class.service";
 import { isCrossCompany } from "../company-scope";
@@ -28,6 +34,8 @@ import { canMutateApForScope, canViewApProjectArea, canViewCompanyAp } from "./a
 import { auditAp } from "./ap-audit";
 import {
   assertSupplierInvoiceEditable,
+  assertSupplierInvoiceLinesWbs,
+  assertSupplierInvoiceLinesApu,
   type SupplierInvoiceView,
 } from "./supplier-invoice.service";
 import { recalcSupplierInvoiceTotals } from "./supplier-invoice-calc.service";
@@ -54,7 +62,7 @@ async function requireNoteMutationProject(
   ctx: ServiceContext,
   projectScopeId: string | undefined,
   permissionMessage: string,
-): Promise<string | null> {
+): Promise<{ projectId: string | null; companyId: string }> {
   const preview = await prisma.supplierInvoice.findUnique({
     where: { id },
     select: { tenantId: true, companyId: true, projectId: true },
@@ -69,7 +77,7 @@ async function requireNoteMutationProject(
   }
   if (!canMutateApForScope(ctx.roles, preview.projectId)) throw new ServiceError("FORBIDDEN", permissionMessage);
   await assertProjectGuardIfPresent(preview.projectId, ctx);
-  return preview.projectId;
+  return { projectId: preview.projectId, companyId: preview.companyId };
 }
 
 function sameProjectScope(
@@ -155,6 +163,7 @@ async function createNoteDraft(
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear notas de crédito/débito");
   }
   await assertProjectGuardIfPresent(parent.projectId, ctx);
+  input = parseApInput(createSupplierFiscalNoteSchema, input);
 
   if (kind === "CREDIT_NOTE") {
     if (!parent.payable || parent.payable.status === "CANCELLED") {
@@ -179,8 +188,23 @@ async function createNoteDraft(
     ? productCalendarDateUtc(new Date(input.dueDate))
     : parent.dueDate;
 
+  const parentId = parent.id;
+  const parentProjectId = parent.projectId;
+  const parentCompanyId = parent.companyId;
   const created = await prisma.$transaction(async (tx) => {
-    if (parent.projectId) await lockProjectForOperationalMutation(tx, parent.projectId, ctx);
+    if (parentProjectId) await lockProjectForOperationalMutation(tx, parentProjectId, ctx);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${parentCompanyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
+    const parent = await tx.supplierInvoice.findUnique({ where: { id: parentId }, include: { payable: true, lines: { orderBy: { sortOrder: "asc" } } } });
+    if (!parent || parent.tenantId !== ctx.tenantId || parent.companyId !== parentCompanyId || parent.projectId !== parentProjectId ||
+        parent.documentKind !== "INVOICE" || parent.status !== "ISSUED") {
+      throw new ServiceError("CONFLICT", "La factura de referencia cambió o ya no está emitida");
+    }
+    await assertApInvoiceParents(parent, tx);
+    if (kind === "CREDIT_NOTE") {
+      if (!parent.payable || parent.payable.status === "CANCELLED") throw new ServiceError("CONFLICT", "La factura no tiene cuenta por pagar activa");
+      assertApPayableMatchesInvoice(parent.payable, parent);
+    }
     const number = await nextSupplierDocumentNumber(tx, {
       tenantId: ctx.tenantId,
       companyId: parent.companyId,
@@ -232,7 +256,7 @@ async function createNoteDraft(
         taxRate: new Prisma.Decimal(l.taxRate ?? "0"),
         discountPct: new Prisma.Decimal(l.discountPct ?? "0"),
         sortOrder: l.sortOrder ?? i,
-        wbsNodeId: l.wbsNodeId ?? null,
+        wbsNodeId: l.wbsNodeId ?? parent.lines[0]?.wbsNodeId ?? null,
         costType: l.costType ?? null,
       }));
     } else if (kind === "CREDIT_NOTE" && parent.payable) {
@@ -269,12 +293,12 @@ async function createNoteDraft(
       }));
     }
 
+    await assertSupplierInvoiceLinesWbs(parent.projectId, sourceLines, ctx.tenantId, tx);
+    assertNonnegativeInvoiceTaxes({ taxAmount: new Prisma.Decimal(0), iibbPerceptionRate: note.iibbPerceptionRate,
+      iibbPerceptionAmount: new Prisma.Decimal(0), lines: sourceLines });
     for (const line of sourceLines) {
-      const lineSubtotal = line.quantity
-        .mul(line.unitPrice)
-        .mul(new Prisma.Decimal(1).minus(line.discountPct.div(100)));
-      const lineTax = lineSubtotal.mul(line.taxRate.div(100));
-      const lineTotal = lineSubtotal.plus(lineTax);
+      const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({ quantity: line.quantity,
+        unitPrice: line.unitPrice, taxRate: line.taxRate, discountPct: line.discountPct });
       await tx.supplierInvoiceLine.create({
         data: {
           invoiceId: note.id,
@@ -374,7 +398,9 @@ function mapNoteView(
         : "FP";
   const hasPoLineLink = inv.lines.some((l) => l.purchaseOrderLineId);
   return {
-    ...inv,
+    ...stripApParents(inv),
+    fxRate: serializeFxRateDecimal(inv.fxRate),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     code: `${prefix}-${String(inv.number).padStart(5, "0")}`,
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
@@ -430,10 +456,12 @@ export async function issueSupplierCreditNote(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de crédito");
+  const { projectId, companyId } = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de crédito");
 
   const result = await prisma.$transaction(async (tx) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -464,6 +492,9 @@ export async function issueSupplierCreditNote(
     if (inv.lines.length === 0) {
       throw new ServiceError("CONFLICT", "No se puede emitir una NC sin líneas");
     }
+    await assertApInvoiceParents(inv, tx);
+    await assertSupplierInvoiceLinesWbs(inv.projectId, inv.lines, ctx.tenantId, tx);
+    await assertSupplierInvoiceLinesApu(inv.projectId, inv.lines, ctx.tenantId, tx);
 
     assertInvoiceLetterOnIssue({
       invoiceLetter: inv.invoiceLetter,
@@ -471,8 +502,11 @@ export async function issueSupplierCreditNote(
       counterpartyCountry: inv.supplierContact.country,
       documentLabel: "nota de crédito",
     });
+    // D-133 requires explicit draft correction; recalculation must not erase a stored negative component.
+    assertNonnegativeInvoiceTaxes(inv);
     await recalcSupplierInvoiceTotals(tx, id);
     const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id } });
+    assertNonnegativeInvoiceTaxes({ ...refreshed, lines: inv.lines });
     if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El total de la NC debe ser mayor a 0");
     }
@@ -500,6 +534,7 @@ export async function issueSupplierCreditNote(
     if (!parent.payable || parent.payable.status === "CANCELLED") {
       throw new ServiceError("CONFLICT", "La factura no tiene cuenta por pagar activa.");
     }
+    assertApPayableMatchesInvoice(parent.payable, parent);
 
     const balanceDue = normalizeObligationBalanceDue(
       computeObligationBalanceDue(
@@ -601,7 +636,7 @@ export async function issueSupplierCreditNote(
     );
 
     return issued;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await ensureDraftJournalFromSupplierInvoice(result.id, ctx);
   return mapNoteView(result);
@@ -613,10 +648,12 @@ export async function issueSupplierDebitNote(
   projectScopeId?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de débito");
+  const { projectId, companyId } = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de débito");
 
   const result = await prisma.$transaction(async (tx) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -647,6 +684,9 @@ export async function issueSupplierDebitNote(
     if (inv.lines.length === 0) {
       throw new ServiceError("CONFLICT", "No se puede emitir una ND sin líneas");
     }
+    await assertApInvoiceParents(inv, tx);
+    await assertSupplierInvoiceLinesWbs(inv.projectId, inv.lines, ctx.tenantId, tx);
+    await assertSupplierInvoiceLinesApu(inv.projectId, inv.lines, ctx.tenantId, tx);
 
     assertInvoiceLetterOnIssue({
       invoiceLetter: inv.invoiceLetter,
@@ -654,8 +694,11 @@ export async function issueSupplierDebitNote(
       counterpartyCountry: inv.supplierContact.country,
       documentLabel: "nota de débito",
     });
+    // D-133 requires explicit draft correction; recalculation must not erase a stored negative component.
+    assertNonnegativeInvoiceTaxes(inv);
     await recalcSupplierInvoiceTotals(tx, id);
     const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id } });
+    assertNonnegativeInvoiceTaxes({ ...refreshed, lines: inv.lines });
     if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
       throw new ServiceError("CONFLICT", "El total de la ND debe ser mayor a 0");
     }
@@ -741,12 +784,15 @@ export async function cancelSupplierCreditNote(
   id: string,
   ctx: ServiceContext,
   projectScopeId?: string,
+  reason?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
-  const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para anular notas de crédito");
+  const { projectId, companyId } = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para anular notas de crédito");
 
   const result = await prisma.$transaction(async (tx) => {
     if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
+    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+    await assertApTransactionModules(tx, ctx);
     const inv = await tx.supplierInvoice.findUnique({
       where: { id },
       include: {
@@ -771,12 +817,17 @@ export async function cancelSupplierCreditNote(
       throw new ServiceError("VALIDATION", "El comprobante no es una nota de crédito.");
     }
     if (inv.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "La nota de crédito ya está anulada.");
+      return inv;
     }
+    const cancellationReason = requireApCancellationReason(inv.status, reason);
     if (inv.status === "DRAFT") {
-      const cancelled = await tx.supplierInvoice.update({
-        where: { id },
+      const flipped = await tx.supplierInvoice.updateMany({
+        where: { id, tenantId: ctx.tenantId, status: "DRAFT" },
         data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
+      });
+      assertOptimisticRowUpdate(flipped.count, "La nota de crédito cambió. Recargá e intentá de nuevo.");
+      const cancelled = await tx.supplierInvoice.findUniqueOrThrow({
+        where: { id },
         include: {
           lines: { orderBy: { sortOrder: "asc" } },
           supplierContact: { select: { legalName: true, fantasyName: true } },
@@ -788,8 +839,10 @@ export async function cancelSupplierCreditNote(
         "SupplierInvoice",
         id,
         { projectId: cancelled.projectId, companyId: cancelled.companyId },
-        { before: { status: "DRAFT" }, after: { status: "CANCELLED" }, tx },
+        { before: { status: "DRAFT" }, after: { status: "CANCELLED", cancellationReason }, tx },
       );
+      await cancelDraftJournalOnOperationalCancel(ctx, { companyId: inv.companyId,
+        sourceType: "SUPPLIER_CREDIT_NOTE", sourceId: id, sourceLabel: "la nota de crédito" }, tx);
       return cancelled;
     }
 
@@ -807,11 +860,22 @@ export async function cancelSupplierCreditNote(
         "La NC emitida no tiene aplicación de crédito activa.",
       );
     }
+    if (app.tenantId !== inv.tenantId || app.companyId !== inv.companyId || app.creditNoteSupplierInvoiceId !== inv.id ||
+        !app.amount.equals(inv.totalAmount)) {
+      throw new ServiceError("CONFLICT", "La nota y su aplicación de crédito tienen relaciones o importes inconsistentes");
+    }
 
     const payable = await tx.payable.findUnique({ where: { id: app.payableId } });
     if (!payable || payable.tenantId !== ctx.tenantId) {
       throw new ServiceError("NOT_FOUND", "Cuenta por pagar no encontrada");
     }
+    const parent = inv.referencedSupplierInvoiceId ? await tx.supplierInvoice.findUnique({ where: { id: inv.referencedSupplierInvoiceId } }) : null;
+    assertApPayableMatchesInvoice(payable, parent);
+    if (payable.companyId !== inv.companyId || payable.projectId !== inv.projectId || payable.currency !== inv.currency ||
+        payable.supplierContactId !== inv.supplierContactId) {
+      throw new ServiceError("CONFLICT", "La nota y la cuenta por pagar no corresponden al mismo documento");
+    }
+    await assertApInvoiceParents(inv, tx);
 
     const newCredited = payable.creditedAmount.minus(app.amount);
     if (newCredited.lessThan(0)) {
@@ -824,7 +888,7 @@ export async function cancelSupplierCreditNote(
     );
 
     const appFlip = await tx.payableCreditApplication.updateMany({
-      where: { id: app.id, status: "CONFIRMED" },
+      where: { id: app.id, tenantId: ctx.tenantId, status: "CONFIRMED" },
       data: { status: "CANCELLED", updatedBy: ctx.actorUserId },
     });
     assertOptimisticRowUpdate(appFlip.count, "La aplicación de crédito ya fue anulada.");
@@ -832,6 +896,7 @@ export async function cancelSupplierCreditNote(
     const payFlip = await tx.payable.updateMany({
       where: {
         id: payable.id,
+        tenantId: ctx.tenantId,
         paidAmount: payable.paidAmount,
         creditedAmount: payable.creditedAmount,
         status: { not: "CANCELLED" },
@@ -861,13 +926,15 @@ export async function cancelSupplierCreditNote(
       { projectId: cancelled.projectId, companyId: cancelled.companyId },
       {
         before: { status: "ISSUED" },
-        after: { status: "CANCELLED", creditedAmount: serializeMoneyDecimal(newCredited) },
+        after: { status: "CANCELLED", creditedAmount: serializeMoneyDecimal(newCredited), cancellationReason },
         tx,
       },
     );
 
+    await cancelDraftJournalOnOperationalCancel(ctx, { companyId: inv.companyId,
+      sourceType: "SUPPLIER_CREDIT_NOTE", sourceId: id, sourceLabel: "la nota de crédito" }, tx);
     return cancelled;
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 
   await cancelDraftJournalOnOperationalCancel(ctx, {
     companyId: result.companyId,
@@ -914,7 +981,7 @@ export async function listCreditDebitNotesForSupplierInvoice(
   await assertApTenantModule(ctx);
   const parent = await prisma.supplierInvoice.findUnique({
     where: { id: supplierInvoiceId },
-    select: { id: true, tenantId: true, companyId: true, projectId: true },
+    include: apInvoiceParents,
   });
   if (!parent || parent.tenantId !== ctx.tenantId) {
     throw new ServiceError("NOT_FOUND", "Factura de proveedor no encontrada");
@@ -933,6 +1000,7 @@ export async function listCreditDebitNotesForSupplierInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de proveedor");
   }
   await requireProjectAccessIfPresent(parent.projectId, ctx);
+  assertApReadRoot(parent, ctx);
 
   const notes = await prisma.supplierInvoice.findMany({
     where: {
@@ -941,18 +1009,11 @@ export async function listCreditDebitNotesForSupplierInvoice(
       documentKind: { in: ["CREDIT_NOTE", "DEBIT_NOTE"] },
     },
     orderBy: [{ issueDate: "desc" }, { number: "desc" }],
-    select: {
-      id: true,
-      number: true,
-      documentKind: true,
-      status: true,
-      totalAmount: true,
-      currency: true,
-      issueDate: true,
-    },
+    include: apInvoiceParents,
   });
 
   return notes.map((n) => {
+    assertApReadRoot(n, ctx);
     const prefix = n.documentKind === "CREDIT_NOTE" ? "NC" : "ND";
     return {
       id: n.id,

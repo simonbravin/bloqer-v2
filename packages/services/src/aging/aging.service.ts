@@ -7,6 +7,7 @@ import { deriveObligationDisplayStatus, hasOpenObligationBalance, obligationDays
 import { computeObligationBalanceDue } from "../finance/obligation-balance";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { requireProjectAccess } from "../security/access";
+import { assertObligationReadIntegrity } from "../finance/obligation-read-integrity";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -44,6 +45,7 @@ export type AgingItem = {
   daysOverdue: number;
   originalAmount: string;
   paidAmount: string;
+  creditedAmount: string;
   balanceDue: string;
   status: string;
   bucket: AgingBucket;
@@ -75,7 +77,8 @@ export type AgingTotals = {
 
 export type AgingReport = {
   asOfDate: string;
-  totals: AgingTotals;
+  /** A single currency, or zero for an empty report. Mixed currencies have no scalar total. */
+  totals: AgingTotals | null;
   byCurrency: Record<string, AgingTotals>;
   rows: AgingRow[];
 };
@@ -148,6 +151,7 @@ export async function getReceivableAgingReport(
   ctx: ServiceContext,
 ): Promise<AgingReport> {
   await assertArTenantModule(ctx);
+  assertAgingCompanyFilter(filters, ctx);
   // D-056: tenant-wide / company aging = company-finance roles; project filter = project area.
   if (filters.projectId) {
     if (!canViewArProjectArea(ctx.roles)) {
@@ -168,13 +172,15 @@ export async function getReceivableAgingReport(
       ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       ...(filters.companyId ? { companyId: filters.companyId } : {}),
       ...(filters.projectId ? { projectId: filters.projectId } : {}),
+      ...(filters.corporateOnly ? { projectId: null } : {}),
       ...(filters.contactId ? { clientContactId:  filters.contactId } : {}),
       ...(filters.currency  ? { currency:         filters.currency  } : {}),
     },
     include: {
-      clientContact: { select: { id: true, legalName: true, fantasyName: true } },
-      salesInvoice:  { select: { id: true, number: true, issueDate: true } },
-      project:       { select: { id: true, name: true } },
+      company: { select: { id: true, tenantId: true } },
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+      salesInvoice: { select: { id: true, number: true, issueDate: true, tenantId: true, companyId: true, projectId: true, clientContactId: true, currency: true, totalAmount: true, documentKind: true, status: true } },
+      project: { select: { id: true, tenantId: true, companyId: true, name: true } },
     },
     orderBy: { dueDate: "asc" },
   });
@@ -185,6 +191,11 @@ export async function getReceivableAgingReport(
   const curMap     = new Map<string, BucketAcc>();
 
   for (const r of rows) {
+    assertObligationReadIntegrity(r, {
+      company: r.company, contact: r.clientContact, contactId: r.clientContactId,
+      project: r.project, invoiceId: r.salesInvoiceId,
+      invoice: { ...r.salesInvoice, contactId: r.salesInvoice.clientContactId },
+    });
     const balanceDue = computeObligationBalanceDue(
       r.originalAmount,
       r.paidAmount,
@@ -204,7 +215,7 @@ export async function getReceivableAgingReport(
 
     if (filters.bucket && bucket !== filters.bucket) continue;
 
-    const status = deriveObligationDisplayStatus(r.status, balanceDue, dueDate, asOf, r.paidAmount);
+    const status = deriveObligationDisplayStatus(r.status, balanceDue, dueDate, asOf, r.paidAmount, r.creditedAmount);
 
     const item: AgingItem = {
       id:             r.id,
@@ -217,6 +228,7 @@ export async function getReceivableAgingReport(
       daysOverdue,
       originalAmount: serializeMoneyDecimal(r.originalAmount),
       paidAmount:     serializeMoneyDecimal(r.paidAmount),
+      creditedAmount: serializeMoneyDecimal(r.creditedAmount),
       balanceDue:     serializeMoneyDecimal(balanceDue),
       status,
       bucket,
@@ -245,6 +257,7 @@ export async function getPayableAgingReport(
   ctx: ServiceContext,
 ): Promise<AgingReport> {
   await assertApTenantModule(ctx);
+  assertAgingCompanyFilter(filters, ctx);
   // D-056: tenant-wide / corporate aging = company-finance roles; project filter = project area.
   if (filters.projectId) {
     if (!canViewApProjectArea(ctx.roles)) {
@@ -275,9 +288,10 @@ export async function getPayableAgingReport(
       ...(filters.currency ? { currency: filters.currency } : {}),
     },
     include: {
-      supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
-      supplierInvoice: { select: { id: true, number: true, issueDate: true } },
-      project:         { select: { id: true, name: true } },
+      company: { select: { id: true, tenantId: true } },
+      supplierContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+      supplierInvoice: { select: { id: true, number: true, issueDate: true, tenantId: true, companyId: true, projectId: true, supplierContactId: true, currency: true, totalAmount: true, documentKind: true, status: true } },
+      project: { select: { id: true, tenantId: true, companyId: true, name: true } },
     },
     orderBy: { dueDate: "asc" },
   });
@@ -288,6 +302,11 @@ export async function getPayableAgingReport(
   const curMap    = new Map<string, BucketAcc>();
 
   for (const p of rows) {
+    assertObligationReadIntegrity(p, {
+      company: p.company, contact: p.supplierContact, contactId: p.supplierContactId,
+      project: p.project, invoiceId: p.supplierInvoiceId,
+      invoice: { ...p.supplierInvoice, contactId: p.supplierInvoice.supplierContactId },
+    });
     const balanceDue = computeObligationBalanceDue(
       p.originalAmount,
       p.paidAmount,
@@ -307,7 +326,7 @@ export async function getPayableAgingReport(
 
     if (filters.bucket && bucket !== filters.bucket) continue;
 
-    const status = deriveObligationDisplayStatus(p.status, balanceDue, dueDate, asOf, p.paidAmount);
+    const status = deriveObligationDisplayStatus(p.status, balanceDue, dueDate, asOf, p.paidAmount, p.creditedAmount);
 
     const item: AgingItem = {
       id:             p.id,
@@ -320,6 +339,7 @@ export async function getPayableAgingReport(
       daysOverdue,
       originalAmount: serializeMoneyDecimal(p.originalAmount),
       paidAmount:     serializeMoneyDecimal(p.paidAmount),
+      creditedAmount: serializeMoneyDecimal(p.creditedAmount),
       balanceDue:     serializeMoneyDecimal(balanceDue),
       status,
       bucket,
@@ -367,5 +387,14 @@ function buildReport(
     items:        g.items,
   }));
 
-  return { asOfDate, totals: serializeAcc(globalAcc), byCurrency, rows };
+  return { asOfDate, totals: curMap.size > 1 ? null : serializeAcc(globalAcc), byCurrency, rows };
+}
+
+function assertAgingCompanyFilter(filters: AgingFilters, ctx: ServiceContext): void {
+  if (ctx.companyId && filters.companyId && ctx.companyId !== filters.companyId) {
+    throw new ServiceError("FORBIDDEN", "El filtro corresponde a otra empresa");
+  }
+  if (filters.projectId && filters.corporateOnly) {
+    throw new ServiceError("VALIDATION", "Elegí una obra o las obligaciones de empresa");
+  }
 }

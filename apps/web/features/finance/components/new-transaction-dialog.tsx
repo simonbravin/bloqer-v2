@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -42,6 +42,7 @@ import type { SettlementMethodValue } from "@/features/treasury/lib/settlement-m
 import { clientUploadDocument } from "@/features/documents/lib/client-upload-document";
 import { registerTransactionAction } from "@/app/(app)/finanzas/transacciones/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 export type SupplierOption = {
   id: string;
@@ -141,8 +142,8 @@ export function NewTransactionDialog({
   const [open, setOpen] = useState(defaultOpen);
   const [kind, setKind] = useState<TransactionKind>(canAp ? "AP_EXPENSE" : canAr ? "AR_INCOME" : "TREASURY_INFLOW");
   const [inflowMode, setInflowMode] = useState<InflowMode>(canAr ? "AR_INVOICE" : "CASH_ONLY");
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [attachment, setAttachment] = useState<File | null>(null);
   const { idempotencyKey: expenseKey, rotateIdempotencyKey: rotateExpenseKey } = useIdempotencyKey();
   const { idempotencyKey: incomeKey, rotateIdempotencyKey: rotateIncomeKey } = useIdempotencyKey();
@@ -283,6 +284,7 @@ export function NewTransactionDialog({
     setPayMethod("");
     setCollectMethod("");
     setInflowAccountId("");
+    setInflowAmount("");
     setCounterpartyContactId(null);
     setInflowMode(canAr ? "AR_INVOICE" : "CASH_ONLY");
   }
@@ -333,7 +335,7 @@ export function NewTransactionDialog({
       linkedEntityId: opts.invoiceId,
       idempotencyKey: attachmentKey,
       revalidatePaths: [opts.detailPath],
-    });
+    }).catch(() => ({ error: "Se perdió la conexión durante la subida" }));
     if ("error" in uploadRes) {
       toast.warning(
         opts.paidOrCollected
@@ -348,17 +350,22 @@ export function NewTransactionDialog({
   function finishAndNavigate(href: string) {
     setOpen(false);
     resetForm();
-    clearRegisterQueryParam();
-    router.refresh();
+    if (searchParams.get("register") === "ap") {
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("register");
+      const query = next.toString();
+      window.history.replaceState(window.history.state, "", query ? `${pathname}?${query}` : pathname);
+    }
     router.push(href);
   }
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     setError(null);
     const fd = new FormData(e.currentTarget);
 
-    startTransition(async () => {
+    void run(async () => {
       if (kind === "AP_EXPENSE") {
         if (!supplierContactId) {
           setError("Debe seleccionar a quién se le paga");
@@ -564,7 +571,7 @@ export function NewTransactionDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
-        if (!next && isPending) return;
+        if (!next && isBusy()) return;
         setOpen(next);
         if (!next) {
           resetForm();
@@ -578,10 +585,10 @@ export function NewTransactionDialog({
       <DialogContent
         className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl"
         onInteractOutside={(e) => {
-          if (isPending) e.preventDefault();
+          if (isBusy()) e.preventDefault();
         }}
         onEscapeKeyDown={(e) => {
-          if (isPending) e.preventDefault();
+          if (isBusy()) e.preventDefault();
         }}
       >
         <DialogHeader>
@@ -612,8 +619,9 @@ export function NewTransactionDialog({
         />
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
           {error && (
-            <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+            <p role="alert" className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
           )}
 
           {kind === "AP_EXPENSE" && (
@@ -992,6 +1000,7 @@ export function NewTransactionDialog({
               {isPending ? "Guardando..." : "Registrar"}
             </Button>
           </div>
+          </fieldset>
         </form>
       </DialogContent>
     </Dialog>

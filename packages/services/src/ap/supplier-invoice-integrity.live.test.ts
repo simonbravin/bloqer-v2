@@ -162,7 +162,7 @@ describe("AP integrity (isolated database)", {
     assert.deepEqual(await getPurchaseOrderBillingSummary(po.id, fx.ctx), before);
     const accruedAfter = await getProjectAccruedTotal(po.projectId, {}, fx.ctx);
     assert.equal(accruedAfter.minus(accruedBefore).toFixed(2), "-48.40");
-    await cancelSupplierCreditNote(credit.id, fx.ctx, po.projectId);
+    await cancelSupplierCreditNote(credit.id, fx.ctx, po.projectId, "Synthetic fiscal adjustment reversal");
     assert.equal((await prisma.payable.findUniqueOrThrow({ where: { id: fx.payableId } })).creditedAmount.toFixed(2), "0.00");
     assert.equal((await getProjectAccruedTotal(po.projectId, {}, fx.ctx)).minus(accruedBefore).toFixed(2), "12.10");
   });

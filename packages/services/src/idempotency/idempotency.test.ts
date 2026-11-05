@@ -45,6 +45,19 @@ describe("requireIdempotencyKey", () => {
 });
 
 describe("payload matchers", () => {
+  it("full-balance retries preserve manually captured FX and settlement metadata", () => {
+    const existing = { payableId: "p", accountId: "a", paymentDate: new Date("2026-11-05"), amount: new Prisma.Decimal("10"), currency: "USD", fxRate: new Prisma.Decimal("1200.123456"), paymentMethod: "TRANSFER", reference: "receipt-1", notes: "Settlement", status: "CONFIRMED" };
+    const input = { payableId: "p", accountId: "a", paymentDate: "2026-11-05", amount: undefined, payFullBalance: true, fxRate: "1200.123456", paymentMethod: "TRANSFER", reference: "receipt-1", notes: "Settlement" };
+    assert.equal(paymentReplayMatches(existing, input), true);
+    for (const delta of [{ fxRate: undefined }, { fxRate: "1200.123457" }, { paymentMethod: "CASH" }, { reference: "receipt-2" }, { notes: "Changed" }]) {
+      assert.equal(paymentReplayMatches(existing, { ...input, ...delta }), false);
+    }
+    const collection = { ...existing, receivableId: "r", collectionDate: existing.paymentDate };
+    const collectInput = { ...input, receivableId: "r", collectionDate: "2026-11-05", collectFullBalance: true };
+    assert.equal(collectionReplayMatches(collection, collectInput), true);
+    assert.equal(collectionReplayMatches(collection, { ...collectInput, notes: "Changed" }), false);
+    assert.equal(collectionReplayMatches(collection, { ...collectInput, fxRate: undefined }), false);
+  });
   it("collection replay preserves the manually entered FX even for full-balance collections", () => {
     const existing = { receivableId: "r", accountId: "a", collectionDate: new Date("2026-10-22"), amount: new Prisma.Decimal("10"), fxRate: new Prisma.Decimal("1200.123456"), status: "CONFIRMED" };
     const input = { receivableId: "r", accountId: "a", collectionDate: "2026-10-22", collectFullBalance: true, amount: undefined, fxRate: "1200.123456" };
@@ -543,6 +556,33 @@ function arExisting(overrides: Record<string, unknown> = {}) {
 }
 
 describe("registerApExpenseReplayMatches", () => {
+  it("preserves APU and explicit cost type while allowing a saved server-derived type", () => {
+    const stored = apExisting({ lines: [{ ...AP_LINE, costAnalysisLineId: "apu-a", costType: "LABOR" }] });
+    const line = { ...AP_INPUT.lines[0]!, costAnalysisLineId: "apu-a" };
+    assert.equal(registerApExpenseReplayMatches(stored, { ...AP_INPUT, lines: [line] }), true);
+    assert.equal(registerApExpenseReplayMatches(stored, { ...AP_INPUT, lines: [{ ...line, costType: "LABOR" }] }), true);
+    assert.equal(registerApExpenseReplayMatches(stored, { ...AP_INPUT, lines: [{ ...line, costType: "MATERIAL" }] }), false);
+    assert.equal(registerApExpenseReplayMatches(stored, { ...AP_INPUT, lines: [{ ...line, costAnalysisLineId: "apu-b" }] }), false);
+  });
+  it("matches a multiset when equal descriptions and positions have different UUID order", () => {
+    const second = { ...AP_LINE, quantity: new Prisma.Decimal("3") };
+    const firstInput = { ...AP_INPUT.lines[0]!, sortOrder: 0 };
+    const input = { ...AP_INPUT, lines: [firstInput, { ...firstInput, quantity: "3" }] };
+    assert.equal(registerApExpenseReplayMatches(apExisting({ lines: [second, AP_LINE] }), input), true);
+    assert.equal(registerApExpenseReplayMatches(apExisting({ lines: [AP_LINE, AP_LINE] }), input), false);
+    assert.equal(registerApExpenseReplayMatches(apExisting({ lines: [second, AP_LINE] }), { ...input, lines: [firstInput, { ...firstInput, quantity: "3", sortOrder: 1 }] }), false);
+  });
+  it("compares the perception rate, exact override and invoice FX", () => {
+    const stored = apExisting({ currency: "USD", fxRate: new Prisma.Decimal("1200.123456"), subtotal: new Prisma.Decimal("200"), iibbPerceptionRate: new Prisma.Decimal("3"), iibbPerceptionAmount: new Prisma.Decimal("6") });
+    const input = { ...AP_INPUT, currency: "USD", fxRate: "1200.123456", iibbPerceptionRate: "3" };
+    assert.equal(registerApExpenseReplayMatches(stored, input), true);
+    assert.equal(registerApExpenseReplayMatches(stored, { ...input, fxRate: "1200.123457" }), false);
+    assert.equal(registerApExpenseReplayMatches(stored, { ...input, iibbPerceptionRate: "4" }), false);
+    assert.equal(registerApExpenseReplayMatches(stored, { ...input, iibbPerceptionAmountOverride: "6.01" }), false);
+    const overridden = { ...stored, iibbPerceptionAmount: new Prisma.Decimal("6.01") };
+    assert.equal(registerApExpenseReplayMatches(overridden, { ...input, iibbPerceptionAmountOverride: "6.01" }), true);
+    assert.equal(registerApExpenseReplayMatches(overridden, input), false);
+  });
   it("matches header + lines, not total-only", () => {
     assert.equal(registerApExpenseReplayMatches(apExisting(), AP_INPUT), true);
     assert.equal(
@@ -622,6 +662,16 @@ describe("pickSameTransactionRow", () => {
 
 describe("pickCompositePayment / pickCompositeCollection", () => {
   const parent = new Date("2026-08-19T12:00:00.000Z");
+  it("uses the exact child operation key instead of adopting an independent later settlement", () => {
+    const row = { payableId: "p", accountId: "a", paymentDate: new Date("2026-08-19"), amount: new Prisma.Decimal("100"), status: "CONFIRMED", createdAt: parent, idempotencyKey: KEY_A };
+    const input = { accountId: "a", paymentDate: "2026-08-19", payFullBalance: true, idempotencyKey: KEY_B };
+    assert.equal(pickCompositePayment(parent, "p", [row], input), undefined);
+    assert.equal(pickCompositePayment(parent, "p", [row], { ...input, idempotencyKey: KEY_A }), row);
+    const collection = { ...row, receivableId: "r", collectionDate: row.paymentDate };
+    const collectNow = { accountId: "a", collectionDate: "2026-08-19", collectFullBalance: true, idempotencyKey: KEY_B };
+    assert.equal(pickCompositeCollection(parent, "r", [collection], collectNow), undefined);
+    assert.equal(pickCompositeCollection(parent, "r", [collection], { ...collectNow, idempotencyKey: KEY_A }), collection);
+  });
 
   it("without payNow only uses the composite window", () => {
     const later = {
@@ -672,6 +722,20 @@ describe("pickCompositePayment / pickCompositeCollection", () => {
 });
 
 describe("registerArSaleReplayMatches", () => {
+  it("does not reject an identical replay because tied lines were loaded in UUID order", () => {
+    const firstInput = { ...AR_INPUT.lines[0]!, sortOrder: 0 };
+    const second = { ...AR_LINE, quantity: new Prisma.Decimal("2") };
+    const input = { ...AR_INPUT, lines: [firstInput, { ...firstInput, quantity: "2" }] };
+    assert.equal(registerArSaleReplayMatches(arExisting({ lines: [second, AR_LINE] }), input), true);
+    assert.equal(registerArSaleReplayMatches(arExisting({ lines: [AR_LINE, AR_LINE] }), input), false);
+  });
+  it("compares AR perception and FX instead of replaying a different economic operation", () => {
+    const stored = arExisting({ currency: "USD", fxRate: new Prisma.Decimal("1200"), subtotal: new Prisma.Decimal("500"), iibbPerceptionRate: new Prisma.Decimal("3"), iibbPerceptionAmount: new Prisma.Decimal("15") });
+    const input = { ...AR_INPUT, currency: "USD", fxRate: "1200", iibbPerceptionRate: "3" };
+    assert.equal(registerArSaleReplayMatches(stored, input), true);
+    assert.equal(registerArSaleReplayMatches(stored, { ...input, fxRate: "1201" }), false);
+    assert.equal(registerArSaleReplayMatches(stored, { ...input, iibbPerceptionRate: "0" }), false);
+  });
   it("matches header + lines; CONFLICT on amount / client / project", () => {
     assert.equal(registerArSaleReplayMatches(arExisting(), AR_INPUT), true);
     assert.equal(

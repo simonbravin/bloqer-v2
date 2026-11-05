@@ -187,6 +187,17 @@ export async function createInternalTransfer(
       }),
     create: async () => {
       return prisma.$transaction(async (tx) => {
+    const sourcePreview = await tx.treasuryAccount.findUnique({ where: { id: input.sourceAccountId } });
+    const destPreview = await tx.treasuryAccount.findUnique({ where: { id: input.destinationAccountId } });
+    if (!sourcePreview || !destPreview) throw new ServiceError("NOT_FOUND", "Cuenta de transferencia no encontrada");
+    if (sourcePreview.tenantId !== ctx.tenantId || destPreview.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+    const lockedCompanyId = ctx.companyId ?? sourcePreview.companyId ?? destPreview.companyId ?? null;
+    if (!lockedCompanyId) throw new ServiceError("VALIDATION", "La transferencia requiere una empresa activa en el contexto o en las cuentas");
+    await assertPeriodOpenUnderCompanyLock(tx, {
+      tenantId: ctx.tenantId,
+      companyId: lockedCompanyId,
+      date: input.transferDate,
+    });
     // Stable lock order avoids deadlocks when two transfers cross the same accounts.
     const accountIds = [input.sourceAccountId, input.destinationAccountId].sort();
     for (const accountId of accountIds) {
@@ -227,11 +238,7 @@ export async function createInternalTransfer(
     // Canonical pair id = InternalTransfer.id so GL draft + cancel sync share one sourceId.
     const transferPairId = randomUUID();
 
-    await assertPeriodOpenUnderCompanyLock(tx, {
-      tenantId: ctx.tenantId,
-      companyId,
-      date: input.transferDate,
-    });
+    if (companyId !== lockedCompanyId) throw new ServiceError("CONFLICT", "La empresa de las cuentas cambió. Recargá e intentá de nuevo.");
 
     // Balance check under account locks: block negative balance on source (D4)
     const sourceBalance = await getAccountBalance(source.id, tx as never);

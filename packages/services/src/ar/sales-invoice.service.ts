@@ -1,5 +1,5 @@
 import { Prisma, prisma, SalesInvoice, SalesInvoiceStatus } from "@bloqer/database";
-import { createInvoiceFromCertificationSchema } from "@bloqer/validators";
+import { createSalesInvoiceSchema, updateSalesInvoiceSchema, createInvoiceFromCertificationSchema } from "@bloqer/validators";
 import {
   requireCertificationAccess,
   loadCertificationRecord,
@@ -15,6 +15,7 @@ import type {
   UpdateSalesInvoiceInput,
 } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
+import { arInvoiceParents, assertArInvoiceParents, arCancellationReason, assertArDateRange, parseArInput, stripArParents, assertArTransactionModules } from "./ar-integrity";
 import { _lockCertificationProject } from "../certification/certification-calc.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
@@ -25,6 +26,7 @@ import {
 } from "../finance/obligation-balance";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { assertNonnegativeInvoiceTaxes } from "../finance/invoice-tax-guards";
 import { resolveSuggestedArInvoiceLetter } from "../finance/resolve-suggested-invoice-letter";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
@@ -90,8 +92,10 @@ export type SalesInvoiceLineView = {
 
 export type SalesInvoiceWithLines = Omit<
   SalesInvoice,
-  "subtotal" | "taxAmount" | "totalAmount" | "iibbPerceptionRate" | "iibbPerceptionAmount"
+  "subtotal" | "taxAmount" | "totalAmount" | "iibbPerceptionRate" | "iibbPerceptionAmount" | "fxRate" | "amountArs"
 > & {
+  fxRate: string;
+  amountArs: string;
   subtotal: string;
   taxAmount: string;
   iibbPerceptionRate: string;
@@ -128,8 +132,9 @@ export async function getSalesInvoiceById(
   const inv = await prisma.salesInvoice.findUnique({
     where: { id },
     include: {
+      ...arInvoiceParents,
       lines: { orderBy: { sortOrder: "asc" } },
-      clientContact: { select: { legalName: true, fantasyName: true } },
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
@@ -145,6 +150,7 @@ export async function getSalesInvoiceById(
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a este proyecto");
   }
   await requireProjectAccessIfPresent(inv.projectId, ctx);
+  assertArInvoiceParents(inv, ctx);
   return serializeInvoice(inv);
 }
 
@@ -163,8 +169,9 @@ export async function getCompanySalesInvoiceById(
   const inv = await prisma.salesInvoice.findUnique({
     where: { id },
     include: {
+      ...arInvoiceParents,
       lines: { orderBy: { sortOrder: "asc" } },
-      clientContact: { select: { legalName: true, fantasyName: true } },
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
     },
   });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
@@ -179,6 +186,7 @@ export async function getCompanySalesInvoiceById(
   if (isCrossCompany(inv.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La factura no pertenece a la empresa activa");
   }
+  assertArInvoiceParents(inv, ctx);
   return serializeInvoice(inv);
 }
 
@@ -311,6 +319,7 @@ export async function listInvoicesByProject(
     projectId,
     tenantId: ctx.tenantId,
     status: { not: "CANCELLED" },
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(classCode ? salesInvoiceClassWhere(classCode) : {}),
     ...(filters?.documentKind ? { documentKind: filters.documentKind } : {}),
     ...(search ? salesInvoiceSearchWhere(search) : {}),
@@ -320,7 +329,8 @@ export async function listInvoicesByProject(
     prisma.salesInvoice.findMany({
       where,
       include: {
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        ...arInvoiceParents,
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
       orderBy: [{ number: "asc" }, { id: "asc" }],
       skip,
@@ -328,6 +338,7 @@ export async function listInvoicesByProject(
     }),
     prisma.salesInvoice.count({ where }),
   ]);
+  invoices.forEach((invoice) => assertArInvoiceParents(invoice, ctx));
   return { data: invoices.map(serializeInvoiceListRow), total };
 }
 
@@ -349,6 +360,7 @@ export async function countOpenSalesInvoicesByProject(
       tenantId: ctx.tenantId,
       status: "ISSUED",
       documentKind: "INVOICE",
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     },
   });
 }
@@ -358,10 +370,11 @@ export async function lockInvoiceNumberCompany(
   tx: Prisma.TransactionClient,
   companyId: string,
   tenantId: string,
+  requireActive = true,
 ) {
   await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${tenantId} FOR NO KEY UPDATE`;
   const company = await tx.company.findFirst({
-    where: { id: companyId, tenantId, status: "ACTIVE" },
+    where: { id: companyId, tenantId, ...(requireActive ? { status: "ACTIVE" as const } : {}) },
     select: { id: true },
   });
   if (!company)
@@ -411,6 +424,9 @@ export async function createSalesInvoice(
   input: CreateSalesInvoiceInput,
   ctx: ServiceContext,
 ): Promise<SalesInvoiceWithLines> {
+  input = parseArInput(createSalesInvoiceSchema, input);
+  assertArDateRange(input.issueDate, input.dueDate);
+  const inputFx = computeDocumentFxAmounts(input.currency, new Prisma.Decimal(0), input.fxRate ? new Prisma.Decimal(input.fxRate) : undefined);
   await assertArTenantModule(ctx);
   if (!canEditArArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para crear facturas");
@@ -441,8 +457,13 @@ export async function createSalesInvoice(
 
   const inv = await prisma.$transaction(
     async (tx) => {
-      if (input.projectId) await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+      if (input.projectId) {
+        const project = await lockProjectForOperationalMutation(tx, input.projectId, ctx);
+        if (project.companyId !== null && project.companyId !== companyId) throw new ServiceError("CONFLICT", "La empresa de la obra cambió. Recargá e intentá de nuevo.");
+      }
       await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
+      await assertContactRoleInTenant(input.clientContactId, "CLIENT", ctx.tenantId, { tx });
+      await assertArTransactionModules(tx, ctx);
       const maxNum = await tx.salesInvoice.aggregate({
         where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
         _max: { number: true },
@@ -459,6 +480,7 @@ export async function createSalesInvoice(
           issueDate: new Date(input.issueDate),
           dueDate: new Date(input.dueDate),
           currency: input.currency ?? "ARS",
+          fxRate: inputFx.fxRate,
           invoiceLetter: suggestedLetter,
           iibbPerceptionRate: new Prisma.Decimal(
             input.iibbPerceptionRate ?? DEFAULT_IIBB_PERCEPTION_RATE_PCT,
@@ -503,8 +525,9 @@ export async function createSalesInvoice(
       const inv = await tx.salesInvoice.findUniqueOrThrow({
         where: { id: created.id },
         include: {
+          ...arInvoiceParents,
           lines: { orderBy: { sortOrder: "asc" } },
-          clientContact: { select: { legalName: true, fantasyName: true } },
+          clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
         },
       });
 
@@ -522,6 +545,7 @@ export async function createSalesInvoice(
     { timeout: 30_000, maxWait: 10_000 },
   );
 
+  assertArInvoiceParents(inv, ctx);
   return serializeInvoice(inv);
 }
 
@@ -539,6 +563,7 @@ export async function createInvoiceFromCertification(
   if (!parsed.success)
     throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Datos inválidos");
   input = parsed.data;
+  assertArDateRange(input.issueDate, input.dueDate);
   const cert = await requireCertificationAccess(input.certificationId, ctx);
   if (projectScopeId !== undefined && cert.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La certificación no pertenece a este proyecto");
@@ -587,7 +612,7 @@ export async function createInvoiceFromCertification(
         await lockProjectForOperationalMutation(tx, cert.projectId, ctx);
         await lockInvoiceNumberCompany(tx, companyId, ctx.tenantId);
         await _lockCertificationProject(tx, cert.projectId);
-        await assertArTenantModule({ ...ctx });
+        await assertArTransactionModules(tx, ctx);
         const currentCert = await loadCertificationRecord(cert.id, ctx, tx);
         if (
           currentCert.updatedAt.getTime() !== cert.updatedAt.getTime() ||
@@ -690,8 +715,9 @@ export async function createInvoiceFromCertification(
         const createdInv = await tx.salesInvoice.findUniqueOrThrow({
           where: { id: created.id },
           include: {
+            ...arInvoiceParents,
             lines: { orderBy: { sortOrder: "asc" } },
-            clientContact: { select: { legalName: true, fantasyName: true } },
+            clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
           },
         });
 
@@ -716,6 +742,7 @@ export async function createInvoiceFromCertification(
     throw err;
   }
 
+  assertArInvoiceParents(inv, ctx);
   return serializeInvoice(inv);
 }
 
@@ -726,7 +753,8 @@ export async function updateSalesInvoice(
   projectScopeId?: string,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
-  const inv = await prisma.salesInvoice.findUnique({ where: { id } });
+  input = parseArInput(updateSalesInvoiceSchema, input);
+  const inv = await prisma.salesInvoice.findUnique({ where: { id }, include: arInvoiceParents });
   if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (inv.tenantId !== ctx.tenantId)
     throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
@@ -740,9 +768,12 @@ export async function updateSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para editar facturas");
   }
   await assertProjectGuardIfPresent(inv.projectId, ctx);
+  assertArInvoiceParents(inv, ctx);
   assertInvoiceEditable(inv);
+  if (inv.documentKind === "INVOICE") assertArDateRange(input.issueDate ?? inv.issueDate, input.dueDate ?? inv.dueDate);
 
-  const zeroTaxForLetter = input.invoiceLetter === "C" || input.invoiceLetter === "E";
+  const resultingLetter = input.invoiceLetter === undefined ? inv.invoiceLetter : input.invoiceLetter;
+  const zeroTaxForLetter = resultingLetter === "C" || resultingLetter === "E";
   const isFiscalNote = inv.documentKind === "CREDIT_NOTE" || inv.documentKind === "DEBIT_NOTE";
   const isCreditNote = inv.documentKind === "CREDIT_NOTE";
   if (input.lines && !isFiscalNote) {
@@ -758,12 +789,17 @@ export async function updateSalesInvoice(
   const updated = await prisma.$transaction(async (tx) => {
     if (inv.projectId) await lockProjectForOperationalMutation(tx, inv.projectId, ctx);
     await lockSalesInvoiceRow(tx, id, ctx.tenantId);
-    assertInvoiceEditable(await tx.salesInvoice.findUniqueOrThrow({ where: { id } }));
+    const current = await tx.salesInvoice.findUniqueOrThrow({ where: { id }, include: arInvoiceParents });
+    assertArInvoiceParents(current, ctx);
+    assertInvoiceEditable(current);
+    await assertArTransactionModules(tx, ctx);
+    if (current.documentKind === "INVOICE") assertArDateRange(input.issueDate ?? current.issueDate, input.dueDate ?? current.dueDate);
     const updatedInvoice = await tx.salesInvoice.update({
       where: { id },
       data: {
         issueDate: input.issueDate ? new Date(input.issueDate) : undefined,
         dueDate: input.dueDate ? new Date(input.dueDate) : undefined,
+        ...(input.fxRate !== undefined ? { fxRate: computeDocumentFxAmounts(current.currency, current.totalAmount, new Prisma.Decimal(input.fxRate)).fxRate } : {}),
         ...(input.invoiceLetter !== undefined ? { invoiceLetter: input.invoiceLetter } : {}),
         // NC credit amount is gross; never inherit/persist parent IIBB on draft edits.
         ...(isCreditNote
@@ -771,13 +807,14 @@ export async function updateSalesInvoice(
           : input.iibbPerceptionRate !== undefined
             ? { iibbPerceptionRate: new Prisma.Decimal(input.iibbPerceptionRate) }
             : {}),
-        notes: input.notes ?? undefined,
-        internalNotes: input.internalNotes ?? undefined,
+        notes: input.notes,
+        internalNotes: input.internalNotes,
         updatedBy: ctx.actorUserId,
       },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
     });
 
@@ -788,19 +825,20 @@ export async function updateSalesInvoice(
         const taxRate = zeroTaxForLetter
           ? new Prisma.Decimal(0)
           : new Prisma.Decimal(line.taxRate ?? "0");
-        const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
+        const { unitPriceNet, lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({
           quantity: new Prisma.Decimal(line.quantity),
           unitPrice: new Prisma.Decimal(line.unitPrice),
           taxRate,
           discountPct: new Prisma.Decimal(line.discountPct ?? "0"),
           previous: line.id ? previousById.get(line.id) : undefined,
+          pricesIncludeTax: zeroTaxForLetter ? false : input.pricesIncludeTax,
         });
         await tx.salesInvoiceLine.create({
           data: {
             invoiceId: id,
             description: line.description,
             quantity: new Prisma.Decimal(line.quantity),
-            unitPrice: new Prisma.Decimal(line.unitPrice),
+            unitPrice: unitPriceNet,
             taxRate,
             discountPct: new Prisma.Decimal(line.discountPct ?? "0"),
             lineSubtotal,
@@ -885,8 +923,9 @@ export async function updateSalesInvoice(
     return tx.salesInvoice.findUniqueOrThrow({
       where: { id },
       include: {
+        ...arInvoiceParents,
         lines: { orderBy: { sortOrder: "asc" } },
-        clientContact: { select: { legalName: true, fantasyName: true } },
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       },
     });
   }, { timeout: 30_000, maxWait: 10_000 });
@@ -929,14 +968,17 @@ export async function issueSalesInvoice(
       const inv = await tx.salesInvoice.findUnique({
         where: { id },
         include: {
+          ...arInvoiceParents,
           lines: true,
-          clientContact: { select: { legalName: true, fantasyName: true, country: true } },
-          company: { select: { country: true } },
+          clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true, country: true } },
+          company: { select: { id: true, tenantId: true, country: true } },
         },
       });
       if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
       if (inv.tenantId !== ctx.tenantId)
         throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+      assertArInvoiceParents(inv, ctx);
+      await assertArTransactionModules(tx, ctx);
       assertInvoiceEditable(inv);
 
       if (inv.documentKind !== "INVOICE") {
@@ -958,8 +1000,11 @@ export async function issueSalesInvoice(
         counterpartyCountry: inv.clientContact.country,
         documentLabel: "factura de venta",
       });
+      // D-133 requires explicit draft correction; recalculation must not erase a stored negative component.
+      assertNonnegativeInvoiceTaxes(inv);
       await recalcInvoiceTotals(tx as never, id);
       const refreshed = await tx.salesInvoice.findUniqueOrThrow({ where: { id } });
+      assertNonnegativeInvoiceTaxes({ ...refreshed, lines: inv.lines });
       if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
         throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
       }
@@ -1009,8 +1054,9 @@ export async function issueSalesInvoice(
       const issued = await tx.salesInvoice.findUniqueOrThrow({
         where: { id },
         include: {
+          ...arInvoiceParents,
           lines: { orderBy: { sortOrder: "asc" } },
-          clientContact: { select: { legalName: true, fantasyName: true } },
+          clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
         },
       });
 
@@ -1060,12 +1106,13 @@ export async function cancelSalesInvoice(
   id: string,
   ctx: ServiceContext,
   projectScopeId?: string,
+  reason?: string,
 ): Promise<SalesInvoice> {
   await assertArTenantModule(ctx);
 
   const invPreview = await prisma.salesInvoice.findUnique({
     where: { id },
-    select: { tenantId: true, projectId: true, companyId: true, status: true },
+    include: arInvoiceParents,
   });
   if (!invPreview) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
   if (invPreview.tenantId !== ctx.tenantId)
@@ -1080,9 +1127,11 @@ export async function cancelSalesInvoice(
     throw new ServiceError("FORBIDDEN", "Sin permisos para anular facturas");
   }
 
+  assertArInvoiceParents(invPreview, ctx);
+  await requireProjectAccessIfPresent(invPreview.projectId, ctx);
   const glParams = {
     companyId: invPreview.companyId,
-    sourceType: "SALES_INVOICE" as const,
+    sourceType: invPreview.documentKind === "DEBIT_NOTE" ? "SALES_DEBIT_NOTE" as const : "SALES_INVOICE" as const,
     sourceId: id,
     sourceLabel: "la factura de venta",
   };
@@ -1090,7 +1139,7 @@ export async function cancelSalesInvoice(
   if (invPreview.status === "CANCELLED") {
     // Repair orphan DRAFT left if a prior cancel succeeded but GL cleanup failed.
     await cancelDraftJournalOnOperationalCancel(ctx, glParams);
-    throw new ServiceError("CONFLICT", "La factura ya está anulada");
+    return prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
   }
 
   if (invPreview.status === "ISSUED") {
@@ -1099,13 +1148,16 @@ export async function cancelSalesInvoice(
 
   const updated = await prisma.$transaction(async (tx) => {
     if (invPreview.projectId) await lockProjectForMutation(tx, invPreview.projectId, ctx.tenantId);
-    const inv = await tx.salesInvoice.findUnique({ where: { id } });
+    await lockInvoiceNumberCompany(tx, invPreview.companyId, ctx.tenantId, false);
+    await assertArTransactionModules(tx, ctx);
+    await lockSalesInvoiceRow(tx, id, ctx.tenantId);
+    const inv = await tx.salesInvoice.findUnique({ where: { id }, include: arInvoiceParents });
     if (!inv) throw new ServiceError("NOT_FOUND", "Factura no encontrada");
     if (inv.tenantId !== ctx.tenantId)
       throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (inv.status === "CANCELLED") {
-      throw new ServiceError("CONFLICT", "La factura ya está anulada");
-    }
+    assertArInvoiceParents(inv, ctx);
+    if (inv.status === "CANCELLED") return inv;
+    const cancellationReason = arCancellationReason(inv.status, reason);
 
     const activeCollectionCount =
       inv.status === "ISSUED"
@@ -1197,11 +1249,12 @@ export async function cancelSalesInvoice(
       "SalesInvoice",
       id,
       { projectId: updated.projectId, companyId: updated.companyId },
-      { after: { number: inv.number, status: "CANCELLED" }, tx },
+      { after: { number: inv.number, status: "CANCELLED", cancellationReason }, tx },
     );
 
+    await cancelDraftJournalOnOperationalCancel(ctx, glParams, tx);
     return updated;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   await cancelDraftJournalOnOperationalCancel(ctx, glParams);
 
@@ -1218,7 +1271,9 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): ProjectSalesInvoiceLis
   const codePrefix =
     inv.documentKind === "CREDIT_NOTE" ? "NC" : inv.documentKind === "DEBIT_NOTE" ? "ND" : "FAC";
   return {
-    ...inv,
+    ...stripArParents(inv),
+    fxRate: inv.fxRate.toFixed(6),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     code: `${codePrefix}-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),
@@ -1255,7 +1310,9 @@ function serializeInvoice(inv: RawInvoice): SalesInvoiceWithLines {
   const codePrefix =
     inv.documentKind === "CREDIT_NOTE" ? "NC" : inv.documentKind === "DEBIT_NOTE" ? "ND" : "FAC";
   return {
-    ...inv,
+    ...stripArParents(inv),
+    fxRate: inv.fxRate.toFixed(6),
+    amountArs: serializeMoneyDecimal(inv.amountArs),
     code: `${codePrefix}-${String(inv.number).padStart(5, "0")}`,
     clientName: inv.clientContact.fantasyName ?? inv.clientContact.legalName,
     subtotal: serializeMoneyDecimal(inv.subtotal),

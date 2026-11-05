@@ -11,6 +11,7 @@ import {
 } from "../finance/receivable-list-filters";
 import { openReceivableBalanceWhere } from "../finance/obligation-balance-filter";
 import { auditAr } from "./ar-audit";
+import { arInvoiceParents, arReceivableParents, assertArReceivableParents, arCancellationReason, stripArParents, assertArTransactionModules } from "./ar-integrity";
 import { assertArTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
@@ -64,8 +65,9 @@ export async function getReceivableById(
   const r = await prisma.receivable.findUnique({
     where: { id },
     include: {
-      clientContact: { select: { legalName: true, fantasyName: true } },
-      salesInvoice: { select: { certificationId: true } },
+      ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+      salesInvoice: { include: arInvoiceParents },
     },
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
@@ -73,8 +75,10 @@ export async function getReceivableById(
   if (projectScopeId !== undefined && r.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
   }
+  assertArReceivableParents(r, ctx);
+  if (r.projectId === null && !canViewCompanyAr(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
   await requireProjectAccessIfPresent(r.projectId, ctx);
-  const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
+  const reconciled = r;
   return serializeReceivable({ ...r, ...reconciled });
 }
 
@@ -90,8 +94,9 @@ export async function getReceivableBySalesInvoiceId(
   const r = await prisma.receivable.findUnique({
     where: { salesInvoiceId },
     include: {
-      clientContact: { select: { legalName: true, fantasyName: true } },
-      salesInvoice: { select: { certificationId: true } },
+      ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+      salesInvoice: { include: arInvoiceParents },
     },
   });
   if (!r) return null;
@@ -99,8 +104,10 @@ export async function getReceivableBySalesInvoiceId(
   if (projectScopeId !== undefined && r.projectId !== projectScopeId) {
     throw new ServiceError("FORBIDDEN", "La cuenta por cobrar no pertenece a este proyecto");
   }
+  assertArReceivableParents(r, ctx);
+  if (r.projectId === null && !canViewCompanyAr(ctx.roles)) throw new ServiceError("FORBIDDEN", "Sin permisos para ver cuentas por cobrar a nivel empresa");
   await requireProjectAccessIfPresent(r.projectId, ctx);
-  const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
+  const reconciled = r;
   return serializeReceivable({ ...r, ...reconciled });
 }
 
@@ -129,14 +136,15 @@ export async function listReceivablesByProject(
     pageSize: filters?.pageSize,
   });
 
-  const where = { projectId, tenantId: ctx.tenantId };
+  const where = { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
 
   const [rows, total] = await Promise.all([
     prisma.receivable.findMany({
       where,
       include: {
-        clientContact: { select: { legalName: true, fantasyName: true } },
-        salesInvoice: { select: { number: true, certificationId: true } },
+        ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+        salesInvoice: { include: arInvoiceParents },
       },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       skip,
@@ -144,7 +152,8 @@ export async function listReceivablesByProject(
     }),
     prisma.receivable.count({ where }),
   ]);
-  const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
+  rows.forEach((r) => assertArReceivableParents(r, ctx));
+  const reconciled = rows;
   return {
     data: reconciled.map((p, i) => {
       const row = rows[i]!;
@@ -174,17 +183,20 @@ export async function listCollectibleReceivablesByProject(
     where: {
       projectId,
       tenantId: ctx.tenantId,
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       status: { in: [...ACTIVE_OBLIGATION_STATUSES] },
       ...openReceivableBalanceWhere(),
     },
     include: {
-      clientContact: { select: { legalName: true, fantasyName: true } },
-      salesInvoice: { select: { certificationId: true } },
+      ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+      salesInvoice: { include: arInvoiceParents },
     },
     orderBy: [{ dueDate: "asc" }, { id: "asc" }],
     take: MAX_COLLECTIBLE_RECEIVABLES,
   });
 
+  rows.forEach((r) => assertArReceivableParents(r, ctx));
   return rows
     .map(serializeReceivable)
     .filter((r) => new Prisma.Decimal(r.balanceDue).greaterThan(0));
@@ -260,9 +272,10 @@ export async function listCompanyReceivables(
     prisma.receivable.findMany({
       where,
       include: {
-        clientContact: { select: { legalName: true, fantasyName: true } },
-        salesInvoice: { select: { number: true, certificationId: true } },
-        project: { select: { code: true, name: true } },
+        ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+        salesInvoice: { include: arInvoiceParents },
+        project: { select: { id: true, tenantId: true, companyId: true, code: true, name: true } },
       },
       orderBy: [{ dueDate: dueDir }, { id: dueDir }],
       skip,
@@ -271,7 +284,8 @@ export async function listCompanyReceivables(
     prisma.receivable.count({ where }),
   ]);
 
-  const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
+  rows.forEach((r) => assertArReceivableParents(r, ctx));
+  const reconciled = rows;
   const data: CompanyReceivableListRow[] = reconciled.map((p, i) => {
     const r = rows[i]!;
     const base = serializeReceivable({ ...r, ...p });
@@ -301,8 +315,9 @@ export async function getCompanyReceivableById(
   const r = await prisma.receivable.findUnique({
     where: { id },
     include: {
-      clientContact: { select: { legalName: true, fantasyName: true } },
-      salesInvoice: { select: { number: true, certificationId: true } },
+      ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+      salesInvoice: { include: arInvoiceParents },
     },
   });
   if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
@@ -316,7 +331,8 @@ export async function getCompanyReceivableById(
   if (isCrossCompany(r.companyId, ctx)) {
     throw new ServiceError("FORBIDDEN", "La cuenta no pertenece a la empresa activa");
   }
-  const reconciled = await reconcileReceivableStatusIfSettled(r, ctx);
+  assertArReceivableParents(r, ctx);
+  const reconciled = r;
   const base = serializeReceivable({ ...r, ...reconciled });
   const num = r.salesInvoice?.number;
   return {
@@ -344,7 +360,7 @@ export async function listReceivablesFieldBoard(
 ): Promise<ReceivablesFieldBoardResult> {
   await assertArTenantModule(ctx);
 
-  const where: Prisma.ReceivableWhereInput = { tenantId: ctx.tenantId };
+  const where: Prisma.ReceivableWhereInput = { tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) };
 
   if ("projectId" in scope) {
     if (!canViewArProjectArea(ctx.roles)) {
@@ -363,9 +379,10 @@ export async function listReceivablesFieldBoard(
     prisma.receivable.findMany({
       where,
       include: {
-        clientContact: { select: { legalName: true, fantasyName: true } },
-        salesInvoice: { select: { number: true, certificationId: true } },
-        project: { select: { name: true } },
+        ...arReceivableParents,
+      clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+        salesInvoice: { include: arInvoiceParents },
+        project: { select: { id: true, tenantId: true, companyId: true, name: true, code: true } },
       },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       take: RECEIVABLES_FIELD_FETCH_LIMIT,
@@ -373,7 +390,8 @@ export async function listReceivablesFieldBoard(
     prisma.receivable.count({ where }),
   ]);
 
-  const reconciled = await Promise.all(rows.map((r) => reconcileReceivableStatusIfSettled(r, ctx)));
+  rows.forEach((r) => assertArReceivableParents(r, ctx));
+  const reconciled = rows;
   const mapped: ReceivablesFieldRow[] = reconciled.map((p, i) => {
     const row = rows[i]!;
     const { salesInvoice, project, ...receivableWithContact } = row;
@@ -453,7 +471,7 @@ export async function summarizeReceivablesByProject(
   await requireProjectAccess(projectId, ctx);
 
   const rows = await prisma.receivable.findMany({
-    where: { projectId, tenantId: ctx.tenantId },
+    where: { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) },
     select: {
       currency: true,
       originalAmount: true,
@@ -492,6 +510,7 @@ export async function cancelReceivable(
   id: string,
   ctx: ServiceContext,
   projectScopeId?: string,
+  reason?: string,
 ): Promise<Receivable> {
   await assertArTenantModule(ctx);
 
@@ -511,11 +530,15 @@ export async function cancelReceivable(
     throw new ServiceError("FORBIDDEN", "Sin permisos para cancelar cuentas por cobrar");
   }
 
+  await requireProjectAccessIfPresent(preview.projectId, ctx);
   const updated = await prisma.$transaction(async (tx) => {
-    const r = await tx.receivable.findUnique({ where: { id } });
+    await assertArTransactionModules(tx, ctx);
+    const r = await tx.receivable.findUnique({ where: { id }, include: arReceivableParents });
     if (!r) throw new ServiceError("NOT_FOUND", "Cuenta por cobrar no encontrada");
     if (r.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
-    if (r.status === "CANCELLED") throw new ServiceError("CONFLICT", "La cuenta ya está cancelada");
+    assertArReceivableParents(r, ctx);
+    if (r.status === "CANCELLED") return r;
+    const cancellationReason = arCancellationReason("ISSUED", reason);
 
     const salesInvoice = await tx.salesInvoice.findUnique({
       where: { id: r.salesInvoiceId },
@@ -546,11 +569,11 @@ export async function cancelReceivable(
       "Receivable",
       id,
       { projectId: updated.projectId, companyId: updated.companyId },
-      { after: { status: "CANCELLED", number: salesInvoice?.number ?? null }, tx },
+      { after: { status: "CANCELLED", number: salesInvoice?.number ?? null, cancellationReason }, tx },
     );
 
     return updated;
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 
   return updated;
 }
@@ -558,49 +581,20 @@ export async function cancelReceivable(
 type RawReceivable = Receivable & {
   clientContact: { legalName: string; fantasyName: string | null };
   salesInvoice?: { number?: number; certificationId?: string | null } | null;
-  project?: { code: string; name: string } | null;
 };
 
-async function reconcileReceivableStatusIfSettled(
-  receivable: Receivable,
-  ctx: ServiceContext,
-): Promise<Receivable> {
-  if (receivable.status === "PAID" || receivable.status === "CANCELLED") return receivable;
-  const balanceDue = computeObligationBalanceDue(
-    receivable.originalAmount,
-    receivable.paidAmount,
-    receivable.creditedAmount,
-  );
-  if (hasOpenObligationBalance(balanceDue)) return receivable;
 
-  const updated = await prisma.receivable.updateMany({
-    where: {
-      id: receivable.id,
-      tenantId: ctx.tenantId,
-      status: { notIn: ["PAID", "CANCELLED"] },
-      paidAmount: receivable.paidAmount,
-      originalAmount: receivable.originalAmount,
-    },
-    data: {
-      status: "PAID",
-      paidAmount: receivable.originalAmount,
-      updatedBy: ctx.actorUserId,
-    },
-  });
-  if (updated.count === 0) return receivable;
-  return { ...receivable, status: "PAID", paidAmount: receivable.originalAmount };
-}
 
 function serializeReceivable(r: RawReceivable): ReceivableView {
   const rawBalance = computeObligationBalanceDue(r.originalAmount, r.paidAmount, r.creditedAmount);
   const balanceDue = normalizeObligationBalanceDue(rawBalance);
-  const status = deriveObligationDisplayStatus(r.status, rawBalance, r.dueDate, undefined, r.paidAmount);
+  const status = deriveObligationDisplayStatus(r.status, rawBalance, r.dueDate, undefined, r.paidAmount, r.creditedAmount);
   const classFields = classFieldsForSalesInvoice({
     projectId: r.projectId,
     certificationId: r.salesInvoice?.certificationId,
   });
   return {
-    ...r,
+    ...stripArParents(r),
     status,
     originalAmount: serializeMoneyDecimal(r.originalAmount),
     paidAmount: serializeMoneyDecimal(r.paidAmount),

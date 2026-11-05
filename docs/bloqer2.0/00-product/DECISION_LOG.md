@@ -2038,6 +2038,17 @@
 - **Propuesta aprobada:** [alcance AG-08 de certificaciones negativas](../08-architecture/platform-audit/2026-11-05-ag-08-negative-certification-scope-proposal.md).
 - **Documentos afectados:** Q-079, CERTIFICATIONS, alcance pendiente, guía/ayuda y conocimiento AI.
 
+### D-133 — IVA y percepción IIBB no negativos en facturas y notas AR/AP
+
+- **Fecha:** 2026-11-05.
+- **Estado:** ACTIVA — aprobación explícita del Owner de la propuesta recomendada de AG-09 (Q-080): «Rechazar negativos, sin alterar históricos».
+- **Decisión:** las nuevas altas y ediciones de facturas AR/AP, NC/ND y composiciones de venta/gasto con caja inmediata rechazan alícuotas negativas de IVA de línea y percepción IIBB de cabecera, y ajustes explícitos negativos del importe de percepción. Cero sigue permitido. No se agrega un máximo de 100 ni un nuevo cálculo fiscal.
+- **Emisión:** un borrador persistido con impuestos negativos debe corregirse antes de emitir; el service revalida los impuestos actuales antes de crear deuda o aplicar crédito. El signo de una NC/ND lo define su tipo de documento según D-115, con importes positivos. Las retenciones conservan su circuito documentado y no se simulan mediante IVA o percepción negativos (BR-TAX-002/003).
+- **Históricos:** sin migración, recálculo ni regularización automática de documentos emitidos, pagos, créditos o movimientos existentes.
+- **Límites:** sin nuevos campos, estados, enums, dependencias ni migraciones; no habilita impuestos negativos con autorización especial ni un motor fiscal automático.
+- **Propuesta aprobada:** [IVA y percepción no negativos AG-09](../08-architecture/platform-audit/2026-11-05-ag-09-nonnegative-invoice-tax-proposal.md).
+- **Documentos afectados:** Q-080, SALES_AND_COLLECTIONS, EXPENSES_AND_PAYMENTS, ACCOUNTS_RECEIVABLE/PAYABLE, TAXES_AND_WITHHOLDINGS, guía/ayuda y conocimiento/evals AI.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

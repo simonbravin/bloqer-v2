@@ -32,6 +32,7 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import {
   revalidateProjectCostAndFinancePaths,
+  revalidateOperationalFinancePaths,
   revalidateTreasuryPaths,
 } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
@@ -79,6 +80,7 @@ function revalidateInvoicePaths(
 ) {
   const projectId = invoice.projectId;
   if (!projectId) return;
+  revalidateOperationalFinancePaths(projectId);
   revalidatePath(`/proyectos/${projectId}/facturas`);
   revalidatePath(`/proyectos/${projectId}/facturas/${invoice.id}`);
   revalidatePath(`/proyectos/${projectId}/facturas/${invoice.id}/editar`);
@@ -131,6 +133,7 @@ export async function registerProjectArSaleAction(
   }
   try {
     const result = await registerArSale({ ...parsed.data, projectId }, ctx);
+    revalidateOperationalFinancePaths(projectId);
     const invoiceLink = result.traceChain.find((l) => l.entityType === "SalesInvoice");
     const invoiceId = invoiceLink?.entityId ?? result.primaryEntityId;
     revalidatePath(`/proyectos/${projectId}/facturas`);
@@ -172,6 +175,7 @@ export async function registerArAdvanceAction(
   }
   try {
     const result = await registerArAdvance({ ...parsed.data, projectId }, ctx);
+    revalidateOperationalFinancePaths(projectId);
     const invoiceLink = result.traceChain.find((l) => l.entityType === "SalesInvoice");
     const invoiceId = invoiceLink?.entityId ?? result.primaryEntityId;
     revalidatePath(`/proyectos/${projectId}/facturas`);
@@ -222,11 +226,12 @@ export async function issueSalesInvoiceAction(
 export async function cancelSalesInvoiceAction(
   invoiceId: string,
   projectId: string,
+  reason?: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
-    const invoice = await cancelSalesInvoice(invoiceId, ctx, projectId);
+    const invoice = await cancelSalesInvoice(invoiceId, ctx, projectId, reason);
     revalidateInvoicePaths(invoice, invoice.certificationId ?? certificationId);
     revalidateTreasuryPaths();
     return { ok: true };
@@ -320,11 +325,12 @@ export async function issueSalesDebitNoteAction(
 export async function cancelSalesCreditNoteAction(
   invoiceId: string,
   projectId: string,
+  reason?: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
     const certificationId = await getInvoiceCertificationReference(invoiceId, projectId, ctx);
-    const note = await cancelSalesCreditNote(invoiceId, ctx, projectId);
+    const note = await cancelSalesCreditNote(invoiceId, ctx, projectId, reason);
     revalidateInvoicePaths(note, certificationId);
     return { ok: true };
   } catch (err) {
@@ -335,10 +341,12 @@ export async function cancelSalesCreditNoteAction(
 export async function cancelReceivableAction(
   receivableId: string,
   projectId: string,
+  reason?: string,
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    await cancelReceivable(receivableId, ctx, projectId);
+    await cancelReceivable(receivableId, ctx, projectId, reason);
+    revalidateOperationalFinancePaths(projectId);
     // The existing receivable getter can reconcile balances while reading. Avoid it for cache
     // discovery: the mutation has already authorized this exact project, including its descendants.
     revalidatePath(`/proyectos/${projectId}`, "layout");

@@ -1,5 +1,14 @@
 import { revalidatePath } from "next/cache";
 
+/** Financial documents affect parent/detail/Field views and derived documents in their scope. */
+export function revalidateOperationalFinancePaths(projectId?: string | null): void {
+  if (projectId) revalidatePath(`/proyectos/${projectId}`, "layout");
+  revalidatePath("/finanzas", "layout");
+  revalidatePath("/tesoreria", "layout");
+  revalidatePath("/contabilidad", "layout");
+  revalidatePath("/reportes", "layout");
+}
+
 /**
  * Paths that show derived project finance / cost KPIs.
  * Call after cash, AP/AR, procurement, cert, or inventory mutations.

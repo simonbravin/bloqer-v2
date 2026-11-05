@@ -5,7 +5,7 @@ import { CollectionForm } from "@/features/collections";
 import { getCurrentUser } from "@/lib/auth";
 import { PageShell } from "@/components/layout/page-shell";
 import { can } from "@bloqer/domain";
-import { getReceivableById, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
+import { getReceivableById, getTenantModuleGate, listSelectableTreasuryAccounts, ServiceError } from "@bloqer/services";
 import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
 
 interface PageProps {
@@ -28,6 +28,7 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
     roles: current.tenantCtx.roles,
   };
 
+  if (!(await getTenantModuleGate(ctx)).isEnabled("TREASURY")) redirect(`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`);
   let receivable;
   let allAccounts;
   try {
@@ -43,7 +44,7 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
   }
 
   const activeAccounts = allAccounts
-    .filter((a) => a.status === "ACTIVE")
+    .filter((a) => a.status === "ACTIVE" && (!a.companyId || a.companyId === receivable.companyId))
     .map((a) => ({ id: a.id, name: a.name, currency: a.currency }));
 
   const isBlocked = receivable.status === "PAID" || receivable.status === "CANCELLED";
@@ -65,7 +66,7 @@ export default async function CobrarReceivablePage({ params }: PageProps) {
         <div className="rounded-lg border bg-card p-6">
           <p className="text-sm text-muted-foreground">
             Esta cuenta por cobrar está en estado{" "}
-            <strong>{receivable.status === "PAID" ? "cobrada" : "cancelada"}</strong> y no admite
+            <strong>{receivable.status === "PAID" ? "saldada" : "cancelada"}</strong> y no admite
             nuevos cobros.{" "}
             <Link
               href={`/proyectos/${id}/cuentas-por-cobrar/${receivableId}`}

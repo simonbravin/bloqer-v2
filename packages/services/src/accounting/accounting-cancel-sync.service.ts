@@ -1,4 +1,4 @@
-import { prisma, type JournalEntrySourceType } from "@bloqer/database";
+import { prisma, type JournalEntrySourceType, type Prisma } from "@bloqer/database";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
 import { cancelJournalEntryAsAutomation } from "./journal-entry.service";
@@ -12,8 +12,8 @@ type CancelSyncParams = {
   enforceCompanyScope?: boolean;
 };
 
-async function findLinkedJournal(ctx: ServiceContext, params: CancelSyncParams) {
-  return prisma.journalEntry.findFirst({
+async function findLinkedJournal(ctx: ServiceContext, params: CancelSyncParams, db: Prisma.TransactionClient | typeof prisma = prisma) {
+  return db.journalEntry.findFirst({
     where: {
       tenantId: ctx.tenantId,
       companyId: params.companyId,
@@ -23,6 +23,11 @@ async function findLinkedJournal(ctx: ServiceContext, params: CancelSyncParams) 
     },
     select: { id: true, status: true, reversedByEntry: { select: { id: true } } },
   });
+}
+
+/** Operational callers lock Project first; Company serializes cancel, create and posting. */
+async function lockCancelCompany(tx: Prisma.TransactionClient, ctx: ServiceContext, params: CancelSyncParams): Promise<void> {
+  await tx.$queryRaw`SELECT id FROM companies WHERE id = ${params.companyId} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
 }
 
 function assertCompanyScope(ctx: ServiceContext, params: CancelSyncParams): void {
@@ -42,9 +47,11 @@ function assertCompanyScope(ctx: ServiceContext, params: CancelSyncParams): void
 export async function assertJournalAllowsOperationalCancel(
   ctx: ServiceContext,
   params: CancelSyncParams,
+  tx?: Prisma.TransactionClient,
 ): Promise<void> {
   assertCompanyScope(ctx, params);
-  const entry = await findLinkedJournal(ctx, params);
+  if (tx) await lockCancelCompany(tx, ctx, params);
+  const entry = await findLinkedJournal(ctx, params, tx);
   if (!entry) return;
   if (entry.status === "POSTED" && !entry.reversedByEntry) {
     throw new ServiceError(
@@ -55,16 +62,19 @@ export async function assertJournalAllowsOperationalCancel(
 }
 
 /**
- * Cancel a linked DRAFT journal after operational cancel committed.
+ * With tx, guard + DRAFT cancellation + audit participate in the operational transaction.
+ * Without tx, preserves the legacy cleanup path after operational commit.
  * No-op if none / already CANCELLED. Throws CONFLICT if a non-reversed POSTED journal
  * appeared after the pre-check (race) — never silently leave books linked to cancelled cash.
  */
 export async function cancelDraftJournalOnOperationalCancel(
   ctx: ServiceContext,
   params: CancelSyncParams,
+  tx?: Prisma.TransactionClient,
 ): Promise<void> {
   assertCompanyScope(ctx, params);
-  const entry = await findLinkedJournal(ctx, params);
+  if (tx) await lockCancelCompany(tx, ctx, params);
+  const entry = await findLinkedJournal(ctx, params, tx);
   if (!entry) return;
   if (entry.status === "POSTED" && !entry.reversedByEntry) {
     throw new ServiceError(
@@ -73,7 +83,7 @@ export async function cancelDraftJournalOnOperationalCancel(
     );
   }
   if (entry.status !== "DRAFT") return;
-  await cancelJournalEntryAsAutomation(entry.id, ctx, { skipPeriodLock: true });
+  await cancelJournalEntryAsAutomation(entry.id, ctx, { skipPeriodLock: true, tx });
 }
 
 /**

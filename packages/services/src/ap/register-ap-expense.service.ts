@@ -1,6 +1,8 @@
 import { Prisma, prisma } from "@bloqer/database";
 import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
-import type { RegisterApExpenseInput } from "@bloqer/validators";
+import { registerApExpenseSchema, type RegisterApExpenseInput } from "@bloqer/validators";
+import { parseApInput } from "./ap-input";
+import { apInvoiceParents, apPaymentParents, assertApReadRoot, assertApPaymentReadParents, assertApPayableMatchesInvoice, assertApInvoiceParents, assertApPayeeInTransaction, assertApTransactionModules } from "./ap-integrity";
 import { auditAp } from "./ap-audit";
 import { applyPaymentToPayable } from "./apply-payment-to-payable";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
@@ -8,6 +10,7 @@ import { buildFinancialHref } from "../finance/financial-trace.service";
 import type { FinancialTraceLink, RegisterTransactionResult } from "../finance/register-transaction.types";
 import { assertInvoiceLetterOnIssue } from "../finance/invoice-letter-guards";
 import { assertInvoiceLetterTaxConsistencyOnIssue } from "../finance/invoice-letter-tax-guards";
+import { assertNonnegativeInvoiceTaxes } from "../finance/invoice-tax-guards";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import { assertApTenantModule, assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { assertProjectAllowsOperationalMutation, lockProjectForOperationalMutation } from "../project/project-operational-guard";
@@ -27,6 +30,7 @@ import { serializeMoneyDecimal, toMoneyDecimal } from "../finance/money-decimal"
 import { assertApInvoicePayee } from "../contact/assert-contact-role";
 import {
   assertPurchaseOrderLinkableForAp,
+  assertInvoicePurchaseOrderScope,
   assertSupplierInvoiceLinesPoLink,
   assertSupplierInvoiceLinesWbs,
   assertSupplierInvoiceLinesApu,
@@ -109,6 +113,10 @@ type ApExpenseReplay = {
   issueDate: Date;
   dueDate: Date;
   currency: string;
+  fxRate: Prisma.Decimal;
+  iibbPerceptionRate: Prisma.Decimal;
+  subtotal: Prisma.Decimal;
+  iibbPerceptionAmount: Prisma.Decimal;
   invoiceLetter: string | null;
   purchaseOrderId: string | null;
   createdAt: Date;
@@ -122,6 +130,8 @@ type ApExpenseReplay = {
     sortOrder: number;
     wbsNodeId: string | null;
     purchaseOrderLineId: string | null;
+    costAnalysisLineId?: string | null;
+    costType?: string | null;
   }>;
   payments: Array<{
     id: string;
@@ -129,42 +139,51 @@ type ApExpenseReplay = {
     accountId: string;
     paymentDate: Date;
     amount: Prisma.Decimal;
+    fxRate: Prisma.Decimal;
+    idempotencyKey: string | null;
+    currency: string;
+    paymentMethod: string | null;
+    reference: string | null;
+    notes: string | null;
     status: string;
     createdAt: Date;
   }>;
 };
 
 async function loadApExpenseReplay(
-  tenantId: string,
+  ctx: ServiceContext,
   idempotencyKey: string,
   payNow?: {
     accountId: string;
     paymentDate: string;
     payFullBalance?: boolean;
     amount?: string | null;
+    fxRate?: string;
+    idempotencyKey?: string;
+    paymentMethod?: string | null;
+    reference?: string | null;
+    notes?: string | null;
   },
 ): Promise<ApExpenseReplay | null> {
+  const tenantId = ctx.tenantId;
   const invoice = await prisma.supplierInvoice.findFirst({
     where: { tenantId, idempotencyKey },
     include: {
+      ...apInvoiceParents,
       lines: { orderBy: [{ sortOrder: "asc" }, { id: "asc" }] },
-      payable: { select: { id: true } },
+      payable: true,
       apPayments: {
         where: { status: "CONFIRMED" },
         orderBy: { createdAt: "asc" },
-        select: {
-          id: true,
-          payableId: true,
-          accountId: true,
-          paymentDate: true,
-          amount: true,
-          status: true,
-          createdAt: true,
-        },
+        include: apPaymentParents,
       },
     },
   });
   if (!invoice) return null;
+  if (isCrossCompany(invoice.companyId, ctx)) throw new ServiceError("CONFLICT", "Esta operación ya se registró en otra empresa");
+  assertApReadRoot(invoice, ctx);
+  if (invoice.payable) assertApPayableMatchesInvoice(invoice.payable, invoice, false);
+  invoice.apPayments.forEach(payment => assertApPaymentReadParents(payment, ctx));
 
   let paymentId: string | undefined;
   let movementId: string | undefined;
@@ -207,6 +226,10 @@ async function loadApExpenseReplay(
     issueDate: invoice.issueDate,
     dueDate: invoice.dueDate,
     currency: invoice.currency,
+    fxRate: invoice.fxRate,
+    iibbPerceptionRate: invoice.iibbPerceptionRate,
+    subtotal: invoice.subtotal,
+    iibbPerceptionAmount: invoice.iibbPerceptionAmount,
     invoiceLetter: invoice.invoiceLetter,
     purchaseOrderId: invoice.purchaseOrderId,
     createdAt: invoice.createdAt,
@@ -311,6 +334,7 @@ export async function registerApExpense(
   if (input.purchaseOrderId && !projectId) {
     throw new ServiceError("VALIDATION", "Una OC solo puede vincularse a una factura de proyecto");
   }
+  input = parseApInput(registerApExpenseSchema, input);
 
   if (input.purchaseOrderId && projectId) {
     const po = await prisma.purchaseOrder.findUnique({ where: { id: input.purchaseOrderId } });
@@ -412,7 +436,13 @@ export async function registerApExpense(
   const idempotencyKey = requireIdempotencyKey(input.idempotencyKey);
 
   const replay = await withIdempotentCreate({
-    findExisting: () => loadApExpenseReplay(ctx.tenantId, idempotencyKey, input.payNow),
+    findExisting: async () => {
+      const existing = await loadApExpenseReplay(ctx, idempotencyKey, input.payNow);
+      if (existing && existing.outcome.companyId !== companyId) {
+        throw new ServiceError("CONFLICT", "Esta operación ya se registró en otra empresa");
+      }
+      return existing;
+    },
     payloadsMatch: (existing) => registerApExpenseReplayMatches(existing, input),
     create: async () => {
       let createdOutcome!: ApExpenseOutcome;
@@ -420,8 +450,17 @@ export async function registerApExpense(
         try {
           createdOutcome = await prisma.$transaction(async (tx) => {
             if (projectId) await lockProjectForOperationalMutation(tx, projectId, ctx);
-            // Share the company INVOICE sequence with manual and subcontract drafts.
             await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} AND "tenantId" = ${ctx.tenantId} FOR NO KEY UPDATE`;
+            await assertApTransactionModules(tx, ctx, Boolean(input.payNow));
+            const scope = { tenantId: ctx.tenantId, companyId, projectId, supplierContactId: input.supplierContactId,
+              purchaseOrderId: input.purchaseOrderId, currency: input.currency ?? "ARS" };
+            await assertApInvoiceParents(scope, tx);
+            await assertApPayeeInTransaction(tx, input.supplierContactId, ctx.tenantId, Boolean(input.purchaseOrderId));
+            await assertInvoicePurchaseOrderScope(scope, tx);
+            await assertSupplierInvoiceLinesWbs(projectId, input.lines, ctx.tenantId, tx);
+            await assertSupplierInvoiceLinesApu(projectId, input.lines, ctx.tenantId, tx);
+            await assertSupplierInvoiceLinesPoLink(projectId, input.purchaseOrderId, input.lines, ctx.tenantId, tx);
+            // Share the company INVOICE sequence with manual and subcontract drafts.
             const maxNum = await tx.supplierInvoice.aggregate({
               where: { tenantId: ctx.tenantId, companyId, documentKind: "INVOICE" },
               _max: { number: true },
@@ -484,11 +523,16 @@ export async function registerApExpense(
 
             await recalcSupplierInvoiceTotals(tx, created.id);
             const refreshed = await tx.supplierInvoice.findUniqueOrThrow({ where: { id: created.id } });
+            assertNonnegativeInvoiceTaxes({ ...refreshed, lines: input.lines.map(line => ({ taxRate: new Prisma.Decimal(line.taxRate) })) });
             if (refreshed.totalAmount.lessThanOrEqualTo(0)) {
               throw new ServiceError("CONFLICT", "El total de la factura debe ser mayor a 0");
             }
 
             const fx = computeDocumentFxAmounts(refreshed.currency, refreshed.totalAmount, refreshed.fxRate);
+            if (projectId && !refreshed.purchaseOrderId) {
+              const settings = await getCompanyProcurementSettingsForProject(projectId, ctx);
+              assertProjectApDirectSpendAllowed(settings, fx.amountArs, ctx);
+            }
             await tx.supplierInvoice.update({
               where: { id: created.id },
               data: {
@@ -535,6 +579,7 @@ export async function registerApExpense(
                   accountId: input.payNow.accountId,
                   amount: payAmount,
                   paymentDate: input.payNow.paymentDate,
+                  fxRate: input.payNow.fxRate,
                   notes: input.payNow.notes ?? null,
                   paymentMethod: input.payNow.paymentMethod ?? null,
                   reference: input.payNow.reference ?? null,
@@ -578,7 +623,7 @@ export async function registerApExpense(
               movementId,
               payAccountId,
             };
-          });
+          }, { maxWait: 10_000, timeout: 30_000 });
           break;
         } catch (err) {
           if (isIdempotencyUniqueConflict(err)) throw err;
@@ -592,7 +637,7 @@ export async function registerApExpense(
 
       await notifyApExpenseCreated(createdOutcome, ctx);
 
-      const row = await loadApExpenseReplay(ctx.tenantId, idempotencyKey, input.payNow);
+      const row = await loadApExpenseReplay(ctx, idempotencyKey, input.payNow);
       if (!row) {
         throw new ServiceError("CONFLICT", "No se pudo recargar la factura registrada");
       }

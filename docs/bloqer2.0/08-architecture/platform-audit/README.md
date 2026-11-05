@@ -4,7 +4,7 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Estado vigente al 05/11/2026
 
-**AG-00 a AG-07 publicadas; AG-08 cerrada localmente.** [Publicación AG-07](./2026-11-05-ag-07-publication.md): PR #5, Production d897aa7f, CI y acceso público comprobados. [Cierre AG-08](./2026-11-05-ag-08-certifications-subcontracts.md): 30 grupos corregidos, D-131/D-132 implementadas, 2.528 pruebas generales y 90 SQL distintos aprobados, tipos/lint/compilación y muestra visual aislada. AG-08 sin publicar; AG-09 no iniciada.
+**AG-00 a AG-08 publicadas; AG-09 cerrada localmente.** [Publicación AG-08](./2026-11-05-ag-08-publication.md): PR #6, Production e817d82f, CI PR/main y acceso público comprobados. [Cierre AG-08](./2026-11-05-ag-08-certifications-subcontracts.md): 30 grupos corregidos, D-131/D-132 implementadas, 2.528 pruebas generales y 90 SQL distintos aprobados, tipos/lint/compilación y muestra visual aislada. [Cierre AG-09](./2026-11-05-ag-09-ar-ap-payments.md): 30 grupos corregidos, 2.650 pruebas generales y 75 casos SQL distintos, tipos/lint, compilación y muestra visual. AG-10 no iniciada.
 
 ## Corte inicial: 03/11/2026
 
@@ -115,7 +115,7 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-06 — Publicada tras corrección y verificación.** [Cierre](./2026-11-04-ag-06-procurement.md) y [publicación PR4](./2026-11-04-ag-05-ag-06-publication.md). D-125/126/127/129 implementadas; cierre parcial formal separado D-128. D-127 productiva comprobada.
 - **AG-07 — Publicada.** [Cierre](./2026-11-04-ag-07-inventory.md), [publicación](./2026-11-05-ag-07-publication.md): PR #5, Production d897aa7f, CI y acceso público comprobados.
 - **AG-08 — Corregida y verificada localmente, sin publicar.** [Cierre](./2026-11-05-ag-08-certifications-subcontracts.md), [JSON](./2026-11-05-ag-08-certifications-subcontracts.json): 30 grupos, D-131/D-132, 2.528 pruebas/90 SQL, tipos/lint/compilación/visual e independencia. AG-09 espera indicación.
-- **AG-09 — Ventas y obligaciones. Pendiente.** Ventas, AR, cobranzas, AP y pagos, en contexto de proyecto y empresa cuando corresponda.
+- **AG-09 — Ventas y obligaciones. Corregida y verificada localmente.** [Cierre](./2026-11-05-ag-09-ar-ap-payments.md), [JSON](./2026-11-05-ag-09-ar-ap-payments.json).
 - **AG-10 — Tesorería y contabilidad. Pendiente.** Cuentas, movimientos, transferencias, conciliación, cierre de períodos y GL.
 - **AG-11 — Operación de campo. Pendiente.** Field, libro de obra, captura de evidencias y avance físico conectado con los demás módulos.
 - **AG-12 — Información y exportaciones. Pendiente.** Reportes, dashboards, filtros, agregados, exportaciones y PDF.
@@ -174,3 +174,9 @@ Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08
 - 2.528 pruebas generales aprobadas y 90 SQL distintos aislados; 36 suites live omitidas en el runner general se distinguen de esa selección. Tipos/lint/compilación final correctos, índice/5 recuperaciones sin LLM.
 - Revisión independiente y adendas, estados/fuentes/saldos/numeración, dos temas y viewports 1280×720/390×844. Capturas y fixtures sintéticos identificados; logout/tema/viewport/pestaña/servidor comprobados.
 - AG-08 permanece sin publicar. AG-09 no iniciada; esperar indicación del Owner. La rectificación eventual conserva diseño previo separado.
+
+## Corrida AG-09: 05/11/2026
+
+- [Informe](./2026-11-05-ag-09-ar-ap-payments.md) y [registro estructurado](./2026-11-05-ag-09-ar-ap-payments.json). 30 grupos corregidos en ventas, CxC, cobranzas, CxP y pagos.
+- 2.650 pruebas generales y 75 casos SQL distintos aprobados: 49 propios y 26 regresiones AG-08. Tipos, lint, compilación, muestra visual aislada y revisión independiente aprobadas.
+- Cierre local, sin publicación ni migraciones. AG-10 espera indicación del Owner.

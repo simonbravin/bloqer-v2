@@ -35,7 +35,7 @@ export const createCollectionSchema = z
     receivableId:       z.string().uuid(),
     fxRate:             optionalFxRateString,
     accountId:          z.string().uuid(),
-    collectionDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    collectionDate:     z.string().date("Fecha inválida"),
     amount:             optionalMoneyAmountString,
     /** Server applies stored balanceDue — [D-053]. */
     collectFullBalance: z.boolean().optional(),
