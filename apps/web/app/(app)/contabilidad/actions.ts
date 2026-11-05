@@ -60,8 +60,7 @@ export async function createAccountingAccountAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const acc = await createAccountingAccount(parsed.data, ctx);
-    revalidatePath("/contabilidad");
-    revalidatePath("/contabilidad/cuentas");
+    revalidatePath("/contabilidad", "layout");
     return { id: acc.id };
   } catch (err) {
     return handle(err);
@@ -76,8 +75,8 @@ export async function createJournalEntryAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     const entry = await createJournalEntry(parsed.data, ctx);
-    revalidatePath("/contabilidad");
-    revalidatePath("/contabilidad/asientos");
+    revalidatePath("/contabilidad", "layout");
+    revalidatePath("/dashboard");
     return { id: entry.id };
   } catch (err) {
     return handle(err);
@@ -93,8 +92,8 @@ export async function updateJournalEntryAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await updateJournalEntry(id, parsed.data, ctx);
-    revalidatePath("/contabilidad/asientos");
-    revalidatePath(`/contabilidad/asientos/${id}`);
+    revalidatePath("/contabilidad", "layout");
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -109,8 +108,8 @@ export async function postJournalEntryAction(
   if (!parsed.success) return { error: "Datos inválidos" };
   try {
     await postJournalEntry(parsed.data.id, ctx);
-    revalidatePath("/contabilidad/asientos");
-    revalidatePath(`/contabilidad/asientos/${parsed.data.id}`);
+    revalidatePath("/contabilidad", "layout");
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -125,8 +124,8 @@ export async function cancelJournalEntryAction(
   if (!parsed.success) return { error: "Datos inválidos" };
   try {
     await cancelJournalEntry(parsed.data.id, ctx);
-    revalidatePath("/contabilidad/asientos");
-    revalidatePath(`/contabilidad/asientos/${parsed.data.id}`);
+    revalidatePath("/contabilidad", "layout");
+    revalidatePath("/dashboard");
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -192,9 +191,8 @@ export async function reverseJournalEntryAction(
     const reverse = await reversePostedJournalEntry(parsed.data.id, ctx, {
       entryDate: parsed.data.entryDate,
     });
-    revalidatePath("/contabilidad/asientos");
-    revalidatePath(`/contabilidad/asientos/${parsed.data.id}`);
-    revalidatePath(`/contabilidad/asientos/${reverse.id}`);
+    revalidatePath("/contabilidad", "layout");
+    revalidatePath("/dashboard");
     return { reverseId: reverse.id };
   } catch (err) {
     return handle(err);

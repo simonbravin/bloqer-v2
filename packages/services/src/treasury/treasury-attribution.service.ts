@@ -5,6 +5,7 @@ import type { DashboardKpi } from "../dashboard/tenant-dashboard.service";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import type { ServiceContext } from "../types";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "./balance-affecting-statuses";
 
 export type TreasuryAttributionByCurrency = {
   currency: string;
@@ -36,7 +37,8 @@ export async function getTreasuryAttributionSummary(
   const rows = await prisma.accountMovement.findMany({
     where: {
       tenantId: ctx.tenantId,
-      status: "CONFIRMED",
+      account: { tenantId: ctx.tenantId },
+      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
       type: { in: ["INFLOW", "OUTFLOW"] },
     },
     select: {

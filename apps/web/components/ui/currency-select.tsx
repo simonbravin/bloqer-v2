@@ -48,6 +48,7 @@ export function CurrencySelect({
 }
 
 type CurrencyFilterSelectProps = {
+  id?: string;
   value: string;
   onValueChange: (code: string) => void;
   className?: string;
@@ -56,6 +57,7 @@ type CurrencyFilterSelectProps = {
 
 /** Filtros de reportes: permite “todas las monedas”. */
 export function CurrencyFilterSelect({
+  id,
   value,
   onValueChange,
   triggerClassName,
@@ -65,7 +67,7 @@ export function CurrencyFilterSelect({
       value={value || "_all"}
       onValueChange={(v) => onValueChange(v === "_all" ? "" : v)}
     >
-      <SelectTrigger className={cn("w-[min(100%,14rem)]", triggerClassName)}>
+      <SelectTrigger id={id} className={cn("w-[min(100%,14rem)]", triggerClassName)}>
         <SelectValue placeholder="Todas las monedas" />
       </SelectTrigger>
       <SelectContent>

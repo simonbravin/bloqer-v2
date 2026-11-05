@@ -19,12 +19,13 @@ import { lockProjectForMutation } from "../project/project-write-lock";
 import { requireProjectAccess, requireProjectAccessIfPresent } from "../security/access";
 
 import { ensureDraftJournalFromPayment } from "../accounting/accounting-auto-draft.service";
+import { lockAccountingCompany } from "../accounting/accounting-company-context";
 import {
   assertJournalAllowsOperationalCancel,
   cancelDraftJournalOnOperationalCancel,
 } from "../accounting/accounting-cancel-sync.service";
 import { assertFinancialPeriodOpen } from "../finance/period-lock.service";
-import { assertPeriodOpenUnderCompanyLock } from "../treasury/treasury-write-locks";
+import { lockTreasuryAccountRow } from "../treasury/treasury-write-locks";
 import { assertResourceTenant } from "../security/tenant-isolation";
 import {
   paymentReplayMatches,
@@ -446,7 +447,7 @@ export async function cancelPayment(
 
   // Hard stops before GL cancel — avoid orphaning DRAFT journals on RECONCILED conflict.
   const linkedMovementPreview = await prisma.accountMovement.findFirst({
-    where: { sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+    where: { tenantId: ctx.tenantId, sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
     select: { id: true, status: true },
   });
   if (linkedMovementPreview?.status === "RECONCILED") {
@@ -460,26 +461,47 @@ export async function cancelPayment(
 
   const updated = await prisma.$transaction(async (tx) => {
     if (paymentPreview.projectId) await lockProjectForMutation(tx, paymentPreview.projectId, ctx.tenantId);
+    await lockAccountingCompany(tx, ctx.tenantId, paymentPreview.companyId);
     const p = await tx.payment.findUnique({ where: { id } });
     if (!p) throw new ServiceError("NOT_FOUND", "Pago no encontrado");
     if (p.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
     if (projectScopeId !== undefined && p.projectId !== projectScopeId) {
       throw new ServiceError("FORBIDDEN", "El pago no pertenece a este proyecto");
     }
+    if (p.companyId !== paymentPreview.companyId || p.projectId !== paymentPreview.projectId) {
+      throw new ServiceError("CONFLICT", "El alcance del pago cambió. Recargá e intentá de nuevo.");
+    }
     if (p.status === "CANCELLED") {
       return p;
     }
 
-    await assertPeriodOpenUnderCompanyLock(tx, {
+    await assertFinancialPeriodOpen({
       tenantId: ctx.tenantId,
       companyId: p.companyId,
       date: p.paymentDate,
-    });
+    }, tx);
     await assertApTransactionModules(tx, ctx, true);
 
-    const linkedMovement = await tx.accountMovement.findFirst({
-      where: { sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+    await lockTreasuryAccountRow(tx, p.accountId, ctx.tenantId);
+    const account = await tx.treasuryAccount.findFirst({
+      where: { id: p.accountId, tenantId: ctx.tenantId },
+      select: { status: true, companyId: true, currency: true },
     });
+    if (!account || account.currency !== p.currency || (account.companyId && account.companyId !== p.companyId)) {
+      throw new ServiceError("CONFLICT", "La cuenta de tesorería del pago es inconsistente");
+    }
+    if (account.status === "CLOSED") {
+      throw new ServiceError("CONFLICT", "No se puede cancelar un pago en una cuenta de tesorería cerrada");
+    }
+
+    const linkedMovements = await tx.accountMovement.findMany({
+      where: { tenantId: ctx.tenantId, sourceType: "PAYMENT", sourceId: id, status: { in: ["CONFIRMED", "RECONCILED"] } },
+      take: 2,
+    });
+    if (linkedMovements.length !== 1) {
+      throw new ServiceError("CONFLICT", "El pago debe tener un único movimiento de tesorería activo");
+    }
+    const linkedMovement = linkedMovements[0]!;
     if (linkedMovement?.status === "RECONCILED") {
       throw new ServiceError(
         "CONFLICT",
@@ -493,8 +515,9 @@ export async function cancelPayment(
     if (p.tenantId !== payable.tenantId || p.companyId !== payable.companyId || p.projectId !== payable.projectId ||
         p.supplierContactId !== payable.supplierContactId || p.supplierInvoiceId !== payable.supplierInvoiceId ||
         p.currency !== payable.currency || !p.amount.greaterThan(0) || payable.status === "CANCELLED" ||
-        payable.paidAmount.lessThan(p.amount) || !linkedMovement || linkedMovement.tenantId !== p.tenantId ||
+        payable.paidAmount.lessThan(p.amount) || linkedMovement.tenantId !== p.tenantId ||
         linkedMovement.accountId !== p.accountId || linkedMovement.projectId !== p.projectId ||
+        linkedMovement.movementDate.getTime() !== p.paymentDate.getTime() ||
         linkedMovement.currency !== p.currency || !linkedMovement.amount.equals(p.amount) ||
         linkedMovement.type !== "OUTFLOW" ||
         (linkedMovement.companyId !== null && linkedMovement.companyId !== p.companyId)) {

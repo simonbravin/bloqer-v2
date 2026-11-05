@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
@@ -16,7 +17,7 @@ export function DeactivateMappingRuleButton({
 }) {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
-  const [pending, start] = useTransition();
+  const { pending, run } = useOperationalAction({ onError: setErr });
   const [open, setOpen] = useState(false);
 
   return (
@@ -43,7 +44,7 @@ export function DeactivateMappingRuleButton({
         variant="destructive"
         pending={pending}
         onConfirm={() => {
-          start(async () => {
+          return run(async () => {
             setErr(null);
             const res = await deactivateAccountingMappingRuleAction(ruleId, ruleCompanyId);
             if ("error" in res) {

@@ -1,13 +1,13 @@
 import { z } from "zod";
-import { moneyAmountString, positiveMoneyAmountString } from "./money";
+import { moneyAmountString, optionalFxRateString, positiveMoneyAmountString } from "./money";
 
 export const bankStatementLineDirectionEnum = z.enum(["CREDIT", "DEBIT"]);
 
 export const createBankReconciliationSchema = z
   .object({
     accountId: z.string().uuid(),
-    periodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    periodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    periodStart: z.string().date("Fecha desde inválida"),
+    periodEnd: z.string().date("Fecha hasta inválida"),
     openingBalance: moneyAmountString,
     closingBalance: moneyAmountString,
     notes: z.string().max(2000).optional().nullable(),
@@ -24,7 +24,7 @@ export const createBankReconciliationSchema = z
 
 export const addBankStatementLineSchema = z.object({
   reconciliationId: z.string().uuid(),
-  lineDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  lineDate: z.string().date("Fecha inválida"),
   description: z.string().trim().min(1).max(500),
   amount: positiveMoneyAmountString,
   direction: bankStatementLineDirectionEnum,
@@ -59,6 +59,7 @@ export const importBankStatementOfxSchema = z.object({
 export const createMovementFromStatementLineSchema = z.object({
   reconciliationId: z.string().uuid(),
   statementLineId: z.string().uuid(),
+  fxRate: optionalFxRateString,
 });
 
 /** Reopen CLOSED session with audited reason ([D-080]). */

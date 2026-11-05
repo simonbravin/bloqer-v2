@@ -11,7 +11,7 @@ export { ManualTreasuryAdjustmentForm } from "./components/manual-treasury-adjus
 export { SettlementFields } from "./components/settlement-fields";
 export { BankReconciliationForm } from "./components/bank-reconciliation-form";
 export { BankReconciliationWorkspace } from "./components/bank-reconciliation-workspace";
-export { DeactivateTreasuryAccountButton } from "./components/deactivate-treasury-account-button";
+export { TreasuryAccountStatusButton } from "./components/treasury-account-status-button";
 export { bankReconciliationStatusLabel } from "./lib/bank-reconciliation-status-label";
 export {
   accountMovementStatusLabel,

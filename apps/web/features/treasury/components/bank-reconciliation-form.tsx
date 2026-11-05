@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
@@ -30,20 +31,22 @@ interface Props {
 
 export function BankReconciliationForm({ accounts }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [accountId, setAccountId] = useState("");
   const [openingBalance, setOpeningBalance] = useState("");
   const [closingBalance, setClosingBalance] = useState("");
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     if (!accountId) {
       setError("Seleccioná una cuenta");
       return;
     }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       const res = await createBankReconciliationAction({
         accountId,
         periodStart: fd.get("periodStart") as string,
@@ -137,7 +140,7 @@ export function BankReconciliationForm({ accounts }: Props) {
       </div>
 
       <div className="flex justify-end gap-2">
-        <Button type="button" variant="outline" onClick={() => router.back()}>
+        <Button type="button" variant="outline" disabled={isPending} onClick={() => router.back()}>
           Cancelar
         </Button>
         <Button type="submit" disabled={isPending}>

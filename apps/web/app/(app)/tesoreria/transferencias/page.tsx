@@ -4,12 +4,11 @@ import { Suspense } from "react";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { Pagination } from "@/components/ui/pagination";
 import { getCurrentUser } from "@/lib/auth";
-import { listInternalTransfers, ServiceError } from "@bloqer/services";
+import { listInternalTransfers, resolvePagination, ServiceError } from "@bloqer/services";
 import { InternalTransferListSection } from "@/features/treasury/components/internal-transfer-list-section";
 import { canEditInternalTransfersUi } from "@/features/treasury/lib/treasury-edit-gates";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
-import { parsePage } from "@/lib/parse-page";
 
 const PAGE_SIZE = 20;
 
@@ -29,7 +28,7 @@ export default async function TransferenciasPage({
   };
 
   const sp = await searchParams;
-  const page = parsePage(sp.page);
+  const { page } = resolvePagination({ page: Number(sp.page ?? 1), pageSize: PAGE_SIZE });
 
   let transfersResult;
   try {
@@ -75,7 +74,7 @@ export default async function TransferenciasPage({
       </div>
 
       <Suspense fallback={null}>
-        <InternalTransferListSection transfers={transfers} />
+        <InternalTransferListSection transfers={transfers} canCancel={canEdit} />
       </Suspense>
       <Pagination page={page} pageSize={PAGE_SIZE} total={total} />
     </PageShell>

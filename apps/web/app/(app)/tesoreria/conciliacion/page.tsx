@@ -4,6 +4,7 @@ import { can } from "@bloqer/domain";
 import { canEditBankReconciliationUi } from "@/features/treasury/lib/treasury-edit-gates";
 import {
   listBankReconciliations,
+  resolvePagination,
   listTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
@@ -27,7 +28,6 @@ import { ReportExportActions } from "@/features/reports";
 import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
-import { parsePage } from "@/lib/parse-page";
 import { bankReconciliationStatusLabel } from "@/features/treasury/lib/bank-reconciliation-status-label";
 
 const PAGE_SIZE = 20;
@@ -92,7 +92,7 @@ export default async function ConciliacionListPage({
   }
 
   const sp = await searchParams;
-  const page = parsePage(sp.page);
+  const { page } = resolvePagination({ page: Number(sp.page ?? 1), pageSize: PAGE_SIZE });
   const status = isStatusFilter(sp.estado) ? sp.estado : undefined;
   const cuentaRaw = sp.cuenta?.trim() || "";
   const accountId =

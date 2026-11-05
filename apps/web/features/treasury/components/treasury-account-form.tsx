@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -12,6 +12,9 @@ import {
 } from "@/components/ui/select";
 import { createTreasuryAccountAction } from "@/app/(app)/tesoreria/actions";
 import { CurrencySelect } from "@/components/ui/currency-select";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
+import { isZeroMoneyAmount } from "@/lib/format-money";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 
 interface Props {
   accounts?: never;
@@ -20,17 +23,21 @@ interface Props {
 export function TreasuryAccountForm(_props: Props) {
   void _props;
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [type, setType] = useState<string>("");
   const [currency, setCurrency] = useState("ARS");
   const [openingBalance, setOpeningBalance] = useState("0");
+  const [openingFxRate, setOpeningFxRate] = useState("");
+  const needsFx = currency !== "ARS" && !isZeroMoneyAmount(openingBalance);
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!type) { setError("Debe seleccionar un tipo de cuenta"); return; }
+    if (isBusy()) return;
+    if (!type) { setError("Seleccioná un tipo de cuenta"); return; }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       const res = await createTreasuryAccountAction({
         name:           fd.get("name") as string,
         type:           type as "BANK" | "CASH" | "DIGITAL_WALLET" | "OTHER",
@@ -39,6 +46,7 @@ export function TreasuryAccountForm(_props: Props) {
         accountNumber:  (fd.get("accountNumber") as string) || null,
         alias:          (fd.get("alias") as string) || null,
         openingBalance: (fd.get("openingBalance") as string) || "0",
+        openingFxRate:  needsFx ? openingFxRate : undefined,
         notes:          (fd.get("notes") as string) || null,
       });
       if ("error" in res) {
@@ -53,19 +61,19 @@ export function TreasuryAccountForm(_props: Props) {
     <div className="rounded-lg border bg-card p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>
         )}
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="col-span-2 space-y-1">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="name">Nombre</Label>
             <Input id="name" name="name" required placeholder="Ej. Caja chica oficina" />
           </div>
 
           <div className="space-y-1">
-            <Label>Tipo</Label>
+            <Label htmlFor="treasury-account-type">Tipo</Label>
             <Select onValueChange={setType} value={type}>
-              <SelectTrigger>
+              <SelectTrigger id="treasury-account-type">
                 <SelectValue placeholder="Seleccionar tipo…" />
               </SelectTrigger>
               <SelectContent>
@@ -79,7 +87,10 @@ export function TreasuryAccountForm(_props: Props) {
 
           <div className="space-y-1">
             <Label htmlFor="currency">Moneda</Label>
-            <CurrencySelect id="currency" value={currency} onValueChange={setCurrency} />
+            <CurrencySelect id="currency" value={currency} onValueChange={(next) => {
+              setCurrency(next);
+              setOpeningFxRate("");
+            }} />
           </div>
 
           <div className="space-y-1">
@@ -107,10 +118,13 @@ export function TreasuryAccountForm(_props: Props) {
               placeholder="0,00"
             />
             <p className="text-xs text-muted-foreground">
-              Si el saldo inicial es mayor a 0, necesitás una empresa en el contexto de tu membresía
+              Si el saldo inicial es distinto de cero, necesitás una empresa en el contexto de tu membresía
               (el período financiero se valida contra esa empresa).
             </p>
           </div>
+          {needsFx ? (
+            <ManualFxField currency={currency} value={openingFxRate} onValueChange={setOpeningFxRate} id="opening-fx-rate" disabled={isPending} />
+          ) : null}
         </div>
 
         <div className="space-y-1">
@@ -119,7 +133,7 @@ export function TreasuryAccountForm(_props: Props) {
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => router.back()}>
             Cancelar
           </Button>
           <Button type="submit" disabled={isPending}>

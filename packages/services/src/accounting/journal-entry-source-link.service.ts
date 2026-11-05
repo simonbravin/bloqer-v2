@@ -1,11 +1,12 @@
 import { prisma } from "@bloqer/database";
 import type { JournalEntrySourceType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import { canViewApProjectArea, canViewCompanyAp } from "../ap/ap-access";
-import { canViewArProjectArea, canViewCompanyAr } from "../ar/ar-access";
+import { formatDbDate, formatGroupedDecimal } from "@bloqer/utils";
+import { isCrossCompany } from "../company-scope";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext } from "../types";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
+import { canViewJournalSource } from "./accounting-source-access";
 
 /** Read-only traceability for journal detail (Phase 11D). No mutations. */
 export type JournalEntrySourceLink = {
@@ -20,16 +21,15 @@ export type JournalEntrySourceLink = {
 };
 
 function fmtDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return formatDbDate(d);
 }
 
 function fmtMoneyAr(amount: { toString(): string }, currency: string): string {
-  const s = serializeMoneyDecimal(amount);
-  const n = Number(s);
-  const num = Number.isFinite(n)
-    ? n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : s;
-  return `${num} ${currency}`;
+  return `${formatGroupedDecimal(serializeMoneyDecimal(amount), 2)} ${currency}`;
+}
+
+function hiddenSource(kindLabel: string): JournalEntrySourceLink {
+  return { kindLabel, detail: "", href: null, noAccessHint: "Necesitás acceso al documento origen para ver su detalle." };
 }
 
 function treasuryAccountExtractoHref(accountId: string): string {
@@ -40,12 +40,12 @@ async function resolvedTreasuryMovementCompanyId(
   m: { companyId: string | null; accountId: string },
   tenantId: string,
 ): Promise<string | null> {
-  if (m.companyId) return m.companyId;
   const acc = await prisma.treasuryAccount.findFirst({
     where: { id: m.accountId, tenantId },
     select: { companyId: true },
   });
-  return acc?.companyId ?? null;
+  if (!acc || (m.companyId && acc.companyId && m.companyId !== acc.companyId)) return null;
+  return m.companyId ?? acc.companyId;
 }
 
 /**
@@ -58,18 +58,28 @@ export async function getJournalEntrySourceLink(
     sourceType: JournalEntrySourceType;
     sourceId:   string | null;
     companyId:  string;
+    reversesEntryId?: string | null;
   },
 ): Promise<JournalEntrySourceLink | null> {
-  const { sourceType, sourceId, companyId } = params;
+  const { sourceType, sourceId, companyId, reversesEntryId } = params;
   await assertAccountingTenantModule(ctx);
   if (!can(ctx.roles, "VIEW", "ACCOUNTING")) return null;
+  if (isCrossCompany(companyId, ctx)) return null;
+  if (reversesEntryId) {
+    const original = await prisma.journalEntry.findFirst({
+      where: { id: reversesEntryId, tenantId: ctx.tenantId, companyId, status: "POSTED" },
+      select: { id: true, entryDate: true, reference: true },
+    });
+    if (!original) return { kindLabel: "Asiento original", detail: "Asiento no encontrado.", href: null, noAccessHint: null };
+    return {
+      kindLabel: "Asiento original",
+      detail: `${original.reference ?? "Asiento contabilizado"} · ${fmtDate(original.entryDate)}`,
+      href: `/contabilidad/asientos/${original.id}?empresa=${encodeURIComponent(companyId)}`,
+      noAccessHint: null,
+    };
+  }
   if (!sourceId || sourceId.trim() === "") return null;
   if (sourceType === "MANUAL") return null;
-
-  const noAr = "Necesitás permiso de AR o Proyectos para abrir el enlace.";
-  const noAp = "Necesitás permiso de AP o Proyectos para abrir el enlace.";
-  const noTr = "Necesitás permiso de Tesorería para abrir el enlace.";
-  const noInv = "Necesitás permiso de Inventario para abrir el enlace.";
 
   switch (sourceType) {
     case "COLLECTION": {
@@ -84,18 +94,14 @@ export async function getJournalEntrySourceLink(
           noAccessHint: null,
         };
       }
+      if (!(await canViewJournalSource(ctx, "AR", c.projectId))) return hiddenSource("Cobranza");
       const detail = `${fmtDate(c.collectionDate)} · ${fmtMoneyAr(c.amount, c.currency)}`;
-      const href =
-        c.projectId && canViewArProjectArea(ctx.roles)
-          ? `/proyectos/${c.projectId}/cobranzas/${c.id}`
-          : !c.projectId && canViewCompanyAr(ctx.roles)
-            ? `/finanzas/cuentas-por-cobrar/${c.receivableId}`
-            : null;
+      const href = c.projectId ? `/proyectos/${c.projectId}/cobranzas/${c.id}` : `/finanzas/cuentas-por-cobrar/${c.receivableId}`;
       return {
         kindLabel: "Cobranza",
         detail,
         href,
-        noAccessHint: href ? null : noAr,
+        noAccessHint: null,
       };
     }
     case "PAYMENT": {
@@ -110,18 +116,14 @@ export async function getJournalEntrySourceLink(
           noAccessHint: null,
         };
       }
+      if (!(await canViewJournalSource(ctx, "AP", p.projectId))) return hiddenSource("Pago a proveedor");
       const detail = `${fmtDate(p.paymentDate)} · ${fmtMoneyAr(p.amount, p.currency)}`;
-      const href =
-        p.projectId && canViewApProjectArea(ctx.roles)
-          ? `/proyectos/${p.projectId}/pagos/${p.id}`
-          : !p.projectId && canViewCompanyAp(ctx.roles)
-            ? `/finanzas/pagos-proveedor/${p.id}`
-            : null;
+      const href = p.projectId ? `/proyectos/${p.projectId}/pagos/${p.id}` : `/finanzas/pagos-proveedor/${p.id}`;
       return {
         kindLabel: "Pago a proveedor",
         detail,
         href,
-        noAccessHint: href ? null : noAp,
+        noAccessHint: null,
       };
     }
     case "TREASURY_INFLOW":
@@ -146,13 +148,14 @@ export async function getJournalEntrySourceLink(
           noAccessHint: null,
         };
       }
+      const kindLabel = sourceType === "TREASURY_INFLOW" ? "Tesorería — ingreso" : "Tesorería — egreso";
+      if (!(await canViewJournalSource(ctx, "TREASURY", m.projectId))) return hiddenSource(kindLabel);
       const detail = `${fmtDate(m.movementDate)} · ${m.description.slice(0, 120)}${m.description.length > 120 ? "…" : ""}`;
-      const canLink = can(ctx.roles, "VIEW", "TREASURY");
       return {
-        kindLabel: sourceType === "TREASURY_INFLOW" ? "Tesorería — ingreso" : "Tesorería — egreso",
+        kindLabel,
         detail,
-        href:      canLink ? treasuryAccountExtractoHref(m.accountId) : null,
-        noAccessHint: canLink ? null : noTr,
+        href:      treasuryAccountExtractoHref(m.accountId),
+        noAccessHint: null,
       };
     }
     case "INTERNAL_TRANSFER": {
@@ -186,21 +189,21 @@ export async function getJournalEntrySourceLink(
           noAccessHint: null,
         };
       }
+      if (!(await canViewJournalSource(ctx, "TREASURY", null))) return hiddenSource("Transferencia interna");
       const detail = `${fmtDate(tr.transferDate)} · ${fmtMoneyAr(tr.amount, tr.currency)}`;
-      const canLink = can(ctx.roles, "VIEW", "TREASURY");
       return {
         kindLabel: "Transferencia interna",
         detail,
-        href:      canLink ? "/tesoreria/transferencias" : null,
-        noAccessHint: canLink ? null : noTr,
+        href:      "/tesoreria/transferencias",
+        noAccessHint: null,
       };
     }
     case "STOCK_MOVEMENT": {
       const sm = await prisma.stockMovement.findFirst({
         where: { id: sourceId, tenantId: ctx.tenantId },
-        include: { product: { select: { name: true } } },
+        include: { product: { select: { name: true, tenantId: true } } },
       });
-      if (!sm || sm.companyId !== companyId) {
+      if (!sm || sm.companyId !== companyId || sm.product.tenantId !== ctx.tenantId) {
         return {
           kindLabel: "Movimiento de stock",
           detail:    "Movimiento no encontrado o no coincide con la empresa del asiento.",
@@ -208,26 +211,14 @@ export async function getJournalEntrySourceLink(
           noAccessHint: null,
         };
       }
-      const tenant = await prisma.tenant.findUnique({
-        where: { id: ctx.tenantId },
-        select: { baseCurrency: true },
-      });
-      const cur = tenant?.baseCurrency ?? "ARS";
-      const cost = sm.totalCost ?? sm.unitCost;
-      const costStr = cost ? fmtMoneyAr(cost, cur) : "—";
-      const detail = `${fmtDate(sm.movementDate)} · ${sm.type} · ${sm.product.name} · costo ${costStr}`;
-      const canInv = can(ctx.roles, "VIEW", "INVENTORY");
-      let href: string | null = null;
-      if (canInv) {
-        href = sm.projectId
-          ? `/proyectos/${sm.projectId}/inventario`
-          : "/inventario/movimientos";
-      }
+      if (!(await canViewJournalSource(ctx, "INVENTORY", sm.projectId))) return hiddenSource("Movimiento de stock");
+      const detail = `${fmtDate(sm.movementDate)} · ${sm.product.name}`;
+      const href = sm.projectId ? `/proyectos/${sm.projectId}/inventario` : "/inventario/movimientos";
       return {
         kindLabel: "Movimiento de stock",
         detail,
         href,
-        noAccessHint: canInv ? null : noInv,
+        noAccessHint: null,
       };
     }
     case "SALES_INVOICE":
@@ -245,6 +236,7 @@ export async function getJournalEntrySourceLink(
       if (!inv || inv.companyId !== companyId) {
         return { kindLabel, detail: "Comprobante no encontrado.", href: null, noAccessHint: null };
       }
+      if (!(await canViewJournalSource(ctx, "AR", inv.projectId))) return hiddenSource(kindLabel);
       const prefix =
         inv.documentKind === "CREDIT_NOTE"
           ? "NC"
@@ -252,17 +244,12 @@ export async function getJournalEntrySourceLink(
             ? "ND"
             : "Factura";
       const detail = `${prefix} #${inv.number} · ${fmtDate(inv.issueDate)}`;
-      const href =
-        inv.projectId && canViewArProjectArea(ctx.roles)
-          ? `/proyectos/${inv.projectId}/facturas/${inv.id}`
-          : !inv.projectId && canViewCompanyAr(ctx.roles)
-            ? `/finanzas/facturas/${inv.id}`
-            : null;
+      const href = inv.projectId ? `/proyectos/${inv.projectId}/facturas/${inv.id}` : `/finanzas/facturas/${inv.id}`;
       return {
         kindLabel,
         detail,
         href,
-        noAccessHint: href ? null : noAr,
+        noAccessHint: null,
       };
     }
     case "SUPPLIER_INVOICE":
@@ -280,6 +267,7 @@ export async function getJournalEntrySourceLink(
       if (!inv || inv.companyId !== companyId) {
         return { kindLabel, detail: "Comprobante no encontrado.", href: null, noAccessHint: null };
       }
+      if (!(await canViewJournalSource(ctx, "AP", inv.projectId))) return hiddenSource(kindLabel);
       const prefix =
         inv.documentKind === "CREDIT_NOTE"
           ? "NC"
@@ -287,17 +275,12 @@ export async function getJournalEntrySourceLink(
             ? "ND"
             : "Factura proveedor";
       const detail = `${prefix} #${inv.number} · ${fmtDate(inv.issueDate)}`;
-      const href =
-        inv.projectId && canViewApProjectArea(ctx.roles)
-          ? `/proyectos/${inv.projectId}/facturas-proveedor/${inv.id}`
-          : !inv.projectId && canViewCompanyAp(ctx.roles)
-            ? `/finanzas/facturas-proveedor/${inv.id}`
-            : null;
+      const href = inv.projectId ? `/proyectos/${inv.projectId}/facturas-proveedor/${inv.id}` : `/finanzas/facturas-proveedor/${inv.id}`;
       return {
         kindLabel,
         detail,
         href,
-        noAccessHint: href ? null : noAp,
+        noAccessHint: null,
       };
     }
     case "ADJUSTMENT": {
@@ -316,13 +299,13 @@ export async function getJournalEntrySourceLink(
           noAccessHint: null,
         };
       }
+      if (!(await canViewJournalSource(ctx, "TREASURY", m.projectId))) return hiddenSource("Ajuste de tesorería");
       const detail = `${fmtDate(m.movementDate)} · ${m.description.slice(0, 120)}${m.description.length > 120 ? "…" : ""}`;
-      const canLink = can(ctx.roles, "VIEW", "TREASURY");
       return {
         kindLabel: "Ajuste de tesorería",
         detail,
-        href:      canLink ? treasuryAccountExtractoHref(m.accountId) : null,
-        noAccessHint: canLink ? null : noTr,
+        href:      treasuryAccountExtractoHref(m.accountId),
+        noAccessHint: null,
       };
     }
     default: {

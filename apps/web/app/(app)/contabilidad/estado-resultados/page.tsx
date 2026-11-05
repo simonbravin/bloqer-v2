@@ -2,11 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { getIncomeStatement } from "@bloqer/services";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
+import { getIncomeStatement, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatDbDate } from "@/lib/format";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import {
@@ -20,6 +21,7 @@ import {
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
+import { AccountingReportRangeError } from "@/features/accounting/components/accounting-report-range-error";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
 import { accountingAccountHref } from "@/lib/accounting-query";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -88,13 +90,20 @@ export default async function EstadoResultadosPage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
-  const report = await getIncomeStatement(ctx, {
-    companyId: cf.companyId ?? null,
-    dateFrom: sp.dateFrom,
-    dateTo: sp.dateTo,
-  });
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
+  let report;
+  try {
+    report = await getIncomeStatement(ctx, {
+      companyId: cf.companyId,
+      dateFrom: sp.dateFrom,
+      dateTo: sp.dateTo,
+    });
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "VALIDATION") {
+      return <AccountingReportRangeError title="Estado de resultados" message={error.message} />;
+    }
+    throw error;
+  }
 
   const exportParams: Record<string, string | undefined> = {
     dateFrom: report.dateFrom,
@@ -112,7 +121,7 @@ export default async function EstadoResultadosPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Estado de resultados</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Período {report.dateFrom} — {report.dateTo}
+            Período {formatDbDate(report.dateFrom)} — {formatDbDate(report.dateTo)}
           </p>
         </div>
         <ReportExportActions

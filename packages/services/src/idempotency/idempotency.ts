@@ -233,7 +233,7 @@ export function treasuryMovementReplayMatches(
     externalInvoiceRef?: string | null;
   },
 ): boolean {
-  if (existing.status !== "CONFIRMED") return false;
+  if (existing.status !== "CONFIRMED" && existing.status !== "RECONCILED") return false;
   if (existing.accountId !== input.accountId) return false;
   if (dateOnlyFingerprint(existing.movementDate) !== input.movementDate) return false;
   if (existing.type !== input.type) return false;

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,8 +59,8 @@ export function AccountingAccountForm({
   existingAccounts = [],
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [type, setType] = useState<AccountType | "">("");
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
@@ -111,12 +112,14 @@ export function AccountingAccountForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     if (!type) {
       setError("Seleccioná el tipo de cuenta");
       return;
     }
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       const res = await createAccountingAccountAction({
         companyId:   companyId || null,
         code:        code.trim(),
@@ -140,7 +143,7 @@ export function AccountingAccountForm({
     <div className="rounded-lg border bg-card p-6">
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>
         )}
 
         {showCompany && (
@@ -276,7 +279,7 @@ export function AccountingAccountForm({
         </div>
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => router.back()}>Cancelar</Button>
           <Button type="submit" disabled={isPending || !!exactCodeMatch}>
             {isPending ? "Guardando…" : "Crear cuenta"}
           </Button>

@@ -10,7 +10,7 @@ Mover fondos entre **cuentas del mismo tenant** registrando **dos movimientos li
 Doble registro inconsistente o pérdida de trazabilidad en movimientos entre bancos/cajas.
 
 ## 4. Datos que consume (inputs)
-- Cuenta origen y destino, montos, monedas, FX si cruzan moneda.
+- Cuentas de la misma moneda, monto, fecha contable y fecha valor. La operación en moneda extranjera guarda su cotización manual en las dos piernas ([D-134], [D-137]).
 
 ## 5. Datos que produce (outputs)
 - **InternalTransfer** + par de **AccountMovement**.
@@ -19,11 +19,10 @@ Doble registro inconsistente o pérdida de trazabilidad en movimientos entre ban
 - **InternalTransfer**, **AccountMovement** (×2).
 
 ## 7. Estados y transiciones
-Borrador opcional → confirmado → anulado (revierte par).
+La transferencia se registra confirmada con sus dos movimientos. La anulación revierte el par en una sola transacción.
 
 ## 8. Acciones disponibles
-- Crear transferencia.
-- Confirmar (genera movimientos).
+- Registrar transferencia (genera los dos movimientos).
 - Anular si periodo abierto.
 
 ## 9. Pantallas y vistas necesarias
@@ -31,6 +30,7 @@ Borrador opcional → confirmado → anulado (revierte par).
 - Formulario `/tesoreria/transferencias/nueva` con ayuda: «Mueve plata entre cuentas de la empresa. Un pago a un proveedor no es una transferencia.»
 - Historial del par OUT/IN: `/tesoreria/transferencias` (sin ítem de menú; link desde Cuentas).
 - Extracto de cuenta: `/tesoreria/cuentas/[accountId]` (incluye las dos patas de la transferencia).
+- El extracto usa fecha contable por defecto y permite consultar por fecha valor. Una transferencia histórica sin fecha valor conserva su fecha contable como referencia identificada. La conciliación usa fecha valor disponible y el cierre usa fecha contable.
 - **No** aparecen en `/finanzas/transacciones` (ledger operativo con terceros, [D-048]).
 - El método de liquidación «Transferencia» en un **Payment**/**Collection** ([D-074]) **no** es un `InternalTransfer`.
 
@@ -45,7 +45,7 @@ Borrador opcional → confirmado → anulado (revierte par).
 - Conversión FX si aplica: [`CURRENCY_CONVERSION_FORMULAS.md`](../04-formulas/CURRENCY_CONVERSION_FORMULAS.md).
 
 ## 13. Casos borde
-- Transferencia USD→ARS con distinto FX compra/venta: registrar dos montos explícitos.
+- Las transferencias entre monedas diferentes quedan fuera del circuito actual. Su diseño requiere especificar ambos montos.
 
 ## 14. Reportes relacionados
 - Flujo de fondos interno, conciliación por cuenta.

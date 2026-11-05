@@ -718,6 +718,42 @@
 - **Propuesta aprobada:** [IVA/percepción no negativos, cero permitido, sin máximos nuevos ni cambios históricos](../08-architecture/platform-audit/2026-11-05-ag-09-nonnegative-invoice-tax-proposal.md). Incluye altas/ediciones/emisión de borradores AR/AP y NC/ND.
 - **Continuación:** implementar D-133 en schemas y service layer, verificar llamadas directas y emisión de borradores persistidos, y actualizar guía/ayuda/AI en AG-09. La aprobación de la regla no sustituye la evidencia de implementación.
 
+### Q-081 — Snapshot FX de movimientos de Tesorería
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-134. El Owner aprobó guardar el tipo de cambio en movimientos nuevos.
+- **Hallazgo:** D-008 exige el dato de la operación y su equivalente en ARS. `AccountMovement` no tiene dónde guardarlos. Ver P-AG10-01.
+- **Propuesta:** [snapshot aditivo para nuevos movimientos, sin cotización inferida para históricos](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-081--tipo-de-cambio-de-nuevos-movimientos).
+
+### Q-082 — Fecha valor de transferencias propias
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-137. El Owner aprobó registrar ambas fechas para nuevas transferencias.
+- **Hallazgo:** D-023 pide dos fechas y la transferencia solo guarda la fecha contable.
+- **Propuesta:** [registrar ambas fechas para nuevas transferencias y explicitar el criterio del extracto](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-082--fecha-de-valor-en-transferencias-propias).
+
+### Q-083 — Dirección ambigua de XFER en OFX/QFX
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-138. El Owner aprobó el signo explícito para XFER y el aviso de fila ambigua.
+- **Hallazgo:** tratar todo XFER como débito contradice el sentido de un crédito de transferencia. D-079 y los casos vigentes divergen en montos sin signo.
+- **Propuesta:** [validar el signo explícito en XFER y conservar la compatibilidad de tipos inequívocos](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-083--dirección-de-transferencias-en-archivos-ofxqfx).
+
+### Q-084 — Anular un origen con un borrador contable en mes cerrado
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-135. El Owner aprobó bloquear hasta reabrir el período del asiento.
+- **Hallazgo:** la sincronización D-061 cancela el borrador vinculado y hoy omite el bloqueo de D-078 si su fecha GL está en otro mes ya cerrado.
+- **Propuesta:** [bloquear la anulación completa hasta reabrir el período del borrador](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-084--anular-un-origen-con-un-borrador-contable-en-mes-cerrado).
+
+### Q-085 — Saldo inicial negativo en una cuenta nueva
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-136. El Owner aprobó registrar la apertura negativa en el extracto.
+- **Hallazgo:** la apertura negativa se permite, pero su registro omite ledger, período y cotización, a diferencia de una apertura positiva.
+- **Propuesta:** [conservar el saldo negativo y guardar un egreso de apertura trazable](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-085--saldo-inicial-negativo-en-una-cuenta-nueva).
+
+### Q-086 — Contabilidad de IVA e IIBB cuando falta solo la cuenta de IIBB
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-139. El Owner aprobó conservar IVA separado y aclarar la documentación.
+- **Hallazgo:** el generador y sus pruebas conservan la línea de IVA si falta solo la cuenta IIBB. El fallback de D-112 §7 no distingue este caso.
+- **Propuesta:** [documentar el funcionamiento existente y conservar la línea de IVA](../08-architecture/platform-audit/2026-11-05-ag-10-treasury-contract-proposal.md#q-086--asientos-de-facturas-cuando-falta-solo-la-cuenta-de-iibb).
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

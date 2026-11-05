@@ -6,12 +6,12 @@ import { isTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { ServiceContext } from "../types";
 import { findActiveMappingRule } from "./accounting-mapping.service";
 import {
-  createJournalEntryAsAutomation,
+  createOrGetJournalEntryAsAutomation,
   lookupNonCancelledJournalEntryIdBySource,
   getJournalEntryByIdUnchecked,
   type JournalEntryView,
 } from "./journal-entry.service";
-import { treasuryMovementSupportsAccountingDraft } from "./accounting-treasury-gl-eligibility";
+import { loadTreasuryJournalMovement, loadTreasuryJournalTransfer } from "./accounting-treasury-source";
 import { notifyAccountingDraftsPendingSoft } from "./accounting-draft-notifications.service";
 import { suggestTreasuryGlAccountCode } from "./treasury-gl-account-hint";
 import {
@@ -151,7 +151,8 @@ async function ensureFromRule(params: {
       sourceType: params.sourceType,
       sourceId: params.sourceId,
     });
-    const entry = await createJournalEntryAsAutomation(input, ctx, params.companyId);
+    const { entry, created } = await createOrGetJournalEntryAsAutomation(input, ctx, params.companyId);
+    if (!created) return { status: "existing", entry };
     try {
       await log({
         tenantId: ctx.tenantId,
@@ -203,7 +204,8 @@ async function createDraftFromInput(
   input: CreateJournalEntryInput,
 ): Promise<EnsureResult> {
   try {
-    const entry = await createJournalEntryAsAutomation(input, ctx, companyId);
+    const { entry, created } = await createOrGetJournalEntryAsAutomation(input, ctx, companyId);
+    if (!created) return { status: "existing", entry };
     try {
       await log({
         tenantId: ctx.tenantId,
@@ -317,17 +319,8 @@ export async function ensureDraftJournalFromTreasuryMovement(
   ctx: ServiceContext,
 ): Promise<EnsureResult> {
   try {
-    const mov = await prisma.accountMovement.findFirst({
-      where: { id: accountMovementId, tenantId: ctx.tenantId },
-      include: { account: true },
-    });
-    // RECONCILED still needs a DRAFT journal when created via recon “crear movimiento”.
-    if (!mov || (mov.status !== "CONFIRMED" && mov.status !== "RECONCILED")) {
-      return { status: "skipped", reason: "not_found_or_not_confirmed" };
-    }
-    if (!treasuryMovementSupportsAccountingDraft({ type: mov.type, sourceType: mov.sourceType })) {
-      return { status: "skipped", reason: "source_excluded_from_treasury_gl" };
-    }
+    const mov = await loadTreasuryJournalMovement(prisma, ctx.tenantId, accountMovementId);
+    if (!mov) return { status: "skipped", reason: "source_not_eligible" };
     const companyId = mov.companyId ?? mov.account.companyId ?? null;
     if (!companyId) {
       return { status: "skipped", reason: "missing_company" };
@@ -335,9 +328,7 @@ export async function ensureDraftJournalFromTreasuryMovement(
 
     // Transfer journals need both legs for correct debit/credit GL overrides.
     if (mov.type === "TRANSFER_IN" || mov.type === "TRANSFER_OUT") {
-      const transferId =
-        mov.transferId
-        ?? (mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null);
+      const transferId = mov.sourceType === "INTERNAL_TRANSFER" ? mov.sourceId : null;
       if (!transferId) return { status: "skipped", reason: "missing_transfer_id" };
       return await ensureDraftJournalFromInternalTransfer(transferId, ctx);
     }
@@ -391,46 +382,19 @@ export async function ensureDraftJournalFromInternalTransfer(
   ctx: ServiceContext,
 ): Promise<EnsureResult> {
   try {
-    const transfer = await prisma.internalTransfer.findFirst({
-      where: { id: transferId, tenantId: ctx.tenantId },
-    });
-    if (!transfer || transfer.status !== "CONFIRMED") {
-      return { status: "skipped", reason: "not_found_or_not_confirmed" };
-    }
-    // Legs store transferId === InternalTransfer.id. Also match sourceId for legacy rows
-    // that used a separate random transferId pair key.
-    const legs = await prisma.accountMovement.findMany({
-      where: {
-        tenantId: ctx.tenantId,
-        status: { in: ["CONFIRMED", "RECONCILED"] },
-        OR: [
-          { transferId: transfer.id },
-          { sourceType: "INTERNAL_TRANSFER", sourceId: transfer.id },
-        ],
-      },
-      include: { account: true },
-      orderBy: { id: "asc" },
-    });
-    const outLeg = legs.find((l) => l.type === "TRANSFER_OUT") ?? legs[0];
-    const inLeg = legs.find((l) => l.type === "TRANSFER_IN");
-    if (!outLeg) return { status: "skipped", reason: "missing_movement_leg" };
-
-    // Prefer destination (IN) for the base movement path; override both GL sides from legs.
-    const primary = inLeg ?? outLeg;
-    const companyId = primary.companyId ?? primary.account.companyId ?? null;
-    if (!companyId) return { status: "skipped", reason: "missing_company" };
-
-    const debitGl = inLeg
-      ? await resolveActiveGlAccountId(
-          ctx.tenantId,
-          companyId,
-          suggestTreasuryGlAccountCode({ type: inLeg.account.type, currency: inLeg.account.currency }),
-        )
-      : null;
+    const source = await loadTreasuryJournalTransfer(prisma, ctx.tenantId, transferId);
+    if (!source) return { status: "skipped", reason: "invalid_transfer_graph" };
+    const { transfer } = source;
+    const companyId = transfer.companyId;
+    const debitGl = await resolveActiveGlAccountId(
+      ctx.tenantId,
+      companyId,
+      suggestTreasuryGlAccountCode(transfer.destinationAccount),
+    );
     const creditGl = await resolveActiveGlAccountId(
       ctx.tenantId,
       companyId,
-      suggestTreasuryGlAccountCode({ type: outLeg.account.type, currency: outLeg.account.currency }),
+      suggestTreasuryGlAccountCode(transfer.sourceAccount),
     );
 
     return await ensureFromRule({
@@ -440,11 +404,11 @@ export async function ensureDraftJournalFromInternalTransfer(
       eventType: "TREASURY_TRANSFER",
       sourceType: "INTERNAL_TRANSFER",
       sourceId: transfer.id,
-      entryDate: primary.movementDate.toISOString().slice(0, 10),
+      entryDate: transfer.transferDate.toISOString().slice(0, 10),
       description: `Asiento automático — transferencia interna (${transfer.id.slice(0, 8)}…)`,
       reference: `TRF-${transfer.id.slice(0, 8)}`,
-      currency: primary.currency,
-      amount: primary.amount,
+      currency: transfer.currency,
+      amount: transfer.amount,
       lineDebit: "Debe — cuenta destino",
       lineCredit: "Haber — cuenta origen",
       debitAccountIdOverride: debitGl ?? undefined,

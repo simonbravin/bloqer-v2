@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { can } from "@bloqer/domain";
 import {
   ServiceError,
@@ -12,10 +13,12 @@ import {
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { contabilidadAsientoHref } from "@/lib/contabilidad-asiento-path";
+import { safeCallbackUrl } from "@/lib/auth-callback-url";
 
 function appendQueryParam(path: string, key: string, value: string): string {
-  const sep = path.includes("?") ? "&" : "?";
-  return `${path}${sep}${key}=${encodeURIComponent(value)}`;
+  const url = new URL(safeCallbackUrl(path), "http://bloqer.local");
+  url.searchParams.set(key, value);
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 async function accountingCtxOrRedirect() {
@@ -28,6 +31,8 @@ async function accountingCtxOrRedirect() {
 }
 
 async function redirectToJournal(entry: { id: string; companyId: string }) {
+  revalidatePath("/contabilidad", "layout");
+  revalidatePath("/dashboard");
   const current = await getCurrentUser();
   redirect(
     contabilidadAsientoHref(entry.id, entry.companyId, current?.tenantCtx?.companyId),

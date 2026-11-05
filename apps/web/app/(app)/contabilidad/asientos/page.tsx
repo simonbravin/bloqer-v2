@@ -6,10 +6,10 @@ import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { Pagination } from "@/components/ui/pagination";
 import { JournalEntryListSection } from "@/features/accounting/components/journal-entry-list-section";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { listJournalEntries } from "@bloqer/services";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
+import { listJournalEntries, resolvePagination } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 import { PageListHeader } from "@/components/ui/page-list-header";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -26,9 +26,8 @@ export default async function AsientosPage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
-  const page = Math.max(1, Number(sp.page ?? 1));
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
+  const { page } = resolvePagination({ page: Number(sp.page ?? 1), pageSize: PAGE_SIZE });
   const status =
     sp.status === "DRAFT" || sp.status === "POSTED" || sp.status === "CANCELLED"
       ? sp.status

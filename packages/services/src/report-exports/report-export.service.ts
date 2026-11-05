@@ -132,6 +132,7 @@ export function parseMovementReportFilters(
   const scope = sp.scope;
   return {
     accountId: sp.accountId,
+    companyId: sp.companyId,
     dateFrom: sp.dateFrom,
     dateTo: sp.dateTo,
     type: sp.type,
@@ -144,6 +145,7 @@ export function parseMovementReportFilters(
     projectOnly: scope === "project" || sp.projectOnly === "true",
     class: sp.class,
     sortDir: sp.dir === "asc" ? "asc" : sp.dir === "desc" ? "desc" : undefined,
+    dateBasis: sp.dateBasis === "value" ? "value" : "accounting",
   };
 }
 
@@ -432,14 +434,17 @@ export async function exportCashPositionCsv(
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
   const report = await getCashPositionReport(filters, ctx);
-  const headers = ["Empresa", "Cuenta", "TipoCuenta", "Moneda", "Estado", "Saldo"];
-  const rows = report.accounts.map((a) => [
+  const headers = ["Empresa", "Cuenta", "TipoCuenta", "Moneda", "Estado", "Saldo", "SaldoEquivalenteHistoricoARS", "TotalEquivalenteHistoricoARS", "EstadoConsolidadoARS"];
+  const rows = report.accounts.map((a, index) => [
     a.companyName ?? "",
     a.name,
     a.type,
     a.currency,
     a.status,
     a.balance,
+    a.balanceArs ?? "",
+    index === 0 ? report.consolidatedArs ?? "" : "",
+    index === 0 ? (report.consolidatedArs === null ? "Incompleto" : "Disponible") : "",
   ]);
   return {
     content: buildCsv(headers, rows),
@@ -459,8 +464,9 @@ export async function exportTreasuryMovementsCsv(
     );
   }
   const { rows, total } = await getAccountMovementReport(
-    { ...filters, page: 1, pageSize: MAX_EXPORT_ROWS },
+    filters,
     ctx,
+    "export",
   );
   if (total > MAX_EXPORT_ROWS) {
     throw new ServiceError(
@@ -484,9 +490,14 @@ export async function exportTreasuryMovementsCsv(
     "TransferenciaInterna",
     "SaldoAcumulado",
     "FacturaInterna",
+    "TipoCambioARS",
+    "ImporteEquivalenteHistoricoARS",
+    "FechaContable",
+    "FechaValor",
+    "CriterioFecha",
   ];
   const data = rows.map((r) => [
-    r.movementDate,
+    filters.dateBasis === "value" ? r.valueDate ?? r.movementDate : r.movementDate,
     r.accountName,
     r.type,
     r.classLabel,
@@ -501,6 +512,11 @@ export async function exportTreasuryMovementsCsv(
     r.isInternalTransfer ? "Si" : "No",
     r.runningBalance ?? "",
     r.documentRef ?? "",
+    r.fxRate ?? "",
+    r.amountArs ?? "",
+    r.movementDate,
+    r.valueDate ?? "",
+    filters.dateBasis === "value" ? "Valor" : "Contable",
   ]);
   return {
     content: buildCsv(headers, data),

@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { CurrencyFilterSelect } from "@/components/ui/currency-select";
 
-export function CashFlowFilters() {
+export function CashFlowFilters({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
   const router   = useRouter();
   const pathname = usePathname();
   const sp       = useSearchParams();
@@ -27,38 +27,43 @@ export function CashFlowFilters() {
   return (
     <div className="flex flex-wrap items-end gap-3">
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Desde</Label>
+        <Label htmlFor="cash-flow-from" className="text-xs text-muted-foreground">Desde</Label>
         <Input
+          id="cash-flow-from"
+          key={dateFrom}
           type="date"
-          defaultValue={sp.get("dateFrom") ?? ""}
+          defaultValue={dateFrom}
           onChange={(e) => update("dateFrom", e.target.value)}
           className="w-36"
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Hasta</Label>
+        <Label htmlFor="cash-flow-to" className="text-xs text-muted-foreground">Hasta</Label>
         <Input
+          id="cash-flow-to"
+          key={dateTo}
           type="date"
-          defaultValue={sp.get("dateTo") ?? ""}
+          defaultValue={dateTo}
           onChange={(e) => update("dateTo", e.target.value)}
           className="w-36"
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Moneda</Label>
+        <Label htmlFor="cash-flow-currency" className="text-xs text-muted-foreground">Moneda</Label>
         <CurrencyFilterSelect
+          id="cash-flow-currency"
           value={sp.get("currency") ?? ""}
           onValueChange={(v) => update("currency", v)}
           triggerClassName="w-[14rem]"
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Agrupación</Label>
+        <Label htmlFor="cash-flow-period" className="text-xs text-muted-foreground">Agrupación</Label>
         <Select
           value={sp.get("period") ?? "month"}
           onValueChange={(v) => update("period", v)}
         >
-          <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+          <SelectTrigger id="cash-flow-period" className="w-32"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="day">Diario</SelectItem>
             <SelectItem value="week">Semanal</SelectItem>

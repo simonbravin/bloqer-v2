@@ -15,10 +15,11 @@ import { cn } from "@/lib/utils";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { TableScroll } from "@/components/ui/table-scroll";
 import type { InternalTransferView } from "@bloqer/services";
+import { formatGroupedDecimal } from "@bloqer/utils";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { CancelInternalTransferButton } from "./cancel-internal-transfer-button";
 
-export function InternalTransferTable({ transfers }: { transfers: InternalTransferView[] }) {
+export function InternalTransferTable({ transfers, canCancel }: { transfers: InternalTransferView[]; canCancel: boolean }) {
   if (transfers.length === 0) {
     return <ListEmptyState message="Sin transferencias registradas." />;
   }
@@ -28,7 +29,8 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Fecha</TableHead>
+            <TableHead>Fecha contable</TableHead>
+            <TableHead>Fecha valor</TableHead>
             <TableHead>Origen</TableHead>
             <TableHead>Destino</TableHead>
             <TableHead>Moneda</TableHead>
@@ -41,6 +43,7 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
           {transfers.map((t) => (
             <TableRow key={t.id}>
               <TableCell className="text-sm">{formatDate(t.transferDate)}</TableCell>
+              <TableCell className="text-sm">{t.valueDate == null ? "Sin registrar" : formatDate(t.valueDate)}</TableCell>
               <TableCell
                 className={cn(tableNameCellClass, "text-sm")}
                 title={t.sourceAccountName}
@@ -56,6 +59,13 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
               <TableCell className="text-sm">{t.currency}</TableCell>
               <TableCell className="text-right font-mono text-sm tabular-nums">
                 {formatMoneyAmount(t.amount)} {t.currency}
+                {t.currency !== "ARS" ? (
+                  <span className="block text-xs text-muted-foreground">
+                    {t.amountArs == null || t.fxRate == null
+                      ? "Equivalente histórico ARS no disponible"
+                      : `Equivalente histórico: ${formatMoneyAmount(t.amountArs, "ARS")} · ${formatGroupedDecimal(t.fxRate, 6)} ARS por ${t.currency}`}
+                  </span>
+                ) : null}
               </TableCell>
               <TableCell>
                 <Badge variant={t.status === "CONFIRMED" ? "default" : "secondary"}>
@@ -63,7 +73,7 @@ export function InternalTransferTable({ transfers }: { transfers: InternalTransf
                 </Badge>
               </TableCell>
               <TableCell>
-                {t.status === "CONFIRMED" ? <CancelInternalTransferButton transferId={t.id} /> : null}
+                {canCancel && t.status === "CONFIRMED" ? <CancelInternalTransferButton transferId={t.id} /> : null}
               </TableCell>
             </TableRow>
           ))}

@@ -11,19 +11,20 @@ import { treasurySettlementFieldsSchema } from "./treasury-settlement";
 import { z } from "zod";
 
 export const createTreasuryAccountSchema = z.object({
-  name:           z.string().min(1),
+  name:           z.string().trim().min(1),
   type:           z.enum(["BANK", "CASH", "DIGITAL_WALLET", "OTHER"]),
-  currency:       z.string().length(3).default("ARS"),
+  currency:       z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Moneda inválida").default("ARS"),
   bankName:       z.string().optional().nullable(),
   accountNumber:  z.string().optional().nullable(),
   alias:          z.string().optional().nullable(),
   notes:          z.string().optional().nullable(),
   openingBalance: moneyAmountString.optional().default("0.00"),
+  openingFxRate:  optionalFxRateString,
   companyId:      z.string().uuid().optional().nullable(),
 });
 
 export const updateTreasuryAccountSchema = z.object({
-  name:          z.string().min(1).optional(),
+  name:          z.string().trim().min(1).optional(),
   bankName:      z.string().optional().nullable(),
   accountNumber: z.string().optional().nullable(),
   alias:         z.string().optional().nullable(),
@@ -63,8 +64,10 @@ export const createCollectionSchema = z
 export const createInternalTransferSchema = z.object({
   sourceAccountId:      z.string().uuid(),
   destinationAccountId: z.string().uuid(),
-  transferDate:         z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  transferDate:         z.string().date("Fecha inválida"),
+  valueDate:            z.string().date("Fecha valor inválida"),
   amount:               positiveMoneyAmountString,
+  fxRate:               optionalFxRateString,
   description:          z.string().optional().nullable(),
   idempotencyKey:       idempotencyKeySchema,
 });
@@ -73,8 +76,9 @@ export const createInternalTransferSchema = z.object({
 
 export const createCorporateTreasuryInflowSchema = z.object({
   accountId:              z.string().uuid(),
-  movementDate:           z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  movementDate:           z.string().date("Fecha inválida"),
   amount:                 positiveMoneyAmountString,
+  fxRate:                 optionalFxRateString,
   description:            z.string().trim().min(1, "Descripcion requerida"),
   /** Optional directory contact with CLIENT role for corporate inflows — D-049. */
   counterpartyContactId:  z.string().uuid().optional().nullable(),
@@ -92,9 +96,10 @@ export const createCorporateTreasuryInflowSchema = z.object({
 /** Generic account adjustment UI ([P-TRZ-04] / Phase 3 close). */
 export const createManualTreasuryAdjustmentSchema = z.object({
   accountId: z.string().uuid(),
-  movementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  movementDate: z.string().date("Fecha inválida"),
   direction: z.enum(["INFLOW", "OUTFLOW"]),
   amount: positiveMoneyAmountString,
+  fxRate: optionalFxRateString,
   description: z.string().trim().min(1, "Descripción requerida").max(500),
   idempotencyKey: idempotencyKeySchema,
 });

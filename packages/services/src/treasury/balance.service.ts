@@ -1,6 +1,7 @@
 import { Prisma, prisma } from "@bloqer/database";
-import type { ServiceContext } from "../types";
+import { ServiceError, type ServiceContext } from "../types";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
+import { canViewCompanyTreasury } from "../finance/finance-access";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "./balance-affecting-statuses";
 
@@ -21,30 +22,34 @@ export function resolveOpeningBase(
 
 export async function getAccountBalanceAsOf(
   accountId: string,
-  options?: { beforeDate?: Date },
+  options?: { beforeDate?: Date; dateBasis?: "accounting" | "value" },
   tx: TxClient = prisma,
 ): Promise<Prisma.Decimal> {
   const account = await tx.treasuryAccount.findUnique({
     where: { id: accountId },
-    select: { openingBalance: true },
+    select: { openingBalance: true, tenantId: true },
   });
   if (!account) return new Prisma.Decimal(0);
 
   const openingMovement = await tx.accountMovement.findFirst({
     where: {
       accountId,
-      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
+      tenantId: account.tenantId,
       sourceType: "OPENING_BALANCE",
     },
     select: { id: true },
   });
   const base = resolveOpeningBase(account.openingBalance, openingMovement != null);
 
+  const cutoff = options?.beforeDate ? { lt: options.beforeDate } : undefined;
   const movements = await tx.accountMovement.findMany({
     where: {
       accountId,
+      tenantId: account.tenantId,
       status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
-      ...(options?.beforeDate ? { movementDate: { lt: options.beforeDate } } : {}),
+      ...(cutoff ? (options?.dateBasis === "value"
+        ? { OR: [{ valueDate: cutoff }, { valueDate: null, movementDate: cutoff }] }
+        : { movementDate: cutoff }) : {}),
     },
     select: { type: true, amount: true },
   });
@@ -112,8 +117,12 @@ export async function getTreasurySummaryByTenant(
   ctx: ServiceContext,
 ): Promise<AccountBalanceSummary[]> {
   await assertTreasuryTenantModule(ctx);
+  if (!canViewCompanyTreasury(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver saldos de tesorería");
+  }
   return loadAccountSummaries({
     tenantId: ctx.tenantId,
+    OR: [{ companyId: null }, { company: { tenantId: ctx.tenantId } }],
     status: "ACTIVE",
   });
 }

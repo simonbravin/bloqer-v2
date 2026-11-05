@@ -11,6 +11,7 @@ import {
 import { TableScroll } from "@/components/ui/table-scroll";
 import { formatCurrencyDisplay } from "@/lib/format";
 import { formatMoneyAmount, isPositiveMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
+import { cashFlowPeriodLabel } from "../lib/cash-flow-period-label";
 
 function formatAmount(value: string) {
   if (isZeroMoneyAmount(value)) return "—";
@@ -34,11 +35,11 @@ export function CashFlowTable({ data }: Props) {
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center justify-between px-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-1">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {formatCurrencyDisplay(currency)}
         </span>
-        <div className="flex gap-6 text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
           <span>
             Saldo inicial:{" "}
             <span className="font-mono font-medium text-foreground">
@@ -67,7 +68,7 @@ export function CashFlowTable({ data }: Props) {
                   <TableHead className="text-right">Neto operativo</TableHead>
                   <TableHead className="text-right">Transf. entrada</TableHead>
                   <TableHead className="text-right">Transf. salida</TableHead>
-                  <TableHead className="text-right">Ajustes</TableHead>
+                  <TableHead className="text-right">Egresos de ajuste</TableHead>
                   <TableHead className="text-right">Neto total</TableHead>
                 </TableRow>
               </TableHeader>
@@ -79,7 +80,7 @@ export function CashFlowTable({ data }: Props) {
                   const netAllZero = isZeroMoneyAmount(b.netCashFlow);
                   return (
                     <TableRow key={b.period}>
-                      <TableCell className="font-mono text-xs">{b.period}</TableCell>
+                      <TableCell className="font-mono text-xs">{cashFlowPeriodLabel(b.period)}</TableCell>
                       <TableCell className="text-right tabular-nums font-mono text-emerald-600 dark:text-emerald-400">
                         {formatAmount(b.inflow)}
                       </TableCell>

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOperationalAction } from "@/hooks/use-operational-action";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,8 +50,8 @@ export function JournalEntryForm({
   initial,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [companyId, setCompanyId] = useState(
     () => initial?.companyId ?? defaultCompanyId ?? companies?.[0]?.id ?? "",
   );
@@ -71,6 +72,7 @@ export function JournalEntryForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     const fd = new FormData(e.currentTarget);
     const entryDate = fd.get("entryDate") as string;
     const description = (fd.get("description") as string).trim();
@@ -85,7 +87,8 @@ export function JournalEntryForm({
       currency:    l.currency.trim() || "ARS",
     }));
 
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       if (mode === "create") {
         const res = await createJournalEntryAction({
           companyId:   companyId || null,
@@ -129,7 +132,7 @@ export function JournalEntryForm({
     <div className="rounded-lg border bg-card p-6">
       <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p className="rounded bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>
         )}
 
         {showCompany && (
@@ -171,7 +174,7 @@ export function JournalEntryForm({
         />
 
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>Cancelar</Button>
+          <Button type="button" variant="outline" disabled={isPending} onClick={() => router.back()}>Cancelar</Button>
           <Button type="submit" disabled={isPending}>
             {isPending ? "Guardando…" : mode === "create" ? "Crear borrador" : "Guardar cambios"}
           </Button>

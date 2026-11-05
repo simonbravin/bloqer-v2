@@ -343,6 +343,8 @@ export async function createCollection(
             sourceId:    created.id,
             currency:    receivable.currency,
             amount,
+            fxRate:      fx.fxRate,
+            amountArs:   fx.amountArs,
             description: `Cobranza factura ${formatSalesInvoiceCode(salesInvoice.number)}`,
             status:      "CONFIRMED",
             createdBy:   ctx.actorUserId,
@@ -491,6 +493,9 @@ export async function cancelCollection(
     const account = await tx.treasuryAccount.findUnique({ where: { id: c.accountId } });
     if (!account) throw new ServiceError("CONFLICT", "La cuenta de la cobranza no existe");
     assertArCollectionParents({ ...c, account }, ctx);
+    if (account.status === "CLOSED") {
+      throw new ServiceError("CONFLICT", "No se puede modificar el saldo de una cuenta de tesorería cerrada");
+    }
     const movements = await tx.accountMovement.findMany({ where: { sourceType: "COLLECTION", sourceId: id } });
     const linkedMovement = collectionMovementForCancellation(c, movements);
     await assertArTransactionModules(tx, ctx, true);

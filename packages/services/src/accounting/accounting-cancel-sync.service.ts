@@ -1,7 +1,7 @@
 import { prisma, type JournalEntrySourceType, type Prisma } from "@bloqer/database";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { cancelJournalEntryAsAutomation } from "./journal-entry.service";
+import { cancelJournalEntryAsAutomation, isValidJournalReversal, journalReversalSelect } from "./journal-entry.service";
 
 type CancelSyncParams = {
   companyId: string;
@@ -12,17 +12,20 @@ type CancelSyncParams = {
   enforceCompanyScope?: boolean;
 };
 
-async function findLinkedJournal(ctx: ServiceContext, params: CancelSyncParams, db: Prisma.TransactionClient | typeof prisma = prisma) {
-  return db.journalEntry.findFirst({
-    where: {
-      tenantId: ctx.tenantId,
-      companyId: params.companyId,
-      sourceType: params.sourceType,
-      sourceId: params.sourceId,
-      status: { not: "CANCELLED" },
-    },
-    select: { id: true, status: true, reversedByEntry: { select: { id: true } } },
-  });
+async function findLinkedJournals(ctx: ServiceContext, params: CancelSyncParams, db: Prisma.TransactionClient | typeof prisma = prisma) {
+  const where = { tenantId: ctx.tenantId, sourceType: params.sourceType, sourceId: params.sourceId, status: { not: "CANCELLED" as const } };
+  const select = { id: true, tenantId: true, companyId: true, status: true, reversedByEntry: { select: journalReversalSelect } } as const;
+  // Legacy intercompany transfers could get a draft in the destination company.
+  // Still guard their origin on cancellation without moving or duplicating the historical journal.
+  if (params.sourceType === "INTERNAL_TRANSFER" && params.enforceCompanyScope === false) {
+    return db.journalEntry.findMany({ where, select, orderBy: [{ companyId: "asc" }, { id: "asc" }] });
+  }
+  const entry = await db.journalEntry.findFirst({ where: { ...where, companyId: params.companyId }, select });
+  return entry ? [entry] : [];
+}
+
+function blocksOperationalCancel(entry: Awaited<ReturnType<typeof findLinkedJournals>>[number]): boolean {
+  return entry.status === "POSTED" && !isValidJournalReversal(entry, entry.reversedByEntry);
 }
 
 /** Operational callers lock Project first; Company serializes cancel, create and posting. */
@@ -41,8 +44,8 @@ function assertCompanyScope(ctx: ServiceContext, params: CancelSyncParams): void
 
 /**
  * Pre-check before mutating operational cash: block if a non-reversed POSTED journal exists.
- * Does not cancel DRAFT journals — call {@link cancelDraftJournalOnOperationalCancel} after
- * the operational txn succeeds so a failed ops cancel cannot orphan a cancelled draft.
+ * Does not cancel DRAFT journals. Call {@link cancelDraftJournalOnOperationalCancel} inside
+ * the operational transaction so a rejected cancellation leaves both sides intact.
  */
 export async function assertJournalAllowsOperationalCancel(
   ctx: ServiceContext,
@@ -51,9 +54,8 @@ export async function assertJournalAllowsOperationalCancel(
 ): Promise<void> {
   assertCompanyScope(ctx, params);
   if (tx) await lockCancelCompany(tx, ctx, params);
-  const entry = await findLinkedJournal(ctx, params, tx);
-  if (!entry) return;
-  if (entry.status === "POSTED" && !entry.reversedByEntry) {
+  const entries = await findLinkedJournals(ctx, params, tx);
+  if (entries.some(blocksOperationalCancel)) {
     throw new ServiceError(
       "CONFLICT",
       `No se puede anular ${params.sourceLabel}: tiene un asiento contabilizado. Revertí el asiento en Contabilidad primero.`,
@@ -63,7 +65,8 @@ export async function assertJournalAllowsOperationalCancel(
 
 /**
  * With tx, guard + DRAFT cancellation + audit participate in the operational transaction.
- * Without tx, preserves the legacy cleanup path after operational commit.
+ * Without tx, supports cleanup of historically cancelled origins.
+ * A closed period on the DRAFT blocks cancellation under D-135.
  * No-op if none / already CANCELLED. Throws CONFLICT if a non-reversed POSTED journal
  * appeared after the pre-check (race) — never silently leave books linked to cancelled cash.
  */
@@ -73,22 +76,29 @@ export async function cancelDraftJournalOnOperationalCancel(
   tx?: Prisma.TransactionClient,
 ): Promise<void> {
   assertCompanyScope(ctx, params);
-  if (tx) await lockCancelCompany(tx, ctx, params);
-  const entry = await findLinkedJournal(ctx, params, tx);
-  if (!entry) return;
-  if (entry.status === "POSTED" && !entry.reversedByEntry) {
-    throw new ServiceError(
-      "CONFLICT",
-      `No se pudo completar la anulación de ${params.sourceLabel}: el asiento se contabilizó mientras se anulaba. Revertí el asiento en Contabilidad y contactá soporte si el documento operativo quedó anulado.`,
-    );
-  }
-  if (entry.status !== "DRAFT") return;
-  await cancelJournalEntryAsAutomation(entry.id, ctx, { skipPeriodLock: true, tx });
+  const sync = async (db: Prisma.TransactionClient) => {
+    await lockCancelCompany(db, ctx, params);
+    const entries = await findLinkedJournals(ctx, params, db);
+    if (entries.some(blocksOperationalCancel)) {
+      throw new ServiceError(
+        "CONFLICT",
+        `No se pudo completar la anulación de ${params.sourceLabel}: el asiento se contabilizó mientras se anulaba. Revertí el asiento en Contabilidad y contactá soporte si el documento operativo quedó anulado.`,
+      );
+    }
+    for (const entry of entries) {
+      if (entry.status === "DRAFT") await cancelJournalEntryAsAutomation(entry.id, ctx, db);
+    }
+  };
+  if (tx) return sync(tx);
+  // Calls for already-cancelled legacy origins have no caller transaction. Recheck
+  // and repair in one transaction if any linked journal still needs attention.
+  const preview = await findLinkedJournals(ctx, params);
+  if (!preview.some(entry => entry.status === "DRAFT" || blocksOperationalCancel(entry))) return;
+  await prisma.$transaction(sync, { maxWait: 10_000, timeout: 30_000 });
 }
 
 /**
- * @deprecated Prefer the split path:
- * `assertJournalAllowsOperationalCancel` → ops txn → `cancelDraftJournalOnOperationalCancel`.
+ * @deprecated Call the guard and the DRAFT cleanup with the operational transaction.
  * This thin wrapper remains for docs/tests; production callers should not use it
  * (cancelling the DRAFT before a failed ops txn can leave GL inconsistent).
  *

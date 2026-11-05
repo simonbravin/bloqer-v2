@@ -11,6 +11,7 @@ Impedir mutaciones retroactivas en **movimientos financieros** y **asientos cont
 ## Alcance del bloqueo
 - **AccountMovement** con `movementDate` ∈ período cerrado: **no crear/editar/anular** sin reapertura ([BR-PER-002]). En docs legacy el campo se llama `date_accounting`; en Prisma es `movementDate`.
 - **JournalEntry** con `entryDate` ∈ período cerrado: **no crear / editar / postear / anular borrador / revertir**.
+- **Anulación de origen con borrador GL vinculado ([D-135]):** además de la fecha operativa, se valida el período de `JournalEntry.entryDate`. Si está cerrado, se bloquea la operación completa. Al reabrirlo, el origen y el borrador se anulan juntos.
 - Otros documentos operativos (OC, certificación) si impactan períodos cerrados: validación cruzada diferida ([BR-PER-002] extensión).
 
 ## Quién opera

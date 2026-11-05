@@ -8,7 +8,8 @@ import { log } from "../audit/audit.service";
 import { assertAccountingTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { isCrossCompany } from "../company-scope";
 import { ServiceContext, ServiceError } from "../types";
-import { resolveAccountingCompanyId } from "./accounting-company-context";
+import { lockAccountingCompany, resolveAccountingCompanyId } from "./accounting-company-context";
+import { resolvePagination } from "../finance/pagination";
 
 export type AccountingAccountView = AccountingAccount;
 
@@ -35,14 +36,13 @@ export async function listAccountingAccounts(
 
   const where = { tenantId: ctx.tenantId, companyId };
   const paginate = opts?.page !== undefined || opts?.pageSize !== undefined;
-  const page = opts?.page ?? 1;
-  const pageSize = opts?.pageSize ?? 20;
+  const { skip, take } = resolvePagination(opts);
 
   const [data, total] = await Promise.all([
     prisma.accountingAccount.findMany({
       where,
       orderBy: [{ code: "asc" }],
-      ...(paginate ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
+      ...(paginate ? { skip, take } : {}),
     }),
     prisma.accountingAccount.count({ where }),
   ]);
@@ -71,40 +71,43 @@ export async function createAccountingAccount(
   await assertEdit(ctx);
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
 
-  if (input.parentId) {
-    const parent = await prisma.accountingAccount.findFirst({
-      where: { id: input.parentId, tenantId: ctx.tenantId, companyId },
-    });
-    if (!parent) {
-      throw new ServiceError("VALIDATION", "Cuenta superior inválida");
-    }
-  }
+  const code = input.code.trim();
+  const name = input.name.trim();
+  if (!code || !name) throw new ServiceError("VALIDATION", "Completá el código y el nombre de la cuenta");
 
   try {
-    const created = await prisma.accountingAccount.create({
-      data: {
+    return await prisma.$transaction(async (tx) => {
+      await lockAccountingCompany(tx, ctx.tenantId, companyId);
+      if (input.parentId) {
+        const parent = await tx.accountingAccount.findFirst({
+          where: { id: input.parentId, tenantId: ctx.tenantId, companyId },
+          select: { id: true },
+        });
+        if (!parent) throw new ServiceError("VALIDATION", "Cuenta superior inválida");
+      }
+      const created = await tx.accountingAccount.create({
+        data: {
+          tenantId:    ctx.tenantId,
+          companyId,
+          code,
+          name,
+          type:        input.type,
+          parentId:    input.parentId ?? null,
+          description: input.description?.trim() ?? null,
+          isActive:    true,
+        },
+      });
+      await log({
         tenantId:    ctx.tenantId,
-        companyId,
-        code:        input.code.trim(),
-        name:        input.name.trim(),
-        type:        input.type,
-        parentId:    input.parentId ?? null,
-        description: input.description?.trim() ?? null,
-        isActive:    true,
-      },
-    });
-
-    await log({
-      tenantId:    ctx.tenantId,
-      actorUserId: ctx.actorUserId,
-      action:      "accounting_account.created",
-      entityType:  "AccountingAccount",
-      entityId:    created.id,
-      after:       { code: created.code, name: created.name, type: created.type },
-      ipAddress:   ctx.ipAddress,
-    });
-
-    return created;
+        actorUserId: ctx.actorUserId,
+        action:      "accounting_account.created",
+        entityType:  "AccountingAccount",
+        entityId:    created.id,
+        after:       { code: created.code, name: created.name, type: created.type },
+        ipAddress:   ctx.ipAddress,
+      }, tx);
+      return created;
+    }, { maxWait: 10_000, timeout: 30_000 });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       throw new ServiceError("CONFLICT", "Ya existe una cuenta con ese código en la empresa");
@@ -128,64 +131,61 @@ export async function updateAccountingAccount(
   }
   await resolveAccountingCompanyId(ctx, existing.companyId);
 
-  const postedLineCount = await prisma.journalEntryLine.count({
-    where: {
-      accountId: id,
-      journalEntry: { status: "POSTED", tenantId: ctx.tenantId },
-    },
-  });
-  if (postedLineCount > 0) {
-    if (input.type !== undefined && input.type !== existing.type) {
-      throw new ServiceError(
-        "CONFLICT",
-        "No se puede cambiar el tipo de cuenta con movimientos contabilizados",
-      );
+  const companyId = existing.companyId;
+  const name = input.name?.trim();
+  if (name === "") throw new ServiceError("VALIDATION", "Completá el nombre de la cuenta");
+  return prisma.$transaction(async (tx) => {
+    await lockAccountingCompany(tx, ctx.tenantId, companyId);
+    const fresh = await tx.accountingAccount.findFirst({ where: { id, tenantId: ctx.tenantId, companyId } });
+    if (!fresh) throw new ServiceError("NOT_FOUND", "Cuenta contable no encontrada");
+    const changesType = input.type !== undefined && input.type !== fresh.type;
+    const changesParent = input.parentId !== undefined && input.parentId !== fresh.parentId;
+    if (changesType || changesParent) {
+      const posted = await tx.journalEntryLine.findFirst({
+        where: { accountId: id, journalEntry: { status: "POSTED", tenantId: ctx.tenantId, companyId } },
+        select: { id: true },
+      });
+      if (posted) throw new ServiceError("CONFLICT", "No se puede cambiar el tipo ni la cuenta superior con movimientos contabilizados");
     }
-    if (
-      input.parentId !== undefined
-      && (input.parentId ?? null) !== (existing.parentId ?? null)
-    ) {
-      throw new ServiceError(
-        "CONFLICT",
-        "No se puede cambiar la cuenta superior con movimientos contabilizados",
-      );
-    }
-  }
 
-  if (input.parentId !== undefined && input.parentId !== null) {
-    if (input.parentId === id) {
-      throw new ServiceError("VALIDATION", "La cuenta no puede ser su propia superior");
+    if (changesParent && input.parentId) {
+      const accounts = await tx.accountingAccount.findMany({
+        where: { tenantId: ctx.tenantId, companyId },
+        select: { id: true, parentId: true },
+      });
+      const parents = new Map(accounts.map(account => [account.id, account.parentId]));
+      const visited = new Set([id]);
+      let ancestor: string | null = input.parentId;
+      while (ancestor) {
+        if (visited.has(ancestor)) throw new ServiceError("VALIDATION", "La jerarquía de cuentas no puede tener ciclos");
+        visited.add(ancestor);
+        const next = parents.get(ancestor);
+        if (next === undefined) throw new ServiceError("VALIDATION", "Cuenta superior inválida");
+        ancestor = next;
+      }
     }
-    const parent = await prisma.accountingAccount.findFirst({
-      where: { id: input.parentId, tenantId: ctx.tenantId, companyId: existing.companyId },
+
+    const updated = await tx.accountingAccount.update({
+      where: { id },
+      data: {
+        name,
+        type: input.type,
+        parentId: input.parentId,
+        description: input.description === undefined ? undefined : input.description?.trim() ?? null,
+        isActive: input.isActive,
+      },
     });
-    if (!parent) {
-      throw new ServiceError("VALIDATION", "Cuenta superior inválida");
-    }
-  }
-
-  const updated = await prisma.accountingAccount.update({
-    where: { id },
-    data: {
-      name:        input.name?.trim() ?? undefined,
-      type:        input.type ?? undefined,
-      parentId:    input.parentId === undefined ? undefined : input.parentId,
-      description: input.description === undefined ? undefined : input.description?.trim() ?? null,
-      isActive:    input.isActive ?? undefined,
-    },
-  });
-
-  await log({
-    tenantId:    ctx.tenantId,
-    actorUserId: ctx.actorUserId,
-    action:      "accounting_account.updated",
-    entityType:  "AccountingAccount",
-    entityId:    id,
-    after:       input,
-    ipAddress:   ctx.ipAddress,
-  });
-
-  return updated;
+    await log({
+      tenantId: ctx.tenantId,
+      actorUserId: ctx.actorUserId,
+      action: "accounting_account.updated",
+      entityType: "AccountingAccount",
+      entityId: id,
+      after: input,
+      ipAddress: ctx.ipAddress,
+    }, tx);
+    return updated;
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function deactivateAccountingAccount(

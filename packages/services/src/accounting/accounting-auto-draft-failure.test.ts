@@ -27,7 +27,13 @@ describe("auto-drafts never reject an already committed operation (D-061)", { co
     status: "CONFIRMED", currency: "ARS", amount: new Prisma.Decimal("10.00"),
     paymentDate: new Date("2026-10-08"), collectionDate: new Date("2026-10-08"),
     movementDate: new Date("2026-10-08"), description: "Treasury operation",
-    account: { type: "BANK", currency: "ARS", companyId: "company" },
+    account: { id: "source-account", tenantId: "tenant", type: "BANK", currency: "ARS", companyId: "company" },
+  };
+  const transfer = {
+    ...source,
+    sourceAccountId: "source-account", destinationAccountId: "destination-account",
+    sourceAccount: source.account, destinationAccount: { ...source.account, id: "destination-account" },
+    transferDate: source.movementDate,
   };
   const invoice = {
     ...source, status: "ISSUED", documentKind: "INVOICE", number: 101,
@@ -41,16 +47,18 @@ describe("auto-drafts never reject an already committed operation (D-061)", { co
     movementType = "OUTFLOW";
     stub(prisma.payment, "findFirst", async () => source);
     stub(prisma.collection, "findFirst", async () => source);
-    stub(prisma.internalTransfer, "findFirst", async () => source);
+    stub(prisma.internalTransfer, "findFirst", async () => transfer);
     stub(prisma.accountMovement, "findFirst", async () => ({
-      ...source, type: movementType, sourceType: null, transferId: "source",
+      ...source, type: movementType, sourceType: movementType === "TRANSFER_OUT" ? "INTERNAL_TRANSFER" : "MANUAL_ADJUSTMENT", sourceId: "source", transferId: "source",
     }));
     stub(prisma.accountMovement, "findMany", async () => [
-      { ...source, type: "TRANSFER_OUT" }, { ...source, type: "TRANSFER_IN" },
+      { ...source, type: "TRANSFER_OUT", accountId: "source-account" },
+      { ...source, type: "TRANSFER_IN", accountId: "destination-account" },
     ]);
     stub(prisma.salesInvoice, "findFirst", async () => invoice);
     stub(prisma.supplierInvoice, "findFirst", async () => invoice);
     stub(prisma.accountingAccount, "findFirst", async () => ({ id: "gl-account", isActive: true }));
+    stub(prisma.accountingAccount, "count", async () => 2);
     stub(prisma.tenantModuleSetting, "findMany", async () => []);
     stub(prisma.journalEntry, "findFirst", async () => null);
     stub(prisma.accountingMappingRule, "findFirst", async () => null);

@@ -2,7 +2,7 @@ import { redirect, notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AccountLedgerTable, AccountTypeBadge } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import {
   defaultAccountingMonthRange,
   getAccountingAccountById,
@@ -11,8 +11,9 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatDbDate } from "@/lib/format";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
@@ -31,8 +32,7 @@ export default async function CuentaContableDetallePage({
 
   const { accountId } = await params;
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
 
   let range;
   try {
@@ -76,7 +76,7 @@ export default async function CuentaContableDetallePage({
             <AccountTypeBadge type={account.type} />
           </div>
           <p className="text-sm text-muted-foreground">
-            Mayor · {range.dateFrom} — {range.dateTo}
+            Mayor · {formatDbDate(range.dateFrom)} — {formatDbDate(range.dateTo)}
           </p>
         </div>
         <ReportExportActions
@@ -103,7 +103,7 @@ export default async function CuentaContableDetallePage({
       </div>
 
       <DataTableSection title="Mayor (solo contabilizado)">
-        <AccountLedgerTable rows={ledger.rows} truncated={ledger.truncated} />
+        <AccountLedgerTable rows={ledger.rows} truncated={ledger.truncated} empresa={cf.companyId} />
       </DataTableSection>
     </PageShell>
   );

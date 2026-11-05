@@ -14,10 +14,11 @@ FINANCE.
 2. Ingresar saldos inicial/final del extracto.
 3. Marcar pares extracto ↔ movimiento sistema.
 4. Crear movimientos faltantes si hay diferencias justificadas.
-5. Cerrar sesión cuando cuadra → movimientos `RECONCILED`.
+5. Revisar la diferencia entre el saldo final del banco y el saldo del libro calculado por fecha valor, cuando esté disponible.
+6. Cerrar cuando el extracto cuadra aritméticamente y los movimientos y líneas del período están emparejados. Ver D-075.
 
 ## 5. Postcondiciones
-- Saldo sistema alineado con banco a fecha valor.
+- La sesión queda cerrada y sus emparejamientos se conservan. La diferencia de saldos se muestra por separado para poder identificar arrastres anteriores al rango.
 
 ## 5b. Reapertura
 Sesión `CLOSED` → **Reabrir** con motivo → `IN_PROGRESS` ([D-080]); matches se conservan.

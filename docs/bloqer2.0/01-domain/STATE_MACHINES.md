@@ -481,9 +481,7 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-  [*] --> DRAFT
-  DRAFT --> CONFIRMED : confirmar
-  DRAFT --> CANCELLED : cancelar
+  [*] --> CONFIRMED : registrar movimiento
   CONFIRMED --> RECONCILED : conciliar
   CONFIRMED --> CANCELLED : anular
   RECONCILED --> CONFIRMED : desconciliar
@@ -493,8 +491,7 @@ stateDiagram-v2
 
 ### Reglas
 
-- `DRAFT` no afecta saldos.
-- `CONFIRMED` afecta saldos y reportes.
+- `CONFIRMED` y `RECONCILED` afectan saldos y reportes. El movimiento de tesorería nace confirmado. Los borradores contables tienen un estado propio en GL.
 - `RECONCILED` significa cotejado con extracto bancario, no editable ([BR-TRZ-002]).
 - Anular `CONFIRMED` revierte saldos y, si tiene `transfer_id`, también la contraparte.
 - No se puede modificar/anular si `date_accounting` está en periodo cerrado ([BR-TRZ-003]).
@@ -1002,7 +999,7 @@ stateDiagram-v2
 | PurchaseInvoice / SupplierInvoice | DRAFT, ISSUED, CANCELLED (+ documentKind INVOICE/CREDIT_NOTE/DEBIT_NOTE) |
 | Receivable | OPEN, PARTIAL, PAID, OVERDUE, CANCELLED |
 | Payable | OPEN, PARTIAL, PAID, OVERDUE, CANCELLED |
-| AccountMovement | DRAFT, CONFIRMED, RECONCILED, CANCELLED |
+| AccountMovement | CONFIRMED, RECONCILED, CANCELLED |
 | Collection / Payment | CONFIRMED, CANCELLED (create-as-CONFIRMED) |
 | JournalEntry | DRAFT, POSTED, CANCELLED (+ reverse = nuevo POSTED) |
 | ChangeOrder | DRAFT, SUBMITTED, APPROVED, REJECTED, APPLIED, CANCELLED |

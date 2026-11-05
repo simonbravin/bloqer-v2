@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import {
   TreasuryAccountStatusBadge,
-  DeactivateTreasuryAccountButton,
+  TreasuryAccountStatusButton,
 } from "@/features/treasury";
 import {
   canEditInternalTransfersUi,
@@ -14,6 +14,7 @@ import { can } from "@bloqer/domain";
 import {
   getAccountMovementReport,
   getTreasuryAccountById,
+  getTenantModuleGate,
   listTreasuryAccounts,
   ServiceError,
 } from "@bloqer/services";
@@ -23,12 +24,12 @@ import { reactivateTreasuryAccountAction } from "../../actions";
 import { redirectWithActionError } from "@/lib/procurement-action-redirect";
 import { Button } from "@/components/ui/button";
 import { DataTableSection } from "@/components/ui/data-table-section";
-import { formatMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 import Link from "next/link";
 
 interface PageProps {
   params: Promise<{ accountId: string }>;
-  searchParams: Promise<{ actionError?: string; sort?: string; dir?: string }>;
+  searchParams: Promise<{ actionError?: string; contabilidad?: string; sort?: string; dir?: string; dateBasis?: string }>;
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -63,10 +64,20 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
   }
 
   const canEdit = canEditTreasuryUi(ctx.roles);
+  const canShowClose = canEdit && account.status !== "CLOSED";
+  const hasZeroBalance = isZeroMoneyAmount(account.balance);
   const canTransfer = canEditInternalTransfersUi(ctx.roles);
-  const canEditAccounting = can(ctx.roles, "EDIT", "ACCOUNTING");
-  const canViewReconciliation = can(ctx.roles, "VIEW", "BANK_RECONCILIATION");
+  const gate = await getTenantModuleGate(ctx);
+  const canEditAccounting = gate.isEnabled("ACCOUNTING") && can(ctx.roles, "EDIT", "ACCOUNTING");
+  const canViewReconciliation = gate.isEnabled("BANK_RECONCILIATION") && can(ctx.roles, "VIEW", "BANK_RECONCILIATION");
   const sortDir = sp.dir === "asc" || sp.dir === "desc" ? sp.dir : undefined;
+  const dateBasis = sp.dateBasis === "value" ? "value" : "accounting";
+  const extractHref = (basis: "accounting" | "value") => {
+    const query = new URLSearchParams();
+    if (basis === "value") query.set("dateBasis", basis);
+    if (sortDir) query.set("dir", sortDir);
+    return query.size > 0 ? `${returnPath}?${query}` : returnPath;
+  };
 
   let canTransferFromThisAccount = false;
   if (canTransfer && account.status === "ACTIVE") {
@@ -86,7 +97,7 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
   let movementRows;
   try {
     ({ rows: movementRows } = await getAccountMovementReport(
-      { accountId, sortDir },
+      { accountId, sortDir, dateBasis },
       ctx,
     ));
   } catch (err) {
@@ -128,9 +139,10 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
                   </Link>
                 </Button>
               )}
-              {canEdit && <DeactivateTreasuryAccountButton accountId={accountId} />}
+              {canEdit && <TreasuryAccountStatusButton accountId={accountId} operation="deactivate" />}
             </>
           )}
+          {canShowClose ? <TreasuryAccountStatusButton accountId={accountId} operation="close" disabled={!hasZeroBalance} /> : null}
           {account.status === "INACTIVE" && canEdit && (
             <form
               action={async () => {
@@ -148,7 +160,8 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
         </div>
       </div>
 
-      <ActionErrorBanner message={sp.actionError} />
+      <ActionErrorBanner message={sp.actionError ?? sp.contabilidad} />
+      {canShowClose && !hasZeroBalance ? <p className="text-sm text-muted-foreground">Para cerrar la cuenta, el saldo debe ser cero.</p> : null}
 
       {!canEdit && account.status === "ACTIVE" ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
@@ -213,19 +226,31 @@ export default async function AccountDetailPage({ params, searchParams }: PagePr
         actions={
           <ReportExportActions
             exportPath="/api/reports/tesoreria/movimientos.csv"
-            params={{ accountId }}
+            params={{ accountId, dir: sortDir, dateBasis }}
             pdf
           />
         }
       >
+        <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Criterio de fecha del extracto">
+          <Button asChild size="sm" variant={dateBasis === "accounting" ? "secondary" : "outline"}>
+            <Link href={extractHref("accounting")} aria-current={dateBasis === "accounting" ? "true" : undefined}>Fecha contable</Link>
+          </Button>
+          <Button asChild size="sm" variant={dateBasis === "value" ? "secondary" : "outline"}>
+            <Link href={extractHref("value")} aria-current={dateBasis === "value" ? "true" : undefined}>Fecha valor</Link>
+          </Button>
+        </div>
+        {dateBasis === "value" ? (
+          <p className="mb-3 text-xs text-muted-foreground">Si la fecha valor no se registró, se usa la fecha contable para ordenar y calcular el saldo.</p>
+        ) : null}
         <div className="text-sm text-muted-foreground mb-3">
           {movementRows.length} movimiento{movementRows.length === 1 ? "" : "s"}.
         </div>
         <MovementLedgerTable
           rows={movementRows}
           showRunningBalance
+          dateBasis={dateBasis}
           showAccountColumn={false}
-          accountingReturnPath={returnPath}
+          accountingReturnPath={extractHref(dateBasis)}
           canEditAccounting={canEditAccounting}
         />
       </DataTableSection>

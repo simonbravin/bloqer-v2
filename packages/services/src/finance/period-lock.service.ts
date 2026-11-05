@@ -1,14 +1,14 @@
 import { prisma, type Prisma } from "@bloqer/database";
 import { can } from "@bloqer/domain";
-import type { ClosePeriodInput, ReopenPeriodInput } from "@bloqer/validators";
+import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { closePeriodSchema, reopenPeriodSchema, type ClosePeriodInput, type ReopenPeriodInput } from "@bloqer/validators";
 import { log } from "../audit/audit.service";
-import { resolveAccountingCompanyId } from "../accounting/accounting-company-context";
+import { lockAccountingCompany, resolveAccountingCompanyId } from "../accounting/accounting-company-context";
 import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { ServiceContext, ServiceError } from "../types";
 import { assertOptimisticRowUpdate } from "./optimistic-lock";
 import {
   assertValidOverheadPeriod,
-  currentOverheadPeriod,
   periodToDateRange,
 } from "./overhead-period";
 
@@ -30,14 +30,15 @@ function toIsoDate(d: Date): string {
 }
 
 function normalizeIsoDate(date: Date | string): string {
+  if (date instanceof Date && Number.isFinite(date.getTime())) return toIsoDate(date);
   if (typeof date === "string") {
     const iso = date.slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) {
-      throw new ServiceError("VALIDATION", "Fecha inválida para validación de período");
+    const day = new Date(`${iso}T00:00:00.000Z`);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(iso) && Number.isFinite(day.getTime()) && toIsoDate(day) === iso) {
+      return iso;
     }
-    return iso;
   }
-  return toIsoDate(date);
+  throw new ServiceError("VALIDATION", "Fecha inválida para validación de período");
 }
 
 function assertCanOperatePeriodClose(ctx: ServiceContext): void {
@@ -48,6 +49,15 @@ function assertCanOperatePeriodClose(ctx: ServiceContext): void {
 
 async function assertPeriodCloseModule(ctx: ServiceContext): Promise<void> {
   await assertTenantModuleEnabled(ctx, "PERIOD_CLOSE");
+}
+
+async function lockPeriodCompany(tx: Prisma.TransactionClient, tenantId: string, companyId: string): Promise<void> {
+  await lockAccountingCompany(tx, tenantId, companyId);
+  const activeCompany = await tx.company.findFirst({
+    where: { id: companyId, tenantId, status: "ACTIVE" },
+    select: { id: true },
+  });
+  if (!activeCompany) throw new ServiceError("VALIDATION", "Empresa no válida o inactiva");
 }
 
 /**
@@ -100,20 +110,25 @@ export async function listFinancialPeriods(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver cierres de período");
   }
 
-  const companyId = await resolveAccountingCompanyId(ctx, companyIdInput ?? null);
   const limit = opts?.limit ?? 12;
+  if (!Number.isInteger(limit) || limit < 1 || limit > 36) {
+    throw new ServiceError("VALIDATION", "Indicá entre 1 y 36 períodos para consultar");
+  }
+  const companyId = await resolveAccountingCompanyId(ctx, companyIdInput ?? null);
 
   const closedRows = await prisma.period.findMany({
     where: { tenantId: ctx.tenantId, companyId },
     orderBy: { periodKey: "desc" },
+    take: limit,
   });
 
-  const keys = new Set<string>([currentOverheadPeriod(), ...closedRows.map((r) => r.periodKey)]);
+  const today = toIsoDateInTimeZone();
+  const monthStart = new Date(`${today.slice(0, 7)}-01T00:00:00.000Z`);
+  const keys = new Set<string>(closedRows.map((r) => r.periodKey));
   // Include recent months even if never closed.
   {
-    const now = new Date();
     for (let i = 0; i < limit; i++) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      const d = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() - i, 1));
       keys.add(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
     }
   }
@@ -143,7 +158,9 @@ export async function closeFinancialPeriod(
 ): Promise<PeriodSummary> {
   await assertPeriodCloseModule(ctx);
   assertCanOperatePeriodClose(ctx);
-  assertValidOverheadPeriod(input.periodKey);
+  const parsed = closePeriodSchema.safeParse(input);
+  if (!parsed.success) throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Cierre inválido");
+  assertValidOverheadPeriod(parsed.data.periodKey);
 
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId);
   const range = periodToDateRange(input.periodKey);
@@ -153,7 +170,7 @@ export async function closeFinancialPeriod(
 
   const row = await prisma.$transaction(async (tx) => {
     // Serialize vs journal post / treasury writes that lock the same company row.
-    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+    await lockPeriodCompany(tx, ctx.tenantId, companyId);
 
     const existing = await tx.period.findUnique({
       where: {
@@ -240,14 +257,16 @@ export async function reopenFinancialPeriod(
 ): Promise<PeriodSummary> {
   await assertPeriodCloseModule(ctx);
   assertCanOperatePeriodClose(ctx);
-  assertValidOverheadPeriod(input.periodKey);
+  const parsed = reopenPeriodSchema.safeParse(input);
+  if (!parsed.success) throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Reapertura inválida");
+  assertValidOverheadPeriod(parsed.data.periodKey);
 
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId);
-  const reason = input.reason.trim();
+  const reason = parsed.data.reason;
   const now = new Date();
 
   const row = await prisma.$transaction(async (tx) => {
-    await tx.$queryRaw`SELECT id FROM companies WHERE id = ${companyId} FOR UPDATE`;
+    await lockPeriodCompany(tx, ctx.tenantId, companyId);
 
     const existing = await tx.period.findUnique({
       where: {

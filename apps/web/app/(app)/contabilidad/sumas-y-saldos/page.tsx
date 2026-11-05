@@ -2,12 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import { getTrialBalanceReport, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { accountingAccountHref } from "@/lib/accounting-query";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatDbDate } from "@/lib/format";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import {
@@ -34,8 +35,7 @@ export default async function TrialBalancePage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
 
   let report;
   let rangeError: string | null = null;
@@ -66,7 +66,7 @@ export default async function TrialBalancePage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Sumas y saldos</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Período {report.dateFrom} — {report.dateTo}. Solo asientos contabilizados.
+            Período {formatDbDate(report.dateFrom)} — {formatDbDate(report.dateTo)}. Solo asientos contabilizados.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

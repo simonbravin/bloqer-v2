@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { can } from "@bloqer/domain";
 import {
-  getCompanies,
   getTenantModuleGate,
   listFinancialPeriods,
   ServiceError,
@@ -13,8 +12,8 @@ import { PageListHeader } from "@/components/ui/page-list-header";
 import { Button } from "@/components/ui/button";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import { accountingPageCompany } from "@/lib/accounting-page-company";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 
 export default async function ContabilidadCierresPage({
   searchParams,
@@ -24,7 +23,7 @@ export default async function ContabilidadCierresPage({
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
-  const ctx = (await buildTenantServiceContext())!;
+  const { ctx, companies, company: activeCompany } = await accountingPageCompany(await searchParams);
   const gate = await getTenantModuleGate(ctx);
   if (!gate.isEnabled("PERIOD_CLOSE") || !can(ctx.roles, "VIEW", "PERIOD_CLOSE")) {
     return (
@@ -50,16 +49,7 @@ export default async function ContabilidadCierresPage({
     );
   }
 
-  const sp = await searchParams;
-  const cf = companyQueryFilter(sp);
-  const companies = await getCompanies(ctx);
-  // Membership company wins (resolveAccountingCompanyId ignores ?empresa= when ctx.companyId is set).
-  const companyId = ctx.companyId ?? cf.companyId ?? companies[0]?.id;
-  const activeCompany = companies.find((c) => c.id === companyId) ?? null;
-  // Only offer a picker when the actor is tenant-wide (no membership company lock).
-  const showCompanyPicker = !ctx.companyId && companies.length > 1;
-
-  if (!companyId) {
+  if (!activeCompany) {
     return (
       <PageShell variant="default" className="space-y-6">
         <PageListHeader
@@ -67,11 +57,12 @@ export default async function ContabilidadCierresPage({
           subtitle="Bloqueo mensual de tesorería y contabilidad"
         />
         <p className="text-sm text-muted-foreground rounded-lg border bg-card p-4">
-          Configurá al menos una empresa activa para cerrar períodos.
+          {companies.length > 1 ? "Elegí una empresa arriba para revisar sus períodos." : "Configurá una empresa activa para cerrar períodos."}
         </p>
       </PageShell>
     );
   }
+  const companyId = activeCompany.id;
 
   let periods: Awaited<ReturnType<typeof listFinancialPeriods>> = [];
   let loadError: string | null = null;
@@ -100,24 +91,6 @@ export default async function ContabilidadCierresPage({
           </>
         }
       />
-
-      {showCompanyPicker ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 px-4 py-3 text-sm">
-          <span className="text-muted-foreground">Empresa:</span>
-          {companies.map((c) => (
-            <Button
-              key={c.id}
-              asChild
-              size="sm"
-              variant={c.id === companyId ? "default" : "outline"}
-            >
-              <Link href={`/contabilidad/cierres?empresa=${encodeURIComponent(c.id)}`}>
-                {c.name}
-              </Link>
-            </Button>
-          ))}
-        </div>
-      ) : null}
 
       {loadError ? (
         <p className="text-sm text-destructive" role="alert">

@@ -1882,11 +1882,16 @@ model AccountMovement {
   /// External official invoice / voucher reference (e.g. ARCA FC A 0001-00001234) when issued outside Bloqer.
   externalInvoiceRef    String?
   movementDate          DateTime                  @db.Date
+  /// D-137: settlement date for new transfer legs; null when not recorded.
+  valueDate             DateTime?                 @db.Date
   type                  AccountMovementType
   sourceType            AccountMovementSourceType
   sourceId              String?
   currency              String
   amount                Decimal                   @db.Decimal(18, 4)
+  /// D-134: snapshots are present on new movements; legacy values remain unknown.
+  fxRate                Decimal?                  @db.Decimal(18, 6)
+  amountArs             Decimal?                  @db.Decimal(18, 4)
   description           String
   status                AccountMovementStatus     @default(CONFIRMED)
   transferId            String?
@@ -2043,6 +2048,8 @@ model InternalTransfer {
   sourceAccountId      String
   destinationAccountId String
   transferDate         DateTime               @db.Date
+  /// D-137: settlement date distinct from the accounting date.
+  valueDate            DateTime?              @db.Date
   currency             String
   amount               Decimal                @db.Decimal(18, 4)
   description          String?

@@ -16,6 +16,7 @@ export default async function TesoreriaLayout({ children }: { children: ReactNod
   }
 
   const gate = await getTenantModuleGate(ctx);
+  if (!gate.isEnabled("TREASURY")) redirect("/dashboard");
   const links = TESORERIA_SUBNAV_LINKS.filter((link) => {
     if (link.href !== "/tesoreria/conciliacion") return true;
     return (

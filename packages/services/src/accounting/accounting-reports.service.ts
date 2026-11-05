@@ -10,7 +10,7 @@ import {
   parseAccountingDateRange,
 } from "./accounting-date";
 import { naturalBalance, naturalBalanceSignedString } from "./accounting-natural-balance";
-import { getAccountLedger } from "./journal-entry.service";
+import { getAccountLedger, normalizeJournalCurrency } from "./journal-entry.service";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 
 export type AccountingReportDateRange = {
@@ -134,7 +134,7 @@ async function aggregatePostedLines(
         status: "POSTED",
         ...(Object.keys(dateFilter).length > 0 ? { entryDate: dateFilter } : {}),
       },
-      ...(types ? { account: { type: { in: types } } } : {}),
+      account: { tenantId: ctx.tenantId, companyId, ...(types ? { type: { in: types } } : {}) },
     },
     include: {
       account: { select: { id: true, code: true, name: true, type: true } },
@@ -143,7 +143,8 @@ async function aggregatePostedLines(
 
   const map = new Map<string, Agg>();
   for (const l of lines) {
-    const key = `${l.accountId}|${l.currency}`;
+    const currency = normalizeJournalCurrency(l.currency);
+    const key = `${l.accountId}|${currency}`;
     const cur = map.get(key);
     if (!cur) {
       map.set(key, {
@@ -151,7 +152,7 @@ async function aggregatePostedLines(
         accountCode: l.account.code,
         accountName: l.account.name,
         accountType: l.account.type,
-        currency: l.currency,
+        currency,
         debit: l.debit,
         credit: l.credit,
       });
@@ -190,9 +191,10 @@ export async function getTrialBalanceReport(
   };
 }
 
-export async function listPostedJournalBook(
+async function loadPostedJournalBook(
   ctx: ServiceContext,
-  input: AccountingReportDateRange & { page?: number; pageSize?: number },
+  input: AccountingReportDateRange,
+  pagination: { skip: number; take: number; exportAll?: boolean },
 ): Promise<{
   dateFrom: string;
   dateTo: string;
@@ -203,8 +205,6 @@ export async function listPostedJournalBook(
   await assertView(ctx);
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
   const { dateFrom, dateTo } = parseAccountingDateRange(input);
-  const page = input.page ?? 1;
-  const pageSize = Math.min(input.pageSize ?? 100, 500);
 
   const where: Prisma.JournalEntryWhereInput = {
     tenantId: ctx.tenantId,
@@ -216,18 +216,24 @@ export async function listPostedJournalBook(
     },
   };
 
-  const [rows, total] = await Promise.all([
-    prisma.journalEntry.findMany({
+  const { rows, total } = await prisma.$transaction(async (tx) => {
+    const total = await tx.journalEntry.count({ where });
+    // Exports reject a range above their cap. Avoid fetching those lines just to discard them.
+    if (pagination.exportAll && total > pagination.take) return { rows: [], total };
+    const rows = await tx.journalEntry.findMany({
       where,
       orderBy: [{ entryDate: "asc" }, { id: "asc" }],
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip: pagination.skip,
+      take: pagination.take,
       include: {
         lines: { include: { account: true }, orderBy: { id: "asc" } },
       },
-    }),
-    prisma.journalEntry.count({ where }),
-  ]);
+    });
+    return { rows, total };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead, timeout: 30_000 });
+  if (rows.some(entry => entry.lines.some(line => line.account.tenantId !== ctx.tenantId || line.account.companyId !== companyId))) {
+    throw new ServiceError("CONFLICT", "El libro contiene asientos con cuentas fuera de su empresa");
+  }
 
   return {
     dateFrom,
@@ -246,10 +252,20 @@ export async function listPostedJournalBook(
         description: l.description,
         debit: serializeMoneyDecimal(l.debit),
         credit: serializeMoneyDecimal(l.credit),
-        currency: l.currency,
+        currency: normalizeJournalCurrency(l.currency),
       })),
     })),
   };
+}
+
+export async function listPostedJournalBook(
+  ctx: ServiceContext,
+  input: AccountingReportDateRange & { page?: number; pageSize?: number },
+) {
+  const take = Number.isSafeInteger(input.pageSize) ? Math.max(1, Math.min(input.pageSize!, 500)) : 100;
+  const page = Number.isSafeInteger(input.page) ? Math.max(1, input.page!) : 1;
+  const skip = (page - 1) * take;
+  return loadPostedJournalBook(ctx, input, { skip: skip > 2_147_483_647 ? 0 : skip, take });
 }
 
 /** Full book for export (capped). */
@@ -258,21 +274,8 @@ export async function listPostedJournalBookForExport(
   input: AccountingReportDateRange,
   maxEntries = 5000,
 ): Promise<{ dateFrom: string; dateTo: string; companyId: string; total: number; data: PostedJournalBookEntry[] }> {
-  const pageSize = 500;
-  const first = await listPostedJournalBook(ctx, { ...input, page: 1, pageSize });
-  const all = [...first.data];
-  const pages = Math.ceil(Math.min(first.total, maxEntries) / pageSize);
-  for (let p = 2; p <= pages; p++) {
-    const next = await listPostedJournalBook(ctx, { ...input, page: p, pageSize });
-    all.push(...next.data);
-  }
-  return {
-    dateFrom: first.dateFrom,
-    dateTo: first.dateTo,
-    companyId: first.companyId,
-    total: first.total,
-    data: all.slice(0, maxEntries),
-  };
+  const take = Number.isSafeInteger(maxEntries) ? Math.max(1, Math.min(10_000, maxEntries)) : 5000;
+  return loadPostedJournalBook(ctx, input, { skip: 0, take, exportAll: true });
 }
 
 export async function getAccountLedgerReport(
@@ -289,6 +292,7 @@ export async function getAccountLedgerReport(
   truncated: boolean;
   rows: Awaited<ReturnType<typeof getAccountLedger>>["rows"];
 }> {
+  await assertView(ctx);
   const { dateFrom, dateTo } = parseAccountingDateRange(input);
   const companyId = await resolveAccountingCompanyId(ctx, input.companyId ?? null);
   const account = await prisma.accountingAccount.findFirst({
@@ -329,10 +333,9 @@ export async function getStatementOfFinancialPosition(
 
   const balanceSheetTypes: AccountType[] = ["ASSET", "LIABILITY", "EQUITY"];
   const plTypes: AccountType[] = ["INCOME", "EXPENSE"];
-  const [bsAggs, plAggs] = await Promise.all([
-    aggregatePostedLines(ctx, companyId, filter, balanceSheetTypes),
-    aggregatePostedLines(ctx, companyId, filter, plTypes),
-  ]);
+  const allAggs = await aggregatePostedLines(ctx, companyId, filter);
+  const bsAggs = allAggs.filter(row => balanceSheetTypes.includes(row.accountType));
+  const plAggs = allAggs.filter(row => plTypes.includes(row.accountType));
 
   const currencies = new Set<string>();
   for (const r of bsAggs) currencies.add(r.currency);

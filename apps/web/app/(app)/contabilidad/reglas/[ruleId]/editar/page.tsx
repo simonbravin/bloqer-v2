@@ -1,10 +1,10 @@
 import { redirect, notFound } from "next/navigation";
 import { AccountingMappingRuleForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import { getAccountingMappingRuleById, listAccountingAccounts } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 
 export default async function EditarReglaContablePage({
@@ -20,8 +20,7 @@ export default async function EditarReglaContablePage({
 
   const { ruleId } = await params;
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
 
   let rule;
   try {

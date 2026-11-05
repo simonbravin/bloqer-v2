@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { MovementReportRow } from "@bloqer/services";
 import { formatDate } from "@/lib/format";
+import { formatGroupedDecimal } from "@bloqer/utils";
 import {
   formatMoneyAmount,
   formatSignedMoneyAmount,
@@ -28,6 +29,7 @@ export type MovementDetailDialogRow = Pick<
   MovementReportRow,
   | "description"
   | "movementDate"
+  | "valueDate"
   | "accountName"
   | "type"
   | "classLabel"
@@ -40,6 +42,8 @@ export type MovementDetailDialogRow = Pick<
   | "documentRef"
   | "externalInvoiceRef"
   | "currency"
+  | "fxRate"
+  | "amountArs"
   | "signedAmount"
   | "runningBalance"
   | "detailHref"
@@ -86,6 +90,8 @@ export function MovementDetailDialog({
             <span className="whitespace-pre-wrap font-normal">{row.description || "—"}</span>
           </DetailField>
           <DetailField label="Cuenta">{row.accountName}</DetailField>
+          <DetailField label="Fecha contable">{formatDate(row.movementDate)}</DetailField>
+          <DetailField label="Fecha valor">{row.valueDate == null ? "Sin registrar" : formatDate(row.valueDate)}</DetailField>
           <DetailField label="Tipo">{typeLabel}</DetailField>
           <DetailField label="Clase">
             {row.classLabel ? (
@@ -122,8 +128,18 @@ export function MovementDetailDialog({
               {row.currency} {formatSignedMoneyAmount(row.signedAmount)}
             </span>
           </DetailField>
+          {row.currency !== "ARS" ? (
+            <>
+              <DetailField label={`Tipo de cambio · ARS por 1 ${row.currency}`}>
+                {row.fxRate == null ? "No disponible" : formatGroupedDecimal(row.fxRate, 6)}
+              </DetailField>
+              <DetailField label="Equivalente histórico ARS">
+                {row.amountArs == null ? "No disponible" : formatMoneyAmount(row.amountArs, "ARS")}
+              </DetailField>
+            </>
+          ) : null}
           {row.runningBalance != null && row.runningBalance !== "" ? (
-            <DetailField label="Saldo">{formatMoneyAmount(row.runningBalance)}</DetailField>
+            <DetailField label="Saldo">{formatMoneyAmount(row.runningBalance, row.currency)}</DetailField>
           ) : null}
         </DetailFieldGrid>
         {href ? (

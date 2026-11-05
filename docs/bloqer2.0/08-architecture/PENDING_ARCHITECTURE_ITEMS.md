@@ -10,7 +10,7 @@
 - **Origen:** frontera detectada en AG-09 al contrastar el alta Solo caja con D-008/MONEY_MODEL. La auditoría completa de cuentas, movimientos y transferencias corresponde a AG-10, aún no iniciada.
 - **Evidencia:** AccountMovement conserva amount/currency pero no tiene columnas fxRate/amountArs; InternalTransfer tampoco representa un snapshot FX. Payment/Collection y facturas sí lo tienen y se corrigen/verifican en AG-09. Agregar un campo visible sin persistencia perdería el dato ingresado.
 - **Pendiente:** diseñar representación, todos sus escritores/lectores/GL, tratamiento explícito de históricos desconocidos y migración. Requiere propuesta y autorización de nuevos campos conforme AGENTS §5; no se presume FX 1 para moneda extranjera ni se regularizan históricos automáticamente.
-- **Estado:** registrado para AG-10. En AG-09 solo se corrige el orden de locks de los consumidores compartidos para que no inviertan Company/Account respecto de pagos/cobros compuestos. No se declara auditada ni resuelta esta función de tesorería.
+- **Estado:** Q-081 aprobada como D-134. Se agregan columnas en `AccountMovement`, y la transferencia propia lee el snapshot de sus piernas. Migración validada en base aislada. Implementación y verificación de escritores, lectores y UI en [AG-10](./platform-audit/2026-11-05-ag-10-treasury-accounting.md).
 
 ## INDARI / Casa Hogar — auditoría del 21/10/2026
 

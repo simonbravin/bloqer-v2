@@ -355,8 +355,9 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Tesorería → Cuentas → Nueva (o + Nueva cuenta).",
-      "Indicá tipo (banco/caja/billetera), moneda y saldo de apertura si aplica.",
+      "Indicá tipo (banco/caja/billetera), moneda y saldo de apertura si aplica. Un saldo inicial positivo o negativo requiere un período abierto y queda en el extracto. Para moneda extranjera ingresá el tipo de cambio en ARS por una unidad.",
       "Usá esa cuenta al cobrar (INFLOW) o pagar (OUTFLOW).",
+      "Con saldo cero y permiso de edición podés elegir Cerrar cuenta desde su detalle. El cierre es definitivo y conserva el extracto.",
     ],
     relatedSlugs: ["transferir-entre-cuentas", "ver-movimientos-de-tesoreria", "por-que-un-pago-se-bloquea"],
     keywords: ["caja", "banco", "cuenta tesoreria", "saldo apertura", "nueva cuenta", "caja chica"],
@@ -378,9 +379,10 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Tesorería → Cuentas → Transferir entre cuentas (o desde el detalle de una cuenta).",
-      "Elegí cuenta origen, destino, monto y fecha. Un pago a un proveedor no es una transferencia.",
+      "Elegí cuentas de la misma moneda, monto, Fecha contable y Fecha valor. Si la moneda es extranjera, ingresá una cotización para ambas piernas.",
       "Confirmá. No puede dejar la origen en negativo.",
       "El historial del par origen/destino está en Historial de transferencias (desde Cuentas).",
+      "En el extracto elegí fecha contable o fecha valor. Cuando un histórico no tiene fecha valor registrada, se indica que se toma la contable como referencia.",
     ],
     pitfalls: [
       "El método de liquidación «Transferencia» en un pago/cobranza ([D-074]) no crea una transferencia interna.",
@@ -410,7 +412,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     steps: [
       "Tesorería → Flujo de caja.",
       "Elegí el período y revisá ingresos vs egresos.",
-      "Para el detalle línea a línea abrí Tesorería → Cuentas → la cuenta.",
+      "Para el detalle línea a línea abrí Tesorería → Cuentas → la cuenta. En el resumen, Posición de caja conserva los saldos por moneda y avisa si falta cotización histórica para el consolidado en pesos.",
     ],
     relatedSlugs: ["ver-movimientos-de-tesoreria", "crear-cuenta-tesoreria"],
     keywords: ["flujo de caja", "cashflow", "ingresos", "egresos", "tesoreria"],
@@ -463,9 +465,9 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/tesoreria/conciliacion", label: "Conciliación" }],
     steps: [
       "Tesorería → Conciliación → Nueva.",
-      "Importá CSV/OFX o cargá líneas del extracto.",
-      "Emparejá movimientos del sistema con el extracto.",
-      "Cerrar conciliación cuando el mes cuadre.",
+      "Importá CSV/OFX o cargá líneas del extracto. Si una fila XFER de OFX no indica + o -, corregí el archivo o ingresá esa línea manualmente.",
+      "Emparejá movimientos del sistema con el extracto. Si creás un movimiento desde una línea de una cuenta extranjera, ingresá el tipo de cambio de esa operación.",
+      "Revisá Saldo de libros al cierre y Diferencia banco − sistema. Cerrá cuando el extracto cuadre y queden emparejadas sus líneas y movimientos del período.",
     ],
     pitfalls: [
       "No canceles un pago/cobranza si el movimiento ya está Conciliado: desemparejá primero.",
@@ -491,7 +493,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/tesoreria/cuentas", label: "Cuentas" }],
     steps: [
       "Abrí el detalle de la cuenta.",
-      "CTA Ajuste manual: monto, fecha y motivo.",
+      "CTA Ajuste manual: monto, fecha y motivo. Para moneda extranjera, ingresá el tipo de cambio de ese ajuste.",
       "Confirmá. Queda movimiento ADJUSTMENT.",
     ],
     relatedSlugs: ["conciliar-el-banco", "ver-movimientos-de-tesoreria"],

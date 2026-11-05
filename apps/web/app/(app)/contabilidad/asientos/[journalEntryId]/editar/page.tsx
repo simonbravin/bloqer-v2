@@ -1,10 +1,11 @@
 import { redirect, notFound } from "next/navigation";
 import { JournalEntryForm } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { getCompanies, getJournalEntryById, listAccountingAccounts } from "@bloqer/services";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
+import { getJournalEntryById, listAccountingAccounts } from "@bloqer/services";
+import { contabilidadAsientoHref } from "@/lib/contabilidad-asiento-path";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { formatDate } from "@/lib/format";
 import { PageShell } from "@/components/layout/page-shell";
 
@@ -21,8 +22,7 @@ export default async function EditarAsientoPage({
 
   const { journalEntryId } = await params;
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
 
   let entry;
   try {
@@ -30,12 +30,9 @@ export default async function EditarAsientoPage({
   } catch {
     notFound();
   }
-  if (entry.status !== "DRAFT") redirect(`/contabilidad/asientos/${journalEntryId}`);
+  if (entry.status !== "DRAFT") redirect(contabilidadAsientoHref(entry.id, entry.companyId, ctx.companyId));
 
-  const [companies, accountsResult] = await Promise.all([
-    getCompanies(ctx),
-    listAccountingAccounts(ctx, { companyId: entry.companyId }),
-  ]);
+  const accountsResult = await listAccountingAccounts(ctx, { companyId: entry.companyId });
   const picks = accountsResult.data.map((a) => ({ id: a.id, code: a.code, name: a.name }));
 
   return (
@@ -48,8 +45,7 @@ export default async function EditarAsientoPage({
         entryId={journalEntryId}
         initial={entry}
         accounts={picks}
-        companies={companies.map((c) => ({ id: c.id, name: c.name }))}
-        defaultCompanyId={current.tenantCtx.companyId}
+        defaultCompanyId={entry.companyId}
       />
     </PageShell>
   );

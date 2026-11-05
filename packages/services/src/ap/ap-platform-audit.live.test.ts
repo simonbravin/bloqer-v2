@@ -4,7 +4,12 @@ import { randomUUID } from "node:crypto";
 import { after, before, describe, it } from "node:test";
 import { prisma } from "@bloqer/database";
 import { createSupplierInvoiceSchema, registerApExpenseSchema, createJournalEntrySchema } from "@bloqer/validators";
-import { createJournalEntryAsAutomation, postJournalEntry } from "../accounting/journal-entry.service";
+import { cancelJournalEntry, createJournalEntryAsAutomation, postJournalEntry, reversePostedJournalEntry, updateJournalEntry } from "../accounting/journal-entry.service";
+import { listPostedJournalBook } from "../accounting/accounting-reports.service";
+import { getJournalEntrySourceLink } from "../accounting/journal-entry-source-link.service";
+import { closeFinancialPeriod, reopenFinancialPeriod } from "../finance/period-lock.service";
+import { getAccountBalance } from "../treasury/balance.service";
+import { closeTreasuryAccount, createTreasuryAccount } from "../treasury/treasury-account.service";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
 import { createSupplierInvoice, issueSupplierInvoice, updateSupplierInvoice, cancelSupplierInvoice, getCompanySupplierInvoiceById } from "./supplier-invoice.service";
@@ -69,6 +74,7 @@ describe("AG-09 AP on isolated SQL", { skip: process.env.BLOQER_AUDIT_LIVE !== "
         await tx.notification.deleteMany({ where: { tenantId: tenants } });
         await tx.emailDeliveryLog.deleteMany({ where: { tenantId: tenants } });
         await tx.journalEntryLine.deleteMany({ where: { journalEntry: { tenantId: tenants } } });
+        await tx.journalEntry.deleteMany({ where: { tenantId: tenants, reversesEntryId: { not: null } } });
         await tx.journalEntry.deleteMany({ where: { tenantId: tenants } });
         await tx.accountingAccount.deleteMany({ where: { tenantId: tenants } });
         await tx.accountMovement.deleteMany({ where: { tenantId: tenants } });
@@ -119,7 +125,12 @@ describe("AG-09 AP on isolated SQL", { skip: process.env.BLOQER_AUDIT_LIVE !== "
     assert.equal((await createPayment(input, ctx)).id, payment.id);
     await assert.rejects(() => createPayment({ ...input, fxRate: "1300" }, ctx), conflict);
     await assert.rejects(() => createPayment({ ...input, fxRate: undefined }, ctx), conflict);
-    assert.equal(await prisma.accountMovement.count({ where: { sourceType: "PAYMENT", sourceId: payment.id } }), 1);
+    const movements = await prisma.accountMovement.findMany({
+      where: { tenantId, sourceType: "PAYMENT", sourceId: payment.id },
+    });
+    assert.equal(movements.length, 1);
+    assert.equal(movements[0]?.fxRate?.toFixed(6), "1250.123456");
+    assert.equal(movements[0]?.amountArs?.toFixed(2), "50004.94");
     await cancelPayment(payment.id, ctx, undefined, "Synthetic reversal");
     await cancelPayment(payment.id, ctx, undefined, "Synthetic retry");
     const payable = await prisma.payable.findUniqueOrThrow({ where: { id: s.payable.id } });
@@ -131,6 +142,49 @@ describe("AG-09 AP on isolated SQL", { skip: process.env.BLOQER_AUDIT_LIVE !== "
     await assert.rejects(() => createPayment({ payableId: s.payable.id, accountId: usdAccountId, paymentDate: day, amount: "40", idempotencyKey: randomUUID(), reference: null }, ctx), invalid);
     assert.equal(await prisma.payment.count({ where: { payableId: s.payable.id } }), 0);
     assert.equal((await prisma.payable.findUniqueOrThrow({ where: { id: s.payable.id } })).paidAmount.toFixed(2), "0.00");
+  });
+
+  it("AG-10 preserves a payment when its cash leg is duplicated, dated differently or in a closed account", async () => {
+    const expense = await issued();
+    const account = await createTreasuryAccount({
+      name: `Synthetic AG10 payment close ${randomUUID()}`,
+      type: "BANK",
+      currency: "ARS",
+      openingBalance: "100",
+    }, ctx);
+    const payment = await createPayment({
+      payableId: expense.payable.id,
+      accountId: account.id,
+      paymentDate: day,
+      amount: "100",
+      idempotencyKey: randomUUID(),
+      reference: null,
+    }, ctx);
+    const movement = await prisma.accountMovement.findFirstOrThrow({
+      where: { tenantId, sourceType: "PAYMENT", sourceId: payment.id },
+    });
+    const cancel = () => cancelPayment(payment.id, ctx, undefined, "Synthetic invalid cancellation");
+    const wrongDate = new Date(movement.movementDate.getTime() + 24 * 60 * 60 * 1_000);
+    await prisma.accountMovement.update({ where: { id: movement.id }, data: { movementDate: wrongDate } });
+    try {
+      await assert.rejects(cancel, /movimiento de tesorería tienen relaciones o importes inconsistentes/);
+    } finally {
+      await prisma.accountMovement.update({ where: { id: movement.id }, data: { movementDate: movement.movementDate } });
+    }
+
+    const duplicate = await prisma.accountMovement.create({ data: { ...movement, id: randomUUID() } });
+    try {
+      await assert.rejects(cancel, /único movimiento/);
+    } finally {
+      await prisma.accountMovement.delete({ where: { id: duplicate.id } });
+    }
+
+    assert.equal((await closeTreasuryAccount(account.id, ctx)).status, "CLOSED");
+    await assert.rejects(cancel, /cuenta de tesorería cerrada/);
+    assert.equal((await getAccountBalance(account.id)).toFixed(2), "0.00");
+    assert.equal((await prisma.payment.findUniqueOrThrow({ where: { id: payment.id } })).status, "CONFIRMED");
+    assert.equal((await prisma.accountMovement.findUniqueOrThrow({ where: { id: movement.id } })).status, "CONFIRMED");
+    assert.equal((await prisma.payable.findUniqueOrThrow({ where: { id: expense.payable.id } })).paidAmount.toFixed(2), "100.00");
   });
   it("partial cash plus full remaining NC keeps cash and credit separate through reads and reversal", async () => {
     const s = await issued();
@@ -253,6 +307,82 @@ describe("AG-09 AP on isolated SQL", { skip: process.env.BLOQER_AUDIT_LIVE !== "
     ]);
     assert.equal(payment.status, "CONFIRMED"); assert.equal(debt.paidAmount.toFixed(2), "40.00"); assert.equal(journal.status, "DRAFT"); assert.equal(movement.status, "CONFIRMED");
     assert.equal(await prisma.auditLog.count({ where: { entityId: { in: [s.payment.id, s.journal.id] }, action: { in: ["payment.cancelled", "journal_entry.cancelled"] } } }), 0);
+  });
+  it("D-135 rolls back payment cancellation when its GL draft date is closed and allows it after reopening", async () => {
+    const s = await paidWithJournal();
+    const periodKey = "2026-10";
+    await setAccounting(true);
+    try {
+      await updateJournalEntry(s.journal.id, { entryDate: "2026-10-31" }, ctx);
+      await closeFinancialPeriod({ companyId, periodKey }, ctx);
+      const initialCash = await getAccountBalance(arsAccountId);
+      await assert.rejects(
+        () => cancelPayment(s.payment.id, ctx, undefined, "Synthetic closed GL rollback"),
+        error => error instanceof ServiceError && error.code === "CONFLICT" && error.message.includes("PERIOD_CLOSED"),
+      );
+      const readEffects = () => Promise.all([
+        prisma.payment.findUniqueOrThrow({ where: { id: s.payment.id } }),
+        prisma.payable.findUniqueOrThrow({ where: { id: s.payable.id } }),
+        prisma.journalEntry.findUniqueOrThrow({ where: { id: s.journal.id } }),
+        prisma.accountMovement.findFirstOrThrow({ where: { tenantId, sourceType: "PAYMENT", sourceId: s.payment.id } }),
+        prisma.auditLog.count({ where: { tenantId, entityId: { in: [s.payment.id, s.journal.id] }, action: { in: ["payment.cancelled", "journal_entry.cancelled"] } } }),
+      ]);
+      const [payment, debt, journal, movement, auditCount] = await readEffects();
+      assert.equal(payment.status, "CONFIRMED");
+      assert.equal(debt.paidAmount.toFixed(2), "40.00");
+      assert.equal(journal.status, "DRAFT");
+      assert.equal(movement.status, "CONFIRMED");
+      assert.equal(auditCount, 0);
+      assert.equal((await getAccountBalance(arsAccountId)).toFixed(2), initialCash.toFixed(2));
+
+      await reopenFinancialPeriod({ companyId, periodKey, reason: "Synthetic D-135 reopening" }, ctx);
+      await cancelPayment(s.payment.id, ctx, undefined, "Synthetic cancellation after reopening");
+      const [cancelled, openDebt, cancelledJournal, cancelledMovement, newAudits] = await readEffects();
+      assert.equal(cancelled.status, "CANCELLED");
+      assert.equal(openDebt.paidAmount.toFixed(2), "0.00");
+      assert.equal(cancelledJournal.status, "CANCELLED");
+      assert.equal(cancelledMovement.status, "CANCELLED");
+      assert.equal(newAudits, 2);
+      assert.equal((await getAccountBalance(arsAccountId)).minus(initialCash).toFixed(2), "40.00");
+    } finally {
+      await setAccounting(false);
+    }
+  });
+  it("AG-10 rejects an adulterated sourced GL draft, then posts and reverses the trusted draft in the journal book", async () => {
+    const s = await paidWithJournal();
+    // Reproduce a stored draft that the old public manual entry point could forge.
+    await prisma.journalEntryLine.updateMany({ where: { journalEntryId: s.journal.id, debit: { gt: 0 } }, data: { debit: "39" } });
+    await prisma.journalEntryLine.updateMany({ where: { journalEntryId: s.journal.id, credit: { gt: 0 } }, data: { credit: "39" } });
+    await setAccounting(true);
+    try {
+      await assert.rejects(() => postJournalEntry(s.journal.id, ctx),
+        error => conflict(error) && (error as ServiceError).message.includes("no coinciden con su origen"));
+      const [draft, payment, cash, posts] = await Promise.all([
+        prisma.journalEntry.findUniqueOrThrow({ where: { id: s.journal.id } }),
+        prisma.payment.findUniqueOrThrow({ where: { id: s.payment.id } }),
+        prisma.accountMovement.findFirstOrThrow({ where: { tenantId, sourceType: "PAYMENT", sourceId: s.payment.id } }),
+        prisma.auditLog.count({ where: { tenantId, entityId: s.journal.id, action: "journal_entry.posted" } }),
+      ]);
+      assert.equal(draft.status, "DRAFT");
+      assert.equal(payment.status, "CONFIRMED");
+      assert.equal(cash.status, "CONFIRMED");
+      assert.equal(cash.amount.toFixed(2), "40.00");
+      assert.equal(posts, 0);
+
+      await cancelJournalEntry(s.journal.id, ctx);
+      const trusted = await createJournalEntryAsAutomation(journalInput(s.payment.id), ctx, companyId);
+      const posted = await postJournalEntry(trusted.id, ctx);
+      const reverse = await reversePostedJournalEntry(posted.id, ctx, { entryDate: day });
+      const book = await listPostedJournalBook(ctx, { dateFrom: day, dateTo: day });
+      assert.equal(reverse.reversesEntryId, posted.id);
+      assert.equal(book.data.find(entry => entry.id === posted.id)?.lines.find(line => line.accountCode === "AP-TEST-DEBIT")?.debit, "40.00");
+      assert.equal(book.data.find(entry => entry.id === reverse.id)?.lines.find(line => line.accountCode === "AP-TEST-DEBIT")?.credit, "40.00");
+      assert.ok(!book.data.some(entry => entry.id === s.journal.id));
+      const link = await getJournalEntrySourceLink(ctx, reverse);
+      assert.equal(link?.href, `/contabilidad/asientos/${posted.id}?empresa=${companyId}`);
+    } finally {
+      await setAccounting(false);
+    }
   });
   it("posting racing payment cancellation leaves either active cash plus POSTED, or cancelled cash plus CANCELLED GL", async () => {
     const s = await paidWithJournal(); await setAccounting(true);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { DecimalInput } from "@/components/ui/decimal-input";
@@ -15,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { registerManualTreasuryAdjustmentAction } from "@/app/(app)/tesoreria/actions";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
+import { useOperationalAction } from "@/hooks/use-operational-action";
+import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 
 interface Props {
   accountId: string;
@@ -28,21 +30,25 @@ export function ManualTreasuryAdjustmentForm({
   currency,
 }: Props) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [amount, setAmount] = useState("");
+  const [fxRate, setFxRate] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError });
   const [direction, setDirection] = useState<"INFLOW" | "OUTFLOW">("INFLOW");
   const { idempotencyKey } = useIdempotencyKey();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (isBusy()) return;
     const fd = new FormData(e.currentTarget);
-    startTransition(async () => {
+    setError(null);
+    void run(async () => {
       const res = await registerManualTreasuryAdjustmentAction({
         accountId,
         movementDate: fd.get("movementDate") as string,
         direction,
         amount: fd.get("amount") as string,
+        fxRate: currency !== "ARS" ? fxRate : undefined,
         description: fd.get("description") as string,
         idempotencyKey,
       });
@@ -50,7 +56,6 @@ export function ManualTreasuryAdjustmentForm({
         setError(res.error);
       } else {
         router.push(`/tesoreria/cuentas/${accountId}`);
-        router.refresh();
       }
     });
   }
@@ -84,6 +89,7 @@ export function ManualTreasuryAdjustmentForm({
               </SelectContent>
             </Select>
           </div>
+          <ManualFxField currency={currency} value={fxRate} onValueChange={setFxRate} id="adjustment-fx-rate" disabled={isPending} />
 
           <div className="space-y-1">
             <Label htmlFor="movementDate">Fecha</Label>

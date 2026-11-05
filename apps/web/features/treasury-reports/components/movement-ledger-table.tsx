@@ -25,6 +25,7 @@ import { MovementDetailDialog } from "./movement-detail-dialog";
 interface Props {
   rows: MovementReportRow[];
   showRunningBalance: boolean;
+  dateBasis?: "accounting" | "value";
   showProjectColumn?: boolean;
   /** Hide when the table is already scoped to one account (extracto). */
   showAccountColumn?: boolean;
@@ -38,6 +39,7 @@ interface Props {
 export function MovementLedgerTable({
   rows,
   showRunningBalance,
+  dateBasis = "accounting",
   showProjectColumn = false,
   showAccountColumn = true,
   canLinkProjects = false,
@@ -46,6 +48,7 @@ export function MovementLedgerTable({
   showFinanceEmptyHelp = false,
 }: Props) {
   const showGl = Boolean(accountingReturnPath && canEditAccounting);
+  const dateLabel = showRunningBalance ? (dateBasis === "value" ? "Fecha valor" : "Fecha contable") : "Fecha";
   if (rows.length === 0) {
     if (showFinanceEmptyHelp) {
       return (
@@ -73,11 +76,11 @@ export function MovementLedgerTable({
       <Table className="table-fixed">
         <TableHeader>
           <TableRow>
-            <Suspense fallback={<TableHead className="w-[5.5rem]">Fecha</TableHead>}>
+            <Suspense fallback={<TableHead className="w-[6.5rem]">{dateLabel}</TableHead>}>
               <UrlSortableTableHead
-                label="Fecha"
+                label={dateLabel}
                 defaultDir={showRunningBalance ? "asc" : "desc"}
-                className="w-[5.5rem]"
+                className="w-[6.5rem]"
               />
             </Suspense>
             {showAccountColumn && <TableHead className="w-[7.5rem]">Cuenta</TableHead>}
@@ -96,7 +99,8 @@ export function MovementLedgerTable({
           {rows.map((m) => (
             <TableRow key={m.id}>
               <TableCell className="whitespace-nowrap text-xs tabular-nums">
-                {formatDate(m.movementDate)}
+                {formatDate(dateBasis === "value" ? m.valueDate ?? m.movementDate : m.movementDate)}
+                {dateBasis === "value" && m.valueDate == null ? <span className="block text-muted-foreground">Sin registrar</span> : null}
               </TableCell>
               {showAccountColumn && (
                 <TableCell className="text-muted-foreground text-xs">

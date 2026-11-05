@@ -16,15 +16,7 @@ import {
 import type { CashFlowCurrency } from "@bloqer/services";
 import { CHART_SERIES } from "@/lib/chart-series-colors";
 import { formatChartMoney } from "@/lib/format-money";
-
-function formatPeriodTick(period: string): string {
-  const m = /^(\d{4})-(\d{2})$/.exec(period);
-  if (!m) return period;
-  return new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, 1)).toLocaleDateString("es-AR", {
-    month: "short",
-    year: "numeric",
-  });
-}
+import { cashFlowPeriodLabel } from "../lib/cash-flow-period-label";
 
 interface Props {
   data: CashFlowCurrency;
@@ -64,7 +56,7 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
             <XAxis
               dataKey="period"
               tick={{ fontSize: 11 }}
-              tickFormatter={formatPeriodTick}
+              tickFormatter={cashFlowPeriodLabel}
               tickLine={false}
               axisLine={false}
               className="text-muted-foreground"
@@ -78,6 +70,7 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
               width={52}
             />
             <Tooltip
+              labelFormatter={cashFlowPeriodLabel}
               formatter={(value, name) => [
                 fmtTooltip(Number(value)),
                 name === "netOperativo" ? "Neto operativo" : String(name),
@@ -126,7 +119,7 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
           <XAxis
             dataKey="period"
             tick={{ fontSize: 11 }}
-            tickFormatter={formatPeriodTick}
+            tickFormatter={cashFlowPeriodLabel}
             interval="preserveStartEnd"
             angle={-20}
             textAnchor="end"
@@ -140,6 +133,7 @@ export function CashFlowChart({ data, variant = "bars", className }: Props) {
             width={60}
           />
           <Tooltip
+            labelFormatter={cashFlowPeriodLabel}
             formatter={(value) => [
               fmtTooltip(Number(value)),
             ]}

@@ -375,7 +375,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/finanzas/transacciones", label: "Transacciones" }],
     steps: [
       "Transacciones → Ingreso / cobro → modo Solo caja (TREASURY_INFLOW). Clase: Ingreso solo caja (badge verde).",
-      "Cuenta, monto y fecha.",
+      "Cuenta, monto y fecha. Si la cuenta es extranjera, ingresá el tipo de cambio en ARS por una unidad.",
       "En el listado, clic en la descripción para leer el texto completo (este tipo no tiene documento origen que abrir).",
     ],
     pitfalls: [

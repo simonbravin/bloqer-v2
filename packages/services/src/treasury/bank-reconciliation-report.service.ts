@@ -6,6 +6,7 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { ServiceContext, ServiceError } from "../types";
+import { bankReconciliationDateWhere } from "./reconciliation-movement-date";
 
 export type BankReconciliationStatusRow = {
   reconciliationId: string;
@@ -55,6 +56,8 @@ export async function getBankReconciliationStatusReport(
   const sessions = await prisma.bankReconciliation.findMany({
     where: {
       tenantId: ctx.tenantId,
+      account: { tenantId: ctx.tenantId },
+      OR: [{ companyId: null }, { company: { tenantId: ctx.tenantId } }],
       ...(filters?.accountId ? { accountId: filters.accountId } : {}),
       status: { not: "CANCELLED" },
     },
@@ -85,7 +88,7 @@ export async function getBankReconciliationStatusReport(
         tenantId: ctx.tenantId,
         accountId: s.accountId,
         status: "CONFIRMED",
-        movementDate: { gte: s.periodStart, lte: s.periodEnd },
+        ...bankReconciliationDateWhere(s.periodStart, s.periodEnd),
       },
     });
 
@@ -106,7 +109,7 @@ export async function getBankReconciliationStatusReport(
       matchedLineCount,
       unmatchedLineCount: Math.max(0, statementLineCount - matchedLineCount),
       unreconciledMovementCount,
-      statementBalancesMatch: impliedClosing.equals(s.closingBalance),
+      statementBalancesMatch: serializeMoneyDecimal(impliedClosing) === serializeMoneyDecimal(s.closingBalance),
     });
   }
 

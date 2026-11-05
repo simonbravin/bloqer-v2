@@ -1764,7 +1764,7 @@
   7. **Contabilidad ([D-085] extendido):** al emitir, asiento con línea aparte si hay percepción y cuenta CoA:
      - **AP:** Debe Gasto(neto) + IVA crédito + **Percepción IIBB crédito** (`1.1.22`) / Haber Proveedores(total).
      - **AR:** Debe Clientes(total) / Haber Ingresos(neto) + IVA débito + **Percepción IIBB a depositar** (`2.1.12`).
-     - Sin cuenta o sin montos de impuesto/percepción → fallback de 2 líneas por total (comportamiento previo).
+     - El fallback de dos líneas y la excepción si falta solo la cuenta de IIBB se detallan en [D-139](#d-139--iva-separado-cuando-falta-solo-la-cuenta-de-iibb).
   8. Copia de cabecera cotización → OC → factura proveedor cuando exista.
   9. No es catálogo provincial ni motor AFIP; alícuota libre. `TaxType`/`TaxLine` fino sigue pendiente ([Q-040]).
 - **Implicancias:** migración Prisma; kernel `@bloqer/utils` `calcDocumentHeaderTaxTotals`; UI de totales con alícuota IIBB; CoA template `ar_construction_v3`; guía/help.
@@ -2048,6 +2048,49 @@
 - **Límites:** sin nuevos campos, estados, enums, dependencias ni migraciones; no habilita impuestos negativos con autorización especial ni un motor fiscal automático.
 - **Propuesta aprobada:** [IVA y percepción no negativos AG-09](../08-architecture/platform-audit/2026-11-05-ag-09-nonnegative-invoice-tax-proposal.md).
 - **Documentos afectados:** Q-080, SALES_AND_COLLECTIONS, EXPENSES_AND_PAYMENTS, ACCOUNTS_RECEIVABLE/PAYABLE, TAXES_AND_WITHHOLDINGS, guía/ayuda y conocimiento/evals AI.
+
+### D-134 — Tipo de cambio persistido en movimientos nuevos de Tesorería
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita del Owner de Q-081.
+- **Decisión:** cada `AccountMovement` nuevo guarda `fxRate` y `amountArs` según D-008/D-053. En ARS se guarda FX 1. En moneda extranjera se exige cotización manual de la operación. Los cobros y pagos copian su snapshot a la pierna de caja dentro de la misma transacción. Una transferencia entre cuentas de la misma moneda guarda el mismo snapshot en ambas piernas.
+- **Históricos:** las dos columnas se agregan como opcionales, sin completar cotizaciones anteriores. Los saldos nativos conservan su moneda. El consolidado en ARS indica que está incompleto cuando una contribución extranjera no tiene cotización comprobable.
+- **Alcance:** conserva las reglas actuales de moneda de las cuentas y difiere transferencias entre monedas diferentes. El reporte y los reintentos leen el dato de la operación, no una tasa externa o vigente.
+- **Documentos afectados:** Q-081, P-AG10-01, ACCOUNT_MOVEMENTS, MULTI_CURRENCY_RULES, TREASURY, Guía y Ayuda.
+
+### D-135 — Bloqueo al anular una operación con borrador contable en período cerrado
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita del Owner de Q-084.
+- **Decisión:** D-078 también aplica a la anulación automática del borrador vinculado de D-061. Si la fecha contable del borrador pertenece a un período cerrado, la operación completa se bloquea e informa qué período debe reabrirse.
+- **Integridad:** al quedar abiertos ambos períodos, el origen, el efectivo cuando corresponde, el borrador y sus auditorías se actualizan en la misma transacción. Un asiento posteado conserva su circuito de reversión.
+- **Documentos afectados:** Q-084, ACCOUNTING, PERIOD_CLOSE_AND_LOCKS, Guía y Ayuda.
+
+### D-136 — Saldo inicial negativo trazable en Tesorería
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita del Owner de Q-085.
+- **Decisión:** una cuenta nueva puede abrir con saldo negativo. El saldo no nulo genera un `OPENING_BALANCE` por su magnitud, `INFLOW` si es positivo y `OUTFLOW` si es negativo. El saldo cero no genera movimiento. La apertura requiere empresa válida y período abierto. En moneda extranjera guarda el snapshot D-134 para ambas direcciones.
+- **Históricos y GL:** los saldos previos se conservan. El reporte y el extracto toman la apertura una sola vez. El origen `OPENING_BALANCE` queda fuera de la generación automática de asientos según D-061.
+- **Documentos afectados:** Q-085, BANK_ACCOUNTS, ACCOUNT_MOVEMENTS, Guía y Ayuda.
+
+### D-137 — Fecha valor registrada en transferencias propias nuevas
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita del Owner de Q-082.
+- **Decisión:** la transferencia nueva guarda fecha contable (`transferDate`) y fecha valor (`valueDate`). Sus dos piernas guardan la misma fecha valor y conservan la fecha contable en `movementDate`. El formulario prellena la fecha valor con la contable hasta que se la edita.
+- **Consultas:** el extracto conserva la fecha contable por defecto y permite consultar por fecha valor. Filtros y saldo corrido usan la misma base. La conciliación usa la fecha valor disponible. El período operativo y el GL siguen la fecha contable.
+- **Históricos:** la migración agrega dos columnas opcionales y deja fechas anteriores sin registrar. Al consultar por valor, la fecha contable es la referencia para filas sin fecha valor, con aviso visible.
+- **Documentos afectados:** Q-082, INTERNAL_TRANSFERS, ACCOUNT_MOVEMENTS, TREASURY_MODEL, Guía y Ayuda.
+
+### D-138 — Dirección de una transferencia OFX/QFX por signo explícito
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita del Owner de Q-083.
+- **Decisión:** D-079 usa `TRNAMT` con signo para `XFER`: `+` es crédito y `-` es débito. Si `XFER` llega sin signo, se informa la fila ambigua antes de importar. En tipos inequívocos se conserva la compatibilidad con montos sin signo y se rechaza una contradicción con un signo explícito.
+- **Documentos afectados:** Q-083, BANK_RECONCILIATION, Guía y Ayuda.
+
+### D-139 — IVA separado cuando falta solo la cuenta de IIBB
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita del Owner de Q-086.
+- **Decisión:** si hay IVA y está disponible su cuenta, se conserva la línea de IVA aunque falte solo la cuenta de percepción IIBB. En ese caso la línea de neto identifica que incluye la percepción. Si hay IVA y falta su cuenta, o no hay importes fiscales para discriminar, se conserva el asiento de dos líneas por el total. Las cuentas fiscales disponibles permiten discriminar sus conceptos según D-085/D-112.
+- **Alcance:** se documenta el comportamiento ya implementado y probado. Los documentos, impuestos y asientos existentes conservan sus importes.
+- **Documentos afectados:** Q-086, D-112, TAXES_AND_WITHHOLDINGS, Guía y Ayuda.
 
 ## Decisiones SUPERSEDED
 

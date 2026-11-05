@@ -1,14 +1,26 @@
 import { Prisma, prisma, TreasuryAccount } from "@bloqer/database";
 import { can, hasCompanyFinanceRole } from "@bloqer/domain";
-import type { CreateTreasuryAccountInput, UpdateTreasuryAccountInput } from "@bloqer/validators";
+import {
+  createTreasuryAccountSchema,
+  updateTreasuryAccountSchema,
+  type CreateTreasuryAccountInput,
+  type UpdateTreasuryAccountInput,
+} from "@bloqer/validators";
 import { toIsoDateInTimeZone } from "@bloqer/utils";
 import { auditTreasury } from "./treasury-audit";
 import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canRegisterApPayment } from "../ap/ap-access";
+import { findActiveCompanyInTenant } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
 import { getAccountBalance } from "./balance.service";
-import { serializeMoneyDecimal } from "../finance/money-decimal";
-import { assertPeriodOpenUnderCompanyLock } from "./treasury-write-locks";
+import { serializeFxRateDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
+import {
+  assertTreasuryPeriodsOpenUnderCompanyLocks,
+  lockCompanyForFinancialWrite,
+  lockTreasuryAccountRow,
+} from "./treasury-write-locks";
+import { resolvePagination } from "../finance/pagination";
+import { computeTreasuryFxSnapshot } from "./treasury-fx";
 
 export type TreasuryAccountView = Omit<TreasuryAccount, "openingBalance"> & {
   openingBalance: string;
@@ -42,6 +54,10 @@ function assertCanEditBankAccounts(roles: ServiceContext["roles"]): void {
   }
 }
 
+function treasuryAccountScope(tenantId: string): Prisma.TreasuryAccountWhereInput {
+  return { tenantId, OR: [{ companyId: null }, { company: { tenantId } }] };
+}
+
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getTreasuryAccountById(
@@ -50,9 +66,8 @@ export async function getTreasuryAccountById(
 ): Promise<TreasuryAccountView> {
   await assertTreasuryTenantModule(ctx);
   assertCanViewBankAccounts(ctx.roles);
-  const acc = await prisma.treasuryAccount.findUnique({ where: { id } });
+  const acc = await prisma.treasuryAccount.findFirst({ where: { id, ...treasuryAccountScope(ctx.tenantId) } });
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
-  if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   const balance = await getAccountBalance(id);
   return serialize(acc, balance);
 }
@@ -64,16 +79,15 @@ export async function listTreasuryAccounts(
   await assertTreasuryTenantModule(ctx);
   assertCanViewBankAccounts(ctx.roles);
 
-  const where = { tenantId: ctx.tenantId };
+  const where = treasuryAccountScope(ctx.tenantId);
   const paginate = opts?.page !== undefined || opts?.pageSize !== undefined;
-  const page = opts?.page ?? 1;
-  const pageSize = opts?.pageSize ?? 20;
+  const { skip, take } = resolvePagination(opts);
 
   const [accounts, total] = await Promise.all([
     prisma.treasuryAccount.findMany({
       where,
-      orderBy: { name: "asc" },
-      ...(paginate ? { skip: (page - 1) * pageSize, take: pageSize } : {}),
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      ...(paginate ? { skip, take } : {}),
     }),
     prisma.treasuryAccount.count({ where }),
   ]);
@@ -104,7 +118,7 @@ export async function listSelectableTreasuryAccounts(
   }
 
   const accounts = await prisma.treasuryAccount.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: { ...treasuryAccountScope(ctx.tenantId), status: "ACTIVE" },
     select: { id: true, name: true, currency: true, status: true, companyId: true },
     orderBy: { name: "asc" },
   });
@@ -114,31 +128,48 @@ export async function listSelectableTreasuryAccounts(
 // ─── Mutations ────────────────────────────────────────────────────────────────
 
 export async function createTreasuryAccount(
-  input: CreateTreasuryAccountInput,
+  rawInput: CreateTreasuryAccountInput,
   ctx: ServiceContext,
 ): Promise<TreasuryAccountView> {
   await assertTreasuryTenantModule(ctx);
   assertCanEditBankAccounts(ctx.roles);
+  const parsed = createTreasuryAccountSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Cuenta inválida");
+  }
+  const input = parsed.data;
 
   const openingBalance = new Prisma.Decimal(input.openingBalance ?? "0");
+  const openingAmount = openingBalance.abs();
   const companyId = input.companyId ?? ctx.companyId ?? null;
+  const currency = input.currency;
 
   // Period lock cannot apply without a company; require one when creating money.
-  if (openingBalance.greaterThan(0) && !companyId) {
+  if (!openingAmount.isZero() && !companyId) {
     throw new ServiceError(
       "VALIDATION",
       "El saldo inicial requiere una empresa en el contexto o en la cuenta",
     );
   }
+  const openingFx = openingAmount.isZero()
+    ? null
+    : computeTreasuryFxSnapshot(currency, openingAmount, input.openingFxRate);
 
   const acc = await prisma.$transaction(async (tx) => {
+    if (companyId && !(await findActiveCompanyInTenant(companyId, ctx.tenantId, tx))) {
+      throw new ServiceError("FORBIDDEN", "Empresa no disponible para esta cuenta de tesorería");
+    }
+    const movementDate = new Date(`${toIsoDateInTimeZone()}T00:00:00.000Z`);
+    if (openingFx && companyId) {
+      await assertTreasuryPeriodsOpenUnderCompanyLocks(tx, ctx.tenantId, [{ companyId, date: movementDate }]);
+    }
     const created = await tx.treasuryAccount.create({
       data: {
         tenantId: ctx.tenantId,
         companyId,
         name: input.name,
         type: input.type,
-        currency: input.currency ?? "ARS",
+        currency,
         bankName: input.bankName ?? null,
         accountNumber: input.accountNumber ?? null,
         alias: input.alias ?? null,
@@ -149,29 +180,20 @@ export async function createTreasuryAccount(
       },
     });
 
-    // D6: create OPENING_BALANCE movement if openingBalance > 0
-    if (openingBalance.greaterThan(0)) {
-      // Guard above ensures companyId when openingBalance > 0.
-      const openingCompanyId = companyId!;
-      // Calendar UTC date (same convention as adjustments / recon) — avoid wall-clock TZ drift.
-      const todayIso = toIsoDateInTimeZone();
-      const movementDate = new Date(`${todayIso}T00:00:00.000Z`);
-      await assertPeriodOpenUnderCompanyLock(tx, {
-        tenantId: ctx.tenantId,
-        companyId: openingCompanyId,
-        date: movementDate,
-      });
+    // D-136: signed native balance; ledger stores the absolute amount with direction.
+    if (openingFx && companyId) {
       await tx.accountMovement.create({
         data: {
           tenantId: ctx.tenantId,
-          companyId: openingCompanyId,
+          companyId,
           accountId: created.id,
           movementDate,
-          type: "INFLOW",
+          type: openingBalance.isNegative() ? "OUTFLOW" : "INFLOW",
           sourceType: "OPENING_BALANCE",
           sourceId: created.id,
           currency: created.currency,
-          amount: openingBalance,
+          amount: openingAmount,
+          ...openingFx,
           description: "Saldo inicial",
           status: "CONFIRMED",
           createdBy: ctx.actorUserId,
@@ -185,11 +207,20 @@ export async function createTreasuryAccount(
       "TreasuryAccount",
       created.id,
       { companyId: created.companyId },
-      { after: { name: input.name, type: input.type, currency: input.currency }, tx },
+      {
+        after: {
+          name: input.name,
+          type: input.type,
+          currency,
+          openingBalance: serializeMoneyDecimal(openingBalance),
+          ...(openingFx ? { openingFxRate: serializeFxRateDecimal(openingFx.fxRate) } : {}),
+        },
+        tx,
+      },
     );
 
     return created;
-  });
+  }, { timeout: 30_000 });
 
   const balance = await getAccountBalance(acc.id);
   return serialize(acc, balance);
@@ -197,28 +228,36 @@ export async function createTreasuryAccount(
 
 export async function updateTreasuryAccount(
   id: string,
-  input: UpdateTreasuryAccountInput,
+  rawInput: UpdateTreasuryAccountInput,
   ctx: ServiceContext,
 ): Promise<TreasuryAccountView> {
   await assertTreasuryTenantModule(ctx);
   assertCanEditBankAccounts(ctx.roles);
-  const acc = await prisma.treasuryAccount.findUnique({ where: { id } });
+  const parsed = updateTreasuryAccountSchema.safeParse(rawInput);
+  if (!parsed.success) {
+    throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Cuenta inválida");
+  }
+  const input = parsed.data;
+  const acc = await prisma.treasuryAccount.findFirst({ where: { id, ...treasuryAccountScope(ctx.tenantId) } });
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
-  if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
   if (acc.status === "CLOSED") throw new ServiceError("CONFLICT", "No se puede editar una cuenta cerrada");
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updatedAccount = await tx.treasuryAccount.update({
-      where: { id },
+    const result = await tx.treasuryAccount.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: { not: "CLOSED" } },
       data: {
-        name:          input.name          ?? undefined,
-        bankName:      input.bankName      ?? undefined,
-        accountNumber: input.accountNumber ?? undefined,
-        alias:         input.alias         ?? undefined,
-        notes:         input.notes         ?? undefined,
+        name: input.name,
+        bankName: input.bankName,
+        accountNumber: input.accountNumber,
+        alias: input.alias,
+        notes: input.notes,
         updatedBy: ctx.actorUserId,
       },
     });
+    if (result.count !== 1) {
+      throw new ServiceError("CONFLICT", "No se puede editar una cuenta cerrada");
+    }
+    const updatedAccount = await tx.treasuryAccount.findUniqueOrThrow({ where: { id } });
 
     await auditTreasury(
       ctx,
@@ -244,6 +283,39 @@ export async function reactivateTreasuryAccount(id: string, ctx: ServiceContext)
   return _setStatus(id, ctx, "ACTIVE", "treasury_account.reactivated");
 }
 
+/** STATE_MACHINES §23: ACTIVE/INACTIVE → CLOSED only with a zero native balance. */
+export async function closeTreasuryAccount(id: string, ctx: ServiceContext): Promise<TreasuryAccount> {
+  await assertTreasuryTenantModule(ctx);
+  assertCanEditBankAccounts(ctx.roles);
+
+  return prisma.$transaction(async tx => {
+    const where = { id, ...treasuryAccountScope(ctx.tenantId) };
+    const preview = await tx.treasuryAccount.findFirst({ where, select: { companyId: true } });
+    if (!preview) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
+    if (preview.companyId) await lockCompanyForFinancialWrite(tx, preview.companyId);
+    await lockTreasuryAccountRow(tx, id, ctx.tenantId);
+    const account = await tx.treasuryAccount.findFirst({ where });
+    if (!account || account.companyId !== preview.companyId) {
+      throw new ServiceError("CONFLICT", "La cuenta cambió mientras la cerrabas. Recargá e intentá de nuevo.");
+    }
+    if (account.status === "CLOSED") throw new ServiceError("CONFLICT", "La cuenta ya está cerrada");
+    const balance = await getAccountBalance(id, tx);
+    if (!balance.isZero()) {
+      throw new ServiceError("CONFLICT", "El saldo de la cuenta debe ser cero para cerrarla");
+    }
+    const closed = await tx.treasuryAccount.update({
+      where: { id, tenantId: ctx.tenantId, status: account.status },
+      data: { status: "CLOSED", updatedBy: ctx.actorUserId },
+    });
+    await auditTreasury(ctx, "account.closed", "TreasuryAccount", id, { companyId: closed.companyId }, {
+      before: { status: account.status },
+      after: { status: "CLOSED", balance: serializeMoneyDecimal(balance), currency: account.currency },
+      tx,
+    });
+    return closed;
+  }, { timeout: 30_000 });
+}
+
 async function _setStatus(
   id: string,
   ctx: ServiceContext,
@@ -252,15 +324,21 @@ async function _setStatus(
 ): Promise<TreasuryAccount> {
   await assertTreasuryTenantModule(ctx);
   assertCanEditBankAccounts(ctx.roles);
-  const acc = await prisma.treasuryAccount.findUnique({ where: { id } });
+  const acc = await prisma.treasuryAccount.findFirst({ where: { id, ...treasuryAccountScope(ctx.tenantId) } });
   if (!acc) throw new ServiceError("NOT_FOUND", "Cuenta no encontrada");
-  if (acc.tenantId !== ctx.tenantId) throw new ServiceError("FORBIDDEN", "Cross-tenant access denied");
+  if (acc.status === "CLOSED") {
+    throw new ServiceError("CONFLICT", "No se puede cambiar el estado de una cuenta cerrada");
+  }
 
   const updated = await prisma.$transaction(async (tx) => {
-    const updatedAccount = await tx.treasuryAccount.update({
-      where: { id },
+    const result = await tx.treasuryAccount.updateMany({
+      where: { id, tenantId: ctx.tenantId, status: acc.status },
       data: { status, updatedBy: ctx.actorUserId },
     });
+    if (result.count !== 1) {
+      throw new ServiceError("CONFLICT", "La cuenta cambió de estado. Recargá e intentá de nuevo.");
+    }
+    const updatedAccount = await tx.treasuryAccount.findUniqueOrThrow({ where: { id } });
 
     await auditTreasury(
       ctx,

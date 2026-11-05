@@ -2,11 +2,13 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
-import { listPostedJournalBook } from "@bloqer/services";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
+import { listPostedJournalBook, resolvePagination, ServiceError } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
+import { formatDbDate } from "@/lib/format";
+import { journalEntrySourceLabel } from "@/features/accounting/lib/journal-entry-source-label";
 import { DataTableSection } from "@/components/ui/data-table-section";
 import { TableScroll } from "@/components/ui/table-scroll";
 import {
@@ -21,6 +23,7 @@ import { ListEmptyState } from "@/components/ui/list-empty-state";
 import { Pagination } from "@/components/ui/pagination";
 import { ReportExportActions } from "@/features/reports";
 import { AccountingReportFilters } from "@/features/accounting/components/accounting-report-filters";
+import { AccountingReportRangeError } from "@/features/accounting/components/accounting-report-range-error";
 import { AccountingGerencialDisclaimer } from "@/features/accounting/components/accounting-gerencial-disclaimer";
 import { formatMoneyAmount, isZeroMoneyAmount } from "@/lib/format-money";
 
@@ -36,16 +39,23 @@ export default async function LibroDiarioPage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
-  const page = Math.max(1, Number(sp.page ?? 1));
-  const book = await listPostedJournalBook(ctx, {
-    companyId: cf.companyId ?? null,
-    dateFrom: sp.dateFrom,
-    dateTo: sp.dateTo,
-    page,
-    pageSize: PAGE_SIZE,
-  });
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
+  const { page } = resolvePagination({ page: Number(sp.page ?? 1), pageSize: PAGE_SIZE });
+  let book;
+  try {
+    book = await listPostedJournalBook(ctx, {
+      companyId: cf.companyId,
+      dateFrom: sp.dateFrom,
+      dateTo: sp.dateTo,
+      page,
+      pageSize: PAGE_SIZE,
+    });
+  } catch (error) {
+    if (error instanceof ServiceError && error.code === "VALIDATION") {
+      return <AccountingReportRangeError title="Libro diario" message={error.message} />;
+    }
+    throw error;
+  }
 
   const exportParams: Record<string, string | undefined> = {
     dateFrom: book.dateFrom,
@@ -60,7 +70,7 @@ export default async function LibroDiarioPage({
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Libro diario</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Período {book.dateFrom} — {book.dateTo}. Solo asientos contabilizados.
+            Período {formatDbDate(book.dateFrom)} — {formatDbDate(book.dateTo)}. Solo asientos contabilizados.
           </p>
         </div>
         <ReportExportActions
@@ -85,14 +95,14 @@ export default async function LibroDiarioPage({
 
       <DataTableSection title="Asientos">
         {book.data.length === 0 ? (
-          <ListEmptyState message="No hay asientos contabilizados en el período. Posteá borradores en Asientos." />
+          <ListEmptyState message="No hay asientos contabilizados en el período. Contabilizá borradores en Asientos." />
         ) : (
           <div className="space-y-4">
             {book.data.map((e) => (
               <div key={e.id} className="rounded-md border">
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-muted/30 px-3 py-2 text-sm">
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="font-mono whitespace-nowrap">{e.entryDate}</span>
+                    <span className="font-mono whitespace-nowrap">{formatDbDate(e.entryDate)}</span>
                     <Link
                       href={`/contabilidad/asientos/${e.id}${empresaQ}`}
                       className="font-medium text-primary underline-offset-4 hover:underline"
@@ -103,7 +113,7 @@ export default async function LibroDiarioPage({
                       {e.description}
                     </span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{e.sourceType}</span>
+                  <span className="text-xs text-muted-foreground">{journalEntrySourceLabel(e.sourceType)}</span>
                 </div>
                 <TableScroll>
                   <Table>

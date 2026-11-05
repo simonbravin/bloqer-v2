@@ -2,10 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AccountingMappingRuleList } from "@/features/accounting";
 import { getCurrentUser } from "@/lib/auth";
-import { buildTenantServiceContext } from "@/lib/tenant-service-context";
+import { requireAccountingPageCompany } from "@/lib/accounting-page-company";
 import { listAccountingMappingRules } from "@bloqer/services";
 import { can } from "@bloqer/domain";
-import { companyQueryFilter, type EmpresaSearch } from "@/lib/accounting-search-params";
+import type { EmpresaSearch } from "@/lib/accounting-search-params";
 import { PageShell } from "@/components/layout/page-shell";
 import { Button } from "@/components/ui/button";
 
@@ -19,8 +19,7 @@ export default async function ContabilidadReglasPage({
   if (!can(current.tenantCtx.roles, "VIEW", "ACCOUNTING")) redirect("/dashboard");
 
   const sp = await searchParams;
-  const ctx = (await buildTenantServiceContext())!;
-  const cf = companyQueryFilter(sp);
+  const { ctx, cf } = await requireAccountingPageCompany(sp);
   const rules = await listAccountingMappingRules(ctx, cf);
 
   const empresa = cf.companyId;
