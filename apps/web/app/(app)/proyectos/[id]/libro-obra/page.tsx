@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  canMutateJobsiteLogAsContributor,
   getJobsiteLogFormPickList,
   getProjectOperationalMutationBlockReason,
   getProjectShellInfo,
@@ -72,7 +73,7 @@ export default async function LibroObraPage({ params, searchParams }: PageProps)
   }
 
   const operationalBlockReason = getProjectOperationalMutationBlockReason(shell.status);
-  const canCreateLog = !operationalBlockReason;
+  const canCreateLog = !operationalBlockReason && canMutateJobsiteLogAsContributor(ctx.roles);
 
   const filters = {
     dateFrom: sp.dateFrom,

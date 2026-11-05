@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@bloqer/database";
-import { calcDocumentHeaderTaxTotals, DEFAULT_IIBB_PERCEPTION_RATE_PCT, isUuid, normalizeRichNote } from "@bloqer/utils";
+import { calcDocumentHeaderTaxTotals, DEFAULT_IIBB_PERCEPTION_RATE_PCT, isUuid, normalizeRichNote, roundToDecimals } from "@bloqer/utils";
 import { resolveInvoiceLineMoney, parseDiscountPct } from "../finance/invoice-line-money";
 import {
   serializeMoneyDecimal,
@@ -698,19 +698,37 @@ export function jobsiteLogReplayMatches(
       wbsNodeId: string;
       quantityCompleted: { toString(): string };
       physicalPct: { toString(): string } | null;
+      description?: string | null;
+      notes?: string | null;
+      sortOrder?: number;
     }>;
     labor: Array<{
       contactId: string | null;
       subcontractId: string | null;
       workersCount: number;
       hoursWorked: { toString(): string } | null;
+      crewDescription?: string | null;
+      notes?: string | null;
+      sortOrder?: number;
     }>;
     materials: Array<{
       productId: string | null;
       warehouseId: string | null;
       quantity: { toString(): string };
+      wbsNodeId?: string | null;
+      description?: string;
+      notes?: string | null;
+      sortOrder?: number;
     }>;
-    issues: Array<{ type: string; severity: string; description: string }>;
+    issues: Array<{
+      type: string;
+      severity: string;
+      description: string;
+      status?: string;
+      notes?: string | null;
+      sortOrder?: number;
+    }>;
+    status?: string;
   },
   input: {
     projectId: string;
@@ -728,19 +746,36 @@ export function jobsiteLogReplayMatches(
       wbsNodeId: string;
       quantityCompleted: string;
       physicalPct?: string | null;
+      description?: string | null;
+      notes?: string | null;
+      sortOrder?: number;
     }>;
     labor?: Array<{
       contactId?: string | null;
       subcontractId?: string | null;
       workersCount?: number;
       hoursWorked?: string | null;
+      crewDescription?: string | null;
+      notes?: string | null;
+      sortOrder?: number;
     }>;
     materials?: Array<{
       productId?: string | null;
       warehouseId?: string | null;
       quantity: string;
+      wbsNodeId?: string | null;
+      description?: string;
+      notes?: string | null;
+      sortOrder?: number;
     }>;
-    issues?: Array<{ type: string; severity: string; description: string }>;
+    issues?: Array<{
+      type: string;
+      severity: string;
+      description: string;
+      status?: string;
+      notes?: string | null;
+      sortOrder?: number;
+    }>;
   },
 ): boolean {
   if (existing.projectId !== input.projectId) return false;
@@ -756,49 +791,71 @@ export function jobsiteLogReplayMatches(
   if (nullableStr(existing.safetyNotes) !== nullableStr(input.safetyNotes)) return false;
 
   const progressFp = (rows: typeof existing.progress | NonNullable<typeof input.progress>) =>
-    [...rows]
-      .map((r) => {
-        const pct =
-          "physicalPct" in r && r.physicalPct != null && r.physicalPct !== ""
-            ? typeof r.physicalPct === "string"
-              ? r.physicalPct
-              : r.physicalPct.toString()
-            : "";
-        return `${r.wbsNodeId}:${qtyFingerprint(r.quantityCompleted)}:${pct}`;
-      })
-      .sort()
-      .join("|");
+    rows.map((r, index) => JSON.stringify([
+      r.wbsNodeId,
+      qtyFingerprint(r.quantityCompleted),
+      r.physicalPct != null && r.physicalPct !== "" ? serializeRatePctDecimal(r.physicalPct) : null,
+      nullableStr(r.description),
+      nullableStr(r.notes),
+      r.sortOrder ?? index,
+    ])).sort().join("\n");
   if (progressFp(existing.progress) !== progressFp(input.progress ?? [])) return false;
 
   const laborFp = (
     rows: typeof existing.labor | NonNullable<typeof input.labor>,
   ) =>
-    [...rows]
-      .map((r) => {
-        const hours =
-          "hoursWorked" in r && r.hoursWorked != null && r.hoursWorked !== ""
-            ? typeof r.hoursWorked === "string"
-              ? r.hoursWorked
-              : r.hoursWorked.toString()
-            : "";
-        const workers = "workersCount" in r && r.workersCount != null ? r.workersCount : 0;
-        return `${r.contactId ?? ""}:${r.subcontractId ?? ""}:${workers}:${hours}`;
-      })
-      .sort()
-      .join("|");
+    rows.map((r, index) => JSON.stringify([
+      r.contactId ?? null,
+      r.subcontractId ?? null,
+      r.workersCount,
+      r.hoursWorked != null && r.hoursWorked !== "" ? roundToDecimals(r.hoursWorked.toString(), 2) : null,
+      nullableStr(r.crewDescription),
+      nullableStr(r.notes),
+      r.sortOrder ?? index,
+    ])).sort().join("\n");
   if (laborFp(existing.labor) !== laborFp(input.labor ?? [])) return false;
 
+  // D-055 can resolve an originally omitted WBS at approval.
+  const progressWbsIds = [...new Set(input.progress?.map((row) => row.wbsNodeId))];
+  const materialFallbackWbs = existing.status === "APPROVED" && progressWbsIds.length === 1
+    ? progressWbsIds[0]
+    : undefined;
   const materialsFp = (
     rows: typeof existing.materials | NonNullable<typeof input.materials>,
+    allowResolvedWbs = false,
   ) =>
-    [...rows]
-      .map((r) => `${r.productId ?? ""}:${r.warehouseId ?? ""}:${qtyFingerprint(r.quantity)}`)
-      .sort()
-      .join("|");
-  if (materialsFp(existing.materials) !== materialsFp(input.materials ?? [])) return false;
+    rows.map((r, index) => {
+      const quantity = qtyFingerprint(r.quantity);
+      const wbsNodeId = r.wbsNodeId ?? (
+        allowResolvedWbs && r.productId && r.warehouseId && quantity !== "0.0000"
+          ? materialFallbackWbs
+          : undefined
+      );
+      return JSON.stringify([
+        r.productId ?? null,
+        r.warehouseId ?? null,
+        quantity,
+        wbsNodeId ?? null,
+        nullableStr(r.description),
+        nullableStr(r.notes),
+        r.sortOrder ?? index,
+      ]);
+    }).sort().join("\n");
+  const existingMaterials = materialsFp(existing.materials);
+  if (
+    existingMaterials !== materialsFp(input.materials ?? []) &&
+    existingMaterials !== materialsFp(input.materials ?? [], true)
+  ) return false;
 
   const issuesFp = (rows: typeof existing.issues | NonNullable<typeof input.issues>) =>
-    [...rows].map((r) => `${r.type}:${r.severity}:${r.description}`).sort().join("|");
+    rows.map((r, index) => JSON.stringify([
+      r.type,
+      r.severity,
+      r.description,
+      r.status ?? "OPEN",
+      nullableStr(r.notes),
+      r.sortOrder ?? index,
+    ])).sort().join("\n");
   return issuesFp(existing.issues) === issuesFp(input.issues ?? []);
 }
 

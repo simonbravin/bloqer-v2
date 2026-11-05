@@ -23,8 +23,8 @@ export async function GET() {
   const ctx = await buildTenantServiceContext();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const projects = await listFieldProjects(ctx);
-    return NextResponse.json({ projects });
+    const projects = await listFieldProjects(ctx, { registration: true });
+    return NextResponse.json({ projects }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (err) {
     if (err instanceof ServiceError) {
       return NextResponse.json({ error: err.message }, { status: statusForServiceError(err.code) });

@@ -80,15 +80,16 @@ export function PendingEvidencePicker({
     if (!list || disabled) return;
     const incoming = Array.from(list);
     const next = [...files];
+    const failures: string[] = [];
     for (const file of incoming) {
       const err = validateUploadFile(file);
       if (err) {
-        setError(err);
+        failures.push(`${file.name}: ${err}`);
         continue;
       }
       next.push({ clientId: crypto.randomUUID(), file });
     }
-    if (next.length !== files.length) setError(null);
+    setError(failures.length ? failures.join(" · ") : null);
     onChange(next);
     if (fileInputRef.current) fileInputRef.current.value = "";
     if (cameraInputRef.current) cameraInputRef.current.value = "";
@@ -104,6 +105,8 @@ export function PendingEvidencePicker({
         ref={fileInputRef}
         type="file"
         className="sr-only"
+        tabIndex={-1}
+        aria-label="Seleccionar archivos de evidencia"
         accept={DOCUMENT_FILE_INPUT_ACCEPT}
         multiple
         data-testid={fileInputTestId}
@@ -114,6 +117,8 @@ export function PendingEvidencePicker({
         ref={cameraInputRef}
         type="file"
         className="sr-only"
+        tabIndex={-1}
+        aria-label="Tomar foto de evidencia"
         accept={IMAGE_ACCEPT}
         capture="environment"
         disabled={disabled}
@@ -141,7 +146,7 @@ export function PendingEvidencePicker({
           <span className="hidden md:inline">Seleccionar archivo</span>
         </Button>
       </div>
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="break-words text-sm text-destructive">{error}</p> : null}
       {files.length > 0 ? (
         <ul className="space-y-2">
           {files.map((item, i) => (

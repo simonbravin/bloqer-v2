@@ -112,7 +112,6 @@ export function usePendingEntityEvidence(options: Options) {
         toast.success("Archivos subidos.");
         options.onRetrySuccess?.(createdId);
         router.replace(options.detailHref(createdId));
-        router.refresh();
         return;
       }
       toast.warning(partialMessage(after) ?? "Algunos archivos no se pudieron subir.");
@@ -133,7 +132,6 @@ export function usePendingEntityEvidence(options: Options) {
         toast.success("Archivos subidos.");
         options.onRetrySuccess?.(createdId);
         router.replace(options.detailHref(createdId));
-        router.refresh();
         return;
       }
       toast.warning(partialMessage(after) ?? "Algunos archivos no se pudieron subir.");

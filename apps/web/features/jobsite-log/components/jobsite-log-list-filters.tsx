@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useId } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export function JobsiteLogListFilters({ wbsOptions }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const filterId = useId();
 
   const [wbsNodeId, setWbsNodeId] = useState(params.get("wbsNodeId") ?? "__all__");
   const [status, setStatus] = useState(params.get("status") ?? "__all__");
@@ -85,28 +86,35 @@ export function JobsiteLogListFilters({ wbsOptions }: Props) {
   return (
     <form onSubmit={apply} className="flex flex-wrap items-end gap-3 rounded-lg border bg-card p-4">
       <div className="space-y-1">
-        <Label className="text-xs">Desde</Label>
+        <Label htmlFor={`${filterId}-from`} className="text-xs">Desde</Label>
         <Input
+          id={`${filterId}-from`}
           name="dateFrom"
           type="date"
           className="h-8 text-xs w-36"
           value={dateFrom}
+          max={dateTo || undefined}
+          aria-describedby={dateRangeInvalid ? `${filterId}-error` : undefined}
           onChange={(e) => setDateFrom(e.target.value)}
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Hasta</Label>
+        <Label htmlFor={`${filterId}-to`} className="text-xs">Hasta</Label>
         <Input
+          id={`${filterId}-to`}
           name="dateTo"
           type="date"
           className="h-8 text-xs w-36"
           value={dateTo}
+          min={dateFrom || undefined}
+          aria-describedby={dateRangeInvalid ? `${filterId}-error` : undefined}
           onChange={(e) => setDateTo(e.target.value)}
         />
       </div>
       <div className="space-y-1 min-w-[14rem] flex-1 max-w-md">
-        <Label className="text-xs">Partida EDT afectada</Label>
+        <Label htmlFor={`${filterId}-wbs`} className="text-xs">Partida EDT afectada</Label>
         <SearchableCombobox
+          id={`${filterId}-wbs`}
           popoverWidth="wide"
           className="h-8 text-xs"
           options={wbsComboboxOptions}
@@ -117,9 +125,9 @@ export function JobsiteLogListFilters({ wbsOptions }: Props) {
         />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Estado</Label>
+        <Label htmlFor={`${filterId}-status`} className="text-xs">Estado</Label>
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="h-8 text-xs w-36">
+          <SelectTrigger id={`${filterId}-status`} className="h-8 text-xs w-36">
             <SelectValue placeholder="— todos —" />
           </SelectTrigger>
           <SelectContent>
@@ -127,7 +135,7 @@ export function JobsiteLogListFilters({ wbsOptions }: Props) {
             <SelectItem value="DRAFT">Borrador</SelectItem>
             <SelectItem value="SUBMITTED">Enviado</SelectItem>
             <SelectItem value="APPROVED">Aprobado</SelectItem>
-            <SelectItem value="CANCELLED">Cancelado</SelectItem>
+            <SelectItem value="CANCELLED">Anulado</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -138,7 +146,7 @@ export function JobsiteLogListFilters({ wbsOptions }: Props) {
         Limpiar
       </Button>
       {dateRangeInvalid && (
-        <p className="w-full text-xs text-destructive">
+        <p id={`${filterId}-error`} role="alert" className="w-full text-xs text-destructive">
           La fecha «desde» no puede ser posterior a «hasta».
         </p>
       )}

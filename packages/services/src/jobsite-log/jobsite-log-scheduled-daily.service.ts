@@ -1,10 +1,14 @@
 import { prisma } from "@bloqer/database";
+import { jobsiteLogDateSchema } from "@bloqer/validators";
+import { companyScopeFilter } from "../company-scope";
+import { resolveAccessibleProjectScope } from "../security/access";
 import { ServiceContext, ServiceError } from "../types";
 import { assertJobsiteLogTenantModule } from "../tenant-modules/tenant-module-enforcement";
 import { canViewJobsiteLogArea } from "./jobsite-log-access";
 
 export type DailyJobsiteLogForSchedule = {
   id: string;
+  companyId: string;
   projectId: string;
   projectCode: string;
   projectName: string;
@@ -33,11 +37,13 @@ export async function listDailyJobsiteLogsForSchedule(
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver partes de obra");
   }
 
-  const uniqueIds = [...new Set(projectIds.filter(Boolean))];
+  const projectScope = await resolveAccessibleProjectScope(ctx);
+  const accessibleIds = projectScope === "ALL" ? null : new Set(projectScope.projectIds);
+  const uniqueIds = [...new Set(projectIds.filter((id) => id && (!accessibleIds || accessibleIds.has(id))))];
   if (uniqueIds.length === 0) {
     return { logs: [], truncated: false, takeLimit: 0 };
   }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(logDateIso)) {
+  if (!jobsiteLogDateSchema.safeParse(logDateIso).success) {
     throw new ServiceError("VALIDATION", "Fecha de parte inválida");
   }
 
@@ -50,13 +56,16 @@ export async function listDailyJobsiteLogsForSchedule(
   const rows = await prisma.jobsiteLog.findMany({
     where: {
       tenantId: ctx.tenantId,
+      // JobsiteLog.companyId is NOT NULL even when its project is shared.
+      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
       projectId: { in: uniqueIds },
       logDate,
       status: { in: ["SUBMITTED", "APPROVED"] },
-      project: { status: "ACTIVE", tenantId: ctx.tenantId },
+      project: { status: "ACTIVE", tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
     },
     select: {
       id: true,
+      companyId: true,
       projectId: true,
       logDate: true,
       status: true,
@@ -75,6 +84,7 @@ export async function listDailyJobsiteLogsForSchedule(
   return {
     logs: logs.map((l) => ({
       id: l.id,
+      companyId: l.companyId,
       projectId: l.projectId,
       projectCode: l.project.code,
       projectName: l.project.name,

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -54,19 +55,6 @@ const STATUS_LABELS: Record<string, string> = {
   APPROVED: "Aprobado",
   CANCELLED: "Anulado",
 };
-
-async function runLifecycle(
-  action: () => Promise<{ ok: true } | { error: string }>,
-  successMessage: string,
-) {
-  const result = await action();
-  if ("error" in result) {
-    toast.error(result.error);
-    return false;
-  }
-  toast.success(successMessage);
-  return true;
-}
 
 function LifecycleLogList({ entries }: { entries: JobsiteLogLifecycleLogEntry[] }) {
   if (entries.length === 0) {
@@ -132,11 +120,13 @@ export function JobsiteLogLifecycleDialog({
   const [isPending, startTransition] = useTransition();
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [comment, setComment] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const isTerminal = status === "APPROVED" || status === "CANCELLED";
 
   function resetForm() {
     setPending(null);
     setComment("");
+    setError(null);
   }
 
   function run(
@@ -144,11 +134,19 @@ export function JobsiteLogLifecycleDialog({
     successMessage: string,
   ) {
     startTransition(async () => {
-      const ok = await runLifecycle(action, successMessage);
-      if (ok) {
+      setError(null);
+      try {
+        const result = await action();
+        if ("error" in result) {
+          setError(result.error);
+          return;
+        }
+        toast.success(successMessage);
         resetForm();
         setOpen(false);
         router.refresh();
+      } catch {
+        setError("No pudimos completar la acción. Volvé a intentar.");
       }
     });
   }
@@ -158,7 +156,7 @@ export function JobsiteLogLifecycleDialog({
     switch (pending?.kind) {
       case "return":
         if (!trimmed) {
-          toast.error("Las observaciones son obligatorias");
+          setError("Las observaciones son obligatorias.");
           return;
         }
         run(() => onReturn({ comment: trimmed }), "Parte devuelto con observaciones");
@@ -170,7 +168,6 @@ export function JobsiteLogLifecycleDialog({
         run(() => onApprove(), "Parte aprobado");
         break;
       case "cancel":
-        if (!confirm("¿Anular este parte? Esta acción no se puede deshacer.")) return;
         run(() => onCancel(), "Parte anulado");
         break;
       default:
@@ -197,6 +194,7 @@ export function JobsiteLogLifecycleDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (isPending) return;
         setOpen(next);
         if (!next) resetForm();
       }}
@@ -206,12 +204,15 @@ export function JobsiteLogLifecycleDialog({
           {triggerLabel}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-lg">
+      <DialogContent closeButtonDisabled={isPending} className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-center gap-2">
             Ciclo de vida del parte
             <JobsiteLogStatusBadge status={status} />
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Consultá el historial y las acciones disponibles para el parte.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-2">
@@ -235,10 +236,16 @@ export function JobsiteLogLifecycleDialog({
                       rows={3}
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
+                      aria-describedby={error ? "jobsite-log-lifecycle-error" : undefined}
                       placeholder="Indicá qué debe corregir el responsable del parte…"
                       disabled={isPending}
                     />
                   </div>
+                )}
+                {error && (
+                  <p id="jobsite-log-lifecycle-error" role="alert" className="text-sm text-destructive">
+                    {error}
+                  </p>
                 )}
                 {pending.kind !== "return" && (
                   <p className="text-sm text-muted-foreground">

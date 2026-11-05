@@ -16,7 +16,7 @@ Falta de registro formal impide demostrar avance físico o causas de demora.
 - Fotos/documentos ([`DOCUMENTS.md`](./DOCUMENTS.md)).
 
 ## 5. Datos que produce (outputs)
-- **JobsiteLogEntry** con estado `DRAFT | SUBMITTED | APPROVED`.
+- **JobsiteLogEntry** con estado `DRAFT | SUBMITTED | APPROVED | CANCELLED`.
 
 ## 6. Entidades principales
 - **JobsiteLogEntry**.
@@ -25,8 +25,8 @@ Falta de registro formal impide demostrar avance físico o causas de demora.
 Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § JobsiteLogEntry.
 
 ## 8. Acciones disponibles
-- Crear parte del día (borrador).
-- Enviar y aprobar.
+- Crear, editar o anular un borrador en una obra activa.
+- Enviar a revisión. Un supervisor puede devolverlo con observaciones o aprobarlo.
 - Anexar fotos y observaciones. **Notas generales** admiten negrita, viñetas y numeración ([D-101]); el resto de notas del parte es texto plano.
 
 ## 9. Pantallas y vistas necesarias
@@ -37,9 +37,11 @@ Ver [`STATE_MACHINES.md`](../01-domain/STATE_MACHINES.md) § JobsiteLogEntry.
 ## 10. Reglas de negocio
 - **BR-JL-001**: recomendación una entrada por día; no obligatorio hard ([BR-JL-001]).
 - **BR-JL-003**: materiales con producto y depósito generan consumo de inventario al aprobar el parte ([BR-JL-003]).
+- Los adjuntos se archivan desde la ficha o Documentos y heredan el acceso de la obra y la empresa del parte, también cuando un adjunto histórico no tiene empresa propia.
 - **Unidad (D-130):** un material vinculado fija la unidad maestra del producto desde esa referencia, incluso en borrador. El material del parte no tiene un campo de unidad propio: su cantidad usa la del producto, que se revalida bajo bloqueo antes del consumo al aprobar. No se compara contra la unidad de la partida ni se convierten cantidades. Los históricos y reintentos ya realizados conservan sus efectos previos.
 - Partes aprobados son lectura para certificación como evidencia complementaria.
 - **BR-SCH-004 / [D-045]:** al aprobar, sincroniza `ScheduleItem.progressPct` en ítems de cronograma con WBS primario enlazado (ver [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md)).
+- El tope del avance incremental se controla a la precisión de los partes por obra y partida, incluidas las partidas compartidas. El Real persistido del cronograma conserva su precisión de dos decimales.
 
 ## 11. Validaciones
 - Fecha no futura para parte “ejecutado”.

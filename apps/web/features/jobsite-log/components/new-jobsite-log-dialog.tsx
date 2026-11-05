@@ -60,6 +60,7 @@ export function NewJobsiteLogDialog({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(defaultOpen);
+  const [saving, setSaving] = useState(false);
   const hasMounted = useHasMounted();
   const isMdUp = useIsMdUp();
   const nuevoHref = `/proyectos/${projectId}/libro-obra/nuevo`;
@@ -102,6 +103,7 @@ export function NewJobsiteLogDialog({
     <Dialog
       open={open}
       onOpenChange={(next) => {
+        if (saving && !next) return;
         setOpen(next);
         if (!next) clearCreateQueryParam();
       }}
@@ -109,7 +111,7 @@ export function NewJobsiteLogDialog({
       <DialogTrigger asChild>
         <Button className="min-h-11 md:min-h-9">{triggerLabel}</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent closeButtonDisabled={saving} className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Nuevo parte de obra</DialogTitle>
           <DialogDescription className="sr-only">
@@ -131,6 +133,7 @@ export function NewJobsiteLogDialog({
             stockPreviewAction={stockPreviewAction}
             action={action}
             onCancel={closeDialog}
+            onSavingChange={setSaving}
             onSuccess={handleSuccess}
           />
         ) : null}

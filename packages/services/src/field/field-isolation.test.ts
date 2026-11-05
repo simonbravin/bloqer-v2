@@ -35,7 +35,7 @@ function setup(t: TestContext) {
 }
 
 describe("Field project/company isolation", { concurrency: false }, () => {
-  it("project picker uses accessible scope before applying its limit", async (t) => {
+  it("project overview uses accessible scope before applying its limit", async (t) => {
     setup(t);
     const findMany = t.mock.fn(async () => []);
     stub(t, prisma.project, "findMany", findMany);
@@ -45,6 +45,26 @@ describe("Field project/company isolation", { concurrency: false }, () => {
       select: { id: true, code: true, name: true, status: true },
       orderBy: { code: "asc" }, take: 100,
     }]);
+  });
+
+  it("registration queries all assigned active works with an enabled action even if Projects is disabled", async (t) => {
+    setup(t);
+    prisma.tenantModuleSetting.findMany = (async () => [{ moduleKey: "PROJECTS", isEnabled: false }]) as unknown as typeof prisma.tenantModuleSetting.findMany;
+    const findMany = t.mock.fn(async () => []);
+    stub(t, prisma.project, "findMany", findMany);
+    await listFieldProjects(ctx, { registration: true });
+    assert.deepEqual(findMany.mock.calls[0]!.arguments, [{
+      where: { tenantId: ctx.tenantId, status: "ACTIVE", id: { in: [assignedId] } },
+      select: { id: true, code: true, name: true, status: true },
+      orderBy: { code: "asc" },
+    }]);
+  });
+
+  it("registration does not list projects for a view-only actor", async (t) => {
+    setup(t);
+    const unexpected = () => { assert.fail("read-only actor queried registration projects"); };
+    stub(t, prisma.project, "findMany", unexpected);
+    assert.deepEqual(await listFieldProjects({ ...ctx, roles: ["VIEWER"] }, { registration: true }), []);
   });
 
   it("stale preferred project cannot override membership or select its schedule", async (t) => {

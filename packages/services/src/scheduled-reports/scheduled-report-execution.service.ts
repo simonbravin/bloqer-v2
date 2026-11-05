@@ -1,7 +1,9 @@
-import type { EmailDeliveryStatus } from "@bloqer/database";
+import type { EmailDeliveryStatus, Prisma } from "@bloqer/database";
 import { prisma } from "@bloqer/database";
+import { companyScopeFilter } from "../company-scope";
 import type { ServiceContext } from "../types";
 import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
+import { canReadScheduledReport } from "./scheduled-report.service";
 
 export type ScheduledReportEmailDeliveryRow = {
   id: string;
@@ -43,6 +45,23 @@ function parseDeliveryMetadata(meta: unknown): {
   };
 }
 
+/** A global delivery can only be inspected by a company that can identify its recipient. */
+export async function scheduledReportEmailCompanyScope(
+  ctx: ServiceContext,
+): Promise<Prisma.EmailDeliveryLogWhereInput> {
+  if (!ctx.companyId) return {};
+  const memberships = await prisma.userMembership.findMany({
+    where: { tenantId: ctx.tenantId, ...companyScopeFilter(ctx) },
+    select: { userId: true },
+  });
+  return {
+    OR: [
+      { companyId: ctx.companyId },
+      { companyId: null, recipientUserId: { in: memberships.map(({ userId }) => userId) } },
+    ],
+  };
+}
+
 export async function listScheduledReportEmailDeliveries(
   ctx: ServiceContext,
   scheduleId: string,
@@ -50,16 +69,13 @@ export async function listScheduledReportEmailDeliveries(
 ): Promise<ScheduledReportEmailDeliveryRow[]> {
   assertCanManageScheduledReports(ctx);
 
-  const schedule = await prisma.scheduledReport.findFirst({
-    where: { id: scheduleId, tenantId: ctx.tenantId },
-    select: { id: true },
-  });
-  if (!schedule) return [];
+  if (!await canReadScheduledReport(scheduleId, ctx)) return [];
 
   const take = Math.min(Math.max(limit, 1), 200);
   const rows = await prisma.emailDeliveryLog.findMany({
     where: {
       tenantId: ctx.tenantId,
+      ...await scheduledReportEmailCompanyScope(ctx),
       emailType: "REPORT_SCHEDULED",
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: scheduleId,
@@ -99,10 +115,12 @@ export async function countRecentFailedScheduledReportDeliveries(
   lookbackMs = 7 * 24 * 60 * 60 * 1000,
 ): Promise<number> {
   assertCanManageScheduledReports(ctx);
+  if (!await canReadScheduledReport(scheduleId, ctx)) return 0;
   const since = new Date(Date.now() - lookbackMs);
   return prisma.emailDeliveryLog.count({
     where: {
       tenantId: ctx.tenantId,
+      ...await scheduledReportEmailCompanyScope(ctx),
       emailType: "REPORT_SCHEDULED",
       relatedEntityType: "SCHEDULED_REPORT",
       relatedEntityId: scheduleId,

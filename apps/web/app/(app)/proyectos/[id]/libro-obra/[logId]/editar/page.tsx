@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  canMutateJobsiteLogAsContributor,
   getJobsiteLogById,
   getJobsiteLogFormPickList,
   getProjectOperationalMutationBlockReason,
@@ -42,7 +43,8 @@ export default async function EditarParteObraPage({ params }: PageProps) {
 
   if (log.projectId !== projectId) notFound();
 
-  if (log.status !== "DRAFT") redirect(`/proyectos/${projectId}/libro-obra/${logId}`);
+  const detailHref = `/proyectos/${projectId}/libro-obra/${logId}`;
+  if (log.status !== "DRAFT" || !canMutateJobsiteLogAsContributor(ctx.roles)) redirect(detailHref);
 
   let shell: Awaited<ReturnType<typeof getProjectShellInfo>>;
   try {
@@ -52,7 +54,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
     throw err;
   }
   if (getProjectOperationalMutationBlockReason(shell.status)) {
-    redirect(`/proyectos/${projectId}/libro-obra/${logId}`);
+    redirect(detailHref);
   }
 
   let wbsRaw: Awaited<ReturnType<typeof listProjectWbsItemsForLog>>;
@@ -92,6 +94,9 @@ export default async function EditarParteObraPage({ params }: PageProps) {
           unit: n.costItem?.unit ?? "",
           budgetQty: n.costItem?.quantity?.toString(),
         }))}
+        existingWbsOptions={log.progress
+          .filter((p) => !wbsRaw.some((node) => node.id === p.wbsNodeId))
+          .map((p) => ({ id: p.wbsNodeId, ...p.wbsNode }))}
         contactOptions={pickList.contactOptions}
         productOptions={pickList.productOptions}
         warehouseOptions={pickList.warehouseOptions}
@@ -106,6 +111,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
         stockPreviewAction={getStockBalancePreviewAction}
         action={updateAction}
         mode="edit"
+        cancelHref={detailHref}
         submitLabel="Guardar cambios"
         defaultValues={{
           logDate: new Date(log.logDate).toISOString().split("T")[0]!,
@@ -132,6 +138,7 @@ export default async function EditarParteObraPage({ params }: PageProps) {
           materials: log.materials.map((m) => ({
             productId: m.productId ?? "__none__",
             warehouseId: m.warehouseId ?? "__none__",
+            wbsNodeId: m.wbsNodeId ?? undefined,
             description: m.description,
             quantity: m.quantity,
             notes: m.notes ?? "",

@@ -47,19 +47,14 @@ function optionalFormText(fd: FormData, key: string): string | null | undefined 
   return String(raw);
 }
 
-function parseJsonArray(fd: FormData, key: string): unknown[] {
+function parseJsonArray(fd: FormData, key: string, required = false): unknown[] {
   const raw = fd.get(key);
-  if (raw == null || raw === "") return [];
+  if (!required && (raw == null || raw === "")) return [];
   try {
-    const parsed = JSON.parse(String(raw));
-    if (!Array.isArray(parsed)) {
-      throw new Error(`Campo "${key}" inválido`);
-    }
-    return parsed;
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith('Campo "')) throw err;
-    throw new Error(`Campo "${key}" inválido`);
-  }
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed)) return parsed;
+  } catch { /* Malformed JSON follows the same error path as a non-array. */ }
+  throw new Error(`Campo "${key}" inválido`);
 }
 
 function revalidateJobsiteLogPaths(projectId: string, logId: string) {
@@ -70,29 +65,26 @@ function revalidateJobsiteLogPaths(projectId: string, logId: string) {
 
 function revalidateProjectSchedulePaths(projectId: string) {
   revalidatePath(`/proyectos/${projectId}/cronograma`);
-  revalidatePath(`/proyectos/${projectId}`);
   revalidateProjectCostAndFinancePaths(projectId);
 }
 
 async function lifecycleAction(
   logId: string,
-  projectId: string,
-  fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>, input?: { returnNotes: string }) => Promise<{ projectId: string }>,
-  input?: { returnNotes: string },
-  options?: { revalidateSchedule?: boolean },
+  fn: (id: string, ctx: Awaited<ReturnType<typeof getCtx>>) => Promise<{ projectId: string }>,
+  options?: { approved?: boolean },
 ): Promise<Ok | Err> {
   const ctx = await getCtx();
   try {
-    const log = await fn(logId, ctx, input);
+    const { projectId } = await fn(logId, ctx);
     revalidateJobsiteLogPaths(projectId, logId);
-    if (log.projectId !== projectId) {
-      revalidateJobsiteLogPaths(log.projectId, logId);
-    }
-    if (options?.revalidateSchedule) {
+    revalidatePath("/dashboard");
+    revalidatePath("/pendientes");
+    revalidatePath(`/proyectos/${projectId}/pendientes`);
+    revalidatePath(`/proyectos/${projectId}/reportes/avances`);
+    if (options?.approved) {
       revalidateProjectSchedulePaths(projectId);
-      if (log.projectId !== projectId) {
-        revalidateProjectSchedulePaths(log.projectId);
-      }
+      revalidatePath("/inventario/movimientos");
+      revalidatePath("/inventario/reportes/stock");
     }
     return { ok: true };
   } catch (err) {
@@ -103,8 +95,8 @@ async function lifecycleAction(
 export async function createJobsiteLogAction(
   fd: FormData,
 ): Promise<{ error: string } | { id: string }> {
+  const ctx = await getCtx();
   try {
-    const ctx = await getCtx();
     let progress: unknown[];
     let labor: unknown[];
     let materials: unknown[];
@@ -144,7 +136,7 @@ export async function createJobsiteLogAction(
       return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
     }
     const log = await createJobsiteLog(parsed.data, ctx);
-    revalidateJobsiteLogPaths(parsed.data.projectId, log.id);
+    revalidateJobsiteLogPaths(log.projectId, log.id);
     return { id: log.id };
   } catch (err) {
     return handle(err);
@@ -155,17 +147,17 @@ export async function updateJobsiteLogAction(
   logId: string,
   fd: FormData,
 ): Promise<{ error: string } | { id: string }> {
+  const ctx = await getCtx();
   try {
-    const ctx = await getCtx();
     let progress: unknown[];
     let labor: unknown[];
     let materials: unknown[];
     let issues: unknown[];
     try {
-      progress = parseJsonArray(fd, "progress");
-      labor = parseJsonArray(fd, "labor");
-      materials = parseJsonArray(fd, "materials");
-      issues = parseJsonArray(fd, "issues");
+      progress = parseJsonArray(fd, "progress", true);
+      labor = parseJsonArray(fd, "labor", true);
+      materials = parseJsonArray(fd, "materials", true);
+      issues = parseJsonArray(fd, "issues", true);
     } catch (err) {
       // Never fall back to [] on update — that would wipe existing children.
       return { error: err instanceof Error ? err.message : "Datos de líneas inválidos" };
@@ -196,47 +188,31 @@ export async function updateJobsiteLogAction(
 
 export async function submitJobsiteLogAction(
   logId: string,
-  projectId: string,
 ): Promise<Ok | Err> {
-  return lifecycleAction(logId, projectId, async (id, ctx) => submitJobsiteLog(id, ctx));
+  return lifecycleAction(logId, submitJobsiteLog);
 }
 
 export async function approveJobsiteLogAction(
   logId: string,
-  projectId: string,
 ): Promise<Ok | Err> {
-  return lifecycleAction(
-    logId,
-    projectId,
-    async (id, ctx) => approveJobsiteLog(id, ctx),
-    undefined,
-    { revalidateSchedule: true },
-  );
+  return lifecycleAction(logId, approveJobsiteLog, { approved: true });
 }
 
 export async function returnJobsiteLogAction(
   logId: string,
-  projectId: string,
   data: { comment: string },
 ): Promise<Ok | Err> {
-  const parsed = returnJobsiteLogSchema.safeParse({ returnNotes: data.comment });
+  const parsed = returnJobsiteLogSchema.safeParse({ returnNotes: data?.comment });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   }
-  return lifecycleAction(
-    logId,
-    projectId,
-    async (id, ctx, input) => returnJobsiteLog(id, input!, ctx),
-    parsed.data,
-    { revalidateSchedule: true },
-  );
+  return lifecycleAction(logId, (id, ctx) => returnJobsiteLog(id, parsed.data, ctx));
 }
 
 export async function cancelJobsiteLogAction(
   logId: string,
-  projectId: string,
 ): Promise<Ok | Err> {
-  return lifecycleAction(logId, projectId, async (id, ctx) => cancelJobsiteLog(id, ctx));
+  return lifecycleAction(logId, cancelJobsiteLog);
 }
 
 export async function getStockBalancePreviewAction(

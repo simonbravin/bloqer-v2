@@ -1,0 +1,136 @@
+{
+  "phase": "AG-11",
+  "status": "closed_local",
+  "date": "2026-11-05",
+  "base": "9a2a32215dc3aed3690038fed0742c4c446a716c",
+  "findings": [
+    {
+      "id": "GA-AG-11-001",
+      "title": "Empresa propietaria del parte",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-002",
+      "title": "Anulación y selector EDT por URL directa",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-003",
+      "title": "Relaciones históricas en partes",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-004",
+      "title": "Fotos, biblioteca y avisos",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-005",
+      "title": "Auditoría, bloqueos y reintentos de transición",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-006",
+      "title": "Fecha, contenido y límites del parte",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-007",
+      "title": "Reenvío del mismo borrador",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-008",
+      "title": "Tope de avance de una partida",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-009",
+      "title": "Materiales vinculados y consumo",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-010",
+      "title": "Avisos del ciclo de vida",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-011",
+      "title": "Registrar desde Field",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-012",
+      "title": "Inicio de Field y pendientes",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-013",
+      "title": "Altas y edición del Libro",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-014",
+      "title": "Carga de evidencia y detalle adaptable",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-015",
+      "title": "Refresco de consumidores",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-016",
+      "title": "Integridad de presupuesto y cobertura",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-017",
+      "title": "Plan, Real y exportaciones",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-018",
+      "title": "Origen de pendientes y ventas directas",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-019",
+      "title": "Configuración y disparo de reportes diarios",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-11-020",
+      "title": "Estado terminal en el workflow",
+      "state": "corrected_verified"
+    }
+  ],
+  "verification": {
+    "workspacePass": 2706,
+    "workspaceLiveSuitesOmitted": 41,
+    "sqlDistinct": 49,
+    "typecheckTasks": 13,
+    "lint": true,
+    "build": true,
+    "sourceHashesVerified": 70,
+    "independentFocalPass": 163,
+    "knowledgeChunks": 587,
+    "visualCaptures": 7,
+    "viewports": [
+      "1440x1000",
+      "768x1024",
+      "390x844"
+    ],
+    "roles": [
+      "OWNER",
+      "PROJECT_VIEWER"
+    ]
+  },
+  "evidence": "output/platform-audit/ag-11-2026-11-05/",
+  "limits": [
+    "isolated synthetic database",
+    "no real R2 or email delivery",
+    "targeted visual sample"
+  ],
+  "nextPhase": "AG-12"
+}

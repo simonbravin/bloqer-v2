@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { isFieldImmersivePath } from "./field-immersive-routes";
 import { isPendingInboxPath } from "./field-pending-path";
-import { listFieldQuickActions } from "./field-quick-actions";
+import { fieldQuickActionHref, listFieldQuickActions } from "./field-quick-actions";
 
 test("immersive paths hide bottom nav", () => {
   assert.equal(isFieldImmersivePath("/proyectos/abc/libro-obra/nuevo"), true);
@@ -43,6 +43,10 @@ test("OWNER can register consumption and field + does not include Pagar or Cobra
     ids.some((id) => id.toLowerCase().includes("cobr") || id.toLowerCase().includes("collect")),
     false,
   );
+});
+
+test("Registrar consumo opens the existing project consumption form", () => {
+  assert.equal(fieldQuickActionHref("abc", "consumption"), "/proyectos/abc/consumos?create=1");
 });
 
 test("a disabled PROJECTS module removes document uploads while retaining other enabled Field actions", () => {

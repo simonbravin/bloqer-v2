@@ -294,7 +294,7 @@ export async function buildJobsiteLogPdfPayload(
       description: m.description,
       product: m.productName ?? "—",
       warehouse: m.warehouseName ?? "—",
-      quantity: formatQty(m.quantity),
+      quantity: formatQty(m.quantity, m.productUnit ?? undefined),
       notes: m.notes ?? "—",
     })),
     issues: log.issues.map((iss) => ({

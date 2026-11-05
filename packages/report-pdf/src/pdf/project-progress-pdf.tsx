@@ -226,8 +226,12 @@ function ExecutivePage({
     [
       "Físico validado",
       pct(report.physical.pct),
-      `Cobertura: ${report.physical.coveragePct === null ? "Sin base" : `${fmt(report.physical.coveragePct)}%`} · ${report.physical.coveredCount}/${report.physical.totalCount} partidas`,
-      `Última medición: ${report.sourceDates.jobsite ?? "Sin evidencia al corte"}`,
+      report.sourceAccess.jobsite
+        ? `Cobertura: ${report.physical.coveragePct === null ? "Sin base" : `${fmt(report.physical.coveragePct)}%`} · ${report.physical.coveredCount}/${report.physical.totalCount} partidas`
+        : "Fuente no disponible",
+      report.sourceAccess.jobsite
+        ? `Última medición: ${report.sourceDates.jobsite ?? "Sin evidencia al corte"}`
+        : "",
     ],
     [
       "Certificado sobre venta",
@@ -328,6 +332,12 @@ function ExecutivePage({
         incluyen el saldo anterior a {report.dateFrom}. Aporte observado:{" "}
         {pct(report.physical.observedPct)}; no es un avance validado con cobertura incompleta.
       </Text>
+      {report.sourceAccess.schedule ? (
+        <Text style={{ fontSize: 6.5, color: colors.muted, marginTop: 4 }}>
+          Real del cronograma completo actual: {pct(report.schedule.progressPct)} · Tareas actuales:
+          {` ${report.schedule.completedTasks} de ${report.schedule.totalTasks} completadas · ${report.schedule.delayedTasks} atrasadas · ${report.schedule.blockedTasks} bloqueadas.`}
+        </Text>
+      ) : null}
       <PdfReportFooter branding={branding} />
     </Page>
   );
@@ -442,6 +452,11 @@ export function ProjectProgressPdfDocument({
             {note}
           </Text>
         ))}
+        {report.excludedDirectSalesHref ? (
+          <Text style={reportPdfStyles.meta}>
+            Acceso a ventas directas en Bloqer: {report.excludedDirectSalesHref}
+          </Text>
+        ) : null}
         <Text style={reportPdfStyles.meta}>
           La cobertura mide qué parte del costo presupuestado tiene medición válida. No se
           renormalizan las partidas observadas. Los históricos ambiguos se conservan y se señalan.
@@ -466,9 +481,9 @@ export function ProjectProgressPdfDocument({
             filterLine={filterLine}
           />
           <Text style={reportPdfStyles.meta}>
-            Cantidades en la unidad de cada partida · Importes en {report.currency} ·{" "}
-            {pageIndex * 16 + 1}–{Math.min((pageIndex + 1) * 16, rows.length)} de{" "}
-            {report.rows.length} partidas
+            Cantidades en la unidad de cada partida · Por ejecutar según % físico · Importes en{" "}
+            {report.currency} · {pageIndex * 16 + 1}–{Math.min((pageIndex + 1) * 16, rows.length)}{" "}
+            de {report.rows.length} partidas
           </Text>
           <View style={reportPdfStyles.headerRow}>
             {columns.map((c) => (

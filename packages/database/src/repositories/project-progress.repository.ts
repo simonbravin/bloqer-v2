@@ -118,6 +118,7 @@ export async function readProjectProgressEvidence(
     scheduleItems,
     certifications,
     invoices,
+    directSale,
     orders,
     subcontracts,
     subCerts,
@@ -137,6 +138,7 @@ export async function readProjectProgressEvidence(
         budgetId: true,
         costItem: {
           select: {
+            budgetId: true,
             unit: true,
             quantity: true,
             totalCostDirect: true,
@@ -172,7 +174,7 @@ export async function readProjectProgressEvidence(
       : [],
     access.schedule
       ? prisma.scheduleItem.findMany({
-          where: { tenantId: scope.tenantId, schedule: where, status: { not: "CANCELLED" } },
+          where: { tenantId: scope.tenantId, schedule: where },
           select: {
             id: true,
             parentId: true,
@@ -184,7 +186,14 @@ export async function readProjectProgressEvidence(
             endDate: true,
             durationDays: true,
             blockReason: true,
-            wbsLinks: { where: { isPrimary: true }, select: { wbsNodeId: true } },
+            wbsLinks: {
+              where: {
+                tenantId: scope.tenantId,
+                isPrimary: true,
+                wbsNode: { budgetId: { in: budgetIds } },
+              },
+              select: { wbsNodeId: true },
+            },
           },
         })
       : [],
@@ -263,6 +272,19 @@ export async function readProjectProgressEvidence(
           },
         })
       : [],
+    access.ar
+      ? prisma.salesInvoice.findFirst({
+          where: {
+            ...where,
+            ...requiredDocumentCompany(scope),
+            status: "ISSUED",
+            documentKind: "INVOICE",
+            certificationId: null,
+            issueDate: { lte: cut },
+          },
+          select: { id: true },
+        })
+      : null,
     access.costs && access.procurement
       ? prisma.purchaseOrder.findMany({
           where: {
@@ -350,6 +372,7 @@ export async function readProjectProgressEvidence(
     scheduleItems,
     certifications,
     invoices,
+    hasDirectSales: directSale !== null,
     orders,
     subcontracts,
     subCerts,
@@ -358,7 +381,12 @@ export async function readProjectProgressEvidence(
   };
 }
 
-type LoadedProjectProgressEvidence = Awaited<ReturnType<typeof readProjectProgressEvidence>>;
+type LoadedProjectProgressEvidence = Omit<
+  Awaited<ReturnType<typeof readProjectProgressEvidence>>,
+  "hasDirectSales"
+>;
 export type ProjectProgressEvidence = {
   [Key in keyof LoadedProjectProgressEvidence]: LoadedProjectProgressEvidence[Key][number][];
+} & {
+  hasDirectSales: boolean;
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button }   from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
 } from "@/lib/searchable-options";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { WbsIncrementalProgressSnapshot } from "@bloqer/services";
-import { addDecimal, compareDecimal, DISPLAY_DECIMALS, multiplyDecimal, QTY_DECIMALS, roundToDecimals, toIsoDateInTimeZone } from "@bloqer/utils";
+import { addDecimal, compareDecimal, formatDateLong, multiplyDecimal, QTY_DECIMALS, roundQty, toIsoDateInTimeZone } from "@bloqer/utils";
 import { compareQty, formatQtyDisplay, formatRatePctFromString } from "@/lib/format-money";
 import { useIdempotencyKey } from "@/lib/use-idempotency-key";
 import {
@@ -50,7 +50,7 @@ export type WbsItemOption = {
   budgetQty?: string;
 };
 export type ContactOption = { id: string; legalName: string; fantasyName: string | null };
-export type ProductOption  = { id: string; name: string };
+export type ProductOption  = { id: string; name: string; unit: string };
 export type WarehouseOption = { id: string; name: string };
 export type SubcontractOption = { id: string; code: string; title: string };
 
@@ -104,8 +104,7 @@ function remainingPctForWbs(
   excludeIndex?: number,
 ): string {
   if (wbsNodeId === JOBSITE_PROGRESS_NONE) return "";
-  const entry = snapshot[wbsNodeId];
-  let rem = entry?.remainingPct != null ? entry.remainingPct : "100";
+  let rem = addDecimal("100", multiplyDecimal(approvedPctForWbs(wbsNodeId, snapshot), "-1"));
   if (draftProgress) {
     for (let i = 0; i < draftProgress.length; i++) {
       if (excludeIndex != null && i === excludeIndex) continue;
@@ -120,7 +119,7 @@ function remainingPctForWbs(
   }
   try {
     if (compareDecimal(rem, "0") < 0) rem = "0";
-    return roundToDecimals(rem, DISPLAY_DECIMALS);
+    return roundQty(rem);
   } catch {
     return rem;
   }
@@ -131,7 +130,7 @@ function approvedPctForWbs(
   snapshot: WbsIncrementalProgressSnapshot,
 ): string {
   if (wbsNodeId === JOBSITE_PROGRESS_NONE) return "0";
-  return snapshot[wbsNodeId]?.approvedIncrementalPct ?? "0";
+  return snapshot[wbsNodeId]?.exactApprovedIncrementalPct ?? "0";
 }
 
 function cumulativePctLabel(
@@ -151,6 +150,7 @@ type Props = {
   projectId:  string;
   companyId:  string;
   wbsOptions: WbsItemOption[];
+  existingWbsOptions?: WbsItemOption[];
   contactOptions: ContactOption[];
   productOptions: ProductOption[];
   warehouseOptions: WarehouseOption[];
@@ -174,8 +174,10 @@ type Props = {
   };
   submitLabel?: string;
   mode?: "create" | "edit";
-  extraSections?: ReactNode;
+  cancelHref?: string;
+  extraSections?: (saving: boolean) => ReactNode;
   onCancel?: () => void;
+  onSavingChange?: (saving: boolean) => void;
   onSuccess?: (id: string) => void;
   onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
 };
@@ -190,29 +192,36 @@ const WEATHER_CUSTOM = "__custom_weather__";
 
 export function JobsiteLogForm({
   projectId, companyId, wbsOptions, contactOptions, productOptions, warehouseOptions, subcontractOptions,
+  existingWbsOptions = [],
   wbsProgressSnapshot = {},
   inventoryModuleEnabled = false,
   legacyPhysicalPctWarning = false,
   stockPreviewAction,
   action, defaultValues, submitLabel = "Crear parte", mode = "create",
+  cancelHref = `/proyectos/${projectId}/libro-obra`,
   extraSections,
   onCancel,
+  onSavingChange,
   onSuccess,
   onCreated,
 }: Props) {
   const router = useRouter();
-  const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
+  const formId = useId();
+  const { idempotencyKey } = useIdempotencyKey();
   const generalNotesRef = useRef<RichNoteEditorHandle>(null);
 
   const [progress,  setProgress, progressRef]  = useSyncedList<ProgressLine>(withRowKeys(defaultValues?.progress  ?? []));
   const [labor,     setLabor, laborRef]        = useSyncedList<LaborLine>(withRowKeys(defaultValues?.labor     ?? []));
   const [materials, setMaterials, materialsRef] = useSyncedList<MaterialLine>(withRowKeys(defaultValues?.materials ?? []));
   const [issues,    setIssues, issuesRef]      = useSyncedList<IssueLine>(withRowKeys(defaultValues?.issues    ?? []));
+  const initialLogDate = defaultValues?.logDate ?? (mode === "create" ? todayLocalInputDate() : "");
+  const [selectedLogDate, setSelectedLogDate] = useState(initialLogDate);
   const [shift, setShift] = useState(defaultValues?.shift ?? "");
   const [weather, setWeather] = useState(defaultValues?.weather ?? "");
   const [error,     setError]     = useState<string | null>(null);
   const [pending,   setPending]   = useState(false);
-  const [stockByKey, setStockByKey] = useState<Record<string, string>>({});
+  const saving = useRef(false);
+  const [stockByKey, setStockByKey] = useState<Record<string, string | null>>({});
   const stockTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const shiftSelectValue = !shift
@@ -229,6 +238,12 @@ export function JobsiteLogForm({
   const progressWbsOptions = useMemo(
     () => wbsToSearchableOptions(wbsOptions),
     [wbsOptions],
+  );
+  const materialWbsOptions = useMemo(
+    () => withNoneOption(progressWbsOptions, {
+      value: JOBSITE_PROGRESS_NONE, label: "Usar la única partida de avance",
+    }),
+    [progressWbsOptions],
   );
   const contactComboboxOptions = useMemo(
     () =>
@@ -254,20 +269,20 @@ export function JobsiteLogForm({
     [productOptions],
   );
 
-  const stockExceeded = useMemo(() => {
-    if (!inventoryModuleEnabled) return false;
+  const stockExceededKeys = useMemo(() => {
     const qtyByPair = new Map<string, string>();
     for (const m of materials) {
       if (m.productId === "__none__" || m.warehouseId === "__none__" || !JOBSITE_QTY_RE.test(m.quantity)) continue;
       const key = `${m.productId}:${m.warehouseId}`;
       qtyByPair.set(key, addDecimal(qtyByPair.get(key) ?? "0", m.quantity));
     }
+    const exceeded = new Set<string>();
     for (const [key, qty] of qtyByPair) {
       const balance = stockByKey[key];
-      if (balance !== undefined && compareQty(qty, balance) > 0) return true;
+      if (balance != null && compareQty(qty, balance) > 0) exceeded.add(key);
     }
-    return false;
-  }, [materials, stockByKey, inventoryModuleEnabled]);
+    return exceeded;
+  }, [materials, stockByKey]);
 
   const fetchStock = useCallback(
     (productId: string, warehouseId: string) => {
@@ -276,10 +291,8 @@ export function JobsiteLogForm({
       const key = `${productId}:${warehouseId}`;
       if (stockTimers.current[key]) clearTimeout(stockTimers.current[key]);
       stockTimers.current[key] = setTimeout(async () => {
-        const res = await stockPreviewAction(warehouseId, productId);
-        if (res.balance !== undefined) {
-          setStockByKey((prev) => ({ ...prev, [key]: res.balance! }));
-        }
+        const res = await stockPreviewAction(warehouseId, productId).catch(() => null);
+        setStockByKey((prev) => ({ ...prev, [key]: res?.balance ?? null }));
       }, 300);
     },
     [inventoryModuleEnabled, stockPreviewAction],
@@ -293,18 +306,10 @@ export function JobsiteLogForm({
   }, []);
 
   useEffect(() => {
-    if (!inventoryModuleEnabled || !stockPreviewAction) return;
     for (const m of defaultValues?.materials ?? []) {
-      if (m.productId === "__none__" || m.warehouseId === "__none__") continue;
-      const key = `${m.productId}:${m.warehouseId}`;
-      void stockPreviewAction(m.warehouseId, m.productId).then((res) => {
-        if ("balance" in res && res.balance !== undefined) {
-          setStockByKey((prev) => ({ ...prev, [key]: res.balance! }));
-        }
-      });
+      fetchStock(m.productId, m.warehouseId);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- prefetch once for edit defaults
-  }, [inventoryModuleEnabled, stockPreviewAction]);
+  }, [defaultValues?.materials, fetchStock]);
 
   function updateProgress(i: number, field: keyof ProgressLine, val: string) {
     setProgress((prev) =>
@@ -348,12 +353,8 @@ export function JobsiteLogForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    // React onSubmit runs before our capture-phase submit listener on the form; sync first.
+    if (saving.current) return;
     const generalNotesSerialized = generalNotesRef.current?.sync() ?? "";
-    if (stockExceeded) {
-      setError("Una o más líneas de material superan el stock disponible.");
-      return;
-    }
     const prepared = prepareProgressLinesForSubmit(progressRef.current, wbsOptions);
     if ("error" in prepared) {
       setError(prepared.error);
@@ -376,7 +377,9 @@ export function JobsiteLogForm({
       return;
     }
 
+    saving.current = true;
     setPending(true);
+    onSavingChange?.(true);
     setError(null);
     const fd = new FormData(e.currentTarget);
     fd.set("generalNotes", generalNotesSerialized);
@@ -422,8 +425,7 @@ export function JobsiteLogForm({
           created = await onCreated?.(result.id);
         } catch {
           created = {
-            navigate: false,
-            message: "Parte creado correctamente. Alguna foto no pudo subirse.",
+            message: "Parte creado. Si falta alguna foto, podés adjuntarla desde el detalle.",
           };
         }
         if (created?.message) {
@@ -431,25 +433,18 @@ export function JobsiteLogForm({
         } else {
           toast.success(mode === "edit" ? "Parte actualizado." : "Parte guardado.");
         }
-        if (mode !== "edit") {
-          rotateIdempotencyKey();
-        }
         if (created?.navigate === false) {
-          setPending(false);
           return;
         }
         onSuccess?.(result.id);
-        if (mode === "edit") {
-          router.push("..");
-        } else {
-          router.replace(`/proyectos/${projectId}/libro-obra/${result.id}`);
-        }
-        router.refresh();
+        router.replace(`/proyectos/${projectId}/libro-obra/${result.id}`);
       }
     } catch {
       setError("Error inesperado al guardar el parte.");
     } finally {
+      saving.current = false;
       setPending(false);
+      onSavingChange?.(false);
     }
   }
 
@@ -458,11 +453,13 @@ export function JobsiteLogForm({
     const key = `${row.productId}:${row.warehouseId}`;
     const balance = stockByKey[key];
     if (balance === undefined) return "Consultando stock…";
-    return `Disponible: ${balance}`;
+    if (balance === null) return "No se pudo consultar el stock. Se verificará al guardar.";
+    const unit = productOptions.find((product) => product.id === row.productId)?.unit;
+    return `Disponible: ${formatQtyDisplay(balance)}${unit ? ` ${unit}` : ""}`;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
+    <form onSubmit={handleSubmit} className="space-y-8" aria-busy={pending}>
       {legacyPhysicalPctWarning && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-100">
           Hay partidas con avance físico acumulado mayor a 100% en datos históricos. Revisá partes aprobados anteriores
@@ -489,12 +486,20 @@ export function JobsiteLogForm({
               name="logDate"
               type="date"
               required
+              max={todayLocalInputDate()}
               className="min-h-11 md:min-h-10"
-              defaultValue={defaultValues?.logDate ?? (mode === "create" ? todayLocalInputDate() : undefined)}
+              defaultValue={initialLogDate}
+              onChange={(event) => setSelectedLogDate(event.currentTarget.value)}
+              aria-describedby={selectedLogDate ? `${formId}-log-date-label` : undefined}
             />
+            {selectedLogDate && (
+              <p id={`${formId}-log-date-label`} className="text-xs text-muted-foreground">
+                {formatDateLong(selectedLogDate)}
+              </p>
+            )}
           </div>
           <div className="space-y-1">
-            <Label>Turno</Label>
+            <Label htmlFor={`${formId}-shift`}>Turno</Label>
             <input type="hidden" name="shift" value={shift} />
             <Select
               value={shiftSelectValue}
@@ -503,7 +508,7 @@ export function JobsiteLogForm({
                 setShift(v === SELECT_NONE ? "" : v);
               }}
             >
-              <SelectTrigger className="min-h-11 md:min-h-10">
+              <SelectTrigger id={`${formId}-shift`} className="min-h-11 md:min-h-10">
                 <SelectValue placeholder="Seleccionar…" />
               </SelectTrigger>
               <SelectContent>
@@ -518,7 +523,7 @@ export function JobsiteLogForm({
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Clima</Label>
+            <Label htmlFor={`${formId}-weather`}>Clima</Label>
             <input type="hidden" name="weather" value={weather} />
             <Select
               value={weatherSelectValue}
@@ -527,7 +532,7 @@ export function JobsiteLogForm({
                 setWeather(v === SELECT_NONE ? "" : v);
               }}
             >
-              <SelectTrigger className="min-h-11 md:min-h-10">
+              <SelectTrigger id={`${formId}-weather`} className="min-h-11 md:min-h-10">
                 <SelectValue placeholder="Seleccionar…" />
               </SelectTrigger>
               <SelectContent>
@@ -574,7 +579,7 @@ export function JobsiteLogForm({
             + Agregar fila
           </Button>
         </div>
-        {wbsOptions.length === 0 ? (
+        {wbsOptions.length === 0 && progress.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             No hay partidas EDT de un presupuesto aprobado. Sin partida no se puede guardar el avance.
           </p>
@@ -583,7 +588,8 @@ export function JobsiteLogForm({
         ) : (
           <div className="space-y-3">
             {progress.map((row, i) => {
-              const wbs = wbsOptions.find((w) => w.id === row.wbsNodeId);
+              const historical = existingWbsOptions.find((w) => w.id === row.wbsNodeId);
+              const wbs = wbsOptions.find((w) => w.id === row.wbsNodeId) ?? historical;
               const approvedPct = approvedPctForWbs(row.wbsNodeId, wbsProgressSnapshot);
               const remPct = remainingPctForWbs(
                 row.wbsNodeId,
@@ -595,11 +601,14 @@ export function JobsiteLogForm({
               return (
               <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="space-y-1">
-                  <Label className="text-xs">Partida EDT *</Label>
+                  <Label htmlFor={`${formId}-wbs-${i}`} className="text-xs">Partida EDT *</Label>
                   <SearchableCombobox
+                    id={`${formId}-wbs-${i}`}
                     popoverWidth="wide"
                     className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
-                    options={progressWbsOptions}
+                    options={historical
+                      ? [...progressWbsOptions, ...wbsToSearchableOptions([historical])]
+                      : progressWbsOptions}
                     value={row.wbsNodeId}
                     onValueChange={(v) => updateProgress(i, "wbsNodeId", v)}
                     placeholder="Seleccionar…"
@@ -607,15 +616,16 @@ export function JobsiteLogForm({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Descripción</Label>
-                  <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} />
+                  <Label htmlFor={`${formId}-progress-description-${i}`} className="text-xs">Descripción</Label>
+                  <Input id={`${formId}-progress-description-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateProgress(i, "description", e.target.value)} />
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">
+                    <Label htmlFor={`${formId}-progress-qty-${i}`} className="text-xs">
                       Cantidad *{wbs?.unit ? ` (${wbs.unit})` : ""}
                     </Label>
                     <DecimalInput
+                      id={`${formId}-progress-qty-${i}`}
                       className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"
                       value={row.quantityCompleted}
                       onValueChange={(v) => updateProgress(i, "quantityCompleted", v)}
@@ -624,23 +634,25 @@ export function JobsiteLogForm({
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">% del día</Label>
+                    <Label htmlFor={`${formId}-progress-pct-${i}`} className="text-xs">% del día</Label>
                     <DecimalInput
+                      id={`${formId}-progress-pct-${i}`}
                       className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"
                       value={row.physicalPct}
                       onValueChange={(v) => updateProgress(i, "physicalPct", v)}
                       placeholder="0,00"
+                      precision={QTY_DECIMALS}
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Avance acumulado</Label>
+                    <p className="text-xs font-medium">Avance acumulado</p>
                     <div className="flex h-11 min-h-11 items-center rounded-md border bg-muted/40 px-2 text-xs font-mono tabular-nums md:h-8 md:min-h-8">
                       {cumulativePctLabel(row.wbsNodeId, progress, wbsProgressSnapshot)}
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Notas</Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} />
+                    <Label htmlFor={`${formId}-progress-notes-${i}`} className="text-xs">Notas</Label>
+                    <Input id={`${formId}-progress-notes-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateProgress(i, "notes", e.target.value)} />
                   </div>
                 </div>
                 {row.wbsNodeId !== JOBSITE_PROGRESS_NONE ? (
@@ -683,8 +695,9 @@ export function JobsiteLogForm({
               <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Contacto</Label>
+                    <Label htmlFor={`${formId}-labor-contact-${i}`} className="text-xs">Contacto</Label>
                     <SearchableCombobox
+                      id={`${formId}-labor-contact-${i}`}
                       popoverWidth="wide"
                       className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                       options={contactComboboxOptions}
@@ -695,8 +708,9 @@ export function JobsiteLogForm({
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Subcontrato</Label>
+                    <Label htmlFor={`${formId}-labor-subcontract-${i}`} className="text-xs">Subcontrato</Label>
                     <SearchableCombobox
+                      id={`${formId}-labor-subcontract-${i}`}
                       popoverWidth="wide"
                       className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                       options={subcontractComboboxOptions}
@@ -709,21 +723,21 @@ export function JobsiteLogForm({
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   <div className="space-y-1 sm:col-span-2">
-                    <Label className="text-xs">Descripción cuadrilla</Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} />
+                    <Label htmlFor={`${formId}-labor-description-${i}`} className="text-xs">Descripción cuadrilla</Label>
+                    <Input id={`${formId}-labor-description-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.crewDescription} onChange={(e) => updateLabor(i, "crewDescription", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Trabajadores</Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} />
+                    <Label htmlFor={`${formId}-labor-workers-${i}`} className="text-xs">Trabajadores</Label>
+                    <Input id={`${formId}-labor-workers-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" type="number" min="1" value={row.workersCount} onChange={(e) => updateLabor(i, "workersCount", e.target.value)} />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Horas</Label>
-                    <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.hoursWorked} onValueChange={(v) => updateLabor(i, "hoursWorked", v)} placeholder="0,00" />
+                    <Label htmlFor={`${formId}-labor-hours-${i}`} className="text-xs">Horas</Label>
+                    <DecimalInput id={`${formId}-labor-hours-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.hoursWorked} onValueChange={(v) => updateLabor(i, "hoursWorked", v)} placeholder="0,00" />
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Notas</Label>
-                  <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateLabor(i, "notes", e.target.value)} />
+                  <Label htmlFor={`${formId}-labor-notes-${i}`} className="text-xs">Notas</Label>
+                  <Input id={`${formId}-labor-notes-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateLabor(i, "notes", e.target.value)} />
                 </div>
                 <div className="flex justify-end">
                   <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setLabor((p) => p.filter((_, idx) => idx !== i))}>Eliminar fila</Button>
@@ -761,18 +775,18 @@ export function JobsiteLogForm({
           <div className="space-y-3">
             {materials.map((row, i) => {
               const stockLabel = materialStockLabel(row);
+              const productUnit = productOptions.find((product) => product.id === row.productId)?.unit;
               const stockKey = row.productId !== "__none__" && row.warehouseId !== "__none__"
                 ? `${row.productId}:${row.warehouseId}` : null;
-              const exceedsStock = stockKey && stockByKey[stockKey] !== undefined
-                && JOBSITE_QTY_RE.test(row.quantity)
-                && compareQty(row.quantity, stockByKey[stockKey]!) > 0;
+              const exceedsStock = stockKey && stockExceededKeys.has(stockKey);
 
               return (
                 <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <Label className="text-xs">Producto</Label>
+                      <Label htmlFor={`${formId}-material-product-${i}`} className="text-xs">Producto</Label>
                       <SearchableCombobox
+                        id={`${formId}-material-product-${i}`}
                         popoverWidth="wide"
                         className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
                         options={productComboboxOptions}
@@ -783,9 +797,9 @@ export function JobsiteLogForm({
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Depósito</Label>
+                      <Label htmlFor={`${formId}-material-warehouse-${i}`} className="text-xs">Depósito</Label>
                       <Select value={row.warehouseId} onValueChange={(v) => updateMaterial(i, "warehouseId", v)}>
-                        <SelectTrigger className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
+                        <SelectTrigger id={`${formId}-material-warehouse-${i}`} className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue placeholder="— ninguno —" /></SelectTrigger>
                         <SelectContent className="min-w-[var(--radix-select-trigger-width)] w-max max-w-[min(28rem,90vw)]">
                           <SelectItem value="__none__">— ninguno —</SelectItem>
                           {warehouseOptions.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
@@ -796,22 +810,45 @@ export function JobsiteLogForm({
                   {stockLabel && (
                     <p className={`text-xs ${exceedsStock ? "text-destructive font-medium" : "text-muted-foreground"}`}>
                       {stockLabel}
-                      {exceedsStock ? " — cantidad supera el disponible" : ""}
+                      {exceedsStock ? " — el total para este producto y depósito supera el disponible consultado. Se verificará al guardar." : ""}
                     </p>
+                  )}
+                  {(inventoryModuleEnabled || row.wbsNodeId) && (
+                    <div className="space-y-1">
+                      <Label htmlFor={`${formId}-material-wbs-${i}`} className="text-xs">Partida EDT del material</Label>
+                      <SearchableCombobox
+                        id={`${formId}-material-wbs-${i}`}
+                        popoverWidth="wide"
+                        className="h-11 min-h-11 w-full text-sm md:h-8 md:min-h-8 md:text-xs"
+                        options={row.wbsNodeId && row.wbsNodeId !== JOBSITE_PROGRESS_NONE &&
+                          !materialWbsOptions.some((option) => option.value === row.wbsNodeId)
+                          ? [...materialWbsOptions, { value: row.wbsNodeId, label: "Partida asignada previamente" }]
+                          : materialWbsOptions}
+                        value={row.wbsNodeId ?? JOBSITE_PROGRESS_NONE}
+                        onValueChange={(value) => updateMaterial(i, "wbsNodeId", value)}
+                        placeholder="Seleccionar…"
+                        searchPlaceholder="Buscar partida…"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Si vinculás producto y depósito, elegí una partida o cargá avance en una sola.
+                      </p>
+                    </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1 sm:col-span-2">
-                      <Label className="text-xs">Descripción *</Label>
-                      <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} />
+                      <Label htmlFor={`${formId}-material-description-${i}`} className="text-xs">Descripción *</Label>
+                      <Input id={`${formId}-material-description-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateMaterial(i, "description", e.target.value)} />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs">Cantidad</Label>
-                      <DecimalInput className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onValueChange={(v) => updateMaterial(i, "quantity", v)} placeholder="0,00" scale={QTY_DECIMALS} />
+                      <Label htmlFor={`${formId}-material-qty-${i}`} className="text-xs">
+                        Cantidad{productUnit ? ` (${productUnit})` : ""}
+                      </Label>
+                      <DecimalInput id={`${formId}-material-qty-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.quantity} onValueChange={(v) => updateMaterial(i, "quantity", v)} placeholder="0,00" scale={QTY_DECIMALS} />
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Notas</Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateMaterial(i, "notes", e.target.value)} />
+                    <Label htmlFor={`${formId}-material-notes-${i}`} className="text-xs">Notas</Label>
+                    <Input id={`${formId}-material-notes-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateMaterial(i, "notes", e.target.value)} />
                   </div>
                   <div className="flex justify-end">
                     <Button type="button" variant="ghost" size="sm" className="text-destructive h-7 px-2" onClick={() => setMaterials((p) => p.filter((_, idx) => idx !== i))}>Eliminar fila</Button>
@@ -823,7 +860,7 @@ export function JobsiteLogForm({
         )}
       </section>
 
-      {extraSections}
+      {extraSections?.(pending)}
 
       {/* ── Issues ── */}
       <section className="form-section space-y-3 p-4 sm:p-5">
@@ -841,9 +878,9 @@ export function JobsiteLogForm({
               <div key={row.rowKey} className="rounded-md border p-4 space-y-3 shell-surface-inset">
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="space-y-1">
-                    <Label className="text-xs">Tipo</Label>
+                    <Label htmlFor={`${formId}-issue-type-${i}`} className="text-xs">Tipo</Label>
                     <Select value={row.type} onValueChange={(v) => updateIssue(i, "type", v)}>
-                      <SelectTrigger className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id={`${formId}-issue-type-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="INCIDENT">Incidente</SelectItem>
                         <SelectItem value="BLOCKER">Bloqueo</SelectItem>
@@ -853,9 +890,9 @@ export function JobsiteLogForm({
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Severidad</Label>
+                    <Label htmlFor={`${formId}-issue-severity-${i}`} className="text-xs">Severidad</Label>
                     <Select value={row.severity} onValueChange={(v) => updateIssue(i, "severity", v)}>
-                      <SelectTrigger className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id={`${formId}-issue-severity-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="LOW">Baja</SelectItem>
                         <SelectItem value="MEDIUM">Media</SelectItem>
@@ -865,9 +902,9 @@ export function JobsiteLogForm({
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Estado</Label>
+                    <Label htmlFor={`${formId}-issue-status-${i}`} className="text-xs">Estado</Label>
                     <Select value={row.status} onValueChange={(v) => updateIssue(i, "status", v)}>
-                      <SelectTrigger className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
+                      <SelectTrigger id={`${formId}-issue-status-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="OPEN">Abierto</SelectItem>
                         <SelectItem value="RESOLVED">Resuelto</SelectItem>
@@ -877,14 +914,14 @@ export function JobsiteLogForm({
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Descripción *</Label>
+                  <Label htmlFor={`${formId}-issue-description-${i}`} className="text-xs">Descripción *</Label>
                   {/* No HTML required: empty draft rows are dropped on submit (same as materials filter). */}
-                  <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} />
+                  <Input id={`${formId}-issue-description-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.description} onChange={(e) => updateIssue(i, "description", e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
                   <div className="min-w-0 flex-1 space-y-1">
-                    <Label className="text-xs">Notas</Label>
-                    <Input className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} />
+                    <Label htmlFor={`${formId}-issue-notes-${i}`} className="text-xs">Notas</Label>
+                    <Input id={`${formId}-issue-notes-${i}`} className="h-11 min-h-11 text-sm md:h-8 md:min-h-8 md:text-xs" value={row.notes} onChange={(e) => updateIssue(i, "notes", e.target.value)} />
                   </div>
                   <Button
                     type="button"
@@ -902,13 +939,13 @@ export function JobsiteLogForm({
         )}
       </section>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
 
       <div className="sticky bottom-0 z-20 -mx-1 flex flex-col gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
         <Button
           type="submit"
           className="min-h-11 md:min-h-9"
-          disabled={pending || stockExceeded}
+          disabled={pending}
         >
           {pending ? "Guardando…" : submitLabel}
         </Button>
@@ -917,7 +954,7 @@ export function JobsiteLogForm({
           variant="outline"
           className="min-h-11 md:min-h-9"
           disabled={pending}
-          onClick={() => (onCancel ? onCancel() : router.back())}
+          onClick={() => (onCancel ? onCancel() : router.push(cancelHref))}
         >
           Cancelar
         </Button>

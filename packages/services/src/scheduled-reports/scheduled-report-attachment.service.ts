@@ -52,6 +52,7 @@ export type ScheduledReportAttachment = {
   content: Buffer;
   contentType: string;
   reportKey: ScheduledReportKey;
+  jobsiteScope?: { projectId: string; companyId: string };
 };
 
 /** Some attachments built; others failed — runner should send what succeeded and mark PARTIAL. */

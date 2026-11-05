@@ -171,7 +171,9 @@ export function ProjectProgressCharts({ report }: Props) {
             </div>
           ) : (
             <EmptyChart>
-              Faltan mediciones aprobadas o fechas de planificación para graficar.
+              {!report.sourceAccess.jobsite && !report.sourceAccess.schedule
+                ? "Libro de obra y Cronograma no están disponibles en este alcance."
+                : "No hay mediciones aprobadas ni fechas de planificación disponibles para graficar."}
             </EmptyChart>
           )}
           <p className="mt-3 text-xs leading-relaxed text-muted-foreground">

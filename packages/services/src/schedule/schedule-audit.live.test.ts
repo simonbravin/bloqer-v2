@@ -8,12 +8,26 @@ import { prisma, type Prisma } from "@bloqer/database";
 import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
+import { listEmailDeliveryLogs } from "../email-delivery/email-delivery-log.service";
 import {
   approveJobsiteLog,
+  createJobsiteLog,
+  getWbsIncrementalProgressSnapshot,
   submitJobsiteLog,
   updateJobsiteLog,
 } from "../jobsite-log/jobsite-log.service";
 import { confirmPurchaseReceipt } from "../procurement/purchase-receipt.service";
+import {
+  assertActiveJobsiteProjectsForSchedule,
+  deactivateScheduledReport,
+  getScheduledReportById,
+  listActiveProjectsForJobsiteSchedulePicker,
+  listScheduledReports,
+} from "../scheduled-reports/scheduled-report.service";
+import {
+  countRecentFailedScheduledReportDeliveries,
+  listScheduledReportEmailDeliveries,
+} from "../scheduled-reports/scheduled-report-execution.service";
 import {
   addScheduleDependency,
   assertScheduleEntityProject,
@@ -780,6 +794,155 @@ describe(
         }
       } finally {
         await prisma.budget.update({ where: { id: budgetId }, data: { companyId } });
+      }
+    });
+
+    it("AG-11 enforces the exact four-decimal progress cap across companies on a shared WBS", async () => {
+      await prisma.budget.update({ where: { id: budgetId }, data: { companyId: null } });
+      try {
+        const otherCtx = { ...ctx, companyId: otherCompanyId };
+        const baseline = await submittedLog(99.9951);
+        await approveJobsiteLog(baseline.id, ctx);
+        const ownSnapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx);
+        assert.equal(ownSnapshot[wbsId]?.exactApprovedIncrementalPct, "99.9951");
+        const otherSnapshot = await getWbsIncrementalProgressSnapshot(projectId, otherCtx);
+        assert.equal(otherSnapshot[wbsId], undefined);
+
+        const createRemainder = (physicalPct: string) =>
+          createJobsiteLog({
+            projectId,
+            idempotencyKey: randomUUID(),
+            logDate: "2026-11-01",
+            progress: [{ wbsNodeId: wbsId, quantityCompleted: "0", physicalPct }],
+            labor: [],
+            materials: [],
+            issues: [],
+          }, otherCtx);
+
+        await assert.rejects(createRemainder("0.0050"), (err) =>
+          isCode("CONFLICT")(err) && err instanceof Error &&
+          err.message.includes("no puede superar 100%") && !err.message.includes("99.9951"),
+        );
+        const remainder = await createRemainder("0.0049");
+        await submitJobsiteLog(remainder.id, otherCtx);
+        await approveJobsiteLog(remainder.id, otherCtx);
+        const aggregate = await prisma.jobsiteLogProgress.aggregate({
+          where: { wbsNodeId: wbsId, jobsiteLog: { tenantId, status: "APPROVED" } },
+          _sum: { physicalPct: true },
+        });
+        assert.equal(aggregate._sum.physicalPct?.toString(), "100");
+      } finally {
+        await prisma.budget.update({ where: { id: budgetId }, data: { companyId } });
+      }
+    });
+
+    it("AG-11 scopes daily report setup and stored report actions to authorized companies and projects", async () => {
+      const ids = {
+        shared: randomUUID(),
+        foreign: randomUUID(),
+        foreignProject: randomUUID(),
+        sharedForeignSelection: randomUUID(),
+      };
+      await prisma.project.update({ where: { id: otherProjectId }, data: { companyId: otherCompanyId } });
+      try {
+        const base = {
+          tenantId,
+          frequency: "DAILY",
+          timeOfDay: "20:00",
+          timezone: "America/Argentina/Buenos_Aires",
+          format: "PDF",
+          nextRunAt: new Date("2030-01-01"),
+          createdByUserId: actorId,
+        } as const;
+        await prisma.scheduledReport.createMany({
+          data: [
+            { ...base, id: ids.shared, companyId: null, scope: "TENANT", name: "Synthetic shared daily report" },
+            { ...base, id: ids.foreign, companyId: otherCompanyId, scope: "TENANT", name: "Synthetic foreign daily report" },
+            {
+              ...base,
+              id: ids.foreignProject,
+              companyId: null,
+              projectId: otherProjectId,
+              scope: "PROJECT",
+              name: "Synthetic foreign project report",
+            },
+            {
+              ...base,
+              id: ids.sharedForeignSelection,
+              companyId: null,
+              scope: "TENANT",
+              name: "Synthetic shared daily report of foreign project",
+              params: { jobsiteProjectIds: otherProjectId },
+            },
+          ],
+        });
+        await prisma.scheduledReportItem.create({
+          data: {
+            tenantId,
+            scheduledReportId: ids.sharedForeignSelection,
+            reportKey: "TENANT_JOBSITE_DAILY_LOGS",
+          },
+        });
+        await prisma.userMembership.create({ data: { tenantId, companyId, userId: actorId, roles: ["OWNER"] } });
+        const delivery = {
+          tenantId,
+          subject: "Synthetic daily report",
+          emailType: "REPORT_SCHEDULED",
+          status: "FAILED",
+          provider: "DISABLED",
+          relatedEntityType: "SCHEDULED_REPORT",
+          relatedEntityId: ids.shared,
+        } as const;
+        await prisma.emailDeliveryLog.createMany({
+          data: [
+            { ...delivery, companyId, recipientUserId: actorId, recipientEmail: "own@example.test" },
+            { ...delivery, companyId: null, recipientUserId: actorId, recipientEmail: "shared-verified@example.test" },
+            { ...delivery, companyId: null, recipientEmail: "shared-unknown@example.test" },
+            { ...delivery, companyId: otherCompanyId, recipientUserId: actorId, recipientEmail: "foreign@example.test" },
+            { ...delivery, companyId, relatedEntityId: ids.sharedForeignSelection, recipientEmail: "foreign-project@example.test" },
+          ],
+        });
+
+        assert.deepEqual((await listActiveProjectsForJobsiteSchedulePicker(ctx)).map(({ id }) => id), [projectId]);
+        const items = [{ reportKey: "TENANT_JOBSITE_DAILY_LOGS" }];
+        await assertActiveJobsiteProjectsForSchedule(items, { jobsiteProjectIds: projectId }, ctx);
+        await assert.rejects(
+          assertActiveJobsiteProjectsForSchedule(items, { jobsiteProjectIds: otherProjectId }, ctx),
+          isCode("VALIDATION"),
+        );
+        assert.deepEqual((await listScheduledReports(ctx)).map(({ id }) => id), [ids.shared]);
+        await assert.rejects(getScheduledReportById(ctx, ids.foreignProject), isCode("NOT_FOUND"));
+        await assert.rejects(getScheduledReportById(ctx, ids.sharedForeignSelection), isCode("NOT_FOUND"));
+        assert.deepEqual(await listScheduledReportEmailDeliveries(ctx, ids.sharedForeignSelection), []);
+        assert.deepEqual(await listEmailDeliveryLogs({
+          relatedEntityType: "SCHEDULED_REPORT",
+          relatedEntityId: ids.sharedForeignSelection,
+        }, ctx), []);
+        const visibleEmails = ["own@example.test", "shared-verified@example.test"];
+        assert.deepEqual(
+          (await listScheduledReportEmailDeliveries(ctx, ids.shared)).map((row) => row.recipientEmail).sort(),
+          visibleEmails,
+        );
+        assert.deepEqual(
+          (await listEmailDeliveryLogs({ relatedEntityType: "SCHEDULED_REPORT", relatedEntityId: ids.shared }, ctx))
+            .map((row) => row.recipientEmail).sort(),
+          visibleEmails,
+        );
+        assert.equal(await countRecentFailedScheduledReportDeliveries(ctx, ids.shared), 2);
+        await assert.rejects(deactivateScheduledReport(ctx, ids.shared), isCode("NOT_FOUND"));
+        await assert.rejects(deactivateScheduledReport(ctx, ids.foreign), isCode("NOT_FOUND"));
+        assert.equal((await getScheduledReportById({ ...ctx, companyId: otherCompanyId }, ids.foreign)).status, "ACTIVE");
+        const tenantCtx = { ...ctx, companyId: null };
+        assert.equal((await listScheduledReportEmailDeliveries(tenantCtx, ids.shared)).length, 4);
+        assert.equal((await getScheduledReportById(tenantCtx, ids.sharedForeignSelection)).status, "ACTIVE");
+        await deactivateScheduledReport(tenantCtx, ids.shared);
+        assert.equal((await getScheduledReportById(ctx, ids.shared)).status, "PAUSED");
+      } finally {
+        await prisma.emailDeliveryLog.deleteMany({ where: { tenantId, relatedEntityId: { in: Object.values(ids) } } });
+        await prisma.userMembership.deleteMany({ where: { tenantId, userId: actorId } });
+        await prisma.scheduledReportItem.deleteMany({ where: { tenantId, scheduledReportId: { in: Object.values(ids) } } });
+        await prisma.scheduledReport.deleteMany({ where: { tenantId, id: { in: Object.values(ids) } } });
+        await prisma.project.update({ where: { id: otherProjectId }, data: { companyId } });
       }
     });
 

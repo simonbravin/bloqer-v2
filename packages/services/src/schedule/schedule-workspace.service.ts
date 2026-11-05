@@ -792,7 +792,7 @@ export async function getProjectScheduleWorkspace(
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
     // Align with DTO post-merge: former containers have no reliable endDate.
-    if (isFormerScheduleContainer(fullActive, i.id)) continue;
+    if (isFormerScheduleContainer(rollupSourceItems, i.id)) continue;
     if (computeDaysLate(i.endDate, i.status) !== null) delayedItems += 1;
   }
 
@@ -800,7 +800,7 @@ export async function getProjectScheduleWorkspace(
   let weightSum = "0";
   for (const i of fullActive) {
     if (!fullLeafIds.has(i.id)) continue;
-    const former = isFormerScheduleContainer(fullActive, i.id);
+    const former = isFormerScheduleContainer(rollupSourceItems, i.id);
     const dur = !former && i.durationDays && i.durationDays > 0 ? String(i.durationDays) : "1";
     weighted = addDecimal(weighted, multiplyDecimal(i.progressPct.toString(), dur));
     weightSum = addDecimal(weightSum, dur);

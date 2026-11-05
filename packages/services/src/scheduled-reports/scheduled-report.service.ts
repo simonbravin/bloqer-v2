@@ -1,6 +1,7 @@
 import { prisma } from "@bloqer/database";
 import type {
   MembershipStatus,
+  Prisma,
   ScheduledReportFormat,
   ScheduledReportFrequency,
   ScheduledReportRunStatus,
@@ -14,8 +15,10 @@ import {
   type CreateScheduledReportInput,
   type ScheduledReportKey,
 } from "@bloqer/validators";
+import { companyScopeFilter } from "../company-scope";
+import { projectRowIdWhereForScope, requireProjectAccess, resolveAccessibleProjectScope } from "../security/access";
 import { ServiceContext, ServiceError } from "../types";
-import { assertCanManageScheduledReports } from "./scheduled-report-permissions";
+import { assertCanManageScheduledReports, canManageScheduledReports } from "./scheduled-report-permissions";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import {
   isReportKeyAllowedForScope,
@@ -61,6 +64,7 @@ export type ScheduledReportRecipientRow = {
 };
 
 export type ScheduledReportDetail = ScheduledReportListRow & {
+  canEditConfiguration: boolean;
   dayOfWeek: number | null;
   dayOfMonth: number | null;
   params: Record<string, string> | null;
@@ -118,12 +122,83 @@ async function resolveTenantTimezone(tenantId: string): Promise<string> {
   return t.timezone;
 }
 
-async function assertProjectInTenant(projectId: string, ctx: ServiceContext): Promise<void> {
-  const p = await prisma.project.findFirst({
-    where: { id: projectId, tenantId: ctx.tenantId },
+export async function scheduledReportWhereForContext(
+  ctx: ServiceContext,
+): Promise<Prisma.ScheduledReportWhereInput> {
+  const scope = await resolveAccessibleProjectScope(ctx);
+  return {
+    tenantId: ctx.tenantId,
+    ...companyScopeFilter(ctx),
+    AND: [{
+      OR: [
+        { projectId: null },
+        { project: { tenantId: ctx.tenantId, ...companyScopeFilter(ctx), ...projectRowIdWhereForScope(scope) } },
+      ],
+    }],
+  };
+}
+
+type ScheduledReportJobsiteSelection = {
+  params: Prisma.JsonValue;
+  items: readonly { reportKey: string }[];
+};
+
+/** D-100 stores selected project IDs in params rather than the report's project FK. */
+async function filterScheduledReportsByJobsiteScope<T extends ScheduledReportJobsiteSelection>(
+  rows: T[],
+  ctx: ServiceContext,
+): Promise<T[]> {
+  const projectIdsByRow = new Map(rows.map((row) => {
+    const params = row.params;
+    const raw = params && typeof params === "object" && !Array.isArray(params)
+      ? params.jobsiteProjectIds
+      : undefined;
+    const ids = row.items.some(({ reportKey }) => reportKey === "TENANT_JOBSITE_DAILY_LOGS")
+      ? parseJobsiteProjectIdsParam(typeof raw === "string" ? raw : undefined)
+      : [];
+    return [row, ids] as const;
+  }));
+  const ids = [...new Set([...projectIdsByRow.values()].flat())];
+  if (ids.length === 0) return rows;
+
+  const scope = await resolveAccessibleProjectScope(ctx);
+  const projects = await prisma.project.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      ...companyScopeFilter(ctx),
+      AND: [{ id: { in: ids } }, projectRowIdWhereForScope(scope)],
+    },
     select: { id: true },
   });
-  if (!p) throw new ServiceError("NOT_FOUND", "Proyecto no encontrado");
+  const authorizedIds = new Set(projects.map(({ id }) => id));
+  return rows.filter((row) => projectIdsByRow.get(row)!.every((id) => authorizedIds.has(id)));
+}
+
+export async function canReadScheduledReport(id: string, ctx: ServiceContext): Promise<boolean> {
+  if (!canManageScheduledReports(ctx)) return false;
+  const row = await prisma.scheduledReport.findFirst({
+    where: { ...await scheduledReportWhereForContext(ctx), id },
+    select: { params: true, items: { select: { reportKey: true } } },
+  });
+  return row !== null && (await filterScheduledReportsByJobsiteScope([row], ctx)).length > 0;
+}
+
+async function requireScheduledReportForMutation(id: string, ctx: ServiceContext) {
+  // The cron uses the stored company scope. A company-bound actor cannot change
+  // a shared configuration that the cron will execute with tenant-wide access.
+  const where = {
+    ...await scheduledReportWhereForContext(ctx),
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    id,
+  };
+  const row = await prisma.scheduledReport.findFirst({
+    where,
+    include: { items: { select: { reportKey: true } } },
+  });
+  if (!row || (await filterScheduledReportsByJobsiteScope([row], ctx)).length === 0) {
+    throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  }
+  return { row, where: { ...where, updatedAt: row.updatedAt } };
 }
 
 async function assertRecipientUsers(
@@ -147,9 +222,9 @@ async function assertRecipientUsers(
   }
 }
 
-async function assertActiveJobsiteProjectsForSchedule(
-  items: { reportKey: ScheduledReportKey }[],
-  params: Record<string, string> | undefined,
+export async function assertActiveJobsiteProjectsForSchedule(
+  items: readonly { reportKey: string }[],
+  params: Record<string, string> | null | undefined,
   ctx: ServiceContext,
 ): Promise<void> {
   if (!items.some((i) => i.reportKey === "TENANT_JOBSITE_DAILY_LOGS")) return;
@@ -157,14 +232,20 @@ async function assertActiveJobsiteProjectsForSchedule(
   if (ids.length === 0) {
     throw new ServiceError("VALIDATION", "Seleccioná al menos una obra ACTIVE para el parte diario");
   }
+  const scope = await resolveAccessibleProjectScope(ctx);
   const found = await prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, id: { in: ids }, status: "ACTIVE" },
+    where: {
+      tenantId: ctx.tenantId,
+      status: "ACTIVE",
+      ...companyScopeFilter(ctx),
+      AND: [{ id: { in: ids } }, projectRowIdWhereForScope(scope)],
+    },
     select: { id: true },
   });
   if (found.length !== ids.length) {
     throw new ServiceError(
       "VALIDATION",
-      "Una o más obras del parte diario no existen o no están ACTIVE",
+      "Una o más obras del parte diario no están disponibles o no están activas",
     );
   }
 }
@@ -258,6 +339,7 @@ export async function listScheduledReports(
   filters: ScheduledReportListFilters = {},
 ): Promise<ScheduledReportListRow[]> {
   assertCanManageScheduledReports(ctx);
+  if (filters.projectId) await requireProjectAccess(filters.projectId, ctx);
 
   const statusFilter = filters.status
     ? filters.status
@@ -267,7 +349,7 @@ export async function listScheduledReports(
 
   const rows = await prisma.scheduledReport.findMany({
     where: {
-      tenantId: ctx.tenantId,
+      ...await scheduledReportWhereForContext(ctx),
       ...(filters.projectId
         ? { projectId: filters.projectId, scope: "PROJECT" as const }
         : {}),
@@ -278,10 +360,10 @@ export async function listScheduledReports(
         : {}),
     },
     orderBy: [{ status: "asc" }, { nextRunAt: "asc" }],
-    include: listInclude,
+    include: { ...listInclude, items: { select: { reportKey: true } } },
   });
 
-  return rows.map(mapListRow);
+  return (await filterScheduledReportsByJobsiteScope(rows, ctx)).map(mapListRow);
 }
 
 export async function getScheduledReportById(
@@ -291,7 +373,7 @@ export async function getScheduledReportById(
   assertCanManageScheduledReports(ctx);
 
   const row = await prisma.scheduledReport.findFirst({
-    where: { id, tenantId: ctx.tenantId },
+    where: { id, ...await scheduledReportWhereForContext(ctx) },
     include: {
       ...listInclude,
       items: { orderBy: { sortOrder: "asc" } },
@@ -300,7 +382,9 @@ export async function getScheduledReportById(
       },
     },
   });
-  if (!row) throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  if (!row || (await filterScheduledReportsByJobsiteScope([row], ctx)).length === 0) {
+    throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  }
 
   const params =
     row.params && typeof row.params === "object" && !Array.isArray(row.params)
@@ -309,6 +393,7 @@ export async function getScheduledReportById(
 
   return {
     ...mapListRow(row),
+    canEditConfiguration: !ctx.companyId || row.companyId === ctx.companyId,
     dayOfWeek: row.dayOfWeek,
     dayOfMonth: row.dayOfMonth,
     params,
@@ -342,7 +427,7 @@ export async function createScheduledReport(
   assertReportKeys(input.items, input.scope);
   await assertReportKeysEnabledForTenant(input.items, ctx);
   if (input.scope === "PROJECT" && input.projectId) {
-    await assertProjectInTenant(input.projectId, ctx);
+    await requireProjectAccess(input.projectId, ctx);
   }
   await assertRecipientUsers(input.recipientUserIds, ctx);
   await assertActiveJobsiteProjectsForSchedule(input.items, input.params, ctx);
@@ -408,11 +493,7 @@ export async function updateScheduledReport(
   }
   const input = parsed.data;
 
-  const existing = await prisma.scheduledReport.findFirst({
-    where: { id: input.id, tenantId: ctx.tenantId },
-    select: { id: true, status: true },
-  });
-  if (!existing) throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  const { row: existing, where } = await requireScheduledReportForMutation(input.id, ctx);
   if (existing.status === "DELETED") {
     throw new ServiceError("CONFLICT", "No se puede editar un envío eliminado");
   }
@@ -420,7 +501,7 @@ export async function updateScheduledReport(
   assertReportKeys(input.items, input.scope);
   await assertReportKeysEnabledForTenant(input.items, ctx);
   if (input.scope === "PROJECT" && input.projectId) {
-    await assertProjectInTenant(input.projectId, ctx);
+    await requireProjectAccess(input.projectId, ctx);
   }
   await assertRecipientUsers(input.recipientUserIds, ctx);
   await assertActiveJobsiteProjectsForSchedule(input.items, input.params, ctx);
@@ -430,7 +511,7 @@ export async function updateScheduledReport(
 
   await prisma.$transaction(async (tx) => {
     await tx.scheduledReport.update({
-      where: { id: input.id, tenantId: ctx.tenantId },
+      where,
       data: {
         projectId: input.scope === "PROJECT" ? input.projectId! : null,
         scope: input.scope,
@@ -475,8 +556,9 @@ export async function updateScheduledReport(
 
 export async function deactivateScheduledReport(ctx: ServiceContext, id: string): Promise<void> {
   assertCanManageScheduledReports(ctx);
+  const { where } = await requireScheduledReportForMutation(id, ctx);
   const updated = await prisma.scheduledReport.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: { in: ["ACTIVE"] } },
+    where: { ...where, status: "ACTIVE" },
     data: { status: "PAUSED" },
   });
   if (updated.count === 0) {
@@ -487,19 +569,7 @@ export async function deactivateScheduledReport(ctx: ServiceContext, id: string)
 export async function reactivateScheduledReport(ctx: ServiceContext, id: string): Promise<void> {
   assertCanManageScheduledReports(ctx);
 
-  const row = await prisma.scheduledReport.findFirst({
-    where: { id, tenantId: ctx.tenantId },
-    select: {
-      id: true,
-      status: true,
-      frequency: true,
-      timeOfDay: true,
-      timezone: true,
-      dayOfWeek: true,
-      dayOfMonth: true,
-    },
-  });
-  if (!row) throw new ServiceError("NOT_FOUND", "Reporte programado no encontrado");
+  const { row, where } = await requireScheduledReportForMutation(id, ctx);
   if (row.status !== "PAUSED") {
     throw new ServiceError("CONFLICT", "Solo se puede reactivar un envío en pausa");
   }
@@ -513,15 +583,16 @@ export async function reactivateScheduledReport(ctx: ServiceContext, id: string)
   });
 
   await prisma.scheduledReport.update({
-    where: { id: row.id, tenantId: ctx.tenantId },
+    where: { ...where, status: "PAUSED" },
     data: { status: "ACTIVE", nextRunAt },
   });
 }
 
 export async function deleteScheduledReport(ctx: ServiceContext, id: string): Promise<void> {
   assertCanManageScheduledReports(ctx);
+  const { where } = await requireScheduledReportForMutation(id, ctx);
   const updated = await prisma.scheduledReport.updateMany({
-    where: { id, tenantId: ctx.tenantId, status: { not: "DELETED" } },
+    where: { ...where, status: { not: "DELETED" } },
     data: { status: "DELETED" },
   });
   if (updated.count === 0) {
@@ -557,8 +628,14 @@ export async function listProjectsForScheduledReportPicker(
   ctx: ServiceContext,
 ): Promise<ProjectPickerRow[]> {
   assertCanManageScheduledReports(ctx);
+  const scope = await resolveAccessibleProjectScope(ctx);
   return prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, status: { not: "CANCELLED" } },
+    where: {
+      tenantId: ctx.tenantId,
+      status: { not: "CANCELLED" },
+      ...companyScopeFilter(ctx),
+      ...projectRowIdWhereForScope(scope),
+    },
     select: { id: true, code: true, name: true },
     orderBy: { code: "asc" },
     take: 500,
@@ -570,8 +647,14 @@ export async function listActiveProjectsForJobsiteSchedulePicker(
   ctx: ServiceContext,
 ): Promise<ProjectPickerRow[]> {
   assertCanManageScheduledReports(ctx);
+  const scope = await resolveAccessibleProjectScope(ctx);
   return prisma.project.findMany({
-    where: { tenantId: ctx.tenantId, status: "ACTIVE" },
+    where: {
+      tenantId: ctx.tenantId,
+      status: "ACTIVE",
+      ...companyScopeFilter(ctx),
+      ...projectRowIdWhereForScope(scope),
+    },
     select: { id: true, code: true, name: true },
     orderBy: { code: "asc" },
     take: 500,

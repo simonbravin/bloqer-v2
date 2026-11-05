@@ -2,9 +2,11 @@ import { can } from "@bloqer/domain";
 import { prisma, type ProjectStatus, type ScheduleItemStatus } from "@bloqer/database";
 import { isUuid, productCalendarDateUtc } from "@bloqer/utils";
 import { canAccessProjectLayout } from "../project/project.service";
+import { canMutateJobsiteLogAsContributor } from "../jobsite-log/jobsite-log-access";
 import { canViewScheduleArea } from "../schedule/schedule-access";
 import { computeDaysLate } from "../schedule/schedule-helpers";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
+import type { TenantModuleGate } from "../tenant-modules/tenant-module-gate";
 import { ServiceContext, ServiceError } from "../types";
 import { getMyFieldPendingItems } from "./field-pending.service";
 import type { FieldPendingCounts } from "./field-pending.service";
@@ -15,7 +17,7 @@ import {
 } from "../security/access";
 
 const TODAY_LIMIT = 5;
-/** Matches `listProjects` max pageSize — Field pickers must not silently drop obras. */
+/** Bounds the number of works considered by the home overview. */
 export const FIELD_PROJECT_LIST_LIMIT = 100;
 
 export type FieldHomeProject = {
@@ -56,20 +58,38 @@ export type FieldHomeView = {
   queryMs: number;
 };
 
-/** Operational obras for Field pickers. Excludes CANCELLED; capped at `FIELD_PROJECT_LIST_LIMIT`. */
-export async function listFieldProjects(ctx: ServiceContext): Promise<FieldHomeProject[]> {
-  if (!can(ctx.roles, "VIEW", "PROJECTS")) return [];
-  if (!(await getTenantModuleGate(ctx)).isEnabled("PROJECTS")) return [];
+function getFieldHomeActions(roles: ServiceContext["roles"], gate: TenantModuleGate): FieldHomeActions {
+  return {
+    jobsiteLog: gate.isEnabled("JOBSITE_LOG") && canMutateJobsiteLogAsContributor(roles),
+    purchaseRequest:
+      gate.isEnabled("PROCUREMENT") &&
+      (can(roles, "EDIT", "PURCHASE_REQUESTS") || can(roles, "EDIT", "PROCUREMENT")),
+    consumption: gate.isEnabled("INVENTORY") && can(roles, "EDIT", "INVENTORY"),
+    document: gate.isEnabled("PROJECTS") && can(roles, "EDIT", "PROJECTS"),
+  };
+}
+
+/** Overview requires project listing access; registration uses the eligible project workspaces. */
+export async function listFieldProjects(
+  ctx: ServiceContext,
+  options?: { registration?: boolean },
+): Promise<FieldHomeProject[]> {
+  const gate = await getTenantModuleGate(ctx);
+  const registration = options?.registration === true;
+  const canList = registration
+    ? canAccessProjectLayout(ctx.roles, gate) && Object.values(getFieldHomeActions(ctx.roles, gate)).some(Boolean)
+    : gate.isEnabled("PROJECTS") && can(ctx.roles, "VIEW", "PROJECTS");
+  if (!canList) return [];
   const scope = await resolveAccessibleProjectScope(ctx);
   return prisma.project.findMany({
     where: {
       tenantId: ctx.tenantId,
-      status: { not: "CANCELLED" },
+      status: registration ? "ACTIVE" : { not: "CANCELLED" },
       ...projectRowIdWhereForScope(scope),
     },
     select: { id: true, code: true, name: true, status: true },
     orderBy: { code: "asc" },
-    take: FIELD_PROJECT_LIST_LIMIT,
+    ...(registration ? {} : { take: FIELD_PROJECT_LIST_LIMIT }),
   });
 }
 
@@ -103,16 +123,7 @@ export async function getFieldHome(
     preferredRow ?? (projects.length === 1 ? projects[0]! : null);
   const needsProjectSelection = projects.length > 1 && featuredProject == null;
 
-  const actions: FieldHomeActions = {
-    jobsiteLog:
-      gate.isEnabled("JOBSITE_LOG") &&
-      (can(ctx.roles, "EDIT", "JOBSITE_LOG") || can(ctx.roles, "EDIT", "PROJECTS")),
-    purchaseRequest:
-      gate.isEnabled("PROCUREMENT") &&
-      (can(ctx.roles, "EDIT", "PURCHASE_REQUESTS") || can(ctx.roles, "EDIT", "PROCUREMENT")),
-    consumption: gate.isEnabled("INVENTORY") && can(ctx.roles, "EDIT", "INVENTORY"),
-    document: gate.isEnabled("PROJECTS") && can(ctx.roles, "EDIT", "PROJECTS"),
-  };
+  const actions = getFieldHomeActions(ctx.roles, gate);
 
   const todayScopeIds = featuredProject ? [featuredProject.id] : projects.map((p) => p.id);
   const canViewSchedule =

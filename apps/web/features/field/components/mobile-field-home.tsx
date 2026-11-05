@@ -7,7 +7,6 @@ import { ProjectStatusBadge } from "@/features/projects/components/project-statu
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { fieldQuickActionHref, type FieldQuickActionId } from "@/lib/field-quick-actions";
-import { useFieldProjectContext } from "@/lib/field-project-context";
 import {
   clearLastProjectIdCookie,
   readLastProjectIdFromDocument,
@@ -34,10 +33,8 @@ type Props = {
 };
 
 export function MobileFieldHome({ home }: Props) {
-  const { convenienceProjectId } = useFieldProjectContext();
-  const featured =
-    home.projects.find((project) => project.id === convenienceProjectId) ?? home.featuredProject;
-  const needsProjectSelection = home.projects.length > 1 && featured == null;
+  const featured = home.featuredProject;
+  const { needsProjectSelection } = home;
 
   useEffect(() => {
     if (featured) {
@@ -49,12 +46,8 @@ export function MobileFieldHome({ home }: Props) {
       clearLastProjectIdCookie();
     }
   }, [featured, featured?.id, home.projects]);
-  const actions = QUICK.filter((action) => home.actions[action.id]).slice(0, 4);
+  const actions = QUICK.filter((action) => home.actions[action.id]);
   const obraHref = featured ? `/proyectos/${featured.id}` : "/proyectos";
-  const cronogramaHref =
-    featured && home.canViewSchedule
-      ? `/proyectos/${featured.id}/cronograma?field=today`
-      : "/proyectos";
   const pendingBits: string[] = [];
   if (home.pendingCounts.purchaseRequests > 0) {
     pendingBits.push(
@@ -75,6 +68,10 @@ export function MobileFieldHome({ home }: Props) {
     pendingBits.push(
       `${home.pendingCounts.purchaseOrdersToReceive} orden${home.pendingCounts.purchaseOrdersToReceive === 1 ? "" : "es"} por recibir`,
     );
+  }
+  if (home.pendingCounts.purchaseOrdersToInvoice > 0) {
+    const count = home.pendingCounts.purchaseOrdersToInvoice;
+    pendingBits.push(`${count} orden${count === 1 ? "" : "es"} por facturar`);
   }
   if (home.pendingCounts.jobsiteLogs > 0) {
     pendingBits.push(
@@ -119,16 +116,14 @@ export function MobileFieldHome({ home }: Props) {
         </section>
       )}
 
-      {actions.length > 0 ? (
+      {featured?.status === "ACTIVE" && actions.length > 0 ? (
         <section>
           <h2 className="mb-2 text-sm font-semibold">Acciones rápidas</h2>
           <div className="grid grid-cols-2 gap-2">
             {actions.map((action) => {
-              const href = featured
-                ? fieldQuickActionHref(featured.id, action.id)
-                : "/proyectos";
+              const href = fieldQuickActionHref(featured.id, action.id);
               return (
-                <Button key={action.id} asChild variant="outline" className="min-h-11">
+                <Button key={action.id} asChild variant="outline" className="h-auto min-h-11 whitespace-normal py-2 text-center">
                   <Link href={href} data-testid={`field-home-action-${action.id}`}>
                     {action.label}
                   </Link>
@@ -143,14 +138,10 @@ export function MobileFieldHome({ home }: Props) {
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-semibold">Hoy</h2>
           {featured && home.canViewSchedule ? (
-            <Link href={cronogramaHref} className="text-sm font-medium underline">
+            <Link href={`/proyectos/${featured.id}/cronograma?field=today`} className="text-sm font-medium underline">
               Ver cronograma
             </Link>
-          ) : featured ? null : (
-            <Link href="/proyectos" className="text-sm font-medium underline">
-              Ver cronograma
-            </Link>
-          )}
+          ) : null}
         </div>
         {home.todayItems.length === 0 ? (
           <p className="mt-3 text-sm text-muted-foreground">No hay tareas activas para mostrar.</p>

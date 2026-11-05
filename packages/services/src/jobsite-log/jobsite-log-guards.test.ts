@@ -29,7 +29,7 @@ test("assertJobsiteLogApprovable rejects APPROVED", () => {
 test("hasLegacyPhysicalPctOverflow detects single WBS over 100", () => {
   assert.equal(
     hasLegacyPhysicalPctOverflow({
-      a: { approvedIncrementalPct: "110", remainingPct: "0.00" },
+      a: buildProgressSnapshotEntry("100.0001"),
     }),
     true,
   );
@@ -38,8 +38,8 @@ test("hasLegacyPhysicalPctOverflow detects single WBS over 100", () => {
 test("hasLegacyPhysicalPctOverflow is false when each WBS within 100", () => {
   assert.equal(
     hasLegacyPhysicalPctOverflow({
-      a: { approvedIncrementalPct: "60", remainingPct: "40.00" },
-      b: { approvedIncrementalPct: "50", remainingPct: "50.00" },
+      a: buildProgressSnapshotEntry("60"),
+      b: buildProgressSnapshotEntry("50"),
     }),
     false,
   );
@@ -58,8 +58,16 @@ test("remainingPhysicalPct: 0 → 100; over 100 → 0", () => {
 test("buildProgressSnapshotEntry includes remaining and qty", () => {
   const e = buildProgressSnapshotEntry("70.00", "8.5");
   assert.equal(e.approvedIncrementalPct, "70.00");
+  assert.equal(e.exactApprovedIncrementalPct, "70.0000");
   assert.equal(e.remainingPct, "30.00");
   assert.equal(e.approvedQty, "8.5000");
+});
+
+test("progress snapshot preserves persisted precision at the 100% boundary", () => {
+  const entry = buildProgressSnapshotEntry("99.9951");
+  assert.equal(entry.approvedIncrementalPct, "100.00");
+  assert.equal(entry.exactApprovedIncrementalPct, "99.9951");
+  assert.equal(hasLegacyPhysicalPctOverflow({ wbs: entry }), false);
 });
 
 test("remainingPhysicalPct does not use IEEE float", () => {

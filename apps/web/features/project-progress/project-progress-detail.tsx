@@ -43,8 +43,10 @@ export function ProjectProgressPending({ report }: { report: ProjectProgressRepo
   const [kind, setKind] = useState("");
   const [page, setPage] = useState(1);
   const kinds = [...new Set(report.pending.map((item) => item.kind))];
-  const filtered = kind ? report.pending.filter((item) => item.kind === kind) : report.pending;
-  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const selectedKind = kinds.includes(kind) ? kind : "";
+  const filtered = selectedKind ? report.pending.filter((item) => item.kind === selectedKind) : report.pending;
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)));
+  const visible = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <Card className="rounded-xl" id="pendientes">
@@ -63,7 +65,7 @@ export function ProjectProgressPending({ report }: { report: ProjectProgressRepo
             </Label>
             <select
               id="progress-pending-kind"
-              value={kind}
+              value={selectedKind}
               onChange={(event) => {
                 setKind(event.target.value);
                 setPage(1);
@@ -124,7 +126,7 @@ export function ProjectProgressPending({ report }: { report: ProjectProgressRepo
             ))}
           </div>
         )}
-        <Pagination page={page} count={filtered.length} onPage={setPage} />
+        <Pagination page={currentPage} count={filtered.length} onPage={setPage} />
       </CardContent>
     </Card>
   );
@@ -145,7 +147,8 @@ export function ProjectProgressDetail({ report }: { report: ProjectProgressRepor
       isPositiveQty(row.pendingCertifyQty);
     return matches && (!pendingOnly || hasPending);
   });
-  const visible = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / PAGE_SIZE)));
+  const visible = rows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <Card className="min-w-0 rounded-xl" id="partidas">
@@ -207,7 +210,11 @@ export function ProjectProgressDetail({ report }: { report: ProjectProgressRepor
                       value={formatRatePctWithSymbol(row.physicalPct)}
                     />
                     <Metric
-                      label="Por ejecutar"
+                      label="Cantidad registrada en el libro"
+                      value={formatQtyWithUnit(row.physicalQty, row.unit)}
+                    />
+                    <Metric
+                      label="Por ejecutar según %"
                       value={formatQtyWithUnit(row.physicalRemainingQty, row.unit)}
                     />
                     <Metric
@@ -265,7 +272,7 @@ export function ProjectProgressDetail({ report }: { report: ProjectProgressRepor
                     <TableHead>Partida / presupuesto</TableHead>
                     <TableHead className="text-right">Plan al corte</TableHead>
                     <TableHead className="text-right">Libro aprobado</TableHead>
-                    <TableHead className="text-right">Por ejecutar</TableHead>
+                    <TableHead className="text-right">Por ejecutar según %</TableHead>
                     <TableHead className="text-right">Certificado</TableHead>
                     <TableHead className="text-right">Por certificar</TableHead>
                     <TableHead className="text-right">Costos · {report.currency}</TableHead>
@@ -330,7 +337,7 @@ export function ProjectProgressDetail({ report }: { report: ProjectProgressRepor
             </div>
           </>
         )}
-        <Pagination page={page} count={rows.length} onPage={setPage} />
+        <Pagination page={currentPage} count={rows.length} onPage={setPage} />
         <p className="mt-4 text-xs text-muted-foreground">
           «—» indica información no disponible o sin acceso. Las cantidades de unidades diferentes
           no se suman.

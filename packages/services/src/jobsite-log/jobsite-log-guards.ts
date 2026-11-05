@@ -4,6 +4,8 @@ import { ServiceError } from "../types";
 export type JobsiteLogProgressSnapshotEntry = {
   /** Sum of incremental physicalPct from APPROVED (and optionally SUBMITTED) logs. */
   approvedIncrementalPct: string;
+  /** Persisted 4-decimal sum for validation and prefill. */
+  exactApprovedIncrementalPct: string;
   /** max(0, 100 − approvedIncrementalPct) — prefill for “% del día”. */
   remainingPct: string;
   /** Sum of quantityCompleted from the same logs (operational evidence). */
@@ -28,13 +30,17 @@ export function buildProgressSnapshotEntry(
   approvedQty?: string | number,
 ): JobsiteLogProgressSnapshotEntry {
   let pct: string;
+  let exactPct: string;
   try {
     pct = roundToDecimals(approvedIncrementalPct, 2);
+    exactPct = roundQty(approvedIncrementalPct);
   } catch {
     pct = "0.00";
+    exactPct = "0.0000";
   }
   const entry: JobsiteLogProgressSnapshotEntry = {
     approvedIncrementalPct: pct,
+    exactApprovedIncrementalPct: exactPct,
     remainingPct: remainingPhysicalPct(pct),
   };
   if (approvedQty != null) {
@@ -60,7 +66,7 @@ export function assertJobsiteLogApprovable(status: string): void {
 export function hasLegacyPhysicalPctOverflow(snapshot: JobsiteLogProgressSnapshot): boolean {
   return Object.values(snapshot).some((v) => {
     try {
-      return compareDecimal(v.approvedIncrementalPct, "100") > 0;
+      return compareDecimal(v.exactApprovedIncrementalPct, "100") > 0;
     } catch {
       return false;
     }

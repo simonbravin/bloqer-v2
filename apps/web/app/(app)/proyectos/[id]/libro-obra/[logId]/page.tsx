@@ -16,12 +16,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
 import { isStorageConfigured } from "@bloqer/config";
-import { getJobsiteLogById, getJobsiteLogActivityLog, getProjectOperationalMutationBlockReason, getProjectShellInfo, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
+import { canMutateJobsiteLogAsContributor, canSuperviseJobsiteLog, getJobsiteLogById, getJobsiteLogActivityLog, getProjectOperationalMutationBlockReason, getProjectShellInfo, getTenantModuleGate, getWbsIncrementalProgressSnapshot, listEntityDocuments, listStockMovements, ServiceError } from "@bloqer/services";
 import { addDecimal, isRichNoteEmpty } from "@bloqer/utils";
 import { formatQtyFromString, formatRatePctDisplay } from "@/lib/format-money";
 import {
   JobsiteLogStatusBadge,
   JobsiteLogIssueSeverityBadge,
+  JobsiteLogIssueStatusBadge,
   JobsiteLogIssueTypeBadge,
   JobsiteLogLifecycleDialog,
   JobsiteLogDetailMobileSections,
@@ -42,14 +43,6 @@ interface PageProps {
   params: Promise<{ id: string; logId: string }>;
 }
 
-function canContributeJobsiteLog(roles: Parameters<typeof can>[0]): boolean {
-  return can(roles, "EDIT", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
-}
-
-function canSuperviseJobsiteLog(roles: Parameters<typeof can>[0]): boolean {
-  return can(roles, "APPROVE", "JOBSITE_LOG") || can(roles, "EDIT", "PROJECTS");
-}
-
 export default async function ParteObraDetailPage({ params }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
@@ -67,11 +60,14 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   let activityLog;
   let wbsProgressSnapshot: Awaited<ReturnType<typeof getWbsIncrementalProgressSnapshot>> = {};
   let materialStockMovements: Awaited<ReturnType<typeof listStockMovements>> = [];
+  const gate = await getTenantModuleGate(ctx);
+  const canViewInventory = gate.isEnabled("INVENTORY") && can(roles, "VIEW", "INVENTORY");
   try {
     [log, activityLog] = await Promise.all([
       getJobsiteLogById(logId, ctx),
       getJobsiteLogActivityLog(logId, ctx),
     ]);
+    if (log.projectId !== projectId) notFound();
     wbsProgressSnapshot = await getWbsIncrementalProgressSnapshot(projectId, ctx, {
       excludeLogId: log.status === "APPROVED" ? logId : undefined,
     });
@@ -79,20 +75,16 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
     const consumableMaterialIds = log.materials
       .filter((m) => m.productId && m.warehouseId)
       .map((m) => m.id);
-    if (log.status === "APPROVED" && consumableMaterialIds.length > 0) {
-      try {
-        materialStockMovements = await listStockMovements(
-          {
-            sourceType: "CONSUMPTION",
-            sourceIds: consumableMaterialIds,
-            projectId,
-            status: "CONFIRMED",
-          },
-          ctx,
-        );
-      } catch (err) {
-        if (!(err instanceof ServiceError && err.code === "FORBIDDEN")) throw err;
-      }
+    if (canViewInventory && log.status === "APPROVED" && consumableMaterialIds.length > 0) {
+      materialStockMovements = await listStockMovements(
+        {
+          sourceType: "CONSUMPTION",
+          sourceIds: consumableMaterialIds,
+          projectId,
+          status: "CONFIRMED",
+        },
+        ctx,
+      );
     }
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) {
@@ -101,23 +93,23 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
     throw err;
   }
 
-  if (log.projectId !== projectId) notFound();
-
-  let projectStatus: Awaited<ReturnType<typeof getProjectShellInfo>>["status"] = "ACTIVE";
+  let projectStatus: Awaited<ReturnType<typeof getProjectShellInfo>>["status"];
   try {
     const shell = await getProjectShellInfo(projectId, ctx);
     projectStatus = shell.status;
-  } catch {
-    /* keep ACTIVE default; log load already validated access */
+  } catch (err) {
+    if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
+    throw err;
   }
 
   const logAttachments = await listEntityDocuments("JOBSITE_LOG", logId, ctx, { projectId });
   const storageConfigured = isStorageConfigured();
-  const canEditAttachments = canContributeJobsiteLog(roles);
-  const canContribute = canContributeJobsiteLog(roles);
-  const canSupervise = canSuperviseJobsiteLog(roles);
-  const projectAllowsMutation = !getProjectOperationalMutationBlockReason(projectStatus);
-  const showEditLink = log.status === "DRAFT" && canContribute && projectAllowsMutation;
+  const projectBlockReason = getProjectOperationalMutationBlockReason(projectStatus);
+  const projectAllowsMutation = projectBlockReason === null;
+  const canEditAttachments = canMutateJobsiteLogAsContributor(roles);
+  const canContribute = projectAllowsMutation && canMutateJobsiteLogAsContributor(roles);
+  const canSupervise = projectAllowsMutation && canSuperviseJobsiteLog(roles);
+  const showEditLink = log.status === "DRAFT" && canContribute;
 
   const wasUpdated =
     log.updatedAt.getTime() - log.createdAt.getTime() > 1000 ||
@@ -130,7 +122,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
   );
 
   const progressRows = log.progress.map((p, idx) => {
-    const approved = wbsProgressSnapshot[p.wbsNodeId]?.approvedIncrementalPct ?? "0";
+    const approved = wbsProgressSnapshot[p.wbsNodeId]?.exactApprovedIncrementalPct ?? "0";
     let logSum = "0";
     for (let j = 0; j <= idx; j++) {
       const row = log.progress[j]!;
@@ -183,10 +175,10 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     : "Ciclo de vida"
               }
               triggerVariant={log.status === "DRAFT" && canContribute ? "default" : "outline"}
-              onSubmit={submitJobsiteLogAction.bind(null, logId, projectId)}
-              onReturn={returnJobsiteLogAction.bind(null, logId, projectId)}
-              onApprove={approveJobsiteLogAction.bind(null, logId, projectId)}
-              onCancel={cancelJobsiteLogAction.bind(null, logId, projectId)}
+              onSubmit={submitJobsiteLogAction.bind(null, logId)}
+              onReturn={returnJobsiteLogAction.bind(null, logId)}
+              onApprove={approveJobsiteLogAction.bind(null, logId)}
+              onCancel={cancelJobsiteLogAction.bind(null, logId)}
             />
             {showEditLink && (
               <Button variant="outline" size="sm" className="min-h-11 md:min-h-8" asChild>
@@ -201,6 +193,12 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+
+      {projectBlockReason && (log.status === "DRAFT" || log.status === "SUBMITTED") && (
+        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-900 dark:text-amber-100">
+          {projectBlockReason}.
+        </p>
+      )}
 
       {log.status === "SUBMITTED" && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm">
@@ -263,6 +261,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
           log={log}
           progressRows={progressRows}
           stockMovementByMaterialId={stockMovementByMaterialId}
+          canViewInventory={canViewInventory}
         />
       </div>
 
@@ -324,7 +323,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
               <TableBody>
                 {log.labor.map((lb) => (
                   <TableRow key={lb.id}>
-                    <TableCell>{lb.contactName ?? lb.subcontractCode ?? "—"}</TableCell>
+                    <TableCell>{[lb.contactName, lb.subcontractCode].filter(Boolean).join(" · ") || "—"}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {lb.crewDescription ?? "—"}
                     </TableCell>
@@ -353,14 +352,14 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                   <TableHead>Producto</TableHead>
                   <TableHead>Depósito</TableHead>
                   <TableHead className="text-right">Cantidad</TableHead>
-                  <TableHead>Consumo inventario</TableHead>
+                  {canViewInventory && <TableHead>Consumo inventario</TableHead>}
                   <TableHead>Notas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {log.materials.map((m) => {
                   const movement = stockMovementByMaterialId.get(m.id);
-                  const showConsumption = m.productId && m.warehouseId;
+                  const showConsumption = m.productId && m.warehouseId && log.status !== "CANCELLED";
                   return (
                   <TableRow key={m.id}>
                     <TableCell className="font-medium">{m.description}</TableCell>
@@ -370,14 +369,16 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
                       {formatQtyFromString(m.quantity)}
+                      {m.productUnit ? ` ${m.productUnit}` : ""}
                     </TableCell>
+                    {canViewInventory && (
                     <TableCell className="text-xs">
                       {!showConsumption ? (
                         <span className="text-muted-foreground">—</span>
                       ) : log.status === "APPROVED" ? (
                         movement ? (
                           <Link
-                            href="/inventario/movimientos"
+                            href={`/proyectos/${projectId}/consumos`}
                             className="text-primary hover:underline"
                           >
                             Registrado · {formatDateLong(new Date(movement.movementDate))}
@@ -389,6 +390,7 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                         <span className="text-muted-foreground">Al aprobar</span>
                       )}
                     </TableCell>
+                    )}
                     <TableCell className="text-xs text-muted-foreground">
                       {m.notes ?? "—"}
                     </TableCell>
@@ -419,17 +421,17 @@ export default async function ParteObraDetailPage({ params }: PageProps) {
                   <TableRow key={iss.id}>
                     <TableCell>
                       <JobsiteLogIssueTypeBadge
-                        type={iss.type as "INCIDENT" | "BLOCKER" | "SAFETY" | "OTHER"}
+                        type={iss.type}
                       />
                     </TableCell>
                     <TableCell>
                       <JobsiteLogIssueSeverityBadge
-                        severity={iss.severity as "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"}
+                        severity={iss.severity}
                       />
                     </TableCell>
                     <TableCell>{iss.description}</TableCell>
-                    <TableCell className="text-xs capitalize text-muted-foreground">
-                      {iss.status.toLowerCase()}
+                    <TableCell>
+                      <JobsiteLogIssueStatusBadge status={iss.status} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {iss.notes ?? "—"}

@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-05T17:38:26.751Z",
-  "sourceHash": "84e64be7f748f6752ce186d52db684d4ed7be364592dd250d6779b1e1a1b7f97",
+  "generatedAt": "2026-11-05T18:40:06.462Z",
+  "sourceHash": "8ae5e1c81dd5a2c94a6e25c64a0b27b0addea28de591086562a898dc2aac1966",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "7ee15481b568e15b1b644c73739e282103bdfdc2c03987abe7ad3703a82deffb",
-      "bytes": 206321
+      "sha256": "10a227c4cd4551f628b3323efe3d472bedb3c92b37dc75688b2e3c5d0951d10d",
+      "bytes": 207360
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -50,8 +50,8 @@
     },
     {
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
-      "sha256": "75c64d72babebefb6e0cc1c22ff8886997b71d797392bf22a840fb759989db02",
-      "bytes": 3590
+      "sha256": "0316362aa27c6f499397371b36f24c2d9f7ab9fcdd4449b1e899fd9d2df1a1d1",
+      "bytes": 4067
     },
     {
       "path": "docs/bloqer2.0/02-modules/CERTIFICATIONS.md",
@@ -263,7 +263,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "1. Configuración inicial de la empresa (nivel empresa)",
-      "text": "- En la barra inferior de campo: **Inicio · Obra · Registrar · Pendientes · Más**. Desde una pantalla general, **Obra** abre `/proyectos`; dentro de una obra, vuelve a su resumen. Si Proyectos no está habilitado, **Obra** queda deshabilitada. **Más** muestra enlaces de la obra actual solo si estás dentro de ella. La consola de administración SaaS conserva su propia navegación.\n- **Registrar** usa la obra de la pantalla actual o comprueba que la última elegida siga disponible para vos. Si hace falta, abre **Seleccionar obra**. Mientras consulta muestra **Cargando obras…**; si falla, **No pudimos cargar las obras. Volvé a intentar.** y **Reintentar**. **No hay obras disponibles.** indica una consulta terminada sin resultados. Al cerrar sesión o cambiar de empresa se borra la preferencia de obra.\n- Las migas del encabezado permiten volver a pantallas existentes; los nombres que solo agrupan páginas se muestran como texto.\n\n#### Carga y recuperación de pantallas\n\n- **Cargando contenido…** indica que se está abriendo la sección.\n- **No encontramos esta página**: revisá la dirección o elegí **Ir al inicio**. Si falta una sección, pedile a un administrador que revise tus permisos.\n- **No "
+      "text": "- En la barra inferior de campo: **Inicio · Obra · Registrar · Pendientes · Más**. Desde una pantalla general, **Obra** abre `/proyectos`; dentro de una obra, vuelve a su resumen. Si Proyectos no está habilitado, **Obra** queda deshabilitada. **Más** muestra enlaces de la obra actual solo si estás dentro de ella. La consola de administración SaaS conserva su propia navegación.\n- **Registrar** usa una obra activa a la que tengas acceso. Comprueba la obra de la pantalla o la última elegida y, si hace falta, abre **Seleccionar obra**. **Nuevo parte** abre el formulario del Libro de obra. **Registrar consumo** abre el diálogo de Consumos. Si Proyectos está deshabilitado, podés usar las acciones de campo de los módulos que tengas habilitados. Mientras consulta aparece **Cargando obras…**. Si falla, usá **Reintentar**. **No hay obras disponibles.** indica una consulta terminada sin resultados. Al cerrar sesión o cambiar de empresa se borra la preferencia de obra.\n- Las migas del encabezado permiten volver a pantallas existentes; los nombres que solo agrupan páginas se muestran como texto.\n\n#### Carga y recuperación de pantallas\n\n- **Cargando contenido…** indica que se está abriendo la se"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#22",
@@ -271,7 +271,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "1. Configuración inicial de la empresa (nivel empresa)",
-      "text": "pudimos cargar esta página**: usá **Volver a cargar** para reintentar o **Ir al inicio** para continuar. En la consola SaaS, ese inicio es el de la consola. Si el problema continúa, comunicate con el administrador."
+      "text": "cción.\n- **No encontramos esta página**: revisá la dirección o elegí **Ir al inicio**. Si falta una sección, pedile a un administrador que revise tus permisos.\n- **No pudimos cargar esta página**: usá **Volver a cargar** para reintentar o **Ir al inicio** para continuar. En la consola SaaS, ese inicio es el de la consola. Si el problema continúa, comunicate con el administrador."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#23",
@@ -919,7 +919,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "## 8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)\n\n### 8.1 Procedimiento — Parte diario (libro de obra)\n\n**Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`\n\n**Equipo de obra (avisos):** en **Administración → Configuración** (`/editar`), al final, card **Equipo de obra**. Ahí se asignan usuarios con cuenta y membresía activas de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Pueden editar el roster quienes tienen permiso de **editar proyectos**, con el módulo habilitado y acceso a esa obra (OWNER, ADMIN y PM según el alcance vigente; no el capataz). En el **Resumen**, si no hay PM activo, aparece un aviso con enlace a Configuración. Sin PM activo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster cuya cuenta o membresía está inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. Si falla Agregar o Quitar, se muestra el error y podés reintentar. `/pendientes` muestra los partes que podés aprobar dentro de las obras accesibles por tu empresa y asignación (D-111).\n\n1. **Nuevo parte** (fecha no futura, clima, c"
+      "text": "## 8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)\n\n### 8.1 Procedimiento — Parte diario (libro de obra)\n\n**Ruta:** Operación → **Libro de obra** → `/proyectos/[id]/libro-obra`\n\n**Equipo de obra (avisos):** en **Administración → Configuración** (`/editar`), al final, card **Equipo de obra**. Ahí se asignan usuarios con cuenta y membresía activas de la organización (etiqueta PM / Capataz / Otro). Eso **no** cambia permisos de acceso: solo define quién recibe campana + email cuando hay un parte pendiente. Pueden editar el roster quienes tienen permiso de **editar proyectos**, con el módulo habilitado y acceso a esa obra (OWNER, ADMIN y PM según el alcance vigente; no el capataz). En el **Resumen**, si no hay PM activo, aparece un aviso con enlace a Configuración. Sin PM activo, esos avisos van solo a OWNER/ADMIN. Un miembro del roster cuya cuenta o membresía está inactiva se muestra como **membresía inactiva** y no cuenta como supervisor. Si falla Agregar o Quitar, se muestra el error y podés reintentar. `/pendientes` muestra los partes que podés aprobar dentro de las obras accesibles por tu empresa y asignación (D-111).\n\n1. **Nuevo parte** en una obra activa con per"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#104",
@@ -927,7 +927,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "uadrilla, tareas). En **Notas generales** podés usar **viñetas**, **numeración** y **negrita** para listar lo hecho o los problemas del día ([D-101]). En **mano de obra**, el contacto se busca por razón social o nombre fantasía."
+      "text": "miso de edición. Elegí una fecha válida que no sea futura. Debajo del selector se lee la fecha con el mes escrito. Ingresá alguna descripción, por ejemplo clima, cuadrilla o tareas. En **Notas generales** podés usar **viñetas**, **numeración** y **negrita** ([D-101]). En **mano de obra**, el contacto se busca por razón social o nombre fantasía. Si editás un borrador, guardar o cancelar vuelve a su detalle."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#105",
@@ -935,7 +935,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "2. Cargar **avance por partida EDT**: cada fila necesita **partida** y **cantidad** (el % del día y la cantidad sugerida se precargan al elegir partida). Si después editás el **% del día** o la **cantidad**, el otro campo se recalcula con el presupuesto de la partida (así el % del libro y el **% avance libro** de EDT coinciden). Si falta partida o cantidad, el parte **no se guarda** y se muestra el error. El **% avance libro** en EDT y costos suma el **% del día** de partes **APPROVED** (un parte enviado todavía no mueve esa columna). Si la partida nunca registró % en un parte aprobado, se usa cantidad/presupuesto. La vista *Financiero* no muestra %: usá *Cantidades* o *% Avance*.\n3. Adjuntar fotos y observaciones. En **Adjuntos**, la columna **Acciones** es una sola fila de iconos: ojo (**Ver**), flecha (**Descargar**), caja (**Archivar**) y tacho (**Eliminar**). Archivar y eliminar piden confirmación. En fotos **jpeg/png/webp**, clic en el **nombre del archivo**, en **Ver** o en la miniatura (celular) abre un **visor a pantalla completa** con las demás fotos del mismo listado (flechas / teclado). Los **PDF** siguen abriéndose en una pestaña nueva o desde el detalle; HEIC u otros "
+      "text": "2. Cargar **avance por partida EDT**: cada fila necesita **partida** y **cantidad** (el % del día y la cantidad sugerida se precargan al elegir partida). Si después editás el **% del día** o la **cantidad**, el otro campo se recalcula con el presupuesto de la partida (así el % del libro y el **% avance libro** de EDT coinciden). Si falta partida o cantidad, el parte **no se guarda** y se muestra el error. El **% avance libro** en EDT y costos suma el **% del día** de partes **APPROVED** (un parte enviado todavía no mueve esa columna). Si la partida nunca registró % en un parte aprobado, se usa cantidad/presupuesto. La vista *Financiero* no muestra %: usá *Cantidades* o *% Avance*.\n3. Guardá el borrador y adjuntá las fotos en **Adjuntos**. Desde ahí podés **Ver**, **Descargar** y, con permiso, **Archivar** con confirmación. Los adjuntos operativos se conservan como respaldo y aparecen en Documentos según el acceso a la obra y la empresa del parte. En fotos **jpeg/png/webp**, el nombre, **Ver** o la miniatura abren el visor con las demás fotos del listado. Los PDF se abren en una pestaña nueva o desde el detalle.\n4. **Enviar a revisión** → `SUBMITTED`. El PM y otros supervisores del "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#106",
@@ -943,7 +943,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "tipos se descargan o se abren según el navegador.\n4. **Enviar a revisión** → `SUBMITTED` → **campana + email** a OWNER/ADMIN y al PM (u otros supervisores) del **Equipo de obra**.\n5. El PM abre el parte (campana, Pendientes o listado) y pulsa **Aprobar parte** → `APPROVED` (queda inmutable salvo anulación con motivo). Si hace falta, **devolver** → el autor recibe campana + email con el motivo."
+      "text": "**Equipo de obra** y OWNER/ADMIN con acceso reciben campana y email según sus preferencias.\n5. El supervisor abre el parte desde campana, **Pendientes** o el listado. **Aprobar parte** cierra la edición del contenido. **Devolver con observaciones** lo vuelve a borrador y avisa al autor con el motivo. **Anular parte** está disponible para borradores con permiso en una obra activa."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#107",
@@ -951,7 +951,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "6. **Exportar PDF** del parte: incluye tablas + **fotos jpeg/png/webp embebidas** (si hay adjuntos en R2). HEIC u otros tipos quedan listados sin embeber.\n7. **Envío programado (empresa):** Configuración → Reportes programados → card **Libro de obra — parte del día**. Elegís obras ACTIVE; cada corrida manda el parte SUBMITTED/APPROVED de ese día (zona del envío). Si no hay parte, esa obra se saltea.\n\n```mermaid\nflowchart LR\n  N[\"Nuevo parte (DRAFT)\"] --> S[\"Enviar a revisión (SUBMITTED)\"]\n  S --> A[\"Aprobar parte (APPROVED)\"]\n  S --> R[\"Devolver\"]\n  A --> SYNC[\"Actualiza % Real del cronograma\"]\n  A --> STK[\"Consumo de inventario (si aplica)\"]\n```\n\n### 8.2 Efectos al aprobar el parte\n\n- Actualiza el **% Real** de tareas con partida EDT primaria enlazada.\n- Materiales del parte con producto + depósito pueden generar **consumo de inventario**.\n- La cantidad del material del parte usa la unidad de su producto; el parte no tiene una unidad independiente. Vincular el producto fija su unidad desde ese uso, incluso en borrador (D-130). Al aprobar se revalida el producto antes de consumir; no se convierte ni se usa la unidad de la partida como equivalencia.\n- Los productos, depósitos y subc"
+      "text": "6. **Exportar PDF** del parte: incluye tablas + **fotos jpeg/png/webp embebidas** (si hay adjuntos en R2). HEIC u otros tipos quedan listados sin embeber.\n7. **Envío programado (empresa).** En Configuración → Reportes programados, elegí **Libro de obra — parte del día** y seleccioná obras activas autorizadas. Cada destinatario con membresía activa recibe los partes enviados o aprobados de ese día que puede consultar. El día se toma de la zona del envío. Si no hay partes autorizados, se omite la entrega.\n\n```mermaid\nflowchart LR\n  N[\"Nuevo parte (DRAFT)\"] --> S[\"Enviar a revisión (SUBMITTED)\"]\n  S --> A[\"Aprobar parte (APPROVED)\"]\n  S --> R[\"Devolver\"]\n  A --> SYNC[\"Actualiza % Real del cronograma\"]\n  A --> STK[\"Consumo de inventario (si aplica)\"]\n```\n\n### 8.2 Efectos al aprobar el parte\n\n- Actualiza el **% Real** de tareas con partida EDT primaria enlazada.\n- Materiales del parte con producto + depósito pueden generar **consumo de inventario**.\n- La disponibilidad mostrada en el formulario es orientativa. El saldo se vuelve a consultar al guardar, enviar y aprobar. El consumo se registra solo al aprobar.\n- Si Inventario está deshabilitado, un parte con producto y depósito vinculado"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#108",
@@ -959,7 +959,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "ontratos del parte respetan la empresa del documento y el acceso a la obra; los contactos mantienen el directorio compartido del tenant. Productos y depósitos aparecen únicamente con Inventario habilitado y permiso de consulta; para consumir se ofrecen depósitos generales o de esa misma obra, dentro del alcance autorizado."
+      "text": "s se conserva para revisar. Para continuar, habilitá Inventario o quitá los vínculos de stock del borrador y conservá la descripción.\n- La cantidad del material del parte usa la unidad de su producto; el parte no tiene una unidad independiente. Vincular el producto fija su unidad desde ese uso, incluso en borrador (D-130). Al aprobar se revalida el producto antes de consumir; no se convierte ni se usa la unidad de la partida como equivalencia."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#109",
@@ -967,7 +967,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "- **Imputación EDT del consumo (D-055):** partida EDT de la línea de material (`WbsNode`); si falta y hay **exactamente una** partida de progreso → esa; si hay **varias** partidas y el material no trae partida EDT → **conflicto** (no se crea consumo).\n\n### 8.3 Procedimiento — Consumos de stock (manual)\n\n**Ruta:** Operación → **Consumos** → `/proyectos/[id]/consumos`\n\n1. **Registrar consumo** (abre diálogo; también `?create=1`). La ruta `/consumos/nuevo` redirige al diálogo.\n2. Completar: **Producto** · **Depósito** · cantidad · fecha · **Partida EDT (opcional)** · notas.\n3. **Registrar consumo**.\n4. Atajos: desde Inventario del proyecto o desde Materiales → enlace **Consumos**.\n\n### 8.4 Procedimiento — Documentos de obra\n\n**Ruta:** Operación → **Documentos** → `/proyectos/[id]/documentos`\n\n1. A la izquierda ves el **árbol de carpetas** de la obra. Hay carpetas de **sistema** (Libro de Obra, Solicitudes de compra, Órdenes de compra, Cotizaciones, Recepciones, Facturas, Certificaciones, Subcontratos, Presupuestos, **Planos**, **General**) que se crean solas y **no se renombran ni borran**. Los adjuntos que subís desde un parte, SC, OC, factura, etc. **caen solos** en la carpeta corre"
+      "text": "- Los productos, depósitos y subcontratos del parte respetan la empresa del documento y el acceso a la obra; los contactos mantienen el directorio compartido del tenant. Productos y depósitos aparecen únicamente con Inventario habilitado y permiso de consulta; para consumir se ofrecen depósitos generales o de esa misma obra, dentro del alcance autorizado.\n- **Imputación EDT del consumo (D-055).** Elegí **Partida EDT del material** para definir a qué partida corresponde. Si cargaste avance en una sola partida, podés usar **Usar la única partida de avance**. Al enviar, el parte avisa si un material vinculado queda sin imputación porque hay varias partidas de avance o todavía no cargaste ninguna.\n\n### 8.3 Procedimiento — Consumos de stock (manual)\n\n**Ruta:** Operación → **Consumos** → `/proyectos/[id]/consumos`\n\n1. **Registrar consumo** (abre diálogo; también `?create=1`). La ruta `/consumos/nuevo` redirige al diálogo.\n2. Completar: **Producto** · **Depósito** · cantidad · fecha · **Partida EDT (opcional)** · notas.\n3. **Registrar consumo**.\n4. Atajos: desde Inventario del proyecto o desde Materiales → enlace **Consumos**.\n\n### 8.4 Procedimiento — Documentos de obra\n\n**Ruta:** Operaci"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#110",
@@ -975,7 +975,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "spondiente.\n2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías.\n3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto, **DWG/DXF**). No hay preview in-app de CAD: Ver/Descargar baja el archivo. Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad."
+      "text": "ón → **Documentos** → `/proyectos/[id]/documentos`\n\n1. A la izquierda ves el **árbol de carpetas** de la obra. Hay carpetas de **sistema** (Libro de Obra, Solicitudes de compra, Órdenes de compra, Cotizaciones, Recepciones, Facturas, Certificaciones, Subcontratos, Presupuestos, **Planos**, **General**) que se crean solas y **no se renombran ni borran**. Los adjuntos que subís desde un parte, SC, OC, factura, etc. **caen solos** en la carpeta correspondiente."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#111",
@@ -983,7 +983,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "4. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo. En fotos **jpeg/png/webp**, clic en el **nombre** o en **Ver** abre un **visor a pantalla completa** (si hay varias en el listado, flechas / teclado para pasar); los **PDF** (y HEIC según el navegador) se abren en una pestaña nueva o desde el detalle. El icono de descarga **baja** el archivo. En el detalle, clic en la preview también amplía la foto.\n5. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.\n6. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar (con el mismo visor de fotos) aparece en las tarjetas y en el detalle del documento. Esos archivos también aparecen en Documentos dentro de su carpeta de sistema.\n\n> Ver [D-113](./00-product/DECISION_LOG."
+      "text": "2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías.\n3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto, **DWG/DXF**). No hay preview in-app de CAD: Ver/Descargar baja el archivo. Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad.\n4. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo. En fotos **jpeg/png/webp**, clic en el **nombre** o en **Ver** abre un **visor a pantalla completa** (si hay varias en el listado, flechas / teclado para pasar); los **PDF** (y HEIC según el navegador) se abren en una pestaña nueva o desde el detalle. El icono de descarga **baja** el archivo. En el detalle, clic en la preview también amplía la foto.\n5. Si el archiv"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#112",
@@ -991,7 +991,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "md): carpetas SYSTEM + USER; auto-filing; adjuntos sin obra no entran al árbol.\n\n<!-- capture:23 parte-de-obra-detalle -->\n![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)"
+      "text": "o es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#113",
@@ -999,7 +999,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "*Parte de obra (detalle).*\n\n<!-- capture:24 listado-de-consumos -->\n![Bloqer — Listado de consumos](./guides/assets/screenshots/24-listado-de-consumos.png)\n\n*Listado de consumos.*\n\n---"
+      "text": "6. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar (con el mismo visor de fotos) aparece en las tarjetas y en el detalle del documento. Esos archivos también aparecen en Documentos dentro de su carpeta de sistema.\n\n> Ver [D-113](./00-product/DECISION_LOG.md): carpetas SYSTEM + USER; auto-filing; adjuntos sin obra no entran al árbol.\n\n<!-- capture:23 parte-de-obra-detalle -->\n![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)\n\n*Parte de obra (detalle).*\n\n<!-- capture:24 listado-de-consumos -->\n![Bloqer — Listado de consumos](./guides/assets/screenshots/24-listado-de-consumos.png)\n\n*Listado de consumos.*\n\n---"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#114",
@@ -1863,7 +1863,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": "7. Usá **Exportar** → **CSV / Excel / PDF** para conservar el mismo alcance, corte y cobertura. **Enviar por email** ofrece CSV/PDF. **Envíos programados** permite incluir el reporte en una programación de obra con los formatos existentes. Revisá los avisos también en el archivo: los permisos se aplican antes de generar cada sección.\n\n**Advertencias de datos:** porcentajes de partes anteriores a junio de 2026 pueden haberse cargado como acumulados en vez de incrementos. El reporte conserva la evidencia y muestra la ambigüedad; no normaliza datos ni presenta ese físico como validado aunque su suma no supere 100%. Un exceso físico tampoco se oculta recortando visualmente al 100%. Las fuentes en otra moneda y las ventas directas sin vínculo al presupuesto se explican por separado; no se distribuyen automáticamente entre partidas.\n\nLa comparabilidad se comprueba en cada fecha de la evolución: una incidencia posterior no borra los meses anteriores que sí eran calculables, también en Excel y PDF. Una cantidad contractual ausente aparece sin dato, no como cero. Si Compras o Subcontratos están deshabilitados, los avisos identifican las fuentes excluidas de las capas de costo. En el PDF las"
+      "text": "7. Usá **Exportar** → **CSV / Excel / PDF** para conservar el mismo alcance, corte y cobertura. **Enviar por email** ofrece CSV/PDF. **Envíos programados** permite incluir el reporte en una programación de obra con los formatos existentes. Revisá los avisos también en el archivo: los permisos se aplican antes de generar cada sección.\n\n**Advertencias de datos:** porcentajes de partes anteriores a junio de 2026 pueden haberse cargado como acumulados en vez de incrementos. El reporte conserva la evidencia y muestra la ambigüedad. Una fuente restringida queda sin cobertura ni conteo de faltantes. **Por ejecutar según %** usa el porcentaje físico y la base presupuestada, mientras **Cantidad ejecutada** muestra la cantidad registrada. Las ventas directas sin vínculo al presupuesto quedan fuera del ratio contractual. **Ver facturas de la obra** abre el listado de facturación si tenés permiso. Las fuentes en otra moneda se informan por separado.\n\nLa comparabilidad se comprueba en cada fecha de la evolución: una incidencia posterior no borra los meses anteriores que sí eran calculables, también en Excel y PDF. Una cantidad contractual ausente aparece sin dato, no como cero. Si Compras o Sub"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#222",
@@ -1871,7 +1871,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "13. EDT y costos, rentabilidad y reportes (nivel proyecto)",
-      "text": " barras negativas se dibujan a la izquierda del origen cero.\n\n**Cómo decidir:** una brecha entre físico y certificado orienta a revisar mediciones; un saldo vencido orienta a revisar cobranzas; una exposición superior al presupuesto orienta a revisar costos. Cada pendiente conserva la operación que lo originó. La falta de base, permiso o medición se muestra como tal y nunca confirma que la obra no avanzó. R-002 no calcula EAC ni una fecha futura de finalización."
+      "text": "contratos están deshabilitados, los avisos identifican las fuentes excluidas de las capas de costo. En el PDF las barras negativas se dibujan a la izquierda del origen cero.\n\n**Cómo decidir:** una brecha entre físico y certificado orienta a revisar mediciones; un saldo vencido orienta a revisar cobranzas; una exposición superior al presupuesto orienta a revisar costos. Cada pendiente conserva la operación que lo originó. La falta de base, permiso o medición se muestra como tal y nunca confirma que la obra no avanzó. R-002 no calcula EAC ni una fecha futura de finalización."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#223",
@@ -3544,7 +3544,7 @@
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
       "section": "5. Datos que produce (outputs)",
-      "text": "## 5. Datos que produce (outputs)\n- **JobsiteLogEntry** con estado `DRAFT | SUBMITTED | APPROVED`."
+      "text": "## 5. Datos que produce (outputs)\n- **JobsiteLogEntry** con estado `DRAFT | SUBMITTED | APPROVED | CANCELLED`."
     },
     {
       "id": "02-modules/JOBSITE_LOG.md#7",
@@ -3568,7 +3568,7 @@
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
       "section": "8. Acciones disponibles",
-      "text": "## 8. Acciones disponibles\n- Crear parte del día (borrador).\n- Enviar y aprobar.\n- Anexar fotos y observaciones. **Notas generales** admiten negrita, viñetas y numeración ([D-101]); el resto de notas del parte es texto plano."
+      "text": "## 8. Acciones disponibles\n- Crear, editar o anular un borrador en una obra activa.\n- Enviar a revisión. Un supervisor puede devolverlo con observaciones o aprobarlo.\n- Anexar fotos y observaciones. **Notas generales** admiten negrita, viñetas y numeración ([D-101]); el resto de notas del parte es texto plano."
     },
     {
       "id": "02-modules/JOBSITE_LOG.md#10",
@@ -3584,10 +3584,18 @@
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
       "section": "10. Reglas de negocio",
-      "text": "## 10. Reglas de negocio\n- **BR-JL-001**: recomendación una entrada por día; no obligatorio hard ([BR-JL-001]).\n- **BR-JL-003**: materiales con producto y depósito generan consumo de inventario al aprobar el parte ([BR-JL-003]).\n- **Unidad (D-130):** un material vinculado fija la unidad maestra del producto desde esa referencia, incluso en borrador. El material del parte no tiene un campo de unidad propio: su cantidad usa la del producto, que se revalida bajo bloqueo antes del consumo al aprobar. No se compara contra la unidad de la partida ni se convierten cantidades. Los históricos y reintentos ya realizados conservan sus efectos previos.\n- Partes aprobados son lectura para certificación como evidencia complementaria.\n- **BR-SCH-004 / [D-045]:** al aprobar, sincroniza `ScheduleItem.progressPct` en ítems de cronograma con WBS primario enlazado (ver [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md))."
+      "text": "## 10. Reglas de negocio\n- **BR-JL-001**: recomendación una entrada por día; no obligatorio hard ([BR-JL-001]).\n- **BR-JL-003**: materiales con producto y depósito generan consumo de inventario al aprobar el parte ([BR-JL-003]).\n- Los adjuntos se archivan desde la ficha o Documentos y heredan el acceso de la obra y la empresa del parte, también cuando un adjunto histórico no tiene empresa propia.\n- **Unidad (D-130):** un material vinculado fija la unidad maestra del producto desde esa referencia, incluso en borrador. El material del parte no tiene un campo de unidad propio: su cantidad usa la del producto, que se revalida bajo bloqueo antes del consumo al aprobar. No se compara contra la unidad de la partida ni se convierten cantidades. Los históricos y reintentos ya realizados conservan sus efectos previos.\n- Partes aprobados son lectura para certificación como evidencia complementaria.\n- **BR-SCH-004 / [D-045]:** al aprobar, sincroniza `ScheduleItem.progressPct` en ítems de cronograma con WBS primario enlazado (ver [`../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md`](../05-workflows/PROGRESS_AND_SCHEDULE_PROCEDURE.md)).\n- El tope del avance incremental se controla a la precisió"
     },
     {
       "id": "02-modules/JOBSITE_LOG.md#12",
+      "sourceType": "bloqer_docs",
+      "title": "Libro de obra (Jobsite Log)",
+      "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
+      "section": "10. Reglas de negocio",
+      "text": "n de los partes por obra y partida, incluidas las partidas compartidas. El Real persistido del cronograma conserva su precisión de dos decimales."
+    },
+    {
+      "id": "02-modules/JOBSITE_LOG.md#13",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3595,7 +3603,7 @@
       "text": "## 11. Validaciones\n- Fecha no futura para parte “ejecutado”.\n- Al menos un campo descriptivo no vacío.\n- `generalNotes`: HTML restringido o texto plano legado; vacío (`<p></p>`, solo `<br>`) no cuenta como contenido ([D-101])."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#13",
+      "id": "02-modules/JOBSITE_LOG.md#14",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3603,7 +3611,7 @@
       "text": "## 12. Fórmulas relacionadas\n_No directas_; cruza con avance físico en [`../04-formulas/PROGRESS_FORMULAS.md`](../04-formulas/PROGRESS_FORMULAS.md)."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#14",
+      "id": "02-modules/JOBSITE_LOG.md#15",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3611,7 +3619,7 @@
       "text": "## 13. Casos borde\n- Turnos nocturnos: permitir fecha + turno.\n- Multiples frentes mismo día: varias entradas o campo “frente”."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#15",
+      "id": "02-modules/JOBSITE_LOG.md#16",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3619,7 +3627,7 @@
       "text": "## 14. Reportes relacionados\n- Libro de obra PDF, línea de tiempo obra.\n- **Avances del proyecto** R-002 (D-120): acumula partes actualmente APPROVED por fecha de ejecución hasta el corte, con físico ponderado por costo y cobertura; porcentajes legacy anteriores a junio de 2026 se advierten como ambiguos, sin reescribirlos."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#16",
+      "id": "02-modules/JOBSITE_LOG.md#17",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3627,7 +3635,7 @@
       "text": "## 15. Relación con otros módulos\n- **Proyectos**, **Cronograma**, **Certificaciones**, **Inventario** (recepciones)."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#17",
+      "id": "02-modules/JOBSITE_LOG.md#18",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3635,7 +3643,7 @@
       "text": "## 16. Permisos\nFOREMAN crea; PM aprueba."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#18",
+      "id": "02-modules/JOBSITE_LOG.md#19",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3643,7 +3651,7 @@
       "text": "## 17. Eventos disparados / consumidos\n- `jobsite_log.submitted`, `jobsite_log.approved`, `jobsite_log.returned` ([D-091] notifica in-app + email)."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#19",
+      "id": "02-modules/JOBSITE_LOG.md#20",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
@@ -3651,7 +3659,7 @@
       "text": "## 18. Fase de implementación\n**Fase 1** web; **Fase 2** móvil offline."
     },
     {
-      "id": "02-modules/JOBSITE_LOG.md#20",
+      "id": "02-modules/JOBSITE_LOG.md#21",
       "sourceType": "bloqer_docs",
       "title": "Libro de obra (Jobsite Log)",
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",

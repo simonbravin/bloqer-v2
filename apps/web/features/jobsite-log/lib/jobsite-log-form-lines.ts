@@ -1,4 +1,4 @@
-import { addDecimal, DISPLAY_DECIMALS, divideDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
+import { addDecimal, compareDecimal, QTY_DECIMALS, divideDecimal, multiplyDecimal, roundQty } from "@bloqer/utils";
 
 export type JobsiteLogProgressDraft = {
   wbsNodeId: string;
@@ -11,6 +11,7 @@ export type JobsiteLogProgressDraft = {
 export type JobsiteLogMaterialDraft = {
   productId: string;
   warehouseId: string;
+  wbsNodeId?: string;
   description: string;
   quantity: string;
   notes: string;
@@ -97,7 +98,7 @@ export function cumulativePhysicalPctFromDrafts(
   return total;
 }
 
-/** % del día implied by qty / budgetQty × 100 (2 dp, same as the form display). */
+/** % del día implied by qty / budgetQty × 100, at persisted progress precision. */
 export function suggestedPctFromQty(
   budgetQty: string | undefined,
   quantityCompleted: string,
@@ -106,7 +107,7 @@ export function suggestedPctFromQty(
   const base = budgetQty?.trim() ?? "";
   if (!JOBSITE_QTY_RE.test(qty) || !JOBSITE_QTY_RE.test(base)) return "";
   try {
-    return divideDecimal(multiplyDecimal(qty, "100"), base, DISPLAY_DECIMALS);
+    return divideDecimal(multiplyDecimal(qty, "100"), base, QTY_DECIMALS);
   } catch {
     return "";
   }
@@ -197,6 +198,7 @@ export function isBlankMaterialLine(m: JobsiteLogMaterialDraft): boolean {
   return (
     m.productId === JOBSITE_PROGRESS_NONE &&
     m.warehouseId === JOBSITE_PROGRESS_NONE &&
+    (!m.wbsNodeId || m.wbsNodeId === JOBSITE_PROGRESS_NONE) &&
     !m.description.trim() &&
     !m.quantity.trim() &&
     !m.notes.trim()
@@ -210,6 +212,7 @@ export function isValidMaterialLine(m: JobsiteLogMaterialDraft): boolean {
 export type JobsiteLogMaterialPayloadLine = {
   productId?: string;
   warehouseId?: string;
+  wbsNodeId?: string;
   description: string;
   quantity: string;
   notes?: string;
@@ -223,10 +226,17 @@ export function prepareMaterialLinesForSubmit(
   if (started.some((m) => !isValidMaterialLine(m))) {
     return { error: "Cada fila de materiales necesita descripción y cantidad." };
   }
+  if (started.some((m) =>
+    m.productId !== JOBSITE_PROGRESS_NONE && m.warehouseId !== JOBSITE_PROGRESS_NONE &&
+    compareDecimal(roundQty(m.quantity), "0") <= 0
+  )) {
+    return { error: "La cantidad de un material con producto y depósito debe ser mayor que cero." };
+  }
   return {
     payload: started.map((m, i) => ({
       productId: m.productId === JOBSITE_PROGRESS_NONE ? undefined : m.productId,
       warehouseId: m.warehouseId === JOBSITE_PROGRESS_NONE ? undefined : m.warehouseId,
+      wbsNodeId: m.wbsNodeId === JOBSITE_PROGRESS_NONE ? undefined : m.wbsNodeId,
       description: m.description,
       quantity: m.quantity,
       notes: m.notes || undefined,

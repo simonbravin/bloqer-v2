@@ -45,6 +45,7 @@ const emptyEvidence = (): ProjectProgressEvidence => ({
   scheduleItems: [],
   certifications: [],
   invoices: [],
+  hasDirectSales: false,
   orders: [],
   subcontracts: [],
   subCerts: [],
@@ -248,6 +249,7 @@ function installReportFixture(shared = false) {
     name: "Estructura",
     budgetId,
     costItem: {
+      budgetId,
       unit: "m2",
       quantity: d(100),
       totalCostDirect: d(60000),
@@ -261,6 +263,7 @@ function installReportFixture(shared = false) {
     name: "Terminación",
     budgetId,
     costItem: {
+      budgetId,
       unit: "m2",
       quantity: d(100),
       totalCostDirect: d(40000),
@@ -332,6 +335,9 @@ function installReportFixture(shared = false) {
       versionNumber: 1,
     },
   ]);
+  replaceMethod(prisma.salesInvoice, "findFirst", async () =>
+    data.hasDirectSales ? { id: "direct-invoice" } : null,
+  );
   const sources = [
     [prisma.wbsNode, data.nodes],
     [prisma.jobsiteLog, data.logs],
@@ -722,6 +728,110 @@ describe("project progress complete service cuts", () => {
 });
 
 describe("project progress access, filters and scoped reads", () => {
+  it("rejects a cost item belonging to another budget before reporting its values", async () => {
+    const fixture = installReportFixture();
+    fixture.nodes[0]!.costItem!.budgetId = "another-budget";
+
+    await assert.rejects(
+      () => getProjectProgressReport("project", { dateTo: "2026-08-31" }, ctx),
+      (error: unknown) => error instanceof ServiceError && error.code === "CONFLICT",
+    );
+  });
+
+  it("ignores stale plan dates and duration from a task whose children were cancelled", async () => {
+    const fixture = installReportFixture();
+    const task = {
+      id: "former-container",
+      parentId: null,
+      name: "Contenedor anterior",
+      type: "TASK" as const,
+      status: "PLANNED" as const,
+      progressPct: d(0),
+      startDate: new Date("2026-05-01"),
+      endDate: new Date("2026-06-01"),
+      durationDays: 31,
+      blockReason: null,
+      wbsLinks: [{ wbsNodeId: "a" }],
+    };
+    fixture.scheduleItems.push(
+      task,
+      { ...task, id: "cancelled-child", parentId: task.id, status: "CANCELLED" },
+      {
+        ...task,
+        id: "active-leaf",
+        status: "COMPLETED",
+        progressPct: d(100),
+        durationDays: 1,
+        wbsLinks: [{ wbsNodeId: "b" }],
+      },
+    );
+
+    const report = await getProjectProgressReport("project", { dateTo: "2026-08-31" }, ctx);
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.rows[0]!.planPct, null);
+    assert.equal(report.rows[1]!.planPct, "100.0000");
+    assert.equal(report.plan.pct, null);
+    assert.equal(report.schedule.progressPct, "50.0000");
+    assert.equal(report.schedule.delayedTasks, 0);
+    assert.ok(!report.pending.some((pending) => pending.kind === "SCHEDULE_DELAYED"));
+  });
+
+  it("links direct sales without including them in the contractual AR totals or disclosing them without access", async () => {
+    const fixture = installReportFixture();
+    fixture.hasDirectSales = true;
+    const filters = { dateTo: "2026-08-31" };
+
+    const report = await getProjectProgressReport("project", filters, ctx);
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.excludedDirectSalesHref, "/proyectos/project/facturas");
+    assert.match(report.warnings.join(" "), /venta directa/);
+    assert.equal(report.financial.invoiced, "48400.00");
+
+    const restricted = await getProjectProgressReport("project", filters, {
+      ...ctx,
+      roles: ["PROJECT_VIEWER"],
+    });
+    if (restricted.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(restricted.excludedDirectSalesHref, null);
+    assert.doesNotMatch(restricted.warnings.join(" "), /venta directa/);
+    assert.equal(restricted.financial.invoiced, null);
+  });
+
+  it("links remaining physical work to the log if scheduling is disabled", async () => {
+    installReportFixture();
+    replaceMethod(prisma.tenantModuleSetting, "findMany", async () => [
+      { moduleKey: "SCHEDULE", isEnabled: false },
+    ]);
+
+    const report = await getProjectProgressReport("project", { dateTo: "2026-08-31" }, ctx);
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.sourceAccess.schedule, false);
+    assert.equal(report.plan.coveragePct, null);
+    assert.equal(report.plan.missingCount, 0);
+    assert.equal(
+      report.pending.find((item) => item.kind === "PHYSICAL_REMAINING")?.href,
+      "/proyectos/project/libro-obra",
+    );
+    assert.ok(
+      !report.warnings.some((warning) => warning.startsWith("Referencia del plan incompleta")),
+    );
+  });
+
+  it("does not report missing measurements or zero coverage when the book is disabled", async () => {
+    installReportFixture();
+    replaceMethod(prisma.tenantModuleSetting, "findMany", async () => [
+      { moduleKey: "JOBSITE_LOG", isEnabled: false },
+    ]);
+
+    const report = await getProjectProgressReport("project", { dateTo: "2026-08-31" }, ctx);
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.sourceAccess.jobsite, false);
+    assert.equal(report.physical.coveragePct, null);
+    assert.equal(report.physical.missingCount, 0);
+    assert.equal(report.physical.totalCount, 2);
+    assert.ok(report.series.every((point) => point.physicalCoveragePct === null));
+  });
+
   it("discloses excluded cost sources when procurement and subcontracts are disabled", async () => {
     installReportFixture();
     replaceMethod(prisma.tenantModuleSetting, "findMany", async () => [
@@ -818,6 +928,11 @@ describe("project progress access, filters and scoped reads", () => {
         return [];
       });
     }
+    let directSalesArgs: unknown;
+    replaceMethod(prisma.salesInvoice, "findFirst", async (args: unknown) => {
+      directSalesArgs = args;
+      return null;
+    });
     const cut = new Date("2026-08-31T23:59:59.999Z");
     await readProjectProgressEvidence(
       { tenantId: "tenant", projectId: "project", companyId: null, activeCompanyId: "company" },
@@ -834,6 +949,19 @@ describe("project progress access, filters and scoped reads", () => {
       },
     );
     assert.equal(captured.length, 10);
+    assert.deepEqual(directSalesArgs, {
+      where: {
+        tenantId: "tenant",
+        projectId: "project",
+        project: { companyId: null },
+        companyId: "company",
+        status: "ISSUED",
+        documentKind: "INVOICE",
+        certificationId: null,
+        issueDate: { lte: cut },
+      },
+      select: { id: true },
+    });
     assert.equal((captured[4]!.where as { companyId?: string }).companyId, "company");
     assert.equal((captured[5]!.where as { companyId?: string }).companyId, "company");
     assert.ok(
@@ -865,6 +993,10 @@ describe("project progress access, filters and scoped reads", () => {
       forbiddenCalls++;
       throw new Error("must not query AR");
     });
+    replaceMethod(prisma.salesInvoice, "findFirst", async () => {
+      forbiddenCalls++;
+      throw new Error("must not query direct sales without AR access");
+    });
     const result = await readProjectProgressEvidence(
       { tenantId: "tenant", projectId: "project", companyId: "company" },
       ["budget"],
@@ -873,6 +1005,7 @@ describe("project progress access, filters and scoped reads", () => {
     );
     assert.equal(forbiddenCalls, 0);
     assert.deepEqual(result.invoices, []);
+    assert.equal(result.hasDirectSales, false);
     assert.deepEqual(result.payments, []);
   });
 });
