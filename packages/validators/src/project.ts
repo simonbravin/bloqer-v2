@@ -7,12 +7,12 @@ export const projectStatusSchema = z.enum(["DRAFT", "ACTIVE", "ON_HOLD", "COMPLE
 const optionalDateField = z
   .union([
     z.string().date("Ingresá una fecha válida").transform((value) => new Date(value)),
-    z.date({ errorMap: () => ({ message: "Ingresá una fecha válida" }) }),
+    z.date({ error: "Ingresá una fecha válida" }),
     z.literal(""),
     z.null(),
-  ], { errorMap: () => ({ message: "Ingresá una fecha válida" }) })
-  .optional()
-  .transform((value) => value === "" ? null : value);
+  ], { error: "Ingresá una fecha válida" })
+  .transform((value) => value === "" ? null : value)
+  .optional();
 
 function validateProjectDateRange(
   input: { startDate?: Date | null; expectedEndDate?: Date | null },
@@ -31,10 +31,7 @@ export const createProjectSchema = z.object({
   code: z.string().min(1, "El código es obligatorio").max(50),
   name: z.string().min(1, "El nombre es obligatorio").max(255),
   description: z.string().max(2000).optional(),
-  clientContactId: z.string({
-    required_error: "Seleccioná un cliente válido",
-    invalid_type_error: "Seleccioná un cliente válido",
-  }).uuid("Seleccioná un cliente válido"),
+  clientContactId: z.string({ error: "Seleccioná un cliente válido" }).guid("Seleccioná un cliente válido"),
   type: projectTypeSchema,
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
@@ -49,7 +46,7 @@ export const updateProjectSchema = z.object({
   code: z.string().min(1).max(50).optional(),
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(2000).optional(),
-  clientContactId: z.string().uuid().optional(),
+  clientContactId: z.string().guid().optional(),
   type: projectTypeSchema.optional(),
   address: z.string().max(500).optional(),
   city: z.string().max(100).optional(),
@@ -63,7 +60,7 @@ export const updateProjectSchema = z.object({
 export const listProjectsSchema = z.object({
   status: projectStatusSchema.optional(),
   search: z.string().max(200).optional(),
-  clientContactId: z.string().uuid().optional(),
+  clientContactId: z.string().guid().optional(),
   page: z.number().int().safe().min(1).optional(),
   pageSize: z.number().int().safe().min(1).max(100).optional(),
 }).superRefine((input, ctx) => {
@@ -106,11 +103,11 @@ export const projectTeamMemberKindSchema = z.enum([
 ]);
 
 export const addProjectTeamMemberSchema = z.object({
-  userId: z.string().uuid("Seleccioná un usuario válido"),
+  userId: z.string().guid("Seleccioná un usuario válido"),
   kind: projectTeamMemberKindSchema.default("OTHER"),
 });
 
-export const projectTeamMemberIdSchema = z.string().uuid("Miembro del equipo no encontrado");
+export const projectTeamMemberIdSchema = z.string().guid("Miembro del equipo no encontrado");
 
 export type AddProjectTeamMemberInput = z.infer<typeof addProjectTeamMemberSchema>;
 export type ProjectTeamMemberKindInput = z.infer<typeof projectTeamMemberKindSchema>;

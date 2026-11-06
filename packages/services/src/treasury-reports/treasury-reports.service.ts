@@ -6,7 +6,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { DEFAULT_CASH_DATE_RANGE_DAYS, defaultDateRangeDays, MAX_CORPORATE_PAYMENT_FILTER_IDS, MAX_EXPORT_ROWS, resolvePagination } from "../finance/pagination";
 import { buildFinancialHref } from "../finance/financial-trace.service";
 import { serializeFxRateDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
-import { getAccountBalanceAsOf } from "../treasury/balance.service";
+import { getAccountBalanceAsOf, getAccountBalancesForAccounts } from "../treasury/balance.service";
 import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "../treasury/balance-affecting-statuses";
 import { defaultReportDateRange } from "../reports/report-month";
 import {
@@ -725,7 +725,7 @@ export async function getCashFlowReport(
   const currencyFilter = filters.currency ? cashPositionCurrency(filters.currency) : undefined;
   const allAccounts = (await prisma.treasuryAccount.findMany({
     where: treasuryReportAccountScope(ctx.tenantId),
-    select: { currency: true, id: true },
+    select: { currency: true, id: true, openingBalance: true },
   }))
     .map((account) => ({ ...account, currency: cashPositionCurrency(account.currency) }))
     .filter((account) => !currencyFilter || account.currency === currencyFilter);
@@ -754,20 +754,17 @@ export async function getCashFlowReport(
     movementsByCurrency.set(currency, rows);
   }
 
-  const currencies = [...new Set(currencyByAccount.values())].sort();
+  const balances = await getAccountBalancesForAccounts(allAccounts, ctx.tenantId, { beforeDate: startDate });
+  const openingByCurrency = new Map<string, Prisma.Decimal>();
+  for (const { id, currency } of allAccounts) {
+    const total = openingByCurrency.get(currency) ?? new Prisma.Decimal(0);
+    openingByCurrency.set(currency, total.plus(balances.get(id)!));
+  }
 
   const result: CashFlowReport = [];
 
-  for (const currency of currencies) {
-    const currAccounts = allAccounts.filter((a) => a.currency === currency);
-
-    // Balance as of startDate (pre-period, P-TRZ-06 safe per account)
-    let openingBalance = new Prisma.Decimal(0);
-    for (const acc of currAccounts) {
-      openingBalance = openingBalance.plus(
-        await getAccountBalanceAsOf(acc.id, { beforeDate: startDate }),
-      );
-    }
+  for (const currency of [...openingByCurrency.keys()].sort()) {
+    const openingBalance = openingByCurrency.get(currency)!;
 
     // Bucket movements in range
     type BucketAcc = {

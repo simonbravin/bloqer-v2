@@ -8,7 +8,7 @@ const inventoryQuantity = positiveQtyString.refine(
 );
 
 export const createProductSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid().optional().nullable(),
   sku: z.string().trim().min(1, "SKU requerido"),
   name: z.string().trim().min(1, "Nombre requerido"),
   description: z.string().optional().nullable(),
@@ -26,8 +26,8 @@ export const updateProductSchema = z.object({
 });
 
 export const createWarehouseSchema = z.object({
-  companyId: z.string().uuid(),
-  projectId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid(),
+  projectId: z.string().guid().optional().nullable(),
   name: z.string().trim().min(1, "Nombre requerido"),
   type: z.enum(["CENTRAL", "PROJECT", "TEMPORARY", "OTHER"]).default("CENTRAL"),
   address: z.string().optional().nullable(),
@@ -42,10 +42,10 @@ export const updateWarehouseSchema = z.object({
 });
 
 export const createStockConsumptionSchema = z.object({
-  projectId: z.string().uuid(),
-  warehouseId: z.string().uuid(),
-  productId: z.string().uuid(),
-  wbsNodeId: z.string().uuid().optional().nullable(),
+  projectId: z.string().guid(),
+  warehouseId: z.string().guid(),
+  productId: z.string().guid(),
+  wbsNodeId: z.string().guid().optional().nullable(),
   quantity: inventoryQuantity,
   movementDate: z.string().date("Fecha inválida"),
   notes: z.string().optional().nullable(),
@@ -53,10 +53,10 @@ export const createStockConsumptionSchema = z.object({
 });
 
 export const createWarehouseTransferSchema = z.object({
-  sourceWarehouseId: z.string().uuid("Depósito origen requerido"),
-  destinationWarehouseId: z.string().uuid("Depósito destino requerido"),
-  productId: z.string().uuid("Producto requerido"),
-  projectId: z.string().uuid().optional().nullable(),
+  sourceWarehouseId: z.string().guid("Depósito origen requerido"),
+  destinationWarehouseId: z.string().guid("Depósito destino requerido"),
+  productId: z.string().guid("Producto requerido"),
+  projectId: z.string().guid().optional().nullable(),
   transferDate: z.string().date("Fecha inválida"),
   quantity: inventoryQuantity,
   unitCost: unitPriceString.optional().nullable(),

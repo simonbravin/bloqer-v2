@@ -465,7 +465,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/tesoreria/conciliacion", label: "Conciliación" }],
     steps: [
       "Tesorería → Conciliación → Nueva.",
-      "Importá CSV/OFX o cargá líneas del extracto. Si una fila XFER de OFX no indica + o -, corregí el archivo o ingresá esa línea manualmente.",
+      "Importá CSV/OFX o cargá líneas del extracto. Si el OFX/QFX declara otra moneda, elegí el extracto de esa cuenta y moneda. Podés importar archivos sin moneda declarada. Si una fila XFER de OFX no indica + o -, corregí el archivo o ingresá esa línea manualmente.",
       "Emparejá movimientos del sistema con el extracto. Si creás un movimiento desde una línea de una cuenta extranjera, ingresá el tipo de cambio de esa operación.",
       "Revisá Saldo de libros al cierre y Diferencia banco − sistema. Cerrá cuando el extracto cuadre y queden emparejadas sus líneas y movimientos del período.",
     ],

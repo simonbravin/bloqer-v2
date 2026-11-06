@@ -48,7 +48,7 @@ function flattenAgingTop(
 }
 
 const payablesSchema = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   overdueOnly: z.boolean().optional(),
   limit: z.number().int().min(1).max(30).optional(),
 });
@@ -135,7 +135,7 @@ export const getPayablesTool = defineBloqerAiTool({
 });
 
 const receivablesSchema = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   overdueOnly: z.boolean().optional(),
   limit: z.number().int().min(1).max(30).optional(),
 });

@@ -13,6 +13,7 @@ type Props = {
   purchaseOrderId: string;
   purchaseReceiptId?: string;
   billing: PurchaseOrderBillingSummary;
+  hasPendingLines: boolean;
   canEditAp: boolean;
   /** Ruta a la que volver si falla la creación del borrador (sin reintentar en cada refresh). */
   errorReturnPath: string;
@@ -25,12 +26,12 @@ export function PoBillingNextStepPanel({
   purchaseOrderId,
   purchaseReceiptId,
   billing,
+  hasPendingLines,
   canEditAp,
   errorReturnPath,
   highlighted = false,
 }: Props) {
   const pending = isPositiveMoneyAmount(billing.pendingToInvoice);
-  const showRegister = billing.hasReceivedQuantity && pending;
   const draftHref = billing.openDraftInvoiceId
     ? `/proyectos/${projectId}/facturas-proveedor/${billing.openDraftInvoiceId}`
     : null;
@@ -91,7 +92,7 @@ export function PoBillingNextStepPanel({
             </ul>
           </ProcurementAmberCallout>
         ) : null}
-        {showRegister ? (
+        {hasPendingLines ? (
           <p className="text-xs text-muted-foreground">
             La recepción no genera deuda automáticamente. Registrá la factura del proveedor y
             emitila para crear la cuenta por pagar
@@ -113,7 +114,7 @@ export function PoBillingNextStepPanel({
               <Link href={draftHref}>Completar factura</Link>
             </Button>
           ) : null}
-          {showRegister ? (
+          {hasPendingLines ? (
             <form
               action={async () => {
                 "use server";
@@ -139,7 +140,7 @@ export function PoBillingNextStepPanel({
             </form>
           ) : null}
         </div>
-      ) : showRegister ? (
+      ) : hasPendingLines ? (
         <p className="text-xs text-muted-foreground">
           Pedile a Finanzas que registre la factura del proveedor vinculada a esta OC.
         </p>

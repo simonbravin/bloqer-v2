@@ -36,7 +36,7 @@ const SOURCE_LABELS: Record<string, string> = {
   OPENING_BALANCE: "Saldo inicial",
 };
 
-const optionalId = z.string().uuid().optional();
+const optionalId = z.string().guid().optional();
 const reportDay = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)

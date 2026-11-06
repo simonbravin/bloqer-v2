@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { hash } from "bcryptjs";
 import { before, after, describe, it } from "node:test";
 import { Prisma, prisma } from "@bloqer/database";
+import { registerArSaleSchema } from "@bloqer/validators";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { clearProjectAccessModeCache } from "../security/access";
 import { ServiceError, type ServiceContext } from "../types";
@@ -15,6 +16,7 @@ import { getReceivableById, getReceivableBySalesInvoiceId, listReceivablesByProj
 import { createSalesCreditNoteFromInvoice, createSalesDebitNoteFromInvoice, issueSalesCreditNote, issueSalesDebitNote, cancelSalesCreditNote } from "./credit-debit-note.service";
 import { createCollection, cancelCollection, getCollectionById, listCollectionsByProject } from "../treasury/collection.service";
 import { registerArIncome } from "./register-ar-income.service";
+import { registerArSale } from "./register-ar-sale.service";
 import { registerArAdvance } from "./register-ar-advance.service";
 import { fetchCompanyReceivableSnapshotRows, aggregateCompanyReceivableBalances } from "./company-ar-snapshot";
 import { postJournalEntry } from "../accounting/journal-entry.service";
@@ -124,6 +126,36 @@ describe("AG09 AR sales, notes and collection SQL integrity", { skip: process.en
     }) as typeof prisma.$transaction;
     try { return await work(); } finally { prisma.$transaction = original; }
   }
+
+  it("AG-14 keeps AR issue and sale committed when the post-commit notification lookup fails", async () => {
+    const work = await project();
+    const invoice = await draft(work.id);
+    const lookup = prisma.receivable.findFirst;
+    const input = registerArSaleSchema.parse({
+      projectId: work.id, clientContactId: clientId, issueDate: date, dueDate: date, invoiceLetter: "C", iibbPerceptionRate: "0",
+      idempotencyKey: key(), lines: [{ description: "Synthetic notice failure sale", quantity: "1", unitPrice: "100" }],
+    });
+    let noticeLookups = 0;
+    prisma.receivable.findFirst = () => {
+      noticeLookups += 1;
+      throw new Error("Synthetic notification lookup failure");
+    };
+    try {
+      const issuedInvoice = await issueSalesInvoice(invoice.id, ctx, work.id);
+      assert.equal(issuedInvoice.status, "ISSUED");
+      const sale = await registerArSale(input, ctx);
+      assert.equal(sale.primaryEntityType, "SalesInvoice");
+      assert.equal((await registerArSale(input, ctx)).primaryEntityId, sale.primaryEntityId);
+      assert.equal(noticeLookups, 2);
+      for (const salesInvoiceId of [invoice.id, sale.primaryEntityId]) {
+        const obligation = await prisma.receivable.findUniqueOrThrow({ where: { salesInvoiceId } });
+        assert.equal(obligation.status, "OPEN");
+        assert.equal(obligation.originalAmount.toFixed(2), "100.00");
+      }
+    } finally {
+      prisma.receivable.findFirst = lookup;
+    }
+  });
 
   it("restricts shared-project invoice, AR and collection lists and ID reads to the document company", async () => {
     const p = await project(), a = await issued(p.id), b = await issued(p.id, other), bank = await account();

@@ -38,14 +38,14 @@ import { revalidatePath } from "next/cache";
 import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
 import { redirect } from "next/navigation";
 
-const uuidIdSchema = z.string().uuid("Id inválido");
+const uuidIdSchema = z.string().guid("Id inválido");
 const lineAndSessionSchema = z.object({
-  lineId: z.string().uuid("Id inválido"),
-  reconciliationId: z.string().uuid("Id inválido"),
+  lineId: z.string().guid("Id inválido"),
+  reconciliationId: z.string().guid("Id inválido"),
 });
 const matchAndSessionSchema = z.object({
-  matchId: z.string().uuid("Id inválido"),
-  reconciliationId: z.string().uuid("Id inválido"),
+  matchId: z.string().guid("Id inválido"),
+  reconciliationId: z.string().guid("Id inválido"),
 });
 
 async function getCtx() {

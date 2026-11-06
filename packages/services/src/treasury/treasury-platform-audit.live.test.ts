@@ -16,6 +16,7 @@ import { cancelAccountMovement, getAccountMovementById } from "./account-movemen
 import {
   addBankStatementLine, cancelBankReconciliation, closeBankReconciliation, createBankReconciliation,
   createMovementFromStatementLine, getBankReconciliationById, matchBankReconciliationLine,
+  importBankStatementLinesFromCsv, importBankStatementLinesFromOfx,
   listCandidateMovementsForReconciliation, removeBankStatementLine, reopenBankReconciliation, unmatchBankReconciliationLine,
 } from "./bank-reconciliation.service";
 import { getAccountBalance, getAccountBalanceAsOf, getTreasurySummaryByTenant } from "./balance.service";
@@ -335,6 +336,43 @@ describe("AG-10 treasury and reconciliation on isolated SQL", { skip: process.en
     await assert.rejects(() => reopenFinancialPeriod({ ...period, reason: "  " }, second), validation);
     await reopenFinancialPeriod({ ...period, reason: "Reapertura para cancelar" }, second);
     await cancelInternalTransfer(saved.id, global);
+  });
+
+  it("AG-14 rejects a conflicting OFX statement currency before importing and preserves legacy and CSV imports", async () => {
+    const account = await createTreasuryAccount(createTreasuryAccountSchema.parse({
+      name: `Cuenta OFX ${randomUUID()}`, type: "BANK",
+    }), ctx);
+    const session = await createBankReconciliation({
+      accountId: account.id, periodStart: "2089-06-01", periodEnd: "2089-06-30",
+      openingBalance: "0", closingBalance: "37.50",
+    }, ctx);
+    const ofx = (currency: string | null, reference: string) => `<OFX><STMTRS>
+${currency ? `<CURDEF>${currency}` : ""}
+<BANKTRANLIST><STMTTRN>
+<TRNTYPE>CREDIT
+<DTPOSTED>20890602
+<TRNAMT>12.50
+<FITID>${reference}
+<NAME>Ingreso de prueba
+</STMTTRN></BANKTRANLIST></STMTRS></OFX>`;
+    const importOfx = (currency: string | null, reference: string) => importBankStatementLinesFromOfx({
+      reconciliationId: session.id, ofxText: ofx(currency, reference),
+    }, ctx);
+    await assert.rejects(() => importOfx("USD", "foreign-currency"), (error) =>
+      validation(error) && (error as Error).message.includes("declara USD"));
+    const unchanged = await getBankReconciliationById(session.id, ctx);
+    assert.equal(unchanged.status, "DRAFT");
+    assert.equal(unchanged.lines.length, 0);
+    assert.equal(await prisma.accountMovement.count({ where: { tenantId, accountId: account.id } }), 0);
+
+    assert.equal((await importOfx("ARS", "matching-currency")).importedCount, 1);
+    assert.equal((await importOfx(null, "legacy-without-curdef")).importedCount, 1);
+    const csv = await importBankStatementLinesFromCsv({
+      reconciliationId: session.id,
+      csvText: "fecha;descripcion;monto;direccion;referencia\n02/06/2089;Ingreso CSV;12,50;CREDIT;import-csv",
+    }, ctx);
+    assert.equal(csv.importedCount, 1);
+    assert.equal(csv.lines.length, 3);
   });
 
   it("prevents duplicate bank movements after unmatch and preserves matches while the financial period is closed", async () => {

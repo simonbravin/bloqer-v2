@@ -65,7 +65,8 @@ export default auth((req) => {
     }
   }
 
-  const isAuthenticated = !!req.auth;
+  const userId = req.auth?.user?.id;
+  const isAuthenticated = typeof userId === "string" && userId.length > 0;
   const publicPath = isPublicPath(pathname);
 
   if (!isAuthenticated && !publicPath) {

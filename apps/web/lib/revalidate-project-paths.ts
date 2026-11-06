@@ -22,6 +22,7 @@ export function revalidateProjectCostAndFinancePaths(projectId: string): void {
   revalidatePath(`/proyectos/${projectId}/consumos`);
   revalidatePath(`/proyectos/${projectId}/compras`);
   revalidatePath(`/proyectos/${projectId}/reportes`);
+  revalidatePath(`/proyectos/${projectId}/reportes/avances`);
   revalidatePath(`/proyectos/${projectId}/reportes/ingresos-gastos`);
   revalidatePath(`/proyectos/${projectId}/reportes/rentabilidad`);
   revalidatePath(`/proyectos/${projectId}/reportes/caja`);

@@ -6,7 +6,7 @@ import { AI_DATA_CLASS } from "../policy/data-class";
 import { ServiceError } from "../../types";
 
 const inputSchema = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   window: z.enum(["this_week", "next_14_days", "month", "all"]).optional(),
   search: z.string().max(80).optional(),
   limit: z.number().int().min(1).max(30).optional(),

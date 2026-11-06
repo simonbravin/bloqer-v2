@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireReportExportContext();
   if (!auth.ok) return auth.response;
   const sp = searchParamsRecord(req);
-  const accountId = z.string().uuid().safeParse(sp.accountId);
+  const accountId = z.string().guid().safeParse(sp.accountId);
   if (!accountId.success) {
     return NextResponse.json({ error: "accountId requerido" }, { status: 400 });
   }

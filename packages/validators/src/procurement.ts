@@ -13,28 +13,28 @@ import {
 } from "./money";
 
 const purchaseOrderLineSchema = z.object({
-  id: z.string().uuid().optional(),
-  wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
-  productId: z.string().uuid().optional().nullable(),
+  id: z.string().guid().optional(),
+  wbsNodeId: z.string().guid({ message: "Cada línea debe imputar a un ítem EDT" }),
+  productId: z.string().guid().optional().nullable(),
   /** Optional APU hint ([D-068]); does not change EDT imputation. */
-  costAnalysisLineId: z.string().uuid().optional().nullable(),
+  costAnalysisLineId: z.string().guid().optional().nullable(),
   /** Job-cost nature ([D-099]). Defaults to APU category or MATERIAL in the service. */
   costType: costCategorySchema.optional().nullable(),
   /** SC line link for award-sourced OCs ([BR-PUR-024]) — round-trip on edit. */
-  purchaseRequestLineId: z.string().uuid().optional().nullable(),
+  purchaseRequestLineId: z.string().guid().optional().nullable(),
   description: z.string().trim().min(1, "Descripción requerida"),
   unit: z.string().default(""),
   quantity: positiveQtyString,
   unitPrice: unitPriceString,
-  taxRate: ratePctString.refine((value) => !value.startsWith("-"), "El impuesto no puede ser negativo").default("21"),
+  taxRate: ratePctString.refine((value) => !value.startsWith("-"), "El impuesto no puede ser negativo").prefault("21"),
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder: z.number().int().default(0),
   varianceJustification: z.string().max(2000).optional().nullable(),
 });
 
 export const createPurchaseOrderSchema = z.object({
-  projectId: z.string().uuid(),
-  supplierContactId: z.string().uuid(),
+  projectId: z.string().guid(),
+  supplierContactId: z.string().guid(),
   issueDate: z.string().date("Ingresá una fecha de emisión válida"),
   expectedDeliveryDate: z.string().date("Ingresá una fecha de entrega válida").optional().nullable(),
   currency: z.string().trim().regex(/^[A-Z]{3}$/, "Moneda inválida").default("ARS"),
@@ -43,12 +43,12 @@ export const createPurchaseOrderSchema = z.object({
   internalNotes: z.string().optional().nullable(),
   emergencyReason: z.string().max(2000).optional().nullable(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate: ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
+  iibbPerceptionRate: ratePctString.optional().prefault(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   lines: z.array(purchaseOrderLineSchema).min(1, "Debe tener al menos una línea"),
 });
 
 export const updatePurchaseOrderSchema = z.object({
-  supplierContactId: z.string().uuid().optional(),
+  supplierContactId: z.string().guid().optional(),
   issueDate: z.string().date("Ingresá una fecha de emisión válida").optional(),
   expectedDeliveryDate: z.string().date("Ingresá una fecha de entrega válida").optional().nullable(),
   fxRate: optionalFxRateString,
@@ -64,7 +64,7 @@ export const returnPurchaseOrderSchema = z.object({
 });
 
 const receiptLineSchema = z.object({
-  purchaseOrderLineId: z.string().uuid(),
+  purchaseOrderLineId: z.string().guid(),
   quantityReceived: qtyString.refine(
     isPositiveRoundedQty,
     "La cantidad recibida debe ser mayor a cero",
@@ -73,8 +73,8 @@ const receiptLineSchema = z.object({
 });
 
 export const createPurchaseReceiptSchema = z.object({
-  purchaseOrderId: z.string().uuid(),
-  warehouseId: z.string().uuid().optional().nullable(),
+  purchaseOrderId: z.string().guid(),
+  warehouseId: z.string().guid().optional().nullable(),
   receiptDate: z.string().date("Ingresá una fecha de recepción válida"),
   notes: z.string().optional().nullable(),
   lines: z.array(receiptLineSchema).min(1, "Debe incluir al menos una línea"),
@@ -83,7 +83,7 @@ export const createPurchaseReceiptSchema = z.object({
 
 /** Edit DRAFT receipt header + lines (no idempotency key). */
 export const updatePurchaseReceiptSchema = z.object({
-  warehouseId: z.string().uuid().optional().nullable(),
+  warehouseId: z.string().guid().optional().nullable(),
   receiptDate: z.string().date("Ingresá una fecha de recepción válida"),
   notes: z.string().optional().nullable(),
   lines: z.array(receiptLineSchema).min(1, "Debe incluir al menos una línea"),

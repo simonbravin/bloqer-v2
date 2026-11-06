@@ -11,13 +11,13 @@ export const subscriptionStatusSchema = z.enum([
 export const tenantOperationalStatusSchema = z.enum(["ACTIVE", "SUSPENDED", "INACTIVE"]);
 
 export const updatePlatformTenantStatusInputSchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().guid(),
   status: tenantOperationalStatusSchema,
   suspendedReason: z.string().max(512).nullable().optional(),
 });
 
 export const updatePlatformTenantPlanMetadataInputSchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().guid(),
   saasPlan: z.string().trim().min(1).max(64).optional(),
   subscriptionStatus: subscriptionStatusSchema.optional(),
   trialEndsAt: z.union([z.null(), z.coerce.date()]).optional(),
@@ -27,12 +27,12 @@ export const updatePlatformTenantPlanMetadataInputSchema = z.object({
 
 /** Extends `trialEndsAt` by N days from max(now, current trial end). */
 export const extendPlatformTenantTrialInputSchema = z.object({
-  tenantId: z.string().uuid(),
+  tenantId: z.string().guid(),
   additionalDays: z.coerce.number().int().min(1).max(90),
 });
 
 export const listPlatformAuditLogFiltersSchema = z.object({
-  targetTenantId: z.string().uuid().optional(),
+  targetTenantId: z.string().guid().optional(),
   action: z.string().trim().min(1).max(128).optional(),
   limit: z.coerce.number().int().min(1).max(200).optional(),
 });

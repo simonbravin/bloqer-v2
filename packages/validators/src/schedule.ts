@@ -12,7 +12,7 @@ export const scheduleItemStatusSchema = z.enum([
 export const scheduleItemTypeSchema = z.enum(["TASK", "MILESTONE"]);
 
 export const scheduleWorkspaceFiltersSchema = z.object({
-  budgetId: z.string().uuid().optional(),
+  budgetId: z.string().guid().optional(),
   status: scheduleItemStatusSchema.optional(),
   delayedOnly: z.preprocess(
     (value) =>
@@ -24,25 +24,25 @@ export const scheduleWorkspaceFiltersSchema = z.object({
 });
 
 export const importScheduleFromBudgetSchema = z.object({
-  budgetId: z.string().uuid(),
+  budgetId: z.string().guid(),
   includeGroups: z.boolean().optional().default(true),
   placeholderDates: z.boolean().optional().default(false),
 });
 
 export const createScheduleItemSchema = z.object({
-  parentId: z.string().uuid().nullable().optional(),
-  afterItemId: z.string().uuid().nullable().optional(),
+  parentId: z.string().guid().nullable().optional(),
+  afterItemId: z.string().guid().nullable().optional(),
   name: z.string().trim().min(1, "El nombre es obligatorio").max(500),
   type: scheduleItemTypeSchema.optional().default("TASK"),
   startDate: z.string().date("Ingresá una fecha válida").nullable().optional(),
   endDate: z.string().date("Ingresá una fecha válida").nullable().optional(),
   sortOrder: z.number().int().min(0).max(2_147_483_647).optional(),
   /** Optional leaf WBS (EDT) to link as primary after create. */
-  wbsNodeId: z.string().uuid().optional(),
+  wbsNodeId: z.string().guid().optional(),
 });
 
 export const moveScheduleItemSchema = z.object({
-  itemId: z.string().uuid(),
+  itemId: z.string().guid(),
   action: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("up") }),
     z.object({ kind: z.literal("down") }),
@@ -50,8 +50,8 @@ export const moveScheduleItemSchema = z.object({
     z.object({ kind: z.literal("outdent") }),
     z.object({
       kind: z.literal("place"),
-      parentId: z.string().uuid().nullable(),
-      afterItemId: z.string().uuid().nullable(),
+      parentId: z.string().guid().nullable(),
+      afterItemId: z.string().guid().nullable(),
     }),
   ]),
 });
@@ -86,8 +86,8 @@ export const blockScheduleItemSchema = z.object({
 
 export const linkWbsNodesSchema = z
   .object({
-    wbsNodeIds: z.array(z.string().uuid()).min(1),
-    primaryWbsNodeId: z.string().uuid().optional(),
+    wbsNodeIds: z.array(z.string().guid()).min(1),
+    primaryWbsNodeId: z.string().guid().optional(),
   })
   .superRefine((data, ctx) => {
     const unique = new Set(data.wbsNodeIds);
@@ -108,16 +108,16 @@ export const linkWbsNodesSchema = z
   });
 
 export const unlinkWbsNodeSchema = z.object({
-  wbsNodeId: z.string().uuid(),
+  wbsNodeId: z.string().guid(),
 });
 
 export const addScheduleDependencySchema = z.object({
-  predecessorId: z.string().uuid(),
-  successorId: z.string().uuid(),
+  predecessorId: z.string().guid(),
+  successorId: z.string().guid(),
 });
 
 export const scheduleItemIdSchema = z.object({
-  scheduleItemId: z.string().uuid(),
+  scheduleItemId: z.string().guid(),
 });
 
 export const updateScheduleItemNameSchema = z.object({
@@ -125,5 +125,5 @@ export const updateScheduleItemNameSchema = z.object({
 });
 
 export const removeScheduleDependencySchema = z.object({
-  dependencyId: z.string().uuid(),
+  dependencyId: z.string().guid(),
 });

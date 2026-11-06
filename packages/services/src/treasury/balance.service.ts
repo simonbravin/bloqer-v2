@@ -6,11 +6,9 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { BALANCE_AFFECTING_MOVEMENT_STATUSES } from "./balance-affecting-statuses";
 
 type TxClient = Omit<typeof prisma, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">;
-
-// Signs: INFLOW/TRANSFER_IN = +1, OUTFLOW/TRANSFER_OUT/ADJUSTMENT = -1
-function movementSign(type: string): 1 | -1 {
-  return type === "INFLOW" || type === "TRANSFER_IN" ? 1 : -1;
-}
+type BalanceCutoff = { beforeDate?: Date; dateBasis?: "accounting" | "value" };
+type BalanceAccount = { id: string; openingBalance: Prisma.Decimal };
+type BalanceDb = { accountMovement: Pick<TxClient["accountMovement"], "groupBy"> };
 
 /** P-TRZ-06: avoid double-count when OPENING_BALANCE movement mirrors TreasuryAccount.openingBalance. */
 export function resolveOpeningBase(
@@ -20,46 +18,60 @@ export function resolveOpeningBase(
   return hasOpeningBalanceMovement ? new Prisma.Decimal(0) : accountOpeningBalance;
 }
 
+/** Aggregate the ledger for already authorized accounts, without fetching the movement history. */
+export async function getAccountBalancesForAccounts(
+  accounts: readonly BalanceAccount[],
+  tenantId: string,
+  options?: BalanceCutoff,
+  db: BalanceDb = prisma,
+): Promise<Map<string, Prisma.Decimal>> {
+  if (accounts.length === 0) return new Map();
+  const scope = { tenantId, accountId: { in: accounts.map(({ id }) => id) } };
+  const cutoff = options?.beforeDate ? { lt: options.beforeDate } : undefined;
+  const [openings, movements] = await Promise.all([
+    // An opening posted after the cutoff still replaces the legacy opening field.
+    db.accountMovement.groupBy({
+      by: ["accountId"],
+      where: { ...scope, sourceType: "OPENING_BALANCE" },
+    }),
+    db.accountMovement.groupBy({
+      by: ["accountId", "type"],
+      where: {
+        ...scope,
+        status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
+        ...(cutoff ? (options?.dateBasis === "value"
+          ? { OR: [{ valueDate: cutoff }, { valueDate: null, movementDate: cutoff }] }
+          : { movementDate: cutoff }) : {}),
+      },
+      _sum: { amount: true },
+    }),
+  ]);
+
+  const openingIds = new Set(openings.map(({ accountId }) => accountId));
+  const balances = new Map(accounts.map(({ id, openingBalance }) => [
+    id, resolveOpeningBase(openingBalance, openingIds.has(id)),
+  ]));
+  for (const { accountId, type, _sum: { amount } } of movements) {
+    const balance = balances.get(accountId);
+    if (balance === undefined || amount === null) continue;
+    const inflow = type === "INFLOW" || type === "TRANSFER_IN";
+    balances.set(accountId, inflow ? balance.plus(amount) : balance.minus(amount));
+  }
+  return balances;
+}
+
 export async function getAccountBalanceAsOf(
   accountId: string,
-  options?: { beforeDate?: Date; dateBasis?: "accounting" | "value" },
+  options?: BalanceCutoff,
   tx: TxClient = prisma,
 ): Promise<Prisma.Decimal> {
   const account = await tx.treasuryAccount.findUnique({
     where: { id: accountId },
-    select: { openingBalance: true, tenantId: true },
+    select: { id: true, openingBalance: true, tenantId: true },
   });
   if (!account) return new Prisma.Decimal(0);
-
-  const openingMovement = await tx.accountMovement.findFirst({
-    where: {
-      accountId,
-      tenantId: account.tenantId,
-      sourceType: "OPENING_BALANCE",
-    },
-    select: { id: true },
-  });
-  const base = resolveOpeningBase(account.openingBalance, openingMovement != null);
-
-  const cutoff = options?.beforeDate ? { lt: options.beforeDate } : undefined;
-  const movements = await tx.accountMovement.findMany({
-    where: {
-      accountId,
-      tenantId: account.tenantId,
-      status: { in: [...BALANCE_AFFECTING_MOVEMENT_STATUSES] },
-      ...(cutoff ? (options?.dateBasis === "value"
-        ? { OR: [{ valueDate: cutoff }, { valueDate: null, movementDate: cutoff }] }
-        : { movementDate: cutoff }) : {}),
-    },
-    select: { type: true, amount: true },
-  });
-
-  return movements.reduce((sum, m) => {
-    const signed = movementSign(m.type as string) === 1
-      ? m.amount
-      : m.amount.negated();
-    return sum.plus(signed);
-  }, base);
+  const balances = await getAccountBalancesForAccounts([account], account.tenantId, options, tx);
+  return balances.get(accountId)!;
 }
 
 export async function getAccountBalance(
@@ -77,30 +89,6 @@ export type AccountBalanceSummary = {
   status: string;
   balance: string;
 };
-
-async function loadAccountSummaries(
-  where: Prisma.TreasuryAccountWhereInput,
-): Promise<AccountBalanceSummary[]> {
-  const accounts = await prisma.treasuryAccount.findMany({
-    where,
-    select: { id: true, name: true, type: true, currency: true, status: true },
-    orderBy: { name: "asc" },
-  });
-
-  const results: AccountBalanceSummary[] = [];
-  for (const acc of accounts) {
-    const balance = await getAccountBalance(acc.id);
-    results.push({
-      accountId: acc.id,
-      name: acc.name,
-      type: acc.type as string,
-      currency: acc.currency,
-      status: acc.status as string,
-      balance: serializeMoneyDecimal(balance),
-    });
-  }
-  return results;
-}
 
 /**
  * Saldos de cuentas activas con alcance **tenant** (todas las empresas del tenant).
@@ -120,9 +108,22 @@ export async function getTreasurySummaryByTenant(
   if (!canViewCompanyTreasury(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver saldos de tesorería");
   }
-  return loadAccountSummaries({
-    tenantId: ctx.tenantId,
-    OR: [{ companyId: null }, { company: { tenantId: ctx.tenantId } }],
-    status: "ACTIVE",
+  const accounts = await prisma.treasuryAccount.findMany({
+    where: {
+      tenantId: ctx.tenantId,
+      OR: [{ companyId: null }, { company: { tenantId: ctx.tenantId } }],
+      status: "ACTIVE",
+    },
+    select: { id: true, name: true, type: true, currency: true, status: true, openingBalance: true },
+    orderBy: { name: "asc" },
   });
+  const balances = await getAccountBalancesForAccounts(accounts, ctx.tenantId);
+  return accounts.map((acc) => ({
+    accountId: acc.id,
+    name: acc.name,
+    type: acc.type,
+    currency: acc.currency,
+    status: acc.status,
+    balance: serializeMoneyDecimal(balances.get(acc.id)!),
+  }));
 }

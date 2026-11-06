@@ -7,6 +7,7 @@ import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { computeObligationBalanceDue } from "../finance/obligation-balance";
 import { hasOpenObligationBalance, isObligationOverdue } from "../finance/obligation-date";
+import { certificationInvoiceStatusSelect, deriveCertificationInvoiceStatus } from "../ar/certification-invoice-status";
 import { compareDecimal } from "@bloqer/utils";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { pickPrincipalContractualBudget } from "../budget/pick-principal-budget";
@@ -93,16 +94,18 @@ export type CertificationReportEmpty = {
 
 export type CertificationReportResult = CertificationEvolutionReport | CertificationReportEmpty;
 
-function derivePaymentStatus(
-  invoiced: Prisma.Decimal,
-  applied: Prisma.Decimal,
-  hasInvoice: boolean,
-  overdue: boolean,
-): CertificationDerivedPaymentStatus {
-  if (!hasInvoice || invoiced.isZero()) return "NOT_INVOICED";
-  if (overdue) return "OVERDUE";
-  if (applied.greaterThanOrEqualTo(invoiced)) return "PAID";
-  if (applied.greaterThan(0)) return "PARTIAL";
+function derivePaymentStatus(state: {
+  invoiceCount: number;
+  unavailable: boolean;
+  settled: boolean;
+  overdue: boolean;
+  hasApplied: boolean;
+}): CertificationDerivedPaymentStatus | null {
+  if (state.unavailable) return null;
+  if (state.invoiceCount === 0) return "NOT_INVOICED";
+  if (state.overdue) return "OVERDUE";
+  if (state.settled) return "PAID";
+  if (state.hasApplied) return "PARTIAL";
   return "UNPAID";
 }
 
@@ -187,21 +190,23 @@ export async function getCertificationEvolutionReport(
           salesInvoices: {
             where: arAvailable ? invoiceWhere : { id: { in: [] } },
             select: {
-              id: true, companyId: true, currency: true,
+              ...certificationInvoiceStatusSelect,
               issueDate: true,
-              totalAmount: true,
               receivable: {
                 select: {
-                  originalAmount: true,
-                  tenantId: true, companyId: true, projectId: true, currency: true,
-                  paidAmount: true,
-                  creditedAmount: true,
+                  ...certificationInvoiceStatusSelect.receivable.select,
                   dueDate: true,
-                  status: true,
                   collections: {
                     where: { ...scope, status: "CONFIRMED" },
                     select: { amount: true, currency: true, companyId: true, salesInvoiceId: true, collectionDate: true },
                   },
+                },
+              },
+              creditDebitNotes: {
+                ...certificationInvoiceStatusSelect.creditDebitNotes,
+                select: {
+                  ...certificationInvoiceStatusSelect.creditDebitNotes.select,
+                  receivable: { select: { ...certificationInvoiceStatusSelect.receivable.select, dueDate: true } },
                 },
               },
             },
@@ -327,24 +332,30 @@ export async function getCertificationEvolutionReport(
   const portfolio: CertificationPortfolioRow[] = certifications.map((cert) => {
     let invoiced = new Prisma.Decimal(0);
     let collected = new Prisma.Decimal(0);
-    let credits = new Prisma.Decimal(0);
-    let invoiceCount = 0;
-    let overdue = false;
+    const payment = { invoiceCount: 0, unavailable: false, settled: true, overdue: false, hasApplied: false };
 
     for (const source of cert.salesInvoices) {
       const inv = invoiceById.get(source.id);
       if (!inv) continue;
-      invoiceCount += 1;
+      payment.invoiceCount += 1;
       invoiced = invoiced.add(inv.totalAmount);
-      const ar = inv.receivable;
-      if (!ar) continue;
       for (const c of inv.collections) {
         collected = collected.add(c.amount);
       }
-      credits = credits.add(ar.creditedAmount);
-      const balance = computeObligationBalanceDue(ar.originalAmount, ar.paidAmount, ar.creditedAmount);
-      if (ar.status !== "PAID" && hasOpenObligationBalance(balance) && isObligationOverdue(ar.dueDate)) {
-        overdue = true;
+
+      // The series retains the original invoice basis. Portfolio settlement follows the
+      // same obligations (including issued debit notes) as the certificate detail.
+      const status = deriveCertificationInvoiceStatus(inv);
+      if (!status.collectionStatusAvailable) {
+        payment.unavailable = true;
+        continue;
+      }
+      payment.settled &&= status.isSettled;
+      for (const ar of [inv.receivable, ...inv.creditDebitNotes.map((note) => note.receivable)]) {
+        if (!ar) continue;
+        payment.hasApplied ||= ar.paidAmount.greaterThan(0) || ar.creditedAmount.greaterThan(0);
+        const balance = computeObligationBalanceDue(ar.originalAmount, ar.paidAmount, ar.creditedAmount);
+        payment.overdue ||= hasOpenObligationBalance(balance) && isObligationOverdue(ar.dueDate);
       }
     }
 
@@ -358,12 +369,7 @@ export async function getCertificationEvolutionReport(
       totalAmount: serializeMoneyDecimal(cert.totalAmount),
       invoicedAmount: arAvailable ? invoiced.toFixed(2) : null,
       collectedAmount: arAvailable ? collected.toFixed(2) : null,
-      paymentStatus: arAvailable ? derivePaymentStatus(
-        invoiced,
-        collected.add(credits),
-        invoiceCount > 0,
-        overdue,
-      ) : null,
+      paymentStatus: arAvailable ? derivePaymentStatus(payment) : null,
     };
   });
 

@@ -14,6 +14,7 @@ import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
 import { createSupplierInvoice, updateSupplierInvoice, issueSupplierInvoice } from "../ap/supplier-invoice.service";
+import { createPayment } from "../ap/payment.service";
 import {
   getCompanyProcurementSettings, getCompanyProcurementSettingsForProject, upsertCompanyProcurementSettings,
 } from "./company-procurement-settings.service";
@@ -21,6 +22,7 @@ import { canViewProcurementProjectArea, canViewPurchaseRequests } from "./procur
 import { filterProcurementNotificationRecipients } from "./procurement-notification-audience";
 import { notifyPurchaseRequestSubmitted, runProcurementSlaReminders } from "./procurement-notifications.service";
 import { getProjectProcurementHub } from "./project-procurement-hub.service";
+import { confirmPurchaseReceipt, createPurchaseReceipt } from "./purchase-receipt.service";
 
 const live = process.env.BLOQER_AUDIT_LIVE === "1";
 const isError = (code: string) => (error: unknown) => error instanceof ServiceError && error.code === code;
@@ -74,6 +76,7 @@ describe("AG-06 procurement platform connections on isolated SQL", { skip: !live
         await tx.notification.deleteMany({ where: { tenantId: tenants } });
         await tx.userNotificationEmailPreference.deleteMany({ where: { tenantId: tenants } });
         await tx.tenantNotificationEmailPolicy.deleteMany({ where: { tenantId: tenants } });
+        await tx.accountMovement.deleteMany({ where: { tenantId: tenants } });
         await tx.payment.deleteMany({ where: { tenantId: tenants } });
         await tx.payable.deleteMany({ where: { tenantId: tenants } });
         await tx.supplierInvoiceLine.deleteMany({ where: { invoice: { tenantId: tenants } } });
@@ -94,6 +97,7 @@ describe("AG-06 procurement platform connections on isolated SQL", { skip: !live
         await tx.budget.deleteMany({ where: { tenantId: tenants } });
         await tx.projectMembership.deleteMany({ where: { tenantId: tenants } });
         await tx.project.deleteMany({ where: { tenantId: tenants } });
+        await tx.treasuryAccount.deleteMany({ where: { tenantId: tenants } });
         await tx.contactRole.deleteMany({ where: { tenantId: tenants } });
         await tx.contact.deleteMany({ where: { tenantId: tenants } });
         await tx.companyProcurementSettings.deleteMany({ where: { companyId: { in: [companyId, otherCompanyId, foreignCompanyId] } } });
@@ -159,6 +163,129 @@ describe("AG-06 procurement platform connections on isolated SQL", { skip: !live
       lines: { create: quantities.map((quantityReceived) => ({ purchaseOrderLineId: order.lines[0]!.id, quantityReceived })) },
     } });
   }
+
+  for (const automatic of [false, true]) {
+    it(`AG-14 D-108 ${automatic ? "creates the automatic draft" : "suggests the pending manual lines"} despite a zero monetary gap`, async () => {
+      const s = await scope();
+      const order = await po(s, { received: 1, status: "PARTIALLY_RECEIVED" });
+      const firstLine = order.lines[0]!;
+      await prisma.purchaseOrderLine.update({ where: { id: firstLine.id }, data: {
+        quantity: 1, unitPrice: 100, lineSubtotal: 100, lineTotal: 100,
+      } });
+      const secondLine = await prisma.purchaseOrderLine.create({ data: {
+        purchaseOrderId: order.id, wbsNodeId: s.wbsNodeId, description: "Synthetic second billed item",
+        unit: "un", quantity: 1, unitPrice: 100, lineSubtotal: 100, lineTotal: 100, sortOrder: 1,
+      } });
+      await prisma.purchaseOrder.update({ where: { id: order.id }, data: {
+        subtotal: 200, totalAmount: 200, totalAmountArs: 200,
+      } });
+      await receipt(order, [1]);
+      await invoice(order, { amount: 200 });
+      const draftReceipt = await createPurchaseReceipt({
+        purchaseOrderId: order.id, receiptDate: "2026-11-04", idempotencyKey: randomUUID(),
+        lines: [{ purchaseOrderLineId: secondLine.id, quantityReceived: "1" }],
+      }, ctx);
+      await upsertCompanyProcurementSettings(companyId, { autoDraftApInvoiceOnReceipt: automatic }, ctx);
+      try {
+        const confirmed = await confirmPurchaseReceipt(draftReceipt.id, ctx);
+        assert.equal(confirmed.status, "CONFIRMED");
+        assert.equal(confirmed.autoDraftApWarning, undefined);
+        const summary = await getPurchaseOrderBillingSummary(order.id, ctx);
+        assert.equal(summary.pendingToInvoice, "0.00");
+        assert.equal(summary.allReceivedAmountIssued, true);
+        assert.equal(summary.allReceivedInvoiceLinesIssued, false);
+        const preview = await getPurchaseOrderInvoiceDraftPreview(order.id, s.projectId, ctx);
+        if (automatic) {
+          const draft = await prisma.supplierInvoice.findFirstOrThrow({
+            where: { purchaseOrderId: order.id, status: "DRAFT" }, include: { lines: true, payable: true },
+          });
+          assert.equal(draft.payable, null);
+          assert.deepEqual(draft.lines.map((line) => [line.purchaseOrderLineId, line.quantity.toFixed(4)]),
+            [[secondLine.id, "1.0000"]]);
+          assert.deepEqual(summary.pendingInvoiceLineIds, []);
+          assert.deepEqual(preview.lines, []);
+
+          await updateSupplierInvoice(draft.id, { invoiceLetter: "A" }, ctx, s.projectId);
+          const issued = await issueSupplierInvoice(draft.id, ctx, s.projectId);
+          assert.equal(issued.status, "ISSUED");
+          assert.equal((await getPurchaseOrderBillingSummary(order.id, ctx)).allReceivedInvoiceLinesIssued, true);
+          const obligation = await prisma.payable.findUniqueOrThrow({ where: { supplierInvoiceId: draft.id } });
+          const bank = await prisma.treasuryAccount.create({ data: {
+            tenantId, companyId, type: "BANK", currency: "ARS", openingBalance: "1000", name: "Synthetic AG14 cash account",
+          } });
+          const paymentInput = {
+            payableId: obligation.id, accountId: bank.id, paymentDate: "2026-11-05",
+            payFullBalance: true, idempotencyKey: randomUUID(), reference: null,
+          };
+          const payment = await createPayment(paymentInput, ctx, s.projectId);
+          assert.equal((await createPayment(paymentInput, ctx, s.projectId)).id, payment.id);
+          const movement = await prisma.accountMovement.findMany({ where: { tenantId, sourceType: "PAYMENT", sourceId: payment.id } });
+          assert.equal(movement.length, 1);
+          assert.equal(movement[0]?.type, "OUTFLOW");
+          assert.equal(movement[0]?.amount.toFixed(2), obligation.originalAmount.toFixed(2));
+          assert.equal((await prisma.payable.findUniqueOrThrow({ where: { id: obligation.id } })).status, "PAID");
+        } else {
+          assert.deepEqual(summary.pendingInvoiceLineIds, [secondLine.id]);
+          assert.deepEqual(preview.lines.map((line) => [line.purchaseOrderLineId, line.quantity]), [[secondLine.id, "1"]]);
+          // Legacy coverage that lacks an item link stays unproven and uses its existing monetary guard.
+          await invoice(order, { amount: 10, linkedLineId: null });
+          const ambiguous = await getPurchaseOrderInvoiceDraftPreview(order.id, s.projectId, ctx);
+          assert.equal(ambiguous.summary.unlinkedInvoiceCount, 1);
+          assert.deepEqual(ambiguous.lines, []);
+          await assert.rejects(() => createSupplierInvoiceDraftFromPurchaseOrder({
+            projectId: s.projectId, purchaseOrderId: order.id, purchaseReceiptId: draftReceipt.id, basis: "received",
+          }, ctx), isError("CONFLICT"));
+          assert.equal(await prisma.supplierInvoice.count({ where: { purchaseOrderId: order.id, status: "DRAFT" } }), 0);
+        }
+      } finally {
+        await upsertCompanyProcurementSettings(companyId, { autoDraftApInvoiceOnReceipt: false }, ctx);
+      }
+    });
+  }
+
+  it("AG-14 D-108 preserves an edited automatic invoice when another receipt is confirmed", async () => {
+    const s = await scope();
+    const order = await po(s, { received: 1, status: "PARTIALLY_RECEIVED" });
+    const firstReceipt = await receipt(order, [1]);
+    const source = { purchaseOrderId: order.id, projectId: s.projectId, basis: "received" as const };
+    const draft = await createSupplierInvoiceDraftFromPurchaseOrder({ ...source, purchaseReceiptId: firstReceipt.id }, ctx);
+    const firstLine = draft.lines[0]!;
+    const edited = await updateSupplierInvoice(draft.id, { lines: [{
+      id: firstLine.id, description: firstLine.description, purchaseOrderLineId: firstLine.purchaseOrderLineId,
+      wbsNodeId: firstLine.wbsNodeId, costAnalysisLineId: firstLine.costAnalysisLineId,
+      costType: "MATERIAL", quantity: firstLine.quantity, unitPrice: "12", taxRate: firstLine.taxRate,
+      discountPct: firstLine.discountPct, sortOrder: firstLine.sortOrder,
+    }] }, ctx, s.projectId);
+    const unchanged = await createSupplierInvoiceDraftFromPurchaseOrder(source, ctx);
+    assert.equal(unchanged.id, edited.id);
+    assert.deepEqual(unchanged.lines, edited.lines);
+
+    const secondReceipt = await createPurchaseReceipt({
+      purchaseOrderId: order.id, receiptDate: "2026-11-04", idempotencyKey: randomUUID(),
+      lines: [{ purchaseOrderLineId: order.lines[0]!.id, quantityReceived: "1" }],
+    }, ctx);
+    await upsertCompanyProcurementSettings(companyId, { autoDraftApInvoiceOnReceipt: true }, ctx);
+    try {
+      const confirmed = await confirmPurchaseReceipt(secondReceipt.id, ctx);
+      assert.equal(confirmed.status, "CONFIRMED");
+      assert.match(confirmed.autoDraftApWarning ?? "", /ya tiene ediciones guardadas/);
+      await assert.rejects(() => createSupplierInvoiceDraftFromPurchaseOrder(source, ctx),
+        (err: unknown) => isError("CONFLICT")(err) && err instanceof Error && /Completar factura/.test(err.message));
+      const drafts = await prisma.supplierInvoice.findMany({
+        where: { purchaseOrderId: order.id, status: "DRAFT" }, include: { lines: true, payable: true },
+      });
+      assert.equal(drafts.length, 1);
+      const saved = drafts[0]!;
+      assert.equal(saved.id, edited.id);
+      assert.equal(saved.totalAmount.toFixed(2), edited.totalAmount);
+      assert.equal(saved.lines[0]?.id, edited.lines[0]?.id);
+      assert.equal(saved.lines[0]?.unitPrice.toFixed(4), "12.0000");
+      assert.equal(saved.lines[0]?.quantity.toFixed(4), "1.0000");
+      assert.equal(saved.payable, null);
+    } finally {
+      await upsertCompanyProcurementSettings(companyId, { autoDraftApInvoiceOnReceipt: false }, ctx);
+    }
+  });
 
   it("rejects invalid direct policy input before replacing stored values", async () => {
     await upsertCompanyProcurementSettings(companyId, { minQuotesRequired: 2, maxQuotesAllowed: 3 }, ctx);
@@ -291,6 +418,10 @@ describe("AG-06 procurement platform connections on isolated SQL", { skip: !live
   it("rejects a mixed-currency billing calculation while retaining readable original documents", async () => {
     const s = await scope("USD"), order = await po(s); await invoice(order, { currency: "ARS" });
     await assert.rejects(() => getPurchaseOrderBillingSummary(order.id, ctx), isError("VALIDATION"));
+    await assert.rejects(() => createSupplierInvoiceDraftFromPurchaseOrder({
+      projectId: s.projectId, purchaseOrderId: order.id, basis: "received",
+    }, ctx), isError("VALIDATION"));
+    assert.equal(await prisma.supplierInvoice.count({ where: { purchaseOrderId: order.id, status: "DRAFT" } }), 0);
     const documents = await listSupplierInvoicesByPurchaseOrder(order.id, ctx);
     assert.equal(documents.length, 1); assert.equal(documents[0]!.currency, "ARS");
     assert.equal(documents[0]!.totalAmount, "10.00"); assert.equal(documents[0]!.fxRate, "1.000000"); assert.equal(documents[0]!.amountArs, "10.00");

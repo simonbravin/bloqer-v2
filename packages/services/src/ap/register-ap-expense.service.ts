@@ -269,7 +269,7 @@ async function notifyApExpenseCreated(outcome: ApExpenseOutcome, ctx: ServiceCon
         purchaseOrderId: inv.purchaseOrderId,
         purchaseOrderCode,
         amountLabel: `${serializeMoneyDecimal(inv.totalAmount)} ${inv.currency}`,
-      }).catch(() => undefined);
+      });
     }
   }
 
@@ -290,7 +290,7 @@ async function notifyApExpenseCreated(outcome: ApExpenseOutcome, ctx: ServiceCon
         invoiceNumber: payment.supplierInvoice.number,
         amountLabel: `${serializeMoneyDecimal(payment.amount)} ${payment.currency}`,
         accountName: payment.account.name,
-      }).catch(() => undefined);
+      });
     }
   }
 }
@@ -635,7 +635,9 @@ export async function registerApExpense(
         throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
       }
 
-      await notifyApExpenseCreated(createdOutcome, ctx);
+      await notifyApExpenseCreated(createdOutcome, ctx).catch(() => {
+        console.warn("[AP] Registered expense notification failed", { invoiceId: createdOutcome.invoiceId });
+      });
 
       const row = await loadApExpenseReplay(ctx, idempotencyKey, input.payNow);
       if (!row) {

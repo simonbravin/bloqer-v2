@@ -4,7 +4,7 @@ Este registro permite retomar la auditoría global de Bloqer o revisar un área 
 
 ## Estado vigente al 05/11/2026
 
-**AG-00 a AG-12 publicadas.** [Publicación AG-12](./2026-11-05-ag-12-publication.md), PR #10 y Production `8c18f331`. [AG-13 cerrada localmente](./2026-11-05-ag-13-cross-cutting.md). La revisión integral de UX/UI se mantiene como etapa posterior.
+**AG-00 a AG-13 publicadas.** [Publicación AG-13](./2026-11-05-ag-13-publication.md), PR #11 y Production `f3b76b37`. [AG-14 cerrada localmente](./2026-11-05-ag-14-cross-regression.md). La revisión integral de UX/UI queda pendiente.
 
 ## Corte inicial: 03/11/2026
 
@@ -119,8 +119,8 @@ Los identificadores, las etapas y sus estados son convenciones de seguimiento do
 - **AG-10 — Tesorería y contabilidad. Publicada.** [Cierre](./2026-11-05-ag-10-treasury-accounting.md) y [publicación](./2026-11-05-ag-10-publication.md).
 - **AG-11 — Operación de campo. Publicada.** [Informe](./2026-11-05-ag-11-field-jobsite.md), [registro estructurado](./2026-11-05-ag-11-field-jobsite.json) y [publicación](./2026-11-05-ag-11-publication.md).
 - **AG-12 — Información y exportaciones. Publicada.** [Informe](./2026-11-05-ag-12-reporting.md), [registro estructurado](./2026-11-05-ag-12-reporting.json) y [publicación](./2026-11-05-ag-12-publication.md).
-- **AG-13 — Servicios transversales e interfaces de ayuda. Cerrada localmente.** Documentos, Registro, avisos, email, crons, Centro de Ayuda y Bloqer AI. [Informe](./2026-11-05-ag-13-cross-cutting.md) y [registro estructurado](./2026-11-05-ag-13-cross-cutting.json).
-- **AG-14 — Regresión y preparación de release. Pendiente.** Workflows cruzados, performance, seguridad, observabilidad y verificación del despliegue correspondiente.
+- **AG-13 — Servicios transversales e interfaces de ayuda. Publicada.** Documentos, Registro, avisos, email, crons, Centro de Ayuda y Bloqer AI. [Informe](./2026-11-05-ag-13-cross-cutting.md), [registro estructurado](./2026-11-05-ag-13-cross-cutting.json) y [publicación](./2026-11-05-ag-13-publication.md).
+- **AG-14 — Regresión y preparación de publicación. Cerrada localmente.** Flujos cruzados, rendimiento, dependencias, observabilidad y despliegue. [Informe](./2026-11-05-ag-14-cross-regression.md) y [registro estructurado](./2026-11-05-ag-14-cross-regression.json).
 
 El orden operativo y los casos que deben reabrirse al cambiar una dependencia se resuelven con el plan y el procedimiento. Una etapa puede requerir varias corridas acotadas; un informe parcial no cierra toda la etapa.
 
@@ -204,4 +204,10 @@ Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08
 
 - [Informe](./2026-11-05-ag-13-cross-cutting.md) y [registro estructurado](./2026-11-05-ag-13-cross-cutting.json). Correcciones en Documentos, Registro, alcance de Equipo, alertas, notificaciones, correo programado, Centro de Ayuda y Bloqer AI.
 - D-143 aprobada para entregas sin confirmar. D-144 aprobada para históricos del Registro.
-- Pasaron 2.756 pruebas generales, 10 casos SQL aislados, 202 casos estructurales de Bloqer AI, tipos, lint y compilación. Cierre local. AG-14 espera indicación del Owner.
+- Pasaron 2.756 pruebas generales, 10 casos SQL aislados, 202 casos estructurales de Bloqer AI, tipos, lint y compilación. [Publicación AG-13](./2026-11-05-ag-13-publication.md) verificada después del cierre local.
+
+## Corrida AG-14 del 05/11/2026
+
+- [Informe](./2026-11-05-ag-14-cross-regression.md) y [registro estructurado](./2026-11-05-ag-14-cross-regression.json). Diez grupos corregidos en compras y ventas, Campo, reportes, caja y contabilidad, dependencias, observabilidad y despliegue.
+- D-145 aprobada para conservar borradores de proveedor con edición guardada. Dependencias de producción con cero avisos críticos, altos o moderados y un aviso bajo documentado.
+- 2.776 pruebas generales, 49 casos SQL aislados, 202 casos estructurales de Bloqer AI, tipos, lint, compilación y cinco escenarios de sesión en Edge compilado. Cierre local y revisión integral de UX/UI pendiente.

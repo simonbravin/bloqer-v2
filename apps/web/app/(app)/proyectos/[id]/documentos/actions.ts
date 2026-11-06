@@ -122,7 +122,7 @@ export async function createDocumentFolderAction(
   if (!current?.tenantCtx) redirect("/login");
   const parsed = createDocumentFolderSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+    throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
   }
   try {
     const folder = await createDocumentFolder(projectId, parsed.data, getCtx(current));
@@ -142,7 +142,7 @@ export async function renameDocumentFolderAction(
   if (!current?.tenantCtx) redirect("/login");
   const parsed = renameDocumentFolderSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+    throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
   }
   try {
     const folder = await renameDocumentFolder(projectId, folderId, parsed.data, getCtx(current));
@@ -176,7 +176,7 @@ export async function moveLibraryDocumentAction(
   if (!current?.tenantCtx) redirect("/login");
   const parsed = moveLibraryDocumentSchema.safeParse(raw);
   if (!parsed.success) {
-    throw new Error(parsed.error.errors.map((e) => e.message).join(", "));
+    throw new Error(parsed.error.issues.map((e) => e.message).join(", "));
   }
   try {
     await loadDocumentInProject(documentId, projectId, getCtx(current));

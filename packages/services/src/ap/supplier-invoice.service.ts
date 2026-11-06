@@ -1473,30 +1473,41 @@ export async function issueSupplierInvoice(
   await ensureDraftJournalFromSupplierInvoice(result.id, ctx);
 
   if (result.projectId) {
-    const payable = await prisma.payable.findUnique({
-      where: { supplierInvoiceId: result.id },
-      select: { id: true },
-    });
-    let purchaseOrderCode: string | null = null;
-    if (result.purchaseOrderId) {
-      const po = await prisma.purchaseOrder.findUnique({
-        where: { id: result.purchaseOrderId },
-        select: { number: true },
+    try {
+      const payable = await prisma.payable.findUnique({
+        where: {
+          supplierInvoiceId: result.id,
+          tenantId: result.tenantId,
+          companyId: result.companyId,
+          projectId: result.projectId,
+          status: { notIn: ["PAID", "CANCELLED"] },
+        },
+        select: { id: true, originalAmount: true, paidAmount: true, creditedAmount: true },
       });
-      if (po) purchaseOrderCode = `OC-${String(po.number).padStart(3, "0")}`;
-    }
-    if (payable) {
-      await notifyPayableReadyToPay({
-        ctx,
-        supplierInvoiceId: result.id,
-        payableId: payable.id,
-        projectId: result.projectId,
-        companyId: result.companyId,
-        invoiceNumber: result.number,
-        purchaseOrderId: result.purchaseOrderId,
-        purchaseOrderCode,
-        amountLabel: `${serializeMoneyDecimal(result.totalAmount)} ${result.currency}`,
-      }).catch(() => undefined);
+      if (payable) {
+        const balance = normalizeObligationBalanceDue(
+          computeObligationBalanceDue(payable.originalAmount, payable.paidAmount, payable.creditedAmount),
+        );
+        if (balance.greaterThan(0)) {
+          const po = result.purchaseOrderId ? await prisma.purchaseOrder.findUnique({
+            where: { id: result.purchaseOrderId, tenantId: result.tenantId, companyId: result.companyId, projectId: result.projectId },
+            select: { number: true },
+          }) : null;
+          await notifyPayableReadyToPay({
+            ctx,
+            supplierInvoiceId: result.id,
+            payableId: payable.id,
+            projectId: result.projectId,
+            companyId: result.companyId,
+            invoiceNumber: result.number,
+            purchaseOrderId: result.purchaseOrderId,
+            purchaseOrderCode: po ? `OC-${String(po.number).padStart(3, "0")}` : null,
+            amountLabel: `${serializeMoneyDecimal(balance)} ${result.currency}`,
+          });
+        }
+      }
+    } catch {
+      console.warn("[AP] Issued invoice notification failed", { invoiceId: result.id });
     }
   }
 

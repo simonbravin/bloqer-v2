@@ -26,7 +26,7 @@ export default async function ConciliacionDetailPage({ params }: PageProps) {
   if (!current?.tenantCtx) redirect("/login");
 
   const { reconciliationId } = await params;
-  if (!z.string().uuid().safeParse(reconciliationId).success) notFound();
+  if (!z.string().guid().safeParse(reconciliationId).success) notFound();
 
   const ctx = {
     actorUserId: current.session.user.id!,

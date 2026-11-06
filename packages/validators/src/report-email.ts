@@ -41,7 +41,7 @@ export const sendReportByEmailInputSchema = z
     subject: z.string().max(200).optional(),
     message: z.string().max(2000).optional(),
     params: paramsRecordSchema.default({}),
-    projectId: z.string().uuid().optional(),
+    projectId: z.string().guid().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.format === "pdf" && !REPORT_TYPES_WITH_PDF.has(data.reportType)) {

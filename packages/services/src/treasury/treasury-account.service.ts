@@ -12,7 +12,7 @@ import { assertTreasuryTenantModule } from "../tenant-modules/tenant-module-enfo
 import { canRegisterApPayment } from "../ap/ap-access";
 import { findActiveCompanyInTenant } from "../company/company.service";
 import { ServiceContext, ServiceError } from "../types";
-import { getAccountBalance } from "./balance.service";
+import { getAccountBalance, getAccountBalancesForAccounts } from "./balance.service";
 import { serializeFxRateDecimal, serializeMoneyDecimal } from "../finance/money-decimal";
 import {
   assertTreasuryPeriodsOpenUnderCompanyLocks,
@@ -92,12 +92,8 @@ export async function listTreasuryAccounts(
     prisma.treasuryAccount.count({ where }),
   ]);
 
-  const data: TreasuryAccountView[] = [];
-  for (const acc of accounts) {
-    const balance = await getAccountBalance(acc.id);
-    data.push(serialize(acc, balance));
-  }
-  return { data, total };
+  const balances = await getAccountBalancesForAccounts(accounts, ctx.tenantId);
+  return { data: accounts.map((acc) => serialize(acc, balances.get(acc.id)!)), total };
 }
 
 /**

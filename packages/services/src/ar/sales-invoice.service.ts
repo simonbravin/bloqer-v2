@@ -1077,25 +1077,32 @@ export async function issueSalesInvoice(
   await ensureDraftJournalFromSalesInvoice(result.id, ctx);
 
   if (result.projectId) {
-    const receivable = await prisma.receivable.findFirst({
-      where: { salesInvoiceId: result.id, tenantId: ctx.tenantId },
-      select: { id: true, status: true, originalAmount: true, paidAmount: true },
-    });
-    if (
-      receivable &&
-      receivable.status !== "CANCELLED" &&
-      receivable.status !== "PAID" &&
-      receivable.paidAmount.lt(receivable.originalAmount)
-    ) {
-      await notifyReceivableReadyToCollect({
-        ctx,
-        salesInvoiceId: result.id,
-        receivableId: receivable.id,
-        projectId: result.projectId,
-        companyId: result.companyId,
-        invoiceNumber: result.number,
-        amountLabel: `${serializeMoneyDecimal(result.totalAmount)} ${result.currency}`,
+    try {
+      const receivable = await prisma.receivable.findFirst({
+        where: {
+          salesInvoiceId: result.id, tenantId: result.tenantId, companyId: result.companyId, projectId: result.projectId,
+          status: { notIn: ["PAID", "CANCELLED"] },
+        },
+        select: { id: true, originalAmount: true, paidAmount: true, creditedAmount: true },
       });
+      if (receivable) {
+        const balance = normalizeObligationBalanceDue(
+          computeObligationBalanceDue(receivable.originalAmount, receivable.paidAmount, receivable.creditedAmount),
+        );
+        if (balance.greaterThan(0)) {
+          await notifyReceivableReadyToCollect({
+            ctx,
+            salesInvoiceId: result.id,
+            receivableId: receivable.id,
+            projectId: result.projectId,
+            companyId: result.companyId,
+            invoiceNumber: result.number,
+            amountLabel: `${serializeMoneyDecimal(balance)} ${result.currency}`,
+          });
+        }
+      }
+    } catch {
+      console.warn("[AR] Issued invoice notification failed", { invoiceId: result.id });
     }
   }
 

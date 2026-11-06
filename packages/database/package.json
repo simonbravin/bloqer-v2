@@ -11,6 +11,7 @@
     "postinstall": "prisma generate",
     "build": "node ./scripts/vercel-migrate-if-needed.mjs && prisma generate",
     "typecheck": "tsc --noEmit",
+    "test": "node --test scripts/*.test.mjs",
     "db:generate": "dotenv -e ../../.env -o -- prisma generate",
     "db:push": "dotenv -e ../../.env -o -- tsx src/assert-non-production-db-cli.ts && dotenv -e ../../.env -o -- prisma db push",
     "db:migrate": "dotenv -e ../../.env -o -- tsx src/assert-non-production-db-cli.ts && dotenv -e ../../.env -o -- prisma migrate dev",

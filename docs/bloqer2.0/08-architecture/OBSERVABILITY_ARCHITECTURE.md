@@ -8,6 +8,7 @@ Instrumentar la aplicación con **logs estructurados**, **métricas** de latenci
 
 - ERP financiero: fallos en **cobranzas, pagos o ledger** requieren diagnóstico rápido ([`../03-finance/TREASURY_MODEL.md`](../03-finance/TREASURY_MODEL.md)).
 - **Jobs** ([`BACKGROUND_JOBS_ARCHITECTURE.md`](./BACKGROUND_JOBS_ARCHITECTURE.md)) necesitan visibilidad de corridas y fallos.
+- Fuera de desarrollo, un fallo de Prisma se registra como `prisma_query_failed` con hora y nivel. El servicio conserva el manejo de errores de su operación. La salida común excluye el mensaje e invocación de Prisma, que pueden contener valores del documento.
 - **Multitenancy** exige detectar patrones anómalos (errores concentrados en un tenant).
 
 ## Problemas que evita

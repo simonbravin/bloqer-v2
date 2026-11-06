@@ -1043,7 +1043,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Si cambiás el tipo de cambio aprobado al Confirmar OC, necesitás poder aprobar el nuevo importe y respetar la segregación vigente. Si no, la OC queda intacta y debe revisarla un aprobador habilitado. El diálogo conserva el FX y muestra el mensaje para corregir o derivar. Sin cambio de FX permanece el permiso habitual de confirmación.",
       "Atajo (política / Atajos operativos): **Un paso: autorizar y comprometer** — bajo umbral: PM/Compras; alto nivel: Admin ([D-106]). Si D-105 y D-107 están ON en Pend. aprobación, Autorizar es el botón primario.",
       "Si la OC queda Confirmada o Recep. parcial y pasa la Entrega prevista, aparece un badge rojo Vencida N d junto a Entrega prevista en el listado y en Pendientes.",
-      "Al recibir: panel Facturación arriba. Con política [D-108] puede crearse borrador de factura automáticamente (emitir = CxP). Si ya hay borrador, el panel muestra **Completar factura** (y **Actualizar borrador** si aún hay cantidad pendiente). Pendientes también lista **Registrar factura** / **Completar factura** hasta ISSUED.",
+      "Al recibir, el panel Facturación ofrece **Registrar factura** o **Completar factura**. Con [D-108] puede crearse o ampliarse un borrador automáticamente por las cantidades pendientes. Si Finanzas ya guardó cambios, completalo manualmente desde su ficha ([D-145]).",
       "Si Facturación o Inventario no están disponibles, la ficha lo informa: no equivale a cero. Ante documentos de monedas distintas, el cálculo mezclado no está disponible y los comprobantes originales conservan sus importes. Una relación inconsistente entre empresa, obra y documentos requiere revisar el origen antes de generar o emitir una factura.",
       "Facturación de la OC compara recibido, facturado y pendiente en neto + IVA, sin percepciones. Pagado total conserva el pago efectivo y puede incluirlas. El paso de pago se completa con las CxP saldadas según su saldo real; no compara bases distintas. Una NC puede dejar sin saldo pendiente de pago sin salida de caja.",
       "Un borrador reserva lo pendiente para evitar duplicados, pero no completa Facturar: solo las facturas emitidas cubren lo recibido. Aunque otra factura parcial esté saldada, el borrador sigue pendiente de completar y emitir, o de corregir/anular si no corresponde.",
@@ -1206,7 +1206,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       { kind: "project", suffix: "/ordenes-compra", label: "Órdenes de compra" },
     ],
     steps: [
-      "Desde Pendientes (**Registrar factura** o **Completar factura**) aterrizás en la OC / borrador; desde recepción confirmada u OC: panel Facturación → **Registrar factura**.",
+      "Desde Pendientes (**Registrar factura** o **Completar factura**) aterrizás en la OC o el borrador. Desde recepción confirmada u OC, usá el panel Facturación. Si hay líneas vinculadas pendientes, podés traerlas aunque la diferencia de importes sea cero.",
       "Revisá montos, **Tipo de costo** (se hereda de la OC; ajustalo si hace falta), el **insumo APU** si venía de la OC ([D-110]: se guarda en la línea para los tableros) y el adjunto del comprobante.",
       "Crear → borrador → Emitir (o Emitir y pagar ahora). En el detalle: pista de proceso Borrador → Emitir → Pagar.",
       "**Sin OC**: al elegir la partida, el sistema pre-tipa la línea solo si el APU tiene una sola categoría (baño químico → EQP). Si es mixto, queda Materiales con hint. Desde Mano de obra / Equipos → Factura, el tipado y el APU vienen prellenados.",

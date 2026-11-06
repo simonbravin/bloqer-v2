@@ -19,6 +19,7 @@ import {
   listEntityDocuments,
   listProjectDocuments,
 } from "../documents/document.service";
+import { getMyFieldPendingItems } from "../field/field-pending.service";
 import { getProjectProgressReport } from "../reports/project-progress.service";
 import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
@@ -185,6 +186,9 @@ describe("AG-11 jobsite lifecycle and evidence on isolated SQL", {
         await tx.stockMovement.deleteMany({ where: { tenantId } });
         await tx.warehouse.deleteMany({ where: { tenantId } });
         await tx.product.deleteMany({ where: { tenantId } });
+        await tx.receivable.deleteMany({ where: { tenantId } });
+        await tx.salesInvoice.deleteMany({ where: { tenantId } });
+        await tx.certification.deleteMany({ where: { tenantId } });
         await tx.schedule.deleteMany({ where: { tenantId } });
         await tx.costItem.deleteMany({ where: { budgetId } });
         await tx.wbsNode.deleteMany({ where: { budgetId } });
@@ -287,6 +291,57 @@ describe("AG-11 jobsite lifecycle and evidence on isolated SQL", {
     assert.equal(report.rows.length, 1);
     assert.equal(Number(report.rows[0]?.physicalQty), 5);
     assert.equal(Number(report.rows[0]?.physicalRemainingQty), 15);
+  });
+
+  it("AG-14 scopes historical certificates in Field and rejects a foreign receivable in R-002", async () => {
+    const date = new Date(today);
+    const [ownCertificate, foreignCertificate] = await prisma.$transaction(async (tx) => {
+      const makeCertificate = async (companyId: string, number: number) => {
+        const budget = await tx.budget.create({ data: {
+          tenantId, companyId, projectId: sharedProject, versionNumber: number + 1,
+          name: "Presupuesto USD de prueba", status: "CLOSED", currency: "USD",
+        } });
+        return tx.certification.create({ data: {
+          tenantId, companyId: null, projectId: sharedProject, budgetId: budget.id,
+          number, periodStart: date, periodEnd: date, issueDate: date, status: "ISSUED", totalAmount: "125.25",
+        } });
+      };
+      const own = await makeCertificate(companyA, 1);
+      const foreign = await makeCertificate(companyB, 2);
+      const invoice = await tx.salesInvoice.create({ data: {
+        tenantId, companyId: companyA, projectId: sharedProject, clientContactId: contactId,
+        certificationId: own.id, number: 1, issueDate: date, dueDate: date, currency: "USD",
+        status: "ISSUED", subtotal: "125.25", totalAmount: "125.25",
+      } });
+      await tx.receivable.create({ data: {
+        tenantId, companyId: companyB, projectId: sharedProject, clientContactId: contactId,
+        salesInvoiceId: invoice.id, issueDate: date, dueDate: date, currency: "USD", originalAmount: "9876.54",
+      } });
+      return [own, foreign] as const;
+    }, { timeout: 30_000 });
+
+    const itemsFor = (ctx: ServiceContext) => getMyFieldPendingItems(ctx, { projectId: sharedProject, group: "certificaciones" });
+    const [ownPending, foreignPending] = await Promise.all([itemsFor(owner), itemsFor(sister)]);
+    assert.equal(ownPending.counts.certifications, 1);
+    assert.equal(foreignPending.counts.certifications, 1);
+    assert.deepEqual(ownPending.items.map(({ entityId, currency }) => ({ entityId, currency })), [
+      { entityId: ownCertificate.id, currency: "USD" },
+    ]);
+    assert.deepEqual(foreignPending.items.map(({ entityId }) => entityId), [foreignCertificate.id]);
+
+    const filters = { budgetId: ownCertificate.budgetId, dateTo: today };
+    const report = await getProjectProgressReport(sharedProject, filters, owner);
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.financial.invoiced, "125.25");
+    assert.equal(report.financial.collected, null);
+    assert.equal(report.financial.receivableBalance, null);
+    assert.equal(report.financial.overdueBalance, null);
+    assert.doesNotMatch(JSON.stringify(report), /9876\.54/);
+    assert.match(report.warnings.join(" "), /relación con la factura no se pudo comprobar/);
+    const restricted = await getProjectProgressReport(sharedProject, filters, reader);
+    if (restricted.type !== "REPORT") return assert.fail("Expected a report for the assigned reader");
+    assert.equal(restricted.sourceAccess.ar, false);
+    assert.equal(restricted.financial.invoiced, null);
   });
 
   it("protects attached evidence across parent scope, including historical null company", async () => {

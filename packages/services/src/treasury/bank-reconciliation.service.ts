@@ -611,6 +611,7 @@ export async function importBankStatementLinesFromOfx(
   return importParsedBankStatementLines({
     reconciliationId: input.reconciliationId,
     lines: parsed.lines,
+    declaredCurrencies: parsed.declaredCurrencies,
     auditAction: "bank_reconciliation.ofx_imported",
     formatLabel: "D-079",
     ctx,
@@ -620,6 +621,7 @@ export async function importBankStatementLinesFromOfx(
 async function importParsedBankStatementLines(params: {
   reconciliationId: string;
   lines: ParsedBankStatementCsvLine[];
+  declaredCurrencies?: readonly string[];
   auditAction: string;
   formatLabel: string;
   ctx: ServiceContext;
@@ -630,7 +632,7 @@ async function importParsedBankStatementLines(params: {
     skippedDuplicates: number;
   }
 > {
-  const { reconciliationId, lines, auditAction, formatLabel, ctx } = params;
+  const { reconciliationId, lines, declaredCurrencies, auditAction, formatLabel, ctx } = params;
 
   let importedCount = 0;
   let skippedOutOfPeriod = 0;
@@ -638,6 +640,13 @@ async function importParsedBankStatementLines(params: {
 
   await prisma.$transaction(async (tx) => {
     const session = await ensureInProgress(tx, reconciliationId, ctx);
+    const incompatibleCurrency = declaredCurrencies?.find((currency) => currency !== session.currency.trim().toUpperCase());
+    if (incompatibleCurrency) {
+      throw new ServiceError(
+        "VALIDATION",
+        `El extracto OFX/QFX declara ${incompatibleCurrency} y la cuenta está en ${session.currency}. Elegí un extracto de la misma moneda.`,
+      );
+    }
 
     const maxSort = await tx.bankStatementLine.aggregate({
       where: { reconciliationId: session.id, tenantId: ctx.tenantId },

@@ -48,12 +48,12 @@ const optionalImportQty = optionalImportDecimal(
 );
 
 export const createBudgetSchema = z.object({
-  projectId: z.string().uuid("Proyecto inválido"),
+  projectId: z.string().guid("Proyecto inválido"),
   name: z.string().trim().min(1, "El nombre es obligatorio").max(255),
   currency: z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Moneda inválida").optional(),
   internalNotes: z.string().max(2000).optional(),
   /** Complementary budget / phase ([D-002], [BR-BUD-001]): points at parent APPROVED|CLOSED. */
-  parentBudgetId: z.string().uuid().optional().nullable(),
+  parentBudgetId: z.string().guid().optional().nullable(),
   overheadPct: percentageNumber.optional(),
   financialCostPct: percentageNumber.optional(),
   financialDaysAvg: databaseInt.optional(),
@@ -87,7 +87,7 @@ export const budgetReturnForChangesSchema = z.object({
 export const subdivideApuSchema = z.enum(["migrate", "discard"]);
 
 export const createWbsNodeSchema = z.object({
-  parentId: z.string().uuid().optional(),
+  parentId: z.string().guid().optional(),
   type: wbsNodeTypeSchema,
   /** Si se omite, el servicio asigna el siguiente código según padre y tipo. */
   code: z.string().trim().min(1).max(50).optional(),
@@ -107,8 +107,8 @@ export const updateWbsNodeSchema = z.object({
 });
 
 export const reorderWbsNodesSchema = z.object({
-  parentId: z.string().uuid().nullable(),
-  orderedNodeIds: z.array(z.string().uuid()).min(1).refine(
+  parentId: z.string().guid().nullable(),
+  orderedNodeIds: z.array(z.string().guid()).min(1).refine(
     (ids) => new Set(ids).size === ids.length, "No se puede repetir una partida en el orden",
   ),
 });
@@ -121,7 +121,7 @@ export const updateCostItemSchema = z.object({
 });
 
 export const createCostAnalysisLineSchema = z.object({
-  costItemId: z.string().uuid(),
+  costItemId: z.string().guid(),
   category: costCategorySchema,
   description: z.string().trim().min(1, "La descripción es obligatoria").max(500),
   unit: z.string().trim().min(1, "La unidad es obligatoria").max(50),
@@ -133,9 +133,9 @@ export const createCostAnalysisLineSchema = z.object({
   partidaQuantity: quantityNumber.nullable().optional(),
   isLumpSum: z.boolean().optional(),
   /** Catalog product for materials → OC / inventory traceability. */
-  productId: z.string().uuid().nullable().optional(),
+  productId: z.string().guid().nullable().optional(),
   sortOrder: databaseInt.optional(),
-  supplierContactId: z.string().uuid().optional(),
+  supplierContactId: z.string().guid().optional(),
   notes: z.string().max(2000).optional(),
 });
 
@@ -148,21 +148,21 @@ export const updateCostAnalysisLineSchema = z.object({
   totalCost: apuMoneyNumber.optional(),
   partidaQuantity: quantityNumber.nullable().optional(),
   isLumpSum: z.boolean().optional(),
-  productId: z.string().uuid().nullable().optional(),
+  productId: z.string().guid().nullable().optional(),
   sortOrder: databaseInt.optional(),
-  supplierContactId: z.string().uuid().nullable().optional(),
+  supplierContactId: z.string().guid().nullable().optional(),
   notes: z.string().max(2000).optional(),
 });
 
 /** Atomic APU save: cost item fields + full line sync ([D-047] C4). */
 export const saveCostItemApuSchema = z.object({
-  costItemId: z.string().uuid(),
+  costItemId: z.string().guid(),
   unit: z.string().trim().min(1, "La unidad es obligatoria").max(50).optional(),
   quantity: positiveQuantityNumber.optional(),
   notes: z.string().max(2000).nullable().optional(),
   lines: z.array(
     z.object({
-      id: z.string().uuid().optional(),
+      id: z.string().guid().optional(),
       category: costCategorySchema,
       description: z.string().trim().min(1).max(500),
       unit: z.string().trim().min(1).max(50),
@@ -171,7 +171,7 @@ export const saveCostItemApuSchema = z.object({
       totalCost: apuMoneyNumber,
       partidaQuantity: quantityNumber.nullable().optional(),
       isLumpSum: z.boolean().optional(),
-      productId: z.string().uuid().nullable().optional(),
+      productId: z.string().guid().nullable().optional(),
       sortOrder: databaseInt.optional(),
       notes: z.string().max(2000).nullable().optional(),
       _delete: z.boolean().optional(),
@@ -226,7 +226,7 @@ export const updateTenantApprovedBudgetEditsPolicySchema = z.object({
 });
 
 export const updateProjectApprovedBudgetEditsPolicySchema = z.object({
-  projectId: z.string().uuid(),
+  projectId: z.string().guid(),
   allow: z.boolean(),
 });
 

@@ -110,7 +110,7 @@ const reportItemsSchema = z
   });
 
 const recipientUserIdsSchema = z
-  .array(z.string().uuid())
+  .array(z.string().guid())
   .min(1, "Seleccioná al menos un destinatario")
   .max(10, "Máximo 10 destinatarios");
 
@@ -165,7 +165,7 @@ function refineScheduleTiming(
 const scheduledReportBodySchema = z.object({
   name: z.string().trim().min(1).max(200),
   scope: scheduledReportScopeSchema,
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   format: scheduledReportFormatSchema,
   params: paramsRecordSchema,
   items: reportItemsSchema,
@@ -234,7 +234,7 @@ export const createScheduledReportSchema =
   scheduledReportBodySchema.superRefine(refineScheduledReportBody);
 
 export const updateScheduledReportSchema = scheduledReportBodySchema
-  .extend({ id: z.string().uuid() })
+  .extend({ id: z.string().guid() })
   .superRefine((data, ctx) => refineScheduledReportBody(data, ctx));
 
 export type CreateScheduledReportInput = z.infer<typeof createScheduledReportSchema>;

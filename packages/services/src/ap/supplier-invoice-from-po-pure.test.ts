@@ -11,6 +11,7 @@ import {
   looksLikeGeneratedFromPurchaseOrderNotes,
   parseAutoFromPoPurchaseOrderId,
   poLineReceivedAmount,
+  poLinesWithUncoveredInvoiceQuantity,
   sumPoLinesReceivedAmount,
   type PoLineForInvoiceDraft,
 } from "./supplier-invoice-from-po-pure";
@@ -77,6 +78,20 @@ test("poLineReceivedAmount is proportional to received qty", () => {
 test("sumPoLinesReceivedAmount aggregates lines", () => {
   const total = sumPoLinesReceivedAmount([sampleLine, { ...sampleLine, id: "line-2", receivedQuantity: "0" }]);
   assert.equal(total.toFixed(2), "605.00");
+});
+
+test("identifies billable uncovered quantities independently by PO line", () => {
+  const lines = [
+    { id: "covered", receivedQuantity: "1", lineTotal: "100" },
+    { id: "pending", receivedQuantity: "0.0002", lineTotal: "100" },
+    { id: "not-received", receivedQuantity: "0", lineTotal: "100" },
+    { id: "no-price", receivedQuantity: "1", lineTotal: "0" },
+  ];
+  const covered = new Map([
+    ["covered", new Prisma.Decimal("2")],
+    ["pending", new Prisma.Decimal("0.0001")],
+  ]);
+  assert.deepEqual(poLinesWithUncoveredInvoiceQuantity(lines, covered), ["pending"]);
 });
 
 test("computePendingToInvoiceAmount never goes negative", () => {

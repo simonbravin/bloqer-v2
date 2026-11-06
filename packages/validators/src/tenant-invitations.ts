@@ -18,12 +18,12 @@ export const userRoleEnum = z.enum([
 export const createTenantInvitationSchema = z.object({
   email:           z.string().trim().toLowerCase().pipe(z.string().email()),
   roles:           z.array(userRoleEnum).min(1).max(16),
-  companyId:       z.union([z.string().uuid(), z.literal(""), z.null()]).optional(),
+  companyId:       z.union([z.string().guid(), z.literal(""), z.null()]).optional(),
   expiresInDays:   z.coerce.number().int().min(1).max(30).default(7),
 });
 
 export const cancelTenantInvitationSchema = z.object({
-  invitationId: z.string().uuid(),
+  invitationId: z.string().guid(),
 });
 
 /** Raw invite tokens are 32 random bytes hex-encoded (64 chars). */

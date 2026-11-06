@@ -4,7 +4,7 @@ import { toMoneyDecimal } from "../finance/money-decimal";
 import { ServiceError } from "../types";
 
 export function parseSubcontractInput<T>(
-  schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+  schema: z.ZodType<T, unknown>,
   input: unknown,
 ): T {
   const parsed = schema.safeParse(input);

@@ -187,17 +187,29 @@ describe("AG-10 accounting service contracts", { concurrency: false }, () => {
     const movementDate = new Date(date);
     const sourceAccount = { id: "from", tenantId: ctx.tenantId, companyId: ctx.companyId, currency: "ARS" };
     const destinationAccount = { ...sourceAccount, id: "to", companyId: "destination-company" };
+    const valueDate = new Date("2026-11-19");
     const transfer = { id: "transfer", companyId: ctx.companyId, sourceAccount, destinationAccount, sourceAccountId: "from",
-      destinationAccountId: "to", amount, currency: "ARS", transferDate: movementDate };
+      destinationAccountId: "to", amount, currency: "ARS", transferDate: movementDate, valueDate: valueDate as Date | null };
+    const sharedLeg = { currency: "ARS", amount, movementDate, valueDate: valueDate as Date | null,
+      transferId: "legacy-pair", sourceId: "transfer" as string | null };
     const legs = [
-      { accountId: "from", companyId: ctx.companyId, status: "CONFIRMED", type: "TRANSFER_OUT", currency: "ARS", amount, movementDate },
-      { accountId: "to", companyId: "destination-company", status: "RECONCILED", type: "TRANSFER_IN", currency: "ARS", amount, movementDate },
+      { ...sharedLeg, accountId: "from", companyId: ctx.companyId, status: "CONFIRMED", type: "TRANSFER_OUT" },
+      { ...sharedLeg, accountId: "to", companyId: "destination-company", status: "RECONCILED", type: "TRANSFER_IN" },
     ];
     const tx = { internalTransfer: { findFirst: async () => transfer }, accountMovement: { findMany: async () => legs } } as unknown as Prisma.TransactionClient;
     const entry = { tenantId: ctx.tenantId, companyId: ctx.companyId!, projectId: null, sourceType: "INTERNAL_TRANSFER" as const,
       sourceId: "transfer", lines: parseJournalLinesFromInput(input.lines) };
     await assertJournalOperationalSourceCurrent(tx, entry);
     await assert.rejects(() => assertJournalOperationalSourceCurrent(tx, { ...entry, companyId: "destination-company" }), conflict);
+    legs[1]!.transferId = "unrelated-pair";
+    await assert.rejects(() => assertJournalOperationalSourceCurrent(tx, entry), conflict);
+    legs[1]!.transferId = "legacy-pair";
+    legs[1]!.valueDate = new Date("2026-11-20");
+    await assert.rejects(() => assertJournalOperationalSourceCurrent(tx, entry), conflict);
+    // Older transfers can link by the header id in transferId and have no stored value date/company.
+    transfer.valueDate = null;
+    for (const leg of legs) Object.assign(leg, { valueDate: null, transferId: transfer.id, sourceId: null, companyId: null });
+    await assertJournalOperationalSourceCurrent(tx, entry);
     legs[1]!.status = "CANCELLED";
     await assert.rejects(() => assertJournalOperationalSourceCurrent(tx, entry), conflict);
     legs.pop();

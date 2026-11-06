@@ -274,7 +274,7 @@ async function notifyArSaleCreated(outcome: ArSaleOutcome, ctx: ServiceContext):
       companyId: outcome.companyId,
       invoiceNumber: outcome.number,
       amountLabel: `${serializeMoneyDecimal(computeObligationBalanceDue(receivable.originalAmount, receivable.paidAmount, receivable.creditedAmount))} ${receivable.currency}`,
-    }).catch(() => undefined);
+    });
   }
 }
 
@@ -668,7 +668,9 @@ export async function registerArSale(
         throw new ServiceError("CONFLICT", "No se pudo asignar número de factura. Intentá de nuevo.");
       }
 
-      await notifyArSaleCreated(createdOutcome, ctx);
+      await notifyArSaleCreated(createdOutcome, ctx).catch(() => {
+        console.warn("[AR] Registered sale notification failed", { invoiceId: createdOutcome.invoiceId });
+      });
 
       const row = await loadArSaleReplay(ctx, idempotencyKey, input.collectNow);
       if (!row) {

@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { ServiceError } from "../types";
 
-export function parseApInput<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, input: unknown): T {
+export function parseApInput<T>(schema: z.ZodType<T, unknown>, input: unknown): T {
   const parsed = schema.safeParse(input);
   if (!parsed.success) throw new ServiceError("VALIDATION", parsed.error.issues[0]?.message ?? "Datos inválidos");
   return parsed.data;

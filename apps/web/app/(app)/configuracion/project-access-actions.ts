@@ -20,7 +20,7 @@ function errMessage(e: unknown): string {
   return "Error inesperado";
 }
 
-const projectIdsSchema = z.array(z.string().uuid()).max(500);
+const projectIdsSchema = z.array(z.string().guid()).max(500);
 
 export async function saveUserProjectAccessAction(
   membershipId: string,
@@ -33,8 +33,8 @@ export async function saveUserProjectAccessAction(
   if (!parsedIds.success) {
     return { error: "Lista de obras inválida." };
   }
-  const parsedUserId = z.string().uuid().safeParse(userId);
-  const parsedMembershipId = z.string().uuid().safeParse(membershipId);
+  const parsedUserId = z.string().guid().safeParse(userId);
+  const parsedMembershipId = z.string().guid().safeParse(membershipId);
   if (!parsedUserId.success || !parsedMembershipId.success) {
     return { error: "Identificadores inválidos." };
   }
@@ -58,7 +58,7 @@ export async function saveUserProjectAccessAction(
 export async function loadUserProjectAccessAction(userId: string) {
   const ctx = await buildTenantServiceContext();
   if (!ctx) return { error: "Sesión inválida" as const };
-  const parsedUserId = z.string().uuid().safeParse(userId);
+  const parsedUserId = z.string().guid().safeParse(userId);
   if (!parsedUserId.success) return { error: "Usuario inválido" as const };
   try {
     const editor = await getUserProjectAccessEditor(parsedUserId.data, ctx);
@@ -113,7 +113,7 @@ export async function setProjectAccessModeAction(input: {
 export async function previewImportTeamMembershipsAction(projectId: string) {
   const ctx = await buildTenantServiceContext();
   if (!ctx) return { error: "Sesión inválida" as const };
-  const parsed = z.string().uuid().safeParse(projectId);
+  const parsed = z.string().guid().safeParse(projectId);
   if (!parsed.success) return { error: "Obra inválida" as const };
   try {
     const preview = await previewImportMembershipsFromProjectTeam(parsed.data, ctx);
@@ -128,7 +128,7 @@ export async function importTeamMembershipsAction(
 ): Promise<{ ok: true; created: number } | { error: string }> {
   const ctx = await buildTenantServiceContext();
   if (!ctx) return { error: "Sesión inválida" };
-  const parsed = z.string().uuid().safeParse(projectId);
+  const parsed = z.string().guid().safeParse(projectId);
   if (!parsed.success) return { error: "Obra inválida" };
   try {
     const result = await importMembershipsFromProjectTeam(parsed.data, ctx);

@@ -285,6 +285,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Presupuesto menos exposición no es el costo necesario para terminar. El reporte no calcula EAC ni fecha estimada de finalización.",
       "Una fuente restringida queda sin cobertura ni conteo de faltantes. Una venta directa sin vínculo queda fuera del ratio contractual. Ver facturas de la obra abre el listado de facturación con el permiso correspondiente.",
       "Una nota de crédito aplicada reduce el saldo por cobrar; no cuenta como una cobranza real de caja.",
+      "Si el vínculo de una cuenta o cobranza es inconsistente, Avances conserva lo facturado comprobable y muestra una advertencia sobre cobros y saldos sin calcular.",
       "Una incidencia de moneda o trazabilidad posterior no borra los puntos anteriores comparables de la evolución, tampoco en Excel o PDF. Las cantidades sin base se muestran sin dato. Los avisos indican si Compras o Subcontratos están deshabilitados y sus fuentes no se incluyen en costos.",
     ],
     relatedSlugs: [

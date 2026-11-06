@@ -66,7 +66,7 @@ const dateSchema = z
 const filtersSchema = z.object({
   dateFrom: dateSchema.optional(),
   dateTo: dateSchema.optional(),
-  budgetId: z.string().uuid().optional(),
+  budgetId: z.string().guid().optional(),
   currency: z
     .string()
     .regex(/^[A-Z]{3}$/)
@@ -134,6 +134,25 @@ export function projectProgressSourceAccess(
 const dateKey = (value: Date) => value.toISOString().slice(0, 10);
 const money = serializeMoneyDecimal;
 const rate = serializeRatePctDecimal;
+
+type ProgressInvoice = ProjectProgressEvidence["invoices"][number];
+type ProgressInvoiceScope = Pick<ProgressInvoice,
+  "tenantId" | "companyId" | "projectId" | "clientContactId" | "currency">;
+
+function matchesProgressInvoiceScope(invoice: ProgressInvoiceScope, source: ProgressInvoiceScope) {
+  return source.tenantId === invoice.tenantId && source.companyId === invoice.companyId &&
+    source.projectId === invoice.projectId && source.clientContactId === invoice.clientContactId &&
+    source.currency === invoice.currency;
+}
+
+function matchesProgressCollection(
+  invoice: ProgressInvoice,
+  collection: NonNullable<ProgressInvoice["receivable"]>["collections"][number],
+) {
+  return collection.companyId === invoice.companyId && collection.clientContactId === invoice.clientContactId &&
+    collection.salesInvoiceId === invoice.id;
+}
+
 function ratio(numerator: Prisma.Decimal, denominator: Prisma.Decimal) {
   return denominator.gt(0) ? rate(numerator.div(denominator).mul(100)) : null;
 }
@@ -408,7 +427,7 @@ export async function getProjectProgressReport(
   const scope = {
     tenantId: ctx.tenantId,
     companyId: project.companyId,
-    activeCompanyId: ctx.companyId,
+    activeCompanyId: project.companyId ?? ctx.companyId,
     projectId,
   };
   const baseline = await readProjectProgressBaseline(scope);
@@ -556,22 +575,45 @@ export async function getProjectProgressReport(
     (c) => c.status === "ISSUED" || c.status === "APPROVED",
   );
   const nativeInvoices = data.invoices.filter((i) => i.currency === currency);
+  const invalidSettlementDates = nativeInvoices.flatMap((invoice) => {
+    const receivable = invoice.receivable;
+    if (!receivable || receivable.status === "CANCELLED" ||
+      !matchesProgressInvoiceScope(invoice, receivable)) return [dateKey(invoice.issueDate)];
+
+    const badCollections = receivable.collections.filter((collection) => !matchesProgressCollection(invoice, collection));
+    const badCredits = receivable.creditApplications.filter((credit) => {
+      const note = credit.creditNoteSalesInvoice;
+      return credit.companyId !== invoice.companyId || !matchesProgressInvoiceScope(invoice, note) ||
+        note.documentKind !== "CREDIT_NOTE" || note.referencedSalesInvoiceId !== invoice.id;
+    });
+    return [
+      ...badCollections.map((collection) => dateKey(collection.collectionDate)),
+      ...badCredits.map((credit) => dateKey(credit.creditNoteSalesInvoice.issueDate)),
+    ];
+  });
   const arAvailabilityAt = (cut: string) =>
     access.ar &&
     data.invoices
       .filter((invoice) => dateKey(invoice.issueDate) <= cut)
-      .every(
-        (invoice) =>
-          invoice.currency === currency &&
-          (invoice.receivable?.collections
-            .filter((collection) => dateKey(collection.collectionDate) <= cut)
-            .every((collection) => collection.currency === currency) ??
-            true),
-      );
+      .every((invoice) => {
+        if (invoice.currency !== currency) return false;
+        const receivable = invoice.receivable;
+        if (!receivable || !matchesProgressInvoiceScope(invoice, receivable)) return true;
+        return receivable.collections.every((collection) =>
+          dateKey(collection.collectionDate) > cut || !matchesProgressCollection(invoice, collection) ||
+          collection.currency === currency,
+        );
+      });
+  const settlementAvailableAt = (cut: string) =>
+    arAvailabilityAt(cut) && !invalidSettlementDates.some((date) => date <= cut);
   const arAvailable = arAvailabilityAt(dateTo);
   if (access.ar && !arAvailable)
     warnings.push(
       "Hay facturas o cobranzas de otra moneda en el alcance. La sección AR está incompleta y no se calcula sin una conversión comparable.",
+    );
+  if (access.ar && invalidSettlementDates.some((date) => date <= dateTo))
+    warnings.push(
+      "Hay cuentas por cobrar, cobranzas o notas de crédito cuya relación con la factura no se pudo comprobar. Los cobros y saldos afectados no se calculan hasta revisar la trazabilidad.",
     );
   const physicalAt = (cut: string) =>
     nodes.map((node) => ({
@@ -608,6 +650,7 @@ export async function getProjectProgressReport(
   const financialAt = (cut: string): ProjectProgressFinancial => {
     const { costsAvailable, exposureAvailable } = costAvailabilityAt(cut);
     const arAvailable = arAvailabilityAt(cut);
+    const settlementAvailable = settlementAvailableAt(cut);
     const certified = activeCerts
       .filter((c) => dateKey(c.issueDate ?? c.periodEnd) <= cut)
       .reduce((sum, c) => sum.plus(c.totalAmount), ZERO);
@@ -616,7 +659,7 @@ export async function getProjectProgressReport(
     let collected = ZERO;
     let balance = ZERO;
     let overdue = ZERO;
-    for (const invoice of invoices) {
+    for (const invoice of settlementAvailable ? invoices : []) {
       if (!invoice.receivable || invoice.receivable.status === "CANCELLED") continue;
       const collections = invoice.receivable.collections
         .filter((c) => c.currency === currency && dateKey(c.collectionDate) <= cut)
@@ -641,9 +684,9 @@ export async function getProjectProgressReport(
       budgetCost: budgetAmounts && budgetBaseComplete ? money(budgetCost) : null,
       certified: access.certifications ? money(certified) : null,
       invoiced: arAvailable ? money(invoiced) : null,
-      collected: arAvailable ? money(collected) : null,
-      receivableBalance: arAvailable ? money(balance) : null,
-      overdueBalance: arAvailable ? money(overdue) : null,
+      collected: settlementAvailable ? money(collected) : null,
+      receivableBalance: settlementAvailable ? money(balance) : null,
+      overdueBalance: settlementAvailable ? money(overdue) : null,
       costAccrued: costsAvailable ? money(accrued) : null,
       costExposure: exposureAvailable ? money(exposure) : null,
       costPaid: costsAvailable ? money(paid) : null,
@@ -654,7 +697,7 @@ export async function getProjectProgressReport(
       costAccruedPct: costsAvailable && budgetBaseComplete ? ratio(accrued, budgetCost) : null,
       costExposurePct: exposureAvailable && budgetBaseComplete ? ratio(exposure, budgetCost) : null,
       costPaidPct: costsAvailable && budgetBaseComplete ? ratio(paid, budgetCost) : null,
-      collectionPct: arAvailable ? ratio(collected, invoiced) : null,
+      collectionPct: settlementAvailable ? ratio(collected, invoiced) : null,
     };
   };
   const physical = coverageAt(dateTo);
@@ -939,7 +982,7 @@ export async function getProjectProgressReport(
     invoices: arAvailable
       ? latest(nativeInvoices.map((invoice) => dateKey(invoice.issueDate)))
       : null,
-    collections: arAvailable
+    collections: settlementAvailableAt(dateTo)
       ? latest(
           nativeInvoices.flatMap(
             (invoice) =>

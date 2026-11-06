@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it, type TestContext } from "node:test";
 
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 
 import { clearProjectAccessModeCache } from "../security/access";
 import { ServiceError, type ServiceContext } from "../types";
@@ -122,17 +122,97 @@ describe("Field project/company isolation", { concurrency: false }, () => {
     }
     const result = await getMyFieldPendingItems({ ...ctx, roles: ["OWNER"] });
     assert.equal(result.counts.total, 0);
-    assert.equal(lookups.length, 16, "all eight list/count sources exercised");
+    assert.equal(lookups.length, 15, "invoice coverage shares its list and count lookup");
     for (const where of lookups) {
       assert.equal(where.tenantId, ctx.tenantId);
       assert.deepEqual(where.projectId, { in: [assignedId] });
       if (where.OR) {
         assert.deepEqual(where.OR, [{ companyId: ctx.companyId }, { companyId: null }]);
+        assert.deepEqual(where.budget, {
+          tenantId: ctx.tenantId,
+          projectId: { in: [assignedId] },
+          OR: [{ companyId: ctx.companyId }, { companyId: null }],
+        });
       } else {
         assert.equal(where.companyId, ctx.companyId);
       }
     }
     assert.equal(lookups.filter((where) => where.OR).length, 2, "only nullable Certification keeps shared rows");
+  });
+
+  it("shows issued certification money in its budget's original currency", async (t) => {
+    setup(t);
+    stub(t, prisma.tenantModuleSetting, "findMany", async () =>
+      ["PROCUREMENT", "JOBSITE_LOG", "SUBCONTRACTS"].map((moduleKey) => ({ moduleKey, isEnabled: false })));
+    stub(t, prisma.project, "findMany", async () => [{ id: assignedId }]);
+    stub(t, prisma.certification, "count", async () => 1);
+    stub(t, prisma.certification, "findMany", async (args: { select: { budget: unknown } }) => {
+      assert.deepEqual(args.select.budget, { select: { currency: true } });
+      return [{
+        id: "certificate", number: 1, totalAmount: new Prisma.Decimal("125.25"),
+        issueDate: new Date("2026-08-01"), createdAt: new Date("2026-08-01"), createdBy: null,
+        projectId: assignedId, project: { code: "P1", name: "Proyecto asignado" }, budget: { currency: "USD" },
+      }];
+    });
+    const result = await getMyFieldPendingItems({ ...ctx, roles: ["OWNER"] });
+    assert.equal(result.counts.certifications, 1);
+    assert.equal(result.items[0]?.amount, "125.25");
+    assert.equal(result.items[0]?.currency, "USD");
+  });
+
+  it("keeps partially invoiced receipts pending even if the first invoice covers the order value", async (t) => {
+    setup(t);
+    const money = (value: number) => new Prisma.Decimal(value);
+    const scope = {
+      tenantId: ctx.tenantId, companyId: ctx.companyId, projectId: assignedId,
+      supplierContactId: "supplier", currency: "ARS",
+    };
+    const orders = ["partly-invoiced", "fully-invoiced", "legacy-with-covered-quantity"].map((id, index) => ({
+      ...scope,
+      id,
+      lines: [{ id: `${id}-line`, quantity: money(10), receivedQuantity: money(10), lineTotal: money(100) }],
+      supplierInvoices: [{
+        ...scope, subtotal: money(index === 2 ? 80 : 100), taxAmount: money(0),
+        lines: [
+          { purchaseOrderLineId: `${id}-line`, quantity: money(index === 0 ? 4 : 10) },
+          ...(index === 2 ? [{ purchaseOrderLineId: null, quantity: money(1) }] : []),
+        ],
+      }],
+    }));
+    let coverageReads = 0;
+    let detailReads = 0;
+    stub(t, prisma.purchaseOrder, "count", async () => 0);
+    stub(t, prisma.purchaseOrder, "findMany", async (args: {
+      where: { id?: unknown; companyId?: string };
+      select: { supplierInvoices?: { where: object }; receipts?: unknown };
+    }) => {
+      if (!args.select.supplierInvoices) return [];
+      assert.equal(args.where.companyId, ctx.companyId);
+      if (!args.select.receipts) {
+        coverageReads++;
+        assert.deepEqual(args.select.supplierInvoices.where, { status: "ISSUED", documentKind: "INVOICE" });
+        return orders;
+      }
+      detailReads++;
+      assert.deepEqual(args.where.id, { in: ["partly-invoiced"] });
+      return [{
+        ...scope, id: "partly-invoiced", number: 1, totalAmount: money(100),
+        createdAt: new Date("2026-08-01"), createdBy: null, originRequestedByUserId: null,
+        status: "RECEIVED", project: { code: "P1", name: "Proyecto asignado" },
+        supplierContact: { fantasyName: null, legalName: "Proveedor" },
+        receipts: [{ ...scope, receiptDate: new Date("2026-08-02") }],
+        supplierInvoices: [{ ...scope, id: "remaining-draft" }],
+      }];
+    });
+    const finance: ServiceContext = { ...ctx, roles: ["FINANCE"] };
+    const list = await getMyFieldPendingItems(finance);
+    assert.equal(list.counts.purchaseOrdersToInvoice, 1);
+    assert.equal(list.items[0]?.href, `/proyectos/${assignedId}/facturas-proveedor/remaining-draft`);
+    const counts = await getMyFieldPendingItems(finance, { countsOnly: true });
+    assert.equal(counts.counts.purchaseOrdersToInvoice, 1);
+    assert.deepEqual(counts.items, []);
+    assert.equal(coverageReads, 2);
+    assert.equal(detailReads, 1);
   });
 
   it("module-off pending sources perform no operational queries", async (t) => {
