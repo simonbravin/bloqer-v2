@@ -5,14 +5,14 @@ const periodKeySchema = z
   .regex(/^\d{4}-\d{2}$/, "Período inválido (use YYYY-MM)");
 
 export const closePeriodSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   periodKey: periodKeySchema,
 });
 
 export type ClosePeriodInput = z.infer<typeof closePeriodSchema>;
 
 export const reopenPeriodSchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   periodKey: periodKeySchema,
   reason: z
     .string()
@@ -24,7 +24,7 @@ export const reopenPeriodSchema = z.object({
 export type ReopenPeriodInput = z.infer<typeof reopenPeriodSchema>;
 
 export const listPeriodsQuerySchema = z.object({
-  companyId: z.string().uuid(),
+  companyId: z.string().guid(),
   limit: z.number().int().min(1).max(36).optional(),
 });
 

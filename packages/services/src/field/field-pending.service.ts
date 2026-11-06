@@ -1,5 +1,10 @@
-import { prisma } from "@bloqer/database";
+import { Prisma, prisma } from "@bloqer/database";
 import { productCalendarDateUtc } from "@bloqer/utils";
+import {
+  computePendingToInvoiceAmount,
+  poLineReceivedAmount,
+  poLinesWithUncoveredInvoiceQuantity,
+} from "../ap/supplier-invoice-from-po-pure";
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
@@ -22,6 +27,7 @@ import {
 } from "../security/access";
 
 const INBOX_LIMIT = 80;
+const INVOICE_COVERAGE_BATCH_SIZE = 200;
 const STALE_MS = 3 * 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -64,7 +70,7 @@ export type FieldPendingCounts = {
   purchaseOrders: number;
   purchaseOrdersToConfirm: number;
   purchaseOrdersToReceive: number;
-  /** OC parcial/totalmente recibida sin factura del proveedor ([D-097]). */
+  /** OC parcial/totalmente recibida con cobertura de facturación pendiente ([D-097], [D-108]). */
   purchaseOrdersToInvoice: number;
   jobsiteLogs: number;
   certifications: number;
@@ -100,6 +106,105 @@ function emptyCounts(): FieldPendingCounts {
   };
 }
 
+const invoiceCoverageSelect = {
+  id: true, tenantId: true, companyId: true, projectId: true, supplierContactId: true, currency: true,
+  lines: { select: { id: true, quantity: true, receivedQuantity: true, lineTotal: true } },
+  supplierInvoices: {
+    where: { status: "ISSUED", documentKind: "INVOICE" },
+    select: {
+      tenantId: true, companyId: true, projectId: true, supplierContactId: true, currency: true,
+      subtotal: true, taxAmount: true,
+      lines: { select: { purchaseOrderLineId: true, quantity: true } },
+    },
+  },
+} as const satisfies Prisma.PurchaseOrderSelect;
+
+type InvoiceCoverageOrder = Prisma.PurchaseOrderGetPayload<{ select: typeof invoiceCoverageSelect }>;
+type InvoiceOrderScope = Pick<InvoiceCoverageOrder, "tenantId" | "companyId" | "projectId" | "supplierContactId" | "currency">;
+
+function invoiceMatchesOrder(order: InvoiceOrderScope, invoice: Omit<InvoiceOrderScope, "projectId"> & { projectId: string | null }) {
+  return invoice.tenantId === order.tenantId && invoice.companyId === order.companyId &&
+    invoice.projectId === order.projectId && invoice.supplierContactId === order.supplierContactId &&
+    invoice.currency === order.currency;
+}
+
+function hasUninvoicedReceipts(order: InvoiceCoverageOrder): boolean {
+  const coveredQtyByLine = new Map<string, Prisma.Decimal>();
+  const lineIds = new Set(order.lines.map((line) => line.id));
+  let coveredAmount = new Prisma.Decimal(0);
+  let hasUnlinkedLines = false;
+  for (const invoice of order.supplierInvoices) {
+    if (!invoiceMatchesOrder(order, invoice)) return false;
+    coveredAmount = coveredAmount.plus(invoice.subtotal).plus(invoice.taxAmount);
+    for (const { purchaseOrderLineId, quantity } of invoice.lines) {
+      if (!purchaseOrderLineId) {
+        hasUnlinkedLines = true;
+        continue;
+      }
+      if (!lineIds.has(purchaseOrderLineId)) return false;
+      coveredQtyByLine.set(purchaseOrderLineId, quantity.plus(coveredQtyByLine.get(purchaseOrderLineId) ?? 0));
+    }
+  }
+  const hasUncoveredQuantity = poLinesWithUncoveredInvoiceQuantity(order.lines, coveredQtyByLine).length > 0;
+  if (!hasUncoveredQuantity || !hasUnlinkedLines) return hasUncoveredQuantity;
+
+  const receivedAmount = order.lines.reduce((sum, line) => sum.plus(poLineReceivedAmount({
+    orderQuantity: line.quantity, receivedQuantity: line.receivedQuantity, lineTotal: serializeMoneyDecimal(line.lineTotal),
+  })), new Prisma.Decimal(0));
+  return serializeMoneyDecimal(computePendingToInvoiceAmount(receivedAmount, coveredAmount)) !== "0.00";
+}
+
+/** Apply the same coverage to the badge and the first page of eligible orders. */
+async function readPendingPurchaseOrderInvoices(where: Prisma.PurchaseOrderWhereInput, list: boolean) {
+  const orderBy = [{ createdAt: "asc" }, { id: "asc" }] as const;
+  let after: string | undefined;
+  let count = 0;
+  const eligible = new Map<string, boolean>();
+  for (;;) {
+    const orders: InvoiceCoverageOrder[] = await prisma.purchaseOrder.findMany({
+      where,
+      orderBy: [...orderBy],
+      take: INVOICE_COVERAGE_BATCH_SIZE,
+      ...(after ? { cursor: { id: after }, skip: 1 } : {}),
+      select: invoiceCoverageSelect,
+    });
+    for (const order of orders) {
+      if (!hasUninvoicedReceipts(order)) continue;
+      count++;
+      if (list && eligible.size < INBOX_LIMIT) eligible.set(order.id, order.supplierInvoices.length > 0);
+    }
+    if (orders.length < INVOICE_COVERAGE_BATCH_SIZE) break;
+    after = orders.at(-1)!.id;
+  }
+  const orders = eligible.size ? await prisma.purchaseOrder.findMany({
+    where: { ...where, id: { in: [...eligible.keys()] } },
+    orderBy: [...orderBy],
+    select: {
+      id: true, number: true, totalAmount: true, currency: true, createdAt: true, status: true,
+      createdBy: true, originRequestedByUserId: true, projectId: true, companyId: true,
+      tenantId: true, supplierContactId: true,
+      project: { select: { code: true, name: true } },
+      supplierContact: { select: { fantasyName: true, legalName: true } },
+      receipts: {
+        where: { status: "CONFIRMED" }, orderBy: { receiptDate: "asc" },
+        select: { receiptDate: true, tenantId: true, companyId: true, projectId: true },
+      },
+      supplierInvoices: {
+        where: { status: "DRAFT", documentKind: "INVOICE" }, orderBy: { createdAt: "asc" },
+        select: { id: true, tenantId: true, companyId: true, projectId: true, supplierContactId: true, currency: true },
+      },
+    },
+  }) : [];
+  const items = orders.map((order) => ({
+    ...order,
+    firstReceiptDate: order.receipts.find((receipt) => receipt.tenantId === order.tenantId &&
+      receipt.companyId === order.companyId && receipt.projectId === order.projectId)?.receiptDate ?? null,
+    draftId: order.supplierInvoices.find((invoice) => invoiceMatchesOrder(order, invoice))?.id ?? null,
+    hasIssuedInvoice: eligible.get(order.id) === true,
+  }));
+  return { count, items };
+}
+
 export async function getMyFieldPendingCounts(
   ctx: ServiceContext,
   filters?: { projectId?: string },
@@ -133,7 +238,12 @@ export async function getMyFieldPendingItems(
     // These operational sources have companyId NOT NULL; Certification is nullable below.
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
   };
-  const certificationProjectWhere = { ...projectScopeWhere, ...companyScopeFilter(ctx) };
+  const certificationProjectWhere = {
+    ...projectScopeWhere,
+    ...companyScopeFilter(ctx),
+    // Legacy certifications can have no company of their own and inherit a budget's scope.
+    budget: { tenantId: ctx.tenantId, ...projectScopeWhere, ...companyScopeFilter(ctx) },
+  };
   const counts = emptyCounts();
   const items: FieldPendingItem[] = [];
 
@@ -268,45 +378,6 @@ export async function getMyFieldPendingItems(
         })
       : Promise.resolve(null);
 
-  const poInvoiceListPromise =
-    runPoInvoice && !countsOnly
-      ? prisma.purchaseOrder.findMany({
-          where: {
-            tenantId: ctx.tenantId,
-            status: { in: ["PARTIALLY_RECEIVED", "RECEIVED"] },
-            supplierInvoices: { none: { status: "ISSUED" } },
-            receipts: { some: { status: "CONFIRMED" } },
-            ...projectWhere,
-          },
-          orderBy: { createdAt: "asc" },
-          take: INBOX_LIMIT,
-          select: {
-            id: true,
-            number: true,
-            totalAmount: true,
-            currency: true,
-            createdAt: true,
-            status: true,
-            createdBy: true,
-            originRequestedByUserId: true,
-            projectId: true,
-            project: { select: { code: true, name: true } },
-            supplierContact: { select: { fantasyName: true, legalName: true } },
-            receipts: {
-              where: { status: "CONFIRMED" },
-              orderBy: { receiptDate: "asc" },
-              take: 1,
-              select: { receiptDate: true },
-            },
-            supplierInvoices: {
-              where: { status: "DRAFT" },
-              take: 1,
-              select: { id: true },
-            },
-          },
-        })
-      : Promise.resolve(null);
-
   const logListPromise =
     runLog && !countsOnly
       ? prisma.jobsiteLog.findMany({
@@ -340,6 +411,7 @@ export async function getMyFieldPendingItems(
             issueDate: true,
             projectId: true,
             project: { select: { code: true, name: true } },
+            budget: { select: { currency: true } },
           },
         })
       : Promise.resolve(null);
@@ -363,11 +435,11 @@ export async function getMyFieldPendingItems(
         })
       : Promise.resolve(null);
 
-  const poInvoiceWhere = {
+  const poInvoiceWhere: Prisma.PurchaseOrderWhereInput = {
     tenantId: ctx.tenantId,
-    status: { in: ["PARTIALLY_RECEIVED", "RECEIVED"] as Array<"PARTIALLY_RECEIVED" | "RECEIVED"> },
-    supplierInvoices: { none: { status: "ISSUED" as const } },
-    receipts: { some: { status: "CONFIRMED" as const } },
+    status: { in: ["PARTIALLY_RECEIVED", "RECEIVED"] },
+    receipts: { some: { tenantId: ctx.tenantId, status: "CONFIRMED", ...projectWhere } },
+    lines: { some: { receivedQuantity: { gt: 0 }, lineTotal: { gt: 0 } } },
     ...projectWhere,
   };
 
@@ -376,7 +448,7 @@ export async function getMyFieldPendingItems(
     pos,
     posConfirm,
     posReceipt,
-    posInvoice,
+    pendingInvoiceOrders,
     logs,
     certs,
     subCerts,
@@ -384,7 +456,6 @@ export async function getMyFieldPendingItems(
     poCount,
     poConfirmCount,
     poReceiptCount,
-    poInvoiceCount,
     logCount,
     certCount,
     subCertCount,
@@ -393,7 +464,9 @@ export async function getMyFieldPendingItems(
     poListPromise,
     poConfirmListPromise,
     poReceiptListPromise,
-    poInvoiceListPromise,
+    countPoInvoice
+      ? readPendingPurchaseOrderInvoices(poInvoiceWhere, runPoInvoice && !countsOnly)
+      : Promise.resolve({ count: 0, items: [] }),
     logListPromise,
     certListPromise,
     subCertListPromise,
@@ -421,9 +494,6 @@ export async function getMyFieldPendingItems(
     countPoReceipt
       ? prisma.purchaseOrder.count({ where: poReceiptWhere })
       : Promise.resolve(0),
-    countPoInvoice
-      ? prisma.purchaseOrder.count({ where: poInvoiceWhere })
-      : Promise.resolve(0),
     countLog
       ? prisma.jobsiteLog.count({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
@@ -445,7 +515,7 @@ export async function getMyFieldPendingItems(
   counts.purchaseOrders = poCount;
   counts.purchaseOrdersToConfirm = poConfirmCount;
   counts.purchaseOrdersToReceive = poReceiptCount;
-  counts.purchaseOrdersToInvoice = poInvoiceCount;
+  counts.purchaseOrdersToInvoice = pendingInvoiceOrders.count;
   counts.jobsiteLogs = logCount;
   counts.certifications = certCount;
   counts.subcontractCertifications = subCertCount;
@@ -462,6 +532,7 @@ export async function getMyFieldPendingItems(
   if (countsOnly) {
     return { items: [], counts, queryMs: Date.now() - started };
   }
+  const posInvoice = pendingInvoiceOrders.items;
 
   const actorIds: Array<string | null> = [];
   if (Array.isArray(prs)) {
@@ -476,9 +547,7 @@ export async function getMyFieldPendingItems(
   if (Array.isArray(posReceipt)) {
     for (const row of posReceipt) actorIds.push(row.originRequestedByUserId, row.createdBy);
   }
-  if (Array.isArray(posInvoice)) {
-    for (const row of posInvoice) actorIds.push(row.originRequestedByUserId, row.createdBy);
-  }
+  for (const row of posInvoice) actorIds.push(row.originRequestedByUserId, row.createdBy);
   if (Array.isArray(logs)) {
     for (const row of logs) actorIds.push(row.createdBy);
   }
@@ -654,43 +723,43 @@ export async function getMyFieldPendingItems(
     }
   }
 
-  if (Array.isArray(posInvoice)) {
-    for (const row of posInvoice) {
-      const firstReceiptDate = row.receipts[0]?.receiptDate ?? null;
-      const occurredAt = firstReceiptDate ?? row.createdAt;
-      const requestedBy =
-        (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
-        (row.createdBy && names.get(row.createdBy)) ||
-        null;
-      const overdueDays = daysOverdueFromDate(firstReceiptDate);
-      const draftId = row.supplierInvoices[0]?.id ?? null;
-      items.push({
-        entityType: "PURCHASE_ORDER_INVOICE",
-        entityId: row.id,
-        projectId: row.projectId,
-        projectCode: row.project.code,
-        projectName: row.project.name,
-        group: "compras",
-        typeLabel: "Orden de compra",
-        title: `OC-${String(row.number).padStart(3, "0")}`,
-        description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
-        statusLabel: draftId
-          ? "Borrador de factura pendiente de emitir"
+  for (const row of posInvoice) {
+    const firstReceiptDate = row.firstReceiptDate;
+    const occurredAt = firstReceiptDate ?? row.createdAt;
+    const requestedBy =
+      (row.originRequestedByUserId && names.get(row.originRequestedByUserId)) ||
+      (row.createdBy && names.get(row.createdBy)) ||
+      null;
+    const overdueDays = daysOverdueFromDate(firstReceiptDate);
+    const draftId = row.draftId;
+    items.push({
+      entityType: "PURCHASE_ORDER_INVOICE",
+      entityId: row.id,
+      projectId: row.projectId,
+      projectCode: row.project.code,
+      projectName: row.project.name,
+      group: "compras",
+      typeLabel: "Orden de compra",
+      title: `OC-${String(row.number).padStart(3, "0")}`,
+      description: row.supplierContact.fantasyName ?? row.supplierContact.legalName,
+      statusLabel: draftId
+        ? "Borrador de factura pendiente de emitir"
+        : row.hasIssuedInvoice
+          ? "Recepción con facturación pendiente"
           : row.status === "PARTIALLY_RECEIVED"
             ? "Recibida parcialmente sin factura"
             : "Recibida sin factura",
-        actionLabel: draftId ? "Completar factura" : "Registrar factura",
-        amount: serializeMoneyDecimal(row.totalAmount),
-        currency: row.currency,
-        requestedByName: requestedBy,
-        occurredAt,
-        href: draftId
-          ? `/proyectos/${row.projectId}/facturas-proveedor/${draftId}`
-          : `/proyectos/${row.projectId}/ordenes-compra/${row.id}?siguiente=facturar#facturar`,
-        priority: stalePriority(occurredAt),
-        overdueDays,
-      });
-    }
+      actionLabel: draftId ? "Completar factura" : "Registrar factura",
+      amount: serializeMoneyDecimal(row.totalAmount),
+      currency: row.currency,
+      requestedByName: requestedBy,
+      occurredAt,
+      href: draftId
+        ? `/proyectos/${row.projectId}/facturas-proveedor/${draftId}`
+        : `/proyectos/${row.projectId}/ordenes-compra/${row.id}?siguiente=facturar#facturar`,
+      priority: stalePriority(occurredAt),
+      overdueDays,
+    });
   }
 
   if (Array.isArray(logs)) {
@@ -733,7 +802,7 @@ export async function getMyFieldPendingItems(
         statusLabel: "Pendiente de aprobación",
         actionLabel: "Revisar",
         amount: serializeMoneyDecimal(row.totalAmount),
-        currency: "ARS",
+        currency: row.budget.currency,
         requestedByName: (row.createdBy && names.get(row.createdBy)) || null,
         occurredAt: row.issueDate ?? row.createdAt,
         href: `/proyectos/${row.projectId}/certificaciones/${row.id}`,

@@ -99,7 +99,7 @@ export function resolveAllowedMimeType(
 const MAX_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
 export const createDocumentMetadataSchema = z.object({
-  projectId:        z.string().uuid(),
+  projectId:        z.string().guid(),
   originalFileName: z.string().min(1, "Nombre de archivo requerido").max(500),
   mimeType:         z.string().min(1, "Tipo de archivo requerido").max(200),
   sizeBytes:        z.coerce.number().int().min(0),
@@ -110,16 +110,16 @@ export const createDocumentMetadataSchema = z.object({
 export const initiateUploadSchema = z
   .object({
     /** Required for project-scoped entities; omit/null for corporate SUPPLIER_INVOICE / SALES_INVOICE (see document.service). */
-    projectId:        z.string().uuid().optional().nullable(),
+    projectId:        z.string().guid().optional().nullable(),
     originalFileName: z.string().min(1, "Nombre de archivo requerido").max(500),
     mimeType:         z.enum(ALLOWED_MIME_TYPES, {
-      errorMap: () => ({ message: "Tipo de archivo no permitido" }),
+      error: "Tipo de archivo no permitido",
     }),
     sizeBytes:        z.coerce.number().int().min(1).max(MAX_SIZE_BYTES, "El archivo no puede superar 50 MB"),
     category:         z.enum(DOCUMENT_CATEGORIES).default("OTHER"),
     description:      z.string().max(1000).optional().nullable(),
     /** Library destination only ([D-113]); ignored/overridden for operational linkedEntityType. */
-    folderId:         z.string().uuid().optional().nullable(),
+    folderId:         z.string().guid().optional().nullable(),
     /** When set with linkedEntityId, attachment is bound to this entity (server validates ownership). */
     linkedEntityType: z
       .enum([
@@ -136,7 +136,7 @@ export const initiateUploadSchema = z
         "BUDGET",
       ])
       .optional(),
-    linkedEntityId:   z.string().uuid().optional(),
+    linkedEntityId:   z.string().guid().optional(),
     idempotencyKey:   idempotencyKeySchema,
   })
   .superRefine((data, ctx) => {
@@ -171,11 +171,11 @@ export const listProjectDocumentsSchema = z.object({
   status:   z.enum(["ACTIVE", "ARCHIVED"]).optional(),
   search:   z.string().max(200).optional(),
   /** When set, only docs in that folder. Omit for flat “Todos”. */
-  folderId: z.string().uuid().optional(),
+  folderId: z.string().guid().optional(),
 });
 
 export const createDocumentFolderSchema = z.object({
-  parentId:  z.string().uuid(),
+  parentId:  z.string().guid(),
   name:      z.string().trim().min(1, "Nombre requerido").max(120),
   sortOrder: z.coerce.number().int().min(0).max(10_000).optional(),
 });
@@ -185,11 +185,11 @@ export const renameDocumentFolderSchema = z.object({
 });
 
 export const moveDocumentFolderSchema = z.object({
-  parentId: z.string().uuid(),
+  parentId: z.string().guid(),
 });
 
 export const moveLibraryDocumentSchema = z.object({
-  folderId: z.string().uuid(),
+  folderId: z.string().guid(),
 });
 
 export type CreateDocumentMetadataInput = z.infer<typeof createDocumentMetadataSchema>;

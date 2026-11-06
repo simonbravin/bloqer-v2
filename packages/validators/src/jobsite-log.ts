@@ -35,7 +35,7 @@ const sortOrderSchema = z.number().int().min(-2_147_483_648).max(2_147_483_647).
 export const jobsiteLogDateSchema = z.string().date("Ingresá una fecha válida");
 
 const progressLineSchema = z.object({
-  wbsNodeId:         z.string().uuid(),
+  wbsNodeId:         z.string().guid(),
   description:       z.string().optional().nullable(),
   quantityCompleted: quantityString,
   physicalPct:       pctString,
@@ -44,8 +44,8 @@ const progressLineSchema = z.object({
 });
 
 const laborLineSchema = z.object({
-  contactId:       z.string().uuid().optional().nullable(),
-  subcontractId:   z.string().uuid().optional().nullable(),
+  contactId:       z.string().guid().optional().nullable(),
+  subcontractId:   z.string().guid().optional().nullable(),
   crewDescription: z.string().optional().nullable(),
   workersCount:    z.number().int().min(1, "Debe haber al menos 1 trabajador").max(2_147_483_647, "Cantidad de trabajadores fuera de rango"),
   hoursWorked:     hoursString.optional().nullable(),
@@ -54,10 +54,10 @@ const laborLineSchema = z.object({
 });
 
 const materialLineSchema = z.object({
-  productId:   z.string().uuid().optional().nullable(),
-  warehouseId: z.string().uuid().optional().nullable(),
+  productId:   z.string().guid().optional().nullable(),
+  warehouseId: z.string().guid().optional().nullable(),
   /** Preferred for inventory consumption imputation ([D-055]). */
-  wbsNodeId:   z.string().uuid().optional().nullable(),
+  wbsNodeId:   z.string().guid().optional().nullable(),
   description: z.string().trim().min(1, "La descripción es requerida"),
   quantity:    quantityString,
   notes:       z.string().optional().nullable(),
@@ -79,11 +79,11 @@ const issueLineSchema = z.object({
 });
 
 export const createJobsiteLogSchema = z.object({
-  projectId:    z.string().uuid(),
+  projectId:    z.string().guid(),
   /** Optional: service resolves from project / membership / first ACTIVE company. */
   companyId:    z.preprocess(
     (v) => (v === "" || v == null ? undefined : v),
-    z.string().uuid().optional(),
+    z.string().guid().optional(),
   ),
   logDate:      jobsiteLogDateSchema,
   title:        z.string().optional().nullable(),

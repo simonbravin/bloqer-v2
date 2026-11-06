@@ -225,4 +225,38 @@ describe("AG-12 operational reports on isolated SQL", {
     assert.equal(report.portfolio[0]?.paymentStatus, "PAID");
     assert.equal(report.portfolio[0]?.collectedAmount, "0.00");
   });
+
+  it("AG-14 keeps the certification report open for an issued debit note and preserves the series basis", async () => {
+    const original = await prisma.salesInvoice.findFirstOrThrow({ where: { tenantId, certificationId: { not: null } } });
+    const debit = await prisma.salesInvoice.create({ data: {
+      tenantId, companyId: companyA, projectId: shared, clientContactId: supplierId,
+      referencedSalesInvoiceId: original.id, documentKind: "DEBIT_NOTE", status: "ISSUED",
+      number: 1, issueDate: nov, dueDate: new Date("2099-12-31T00:00:00Z"),
+      currency: "ARS", subtotal: "10", totalAmount: "10",
+    } });
+    const read = async () => {
+      const report = await getCertificationEvolutionReport(shared, { budgetId: budgetA }, admin);
+      assert.equal(report.type, "REPORT");
+      return report;
+    };
+    try {
+      // A linked issued debit note without a verifiable obligation is unavailable.
+      assert.equal((await read()).portfolio[0]?.paymentStatus, null);
+      const obligation = await prisma.receivable.create({ data: {
+        tenantId, companyId: companyA, projectId: shared, clientContactId: supplierId,
+        salesInvoiceId: debit.id, issueDate: debit.issueDate, dueDate: debit.dueDate,
+        currency: "ARS", originalAmount: "10", status: "OPEN",
+      } });
+      const report = await read();
+      assert.equal(report.portfolio[0]?.paymentStatus, "PARTIAL");
+      assert.equal(report.portfolio[0]?.invoicedAmount, "121.00");
+      assert.equal(report.portfolio[0]?.collectedAmount, "0.00");
+      assert.equal(report.monthlySeries.find((point) => point.periodKey === "2026-11")?.invoicedAmount, "121.00");
+      await prisma.receivable.update({ where: { id: obligation.id }, data: { paidAmount: "10", status: "PAID" } });
+      assert.equal((await read()).portfolio[0]?.paymentStatus, "PAID");
+    } finally {
+      await prisma.receivable.deleteMany({ where: { salesInvoiceId: debit.id } });
+      await prisma.salesInvoice.delete({ where: { id: debit.id } });
+    }
+  });
 });

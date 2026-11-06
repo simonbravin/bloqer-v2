@@ -51,8 +51,8 @@ export const accountingMappingEventTypeSchema = z.enum([
 ]);
 
 export const journalLineInputSchema = z.object({
-  accountId:   z.string().uuid(),
-  projectId:   z.string().uuid().optional().nullable(),
+  accountId:   z.string().guid(),
+  projectId:   z.string().guid().optional().nullable(),
   description: z.string().max(512).optional().nullable(),
   debit:       amountStr,
   credit:      amountStr,
@@ -60,25 +60,25 @@ export const journalLineInputSchema = z.object({
 });
 
 export const createAccountingAccountSchema = z.object({
-  companyId:   z.string().uuid().optional().nullable(),
+  companyId:   z.string().guid().optional().nullable(),
   code:        z.string().trim().min(1).max(64),
   name:        z.string().trim().min(1).max(256),
   type:        accountTypeSchema,
-  parentId:    z.string().uuid().optional().nullable(),
+  parentId:    z.string().guid().optional().nullable(),
   description: z.string().max(1024).optional().nullable(),
 });
 
 export const updateAccountingAccountSchema = z.object({
   name:        z.string().trim().min(1).max(256).optional(),
   type:        accountTypeSchema.optional(),
-  parentId:    z.string().uuid().optional().nullable(),
+  parentId:    z.string().guid().optional().nullable(),
   description: z.string().max(1024).optional().nullable(),
   isActive:    z.boolean().optional(),
 });
 
 export const createJournalEntrySchema = z.object({
-  companyId:   z.string().uuid().optional().nullable(),
-  projectId:     z.string().uuid().optional().nullable(),
+  companyId:   z.string().guid().optional().nullable(),
+  projectId:     z.string().guid().optional().nullable(),
   entryDate:     isoDate,
   description:   z.string().trim().min(1).max(1024),
   reference:     z.string().max(256).optional().nullable(),
@@ -88,8 +88,8 @@ export const createJournalEntrySchema = z.object({
 });
 
 export const updateJournalEntrySchema = z.object({
-  companyId:   z.string().uuid().optional().nullable(),
-  projectId:   z.string().uuid().optional().nullable(),
+  companyId:   z.string().guid().optional().nullable(),
+  projectId:   z.string().guid().optional().nullable(),
   entryDate:   isoDate.optional(),
   description: z.string().trim().min(1).max(1024).optional(),
   reference:   z.string().max(256).optional().nullable(),
@@ -97,7 +97,7 @@ export const updateJournalEntrySchema = z.object({
 });
 
 export const listJournalEntriesSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid().optional().nullable(),
   status:    journalEntryStatusSchema.optional(),
   fromDate:  isoDate.optional(),
   toDate:    isoDate.optional(),
@@ -106,28 +106,28 @@ export const listJournalEntriesSchema = z.object({
 });
 
 export const listAccountLedgerSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
-  accountId: z.string().uuid(),
+  companyId: z.string().guid().optional().nullable(),
+  accountId: z.string().guid(),
   dateFrom:  isoDate.optional(),
   dateTo:    isoDate.optional(),
   limit:     z.coerce.number().int().min(1).max(5000).optional().default(200),
 });
 
 export const postJournalEntrySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 
 export const cancelJournalEntrySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
 });
 
 export const reverseJournalEntrySchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().guid(),
   entryDate: isoDate.optional(),
 });
 
 export const trialBalanceSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid().optional().nullable(),
   dateFrom:  isoDate.optional(),
   dateTo:    isoDate.optional(),
   /** @deprecated use dateFrom */
@@ -137,23 +137,23 @@ export const trialBalanceSchema = z.object({
 });
 
 export const accountingReportRangeSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid().optional().nullable(),
   dateFrom:  isoDate.optional(),
   dateTo:    isoDate.optional(),
 });
 
 export const accountingAsOfSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid().optional().nullable(),
   asOfDate:  isoDate.optional(),
 });
 
 export const accountingLedgerReportSchema = accountingReportRangeSchema.extend({
-  accountId: z.string().uuid(),
+  accountId: z.string().guid(),
   limit:     z.coerce.number().int().min(1).max(5000).optional(),
 });
 
 export const applyArgentineCoaTemplateSchema = z.object({
-  companyId: z.string().uuid().optional().nullable(),
+  companyId: z.string().guid().optional().nullable(),
 });
 
 export type CreateAccountingAccountInput = z.infer<typeof createAccountingAccountSchema>;

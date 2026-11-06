@@ -46,6 +46,7 @@ describe("parseBankStatementOfx (D-079)", () => {
     assert.equal(r.ok, true);
     if (!r.ok) return;
     assert.equal(r.lines.length, 2);
+    assert.deepEqual(r.declaredCurrencies, []);
     assert.deepEqual(r.lines[0], {
       lineDate: "2026-08-05",
       description: "Transferencia cliente — Cobro factura",
@@ -57,6 +58,16 @@ describe("parseBankStatementOfx (D-079)", () => {
     assert.equal(r.lines[1]!.direction, "DEBIT");
     assert.equal(r.lines[1]!.amount, "250.00");
     assert.equal(r.lines[1]!.lineDate, "2026-08-06");
+  });
+
+  it("reports currency declared by bank and card statements containing transactions", () => {
+    const bankStatement = SAMPLE.replace("<STMTRS>", "<STMTRS><CURDEF> usd </CURDEF>");
+    const cardStatement = `<CCSTMTRS><CURDEF>ARS<BANKTRANLIST><STMTTRN><DTPOSTED>20260808<TRNAMT>20</STMTTRN></BANKTRANLIST></CCSTMTRS>`;
+    const otherMessages = `<STMTRS><CURDEF>EUR</STMTRS><XFERPRC><CURDEF>GBP</XFERPRC>`;
+    const r = parseBankStatementOfx(bankStatement.replace("</OFX>", `${cardStatement}${otherMessages}</OFX>`));
+    assert.ok(r.ok);
+    assert.deepEqual(r.declaredCurrencies, ["USD", "ARS"]);
+    assert.equal(r.lines.length, 3);
   });
 
   it("rejects empty / missing transactions", () => {

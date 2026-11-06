@@ -10,8 +10,8 @@ export const certificationStatusSchema = z.enum([
 
 export const createCertificationSchema = z
   .object({
-    projectId: z.string().uuid("Proyecto inválido"),
-    budgetId: z.string().uuid("Presupuesto inválido"),
+    projectId: z.string().guid("Proyecto inválido"),
+    budgetId: z.string().guid("Presupuesto inválido"),
     periodStart: z.string().date("Fecha de inicio inválida"),
     periodEnd: z.string().date("Fecha de fin inválida"),
     notes: z.string().max(2000).optional(),
@@ -35,8 +35,8 @@ export const updateCertificationSchema = z
   });
 
 export const addCertificationLineSchema = z.object({
-  certificationId: z.string().uuid(),
-  wbsNodeId: z.string().uuid("Nodo EDT inválido"),
+  certificationId: z.string().guid(),
+  wbsNodeId: z.string().guid("Nodo EDT inválido"),
   physicalPct: z.number().finite().min(0).max(100),
   currentQty: z.number().finite().min(0),
   notes: z.string().max(2000).optional(),
@@ -51,12 +51,12 @@ export const updateCertificationLineSchema = z.object({
 });
 
 export const saveCertificationMeasurementSchema = z.object({
-  certificationId: z.string().uuid(),
+  certificationId: z.string().guid(),
   expectedRevision: z.string().datetime().optional(),
   rows: z
     .array(
       z.object({
-        wbsNodeId: z.string().uuid(),
+        wbsNodeId: z.string().guid(),
         included: z.boolean(),
         /** Canonical decimal string. The service rounds to 4 dp; a JS number is not accepted. */
         currentQty: z.string().trim().max(40).optional(),

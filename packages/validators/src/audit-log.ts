@@ -32,11 +32,11 @@ const coercedValidDateSchema = z.coerce
 
 export const listTenantAuditLogFiltersSchema = z.object({
   module: auditUiModuleSchema.optional(),
-  projectId: z.string().uuid().optional(),
-  companyId: z.string().uuid().optional(),
-  actorUserId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
+  companyId: z.string().guid().optional(),
+  actorUserId: z.string().guid().optional(),
   entityType: z.string().trim().min(1).max(128).optional(),
-  entityId: z.string().uuid().optional(),
+  entityId: z.string().guid().optional(),
   action: z.string().trim().min(1).max(128).optional(),
   dateFrom: coercedValidDateSchema.optional(),
   dateTo: coercedValidDateSchema.optional(),
@@ -48,11 +48,11 @@ export const listTenantAuditLogFiltersSchema = z.object({
 /** Filters from URL search params (date fields as YYYY-MM-DD strings). */
 export const listTenantAuditLogUrlFiltersSchema = z.object({
   module: auditUiModuleSchema.optional(),
-  projectId: z.string().uuid().optional(),
-  companyId: z.string().uuid().optional(),
-  actorUserId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
+  companyId: z.string().guid().optional(),
+  actorUserId: z.string().guid().optional(),
   entityType: z.string().trim().min(1).max(128).optional(),
-  entityId: z.string().uuid().optional(),
+  entityId: z.string().guid().optional(),
   action: z.string().trim().min(1).max(128).optional(),
   dateFrom: dateOnlySchema.optional(),
   dateTo: dateOnlySchema.optional(),

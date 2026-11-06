@@ -1,4 +1,4 @@
-import type { ZodType, ZodTypeDef } from "zod";
+import type { ZodType } from "zod";
 import { prisma, Prisma } from "@bloqer/database";
 import type { Contact, ContactRole, ContactRoleType, TaxIdType } from "@bloqer/database";
 import { can } from "@bloqer/domain";
@@ -43,7 +43,7 @@ const ROLE_LABEL_ES: Record<ContactRoleType, string> = {
   OTHER: "otro",
 };
 
-function validateContactInput<T>(schema: ZodType<T, ZodTypeDef, unknown>, input: unknown): T {
+function validateContactInput<T>(schema: ZodType<T, unknown>, input: unknown): T {
   const result = schema.safeParse(input);
   if (!result.success) throw new ServiceError("VALIDATION", result.error.issues[0]?.message ?? "Datos inválidos");
   return result.data;

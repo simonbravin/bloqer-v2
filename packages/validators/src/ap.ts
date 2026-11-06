@@ -17,7 +17,7 @@ import { invoiceLetterSchema } from "./contact";
 import { idempotencyKeySchema } from "./idempotency";
 
 const supplierInvoiceLineSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().guid().optional(),
   description: z.string().min(1, "Descripción requerida"),
   quantity:    qtyString,
   unitPrice:   unitPriceString,
@@ -25,11 +25,11 @@ const supplierInvoiceLineSchema = z.object({
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
   /** Required when invoice has projectId ([D-055]). */
-  wbsNodeId:   z.string().uuid().optional().nullable(),
+  wbsNodeId:   z.string().guid().optional().nullable(),
   /** Optional link to PO line when invoice is tied to an OC ([D-066]). */
-  purchaseOrderLineId: z.string().uuid().optional().nullable(),
+  purchaseOrderLineId: z.string().guid().optional().nullable(),
   /** Optional APU hint ([D-110] / D-068); does not change EDT imputation. */
-  costAnalysisLineId: z.string().uuid().optional().nullable(),
+  costAnalysisLineId: z.string().guid().optional().nullable(),
   /** Job-cost nature ([D-099]). Required for project invoices without PO line inherit; default MATERIAL. */
   costType: z
     .enum(["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT", "OTHER"])
@@ -41,8 +41,8 @@ const calendarDate = z.string().date("Ingresá una fecha válida");
 
 /** projectId null/omit = company-level AP (Phase 16B). Project routes must still pass projectId from URL. */
 export const createSupplierInvoiceSchema = z.object({
-  projectId:         z.string().uuid().optional().nullable(),
-  supplierContactId: z.string().uuid(),
+  projectId:         z.string().guid().optional().nullable(),
+  supplierContactId: z.string().guid(),
   issueDate:         calendarDate,
   dueDate:           calendarDate,
   currency:          z.string().length(3).default("ARS"),
@@ -52,15 +52,15 @@ export const createSupplierInvoiceSchema = z.object({
   /** When true, line unit prices are gross (IVA incluido) — [D-086]. */
   pricesIncludeTax:  z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate: nonNegativeRatePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
+  iibbPerceptionRate: nonNegativeRatePctString.optional().prefault(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
-  purchaseOrderId:   z.string().uuid().optional().nullable(),
+  purchaseOrderId:   z.string().guid().optional().nullable(),
   lines:             z.array(supplierInvoiceLineSchema).min(1, "Debe tener al menos una línea"),
 });
 
 export const updateSupplierInvoiceSchema = z.object({
-  supplierContactId: z.string().uuid().optional(),
+  supplierContactId: z.string().guid().optional(),
   issueDate:         calendarDate.optional(),
   dueDate:           calendarDate.optional(),
   fxRate:            optionalFxRateString,
@@ -69,14 +69,14 @@ export const updateSupplierInvoiceSchema = z.object({
   iibbPerceptionRate: nonNegativeRatePctString.optional(),
   notes:             z.string().optional().nullable(),
   internalNotes:     z.string().optional().nullable(),
-  purchaseOrderId:   z.string().uuid().optional().nullable(),
+  purchaseOrderId:   z.string().guid().optional().nullable(),
   lines:             z.array(supplierInvoiceLineSchema).min(1).optional(),
 });
 
 export const createPaymentFieldsSchema = z
   .object({
-    payableId:      z.string().uuid(),
-    accountId:      z.string().uuid(),
+    payableId:      z.string().guid(),
+    accountId:      z.string().guid(),
     paymentDate:    calendarDate,
     fxRate:         optionalFxRateString,
     amount:         optionalMoneyAmountString,
@@ -106,7 +106,7 @@ export const createPaymentSchema = createPaymentFieldsSchema.superRefine((val, c
 
 export const payNowSchema = z
   .object({
-    accountId:      z.string().uuid(),
+    accountId:      z.string().guid(),
     paymentDate:    calendarDate,
     fxRate:         optionalFxRateString,
     amount:         optionalMoneyAmountString,
@@ -146,7 +146,7 @@ export type RegisterApExpenseInput     = z.infer<typeof registerApExpenseSchema>
 
 /** Same canonical line/date validation for notes created directly by a service consumer. */
 export const createSupplierFiscalNoteSchema = z.object({
-  parentSupplierInvoiceId: z.string().uuid(),
+  parentSupplierInvoiceId: z.string().guid(),
   issueDate: calendarDate.optional(),
   dueDate: calendarDate.optional(),
   notes: z.string().optional().nullable(),
@@ -154,9 +154,9 @@ export const createSupplierFiscalNoteSchema = z.object({
 });
 
 export const createSupplierInvoiceFromPurchaseOrderSchema = z.object({
-  projectId:          z.string().uuid(),
-  purchaseOrderId:    z.string().uuid(),
-  purchaseReceiptId:  z.string().uuid().optional().nullable(),
+  projectId:          z.string().guid(),
+  purchaseOrderId:    z.string().guid(),
+  purchaseReceiptId:  z.string().guid().optional().nullable(),
   basis:              z.enum(["received", "remaining"]).optional().default("received"),
 });
 

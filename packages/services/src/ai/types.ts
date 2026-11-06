@@ -61,19 +61,7 @@ export type BloqerAiTool<TIn = unknown> = {
 };
 
 /** Identity helper so TypeScript infers `args` from `inputSchema`. */
-export function defineBloqerAiTool<TSchema extends z.ZodType>(
-  tool: {
-    name: string;
-    description: string;
-    risk: AiToolRisk;
-    requiredModules?: PermissionModule[];
-    policy: AiToolPolicy;
-    inputSchema: TSchema;
-    jsonSchema: Record<string, unknown>;
-    statusLabel?: string;
-    execute: (ctx: AiExecutionContext, args: z.infer<TSchema>) => Promise<AiToolExecuteResult>;
-  },
-): BloqerAiTool<z.infer<TSchema>> {
+export function defineBloqerAiTool<TIn>(tool: BloqerAiTool<TIn>): BloqerAiTool<TIn> {
   return tool;
 }
 

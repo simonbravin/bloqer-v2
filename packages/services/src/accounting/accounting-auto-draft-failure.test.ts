@@ -52,8 +52,8 @@ describe("auto-drafts never reject an already committed operation (D-061)", { co
       ...source, type: movementType, sourceType: movementType === "TRANSFER_OUT" ? "INTERNAL_TRANSFER" : "MANUAL_ADJUSTMENT", sourceId: "source", transferId: "source",
     }));
     stub(prisma.accountMovement, "findMany", async () => [
-      { ...source, type: "TRANSFER_OUT", accountId: "source-account" },
-      { ...source, type: "TRANSFER_IN", accountId: "destination-account" },
+      { ...source, sourceId: "source", transferId: "source", type: "TRANSFER_OUT", accountId: "source-account" },
+      { ...source, sourceId: "source", transferId: "source", type: "TRANSFER_IN", accountId: "destination-account" },
     ]);
     stub(prisma.salesInvoice, "findFirst", async () => invoice);
     stub(prisma.supplierInvoice, "findFirst", async () => invoice);

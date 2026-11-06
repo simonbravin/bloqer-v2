@@ -4,8 +4,8 @@ import { collectNowSchema } from "./sales-invoice";
 import { idempotencyKeySchema } from "./idempotency";
 
 export const registerArAdvanceSchema = z.object({
-  projectId: z.string().uuid(),
-  clientContactId: z.string().uuid(),
+  projectId: z.string().guid(),
+  clientContactId: z.string().guid(),
   issueDate: z.string().date("Fecha inválida"),
   dueDate: z.string().date("Fecha inválida").optional(),
   fxRate: optionalFxRateString,
@@ -21,10 +21,10 @@ export type RegisterArAdvanceInput = z.infer<typeof registerArAdvanceSchema>;
 
 /** Phase 2 — pago anticipado a proveedor sin factura (cuenta puente). Validación de entrada; implementación pendiente de schema. */
 export const registerSupplierAdvanceSchema = z.object({
-  projectId: z.string().uuid(),
-  supplierContactId: z.string().uuid(),
+  projectId: z.string().guid(),
+  supplierContactId: z.string().guid(),
   paymentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  accountId: z.string().uuid(),
+  accountId: z.string().guid(),
   currency: z.string().length(3).default("ARS"),
   amount: moneyAmountString,
   notes: z.string().optional().nullable(),

@@ -19,7 +19,7 @@ export const getRecentJobsiteLogsTool = defineBloqerAiTool({
     accessKind: "jobsite",
   },
   inputSchema: z.object({
-    projectId: z.string().uuid().optional(),
+    projectId: z.string().guid().optional(),
     limit: z.number().int().min(1).max(20).optional(),
     status: z.enum(["DRAFT", "SUBMITTED", "APPROVED", "CANCELLED"]).optional(),
   }),
@@ -73,7 +73,7 @@ export const getProjectFieldSummaryTool = defineBloqerAiTool({
     scope: "PROJECT",
     accessKind: "field",
   },
-  inputSchema: z.object({ projectId: z.string().uuid().optional() }),
+  inputSchema: z.object({ projectId: z.string().guid().optional() }),
   jsonSchema: {
     type: "object",
     properties: { projectId: { type: "string", format: "uuid" } },
@@ -113,7 +113,7 @@ export const getProjectCertificationSummaryTool = defineBloqerAiTool({
     scope: "PROJECT",
     accessKind: "certifications",
   },
-  inputSchema: z.object({ projectId: z.string().uuid().optional() }),
+  inputSchema: z.object({ projectId: z.string().guid().optional() }),
   jsonSchema: {
     type: "object",
     properties: { projectId: { type: "string", format: "uuid" } },

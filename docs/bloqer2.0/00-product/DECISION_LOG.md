@@ -2131,6 +2131,13 @@
 - **Evidencia:** se puede comprobar el alcance mediante los campos del evento, una relación vigente inequívoca o los datos de empresa del evento. Los cambios de membresía posteriores no prueban la empresa de un evento anterior. Los eventos se conservan y no se reescriben.
 - **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-13-audit-history-scope-proposal.md), AUDIT_LOG, Guía y Ayuda.
 
+### D-145 — Protección de un borrador de proveedor editado al recibir otra entrega
+
+- **Fecha:** 2026-11-05. **Estado:** ACTIVA. Aprobación explícita de Q-092.
+- **Decisión:** si regenerar las líneas de un borrador automático cambiaría su contenido y el borrador tiene una edición guardada comprobable, se conserva el documento y se indica que debe completarse manualmente. Aplica al atajo de D-108 y a **Actualizar borrador**. La recepción confirmada conserva su resultado. Un borrador automático sin edición comprobada puede ampliarse por las cantidades recibidas pendientes.
+- **Evidencia:** el evento `supplier_invoice.updated` se verifica dentro del alcance del documento y bajo los bloqueos de la actualización. El evento acredita que hubo una edición. El comprobante del proveedor sigue siendo la fuente de sus importes.
+- **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-14-edited-ap-draft-proposal.md), módulo Compras, Guía y Ayuda.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

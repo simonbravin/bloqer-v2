@@ -66,12 +66,12 @@ export const updateTenantDisplaySettingsInputSchema = z.object({
 });
 
 export const updateTenantMemberRolesInputSchema = z.object({
-  membershipId: z.string().uuid(),
+  membershipId: z.string().guid(),
   roles:        z.array(userRoleEnum).min(1).max(16),
 });
 
 export const updateTenantMemberStatusInputSchema = z.object({
-  membershipId: z.string().uuid(),
+  membershipId: z.string().guid(),
   status:       z.enum(["ACTIVE", "INACTIVE"]),
 });
 
@@ -81,5 +81,5 @@ const permissionMatrixNoteEntrySchema = z.object({
 
 /** Partial update: only keys present are merged server-side. */
 export const updateTenantPermissionMatrixNotesInputSchema = z.object({
-  notes: z.record(z.enum(OVERVIEW_MODULE_KEYS_FOR_ZOD), permissionMatrixNoteEntrySchema),
+  notes: z.partialRecord(z.enum(OVERVIEW_MODULE_KEYS_FOR_ZOD), permissionMatrixNoteEntrySchema),
 });

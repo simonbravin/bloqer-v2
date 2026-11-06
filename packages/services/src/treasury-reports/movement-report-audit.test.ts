@@ -45,9 +45,9 @@ test("extract by value date orders the balance and keeps fallback accounting dat
   const c = movement("first-by-value", "2026-11-06", "2026-11-03", "10", "OUTFLOW");
   stub(t, prisma.tenantModuleSetting, "findMany", async () => []);
   stub(t, prisma.treasuryAccount, "findFirst", async () => ({ id: accountId }));
-  stub(t, prisma.treasuryAccount, "findUnique", async () => ({ tenantId: ctx.tenantId, openingBalance: new Prisma.Decimal(100) }));
-  stub(t, prisma.accountMovement, "findFirst", async () => null);
-  stub(t, prisma.accountMovement, "findMany", async (query: { include?: unknown }) => query.include ? [a, b, c] : []);
+  stub(t, prisma.treasuryAccount, "findUnique", async () => ({ id: accountId, tenantId: ctx.tenantId, openingBalance: new Prisma.Decimal(100) }));
+  stub(t, prisma.accountMovement, "groupBy", async () => []);
+  stub(t, prisma.accountMovement, "findMany", async () => [a, b, c]);
 
   const report = await getAccountMovementReport({ accountId, dateBasis: "value", sortDir: "desc" }, ctx);
   assert.deepEqual(report.rows.map(({ id, valueDate, runningBalance }) => [id, valueDate, runningBalance]), [
@@ -113,17 +113,19 @@ test("cash flow and extracts share the valid company scope, and legacy ARS amoun
   });
   stub(t, prisma.accountMovement, "findMany", async (query: { where: Prisma.AccountMovementWhereInput; include?: unknown }) => {
     movementReads += 1;
-    if (query.where.accountId === validAccountId) return []; // Opening balance before the period.
     assert.deepEqual(query.where.account, accountScope);
     if (!query.include) assert.deepEqual(query.where.accountId, { in: [validAccountId] });
     return [{ ...movement("legacy-ars", "2026-11-05", null, "10.25"), accountId: validAccountId, currency: " ars " }];
   });
   stub(t, prisma.treasuryAccount, "findMany", async (query: { where: Prisma.TreasuryAccountWhereInput }) => {
     assert.deepEqual(query.where, accountScope);
-    return [{ id: validAccountId, currency: "ARS" }];
+    return [{ id: validAccountId, currency: "ARS", openingBalance: new Prisma.Decimal(5) }];
   });
-  stub(t, prisma.treasuryAccount, "findUnique", async () => ({ tenantId: ctx.tenantId, openingBalance: new Prisma.Decimal(5) }));
-  stub(t, prisma.accountMovement, "findFirst", async () => null);
+  stub(t, prisma.accountMovement, "groupBy", async (query: { by: string[]; where: Prisma.AccountMovementWhereInput }) => {
+    assert.deepEqual(query.where.accountId, { in: [validAccountId] });
+    if (query.by.length > 1) assert.deepEqual(query.where.movementDate, { lt: new Date("2026-11-01T00:00:00.000Z") });
+    return [];
+  });
 
   await assert.rejects(getAccountMovementReport({ accountId }, ctx), { code: "FORBIDDEN" });
   assert.equal(movementReads, 0);

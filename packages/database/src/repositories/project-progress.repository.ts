@@ -71,6 +71,11 @@ export async function readProjectProgressEvidence(
   access: ProjectProgressSourceAccess,
 ) {
   const where = progressProjectWhere(scope);
+  const certificationWhere = {
+    ...where,
+    ...nullableDocumentCompany(scope),
+    budgetId: { in: budgetIds },
+  };
   const invoiceAllocationSelect = {
     id: true,
     tenantId: true,
@@ -200,9 +205,7 @@ export async function readProjectProgressEvidence(
     access.certifications
       ? prisma.certification.findMany({
           where: {
-            ...where,
-            ...nullableDocumentCompany(scope),
-            budgetId: { in: budgetIds },
+            ...certificationWhere,
             status: { not: "CANCELLED" },
           },
           select: {
@@ -214,12 +217,13 @@ export async function readProjectProgressEvidence(
             totalAmount: true,
             lines: { select: { wbsNodeId: true, currentQty: true, periodAmount: true } },
             salesInvoices: {
-              where: {
+              where: access.ar ? {
                 status: "ISSUED",
                 documentKind: "INVOICE",
                 tenantId: scope.tenantId,
+                projectId: scope.projectId,
                 ...requiredDocumentCompany(scope),
-              },
+              } : { id: { in: [] } },
               select: { id: true },
             },
           },
@@ -230,22 +234,39 @@ export async function readProjectProgressEvidence(
           where: {
             ...where,
             status: "ISSUED",
-            documentKind: { in: ["INVOICE", "DEBIT_NOTE"] },
             ...requiredDocumentCompany(scope),
             issueDate: { lte: cut },
             OR: [
-              { certification: { budgetId: { in: budgetIds } } },
-              { referencedSalesInvoice: { certification: { budgetId: { in: budgetIds } } } },
+              { documentKind: "INVOICE", certification: certificationWhere },
+              {
+                documentKind: "DEBIT_NOTE",
+                referencedSalesInvoice: {
+                  ...where,
+                  ...requiredDocumentCompany(scope),
+                  documentKind: "INVOICE",
+                  status: "ISSUED",
+                  certification: certificationWhere,
+                },
+              },
             ],
           },
           select: {
             id: true,
+            tenantId: true,
+            companyId: true,
+            projectId: true,
+            clientContactId: true,
             issueDate: true,
             dueDate: true,
             currency: true,
             totalAmount: true,
             receivable: {
               select: {
+                tenantId: true,
+                companyId: true,
+                projectId: true,
+                clientContactId: true,
+                currency: true,
                 originalAmount: true,
                 status: true,
                 collections: {
@@ -256,7 +277,10 @@ export async function readProjectProgressEvidence(
                     ...requiredDocumentCompany(scope),
                     projectId: scope.projectId,
                   },
-                  select: { amount: true, collectionDate: true, currency: true },
+                  select: {
+                    amount: true, collectionDate: true, currency: true, companyId: true,
+                    clientContactId: true, salesInvoiceId: true,
+                  },
                 },
                 creditApplications: {
                   where: {
@@ -265,7 +289,15 @@ export async function readProjectProgressEvidence(
                     creditNoteSalesInvoice: { status: "ISSUED", issueDate: { lte: cut } },
                     ...requiredDocumentCompany(scope),
                   },
-                  select: { amount: true, creditNoteSalesInvoice: { select: { issueDate: true } } },
+                  select: {
+                    amount: true,
+                    companyId: true,
+                    creditNoteSalesInvoice: { select: {
+                      issueDate: true, tenantId: true, companyId: true, projectId: true,
+                      clientContactId: true, currency: true, documentKind: true,
+                      referencedSalesInvoiceId: true,
+                    } },
+                  },
                 },
               },
             },

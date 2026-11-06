@@ -111,8 +111,8 @@ export function fieldPendingSourcesForActor(
     if (canEditPurchaseReceipts(roles)) {
       sources.push("PURCHASE_ORDER_RECEIPT");
     }
-    // OC recibida sin factura del proveedor ([D-097] / [BR-PUR-020]).
-    if (can(roles, "EDIT", "AP")) {
+    // The invoice action also requires AP; a disabled AP module cannot serve the CTA.
+    if (gate.isEnabled("AP") && can(roles, "EDIT", "AP")) {
       sources.push("PURCHASE_ORDER_INVOICE");
     }
   }

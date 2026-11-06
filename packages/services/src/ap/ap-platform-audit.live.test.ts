@@ -117,6 +117,41 @@ describe("AG-09 AP on isolated SQL", { skip: process.env.BLOQER_AUDIT_LIVE !== "
     return { ...s, payment, journal };
   }
   const setAccounting = (isEnabled: boolean) => prisma.tenantModuleSetting.update({ where: { tenantId_moduleKey: { tenantId, moduleKey: "ACCOUNTING" } }, data: { isEnabled } });
+
+  it("AG-14 keeps AP issue and expense committed when the post-commit notification lookup fails", async () => {
+    const payableLookup = prisma.payable.findUnique;
+    const invoiceLookup = prisma.supplierInvoice.findUnique;
+    let noticeLookups = 0;
+    const failNoticeLookup = () => {
+      noticeLookups += 1;
+      throw new Error("Synthetic notification lookup failure");
+    };
+    prisma.payable.findUnique = failNoticeLookup;
+    try {
+      const invoice = await issued("ARS", true);
+      assert.equal(invoice.payable.status, "OPEN");
+    } finally {
+      prisma.payable.findUnique = payableLookup;
+    }
+
+    const input = registerApExpenseSchema.parse({
+      projectId, supplierContactId: supplierId, issueDate: day, dueDate: day, invoiceLetter: "A", iibbPerceptionRate: "0",
+      idempotencyKey: randomUUID(), lines: [{ description: "Synthetic notice failure expense", quantity: "1", unitPrice: "100", wbsNodeId: wbsId }],
+    });
+    prisma.supplierInvoice.findUnique = failNoticeLookup;
+    try {
+      const expense = await registerApExpense(input, ctx);
+      assert.equal(expense.primaryEntityType, "SupplierInvoice");
+      assert.equal((await registerApExpense(input, ctx)).primaryEntityId, expense.primaryEntityId);
+      const obligation = await prisma.payable.findUniqueOrThrow({ where: { supplierInvoiceId: expense.primaryEntityId } });
+      assert.equal(obligation.status, "OPEN");
+      assert.equal(obligation.originalAmount.toFixed(2), "100.00");
+      assert.equal(noticeLookups, 2);
+    } finally {
+      prisma.supplierInvoice.findUnique = invoiceLookup;
+    }
+  });
+
   it("pays USD with the payment's manual FX, replays once, then reverses exactly once", async () => {
     const s = await issued("USD"), idempotencyKey = randomUUID();
     const input = { payableId: s.payable.id, accountId: usdAccountId, paymentDate: day, amount: "40", fxRate: "1250.123456", idempotencyKey, reference: null };

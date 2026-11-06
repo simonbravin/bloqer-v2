@@ -121,7 +121,9 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
     paidAmount: "0",
     allIssuedInvoicesSettled: false,
     allReceivedAmountIssued: false,
+    allReceivedInvoiceLinesIssued: false,
     pendingToInvoice: "0",
+    pendingInvoiceLineIds: [],
     hasReceivedQuantity: false,
     draftInvoiceCount: 0,
     unlinkedInvoiceCount: 0,
@@ -199,8 +201,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const canInvoiceNow =
     showBilling &&
     !isCancelled &&
-    billing.hasReceivedQuantity &&
-    isPositiveMoneyAmount(billing.pendingToInvoice);
+    billing.pendingInvoiceLineIds.length > 0;
   const highlightBilling = canInvoiceNow && sp.siguiente === "facturar";
   const billingPanel =
     billingAvailable && showBilling && !isCancelled ? (
@@ -208,6 +209,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
         projectId={id}
         purchaseOrderId={poId}
         billing={billing}
+        hasPendingLines={canInvoiceNow}
         canEditAp={canEditAp}
         errorReturnPath={`/proyectos/${id}/ordenes-compra/${poId}`}
         highlighted={highlightBilling}
@@ -229,7 +231,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const canCancel =
     !isCancelled && canEditPo && !["PARTIALLY_RECEIVED", "RECEIVED"].includes(order.status);
   const hasIssuedInvoice = isPositiveMoneyAmount(billing.invoicedAmount);
-  const invoiceSettled = billingAvailable && billing.allReceivedAmountIssued === true;
+  const invoiceSettled = billingAvailable && billing.allReceivedInvoiceLinesIssued;
   // Services resolve outstanding payables, including credit-note settlement (D-112/D-115).
   const fullyPaid = billingAvailable && billing.allIssuedInvoicesSettled === true;
   const hasActions =

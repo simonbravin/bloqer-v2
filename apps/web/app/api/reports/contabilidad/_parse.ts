@@ -4,7 +4,7 @@ import { z } from "zod";
 export function parseAccountingCompanyId(sp: Record<string, string>): string | null {
   const raw = sp.empresa || sp.companyId;
   if (!raw) return null;
-  const parsed = z.string().uuid().safeParse(raw);
+  const parsed = z.string().guid().safeParse(raw);
   return parsed.success ? parsed.data : null;
 }
 

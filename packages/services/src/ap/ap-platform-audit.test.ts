@@ -31,18 +31,30 @@ describe("AP settlement contracts", () => {
       currency, status: "ACTIVE", openingBalance: d(200) };
     let period: { periodKey: string } | null = null;
     let moduleOff = false;
+    let ledgerOutflow = d(0);
+    const balanceQueries: Prisma.AccountMovementGroupByArgs[] = [];
     const tx = {
       $queryRaw: async (strings: TemplateStringsArray) => { locks.push(strings.join("").includes("companies") ? "company" : "account"); return []; },
       period: { findFirst: async () => period },
       tenantModuleSetting: { findMany: async () => moduleOff ? [{ moduleKey: "AP", isEnabled: false }] : [] },
       treasuryAccount: { findUnique: async () => account },
       payment: { create: async ({ data }: { data: Prisma.PaymentCreateInput }) => { payments.push(data); return { id: "payment" }; } },
-      accountMovement: { findFirst: async () => null, findMany: async () => [],
-        create: async ({ data }: { data: unknown }) => { movements.push(data); return { id: "movement" }; } },
+      accountMovement: {
+        groupBy: async (query: Prisma.AccountMovementGroupByArgs) => {
+          balanceQueries.push(query);
+          if (!query._sum?.amount || ledgerOutflow.isZero()) return [];
+          return [{ accountId: account.id, type: "OUTFLOW", _sum: { amount: ledgerOutflow } }];
+        },
+        create: async ({ data }: { data: unknown }) => { movements.push(data); return { id: "movement" }; },
+      },
       payable: { updateMany: async () => ({ count: 1 }) },
     } as unknown as Prisma.TransactionClient;
     const input = { payable, accountId: account.id, amount: d(90), paymentDate: "2026-11-05", supplierInvoiceNumber: 1, idempotencyKey: randomUUID() };
-    return { tx, input, locks, payments, movements, account, close: () => { period = { periodKey: "2026-11" }; }, disable: () => { moduleOff = true; } };
+    return { tx, input, locks, payments, movements, balanceQueries,
+      close: () => { period = { periodKey: "2026-11" }; },
+      disable: () => { moduleOff = true; },
+      setLedgerOutflow: (amount: number) => { ledgerOutflow = d(amount); },
+    };
   }
 
   it("captures manual FX per payment and uses company before account lock", async () => {
@@ -69,6 +81,7 @@ describe("AP settlement contracts", () => {
     const h = paymentHarness(); h.close();
     await assert.rejects(() => applyPaymentToPayable(h.tx, { ...h.input, fxRate: "1200" }, ctx), conflict);
     assert.deepEqual(h.locks, ["company"]);
+    assert.equal(h.balanceQueries.length, 0);
     assert.equal(h.payments.length + h.movements.length, 0);
   });
   it("checks the current module gate inside the transaction before payment effects", async () => {
@@ -80,8 +93,9 @@ describe("AP settlement contracts", () => {
   it("does not spend beyond funds or the remaining balance after credit", async () => {
     const h = paymentHarness();
     await assert.rejects(() => applyPaymentToPayable(h.tx, { ...h.input, amount: d(91), fxRate: "1200" }, ctx), conflict);
-    h.account.openingBalance = d(89);
+    h.setLedgerOutflow(111);
     await assert.rejects(() => applyPaymentToPayable(h.tx, { ...h.input, fxRate: "1200" }, ctx), conflict);
+    assert.equal(h.balanceQueries.length, 2);
     assert.equal(h.payments.length + h.movements.length, 0);
   });
   it("accepts only real dates and positive six-decimal FX", () => {

@@ -62,10 +62,10 @@ const bodySchema = z.object({
   }, z.array(chatMessageSchema).min(1).max(AI_CHAT_MAX_MESSAGES)
     .refine((messages) => messages[0]?.role === "user" && messages.at(-1)?.role === "user")),
   currentRoute: z.string().max(500).optional(),
-  currentProjectId: z.string().uuid().optional(),
+  currentProjectId: z.string().guid().optional(),
   // Reserved for future entity-aware tools — ignored for auth until revalidated like projects.
   currentEntityType: z.string().max(80).optional(),
-  currentEntityId: z.string().uuid().optional(),
+  currentEntityId: z.string().guid().optional(),
   /** Client hint: no prior assistant messages in this browser session. */
   isFirstAssistantTurn: z.boolean().optional(),
 });

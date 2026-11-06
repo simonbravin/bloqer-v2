@@ -101,8 +101,13 @@ async function toPurchaseReceiptView(
 ): Promise<PurchaseReceiptView> {
   assertReceiptRelations(r);
   const actorId = receiptActorUserId(r);
-  const nameById = await resolveUserDisplayNames([actorId]);
-  return serializeReceipt(r, userDisplayNameFromMap(nameById, actorId));
+  let receivedByName: string | null = null;
+  try {
+    receivedByName = userDisplayNameFromMap(await resolveUserDisplayNames([actorId]), actorId);
+  } catch {
+    console.warn("[purchase-receipt] actor label unavailable", { tenantId: r.tenantId, receiptId: r.id });
+  }
+  return serializeReceipt(r, receivedByName);
 }
 
 const receiptInclude = {
@@ -801,8 +806,8 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
         const { createSupplierInvoiceDraftFromPurchaseOrder, getPurchaseOrderBillingSummary } =
           await import("../ap/supplier-invoice-from-po.service");
         const billing = await getPurchaseOrderBillingSummary(existing.purchaseOrderId, ctx);
-        const pending = new Prisma.Decimal(billing.pendingToInvoice);
-        if (billing.hasReceivedQuantity && pending.greaterThan(0)) {
+        const pendingLines = new Set(billing.pendingInvoiceLineIds);
+        if (receipt.lines.some((line) => pendingLines.has(line.purchaseOrderLineId))) {
           await createSupplierInvoiceDraftFromPurchaseOrder(
             {
               projectId: existing.projectId,
@@ -817,13 +822,15 @@ export async function confirmPurchaseReceipt(id: string, ctx: ServiceContext): P
       }
     } catch (err) {
       // Receipt already confirmed; Finance can still use Pendientes / panel billing.
-      const message = err instanceof Error ? err.message : String(err);
+      const detail = err instanceof ServiceError
+        ? err.message
+        : "Abrí Facturación de la OC para completar la factura o volver a intentar.";
       console.warn("[D-108] auto-draft AP after receipt failed", {
         receiptId: id,
         purchaseOrderId: existing.purchaseOrderId,
-        message,
+        code: err instanceof ServiceError ? err.code : "UNEXPECTED",
       });
-      autoDraftApWarning = `La recepción quedó confirmada, pero no se pudo crear el borrador de factura: ${message}`;
+      autoDraftApWarning = `La recepción quedó confirmada, pero no se pudo preparar el borrador de factura. ${detail}`;
     }
   }
 

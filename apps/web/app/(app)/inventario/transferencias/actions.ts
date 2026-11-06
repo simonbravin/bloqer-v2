@@ -33,7 +33,7 @@ export async function createWarehouseTransferAction(fd: FormData): Promise<{ err
 
   const parsed = createWarehouseTransferSchema.safeParse(raw);
   if (!parsed.success) {
-    const msg = parsed.error.errors.map((e) => e.message).join(", ");
+    const msg = parsed.error.issues.map((e) => e.message).join(", ");
     return { error: msg };
   }
 

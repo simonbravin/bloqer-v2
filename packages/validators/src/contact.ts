@@ -78,8 +78,7 @@ export const createContactSchema = z.object({
   email: optionalNullableEmail,
   notes: optionalNullableText(2000),
   initialRole: z.enum(contactRoleTypeSchema.options, {
-    required_error: "Elegí un rol",
-    invalid_type_error: "Elegí un rol",
+    error: (issue) => typeof issue.input !== "string" ? "Elegí un rol" : undefined,
   }),
 });
 

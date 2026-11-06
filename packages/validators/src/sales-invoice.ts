@@ -13,21 +13,21 @@ import { invoiceLetterSchema } from "./contact";
 import { idempotencyKeySchema } from "./idempotency";
 
 const invoiceLineSchema = z.object({
-  id: z.string().uuid().optional(),
+  id: z.string().guid().optional(),
   description: z.string().min(1),
   quantity:    qtyString,
   unitPrice:   unitPriceString,
   taxRate:     nonNegativeRatePctString.optional().default("0.0000"),
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder:   z.number().int().min(0).optional().default(0),
-  certificationLineId: z.string().uuid().optional().nullable(),
+  certificationLineId: z.string().guid().optional().nullable(),
 });
 
 /** projectId null/omit = company-level AR (D-051). Project routes must still pass projectId from URL. */
 export const createSalesInvoiceSchema = z.object({
-  projectId:           z.string().uuid().optional().nullable(),
-  clientContactId:     z.string().uuid(),
-  certificationId:     z.string().uuid().optional().nullable(),
+  projectId:           z.string().guid().optional().nullable(),
+  clientContactId:     z.string().guid(),
+  certificationId:     z.string().guid().optional().nullable(),
   issueDate:           z.string().date("Fecha inválida"),
   dueDate:             z.string().date("Fecha inválida"),
   fxRate:             optionalFxRateString,
@@ -40,7 +40,7 @@ export const createSalesInvoiceSchema = z.object({
    */
   pricesIncludeTax:    z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate:  nonNegativeRatePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
+  iibbPerceptionRate:  nonNegativeRatePctString.optional().prefault(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   notes:               z.string().optional().nullable(),
   internalNotes:       z.string().optional().nullable(),
   externalInvoiceRef:  z
@@ -54,7 +54,7 @@ export const createSalesInvoiceSchema = z.object({
 });
 
 export const createInvoiceFromCertificationSchema = z.object({
-  certificationId: z.string().uuid(),
+  certificationId: z.string().guid(),
   fxRate: optionalFxRateString,
   issueDate:       z.string().date("Fecha inválida"),
   dueDate:         z.string().date("Fecha inválida"),
@@ -82,7 +82,7 @@ export const updateSalesInvoiceSchema = z.object({
 
 /** NC/ND inputs share the same decimal/calendar boundary as invoices (D-115). */
 export const createSalesNoteSchema = z.object({
-  parentSalesInvoiceId: z.string().uuid(),
+  parentSalesInvoiceId: z.string().guid(),
   issueDate: z.string().date("Fecha inválida").optional(),
   dueDate: z.string().date("Fecha inválida").optional(),
   notes: z.string().optional().nullable(),
@@ -93,7 +93,7 @@ export const createSalesNoteSchema = z.object({
 
 export const collectNowSchema = z
   .object({
-    accountId:            z.string().uuid(),
+    accountId:            z.string().guid(),
     collectionDate:       z.string().date("Fecha inválida"),
     fxRate:               optionalFxRateString,
     amount:               optionalMoneyAmountString,

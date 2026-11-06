@@ -12,7 +12,7 @@ import { minimizeNotes } from "../policy/minimize";
 import { ServiceError } from "../../types";
 
 const searchPrSchema = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   status: z.string().optional(),
   limit: z.number().int().min(1).max(30).optional(),
 });
@@ -66,7 +66,7 @@ export const searchPurchaseRequestsTool = defineBloqerAiTool({
 });
 
 const searchPoSchema = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   status: z.string().optional(),
   pendingApproval: z.boolean().optional(),
   pendingReceipt: z.boolean().optional(),
@@ -138,7 +138,7 @@ export const getPurchaseOrderTool = defineBloqerAiTool({
     scope: "PROJECT",
     accessKind: "purchase_orders",
   },
-  inputSchema: z.object({ purchaseOrderId: z.string().uuid() }),
+  inputSchema: z.object({ purchaseOrderId: z.string().guid() }),
   jsonSchema: {
     type: "object",
     properties: { purchaseOrderId: { type: "string", format: "uuid" } },
@@ -183,7 +183,7 @@ export const getPendingPurchaseOrdersTool = defineBloqerAiTool({
     scope: "PROJECT",
     accessKind: "purchase_orders",
   },
-  inputSchema: z.object({ projectId: z.string().uuid().optional() }),
+  inputSchema: z.object({ projectId: z.string().guid().optional() }),
   jsonSchema: {
     type: "object",
     properties: { projectId: { type: "string", format: "uuid" } },

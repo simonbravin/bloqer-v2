@@ -6,7 +6,7 @@ import { AI_DATA_CLASS } from "../policy/data-class";
 import { ServiceError } from "../../types";
 
 const inputSchema = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
 });
 
 export const getProjectScheduleSummaryTool = defineBloqerAiTool({
@@ -52,7 +52,7 @@ export const getProjectScheduleSummaryTool = defineBloqerAiTool({
 });
 
 const delayedInput = z.object({
-  projectId: z.string().uuid().optional(),
+  projectId: z.string().guid().optional(),
   limit: z.number().int().min(1).max(20).optional(),
 });
 

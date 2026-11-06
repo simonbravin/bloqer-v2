@@ -66,7 +66,7 @@ export async function uploadDocumentAction(formData: FormData): Promise<UploadDo
   });
 
   if (!parsed.success) {
-    return { error: parsed.error.errors.map((e) => e.message).join(", ") };
+    return { error: parsed.error.issues.map((e) => e.message).join(", ") };
   }
 
   const ctx = {

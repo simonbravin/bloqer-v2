@@ -784,6 +784,12 @@
 - **Hallazgo:** faltan campos de alcance en registros históricos y algunos eventos de membresía. Un valor vacío puede corresponder a una operación de otra empresa.
 - **Propuesta:** [conservar los registros y exigir alcance global donde la empresa no se pueda verificar](../08-architecture/platform-audit/2026-11-05-ag-13-audit-history-scope-proposal.md).
 
+### Q-092 — Recepción posterior a una factura de proveedor editada
+
+- **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-145. El Owner aprobó conservar la edición y avisar.
+- **Hallazgo:** al refrescar un borrador automático tras otra recepción, pueden perderse precios y otros datos fiscales ya editados y guardados por Finanzas. D-108 y P-IND-02 no definen la prioridad entre esas ediciones y la sugerencia de nuevas líneas.
+- **Propuesta:** [conservar la factura editada y pedir completarla manualmente](../08-architecture/platform-audit/2026-11-05-ag-14-edited-ap-draft-proposal.md).
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

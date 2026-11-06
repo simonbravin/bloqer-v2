@@ -25,7 +25,7 @@ const dateRange = (
 };
 
 const subcontractLineSchema = z.object({
-  wbsNodeId: z.string().uuid().optional().nullable(),
+  wbsNodeId: z.string().guid().optional().nullable(),
   description: z.string().trim().min(1, "La descripción es requerida"),
   unit: z.string().default(""),
   quantity,
@@ -36,9 +36,9 @@ const subcontractLineSchema = z.object({
 
 export const createSubcontractSchema = z
   .object({
-    companyId: z.string().uuid(),
-    projectId: z.string().uuid(),
-    subcontractorContactId: z.string().uuid(),
+    companyId: z.string().guid(),
+    projectId: z.string().guid(),
+    subcontractorContactId: z.string().guid(),
     title: z.string().trim().min(1, "El título es requerido"),
     description: z.string().optional().nullable(),
     contractDate: calendarDate,
@@ -84,7 +84,7 @@ export const updateSubcontractMetaSchema = z
   );
 
 const certificationLineInputSchema = z.object({
-  subcontractLineId: z.string().uuid(),
+  subcontractLineId: z.string().guid(),
   currentQty: quantity,
   notes: z.string().optional().nullable(),
 });
@@ -106,12 +106,12 @@ const certificationLines = z
 
 export const createSubcontractCertificationSchema = z
   .object({
-    subcontractId: z.string().uuid(),
+    subcontractId: z.string().guid(),
     periodStart: calendarDate,
     periodEnd: calendarDate,
     certificationDate: calendarDate,
     notes: z.string().optional().nullable(),
-    replacesCertificationId: z.string().uuid().optional().nullable(),
+    replacesCertificationId: z.string().guid().optional().nullable(),
     lines: certificationLines,
   })
   .superRefine((value, ctx) => dateRange(value.periodStart, value.periodEnd, ctx, "periodEnd"));

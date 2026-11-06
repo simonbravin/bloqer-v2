@@ -20,7 +20,7 @@ export const createTreasuryAccountSchema = z.object({
   notes:          z.string().optional().nullable(),
   openingBalance: moneyAmountString.optional().default("0.00"),
   openingFxRate:  optionalFxRateString,
-  companyId:      z.string().uuid().optional().nullable(),
+  companyId:      z.string().guid().optional().nullable(),
 });
 
 export const updateTreasuryAccountSchema = z.object({
@@ -33,9 +33,9 @@ export const updateTreasuryAccountSchema = z.object({
 
 export const createCollectionSchema = z
   .object({
-    receivableId:       z.string().uuid(),
+    receivableId:       z.string().guid(),
     fxRate:             optionalFxRateString,
-    accountId:          z.string().uuid(),
+    accountId:          z.string().guid(),
     collectionDate:     z.string().date("Fecha inválida"),
     amount:             optionalMoneyAmountString,
     /** Server applies stored balanceDue — [D-053]. */
@@ -62,8 +62,8 @@ export const createCollectionSchema = z
   });
 
 export const createInternalTransferSchema = z.object({
-  sourceAccountId:      z.string().uuid(),
-  destinationAccountId: z.string().uuid(),
+  sourceAccountId:      z.string().guid(),
+  destinationAccountId: z.string().guid(),
   transferDate:         z.string().date("Fecha inválida"),
   valueDate:            z.string().date("Fecha valor inválida"),
   amount:               positiveMoneyAmountString,
@@ -75,13 +75,13 @@ export const createInternalTransferSchema = z.object({
 
 
 export const createCorporateTreasuryInflowSchema = z.object({
-  accountId:              z.string().uuid(),
+  accountId:              z.string().guid(),
   movementDate:           z.string().date("Fecha inválida"),
   amount:                 positiveMoneyAmountString,
   fxRate:                 optionalFxRateString,
   description:            z.string().trim().min(1, "Descripcion requerida"),
   /** Optional directory contact with CLIENT role for corporate inflows — D-049. */
-  counterpartyContactId:  z.string().uuid().optional().nullable(),
+  counterpartyContactId:  z.string().guid().optional().nullable(),
   /** Official voucher issued outside Bloqer (e.g. ARCA FC A 0001-00001234). */
   externalInvoiceRef:     z
     .string()
@@ -95,7 +95,7 @@ export const createCorporateTreasuryInflowSchema = z.object({
 
 /** Generic account adjustment UI ([P-TRZ-04] / Phase 3 close). */
 export const createManualTreasuryAdjustmentSchema = z.object({
-  accountId: z.string().uuid(),
+  accountId: z.string().guid(),
   movementDate: z.string().date("Fecha inválida"),
   direction: z.enum(["INFLOW", "OUTFLOW"]),
   amount: positiveMoneyAmountString,

@@ -332,6 +332,35 @@ describe("AG-06 OC and receipts: isolated SQL scope, currency and physical integ
     assert.equal(await prisma.purchaseReceipt.count({ where: { purchaseOrderId: po.id } }), 1);
   });
 
+  it("AG-14 keeps receipt mutations successful when ancillary reads fail after commit", async (t) => {
+    const s = await scope();
+    const po = await order(s);
+    const receipt = await draft(po, ["2"]);
+    await prisma.companyProcurementSettings.update({ where: { companyId }, data: { autoDraftApInvoiceOnReceipt: true } });
+    const warnings: unknown[][] = [];
+    const failure = new Error("private synthetic failure in ancillary read");
+    t.mock.method(console, "warn", (...args: unknown[]) => { warnings.push(args); });
+    const users = prisma.user.findMany;
+    const invoices = prisma.supplierInvoice.findMany;
+    try {
+      prisma.user.findMany = () => { throw failure; };
+      prisma.supplierInvoice.findMany = () => { throw failure; };
+      const confirmed = await confirmPurchaseReceipt(receipt.id, ctx);
+      assert.equal(confirmed.status, "CONFIRMED");
+      assert.equal(confirmed.receivedByName, null);
+      assert.match(confirmed.autoDraftApWarning ?? "", /Facturación de la OC/);
+      assert.doesNotMatch(confirmed.autoDraftApWarning ?? "", /private synthetic/);
+      const cancelled = await cancelPurchaseReceipt(receipt.id, ctx);
+      assert.equal(cancelled.status, "CANCELLED");
+      assert.equal((await prisma.purchaseOrderLine.findUniqueOrThrow({ where: { id: po.lines[0]!.id } })).receivedQuantity.toString(), "0");
+      assert.doesNotMatch(JSON.stringify(warnings), /private synthetic/);
+    } finally {
+      prisma.user.findMany = users;
+      prisma.supplierInvoice.findMany = invoices;
+      await prisma.companyProcurementSettings.update({ where: { companyId }, data: { autoDraftApInvoiceOnReceipt: false } });
+    }
+  });
+
   it("D-127 serializes new receipt numbers across projects in the same company", async () => {
     const a = await scope(), b = await scope(), first = await order(a), second = await order(b);
     const before = await prisma.purchaseReceipt.aggregate({ where: { tenantId, companyId }, _max: { number: true } });

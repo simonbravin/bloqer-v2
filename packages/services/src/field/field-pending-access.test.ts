@@ -66,6 +66,12 @@ test("FINANCE sees PURCHASE_ORDER_INVOICE via AP even without procurement approv
   assert.ok(sources.includes("PURCHASE_ORDER_INVOICE"));
 });
 
+test("disabled AP hides the invoice action while retaining procurement actions", () => {
+  const gate = createTenantModuleGate(new Map([["AP", false]]));
+  assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_ORDER_INVOICE"), false);
+  assert.equal(fieldPendingSourceAllowed(["OWNER"], gate, "PURCHASE_ORDER_RECEIPT"), true);
+});
+
 test("VIEWER gets no pending sources", () => {
   const sources = fieldPendingSourcesForActor(["VIEWER"], allOn);
   assert.deepEqual(sources, []);

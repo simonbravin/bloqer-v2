@@ -4,10 +4,10 @@ import { positiveQtyString, discountPctString, unitPriceString, ratePctString, o
 import { costCategorySchema } from "./budget";
 
 const purchaseRequestLineSchema = z.object({
-  wbsNodeId: z.string().uuid({ message: "Cada línea debe imputar a un ítem EDT" }),
-  productId: z.string().uuid().optional().nullable(),
+  wbsNodeId: z.string().guid({ message: "Cada línea debe imputar a un ítem EDT" }),
+  productId: z.string().guid().optional().nullable(),
   /** Optional APU hint ([D-068]); does not change EDT imputation. */
-  costAnalysisLineId: z.string().uuid().optional().nullable(),
+  costAnalysisLineId: z.string().guid().optional().nullable(),
   /** Job-cost nature ([D-099]). Defaults to APU category or MATERIAL in the service. */
   costType: costCategorySchema.optional().nullable(),
   lineType: z.enum(["MATERIAL", "SERVICE", "OTHER"]).default("MATERIAL"),
@@ -18,9 +18,9 @@ const purchaseRequestLineSchema = z.object({
 });
 
 export const createPurchaseRequestSchema = z.object({
-  projectId: z.string().uuid(),
+  projectId: z.string().guid(),
   neededByDate: z
-    .string({ required_error: "La fecha requerida es obligatoria" })
+    .string({ error: (issue) => issue.input === undefined ? "La fecha requerida es obligatoria" : undefined })
     .date("Ingresá una fecha requerida válida"),
   notes: z.string().optional().nullable(),
   lines: z.array(purchaseRequestLineSchema).min(1, "Debe tener al menos una línea"),
@@ -28,7 +28,7 @@ export const createPurchaseRequestSchema = z.object({
 
 export const updatePurchaseRequestSchema = z.object({
   neededByDate: z
-    .string({ required_error: "La fecha requerida es obligatoria" })
+    .string({ error: (issue) => issue.input === undefined ? "La fecha requerida es obligatoria" : undefined })
     .date("Ingresá una fecha requerida válida")
     .optional(),
   notes: z.string().optional().nullable(),
@@ -41,17 +41,17 @@ export const returnPurchaseRequestSchema = z.object({
 });
 
 const quoteLineSchema = z.object({
-  purchaseRequestLineId: z.string().uuid(),
+  purchaseRequestLineId: z.string().guid(),
   offerKind: z.enum(QUOTE_LINE_OFFER_KINDS).optional().nullable(),
   unitPrice: unitPriceString,
-  taxRate: ratePctString.refine((value) => !value.startsWith("-"), "El impuesto no puede ser negativo").default("21"),
+  taxRate: ratePctString.refine((value) => !value.startsWith("-"), "El impuesto no puede ser negativo").prefault("21"),
   discountPct: discountPctString.optional().default("0.0000"),
   sortOrder: z.number().int().default(0),
 });
 
 export const createProcurementQuoteSchema = z.object({
-  purchaseRequestId: z.string().uuid(),
-  supplierContactId: z.string().uuid(),
+  purchaseRequestId: z.string().guid(),
+  supplierContactId: z.string().guid(),
   currency: z.string().trim().regex(/^[A-Z]{3}$/, "Moneda inválida").default("ARS"),
   fxRate: optionalFxRateString,
   validUntil: z.string().date("Ingresá una fecha de vigencia válida").optional().nullable(),
@@ -60,7 +60,7 @@ export const createProcurementQuoteSchema = z.object({
   /** Ephemeral input flag [D-086]: unit price is gross (Factura B). Not persisted. */
   pricesIncludeTax: z.boolean().optional(),
   /** Percepción IIBB % on net subtotal ([D-112]). Default 3%. */
-  iibbPerceptionRate: ratePctString.optional().default(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
+  iibbPerceptionRate: ratePctString.optional().prefault(DEFAULT_IIBB_PERCEPTION_RATE_PCT),
   lines: z.array(quoteLineSchema).min(1),
 });
 
@@ -81,9 +81,9 @@ export const confirmPurchaseOrderSchema = z.object({
 
 /** Award whole PR lines from one quote onto a new DRAFT PO ([BR-PUR-024]). */
 export const createPurchaseOrderFromQuoteLinesSchema = z.object({
-  procurementQuoteId: z.string().uuid(),
+  procurementQuoteId: z.string().guid(),
   purchaseRequestLineIds: z
-    .array(z.string().uuid())
+    .array(z.string().guid())
     .min(1, "Seleccioná al menos un ítem")
     .refine((ids) => new Set(ids).size === ids.length, {
       message: "Cada ítem solo puede adjudicarse una vez",
@@ -93,13 +93,13 @@ export const createPurchaseOrderFromQuoteLinesSchema = z.object({
 /** Batch award: one transaction, one OC per quote group ([BR-PUR-024]). */
 export const createPurchaseOrdersFromAwardsSchema = z
   .object({
-    purchaseRequestId: z.string().uuid(),
+    purchaseRequestId: z.string().guid(),
     groups: z
       .array(
         z.object({
-          procurementQuoteId: z.string().uuid(),
+          procurementQuoteId: z.string().guid(),
           purchaseRequestLineIds: z
-            .array(z.string().uuid())
+            .array(z.string().guid())
             .min(1, "Cada grupo debe tener al menos un ítem")
             .refine((ids) => new Set(ids).size === ids.length, {
               message: "Cada ítem solo puede adjudicarse una vez en el grupo",

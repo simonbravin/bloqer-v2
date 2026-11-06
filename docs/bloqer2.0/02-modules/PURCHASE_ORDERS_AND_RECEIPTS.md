@@ -86,6 +86,7 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 - Matching 3 vías OC ↔ recepción ↔ factura ([BR-PUR-012]).
 - Panel de facturación: cobertura monetaria neto + IVA, sin IIBB (D-112); pagos son importes efectivos completos. El indicador `allIssuedInvoicesSettled` es derivado, no persistido: requiere facturas emitidas, Payables consistentes en estado PAID y saldo canónico normalizado cero (D-115). Sin facturas/Payable válido no afirma cierre. La nota de crédito puede saldar sin pago de caja; la presentación dice sin saldo pendiente, no pago efectivo.
 - Ese indicador financiero incluye obligaciones de ND emitidas vinculadas a la OC o referenciadas a sus facturas; las NC/ND siguen fuera de la cobertura/cantidades de recepción. El indicador derivado `allReceivedAmountIssued` usa solo cobertura emitida: las reservas DRAFT evitan duplicados pero no completan Facturar (D-006/D-108).
+- El atajo D-108 usa las cantidades recibidas pendientes comprobables por línea, incluso cuando la diferencia entre importes es cero. Para líneas históricas sin vínculo se conserva el criterio de cobertura monetaria disponible. Si hay una edición guardada en el borrador automático, **Completar factura** permite incorporar las nuevas cantidades manualmente ([D-145](../00-product/DECISION_LOG.md#d-145--protección-de-un-borrador-de-proveedor-editado-al-recibir-otra-entrega)).
 - Cierre parcial con saldo sin recibir ([BR-PUR-013]).
 
 ## 14. Reportes relacionados

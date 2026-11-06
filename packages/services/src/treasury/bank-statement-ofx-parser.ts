@@ -13,7 +13,7 @@ import { BANK_STATEMENT_CSV_MAX_ROWS } from "./bank-statement-csv-parser";
 export const BANK_STATEMENT_OFX_MAX_ROWS = BANK_STATEMENT_CSV_MAX_ROWS;
 
 export type ParseBankStatementOfxResult =
-  | { ok: true; lines: ParsedBankStatementCsvLine[] }
+  | { ok: true; lines: ParsedBankStatementCsvLine[]; declaredCurrencies: string[] }
   | { ok: false; error: string };
 
 function decodeOfxEntities(s: string): string {
@@ -106,6 +106,19 @@ function extractOfxBody(text: string): string {
   return text;
 }
 
+/** CURDEF declares the statement's default currency, not an individual transfer's currency. */
+function readStatementCurrencies(body: string): string[] {
+  const currencies = new Set<string>();
+  for (const match of body.matchAll(/<(STMTRS|CCSTMTRS)>([\s\S]*?)(?:<\/\1>|(?=<(?:STMTRS|CCSTMTRS)>|$))/gi)) {
+    const statement = match[2]!;
+    const firstTransaction = statement.search(/<STMTTRN>/i);
+    if (firstTransaction < 0) continue;
+    const code = tagValue(statement.slice(0, firstTransaction), "CURDEF")?.toUpperCase();
+    if (code && /^[A-Z]{3}$/.test(code)) currencies.add(code);
+  }
+  return [...currencies];
+}
+
 export function parseBankStatementOfx(text: string): ParseBankStatementOfxResult {
   if (!text || !text.trim()) {
     return { ok: false, error: "El archivo OFX está vacío" };
@@ -191,5 +204,5 @@ export function parseBankStatementOfx(text: string): ParseBankStatementOfxResult
     });
   }
 
-  return { ok: true, lines };
+  return { ok: true, lines, declaredCurrencies: readStatementCurrencies(body) };
 }

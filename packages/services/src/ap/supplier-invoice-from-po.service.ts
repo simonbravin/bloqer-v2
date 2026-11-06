@@ -30,6 +30,7 @@ import {
   buildInvoiceDraftLinesFromPo,
   clampReceiptQuantitiesToPendingInvoice,
   computePendingToInvoiceAmount,
+  poLinesWithUncoveredInvoiceQuantity,
   sumPoLinesReceivedAmount,
   type CostCategoryCode,
   type InvoiceDraftLineInput,
@@ -66,8 +67,12 @@ export type PurchaseOrderBillingSummary = {
   allIssuedInvoicesSettled: boolean;
   /** Received neto+IVA is covered by ISSUED invoices, excluding DRAFT reservations. */
   allReceivedAmountIssued: boolean;
+  /** ISSUED line coverage for the workflow, falling back to monetary coverage for unlinked lines. */
+  allReceivedInvoiceLinesIssued: boolean;
   /** Received − (ISSUED + DRAFT reserved). */
   pendingToInvoice: string;
+  /** Received billable lines still uncovered by both issued and draft invoices. */
+  pendingInvoiceLineIds: string[];
   hasReceivedQuantity: boolean;
   draftInvoiceCount: number;
   /** Header-linked invoices whose quantities cannot be fully matched to PO lines. */
@@ -131,6 +136,12 @@ const billingInvoiceScopeSelect = {
   tenantId: true, companyId: true, projectId: true, supplierContactId: true,
 } as const;
 
+function assertComparableBillingCurrency(invoiceCurrency: string, orderCurrency: string): void {
+  if (invoiceCurrency !== orderCurrency) {
+    throw new ServiceError("VALIDATION", "No se puede calcular la facturación: la orden y sus facturas tienen monedas distintas. Los comprobantes conservan su moneda; no se convierten ni se suman importes incompatibles.");
+  }
+}
+
 function isBillingPayableSettled(payable: {
   status: string;
   originalAmount: Prisma.Decimal;
@@ -182,6 +193,14 @@ export async function getPurchaseOrderBillingSummary(
   }
 
   const po = await loadPoForBilling(purchaseOrderId, ctx);
+  return summarizePurchaseOrderBilling(po, ctx);
+}
+
+async function summarizePurchaseOrderBilling(
+  po: BillingOrderScope,
+  ctx: ServiceContext,
+): Promise<PurchaseOrderBillingSummary> {
+  const purchaseOrderId = po.id;
   const poLines = po.lines.map(toPoLineDraft);
   const receivedAmount = sumPoLinesReceivedAmount(poLines);
   const hasReceivedQuantity = po.lines.some((l) => l.receivedQuantity.greaterThan(0));
@@ -214,20 +233,21 @@ export async function getPurchaseOrderBillingSummary(
   let allIssuedInvoicesSettled = true;
   let draftInvoiceCount = 0;
   let unlinkedInvoiceCount = 0;
+  let hasUnlinkedIssuedInvoice = false;
   let openDraftInvoiceId: string | null = null;
   const invoicedQtyByPoLine = new Map<string, Prisma.Decimal>();
+  const issuedQtyByPoLine = new Map<string, Prisma.Decimal>();
 
   for (const inv of invoices) {
     assertBillingInvoiceScope(inv, po);
-    if (inv.currency !== po.currency) {
-      throw new ServiceError("VALIDATION", "No se puede calcular la facturación: la orden y sus facturas tienen monedas distintas. Los comprobantes conservan su moneda; no se convierten ni se suman importes incompatibles.");
-    }
+    assertComparableBillingCurrency(inv.currency, po.currency);
     if (inv.payable && (inv.payable.tenantId !== inv.tenantId || inv.payable.companyId !== inv.companyId ||
         inv.payable.projectId !== inv.projectId || inv.payable.supplierContactId !== inv.supplierContactId ||
         inv.payable.supplierInvoiceId !== inv.id || inv.payable.currency !== inv.currency)) {
       throw new ServiceError("CONFLICT", "La factura y su cuenta por pagar tienen relaciones inconsistentes.");
     }
-    if (inv.lines.some((line) => !line.purchaseOrderLineId)) unlinkedInvoiceCount += 1;
+    const hasUnlinkedLines = inv.lines.some((line) => !line.purchaseOrderLineId);
+    if (hasUnlinkedLines) unlinkedInvoiceCount += 1;
     // Coverage vs recibido uses neto+IVA only — IIBB is crédito fiscal, not goods coverage ([D-112]).
     const goodsTaxAmount = inv.subtotal.plus(inv.taxAmount);
     if (inv.status === "DRAFT") {
@@ -244,6 +264,7 @@ export async function getPurchaseOrderBillingSummary(
     }
     invoicedAmount = invoicedAmount.add(goodsTaxAmount);
     issuedInvoiceCount += 1;
+    hasUnlinkedIssuedInvoice ||= hasUnlinkedLines;
     if (!isBillingPayableSettled(inv.payable)) allIssuedInvoicesSettled = false;
     if (inv.payable && inv.payable.status !== "CANCELLED") {
       paidAmount = paidAmount.add(inv.payable.paidAmount);
@@ -252,6 +273,8 @@ export async function getPurchaseOrderBillingSummary(
       if (!line.purchaseOrderLineId) continue;
       const prev = invoicedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
       invoicedQtyByPoLine.set(line.purchaseOrderLineId, prev.add(line.quantity));
+      const issued = issuedQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+      issuedQtyByPoLine.set(line.purchaseOrderLineId, issued.add(line.quantity));
     }
   }
 
@@ -313,6 +336,16 @@ export async function getPurchaseOrderBillingSummary(
   const coveredAmount = invoicedAmount.add(draftReservedAmount);
   const pendingToInvoice = computePendingToInvoiceAmount(receivedAmount, coveredAmount);
   const pendingIssuedCoverage = computePendingToInvoiceAmount(receivedAmount, invoicedAmount);
+  const allReceivedAmountIssued = issuedInvoiceCount > 0 && hasReceivedQuantity &&
+    serializeMoneyDecimal(pendingIssuedCoverage) === "0.00";
+  // Header-only invoices cannot prove coverage by item. Preserve the monetary guard for them.
+  const pendingInvoiceLineIds = unlinkedInvoiceCount > 0 && serializeMoneyDecimal(pendingToInvoice) === "0.00"
+    ? []
+    : poLinesWithUncoveredInvoiceQuantity(po.lines, invoicedQtyByPoLine);
+  const allReceivedInvoiceLinesIssued = issuedInvoiceCount > 0 && hasReceivedQuantity && (
+    poLinesWithUncoveredInvoiceQuantity(po.lines, issuedQtyByPoLine).length === 0 ||
+    (hasUnlinkedIssuedInvoice && allReceivedAmountIssued)
+  );
 
   return {
     receivedAmount: serializeMoneyDecimal(receivedAmount),
@@ -321,8 +354,10 @@ export async function getPurchaseOrderBillingSummary(
     draftReservedAmount: serializeMoneyDecimal(draftReservedAmount),
     paidAmount: serializeMoneyDecimal(paidAmount),
     allIssuedInvoicesSettled: issuedInvoiceCount > 0 && allIssuedInvoicesSettled,
-    allReceivedAmountIssued: issuedInvoiceCount > 0 && hasReceivedQuantity && serializeMoneyDecimal(pendingIssuedCoverage) === "0.00",
+    allReceivedAmountIssued,
+    allReceivedInvoiceLinesIssued,
     pendingToInvoice: serializeMoneyDecimal(pendingToInvoice),
+    pendingInvoiceLineIds,
     hasReceivedQuantity,
     draftInvoiceCount,
     unlinkedInvoiceCount,
@@ -361,10 +396,10 @@ export async function getPurchaseOrderInvoiceDraftPreview(
     throw new ServiceError("CONFLICT", "La orden de compra no pertenece a este proyecto");
   }
 
-  const summary = await getPurchaseOrderBillingSummary(purchaseOrderId, ctx);
+  const summary = await summarizePurchaseOrderBilling(po, ctx);
   const poLines = po.lines.map(toPoLineDraft);
   const receivedAmount = sumPoLinesReceivedAmount(poLines);
-  const issuedQtyByPoLine = new Map(
+  const coveredQtyByPoLine = new Map(
     summary.lineMatches.map((l) => {
       // lineMatches.include draft+issued; for Traer líneas we want pending vs all reserved.
       return [l.poLineId, new Prisma.Decimal(l.invoicedQty)] as const;
@@ -373,12 +408,11 @@ export async function getPurchaseOrderInvoiceDraftPreview(
   const coveredAmount = new Prisma.Decimal(summary.invoicedAmount).add(
     new Prisma.Decimal(summary.draftReservedAmount),
   );
-  const basis = coveredAmount.greaterThan(0) ? "remaining" : "received";
-  const lines = buildInvoiceDraftLinesFromPo(poLines, {
-    basis,
+  const lines = summary.pendingInvoiceLineIds.length === 0 ? [] : buildInvoiceDraftLinesFromPo(poLines, {
+    basis: "remaining",
     receivedAmount,
     invoicedAmount: coveredAmount,
-    invoicedQtyByPoLine: issuedQtyByPoLine,
+    invoicedQtyByPoLine: coveredQtyByPoLine,
   });
 
   return {
@@ -652,12 +686,17 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     }
 
     const poLines = po.lines.map(toPoLineDraft);
-    // Exclude the open auto-draft so a later receipt can refresh its lines ([D-108]).
-    const coveredQtyByPoLine = await loadCoveredQtyByPoLine(
-      po,
-      existingDraft?.id ?? null,
-      tx,
+    const orderReceivedAmount = sumPoLinesReceivedAmount(poLines);
+    // Exclude the open auto-draft from reservations so a later receipt can refresh its lines.
+    const { coveredQtyByPoLine, amount, hasUnlinkedInvoice } = await loadInvoiceDraftCoverage(
+      po, existingDraft?.id ?? null, tx,
     );
+    if (hasUnlinkedInvoice && serializeMoneyDecimal(computePendingToInvoiceAmount(orderReceivedAmount, amount)) === "0.00") {
+      throw new ServiceError(
+        "CONFLICT",
+        "Las facturas sin vínculo a un renglón ya cubren el importe recibido. Revisá sus comprobantes antes de preparar otro borrador.",
+      );
+    }
 
     if (receiptQuantities) {
       receiptQuantities = clampReceiptQuantitiesToPendingInvoice(
@@ -676,7 +715,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
           if (orderQty.lessThanOrEqualTo(0)) return acc;
           return acc.add(lineTotal.mul(new Prisma.Decimal(qty)).div(orderQty));
         }, new Prisma.Decimal(0))
-      : sumPoLinesReceivedAmount(poLines);
+      : orderReceivedAmount;
 
     if (receivedAmount.lessThanOrEqualTo(0)) {
       if (existingDraft) {
@@ -704,7 +743,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     const draftLines = existingDraft
       ? buildInvoiceDraftLinesFromPo(poLines, {
           basis: "remaining",
-          receivedAmount: sumPoLinesReceivedAmount(poLines),
+          receivedAmount: orderReceivedAmount,
           invoicedAmount: coveredMoney,
           invoicedQtyByPoLine: coveredQtyByPoLine,
         })
@@ -715,7 +754,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
               ? "remaining"
               : (input.basis ?? "received"),
           receiptQuantities,
-          receivedAmount: sumPoLinesReceivedAmount(poLines),
+          receivedAmount: orderReceivedAmount,
           invoicedAmount: coveredMoney,
           invoicedQtyByPoLine: coveredQtyByPoLine,
         });
@@ -730,6 +769,7 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
     if (existingDraft) {
       await syncAutoFromPoDraftLines(tx, {
         draftId: existingDraft.id,
+        tenantId: existingDraft.tenantId,
         existingLines: existingDraft.lines,
         draftLines,
         invoiceLetter: existingDraft.invoiceLetter,
@@ -787,12 +827,12 @@ export async function createSupplierInvoiceDraftFromPurchaseOrder(
   }, { maxWait: 10_000, timeout: 30_000 });
 }
 
-/** Qty already on ISSUED + other DRAFTs (optionally excluding one auto-draft being refreshed). */
-async function loadCoveredQtyByPoLine(
+/** ISSUED and DRAFT coverage, excluding the auto-draft being refreshed. */
+async function loadInvoiceDraftCoverage(
   po: BillingOrderScope,
   excludeDraftId: string | null,
   db: Prisma.TransactionClient = prisma,
-): Promise<Map<string, Prisma.Decimal>> {
+) {
   const invoices = await db.supplierInvoice.findMany({
     where: {
       purchaseOrderId: po.id,
@@ -800,33 +840,44 @@ async function loadCoveredQtyByPoLine(
       status: { in: ["DRAFT", "ISSUED"] },
       ...(excludeDraftId ? { id: { not: excludeDraftId } } : {}),
     },
-    select: { ...billingInvoiceScopeSelect, lines: { select: { purchaseOrderLineId: true, quantity: true } } },
+    select: {
+      ...billingInvoiceScopeSelect,
+      currency: true, subtotal: true, taxAmount: true,
+      lines: { select: { purchaseOrderLineId: true, quantity: true } },
+    },
   });
-  const map = new Map<string, Prisma.Decimal>();
+  const coveredQtyByPoLine = new Map<string, Prisma.Decimal>();
+  let amount = new Prisma.Decimal(0);
+  let hasUnlinkedInvoice = false;
   for (const inv of invoices) {
     assertBillingInvoiceScope(inv, po);
+    assertComparableBillingCurrency(inv.currency, po.currency);
+    amount = amount.add(inv.subtotal).add(inv.taxAmount);
     for (const line of inv.lines) {
-      if (!line.purchaseOrderLineId) continue;
-      const prev = map.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
-      map.set(line.purchaseOrderLineId, prev.add(line.quantity));
+      if (!line.purchaseOrderLineId) {
+        hasUnlinkedInvoice = true;
+        continue;
+      }
+      const prev = coveredQtyByPoLine.get(line.purchaseOrderLineId) ?? new Prisma.Decimal(0);
+      coveredQtyByPoLine.set(line.purchaseOrderLineId, prev.add(line.quantity));
     }
   }
-  return map;
+  return { coveredQtyByPoLine, amount, hasUnlinkedInvoice };
 }
 
 function autoDraftLinesAlreadyCover(
   existingLines: Array<{ purchaseOrderLineId: string | null; quantity: Prisma.Decimal }>,
   targets: InvoiceDraftLineInput[],
 ): boolean {
-  const byPo = new Map<string, string>();
+  const byPo = new Map<string, Prisma.Decimal>();
   for (const l of existingLines) {
-    if (!l.purchaseOrderLineId) continue;
-    byPo.set(l.purchaseOrderLineId, serializeQtyDecimal(l.quantity));
+    if (!l.purchaseOrderLineId || byPo.has(l.purchaseOrderLineId)) return false;
+    byPo.set(l.purchaseOrderLineId, l.quantity);
   }
   if (byPo.size !== targets.length) return false;
   for (const t of targets) {
     if (!t.purchaseOrderLineId) return false;
-    if (byPo.get(t.purchaseOrderLineId) !== t.quantity) return false;
+    if (!byPo.get(t.purchaseOrderLineId)?.equals(t.quantity)) return false;
   }
   return true;
 }
@@ -837,6 +888,7 @@ function autoDraftLinesAlreadyCover(
  */
 async function syncAutoFromPoDraftLines(tx: Prisma.TransactionClient, params: {
   draftId: string;
+  tenantId: string;
   existingLines: Array<{ purchaseOrderLineId: string | null; quantity: Prisma.Decimal }>;
   draftLines: InvoiceDraftLineInput[];
   invoiceLetter: string | null;
@@ -845,6 +897,23 @@ async function syncAutoFromPoDraftLines(tx: Prisma.TransactionClient, params: {
 }): Promise<void> {
   if (autoDraftLinesAlreadyCover(params.existingLines, params.draftLines)) {
     return;
+  }
+
+  // D-145: a saved edit is provenance to protect, not a basis for recalculating fiscal lines.
+  const savedEdit = await tx.auditLog.findFirst({
+    where: {
+      tenantId: params.tenantId,
+      entityType: "SupplierInvoice",
+      entityId: params.draftId,
+      action: "supplier_invoice.updated",
+    },
+    select: { id: true },
+  });
+  if (savedEdit) {
+    throw new ServiceError(
+      "CONFLICT",
+      "El borrador ya tiene ediciones guardadas. Abrí Completar factura y agregá las cantidades nuevas manualmente.",
+    );
   }
 
   const forceZeroTax = params.invoiceLetter === "C" || params.invoiceLetter === "E";

@@ -45,6 +45,8 @@ Elegir **una** de estas dos convenciones (documentar la elegida en el proyecto V
 | **Preview** | Deploy por PR (schema migrado automático o manual según política) |
 | **Production** | Rama protegida; migraciones con checklist |
 
+En Vercel el paso de migración comprueba `VERCEL_ENV`, que ambas URLs apuntan a la misma base y esquema, y que `DIRECT_URL` usa la conexión directa. Production requiere el compute de portal, base `neondb` y esquema `public`. Preview y Development requieren un compute diferente del de portal. Un destino inválido detiene el build antes de invocar Prisma. Los builds locales y CI con `VERCEL` desactivado omiten la migración.
+
 ## Pipeline conceptual (sin YAML aquí)
 
 1. CI: lint, typecheck, tests.  

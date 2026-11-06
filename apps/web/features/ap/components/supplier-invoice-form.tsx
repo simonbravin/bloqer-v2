@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions } from "@/lib/searchable-options";
-import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
+import { formatMoneyAmount } from "@/lib/format-money";
 import { InvoiceLinesEditor } from "./invoice-lines-editor";
 import type { InvoiceLine, InvoiceWbsOption } from "./invoice-lines-editor";
 import { DocumentUploadZone } from "@/features/documents/components/document-upload-zone";
@@ -800,7 +800,7 @@ function PoBillingReference({
   if (!preview) return null;
 
   const { summary, currency } = preview;
-  const hasPending = preview.lines.length > 0 && isPositiveMoneyAmount(summary.pendingToInvoice);
+  const hasPending = preview.lines.length > 0;
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -821,7 +821,7 @@ function PoBillingReference({
           Pagado: <span className="font-medium tabular-nums text-foreground">{formatMoneyAmount(summary.paidAmount, currency)}</span>
         </span>
         <span className="text-muted-foreground">
-          Pendiente de facturar:{" "}
+          Pendiente por importes:{" "}
           <span className="font-semibold tabular-nums text-foreground">{formatMoneyAmount(summary.pendingToInvoice, currency)}</span>
         </span>
       </div>
@@ -832,7 +832,7 @@ function PoBillingReference({
       ) : (
         <p className="text-xs text-muted-foreground">
           {summary.hasReceivedQuantity
-            ? "No hay saldo pendiente de facturar en esta OC."
+            ? "No hay cantidades pendientes que se puedan sugerir desde esta OC."
             : "La OC aún no tiene cantidades recibidas para facturar."}
         </p>
       )}

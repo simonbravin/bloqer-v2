@@ -1,0 +1,99 @@
+{
+  "phase": "AG-14",
+  "status": "closed_local",
+  "date": "2026-11-05",
+  "base": "45bdc41c6c3e825ad911f2727c62e101d10b9104",
+  "previousRelease": {
+    "phase": "AG-13",
+    "pr": 11,
+    "main": "f3b76b37b4b9576106e0794e4716552bf6ff7db2",
+    "productionVerified": true
+  },
+  "findings": [
+    {
+      "id": "GA-AG-14-001",
+      "title": "Facturación de recepciones según cobertura por línea",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-002",
+      "title": "Borrador fiscal editado al recibir otra entrega",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-003",
+      "title": "Mutaciones confirmadas ante fallos de efectos secundarios",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-004",
+      "title": "Pendientes de Campo con empresa, moneda y módulo comprobados",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-005",
+      "title": "Paridad de Avances y cartera de certificaciones",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-006",
+      "title": "Agregación de saldos de Tesorería",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-007",
+      "title": "Coherencia de los pares de transferencia y de la importación bancaria",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-008",
+      "title": "Dependencias y protección de sesión",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-009",
+      "title": "Destino comprobado antes de migrar en Vercel",
+      "state": "corrected_verified"
+    },
+    {
+      "id": "GA-AG-14-010",
+      "title": "Registro técnico de errores de persistencia",
+      "state": "corrected_verified"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "D-145",
+      "question": "Q-092"
+    }
+  ],
+  "verification": {
+    "generalPassed": 2776,
+    "topLevelSuitesSkipped": 44,
+    "isolatedSqlDistinctPassed": 49,
+    "isolatedMigrationsApplied": 73,
+    "aiStructuralSimulatedPassed": 202,
+    "typecheckTasksPassed": 13,
+    "lint": "passed",
+    "build": "passed",
+    "buildSourceMatches": 116,
+    "compiledEdgeSessionCasesPassed": 5,
+    "docsIndexChunks": 598,
+    "sharedFirstLoadJsKb": 103,
+    "dependencyAdvisoriesBefore": 42,
+    "dependencyAdvisoriesAfter": {
+      "critical": 0,
+      "high": 0,
+      "moderate": 0,
+      "low": 1
+    },
+    "browser": "deferred_to_ux_ui_stage",
+    "providers": "simulated_or_disabled",
+    "evidenceDirectory": "output/platform-audit/ag-14-2026-11-05"
+  },
+  "followUp": [
+    "Publicación de AG-14",
+    "Validación de sesión y proveedores en entornos autorizados",
+    "Revisión integral UX/UI"
+  ]
+}

@@ -40,7 +40,7 @@ async function handleOperationalAlertsCron(req: NextRequest): Promise<NextRespon
 
   const tenantIdRaw = req.nextUrl.searchParams.get("tenantId");
   if (tenantIdRaw !== null && tenantIdRaw !== "") {
-    const parsed = z.string().uuid().safeParse(tenantIdRaw);
+    const parsed = z.string().guid().safeParse(tenantIdRaw);
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: "invalid_tenant_id" }, { status: 400 });
     }

@@ -31,7 +31,7 @@ import {
   ServiceError,
 } from "@bloqer/services";
 import { PageShell } from "@/components/layout/page-shell";
-import { formatQtyFromString, isPositiveMoneyAmount } from "@/lib/format-money";
+import { formatQtyFromString } from "@/lib/format-money";
 import { toDateInput } from "@/lib/date-input";
 import {
   cancelPurchaseReceiptAction,
@@ -124,10 +124,9 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
 
   const canEditAp = canRegisterApInvoice(current.tenantCtx.roles);
   const isConfirmed = receipt.status === "CONFIRMED";
-  const canInvoiceNow =
-    isConfirmed &&
-    billing?.hasReceivedQuantity &&
-    isPositiveMoneyAmount(billing.pendingToInvoice);
+  const pendingInvoiceLineIds = new Set(billing?.pendingInvoiceLineIds);
+  const canInvoiceNow = isConfirmed &&
+    receipt.lines.some((line) => pendingInvoiceLineIds.has(line.purchaseOrderLineId));
   const highlightBilling = canInvoiceNow && sp.siguiente === "facturar";
   const actionBtn = procurementActionBtnClass;
 
@@ -231,6 +230,7 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
           purchaseOrderId={receipt.purchaseOrderId}
           purchaseReceiptId={receiptId}
           billing={billing}
+          hasPendingLines={canInvoiceNow}
           canEditAp={canEditAp}
           errorReturnPath={`/proyectos/${id}/recepciones/${receiptId}`}
           highlighted={highlightBilling}

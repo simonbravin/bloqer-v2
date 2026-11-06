@@ -299,19 +299,30 @@ function installReportFixture(shared = false) {
   });
   data.invoices.push({
     id: "inv",
+    tenantId: "tenant",
+    companyId: "company",
+    projectId: "project",
+    clientContactId: "client",
     issueDate: new Date("2026-07-02"),
     dueDate: new Date("2026-08-01"),
     currency: "ARS",
     totalAmount: d(48400),
     receivable: {
+      tenantId: "tenant", companyId: "company", projectId: "project", clientContactId: "client",
+      currency: "ARS",
       originalAmount: d(48400),
       status: "PARTIAL",
       collections: [
-        { amount: d(10000), collectionDate: new Date("2026-08-15"), currency: "ARS" },
-        { amount: d(5000), collectionDate: new Date("2026-09-01"), currency: "ARS" },
+        { amount: d(10000), collectionDate: new Date("2026-08-15"), currency: "ARS",
+          companyId: "company", clientContactId: "client", salesInvoiceId: "inv" },
+        { amount: d(5000), collectionDate: new Date("2026-09-01"), currency: "ARS",
+          companyId: "company", clientContactId: "client", salesInvoiceId: "inv" },
       ],
       creditApplications: [
-        { amount: d(4840), creditNoteSalesInvoice: { issueDate: new Date("2026-08-20") } },
+        { amount: d(4840), companyId: "company", creditNoteSalesInvoice: {
+          issueDate: new Date("2026-08-20"), tenantId: "tenant", companyId: "company", projectId: "project",
+          clientContactId: "client", currency: "ARS", documentKind: "CREDIT_NOTE", referencedSalesInvoiceId: "inv",
+        } },
       ],
     },
   });
@@ -502,6 +513,7 @@ describe("project progress complete service cuts", () => {
       amount: d(1),
       collectionDate: new Date("2026-08-20"),
       currency: "USD",
+      companyId: "company", clientContactId: "client", salesInvoiceId: "inv",
     });
     const report = await getProjectProgressReport(
       "project",
@@ -512,6 +524,34 @@ describe("project progress complete service cuts", () => {
     assert.equal(report.financial.invoiced, null);
     assert.equal(report.series[0]!.invoiced, "48400.00");
     assert.equal(report.series[0]!.collected, "0.00");
+  });
+
+  it("keeps invoiced amounts but does not infer settlement from an invoice with a foreign receivable", async () => {
+    const fixture = installReportFixture(true);
+    fixture.invoices[0]!.receivable!.companyId = "other-company";
+    const report = await getProjectProgressReport("project", { dateTo: "2026-08-31" }, ctx);
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.financial.invoiced, "48400.00");
+    assert.equal(report.financial.collected, null);
+    assert.equal(report.financial.receivableBalance, null);
+    assert.equal(report.financial.overdueBalance, null);
+    assert.equal(report.sourceDates.collections, null);
+    assert.match(report.warnings.join(" "), /relación con la factura no se pudo comprobar/);
+  });
+
+  it("only invalidates settlement cuts that include a collection or credit from a conflicting invoice", async () => {
+    const fixture = installReportFixture();
+    const receivable = fixture.invoices[0]!.receivable!;
+    receivable.collections[0]!.salesInvoiceId = "different-invoice";
+    receivable.creditApplications[0]!.creditNoteSalesInvoice.referencedSalesInvoiceId = "different-invoice";
+    const report = await getProjectProgressReport(
+      "project", { dateFrom: "2026-07-01", dateTo: "2026-08-31" }, ctx,
+    );
+    if (report.type !== "REPORT") return assert.fail("Expected a report");
+    assert.equal(report.series[0]!.collected, "0.00");
+    assert.equal(report.financial.invoiced, "48400.00");
+    assert.equal(report.financial.collected, null);
+    assert.equal(report.financial.receivableBalance, null);
   });
 
   it("does not publish partial budget totals or global budget ratios when a CostItem is missing", async () => {
@@ -1007,5 +1047,24 @@ describe("project progress access, filters and scoped reads", () => {
     assert.deepEqual(result.invoices, []);
     assert.equal(result.hasDirectSales, false);
     assert.deepEqual(result.payments, []);
+  });
+
+  it("blocks invoice links when certification is visible without AR", async () => {
+    replaceMethod(prisma.wbsNode, "findMany", async () => []);
+    let certificationArgs: unknown;
+    replaceMethod(prisma.certification, "findMany", async (args) => {
+      certificationArgs = args;
+      return [];
+    });
+    await readProjectProgressEvidence(
+      { tenantId: "tenant", projectId: "project", companyId: "company" },
+      ["budget"],
+      new Date(),
+      { ...none, certifications: true },
+    );
+    assert.deepEqual(
+      (certificationArgs as { select: { salesInvoices: { where: object } } }).select.salesInvoices.where,
+      { id: { in: [] } },
+    );
   });
 });

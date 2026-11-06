@@ -13,9 +13,9 @@ FINANCE (+ PM para hitos intermedios).
 ## 4. Pasos
 1. Generar **SalesInvoice** desde certificación (o manual). A lo sumo **una factura activa** (no `CANCELLED`) por `certificationId` — guard en service + índice parcial DB `sales_invoices_one_active_per_certification_key`.
 2. Estado factura `ISSUED` → crea **Receivable** (`receivable.created`) y aviso `RECEIVABLE_READY_TO_COLLECT` a finanzas empresa ([D-072]).
-3. Registrar **Collection**: seleccionar cuenta destino, montos, FX. Solo la cobranza acredita tesorería ([D-072]).
-4. Aplicar cobranza a factura(s); permite parciales ([D-010]).
-5. Confirmar → **AccountMovement INCOME** + actualización `paid_amount`.
+3. Abrir la **CxC** de la factura y elegir **Cobrar**. Elegir cuenta de la misma moneda, fecha, importe y FX manual para moneda extranjera. [Registrar cobranza](./REGISTER_COLLECTION.md).
+4. Aplicar el cobro a esa única obligación. Una misma CxC admite varios cobros parciales ([D-010]).
+5. Confirmar para registrar **AccountMovement** `INFLOW` y actualizar `paid_amount`. La cobranza acredita tesorería ([D-072]).
 
 ## 5. Postcondiciones
 - Avance financiero del proyecto actualizado.

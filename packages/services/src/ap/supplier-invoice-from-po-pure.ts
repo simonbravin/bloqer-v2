@@ -53,7 +53,11 @@ export {
 } from "./supplier-invoice-from-po-markers";
 
 /** Received value for a PO line (proportional to lineTotal). */
-export function poLineReceivedAmount(line: PoLineForInvoiceDraft): Prisma.Decimal {
+export function poLineReceivedAmount(line: {
+  orderQuantity: Prisma.Decimal.Value;
+  receivedQuantity: Prisma.Decimal.Value;
+  lineTotal: Prisma.Decimal.Value;
+}): Prisma.Decimal {
   const orderQty = new Prisma.Decimal(line.orderQuantity);
   const receivedQty = new Prisma.Decimal(line.receivedQuantity);
   const lineTotal = new Prisma.Decimal(line.lineTotal);
@@ -71,6 +75,17 @@ export function computePendingToInvoiceAmount(
 ): Prisma.Decimal {
   const pending = receivedAmount.sub(invoicedAmount);
   return pending.greaterThan(0) ? pending : ZERO;
+}
+
+/** Find billable receipt quantities without comparing different fiscal unit prices. */
+export function poLinesWithUncoveredInvoiceQuantity(
+  lines: ReadonlyArray<{ id: string; receivedQuantity: Prisma.Decimal.Value; lineTotal: Prisma.Decimal.Value }>,
+  coveredQtyByPoLine: ReadonlyMap<string, Prisma.Decimal>,
+): string[] {
+  return lines.filter((line) =>
+    new Prisma.Decimal(line.lineTotal).greaterThan(0) &&
+    new Prisma.Decimal(line.receivedQuantity).greaterThan(coveredQtyByPoLine.get(line.id) ?? ZERO),
+  ).map((line) => line.id);
 }
 
 /**

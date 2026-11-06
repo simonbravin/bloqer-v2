@@ -8,22 +8,21 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveVercelMigrationTarget } from "./vercel-migration-target.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-if (process.env.VERCEL !== "1") {
-  process.exit(0);
-}
-
-if (!process.env.DATABASE_URL || !process.env.DIRECT_URL) {
-  console.error(
-    "[vercel-migrate] DATABASE_URL and DIRECT_URL are required on Vercel to run prisma migrate deploy.",
-  );
+let target;
+try {
+  target = resolveVercelMigrationTarget(process.env);
+} catch (error) {
+  console.error(`[vercel-migrate] ${error.message}`);
   process.exit(1);
 }
+if (target === null) process.exit(0);
 
 console.log(
-  `[vercel-migrate] prisma migrate deploy (VERCEL_ENV=${process.env.VERCEL_ENV ?? "unknown"})`,
+  `[vercel-migrate] prisma migrate deploy (VERCEL_ENV=${target})`,
 );
 
 const result = spawnSync("pnpm", ["exec", "prisma", "migrate", "deploy"], {

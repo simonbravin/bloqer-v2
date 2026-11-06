@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const auth = await requireReportExportContext();
   if (!auth.ok) return auth.response;
   const sp = searchParamsRecord(req);
-  const accountId = z.string().uuid().safeParse(sp.accountId || undefined).success
+  const accountId = z.string().guid().safeParse(sp.accountId || undefined).success
     ? sp.accountId
     : undefined;
   try {

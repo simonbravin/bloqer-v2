@@ -144,7 +144,7 @@ test("billing panel renders all amounts with the original order currency", () =>
   const { PoBillingNextStepPanel } = load<{ PoBillingNextStepPanel: (props: unknown) => Element }>("../components/po-billing-next-step-panel.tsx", {}, {
     "./procurement-amber-callout": { ProcurementAmberCallout: "ProcurementAmberCallout" }, "../lib/procurement-ui": { procurementActionBtnClass: "action" },
   });
-  const tree = PoBillingNextStepPanel({ projectId: "project", purchaseOrderId: "order", billing: { currency: "USD", hasReceivedQuantity: true, receivedAmount: "10.00", invoicedAmount: "5.00", paidAmount: "3.00", pendingToInvoice: "3.00", draftInvoiceCount: 1, draftReservedAmount: "2.00", lineMatches: [] }, canEditAp: false });
+  const tree = PoBillingNextStepPanel({ projectId: "project", purchaseOrderId: "order", billing: { currency: "USD", hasReceivedQuantity: true, receivedAmount: "10.00", invoicedAmount: "5.00", paidAmount: "3.00", pendingToInvoice: "3.00", draftInvoiceCount: 1, draftReservedAmount: "2.00", lineMatches: [] }, hasPendingLines: true, canEditAp: false });
   const content = text(tree);
   for (const amount of ["10.00", "5.00", "3.00", "2.00"]) assert.ok(content.includes(`USD ${amount}`));
   assert.ok(content.includes("Facturación de la OC · USD"));
@@ -153,20 +153,22 @@ test("billing panel renders all amounts with the original order currency", () =>
 });
 
 for (const scenario of [
-  { name: "unpaid perceptions remain pending after a payment covering net plus VAT", receivedAmount: "121.00", draftReservedAmount: "0.00", draftInvoiceCount: 0, paidAmount: "121.00", settled: false, allReceivedAmountIssued: true, expectedState: "current", expectedInvoiceState: "done", expectedComplete: false },
-  { name: "credit-note settlement completes payment stage without cash", receivedAmount: "121.00", draftReservedAmount: "0.00", draftInvoiceCount: 0, paidAmount: "0.00", settled: true, allReceivedAmountIssued: true, expectedState: "done", expectedInvoiceState: "done", expectedComplete: true },
-  { name: "a paid issued invoice plus a draft reservation still requires invoicing", receivedAmount: "242.00", draftReservedAmount: "121.00", draftInvoiceCount: 1, paidAmount: "124.00", settled: true, allReceivedAmountIssued: false, expectedState: "upcoming", expectedInvoiceState: "current", expectedComplete: false },
+  { name: "unpaid perceptions remain pending after a payment covering net plus VAT", receivedAmount: "121.00", draftReservedAmount: "0.00", draftInvoiceCount: 0, paidAmount: "121.00", settled: false, allReceivedAmountIssued: true, allReceivedInvoiceLinesIssued: true, expectedState: "current", expectedInvoiceState: "done", expectedComplete: false },
+  { name: "credit-note settlement completes payment stage without cash", receivedAmount: "121.00", draftReservedAmount: "0.00", draftInvoiceCount: 0, paidAmount: "0.00", settled: true, allReceivedAmountIssued: true, allReceivedInvoiceLinesIssued: true, expectedState: "done", expectedInvoiceState: "done", expectedComplete: true },
+  { name: "a paid issued invoice plus a draft reservation still requires invoicing", receivedAmount: "242.00", draftReservedAmount: "121.00", draftInvoiceCount: 1, paidAmount: "124.00", settled: true, allReceivedAmountIssued: false, allReceivedInvoiceLinesIssued: false, expectedState: "upcoming", expectedInvoiceState: "current", expectedComplete: false },
+  { name: "a zero monetary gap keeps the next step when a received line is still pending", receivedAmount: "121.00", draftReservedAmount: "0.00", draftInvoiceCount: 0, paidAmount: "121.00", settled: true, allReceivedAmountIssued: true, allReceivedInvoiceLinesIssued: false, pendingInvoiceLineIds: ["pending"], expectedState: "upcoming", expectedInvoiceState: "current", expectedComplete: false },
 ]) {
   test(`order settlement uses the canonical flag: ${scenario.name}`, async () => {
     const { default: Page } = load<{ default: (props: unknown) => Promise<Element> }>("../../../app/(app)/proyectos/[id]/ordenes-compra/[poId]/page.tsx", orderServices({
       getPurchaseOrderById: async () => ({ id: "order", projectId: "project", companyId: "company", code: "OC-001", currency: "ARS", status: "RECEIVED", lines: [], supplierName: "Supplier", totalAmount: "124.00", taxAmount: "21.00", subtotal: "100.00" }),
-      getPurchaseOrderBillingSummary: async () => ({ currency: "ARS", receivedAmount: scenario.receivedAmount, invoicedAmount: "121.00", draftReservedAmount: scenario.draftReservedAmount, paidAmount: scenario.paidAmount, pendingToInvoice: "0.00", hasReceivedQuantity: true, draftInvoiceCount: scenario.draftInvoiceCount, unlinkedInvoiceCount: 0, openDraftInvoiceId: null, lineMatches: [], matchWarningCount: 0, allIssuedInvoicesSettled: scenario.settled, allReceivedAmountIssued: scenario.allReceivedAmountIssued }),
+      getPurchaseOrderBillingSummary: async () => ({ currency: "ARS", receivedAmount: scenario.receivedAmount, invoicedAmount: "121.00", draftReservedAmount: scenario.draftReservedAmount, paidAmount: scenario.paidAmount, pendingToInvoice: "0.00", hasReceivedQuantity: true, draftInvoiceCount: scenario.draftInvoiceCount, unlinkedInvoiceCount: 0, openDraftInvoiceId: null, lineMatches: [], matchWarningCount: 0, allIssuedInvoicesSettled: scenario.settled, allReceivedAmountIssued: scenario.allReceivedAmountIssued, allReceivedInvoiceLinesIssued: scenario.allReceivedInvoiceLinesIssued, pendingInvoiceLineIds: scenario.pendingInvoiceLineIds ?? [] }),
       listSupplierInvoicesByPurchaseOrder: async () => [],
     }), { "@/features/procurement/lib/purchase-order-process-steps": orderProcess });
     const tree = await Page({ params: Promise.resolve({ id: "project", poId: "order" }), searchParams: Promise.resolve({}) });
     const steps = elements(tree, "ProcessStepper")[0]!.props.steps as { id: string; state: string }[];
     assert.equal(steps.find((step) => step.id === "pay")?.state, scenario.expectedState);
     assert.equal(steps.find((step) => step.id === "invoice")?.state, scenario.expectedInvoiceState);
+    assert.equal(elements(tree, "PoBillingNextStepPanel")[0]!.props.hasPendingLines, Boolean(scenario.pendingInvoiceLineIds?.length));
     const nextProps = elements(tree, "PurchaseOrderNextStep")[0]!.props;
     assert.equal(nextProps.paymentSettled, scenario.expectedComplete);
     const { PurchaseOrderNextStep } = load<{ PurchaseOrderNextStep: (props: unknown) => Element }>("../components/purchase-order-next-step.tsx", {});

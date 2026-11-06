@@ -5,7 +5,7 @@ export const bankStatementLineDirectionEnum = z.enum(["CREDIT", "DEBIT"]);
 
 export const createBankReconciliationSchema = z
   .object({
-    accountId: z.string().uuid(),
+    accountId: z.string().guid(),
     periodStart: z.string().date("Fecha desde inválida"),
     periodEnd: z.string().date("Fecha hasta inválida"),
     openingBalance: moneyAmountString,
@@ -23,7 +23,7 @@ export const createBankReconciliationSchema = z
   });
 
 export const addBankStatementLineSchema = z.object({
-  reconciliationId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
   lineDate: z.string().date("Fecha inválida"),
   description: z.string().trim().min(1).max(500),
   amount: positiveMoneyAmountString,
@@ -38,33 +38,33 @@ export const addBankStatementLineSchema = z.object({
 });
 
 export const matchBankReconciliationSchema = z.object({
-  reconciliationId: z.string().uuid(),
-  statementLineId: z.string().uuid(),
-  accountMovementId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
+  statementLineId: z.string().guid(),
+  accountMovementId: z.string().guid(),
 });
 
 /** Raw CSV text for bank statement import ([D-076]). */
 export const importBankStatementCsvSchema = z.object({
-  reconciliationId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
   csvText: z.string().min(1).max(1_000_000),
 });
 
 /** Raw OFX/QFX text for bank statement import ([D-079]). */
 export const importBankStatementOfxSchema = z.object({
-  reconciliationId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
   ofxText: z.string().min(1).max(2_000_000),
 });
 
 /** Create system movement from unmatched statement line and match ([BANK_RECONCILIATION.md] §8). */
 export const createMovementFromStatementLineSchema = z.object({
-  reconciliationId: z.string().uuid(),
-  statementLineId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
+  statementLineId: z.string().guid(),
   fxRate: optionalFxRateString,
 });
 
 /** Reopen CLOSED session with audited reason ([D-080]). */
 export const reopenBankReconciliationSchema = z.object({
-  reconciliationId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
   reason: z
     .string()
     .trim()
@@ -74,7 +74,7 @@ export const reopenBankReconciliationSchema = z.object({
 
 /** Cancel session; reason required when cancelling a CLOSED session. */
 export const cancelBankReconciliationSchema = z.object({
-  reconciliationId: z.string().uuid(),
+  reconciliationId: z.string().guid(),
   reason: z
     .string()
     .trim()
