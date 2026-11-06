@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ClipboardList, HardHat, Home, Menu, Plus } from "lucide-react";
 import { can, type PermissionModule, type UserRole } from "@bloqer/domain";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,8 @@ import { isPendingInboxPath } from "@/lib/field-pending-path";
 import { useFieldProjectContext } from "@/lib/field-project-context";
 import { pendingCountAriaLabel } from "@/lib/pending-count-badge";
 import { usePendingInboxCount } from "@/lib/pending-inbox-count-context";
+import { MD_UP_QUERY, useMediaQuery } from "@/lib/media-query";
+import { focusShellSidebarToggle } from "@/components/layout/sidebar-shell-context";
 import { PendingCountBadge } from "@/components/ui/pending-count-badge";
 import { FieldPlusSheet } from "./field-plus-sheet";
 import { FieldMoreSheet } from "./field-more-sheet";
@@ -20,14 +22,26 @@ type Props = {
   moduleGateSnapshot: Partial<Record<PermissionModule, boolean>>;
 };
 
+function restoreFieldMenuFocus(event: Event, trigger: HTMLButtonElement | null) {
+  event.preventDefault();
+  if (trigger?.getClientRects().length) trigger.focus();
+  else focusShellSidebarToggle();
+}
+
 export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
   const pathname = usePathname();
+  const isMdUp = useMediaQuery(MD_UP_QUERY);
   const { convenienceProjectId, pathProjectId } = useFieldProjectContext();
   const { tenantCount } = usePendingInboxCount();
-  const [plusOpen, setPlusOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<{ kind: "plus" | "more"; pathname: string } | null>(null);
+  const plusOpen = openMenu?.pathname === pathname && openMenu.kind === "plus";
+  const moreOpen = openMenu?.pathname === pathname && openMenu.kind === "more";
   const plusButtonRef = useRef<HTMLButtonElement>(null);
   const moreButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setOpenMenu(null);
+  }, [pathname, isMdUp]);
 
   if (isFieldImmersivePath(pathname)) return null;
 
@@ -90,7 +104,7 @@ export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
               aria-expanded={plusOpen}
               data-testid="field-plus-button"
               className="-mt-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
-              onClick={() => setPlusOpen(true)}
+              onClick={() => setOpenMenu({ kind: "plus", pathname })}
             >
               <Plus className="h-6 w-6" aria-hidden />
             </button>
@@ -121,7 +135,7 @@ export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
               aria-expanded={moreOpen}
               data-testid="field-more-button"
               className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 px-1 pt-2 text-[11px] text-muted-foreground"
-              onClick={() => setMoreOpen(true)}
+              onClick={() => setOpenMenu({ kind: "more", pathname })}
             >
               <Menu className="h-5 w-5" aria-hidden />
               Más
@@ -129,30 +143,27 @@ export function FieldBottomNav({ roles, moduleGateSnapshot }: Props) {
           </li>
         </ul>
       </nav>
-      <FieldPlusSheet
-        open={plusOpen}
-        onOpenChange={setPlusOpen}
-        roles={roles}
-        moduleGateSnapshot={moduleGateSnapshot}
-        convenienceProjectId={convenienceProjectId}
-        onCloseAutoFocus={(event) => {
-          if (!plusButtonRef.current) return;
-          event.preventDefault();
-          plusButtonRef.current.focus();
-        }}
-      />
-      <FieldMoreSheet
-        open={moreOpen}
-        onOpenChange={setMoreOpen}
-        roles={roles}
-        moduleGateSnapshot={moduleGateSnapshot}
-        projectId={pathProjectId}
-        onCloseAutoFocus={(event) => {
-          if (!moreButtonRef.current) return;
-          event.preventDefault();
-          moreButtonRef.current.focus();
-        }}
-      />
+      {!isMdUp ? (
+        <>
+          <FieldPlusSheet
+            key={pathname}
+            open={plusOpen}
+            onOpenChange={(open) => setOpenMenu(open ? { kind: "plus", pathname } : null)}
+            roles={roles}
+            moduleGateSnapshot={moduleGateSnapshot}
+            convenienceProjectId={convenienceProjectId}
+            onCloseAutoFocus={(event) => restoreFieldMenuFocus(event, plusButtonRef.current)}
+          />
+          <FieldMoreSheet
+            open={moreOpen}
+            onOpenChange={(open) => setOpenMenu(open ? { kind: "more", pathname } : null)}
+            roles={roles}
+            moduleGateSnapshot={moduleGateSnapshot}
+            projectId={pathProjectId}
+            onCloseAutoFocus={(event) => restoreFieldMenuFocus(event, moreButtonRef.current)}
+          />
+        </>
+      ) : null}
     </>
   );
 }

@@ -7,6 +7,8 @@ import {
   isPayablesFieldViewport,
   isReceivablesFieldViewport,
   parseViewportHint,
+  readViewportHintFromDocument,
+  shouldRefreshForViewport,
   viewportHintFromMatchMedia,
 } from "./viewport-hint-cookie";
 
@@ -43,4 +45,40 @@ test("matchMedia maps 390/768/1440 onto sm/md/lg", () => {
   assert.equal(viewportHintFromMatchMedia(false, false), "sm");
   assert.equal(viewportHintFromMatchMedia(true, false), "md");
   assert.equal(viewportHintFromMatchMedia(true, true), "lg");
+});
+
+test("malformed viewport cookies are ignored instead of interrupting sync", () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, "document");
+  const browserDocument = { cookie: "unrelated=lg; bloqer-viewport=%E0%A4%A" };
+  Object.defineProperty(globalThis, "document", { configurable: true, value: browserDocument });
+  try {
+    assert.equal(readViewportHintFromDocument(), null);
+    browserDocument.cookie = "unrelated=lg; bloqer-viewport=l%67";
+    assert.equal(readViewportHintFromDocument(), "lg");
+  } finally {
+    if (previous) Object.defineProperty(globalThis, "document", previous);
+    else Reflect.deleteProperty(globalThis, "document");
+  }
+});
+
+test("labor and equipment switch view on direct desktop entry and cross the 1024px breakpoint", () => {
+  for (const section of ["mano-obra", "equipos"]) {
+    const href = `/proyectos/project-id/${section}`;
+    assert.equal(shouldRefreshForViewport(href, null, "lg"), true);
+    assert.equal(shouldRefreshForViewport(href, null, "md"), false);
+    assert.equal(shouldRefreshForViewport(href, "md", "lg"), true);
+    assert.equal(shouldRefreshForViewport(href, "lg", "md"), true);
+    assert.equal(shouldRefreshForViewport(href, "md", "sm"), false);
+  }
+});
+
+test("dashboard switches at 768px while financial details use the 1024px breakpoint", () => {
+  assert.equal(shouldRefreshForViewport("/dashboard", null, "md"), true);
+  assert.equal(shouldRefreshForViewport("/dashboard", "sm", "md"), true);
+  assert.equal(shouldRefreshForViewport("/dashboard", "md", "lg"), false);
+  assert.equal(shouldRefreshForViewport("/dashboard", "md", "sm"), true);
+  assert.equal(shouldRefreshForViewport("/finanzas/cuentas-por-cobrar/id/cobrar", null, "lg"), true);
+  assert.equal(shouldRefreshForViewport("/proyectos/id/cuentas-por-pagar/id/pagar", "lg", "md"), true);
+  assert.equal(shouldRefreshForViewport("/proyectos/id/documentos", null, "lg"), false);
+  assert.equal(shouldRefreshForViewport("/proyectos/id/documentos", "sm", "lg"), true);
 });

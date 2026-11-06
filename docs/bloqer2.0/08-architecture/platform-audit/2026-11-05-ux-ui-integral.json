@@ -1,0 +1,45 @@
+{
+  "audit": "UX/UI integral",
+  "date": "2026-11-05",
+  "baseCommit": "18179baccbca65a1b99771be486cf12e03f3dccc",
+  "status": "verified-locally",
+  "release": {
+    "stage": "AG-14",
+    "pullRequest": 12,
+    "productionCommit": "a3e88ef41bfa314eb9ab1f1ffc13f924eb189205",
+    "productionDeployment": 7589461635
+  },
+  "verification": {
+    "browser": "Chromium",
+    "environment": "isolated local instance with synthetic data",
+    "roles": ["anonymous", "OWNER", "PROJECT_VIEWER", "SITE_FOREMAN"],
+    "themes": ["light", "dark"],
+    "viewportSizes": [[1440, 1000], [768, 1024], [390, 844], [320, 720], [430, 932], [1024, 768], [390, 500]],
+    "broadScenarios": 65,
+    "broadVisits": 227,
+    "targetedVisits": 86,
+    "alternateFormatVisits": 30,
+    "finalRegressionVisits": 12,
+    "interactionsPassed": 42,
+    "generalTestsPassed": 2793,
+    "typecheckTasksPassed": 13,
+    "lintPassed": true,
+    "buildPassed": true,
+    "diffCheckPassed": true,
+    "matchedSourceFiles": 64,
+    "helpIndexChunks": 600
+  },
+  "findings": [
+    { "id": "GA-UX-001", "area": "Decimal editing and action validation", "status": "corrected" },
+    { "id": "GA-UX-002", "area": "Receipt quantity identity and precision", "status": "corrected" },
+    { "id": "GA-UX-003", "area": "Process stepper overflow", "status": "corrected" },
+    { "id": "GA-UX-004", "area": "Table scrolling and focus", "status": "corrected" },
+    { "id": "GA-UX-005", "area": "Navigation and responsive headers", "status": "corrected" },
+    { "id": "GA-UX-006", "area": "Notification recovery and layout", "status": "corrected" },
+    { "id": "GA-UX-007", "area": "Certification measurements and Kanban", "status": "corrected" },
+    { "id": "GA-UX-008", "area": "Project progress filters and section replacement", "status": "corrected" },
+    { "id": "GA-UX-009", "area": "Input contrast and password keyboard access", "status": "corrected" },
+    { "id": "GA-UX-010", "area": "Legacy invoice and material consumption redirects", "status": "corrected" }
+  ],
+  "localEvidence": "output/platform-audit/ux-ui-2026-11-05/"
+}

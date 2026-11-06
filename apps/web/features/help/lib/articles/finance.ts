@@ -125,6 +125,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
       "Prerrequisito: presupuesto APPROVED o CLOSED.",
       "Nueva certificación con período. El alta es solo el encabezado.",
       "La planilla muestra una fila por partida. Buscá por código o nombre, desplegá los rubros o usá Expandir todo / Contraer todo. Los padres sólo agrupan: no se miden. La búsqueda abre las coincidencias y conserva sus padres.",
+      "Medir y Editar están junto al nombre de la partida. Al cerrar el diálogo con Escape, el foco vuelve a la partida o a la búsqueda si la fila ya no se muestra.",
       "Medir propone el avance físico aprobado hasta el cierre, descontando los otros certificados emitidos o aprobados. Ejemplo: 37% real y 12% ya certificado → 25% pendiente. Compras y Recepciones son alternativas editables basadas en costo neto / presupuesto de costo; no modifican el % físico. Sin datos comparables no se inventa una sugerencia.",
       "Si una fuente de Libro de obra, Compras, Recepciones o Costos está restringida, la planilla lo advierte. — o ausencia de sugerencia no significa cero avance; las mediciones guardadas conservan su propia lectura.",
       "Revisá Cantidad de este período, % físico de este período y Monto a certificar. Cantidad y físico son independientes. Guardar medición graba sólo esa partida; Cancelar no guarda. Una medición existente conserva sus valores y precio de venta. Ver libro y costos de referencia despliega el detalle.",

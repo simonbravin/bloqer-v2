@@ -10,8 +10,8 @@ import * as formatMoney from "../../../lib/format-money";
 import * as attachmentLimits from "../../subcontracts/lib/create-attachment-limits";
 import * as domain from "@bloqer/domain";
 
-type Element = { type: unknown; props: Record<string, unknown> };
-const jsx = (type: unknown, props: Record<string, unknown>): Element => ({ type, props });
+type Element = { type: unknown; props: Record<string, unknown>; key?: string | number };
+const jsx = (type: unknown, props: Record<string, unknown>, key?: string | number): Element => ({ type, props, key });
 function nodes(tree: unknown): Element[] {
   if (Array.isArray(tree)) return tree.flatMap(nodes);
   if (!tree || typeof tree !== "object" || !("props" in tree)) return [];
@@ -1196,6 +1196,41 @@ test("subcontract editor preserves identity fields and computes native money onl
   assert.equal(elements(render(), "DecimalInput")[0]!.props.value, "1.2345");
 });
 
+test("subcontract rows keep each decimal draft with its own line when removing or prefilling", () => {
+  const env = environment();
+  const { SubcontractForm } = load<{ SubcontractForm(p: unknown): Element }>(
+    "../../subcontracts/components/subcontract-form.tsx",
+    env.dependencies,
+  );
+  const hint = { wbsNodeId: "wbs", name: "Partida", code: "1", unit: "m2", quantity: "2", budgetSubcontractTotal: "10", currency: "ARS" };
+  const render = () => env.render(() => SubcontractForm({
+    projectId: "p",
+    companyId: "c",
+    subcontractorOptions: [],
+    wbsOptions: [],
+    budgetHints: [hint],
+    action: () => assert.fail("does not submit"),
+  }));
+  const rowKeys = (tree: Element) => elements(tree, "TableRow")
+    .filter((node) => elements(node, "DecimalInput").length > 0)
+    .map((node) => node.key);
+
+  click(eventButton(render(), "+ Agregar línea"));
+  const twoRows = render();
+  const [first, second] = rowKeys(twoRows);
+  assert.notEqual(first, second);
+  click(eventButton(twoRows, "×"));
+  const oneRow = render();
+  assert.deepEqual(rowKeys(oneRow), [second]);
+
+  const onPick = elements(oneRow, "SubcontractBudgetHints")[0]!.props.onPick as (value: typeof hint) => void;
+  onPick(hint);
+  const filled = render();
+  assert.equal(rowKeys(filled).length, 1);
+  assert.notEqual(rowKeys(filled)[0], second);
+  assert.equal(elements(filled, "DecimalInput")[0]!.props.value, "2");
+});
+
 test("subcontract hint displays its source currency and permits only comparable picks", () => {
   const env = environment();
   const picked: string[] = [];
@@ -1251,6 +1286,11 @@ test("measurement keeps canonical strings and its revision, with no false zero f
   const env = environment(),
     request = deferred<{ error: string }>(),
     sent: Record<string, unknown>[] = [];
+  let validDecimal = false;
+  env.dependencies["@/components/ui/decimal-input"] = {
+    DecimalInput: "DecimalInput",
+    reportInvalidDecimalInputs: () => validDecimal,
+  };
   const { CertificationMeasureForm } = load<{ CertificationMeasureForm(p: unknown): Element }>(
     "../components/certification-measure-form.tsx",
     env.dependencies,
@@ -1283,6 +1323,9 @@ test("measurement keeps canonical strings and its revision, with no false zero f
     "—",
   );
   click(eventButton(tree, "Guardar medición"));
+  assert.equal(sent.length, 0, "an invalid edit cannot save the previous quantities");
+  validDecimal = true;
+  click(eventButton(tree, "Guardar medición"));
   click(eventButton(tree, "Guardar medición"));
   assert.equal(sent.length, 1);
   assert.equal(sent[0]!.expectedRevision, "revision");
@@ -1299,6 +1342,7 @@ for (const kind of ["new", "header", "measurement"] as const) {
   test(`${kind} dialog cannot discard an in-flight operation, including before its pending rerender`, () => {
     const env = environment();
     let render: () => Element, childType: string;
+    let measurementFocused = false;
     if (kind === "new") {
       env.dependencies["./certification-form"] = { CertificationForm: "CertificationForm" };
       const { NewCertificationDialog } = load<{ NewCertificationDialog(p: unknown): Element }>(
@@ -1343,7 +1387,7 @@ for (const kind of ["new", "header", "measurement"] as const) {
         env.render(() =>
           CertificationMeasurementWorksheet({
             sheet: {
-              rows: [row],
+              rows: [{ ...row, lineId: null }],
               groups: [],
               revision: "revision",
               sourceWarnings: ["Libro restringido"],
@@ -1351,10 +1395,13 @@ for (const kind of ["new", "header", "measurement"] as const) {
             editable: true,
           }),
         );
-      (elements(render(), "Dialog")[0]!.props.onOpenChange as (open: boolean) => void)(true);
-      // The sheet opens a row via its render callback, not by opening an empty dialog.
-      const slotEntry = nodes(render()).find((node) => node.props.onMeasure);
-      if (slotEntry) (slotEntry.props.onMeasure as () => void)();
+      const slotEntry = nodes(render()).find((node) => node.props.onMeasure)!;
+      const renderedRow = (slotEntry.type as (props: unknown) => Element)(slotEntry.props);
+      const firstCell = elements(renderedRow, "TableCell")[0];
+      const measure = elements(firstCell, "Button")[0];
+      assert.equal(measure?.props["aria-label"], `Medir ${row.code}`);
+      const trigger = { isConnected: true, disabled: false, focus() { measurementFocused = true; } };
+      (measure.props.onClick as (event: unknown) => void)({ currentTarget: trigger });
       childType = "CertificationMeasureForm";
       assert.ok(text(render()).includes("Libro restringido"));
     }
@@ -1373,6 +1420,13 @@ for (const kind of ["new", "header", "measurement"] as const) {
     (child.props.onPendingChange as (pending: boolean) => void)(false);
     (elements(render(), "Dialog")[0]!.props.onOpenChange as (open: boolean) => void)(false);
     assert.equal(elements(render(), "Dialog")[0]!.props.open, false);
+    if (kind === "measurement") {
+      let preventedDefault = false;
+      const onCloseAutoFocus = elements(render(), "DialogContent")[0]!.props.onCloseAutoFocus;
+      (onCloseAutoFocus as (event: unknown) => void)({ preventDefault() { preventedDefault = true; } });
+      assert.equal(preventedDefault, true);
+      assert.equal(measurementFocused, true);
+    }
   });
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useScheduleAction } from "../lib/use-schedule-action";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -11,7 +11,7 @@ import type {
   ScheduleWorkspaceItemDto,
 } from "@bloqer/services";
 import { Button } from "@/components/ui/button";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -105,6 +105,7 @@ export function ScheduleItemDialog({
   const [predecessorPick, setPredecessorPick] = useState("");
   const [wbsPick, setWbsPick] = useState("");
   const [progressInput, setProgressInput] = useState("");
+  const progressFieldsRef = useRef<HTMLDivElement>(null);
   const [startDateInput, setStartDateInput] = useState("");
   const [endDateInput, setEndDateInput] = useState("");
   const [tab, setTab] = useState<ScheduleItemDialogTab>(initialTab);
@@ -246,6 +247,7 @@ export function ScheduleItemDialog({
   }
 
   function saveProgress() {
+    if (!reportInvalidDecimalInputs(progressFieldsRef.current)) return;
     const pct = Number(progressInput);
     if (!progressInput.trim() || Number.isNaN(pct) || pct < 0 || pct > 100) {
       toast.error("Avance inválido (0–100)");
@@ -544,7 +546,7 @@ export function ScheduleItemDialog({
                 <p className="text-destructive">Bloqueo: {item.blockReason}</p>
               )}
               {canEditItem && !isContainer && item.status !== "CANCELLED" && item.status !== "COMPLETED" && (
-                <div className="flex items-end gap-2">
+                <div ref={progressFieldsRef} className="flex items-end gap-2">
                   <div className="min-w-0 flex-1 space-y-1">
                     <div className="flex items-center gap-1">
                       <Label className="text-xs">

@@ -32,7 +32,8 @@
     --destructive: 0 72.2% 44%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    /* Input boundaries need to remain visible on cards and form sections. */
+    --input: 215 16% 53%;
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
     /* Slightly separated from main canvas (sidebars) */
@@ -70,7 +71,7 @@
     --destructive: 0 72.2% 66%;
     --destructive-foreground: 222.2 84% 4.9%;
     --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --input: 215 16% 51%;
     --ring: 212.7 26.8% 83.9%;
     --sidebar: 222.2 47% 6%;
     --sidebar-foreground: 210 40% 98%;

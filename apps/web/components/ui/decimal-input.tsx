@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   DISPLAY_DECIMALS,
@@ -19,6 +19,20 @@ type DecimalInputProps = Omit<React.ComponentProps<typeof Input>, "value" | "onC
   /** Editable/persisted precision, independent of display (unit prices/qty/%: 4). */
   precision?: number;
 };
+
+const INVALID_DECIMAL = "Ingresá un número válido.";
+
+/** Same native feedback for decimal editors whose actions sit outside a form. */
+export function reportInvalidDecimalInputs(scope: ParentNode | null): boolean {
+  const inputs = scope?.querySelectorAll<HTMLInputElement>("input[data-decimal-input]:invalid");
+  if (!inputs) return true;
+  for (const input of inputs) {
+    if (!input.validity.customError || input.getClientRects().length === 0) continue;
+    input.reportValidity();
+    return false;
+  }
+  return true;
+}
 
 /** Canonical DecimalInput string → number for RHF `valueAsNumber` fields. */
 export function numberFromCanonicalDecimal(canonical: string): number {
@@ -63,6 +77,8 @@ export function DecimalInput({
   scale = DISPLAY_DECIMALS,
   precision = scale,
   name,
+  disabled,
+  form: formId,
   className,
   onBlur,
   onFocus,
@@ -71,8 +87,11 @@ export function DecimalInput({
 }: DecimalInputProps) {
   const [focused, setFocused] = useState(false);
   const [draft, setDraft] = useState(() => displayFromCanonical(value, scale));
+  const [invalidDraft, setInvalidDraft] = useState(false);
+  const errorId = useId();
   const hiddenRef = useRef<HTMLInputElement>(null);
   const visibleRef = useRef<HTMLInputElement>(null);
+  const previousValueRef = useRef(value);
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const precisionRef = useRef(precision);
@@ -82,27 +101,57 @@ export function DecimalInput({
   onValueChangeRef.current = onValueChange;
 
   useEffect(() => {
-    if (!focused) {
+    const valueChanged = value !== previousValueRef.current;
+    previousValueRef.current = value;
+    if (!focused && (!invalidDraft || valueChanged)) {
       setDraft(displayFromCanonical(value, scale));
       editRef.current.reset();
+      visibleRef.current?.setCustomValidity("");
+      setInvalidDraft(false);
     }
-  }, [value, scale, focused]);
+  }, [value, scale, focused, invalidDraft]);
+
+  useEffect(() => {
+    const input = visibleRef.current;
+    if (!invalidDraft || !input) return;
+    const syncValidity = () => {
+      input.setCustomValidity(input.getClientRects().length ? INVALID_DECIMAL : "");
+    };
+    syncValidity();
+    const observer = new ResizeObserver(syncValidity);
+    observer.observe(input);
+    return () => observer.disconnect();
+  }, [invalidDraft]);
 
   function emitCanonical(canonical: string) {
     if (hiddenRef.current) hiddenRef.current.value = canonical;
     onValueChangeRef.current(canonical);
   }
 
-  function commit(raw: string) {
+  function setValidity(invalid: boolean) {
+    const input = visibleRef.current;
+    input?.setCustomValidity(invalid && input.getClientRects().length ? INVALID_DECIMAL : "");
+    setInvalidDraft(invalid);
+  }
+
+  function commit(raw: string): boolean {
     // Formatting must never rewrite an untouched stored value on blur or submit.
+    let rounded: string | null;
     try {
-      const rounded = editRef.current.commit(raw, precisionRef.current);
-      if (rounded == null) return;
-      emitCanonical(rounded);
-      setDraft(rounded ? formatDecimalEditBuffer(rounded, precisionRef.current) : "");
+      rounded = editRef.current.commit(raw, precisionRef.current);
     } catch {
-      /* keep draft */
+      setValidity(true);
+      return false;
     }
+    if (rounded === null) {
+      const invalid = editRef.current.hasInvalidEdit(raw);
+      setValidity(invalid);
+      return !invalid;
+    }
+    setValidity(false);
+    emitCanonical(rounded);
+    setDraft(rounded ? formatDecimalEditBuffer(rounded, precisionRef.current) : "");
+    return true;
   }
 
   const commitRef = useRef(commit);
@@ -111,54 +160,77 @@ export function DecimalInput({
   useEffect(() => {
     const form = visibleRef.current?.form;
     if (!form) return;
-    const onSubmit = () => {
+    const onSubmit = (event: Event) => {
+      const input = visibleRef.current;
+      if (!input?.willValidate || input.getClientRects().length === 0) return;
       // Capture-phase: commit before the form reads React state (jobsite log qty, money, etc.).
+      let valid = true;
       flushSync(() => {
-        commitRef.current(draftRef.current);
+        valid = commitRef.current(draftRef.current);
       });
+      if (!valid) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        input.reportValidity();
+      }
     };
     form.addEventListener("submit", onSubmit, true);
     return () => form.removeEventListener("submit", onSubmit, true);
-  }, []);
+  }, [formId]);
+
+  const describedBy = [rest["aria-describedby"], invalidDraft && errorId].filter(Boolean).join(" ") || undefined;
 
   return (
     <>
-      {name ? <input ref={hiddenRef} type="hidden" name={name} value={value} /> : null}
+      {name ? <input ref={hiddenRef} type="hidden" name={name} value={value} form={formId} disabled={disabled} /> : null}
       <Input
         {...rest}
         ref={visibleRef}
         name={undefined}
+        form={formId}
+        disabled={disabled}
         type="text"
+        data-decimal-input=""
         inputMode="decimal"
         autoComplete="off"
-        className={cn("tabular-nums", className)}
-        value={focused ? draft : displayFromCanonical(value, scale)}
+        aria-invalid={invalidDraft || rest["aria-invalid"]}
+        aria-describedby={describedBy}
+        className={cn("tabular-nums", className, invalidDraft && "border-destructive")}
+        value={focused || invalidDraft ? draft : displayFromCanonical(value, scale)}
         onFocus={(e) => {
           setFocused(true);
-          const t = value.trim();
-          setDraft(t ? formatDecimalEditBuffer(t, precision) : "");
+          if (!invalidDraft) {
+            const t = value.trim();
+            setDraft(t ? formatDecimalEditBuffer(t, precision) : "");
+          }
           onFocus?.(e);
         }}
         onChange={(e) => {
           const next = e.target.value;
+          draftRef.current = next;
           setDraft(next);
           try {
             const canonical = editRef.current.change(next, precisionRef.current);
+            setValidity(canonical === null && editRef.current.hasInvalidEdit(next));
             if (canonical != null) emitCanonical(canonical);
           } catch {
-            /* incomplete token */
+            setValidity(true);
           }
         }}
         onKeyDown={(e) => {
           onKeyDown?.(e);
-          if (e.key === "Enter") commit(draft);
+          if (e.key === "Enter" && !e.defaultPrevented && !commit(e.currentTarget.value)) {
+            e.preventDefault();
+            e.currentTarget.reportValidity();
+          }
         }}
         onBlur={(e) => {
           setFocused(false);
-          commit(draft);
+          commit(e.currentTarget.value);
           onBlur?.(e);
         }}
       />
+      <span id={errorId} className="sr-only" aria-live="polite">{invalidDraft ? INVALID_DECIMAL : ""}</span>
     </>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
 import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { confirmPurchaseOrderAction } from "@/app/(app)/proyectos/[id]/ordenes-compra/actions";
@@ -15,12 +16,13 @@ export function ConfirmPurchaseOrderButton({ poId, projectId, currency, initialF
   const [open, setOpen] = useState(false);
   const [fxRate, setFxRate] = useState(initialFxRate);
   const [error, setError] = useState<string | null>(null);
+  const fxFieldsRef = useRef<HTMLDivElement>(null);
   const { pending, run, isRunning } = useProcurementAction();
   return <>
     <Button type="button" className={className} disabled={pending} onClick={() => setOpen(true)}>Confirmar al proveedor</Button>
     <ConfirmAlertDialog open={open} onOpenChange={(next) => { if (!isRunning()) setOpen(next); }} pending={pending}
       title="Confirmar al proveedor" confirmLabel="Confirmar OC"
-      description={<div className="space-y-3">
+      description={<div ref={fxFieldsRef} className="space-y-3">
         <p>La OC compromete el costo y queda disponible para recibir y facturar. Moneda: {currency}.</p>
         <ManualFxField id="confirm-po-fx" currency={currency} value={fxRate} onValueChange={setFxRate} disabled={pending} />
         {currency !== "ARS" ? <p className="text-xs text-muted-foreground">
@@ -28,13 +30,16 @@ export function ConfirmPurchaseOrderButton({ poId, projectId, currency, initialF
         </p> : null}
         {error ? <p className="text-destructive" role="alert">{error}</p> : null}
       </div>}
-      onConfirm={() => run(async () => {
-        setError(null);
-        if (currency !== "ARS" && !fxRate.trim()) { setError("Ingresá el tipo de cambio de esta operación"); return; }
-        const result = await confirmPurchaseOrderAction(poId, projectId, { fxRate: currency === "ARS" ? undefined : fxRate });
-        if ("error" in result) { setError(result.error); return; }
-        setOpen(false); router.refresh();
-      })}
+      onConfirm={() => {
+        if (!reportInvalidDecimalInputs(fxFieldsRef.current)) return;
+        return run(async () => {
+          setError(null);
+          if (currency !== "ARS" && !fxRate.trim()) { setError("Ingresá el tipo de cambio de esta operación"); return; }
+          const result = await confirmPurchaseOrderAction(poId, projectId, { fxRate: currency === "ARS" ? undefined : fxRate });
+          if ("error" in result) { setError(result.error); return; }
+          setOpen(false); router.refresh();
+        });
+      }}
     />
   </>;
 }

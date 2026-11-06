@@ -2,10 +2,8 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Contenedor estándar para tablas de listados y reportes.
- * Scroll horizontal en pantallas chicas. Con `stickyFirstColumn`, la primera
- * columna queda fija (los consumidores deben marcar `th`/`td` con
- * `sticky left-0 z-10 bg-card` o `bg-muted/50` en header).
+ * Marco para las tablas de listados y reportes. `Table` controla el scroll.
+ * Con `stickyFirstColumn`, la primera columna de la tabla directa queda fija.
  */
 export function TableScroll({
   children,
@@ -19,9 +17,15 @@ export function TableScroll({
   return (
     <div
       className={cn(
-        "w-full overflow-x-auto rounded-lg border bg-card",
-        stickyFirstColumn &&
-          "[&_th:first-child]:sticky [&_th:first-child]:left-0 [&_th:first-child]:z-20 [&_th:first-child]:bg-muted/80 [&_td:first-child]:sticky [&_td:first-child]:left-0 [&_td:first-child]:z-10 [&_td:first-child]:bg-card",
+        "w-full min-w-0 overflow-x-auto rounded-lg border bg-card has-[>[data-table-viewport]]:overflow-clip",
+        stickyFirstColumn && [
+          "[&>[data-table-viewport]>table>*>tr>:first-child:not(:only-child[colspan])]:sticky",
+          "[&>[data-table-viewport]>table>*>tr>:first-child:not(:only-child[colspan])]:left-0",
+          "[&>[data-table-viewport]>table>*>tr>th:first-child:not(:only-child[colspan])]:z-20",
+          "[&>[data-table-viewport]>table>*>tr>th:first-child:not(:only-child[colspan])]:bg-muted",
+          "[&>[data-table-viewport]>table>*>tr>td:first-child:not(:only-child[colspan])]:z-10",
+          "[&>[data-table-viewport]>table>*>tr>td:first-child:not(:only-child[colspan])]:bg-card",
+        ],
         className,
       )}
     >

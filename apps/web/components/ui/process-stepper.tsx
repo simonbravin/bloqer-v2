@@ -81,12 +81,11 @@ export function ProcessStepper({
     const run = () => {
       const liRect = li.getBoundingClientRect();
       const scRect = scroller.getBoundingClientRect();
-      // Only nudge horizontally when the active step is clipped — avoids jumping the page.
+      // Scroll only the track. scrollIntoView can also move the app shell.
       if (liRect.left >= scRect.left && liRect.right <= scRect.right) return;
-      li.scrollIntoView({
+      scroller.scrollTo({
+        left: scroller.scrollLeft + (liRect.left + liRect.right - scRect.left - scRect.right) / 2,
         behavior: preferReduced ? "auto" : "smooth",
-        inline: "center",
-        block: "nearest",
       });
     };
 
@@ -112,7 +111,8 @@ export function ProcessStepper({
         aria-label={ariaLabel}
         aria-describedby={mobileSummary ? summaryId : undefined}
         className={cn(
-          "flex w-full list-none items-center justify-start gap-0 overflow-x-auto overscroll-x-contain px-1 py-1.5 sm:[&>li:first-child]:ml-auto sm:[&>li:last-child]:mr-auto",
+          // Keep the absolutely positioned sr-only labels inside the track's scroll bounds.
+          "relative flex w-full list-none items-center justify-start gap-0 overflow-x-auto overscroll-x-contain px-1 py-1.5 sm:[&>li:first-child]:ml-auto sm:[&>li:last-child]:mr-auto",
           // Thin scrollbar on small screens (discoverability); hide chrome on sm+.
           "[scrollbar-width:thin] sm:[scrollbar-width:none] sm:[-ms-overflow-style:none] sm:[&::-webkit-scrollbar]:hidden",
         )}

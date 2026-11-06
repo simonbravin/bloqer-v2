@@ -71,6 +71,7 @@ export function CreateFiscalNoteDialog({
   const isCredit = kind === "CREDIT_NOTE";
   const balanceSerialized = openBalance ? serializeMoney(openBalance) : "0.00";
   const [amount, setAmount] = useState(balanceSerialized);
+  const [amountRevision, setAmountRevision] = useState(0);
   const kindLabel = FISCAL_DOCUMENT_KIND_LABELS[kind];
   const buttonLabel = triggerLabel ?? (isCredit ? "Nota de crédito" : "Nota de débito");
 
@@ -189,6 +190,7 @@ export function CreateFiscalNoteDialog({
               <div className="space-y-1">
                 <Label htmlFor="fiscal-note-amount">Monto de la NC</Label>
                 <DecimalInput
+                  key={amountRevision}
                   id="fiscal-note-amount"
                   value={amount}
                   onValueChange={setAmount}
@@ -202,7 +204,10 @@ export function CreateFiscalNoteDialog({
                       currency,
                     },
                   ]}
-                  onPick={(next) => setAmount(next)}
+                  onPick={(next) => {
+                    setAmount(next);
+                    setAmountRevision((revision) => revision + 1);
+                  }}
                 />
               </div>
             </div>

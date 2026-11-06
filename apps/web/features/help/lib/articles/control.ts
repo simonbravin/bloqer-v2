@@ -306,6 +306,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Abrí la campana (badge si hay no leídas).",
+      "Si falla la carga, usá Reintentar o Ver todas. Un aviso abre su destino aunque falle marcarlo como leído.",
       "Ver todas → /notificaciones (filtros Todas / No leídas / Leídas / Archivadas).",
       "Desde el inbox: Configurar emails → elegí qué categorías recibís por correo.",
       "Compras: Nueva solicitud (a quien aprueba SC/OC), OC pendiente / aprobada / confirmada. Si podés recibir, el aviso de OC confirmada abre el formulario de recepción.",

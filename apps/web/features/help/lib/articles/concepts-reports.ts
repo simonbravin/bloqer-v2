@@ -267,7 +267,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí Planificación → Reportes → Avances del proyecto. Desde Resumen o Cronograma también podés usar Reporte de avances.",
       "Elegí Presupuesto y Moneda. Sin recorte, el alcance incluye principal y adendas Aprobados/Cerrados de la moneda elegida. No convierte automáticamente presupuestos de otras monedas.",
-      "Elegí Movimientos desde y Fecha de corte. Los accesos rápidos de período completan los campos de fecha, incluso al volver a elegir el rango activo. La ventana visible admite hasta 120 meses calendario, sin reiniciar los acumulados ni perder el saldo anterior. El corte no puede ser futuro y usa ejecución con el estado documental actual.",
+      "Elegí Movimientos desde y Fecha de corte. Los accesos rápidos completan las fechas y conservan el presupuesto y la moneda seleccionados. Usá Aplicar para actualizar el reporte con todos los filtros. La ventana admite hasta 120 meses calendario y conserva los acumulados y el saldo anterior. El corte usa ejecución con el estado documental actual y no puede ser futuro.",
       "Leé Ejecutado · libro aprobado junto con su cobertura: el físico pondera por costo directo presupuestado de partidas hoja. Sin medición no significa 0% validado; la parte sin medir conserva su peso y el indicador parcial dice Ejecutado observado. Sin ninguna medición válida no se calcula un porcentaje.",
       "Compará Plan y ejecución registrada solo cuando haya base y cobertura. El plan usa las mismas partidas y pesos. Real · cronograma completo actual y Tareas actuales · proyecto completo muestran toda la obra hoy, sin recorte por presupuesto o corte pasado; no se suman al libro.",
       "Revisá Certificado sobre venta, Costo devengado y exposición sobre presupuesto de costo, y Cobrado sobre facturado. Cada porcentaje tiene su propio denominador y última evidencia: Última medición, Último certificado, Último registro de costo o Última cobranza. Sin evidencia al corte no confirma cero ni un atraso.",
@@ -584,6 +584,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Al editar cotizaciones, OC y facturas en borrador, cambiar notas o descripción conserva los importes de la línea. Cambiar cantidad, precio, IVA o descuento recalcula. Con IVA incluido sin descuento se conserva el total ingresado.",
       "Cantidades en pantalla: 2 decimales (ej. 1,00). % (IVA, descuento, desvíos, avance): 2 decimales (ej. 0,00 o 10,50).",
       "El mismo formato vale en OC, SC, facturas, tesorería, presupuesto, libro de obra, cronograma y políticas: coma decimal, punto de miles. Días/cotizaciones/personas siguen enteros.",
+      "Si ves Ingresá un número válido, corregí la edición antes de continuar. El campo conserva lo que escribiste. En cobros y pagos podés usar Cobrar saldo total o Pagar saldo total para recuperar el importe.",
       "Al pagar o cobrar el total: click en el saldo pendiente o dejá el default; no reescribas un redondeo distinto.",
       "Sin fondos suficientes en la cuenta, el pago se rechaza.",
     ],

@@ -73,6 +73,7 @@ export function PaymentForm({
   const matchingAccounts = accounts.filter((a) => a.currency === payableCurrency);
   const balanceSerialized = serializeMoney(payableBalance);
   const [amount, setAmount] = useState(balanceSerialized);
+  const [amountRevision, setAmountRevision] = useState(0);
   const [fxRate, setFxRate] = useState("");
   const [paymentDate, setPaymentDate] = useState(() => (fieldMode ? toIsoDateLocal() : ""));
   const [flash, setFlash] = useState(false);
@@ -84,6 +85,7 @@ export function PaymentForm({
 
   function fillAmount(next: string) {
     setAmount(serializeMoney(next));
+    setAmountRevision((revision) => revision + 1);
     setFlash(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setFlash(false), 900);
@@ -93,7 +95,7 @@ export function PaymentForm({
     return matchingAccounts.find((a) => a.id === accountId)?.name ?? "";
   }
 
-  function goConfirm() {
+  function goConfirm(rawAmount: string) {
     if (isBusy()) return;
     if (!accountId) {
       setError("Seleccioná una cuenta de tesorería");
@@ -109,7 +111,7 @@ export function PaymentForm({
         setError("Ingresá un tipo de cambio mayor a 0.");
         return;
       }
-      const rounded = roundMoney(amount);
+      const rounded = roundMoney(rawAmount);
       if (compareDecimal(rounded, "0") <= 0) {
         setError("Ingresá un monto mayor a cero");
         return;
@@ -133,6 +135,10 @@ export function PaymentForm({
     if (!accountId) { setError("Seleccioná una cuenta de tesorería"); return; }
     const fd = new FormData(e.currentTarget);
     const rawAmount = String(fd.get("amount") ?? "").trim() || amount.trim();
+    if (fieldMode && step === "form") {
+      goConfirm(rawAmount);
+      return;
+    }
     let rounded: string;
     try {
       rounded = roundMoney(rawAmount);
@@ -276,6 +282,7 @@ export function PaymentForm({
             <div className="space-y-1">
               <Label htmlFor="amount">Monto ({payableCurrency})</Label>
               <DecimalInput
+                key={amountRevision}
                 id="amount"
                 name="amount"
                 required
@@ -364,10 +371,9 @@ export function PaymentForm({
             </Button>
             {fieldMode ? (
               <Button
-                type="button"
+                type="submit"
                 disabled={isPending}
                 data-testid="payables-field-review-pay"
-                onClick={goConfirm}
               >
                 Registrar pago
               </Button>

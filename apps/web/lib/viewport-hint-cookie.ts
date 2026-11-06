@@ -14,8 +14,12 @@ export function parseViewportHint(value: string | null | undefined): ViewportHin
 export function readViewportHintFromDocument(): ViewportHint | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(new RegExp(`(?:^|; )${VIEWPORT_COOKIE}=([^;]*)`));
-  const raw = match?.[1] ? decodeURIComponent(match[1]) : null;
-  return parseViewportHint(raw);
+  if (!match?.[1]) return null;
+  try {
+    return parseViewportHint(decodeURIComponent(match[1]));
+  } catch {
+    return null;
+  }
 }
 
 export function writeViewportHintCookie(hint: ViewportHint): void {
@@ -24,7 +28,7 @@ export function writeViewportHintCookie(hint: ViewportHint): void {
   document.cookie = `${VIEWPORT_COOKIE}=${hint}; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax${secure}`;
 }
 
-/** Dashboard desktop tree: `md` (≥768) and `lg` (≥1024). Missing cookie → both trees. */
+/** Dashboard desktop tree: `md` (≥768) and `lg` (≥1024). Missing cookie → Field. */
 export function isDesktopDashboardViewport(hint: ViewportHint | null): boolean {
   return hint === "md" || hint === "lg";
 }
@@ -50,6 +54,25 @@ export function isPayablesFieldViewport(hint: ViewportHint | null): boolean {
 /** Same `lg` threshold as Cronograma/Materiales/CxP. 768 uses CxC cards. */
 export function isReceivablesFieldViewport(hint: ViewportHint | null): boolean {
   return isScheduleFieldViewport(hint);
+}
+
+const LG_WORKSPACE_ROUTES = /^\/(?:proyectos\/[^/]+\/(?:cronograma|materiales|mano-obra|equipos|cuentas-por-pagar|cuentas-por-cobrar)|finanzas\/(?:cuentas-por-pagar|cuentas-por-cobrar))(?:\/|$)/;
+
+/** On direct entry, refresh only if the cookie switches the selected RSC view. */
+export function shouldRefreshForViewport(
+  pathname: string,
+  previous: ViewportHint | null,
+  next: ViewportHint,
+): boolean {
+  if (previous === next) return false;
+  if (pathname === "/dashboard") {
+    return isDesktopDashboardViewport(previous) !== isDesktopDashboardViewport(next);
+  }
+  if (LG_WORKSPACE_ROUTES.test(pathname)) {
+    return isScheduleFieldViewport(previous) !== isScheduleFieldViewport(next);
+  }
+  // Preserve cache invalidation when resizing away from viewport-aware routes.
+  return previous !== null;
 }
 
 export function viewportHintFromMatchMedia(mdMatches: boolean, lgMatches: boolean): ViewportHint {

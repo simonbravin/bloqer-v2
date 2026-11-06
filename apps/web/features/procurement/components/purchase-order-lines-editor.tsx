@@ -2,7 +2,7 @@
 
 import type { StoredDocumentLineMoney } from "@bloqer/utils";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addDecimal, divideDecimal, roundMoney, roundQty, QTY_DECIMALS, resolveDocumentLineAmounts, effectiveUnitPriceNet, normalizeDiscountPct } from "@bloqer/utils";
 import { isGlobalUnit, IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
@@ -23,7 +23,7 @@ import {
 } from "@/lib/format-money";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -161,6 +161,9 @@ export function PurchaseOrderLinesEditor({
     [productOptions],
   );
   const [headerDiscount, setHeaderDiscount] = useState("");
+  const [discountRevision, setDiscountRevision] = useState(0);
+  const [decimalRevisions, setDecimalRevisions] = useState<Record<string, number>>({});
+  const headerDiscountRef = useRef<HTMLDivElement>(null);
   const [lineKeys, setLineKeys] = useState<string[]>(() =>
     Array.from({ length: Math.max(lines.length, 1) }, createLineKey),
   );
@@ -183,6 +186,19 @@ export function PurchaseOrderLinesEditor({
       return prev.slice(0, lines.length);
     });
   }, [lines.length]);
+
+  function replaceLineDecimals(i: number, ...fields: ("quantity" | "unitPrice")[]) {
+    if (fields.length === 0) return;
+    const lineKey = lineKeys[i] ?? String(i);
+    setDecimalRevisions((previous) => {
+      const next = { ...previous };
+      for (const field of fields) {
+        const key = `${lineKey}-${field}`;
+        next[key] = (previous[key] ?? 0) + 1;
+      }
+      return next;
+    });
+  }
 
   function update(i: number, field: keyof PurchaseOrderLine, value: string | null) {
     const lineKey = lineKeys[i] ?? String(i);
@@ -244,9 +260,8 @@ export function PurchaseOrderLinesEditor({
       update(i, "costAnalysisLineId", apuId);
       return;
     }
-    const prefillQty = isPositiveQty(apu.quantity) && apu.quantity
-      ? apu.quantity
-      : line.quantity;
+    const prefillQty = isPositiveQty(apu.quantity) ? apu.quantity : null;
+    const prefillPrice = !line.unitPrice.trim() && wbs?.budgetCurrency === currency;
     const next: PurchaseOrderLine = {
       ...line,
       costAnalysisLineId: apu.id,
@@ -256,10 +271,12 @@ export function PurchaseOrderLinesEditor({
       description: apu.description,
       unit: apu.unit,
       productId: apu.productId ?? line.productId,
-      unitPrice: line.unitPrice.trim() ? line.unitPrice : wbs?.budgetCurrency === currency ? apu.unitCost : "",
-      quantity: prefillQty,
+      unitPrice: prefillPrice ? apu.unitCost : line.unitPrice.trim() ? line.unitPrice : "",
+      quantity: prefillQty ?? line.quantity,
     };
     onChange(lines.map((l, idx) => (idx === i ? next : l)));
+    if (prefillQty) replaceLineDecimals(i, "quantity");
+    if (prefillPrice) replaceLineDecimals(i, "unitPrice");
     const hint =
       apu.needQty != null || apu.orderedQty != null
         ? `Necesidad ${formatQtyDisplay(apu.needQty)} · Pedido ${formatQtyDisplay(apu.orderedQty)} · Faltante ${formatQtyDisplay(apu.shortfallQty ?? apu.quantity)}`
@@ -272,18 +289,22 @@ export function PurchaseOrderLinesEditor({
     if (wbs?.budgetCurrency !== currency) return;
     if (!wbs?.budgetUnitCost || !isPositiveMoneyAmount(wbs.budgetUnitCost)) return;
     update(i, "unitPrice", wbs.budgetUnitCost);
+    replaceLineDecimals(i, "unitPrice");
     toast.success("Precio unitario completado con el referencial del presupuesto.");
   }
 
   /** Ajusta la cantidad para consumir el saldo disponible de la partida. */
-  function consumePartidaSaldo(i: number, line: PurchaseOrderLine, wbs?: WbsOption) {
+  function consumePartidaSaldo(i: number, line: PurchaseOrderLine, wbs: WbsOption, row: Element | null) {
     if (wbs?.budgetCurrency !== currency) return;
     if (wbs?.availableSaldo == null) return;
     if (!isPositiveMoneyAmount(wbs.availableSaldo)) {
       toast.error("La partida no tiene saldo disponible para consumir.");
       return;
     }
-    const price = line.unitPrice.trim() || wbs.budgetUnitCost || "";
+    const currentPrice = line.unitPrice.trim();
+    if (!reportInvalidDecimalInputs(row?.querySelector('[data-po-decimal="discount"]') ?? null)) return;
+    if (currentPrice && !reportInvalidDecimalInputs(row?.querySelector('[data-po-decimal="unitPrice"]') ?? null)) return;
+    const price = currentPrice || wbs.budgetUnitCost || "";
     if (!price || !isPositiveMoneyAmount(price)) {
       toast.error("Definí primero un precio unitario (o usá el referencial).");
       return;
@@ -312,10 +333,11 @@ export function PurchaseOrderLinesEditor({
     }
     const next: PurchaseOrderLine = {
       ...line,
-      unitPrice: line.unitPrice.trim() ? line.unitPrice : price,
+      unitPrice: currentPrice ? line.unitPrice : price,
       quantity: qty,
     };
     onChange(lines.map((l, idx) => (idx === i ? next : l)));
+    replaceLineDecimals(i, "quantity", ...(currentPrice ? [] : ["unitPrice"] as const));
     toast.success("Cantidad ajustada para consumir el saldo de la partida.");
   }
 
@@ -355,7 +377,7 @@ export function PurchaseOrderLinesEditor({
           <p className="text-xs text-muted-foreground">Ítems fijados por la adjudicación</p>
         )}
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div ref={headerDiscountRef} className="flex flex-wrap items-center gap-2">
         <Label htmlFor="po-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
           Descuento general %
         </Label>
@@ -373,6 +395,7 @@ export function PurchaseOrderLinesEditor({
           size="sm"
           className="min-h-11 md:min-h-8"
           onClick={() => {
+            if (!reportInvalidDecimalInputs(headerDiscountRef.current)) return;
             if (headerDiscount.trim() === "") {
               toast.error("Ingresá un descuento entre 0 y 100");
               return;
@@ -380,6 +403,7 @@ export function PurchaseOrderLinesEditor({
             try {
               const pct = normalizeDiscountPct(headerDiscount);
               onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+              setDiscountRevision((revision) => revision + 1);
               toast.success("Descuento copiado a todas las líneas");
             } catch {
               toast.error("El descuento debe estar entre 0 y 100");
@@ -466,7 +490,7 @@ export function PurchaseOrderLinesEditor({
                   {wbs?.availableSaldo != null && wbs.budgetCurrency === currency && (
                     <button
                       type="button"
-                      onClick={() => consumePartidaSaldo(i, line, wbs)}
+                      onClick={(event) => consumePartidaSaldo(i, line, wbs, event.currentTarget.closest("section"))}
                       title="Ajustar la cantidad para consumir este saldo"
                       className={`block text-left text-[10px] underline decoration-dotted underline-offset-2 hover:opacity-80 ${
                         wbs.wouldExceedBudget ? "text-destructive" : "text-muted-foreground"
@@ -595,6 +619,7 @@ export function PurchaseOrderLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label htmlFor={`po-line-${lineKey}-quantity`} className="text-xs">Cantidad</Label>
                   <DecimalInput id={`po-line-${lineKey}-quantity`}
+                    key={decimalRevisions[`${lineKey}-quantity`] ?? 0}
                     precision={4}
                     required
                     value={line.quantity}
@@ -603,9 +628,10 @@ export function PurchaseOrderLinesEditor({
                     className={LINE_FIELD_CLASS}
                   />
                 </div>
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1 min-w-0" data-po-decimal="unitPrice">
                   <Label htmlFor={`po-line-${lineKey}-unit-price`} className="text-xs">Precio unitario</Label>
                   <DecimalInput id={`po-line-${lineKey}-unit-price`}
+                    key={decimalRevisions[`${lineKey}-unitPrice`] ?? 0}
                     precision={4}
                     required
                     value={line.unitPrice}
@@ -624,6 +650,7 @@ export function PurchaseOrderLinesEditor({
                         onClick={() => {
                           if (selectedApu?.unitCost) {
                             update(i, "unitPrice", selectedApu.unitCost);
+                            replaceLineDecimals(i, "unitPrice");
                             toast.success("Precio unitario completado con el referencial del insumo APU.");
                             return;
                           }
@@ -684,9 +711,9 @@ export function PurchaseOrderLinesEditor({
               </p>
 
               <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1 min-w-0" data-po-decimal="discount">
                   <Label htmlFor={`po-line-${lineKey}-discount`} className="text-xs">Desc. %</Label>
-                  <DecimalInput id={`po-line-${lineKey}-discount`}
+                  <DecimalInput key={discountRevision} id={`po-line-${lineKey}-discount`}
                     precision={4}
                     value={line.discountPct ?? "0"}
                     onValueChange={(v) => update(i, "discountPct", v)}

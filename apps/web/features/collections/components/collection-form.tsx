@@ -73,6 +73,7 @@ export function CollectionForm({
   const matchingAccounts = accounts.filter((a) => a.currency === receivableCurrency);
   const balanceSerialized = serializeMoney(receivableBalance);
   const [amount, setAmount] = useState(balanceSerialized);
+  const [amountRevision, setAmountRevision] = useState(0);
   const [fxRate, setFxRate] = useState("");
   const [collectionDate, setCollectionDate] = useState(() => (fieldMode ? toIsoDateLocal() : ""));
   const [flash, setFlash] = useState(false);
@@ -84,6 +85,7 @@ export function CollectionForm({
 
   function fillAmount(next: string) {
     setAmount(serializeMoney(next));
+    setAmountRevision((revision) => revision + 1);
     setFlash(true);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => setFlash(false), 900);
@@ -93,7 +95,7 @@ export function CollectionForm({
     return matchingAccounts.find((a) => a.id === accountId)?.name ?? "";
   }
 
-  function goConfirm() {
+  function goConfirm(rawAmount: string) {
     if (isBusy()) return;
     if (!accountId) {
       setError("Seleccioná una cuenta de tesorería");
@@ -113,7 +115,7 @@ export function CollectionForm({
         setError("Ingresá un tipo de cambio mayor a 0.");
         return;
       }
-      const rounded = roundMoney(amount);
+      const rounded = roundMoney(rawAmount);
       if (compareDecimal(rounded, "0") <= 0) {
         setError("Ingresá un monto mayor a cero");
         return;
@@ -141,6 +143,10 @@ export function CollectionForm({
     }
     const fd = new FormData(e.currentTarget);
     const rawAmount = String(fd.get("amount") ?? "").trim() || amount.trim();
+    if (fieldMode && step === "form") {
+      goConfirm(rawAmount);
+      return;
+    }
     let rounded: string;
     try {
       rounded = roundMoney(rawAmount);
@@ -269,6 +275,7 @@ export function CollectionForm({
             <div className="space-y-1">
               <Label htmlFor="amount">Monto ({receivableCurrency})</Label>
               <DecimalInput
+                key={amountRevision}
                 id="amount"
                 name="amount"
                 required
@@ -357,10 +364,9 @@ export function CollectionForm({
             </Button>
             {fieldMode ? (
               <Button
-                type="button"
+                type="submit"
                 disabled={isPending}
                 data-testid="receivables-field-review-collect"
-                onClick={goConfirm}
               >
                 Registrar cobro
               </Button>

@@ -16,6 +16,10 @@ export class DecimalInputDraft {
     return canonical;
   }
 
+  hasInvalidEdit(raw: string): boolean {
+    return this.edited && tryParseUserDecimal(raw, "commit") === null;
+  }
+
   reset(): void {
     this.edited = false;
   }

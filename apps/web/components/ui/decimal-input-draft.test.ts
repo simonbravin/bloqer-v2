@@ -44,4 +44,18 @@ describe("decimal editing preserves document precision", () => {
     editor.reset();
     assert.equal(editor.commit("1,23", 4), null);
   });
+
+  it("identifies only malformed edits and lets pending formats or optional blanks commit", () => {
+    const editor = new DecimalInputDraft();
+    assert.equal(editor.hasInvalidEdit("abc"), false, "no edit has happened");
+    assert.equal(editor.change("abc", 2), null);
+    assert.equal(editor.hasInvalidEdit("abc"), true);
+    assert.equal(editor.commit("abc", 2), null);
+    assert.equal(editor.hasInvalidEdit("abc"), true, "an invalid blur does not clear the draft");
+    assert.equal(editor.change("1.234", 2), null, "the live amount waits for the thousands ambiguity");
+    assert.equal(editor.hasInvalidEdit("1.234"), false);
+    assert.equal(editor.commit("1.234", 2), "1234.00");
+    assert.equal(editor.change("", 2), "");
+    assert.equal(editor.hasInvalidEdit(""), false);
+  });
 });

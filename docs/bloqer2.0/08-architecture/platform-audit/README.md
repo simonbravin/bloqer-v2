@@ -210,4 +210,9 @@ Base limpia b05fa722, posterior a la entrega AG-07. [Informe](./2026-11-05-ag-08
 
 - [Informe](./2026-11-05-ag-14-cross-regression.md) y [registro estructurado](./2026-11-05-ag-14-cross-regression.json). Diez grupos corregidos en compras y ventas, Campo, reportes, caja y contabilidad, dependencias, observabilidad y despliegue.
 - D-145 aprobada para conservar borradores de proveedor con edición guardada. Dependencias de producción con cero avisos críticos, altos o moderados y un aviso bajo documentado.
-- 2.776 pruebas generales, 49 casos SQL aislados, 202 casos estructurales de Bloqer AI, tipos, lint, compilación y cinco escenarios de sesión en Edge compilado. Cierre local y revisión integral de UX/UI pendiente.
+- 2.776 pruebas generales, 49 casos SQL aislados, 202 casos estructurales de Bloqer AI, tipos, lint, compilación y cinco escenarios de sesión en Edge compilado. [Publicación AG-14](./2026-11-05-ag-14-publication.md) verificada en Production después del cierre local.
+
+## Auditoría integral de UX/UI del 05/11/2026
+
+- [Informe](./2026-11-05-ux-ui-integral.md) y [registro estructurado](./2026-11-05-ux-ui-integral.json). Diez grupos corregidos en navegación, formularios, tablas, reportes y accesibilidad.
+- La matriz amplia incluyó 65 escenarios y 227 visitas en escritorio, tablet y teléfono. Pasaron 42 comprobaciones de interacción, 2.793 pruebas generales, tipos, lint y compilación. El lote de UX/UI queda verificado localmente.

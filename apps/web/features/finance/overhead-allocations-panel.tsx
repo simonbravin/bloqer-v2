@@ -282,46 +282,45 @@ export function OverheadAllocationsPanel({
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Prorrateo automático (% empresa)</CardTitle>
             </CardHeader>
-            <CardContent className="flex flex-wrap items-end gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="overhead-pct">% sobre CD devengado</Label>
-                <DecimalInput
-                  id="overhead-pct"
-                  className="w-32"
-                  value={pct}
-                  disabled={!canEdit || pending}
-                  onValueChange={setPct}
-                  placeholder="0,00"
-                />
-              </div>
-              {canEdit ? (
-                <Button
-                  type="button"
-                  disabled={pending}
-                  onClick={() => {
-                    setError(null);
-                    startTransition(async () => {
-                      if (!pct.trim()) {
-                        setError("El porcentaje debe estar entre 0 y 100");
-                        return;
-                      }
-                      const parsed = numberFromCanonicalDecimal(pct);
-                      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
-                        setError("El porcentaje debe estar entre 0 y 100");
-                        return;
-                      }
-                      const res = await updateCompanyOverheadPctAction({
-                        companyId,
-                        overheadAllocationPct: parsed,
-                      });
-                      if ("error" in res) setError(res.error);
-                      else refresh();
+            <CardContent>
+              <form
+                className="flex flex-wrap items-end gap-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!canEdit || pending) return;
+                  setError(null);
+                  const parsed = numberFromCanonicalDecimal(pct);
+                  if (!pct.trim() || !Number.isFinite(parsed) || parsed < 0 || parsed > 100) {
+                    setError("El porcentaje debe estar entre 0 y 100");
+                    return;
+                  }
+                  startTransition(async () => {
+                    const res = await updateCompanyOverheadPctAction({
+                      companyId,
+                      overheadAllocationPct: parsed,
                     });
-                  }}
-                >
-                  Guardar %
-                </Button>
-              ) : null}
+                    if ("error" in res) setError(res.error);
+                    else refresh();
+                  });
+                }}
+              >
+                <div className="space-y-1">
+                  <Label htmlFor="overhead-pct">% sobre CD devengado</Label>
+                  <DecimalInput
+                    id="overhead-pct"
+                    className="w-32"
+                    value={pct}
+                    disabled={!canEdit || pending}
+                    onValueChange={setPct}
+                    placeholder="0,00"
+                  />
+                </div>
+                {canEdit ? (
+                  <Button type="submit" disabled={pending}>
+                    Guardar %
+                  </Button>
+                ) : null}
+              </form>
             </CardContent>
           </Card>
 

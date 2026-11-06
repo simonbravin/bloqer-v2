@@ -144,6 +144,109 @@ test("a block reason survives a failed attempt", () => {
   assert.equal(elements(render(), "Textarea")[0]!.props.value, "Falta autorización");
 });
 
+function loadKanban(env: ReturnType<typeof environment>) {
+  return load<Record<string, (props: unknown) => Element>>("../../../components/kibo-ui/kanban/index.tsx", {
+    react: {
+      ...(env.dependencies.react as object),
+      createContext: (value: unknown) => ({ Provider: "Provider", value }),
+      useContext: (context: { value: unknown }) => context.value,
+    },
+    "react-dom": {},
+    "tunnel-rat": { default: () => ({ In: "In" }) },
+    "lucide-react": { GripVertical: "GripVertical" },
+    "@dnd-kit/core": {
+      DndContext: "DndContext",
+      useSensor() {},
+      useSensors() {},
+    },
+    "@dnd-kit/sortable": {
+      useSortable: ({ disabled }: { disabled: { draggable: boolean } }) => ({
+        attributes: { role: "button", tabIndex: 0 },
+        listeners: disabled.draggable ? undefined : { onKeyDown() {} },
+      }),
+    },
+    "@dnd-kit/utilities": { CSS: { Transform: { toString() {} } } },
+    "@/lib/utils": { cn: (...parts: unknown[]) => parts.filter(Boolean).join(" ") },
+  });
+}
+
+test("Kanban separates details from the keyboard drag activator and hides mutation affordances in read-only mode", () => {
+  const env = environment();
+  const selected: string[] = [];
+  const { KanbanCard } = loadKanban(env);
+  const { ScheduleKanbanView } = load<{ ScheduleKanbanView: (props: unknown) => Element }>(
+    "../components/schedule-kanban-view.tsx",
+    {
+      ...env.dependencies,
+      "@/components/kibo-ui/kanban": { KanbanProvider: "KanbanProvider", KanbanBoard: "KanbanBoard", KanbanCards: "KanbanCards", KanbanCard: "KanbanCard" },
+      "@/lib/utils": { cn: (...parts: unknown[]) => parts.filter(Boolean).join(" ") },
+      "../actions/schedule-actions": {},
+      "../adapters/schedule-view-types": {
+        STATUS_LABELS: { PLANNED: "Planificado", IN_PROGRESS: "En curso", CANCELLED: "Cancelada" },
+        mapItemToKanbanCard: (item: { status: string }) => ({ ...item, column: item.status, badges: [] }),
+      },
+      "./schedule-progress-dimensions": { ScheduleProgressDimensions: "progress" },
+      "./schedule-block-dialog": { ScheduleBlockDialog: "block-dialog" },
+      "./schedule-empty-state": {},
+    },
+  );
+  const planned = { id: "planned", name: "Tarea", type: "TASK", status: "PLANNED", isLeaf: true };
+  const cancelled = { ...planned, id: "cancelled", status: "CANCELLED" };
+  const items = [planned, cancelled];
+  const renderCard = (canEdit: boolean, item: typeof planned) => {
+    const tree = env.render(() => ScheduleKanbanView({
+      projectId: "project", workspace: { canEdit }, items,
+      onSelect: (value: typeof planned) => selected.push(value.id),
+    }));
+    const provider = elements(tree, "KanbanProvider")[0]!;
+    const column = (provider.props.children as (column: unknown) => Element)({ id: item.status });
+    const cards = elements(column, "KanbanCards")[0]!;
+    const card = (cards.props.children as (value: unknown) => Element)({ ...item, badges: [] });
+    return KanbanCard(card.props);
+  };
+  const viewer = renderCard(false, planned);
+  const open = elements(viewer, "button")[0]!;
+  assert.equal(text(open), "Tarea");
+  assert.equal(open.props["aria-haspopup"], "dialog");
+  (open.props.onClick as () => void)();
+  assert.deepEqual(selected, ["planned"]);
+  assert.equal(elements(viewer, "Button").length, 0);
+
+  const editor = renderCard(true, planned);
+  const drag = elements(editor, "Button").find((node) => node.props["aria-label"] === "Mover Tarea")!;
+  assert.equal(typeof drag.props.onKeyDown, "function");
+  assert.equal(elements(editor, "div").some((node) => node.props.role === "button"), false);
+  assert.equal(elements(renderCard(true, cancelled), "Button").length, 0);
+});
+
+test("cancelling a Kanban drag restores its original column instead of mutating the saved card", () => {
+  const env = environment();
+  const { KanbanProvider } = loadKanban(env);
+  const original = Object.freeze({ id: "task", name: "Tarea", column: "PLANNED" });
+  let displayed = [original];
+  const render = () => env.render(() => KanbanProvider({
+    label: "Tablero Kanban del cronograma",
+    columns: [{ id: "PLANNED", name: "Planificada" }, { id: "IN_PROGRESS", name: "En curso" }],
+    data: displayed,
+    children: () => null,
+    onDataChange: (data: typeof displayed) => { displayed = data; },
+    onDragCancel: () => { displayed = [original]; },
+  }));
+  let tree = render();
+  let dnd = elements(tree, "DndContext")[0]!;
+  (dnd.props.onDragStart as (event: unknown) => void)({ active: { id: original.id } });
+  (dnd.props.onDragOver as (event: unknown) => void)({ active: { id: original.id }, over: { id: "IN_PROGRESS" } });
+  assert.equal(displayed[0]!.column, "IN_PROGRESS");
+  assert.equal(original.column, "PLANNED");
+
+  tree = render();
+  dnd = elements(tree, "DndContext")[0]!;
+  assert.equal((tree.props.value as { activeCardId: string }).activeCardId, original.id);
+  (dnd.props.onDragCancel as (event: unknown) => void)({ active: { id: original.id } });
+  assert.equal(displayed[0]!.column, "PLANNED");
+  assert.equal((render().props.value as { activeCardId: string | null }).activeCardId, null);
+});
+
 test("an old task response cannot overwrite the selected task history", async () => {
   const env = environment();
   const history = new Map<string, ReturnType<typeof deferred<unknown>>>();

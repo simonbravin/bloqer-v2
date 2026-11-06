@@ -23,7 +23,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatMoneyAmount, formatQtyFromString } from "@/lib/format-money";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { CATEGORY_LABELS, VISIBLE_COST_CATEGORIES, type VisibleCostCategory } from "@/lib/budget-categories";
 import { budgetUnitLabel } from "@/lib/budget-units";
 import { UnitSelect } from "./unit-select";
@@ -241,6 +241,8 @@ export function CostItemApuDialog({
   const [unit, setUnit] = useState("");
   const [quantity, setQuantity] = useState("");
   const quantityRef = useRef(quantity);
+  const quantityFieldRef = useRef<HTMLDivElement>(null);
+  const inlineLineFieldsRef = useRef<HTMLDivElement>(null);
   quantityRef.current = quantity;
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<LocalLine[]>([]);
@@ -358,6 +360,7 @@ export function CostItemApuDialog({
 
   function addInlineLine() {
     if (!editable || isRunning()) return;
+    if (!reportInvalidDecimalInputs(inlineLineFieldsRef.current) || !reportInvalidDecimalInputs(quantityFieldRef.current)) return;
     if (!costItem || !newDesc.trim()) {
       toast.error("Ingresá una descripción");
       return;
@@ -421,6 +424,7 @@ export function CostItemApuDialog({
   }
 
   function handleEntryModeChange(next: ApuEntryMode) {
+    if (!reportInvalidDecimalInputs(inlineLineFieldsRef.current) || !reportInvalidDecimalInputs(quantityFieldRef.current)) return;
     const itemQty = parseFloat(quantity) || 0;
     if (next === "total" && !canUseTotalPartidaMode(itemQty)) {
       toast.error("Definí la cantidad del ítem para cargar por total de partida");
@@ -452,6 +456,7 @@ export function CostItemApuDialog({
 
   function handleSave() {
     if (!editable || !costItem || !initialSnapshot || isRunning()) return;
+    if (!reportInvalidDecimalInputs(quantityFieldRef.current) || !reportInvalidDecimalInputs(inlineLineFieldsRef.current)) return;
     if (hasDraftLine) {
       toast.error("Agregá la línea APU que estás cargando antes de guardar los cambios");
       return;
@@ -554,7 +559,7 @@ export function CostItemApuDialog({
                     <p className="text-sm font-medium">{unit || "—"}</p>
                   )}
                 </div>
-                <div className="space-y-0.5">
+                <div ref={quantityFieldRef} className="space-y-0.5">
                   <Label htmlFor={`${formId}-quantity`} className="text-[11px]">Cantidad</Label>
                   {editable ? (
                     <DecimalInput
@@ -564,7 +569,8 @@ export function CostItemApuDialog({
                         quantityRef.current = v;
                         setQuantity(v);
                       }}
-                      onBlur={() => {
+                      onBlur={(event) => {
+                        if (event.currentTarget.validity.customError) return;
                         const next = parseFloat(quantityRef.current) || 0;
                         if (next > 0) syncLinesToQuantity(next);
                       }}
@@ -674,7 +680,7 @@ export function CostItemApuDialog({
                       ? `Cant. recurso de toda la partida (ej. 500 kg). Unidad Global + cant. 1 = importe sin necesidad en Materiales.`
                       : `Por cada 1 ${itemUnitLabel}. Cantidad del ítem: ${fmtNum(quantity)} ${itemUnitLabel}.`}
                   </p>
-                  <div className="grid gap-2 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
+                  <div ref={inlineLineFieldsRef} className="grid gap-2 sm:grid-cols-[1fr_6rem_5rem_6rem_auto] sm:items-end">
                     <div className="space-y-0.5">
                       <Label htmlFor={`${formId}-new-description`} className="text-[11px]">Descripción</Label>
                       <Input

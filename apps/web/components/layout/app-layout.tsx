@@ -47,6 +47,7 @@ export function AppLayout({
         <Header
           user={user}
           tenantName={tenantCtx?.tenantName}
+          hasTenantContext={Boolean(tenantCtx)}
           notificationUnreadCount={notificationUnreadCount}
           showPlatformLink={showPlatformLink}
         />
@@ -54,6 +55,7 @@ export function AppLayout({
       pendingCount={pendingCount}
       roles={roles}
       moduleGateSnapshot={moduleGateSnapshot}
+      showFieldNavigation={Boolean(tenantCtx)}
     >
       {children}
       {tenantCtx ? (

@@ -7,15 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { TableScroll } from "@/components/ui/table-scroll";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -90,14 +81,20 @@ function ReceiptQtyInput({
 }) {
   const inputId = `receipt-qty-${line.purchaseOrderLineId}`;
   return (
-    <DecimalInput
-      id={inputId}
-      value={line.quantityReceived}
-      onValueChange={(v) => onChange(index, v)}
-      placeholder="0,00"
-      className="h-11 min-h-11 text-base tabular-nums md:h-8 md:min-h-8 md:text-sm"
-      aria-label={`Cantidad recibida de ${line.description}`}
-    />
+    <div className="space-y-1 md:space-y-0">
+      <Label htmlFor={inputId} className="text-sm font-semibold md:sr-only">
+        Cantidad recibida
+      </Label>
+      <DecimalInput
+        id={inputId}
+        value={line.quantityReceived}
+        onValueChange={(v) => onChange(index, v)}
+        precision={4}
+        placeholder="0,00"
+        className="h-11 min-h-11 text-base tabular-nums md:h-8 md:min-h-8 md:text-sm"
+        aria-label={`Cantidad recibida de ${line.description}`}
+      />
+    </div>
   );
 }
 
@@ -126,6 +123,9 @@ function buildLines(
 }
 
 type PendingAction = "save" | "confirm" | "cancel" | null;
+
+const receiptRowColumns = "md:grid-cols-[minmax(0,4fr)_minmax(0,3.2fr)_minmax(0,2.8fr)] md:gap-x-3 md:px-3";
+const receiptDetailColumns = "md:grid-cols-[minmax(0,1.2fr)_minmax(0,2fr)] md:gap-x-3";
 
 export function ReceiptForm(props: ReceiptFormProps) {
   const isEdit = props.mode === "edit";
@@ -389,70 +389,46 @@ export function ReceiptForm(props: ReceiptFormProps) {
           />
         </div>
 
-        <div className="space-y-3 md:hidden">
-          {lines.map((line, i) => (
-            <div
-              key={line.purchaseOrderLineId}
-              className="space-y-3 rounded-lg border bg-background p-4"
-            >
-              <p className="font-medium leading-snug">{line.description}</p>
-              <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-                <div>
-                  <dt className="text-xs text-muted-foreground">Unidad</dt>
-                  <dd>{line.unit || "—"}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-muted-foreground">Pedida</dt>
-                  <dd className="tabular-nums">{formatQtyFromString(line.ordered)}</dd>
-                </div>
-                {isPositiveQty(line.previouslyReceived) ? (
-                  <div>
-                    <dt className="text-xs text-muted-foreground">Recibida previa</dt>
-                    <dd className="tabular-nums">{formatQtyFromString(line.previouslyReceived)}</dd>
-                  </div>
-                ) : null}
-                <div>
-                  <dt className="text-xs text-muted-foreground">Pendiente</dt>
-                  <dd className="tabular-nums font-medium">{formatQtyFromString(line.remaining)}</dd>
-                </div>
-              </dl>
-              <div className="space-y-1">
-                <Label htmlFor={`receipt-qty-${line.purchaseOrderLineId}`} className="text-sm font-semibold">
-                  Cantidad recibida
-                </Label>
-                <ReceiptQtyInput line={line} index={i} onChange={updateQty} />
-              </div>
+        <div className="md:rounded-lg md:border md:bg-card">
+          <div aria-hidden className={`hidden border-b py-3 text-sm font-medium text-muted-foreground md:grid ${receiptRowColumns}`}>
+            <span>Descripción</span>
+            <div className={`grid ${receiptDetailColumns}`}>
+              <span>Unidad</span>
+              <span>Pendiente</span>
             </div>
-          ))}
-        </div>
-
-        <div className="hidden md:block">
-          <TableScroll>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[40%]">Descripción</TableHead>
-                  <TableHead className="w-[12%]">Unidad</TableHead>
-                  <TableHead className="w-[20%]">Pendiente</TableHead>
-                  <TableHead className="w-[28%]">Cantidad recibida</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lines.map((line, i) => (
-                  <TableRow key={line.purchaseOrderLineId}>
-                    <TableCell>{line.description}</TableCell>
-                    <TableCell className="text-muted-foreground">{line.unit || "—"}</TableCell>
-                    <TableCell className="tabular-nums">
-                      {formatQtyFromString(line.remaining)}
-                    </TableCell>
-                    <TableCell>
-                      <ReceiptQtyInput line={line} index={i} onChange={updateQty} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableScroll>
+            <span>Cantidad recibida</span>
+          </div>
+          <ul role="list" aria-label="Líneas de la recepción" className="space-y-3 md:divide-y md:space-y-0">
+            {lines.map((line, i) => (
+              <li
+                key={line.purchaseOrderLineId}
+                className={`grid gap-y-3 rounded-lg border bg-background p-4 md:items-center md:rounded-none md:border-0 md:bg-transparent md:py-2 md:hover:bg-muted/50 ${receiptRowColumns}`}
+              >
+                <p className="break-words font-medium leading-snug md:text-sm md:font-normal">{line.description}</p>
+                <dl className={`grid grid-cols-2 gap-x-3 gap-y-1 text-sm ${receiptDetailColumns}`}>
+                  <div>
+                    <dt className="text-xs text-muted-foreground md:sr-only">Unidad</dt>
+                    <dd className="break-words md:text-muted-foreground">{line.unit || "—"}</dd>
+                  </div>
+                  <div className="md:hidden">
+                    <dt className="text-xs text-muted-foreground">Pedida</dt>
+                    <dd className="tabular-nums">{formatQtyFromString(line.ordered)}</dd>
+                  </div>
+                  {isPositiveQty(line.previouslyReceived) ? (
+                    <div className="md:hidden">
+                      <dt className="text-xs text-muted-foreground">Recibida previa</dt>
+                      <dd className="tabular-nums">{formatQtyFromString(line.previouslyReceived)}</dd>
+                    </div>
+                  ) : null}
+                  <div>
+                    <dt className="text-xs text-muted-foreground md:sr-only">Pendiente</dt>
+                    <dd className="break-words font-medium tabular-nums md:font-normal">{formatQtyFromString(line.remaining)}</dd>
+                  </div>
+                </dl>
+                <ReceiptQtyInput line={line} index={i} onChange={updateQty} />
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="space-y-1">

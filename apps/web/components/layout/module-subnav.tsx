@@ -63,7 +63,7 @@ export function ModuleSubnav({
           {sectionLabel}
         </p>
       ) : null}
-      <div className={cn("flex w-full min-w-0 flex-wrap gap-1.5 rounded-xl border border-border/80 bg-card/80 p-1.5 shadow-sm ring-1 ring-border/40 backdrop-blur-sm dark:bg-card/50", !wrap && "sm:flex-nowrap")}>
+      <div className="flex w-full min-w-0 flex-wrap gap-1.5 rounded-xl border border-border/80 bg-card/80 p-1.5 shadow-sm ring-1 ring-border/40 backdrop-blur-sm dark:bg-card/50">
         {links.map((l) => {
           const on = isNavLinkActive(pathname, null, l.href, { matchExact: l.match === "exact" });
           const Icon = l.icon ? SUBNAV_ICONS[l.icon] : undefined;
@@ -74,15 +74,15 @@ export function ModuleSubnav({
               title={l.title}
               aria-current={on ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-9 min-w-0 flex-1 basis-[calc(50%-0.375rem)] items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-center text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3",
-                wrap ? "sm:basis-28" : "sm:basis-0",
+                "inline-flex min-h-9 min-w-0 max-w-full flex-1 basis-[calc(50%-0.375rem)] items-center justify-center gap-1.5 rounded-lg px-2 py-1.5 text-center text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3",
+                wrap ? "sm:basis-28" : "sm:basis-[max-content]",
                 on
                   ? "bg-background text-foreground shadow-sm ring-1 ring-border"
                   : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
               )}
             >
               {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden /> : null}
-              <span className="truncate">{l.label}</span>
+              <span className="min-w-0 break-words leading-snug">{l.label}</span>
             </Link>
           );
         })}
