@@ -54,9 +54,12 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [items, setItems] = useState<BellItem[]>([]);
+  const [feedStatus, setFeedStatus] = useState<"loading" | "ready" | "error" | "retrying">("loading");
   const [open, setOpen] = useState(false);
   const mountedRef = useRef(true);
   const fetchGenRef = useRef(0);
+  const retryItemRef = useRef<HTMLDivElement>(null);
+  const inboxLinkRef = useRef<HTMLAnchorElement>(null);
 
   const refresh = useCallback(async () => {
     const gen = ++fetchGenRef.current;
@@ -66,13 +69,16 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
         credentials: "same-origin",
         cache: "no-store",
       });
-      if (!res.ok || !mountedRef.current || gen !== fetchGenRef.current) return;
+      if (!res.ok) throw new Error("notification feed unavailable");
+      if (!mountedRef.current || gen !== fetchGenRef.current) return;
       const data = (await res.json()) as BellSnapshot;
       if (!mountedRef.current || gen !== fetchGenRef.current) return;
       setUnreadCount(typeof data.unreadCount === "number" ? data.unreadCount : 0);
       setItems(Array.isArray(data.items) ? data.items : []);
+      if (document.activeElement === retryItemRef.current) inboxLinkRef.current?.focus();
+      setFeedStatus("ready");
     } catch {
-      /* best-effort poll */
+      if (mountedRef.current && gen === fetchGenRef.current) setFeedStatus("error");
     }
   }, []);
 
@@ -132,21 +138,16 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
   const onItemSelect = (item: BellItem) => {
     const href = safeActionHref(item.actionUrl) ?? "/notificaciones";
     setOpen(false);
-    void (async () => {
-      if (item.status === "UNREAD") {
-        const result = await markNotificationReadAction(item.id);
-        if (result.ok && mountedRef.current) {
-          setUnreadCount((c) => Math.max(0, c - 1));
-          setItems((prev) =>
-            prev.map((n) => (n.id === item.id ? { ...n, status: "READ" } : n)),
-          );
-        } else if (mountedRef.current) {
-          // Resync badge if mark failed or already processed.
-          void refresh();
-        }
-      }
+    if (item.status !== "UNREAD") {
       router.push(href);
-    })();
+      return;
+    }
+    const finish = () => {
+      if (!mountedRef.current) return;
+      void refresh();
+      router.push(href);
+    };
+    void markNotificationReadAction(item.id).then(finish, finish);
   };
 
   return (
@@ -179,16 +180,40 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[22rem] p-0 sm:w-96">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-[22rem] max-w-[calc(100vw-1rem)] p-0 sm:w-96">
         <DropdownMenuLabel className="px-3 py-2.5 text-sm font-semibold">
           Notificaciones
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="m-0" />
-        {items.length === 0 ? (
+        {feedStatus === "loading" ? (
+          <p role="status" className="px-3 py-4 text-center text-sm text-muted-foreground">
+            Cargando notificaciones…
+          </p>
+        ) : null}
+        {feedStatus === "error" || feedStatus === "retrying" ? (
+          <div className="px-2 py-1">
+            <p role="status" className="px-1 py-2 text-sm text-muted-foreground">
+              {feedStatus === "retrying" ? "Cargando notificaciones…" : "No se pudieron cargar las notificaciones."}
+            </p>
+            <DropdownMenuItem
+              ref={retryItemRef}
+              onSelect={(event) => {
+                event.preventDefault();
+                if (feedStatus === "retrying") return;
+                setFeedStatus("retrying");
+                void refresh();
+              }}
+            >
+              Reintentar
+            </DropdownMenuItem>
+          </div>
+        ) : null}
+        {feedStatus === "ready" && items.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
             No hay notificaciones recientes
           </p>
-        ) : (
+        ) : null}
+        {items.length > 0 ? (
           <ul className="max-h-[22rem] overflow-y-auto py-1">
             {items.map((n) => {
               const unread = n.status === "UNREAD";
@@ -227,11 +252,11 @@ export function NotificationBell({ initialUnreadCount = 0 }: { initialUnreadCoun
               );
             })}
           </ul>
-        )}
+        ) : null}
         <DropdownMenuSeparator className="m-0" />
         <div className="p-1">
           <DropdownMenuItem asChild className="justify-center rounded-md text-sm font-medium">
-            <Link href="/notificaciones">Ver todas</Link>
+            <Link ref={inboxLinkRef} href="/notificaciones">Ver todas</Link>
           </DropdownMenuItem>
         </div>
       </DropdownMenuContent>

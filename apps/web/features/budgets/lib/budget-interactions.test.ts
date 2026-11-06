@@ -389,7 +389,7 @@ test("replacing an existing EDT requires the explicit replacement checkbox befor
   assert.equal((executions[0] as { replaceExisting: boolean }).replaceExisting, true);
 });
 
-function apu(quantity = "3", analysisLines?: unknown[]) {
+function apu(quantity = "3", analysisLines?: unknown[], reportInvalidDecimalInputs = () => true) {
   const env = environment();
   const saves: { payload: unknown; request: ReturnType<typeof deferred<unknown>> }[] = [];
   const closed: boolean[] = [];
@@ -402,6 +402,7 @@ function apu(quantity = "3", analysisLines?: unknown[]) {
   };
   const { CostItemApuDialog } = loadModule<{ CostItemApuDialog: (props: unknown) => Element }>("../components/cost-item-apu-dialog.tsx", {
     ...env.dependencies, "@bloqer/domain": domain, "@bloqer/utils": money,
+    "@/components/ui/decimal-input": { ...ui["@/components/ui/decimal-input"], reportInvalidDecimalInputs },
     "@bloqer/validators": validators,
     "@/lib/format-money": { formatMoneyAmount: (value: string) => `M:${money.serializeMoney(value)}`, formatQtyFromString: String },
     "@/lib/budget-categories": { CATEGORY_LABELS: { MATERIAL: "Materiales", LABOR: "Mano de obra", EQUIPMENT: "Equipos", SUBCONTRACT: "Subcontratos", OTHER: "Otros" }, VISIBLE_COST_CATEGORIES: ["MATERIAL", "LABOR", "EQUIPMENT", "SUBCONTRACT"] },
@@ -458,6 +459,20 @@ test("APU refuses to discard an unadded resource line when saving the item", () 
   assert.ok(env.errors[0]?.includes("Agregá la línea APU"));
 });
 
+test("APU refuses to add or save using the previous values of malformed decimal drafts", () => {
+  let validDecimal = false;
+  const env = apu("3", [], () => validDecimal);
+  change(elements(env.render(), "input").find((node) => node.props.placeholder === "Nombre")!, "Recurso");
+  click(button(env.render(), "Agregar"));
+  assert.ok(!elements(env.render(), "tablecell").some((node) => text(node) === "Recurso"));
+  validDecimal = true;
+  click(button(env.render(), "Agregar"));
+  assert.ok(elements(env.render(), "tablecell").some((node) => text(node) === "Recurso"));
+  validDecimal = false;
+  click(button(env.render(), "Guardar cambios"));
+  assert.equal(env.saves.length, 0);
+});
+
 test("new APU resource contributions are rounded per line before aggregating and submitting", async () => {
   const env = apu("5", []);
   for (const description of ["Recurso uno", "Recurso dos"]) {
@@ -490,7 +505,7 @@ test("an imported zero-quantity item tracks the first positive quantity when rec
   function setQuantity(value: string) {
     const control = elements(env.render(), "decimal-input").find((node) => String(node.props.id).endsWith("-quantity"))!;
     (control.props.onValueChange as (value: string) => void)(value);
-    (elements(env.render(), "decimal-input").find((node) => String(node.props.id).endsWith("-quantity"))!.props.onBlur as () => void)();
+    (elements(env.render(), "decimal-input").find((node) => String(node.props.id).endsWith("-quantity"))!.props.onBlur as (event: unknown) => void)({ currentTarget: { validity: { customError: false } } });
   }
   setQuantity("5");
   change(elements(env.render(), "input").find((node) => node.props.placeholder === "Nombre")!, "Recurso");

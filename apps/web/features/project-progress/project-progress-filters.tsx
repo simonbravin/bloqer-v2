@@ -44,6 +44,8 @@ export function ProjectProgressFilters(props: Props) {
         </div>
         <DateRangePresets
           defaultPreset={null}
+          value={{ dateFrom, dateTo }}
+          throughDate={props.maxDate}
           onRangeChange={(range) => {
             setDateFrom(range.dateFrom);
             setDateTo(range.dateTo);

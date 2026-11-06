@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -80,6 +80,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
   const [lineAmount, setLineAmount] = useState("");
   const [movementFxRate, setMovementFxRate] = useState("");
   const [movementFxError, setMovementFxError] = useState<string | null>(null);
+  const movementFieldsRef = useRef<HTMLDivElement>(null);
   const [dialog, setDialog] = useState<PendingDialog | null>(null);
 
   const editable = canEdit && (session.status === "DRAFT" || session.status === "IN_PROGRESS");
@@ -678,7 +679,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         title="Crear movimiento desde extracto"
         description={
           dialog?.kind === "create-movement" ? (
-            <div className="space-y-3">
+            <div ref={movementFieldsRef} className="space-y-3">
               <p>
                 ¿Crear un movimiento de {dialog.dirLabel} por{" "}
                 {formatMoneyAmount(dialog.amount, session.currency)} en «{session.accountName}» y
@@ -702,6 +703,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         pending={isPending}
         onConfirm={() => {
           if (dialog?.kind !== "create-movement") return;
+          if (!reportInvalidDecimalInputs(movementFieldsRef.current)) return;
           if (session.currency !== "ARS" && !movementFxRate) {
             setMovementFxError("Ingresá el tipo de cambio para este movimiento.");
             return;

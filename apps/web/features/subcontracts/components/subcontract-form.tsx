@@ -57,6 +57,8 @@ type LineState = {
   notes: string;
 };
 
+type EditableLine = LineState & { rowKey: number };
+
 const DEFAULT_LINE: LineState = {
   wbsNodeId: "__none__",
   description: "",
@@ -107,7 +109,10 @@ export function SubcontractForm({
   storageConfigured = false,
 }: Props) {
   const router = useRouter();
-  const [lines, setLines] = useState<LineState[]>(defaultValues?.lines ?? [{ ...DEFAULT_LINE }]);
+  const [lines, setLines] = useState<EditableLine[]>(() =>
+    (defaultValues?.lines ?? [DEFAULT_LINE]).map((line, rowKey) => ({ ...line, rowKey })),
+  );
+  const nextRowKey = useRef(lines.length);
   const [subcontractorId, setSubcontractorId] = useState(
     defaultValues?.subcontractorContactId ?? "",
   );
@@ -124,7 +129,8 @@ export function SubcontractForm({
   );
 
   function addLine() {
-    setLines((prev) => [...prev, { ...DEFAULT_LINE }]);
+    const rowKey = nextRowKey.current++;
+    setLines((prev) => [...prev, { ...DEFAULT_LINE, rowKey }]);
   }
   function removeLine(i: number) {
     setLines((prev) => prev.filter((_, idx) => idx !== i));
@@ -148,7 +154,8 @@ export function SubcontractForm({
       } catch {
         /* keep snapshot unit cost */
       }
-      const newLine: LineState = {
+      const newLine: EditableLine = {
+        rowKey: nextRowKey.current++,
         wbsNodeId: hint.wbsNodeId,
         description: hint.name,
         unit: hint.unit,
@@ -372,7 +379,7 @@ export function SubcontractForm({
                 {lines.map((line, i) => {
                   const sub = previewLineMoney(line.quantity, line.unitPrice);
                   return (
-                    <TableRow key={i}>
+                    <TableRow key={line.rowKey}>
                       <TableCell className="min-w-[160px]">
                         <SearchableCombobox
                           disabled={pending}

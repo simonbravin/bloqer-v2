@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   readViewportHintFromDocument,
+  shouldRefreshForViewport,
   VIEWPORT_LG_QUERY,
   VIEWPORT_MD_QUERY,
   viewportHintFromMatchMedia,
@@ -22,26 +23,9 @@ export function ViewportHintSync() {
     const sync = () => {
       const next: ViewportHint = viewportHintFromMatchMedia(mdMq.matches, lgMq.matches);
       const prev = readViewportHintFromDocument();
-      writeViewportHintCookie(next);
-      if (readViewportHintFromDocument() !== next) return;
       if (prev === next) return;
-
-      const isDashboard = pathname === "/dashboard";
-      const isCronograma = pathname.includes("/cronograma");
-      const isMateriales = pathname.includes("/materiales");
-      const isCuentasPorPagar = pathname.includes("/cuentas-por-pagar");
-      const isCuentasPorCobrar = pathname.includes("/cuentas-por-cobrar");
-      const fieldSourceChanged = (prev === "lg") !== (next === "lg");
-
-      if (isDashboard) {
-        router.refresh();
-        return;
-      }
-      if (isCronograma || isMateriales || isCuentasPorPagar || isCuentasPorCobrar) {
-        if (fieldSourceChanged) router.refresh();
-        return;
-      }
-      if (prev !== null) {
+      writeViewportHintCookie(next);
+      if (readViewportHintFromDocument() === next && shouldRefreshForViewport(pathname, prev, next)) {
         router.refresh();
       }
     };

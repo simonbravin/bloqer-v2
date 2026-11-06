@@ -1,6 +1,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { TableViewport } from "./table-viewport"
 
 /**
  * Flexible name/description column: takes remaining width and truncates.
@@ -25,13 +26,13 @@ const Table = React.forwardRef<
   HTMLTableElement,
   React.HTMLAttributes<HTMLTableElement>
 >(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-x-auto">
+  <TableViewport label={props["aria-label"]} labelledBy={props["aria-labelledby"]}>
     <table
       ref={ref}
       className={cn("w-full caption-bottom text-sm", className)}
       {...props}
     />
-  </div>
+  </TableViewport>
 ))
 Table.displayName = "Table"
 

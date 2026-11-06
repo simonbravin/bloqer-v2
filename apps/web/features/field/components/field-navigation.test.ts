@@ -37,10 +37,10 @@ function loadComponent<T>(filename: string, dependencies: Record<string, unknown
 const currentProject = "11111111-1111-4111-8111-111111111111";
 const staleProject = "22222222-2222-4222-8222-222222222222";
 
-function bottomNav(pathname: string, projectsEnabled = true) {
+function bottomNav(pathname: string, projectsEnabled = true, isMdUp = false) {
   const pathProjectId = pathname.startsWith(`/proyectos/${currentProject}`) ? currentProject : null;
   const component = loadComponent<{ FieldBottomNav: (props: unknown) => unknown }>("./field-bottom-nav.tsx", {
-    react: { useState: () => [false, () => {}], useRef: () => ({ current: null }) },
+    react: { useState: () => [null, () => {}], useRef: () => ({ current: null }), useEffect: () => {} },
     "next/link": { default: "link" },
     "next/navigation": { usePathname: () => pathname },
     "lucide-react": { ClipboardList: "icon", HardHat: "icon", Home: "icon", Menu: "icon", Plus: "icon" },
@@ -51,6 +51,8 @@ function bottomNav(pathname: string, projectsEnabled = true) {
     "@/lib/field-project-context": { useFieldProjectContext: () => ({ pathProjectId, convenienceProjectId: staleProject }) },
     "@/lib/pending-count-badge": { pendingCountAriaLabel: () => "Pendientes" },
     "@/lib/pending-inbox-count-context": { usePendingInboxCount: () => ({ tenantCount: 0 }) },
+    "@/lib/media-query": { MD_UP_QUERY: "(min-width: 768px)", useMediaQuery: () => isMdUp },
+    "@/components/layout/sidebar-shell-context": { focusShellSidebarToggle: () => {} },
     "@/components/ui/pending-count-badge": { PendingCountBadge: "badge" },
     "./field-plus-sheet": { FieldPlusSheet: "plus-sheet" },
     "./field-more-sheet": { FieldMoreSheet: "more-sheet" },
@@ -72,6 +74,15 @@ test("Obra marks the projects index active, retains the current route, and respe
     .find((node) => node.props["aria-label"] === "Obra");
   assert.equal(scoped?.props.href, `/proyectos/${currentProject}`);
   assert.equal(descendants(bottomNav("/dashboard", false), "link").some((node) => node.props["aria-label"] === "Obra"), false);
+});
+
+test("Field overlays only mount below the tablet breakpoint", () => {
+  const mobile = bottomNav("/dashboard");
+  const tablet = bottomNav("/dashboard", true, true);
+  for (const overlay of ["plus-sheet", "more-sheet"]) {
+    assert.equal(descendants(mobile, overlay).length, 1);
+    assert.equal(descendants(tablet, overlay).length, 0);
+  }
 });
 
 test("Registrar reuses a path or saved project only if the eligible list includes it", () => {

@@ -11,7 +11,7 @@ import { PlatformNavIcon } from "@/lib/platform-nav-icons";
 
 const PLATFORM_LINKS = [
   { href: "/platform", label: "Consola", matchExact: true as const },
-  { href: "/platform/tenants", label: "Organizaciones" },
+  { href: "/platform/tenants", label: "Organizaciones", matchExact: true as const },
   { href: "/platform/vencimientos", label: "Vencimientos" },
   { href: "/platform/registro", label: "Registro de actividad" },
   { href: "/platform/tenants/new", label: "Crear organización" },
@@ -26,7 +26,7 @@ export function PlatformSidebar() {
     return m?.[1] && m[1] !== "new" ? m[1] : null;
   }, [pathname]);
 
-  const tenantId = activeTenant?.id ?? tenantIdFromPath;
+  const tenantId = tenantIdFromPath;
 
   const tenantLinks = useMemo(() => {
     if (!tenantId) return null;
@@ -39,7 +39,7 @@ export function PlatformSidebar() {
     ] as const;
   }, [tenantId]);
 
-  const tenantSectionTitle = activeTenant?.name ?? "Organización";
+  const tenantSectionTitle = activeTenant?.id === tenantId ? activeTenant.name : "Organización";
   const [tenantSectionOpen, setTenantSectionOpen] = useState(true);
 
   useEffect(() => {

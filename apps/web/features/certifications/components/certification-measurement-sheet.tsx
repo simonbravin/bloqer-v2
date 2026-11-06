@@ -40,6 +40,8 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [lock, setLock] = useState<string | null>(null);
   const running = useRef(false);
+  const measureTrigger = useRef<HTMLButtonElement>(null);
+  const searchInput = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   if (lock && lock !== sheet.revision) setLock(null);
   const active = sheet.rows.find((row) => row.wbsNodeId === activeId) ?? null;
@@ -107,6 +109,7 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
           />
           <Input
+            ref={searchInput}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar por código o nombre de partida…"
@@ -186,18 +189,13 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
                   Acumulado
                 </TableHead>
                 <TableHead className="text-right">Monto · {sheet.currency}</TableHead>
-                {editable && (
-                  <TableHead className="w-20">
-                    <span className="sr-only">Acciones</span>
-                  </TableHead>
-                )}
               </TableRow>
             </TableHeader>
             <TableBody>
               {entries.map((entry) =>
                 entry.isGroup ? (
                   <TableRow key={entry.id} className="bg-muted/50 hover:bg-muted/70">
-                    <TableCell colSpan={editable ? 8 : 7}>
+                    <TableCell colSpan={7}>
                       <button
                         type="button"
                         className="flex min-h-8 w-full items-center gap-2 rounded text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -228,7 +226,10 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
                     depth={entry.depth}
                     editable={editable}
                     disabled={lock != null}
-                    onMeasure={() => setActiveId(entry.id)}
+                    onMeasure={(trigger) => {
+                      measureTrigger.current = trigger;
+                      setActiveId(entry.id);
+                    }}
                   />
                 ),
               )}
@@ -252,6 +253,13 @@ export function CertificationMeasurementWorksheet({ sheet, editable, onSave }: P
         <DialogContent
           closeButtonDisabled={pending}
           className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            const trigger = measureTrigger.current;
+            if (trigger?.isConnected && !trigger.disabled) trigger.focus();
+            else searchInput.current?.focus();
+            measureTrigger.current = null;
+          }}
         >
           {active && (
             <CertificationMeasureForm
@@ -287,7 +295,7 @@ function SheetRow({
   depth: number;
   editable: boolean;
   disabled: boolean;
-  onMeasure: () => void;
+  onMeasure: (trigger: HTMLButtonElement) => void;
 }) {
   const included = row.lineId != null;
   const preview = previewCertificationMeasurement({
@@ -307,6 +315,20 @@ function SheetRow({
             {row.unit || "—"}
           </span>
         </div>
+        {editable && (
+          <Button
+            type="button"
+            variant={included ? "ghost" : "outline"}
+            size="sm"
+            className="mt-2"
+            disabled={disabled}
+            onClick={(event) => onMeasure(event.currentTarget)}
+            aria-label={`${included ? "Editar" : "Medir"} ${row.code}`}
+            aria-haspopup="dialog"
+          >
+            {included ? "Editar" : "Medir"}
+          </Button>
+        )}
       </TableCell>
       <TableCell
         className="text-right font-mono text-xs"
@@ -331,20 +353,6 @@ function SheetRow({
       <TableCell className="text-right font-mono text-xs font-medium">
         {included ? formatMoneyAmount(row.currentAmount!) : "—"}
       </TableCell>
-      {editable && (
-        <TableCell>
-          <Button
-            type="button"
-            variant={included ? "ghost" : "outline"}
-            size="sm"
-            disabled={disabled}
-            onClick={onMeasure}
-            aria-label={`${included ? "Editar" : "Medir"} ${row.code}`}
-          >
-            {included ? "Editar" : "Medir"}
-          </Button>
-        </TableCell>
-      )}
     </TableRow>
   );
 }

@@ -14,6 +14,7 @@ export const SETUP_ARTICLES: HelpArticle[] = [
     hrefs: [{ kind: "company", path: "/dashboard", label: "Inicio" }, { kind: "company", path: "/proyectos", label: "Obras" }],
     steps: [
       "Usá el menú de empresa; al entrar a una obra, se reemplaza por el menú del proyecto. Las migas enlazan pantallas existentes; algunos grupos son solo texto.",
+      "En pantallas angostas el encabezado prioriza la ubicación actual y, cuando hay espacio, su nivel anterior. Usá el menú lateral para el resto de la jerarquía.",
       "Con teclado, Ir al contenido principal salta al contenido. En teléfono, Mostrar menú lateral abre el menú; Escape o Cerrar lo cierran y devuelven el foco al botón.",
       "Obra abre el listado desde pantallas generales y el resumen si ya estás dentro de una obra. Más muestra enlaces de la obra actual solo dentro de ella.",
       "Registrar comprueba que la obra actual o la última seleccionada esté activa y siga accesible. Si hace falta, usá Seleccionar obra. Registrar consumo abre su formulario. Ante un error de consulta, usá Reintentar.",
@@ -61,6 +62,7 @@ export const SETUP_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "Entrá por /login. Si creás una cuenta en /registro, confirmá el email desde el enlace recibido.",
+      "Mostrar contraseña y Ocultar contraseña se pueden activar con teclado. Usá Tab para llegar al botón y Enter o Espacio para alternar.",
       "La contraseña nueva requiere 10 caracteres, una letra y un número. El máximo es 72 bytes: acortala si incluye acentos o emojis.",
       "Si olvidaste la contraseña, usá Recuperar contraseña; el enlace tiene vencimiento y se usa una sola vez.",
       "Si aparece Acceso al espacio no disponible, pedile a un administrador que revise organización, empresa y roles. Podés aceptar otras invitaciones pendientes o Cerrar sesión para cambiar de cuenta.",

@@ -24,6 +24,7 @@ interface HeaderProps {
   user: Session["user"];
   /** Organization name from tenant; shown under product title on desktop. */
   tenantName?: string | null;
+  hasTenantContext: boolean;
   notificationUnreadCount?: number;
   showPlatformLink?: boolean;
 }
@@ -43,27 +44,33 @@ function getInitials(name?: string | null, email?: string | null): string {
 export function Header({
   user,
   tenantName,
+  hasTenantContext,
   notificationUnreadCount = 0,
   showPlatformLink = false,
 }: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 py-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
+    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-3 py-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <ShellHeaderLeading>
         {tenantName ? <AppShellBreadcrumb tenantName={tenantName} /> : null}
       </ShellHeaderLeading>
-      <div className="flex items-center gap-1 sm:gap-2">
-        <Button variant="ghost" size="icon" asChild className="h-9 w-9" title="Ayuda">
-          <Link href="/ayuda" aria-label="Ayuda">
-            <CircleHelp className="h-5 w-5" />
-          </Link>
-        </Button>
-        <NotificationBell initialUnreadCount={notificationUnreadCount} />
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2 [&>button]:h-11 [&>button]:w-11 md:[&>button]:h-9 md:[&>button]:w-9">
+        {hasTenantContext ? (
+          <>
+            <Button variant="ghost" size="icon" asChild className="h-11 w-11 md:h-9 md:w-9" title="Ayuda">
+              <Link href="/ayuda" aria-label="Ayuda">
+                <CircleHelp className="h-5 w-5" aria-hidden />
+              </Link>
+            </Button>
+            <NotificationBell initialUnreadCount={notificationUnreadCount} />
+          </>
+        ) : null}
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-2 rounded-full border border-transparent p-0.5 outline-none transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="Menú de cuenta"
+              className="flex items-center justify-center rounded-full border border-transparent p-0.5 outline-none transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? "Usuario"} />
@@ -86,10 +93,12 @@ export function Header({
                 <Link href="/platform">Plataforma</Link>
               </DropdownMenuItem>
             ) : null}
-            <DropdownMenuItem asChild>
-              <Link href="/configuracion/perfil">Mi perfil</Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
+            {hasTenantContext ? (
+              <DropdownMenuItem asChild>
+                <Link href="/configuracion/perfil">Mi perfil</Link>
+              </DropdownMenuItem>
+            ) : null}
+            {hasTenantContext || showPlatformLink ? <DropdownMenuSeparator /> : null}
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
               onSelect={() => {

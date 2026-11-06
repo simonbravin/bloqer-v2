@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useSyncExternalStore } from "react";
+import { Fragment, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import {
   resolveAppShellBreadcrumbs,
@@ -10,9 +10,9 @@ import {
 import { useBreadcrumbOverride } from "@/lib/breadcrumb-override-context";
 import { useProjectShellName } from "@/lib/project-shell-context";
 import { usePlatformNav } from "@/features/platform/platform-nav-context";
+import { cn } from "@/lib/utils";
 import {
   Breadcrumb,
-  BreadcrumbEllipsis,
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
@@ -20,46 +20,11 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-const MOBILE_MAX_VISIBLE = 3;
-const MOBILE_MQ = "(max-width: 639px)";
-
-function subscribeMobileBreadcrumb(onStoreChange: () => void) {
-  const mq = window.matchMedia(MOBILE_MQ);
-  mq.addEventListener("change", onStoreChange);
-  return () => mq.removeEventListener("change", onStoreChange);
-}
-
-function getMobileBreadcrumbSnapshot() {
-  return window.matchMedia(MOBILE_MQ).matches;
-}
-
-function useIsMobileBreadcrumb(): boolean {
-  return useSyncExternalStore(subscribeMobileBreadcrumb, getMobileBreadcrumbSnapshot, () => false);
-}
-
-type DisplayBreadcrumbItem = ShellBreadcrumbItem & { ellipsis?: boolean };
-
-function collapseBreadcrumbItems(
-  items: ShellBreadcrumbItem[],
-  isMobile: boolean,
-): DisplayBreadcrumbItem[] {
-  if (!isMobile || items.length <= MOBILE_MAX_VISIBLE) return items;
-
-  const tail = items.slice(-2);
-  return [items[0]!, { label: "…", ellipsis: true }, ...tail];
-}
-
 function ShellBreadcrumbTrail({ items }: { items: ShellBreadcrumbItem[] }) {
-  const isMobile = useIsMobileBreadcrumb();
-  const displayItems = useMemo(
-    () => collapseBreadcrumbItems(items, isMobile),
-    [items, isMobile],
-  );
+  if (items.length === 0) return null;
 
-  if (displayItems.length === 0) return null;
-
-  if (displayItems.length === 1 && !displayItems[0]!.ellipsis) {
-    const only = displayItems[0]!;
+  if (items.length === 1) {
+    const only = items[0]!;
     return (
       <p className="truncate text-sm font-semibold tracking-tight text-foreground" title={only.label}>
         {only.label}
@@ -69,32 +34,31 @@ function ShellBreadcrumbTrail({ items }: { items: ShellBreadcrumbItem[] }) {
 
   return (
     <Breadcrumb className="min-w-0">
-      <BreadcrumbList>
-        {displayItems.map((item, index) => {
-          const isLast = index === displayItems.length - 1;
-          if (item.ellipsis) {
-            return (
-              <Fragment key="breadcrumb-ellipsis">
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbEllipsis />
-                </BreadcrumbItem>
-              </Fragment>
-            );
-          }
+      <BreadcrumbList className="flex-nowrap">
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1;
+          const isParent = index === items.length - 2;
 
           return (
             <Fragment key={item.href ?? `crumb-${index}`}>
-              {index > 0 ? <BreadcrumbSeparator /> : null}
-              <BreadcrumbItem>
+              {index > 0 ? (
+                <BreadcrumbSeparator
+                  className={cn("hidden shrink-0", isLast ? "min-[375px]:block" : "lg:block")}
+                />
+              ) : null}
+              <BreadcrumbItem className={cn(
+                "min-w-0 max-w-full",
+                isLast && "min-[375px]:max-w-[60%] min-[375px]:shrink-0 lg:max-w-[18rem] lg:shrink",
+                !isLast && (isParent ? "hidden min-[375px]:inline-flex" : "hidden lg:inline-flex"),
+              )}>
                 {isLast ? (
-                  <BreadcrumbPage title={item.label}>{item.label}</BreadcrumbPage>
+                  <BreadcrumbPage className="min-w-0 max-w-full" title={item.label}>{item.label}</BreadcrumbPage>
                 ) : item.href ? (
-                  <BreadcrumbLink href={item.href} title={item.label}>
+                  <BreadcrumbLink className="min-w-0 max-w-full" href={item.href} title={item.label}>
                     {item.label}
                   </BreadcrumbLink>
                 ) : (
-                  <span className="max-w-[8rem] truncate font-medium sm:max-w-[10rem] md:max-w-[14rem]" title={item.label}>
+                  <span className="min-w-0 truncate font-medium" title={item.label}>
                     {item.label}
                   </span>
                 )}

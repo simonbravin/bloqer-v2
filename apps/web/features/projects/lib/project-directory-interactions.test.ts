@@ -211,11 +211,12 @@ test("all profile forms send explicit clears and keep their dialog locked during
     const saving = deferred<{ ok: true }>();
     const payloads: Record<string, unknown>[] = [];
     let refreshed = 0;
+    let validDecimal = role !== "CLIENT";
     const save = (_id: string, payload: Record<string, unknown>) => { payloads.push(payload); return saving.promise; };
     const { RoleManager } = loadModule<{ RoleManager: (props: unknown) => unknown }>("../../directory/components/role-manager.tsx", {
       ...ui, react: harness.react,
       "next/navigation": { useRouter: () => ({ refresh: () => { refreshed++; } }) },
-      "@/components/ui/decimal-input": { DecimalInput: "decimal" },
+      "@/components/ui/decimal-input": { DecimalInput: "decimal", reportInvalidDecimalInputs: () => validDecimal },
       "./role-badge": { RoleBadge: "role-badge" },
       "@/app/(app)/directorio/actions": { updateClientProfileAction: save, updateSupplierProfileAction: save, updateSubcontractorProfileAction: save },
     });
@@ -234,6 +235,11 @@ test("all profile forms send explicit clears and keep their dialog locked during
     if (credit) (credit.props.onValueChange as (value: string) => void)("");
     tree = render();
     const saveButton = button(tree, "Guardar");
+    if (role === "CLIENT") {
+      click(saveButton);
+      assert.equal(payloads.length, 0);
+      validDecimal = true;
+    }
     click(saveButton);
     click(saveButton);
     for (const modal of elements(tree, "dialog")) (modal.props.onOpenChange as (open: boolean) => void)(false);

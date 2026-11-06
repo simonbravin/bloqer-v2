@@ -152,6 +152,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Completá fechas en las hojas (no edites fechas de contenedores a mano: se pisan con el rollup).",
       "Agregá dependencias FS donde haga falta. El Gantt abre en hoy; Ir a hoy vuelve a esa fecha.",
       "Calendario muestra hasta tres ítems por celda; +N más indica otros del mismo día. Usá Tabla para revisar el listado completo.",
+      "En Kanban, elegí el nombre para abrir una tarea. Con permiso de edición, usá Mover para arrastrarla. Con teclado, Espacio inicia o confirma, las flechas cambian la posición y Escape cancela.",
     ],
     figure: {
       src: "/help/mapa-armar-cronograma.png",
@@ -165,7 +166,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "agregar-hito-al-cronograma",
       "exportar-cronograma",
     ],
-    keywords: ["cronograma", "gantt", "calendario", "más tareas", "importar", "fechas", "armar cronograma"],
+    keywords: ["cronograma", "gantt", "kanban", "mover tarea", "calendario", "más tareas", "importar", "fechas", "armar cronograma"],
     guideRef: "§7",
   },
   {
@@ -1151,6 +1152,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     steps: [
       "Desde Pendientes (botón Recibir), la campana (CTA Registrar recepción), la OC (Registrar / Continuar recepción) o Compras → Recepciones. Si ya hay borrador, se abre esa misma ficha.",
       "En borrador editá fecha, cantidades, notas y Depósito destino. El depósito es obligatorio para líneas con producto. Las líneas sin producto asociado no generan stock, aunque el tipo de costo sea Materiales. Si no aparece un depósito autorizado, revisá Inventario o pedí acceso; la ayuda también aparece sin depósitos disponibles. Se permite el excedente autorizado por la tolerancia de la empresa. Guardá el borrador o confirmá la recepción.",
+      "Al editar, la cantidad admite hasta cuatro decimales y se conserva al cambiar el tamaño de pantalla. El resumen muestra dos decimales.",
       "Las altas nuevas tienen código RC-NNN por empresa y muestran separada su OC de origen. Las recepciones históricas mantienen su identificador actual. Anular y reintentar no cambia ni reutiliza el número.",
       "Para ingresar stock, la unidad de la línea de OC debe coincidir con la del producto. Una diferencia bloquea el nuevo ingreso sin convertir cantidades ni alterar históricos; revisá el documento origen, sin modificar una OC confirmada para sortear el control.",
       "Al confirmar, el panel Facturación queda arriba. Si la política «Al recibir, crear borrador» está ON, ya hay borrador para Completar y emitir (no crea CxP sola la recepción).",

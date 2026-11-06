@@ -181,7 +181,7 @@ export default async function ReporteAvancesPage({ params, searchParams }: PageP
       </ReportSubnav>
 
       <ProjectProgressFilters
-        key={scopeKey}
+        key={`filters:${scopeKey}`}
         budgets={report.availableBudgets}
         currencies={report.availableCurrencies}
         budgetId={selectedBudgetId}
@@ -255,8 +255,8 @@ export default async function ReporteAvancesPage({ params, searchParams }: PageP
       ) : null}
 
       <ProjectProgressCharts report={report} />
-      <ProjectProgressPending key={scopeKey} report={report} />
-      <ProjectProgressDetail key={scopeKey} report={report} />
+      <ProjectProgressPending key={`pending:${scopeKey}`} report={report} />
+      <ProjectProgressDetail key={`detail:${scopeKey}`} report={report} />
 
       <details className="rounded-xl border bg-card p-4">
         <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">

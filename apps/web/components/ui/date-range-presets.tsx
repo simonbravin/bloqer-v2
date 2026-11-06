@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
  * Canonical temporality control (segmented pill) for date-range filtering.
  *
  * Standard control for quick date presets across the platform. Writes the
- * selected range into the URL (`fromKey`/`toKey`) and resets pagination.
+ * selected range into the URL (`fromKey`/`toKey`) and resets pagination unless
+ * a form supplies a draft range and handles its own submission.
  * Coexists with explicit "Desde/Hasta" inputs: presets just fill those dates,
  * so custom ranges keep working. When the current dates match no preset, no
  * pill is highlighted (custom range).
@@ -28,6 +29,8 @@ const PRESETS: { id: DateRangePresetId; label: string }[] = [
 
 export type { DateRangePresetId };
 
+type DateRange = { dateFrom: string; dateTo: string };
+
 export type DateRangePresetsProps = {
   /** URL param for range start. Defaults to "dateFrom". */
   fromKey?: string;
@@ -41,36 +44,48 @@ export type DateRangePresetsProps = {
    */
   defaultPreset?: DateRangePresetId | null;
   className?: string;
-  /** Synchronizes draft form inputs even when selecting the already-active URL range. */
-  onRangeChange?: (range: { dateFrom: string; dateTo: string }) => void;
-};
+} & (
+  | { value?: never; onRangeChange?: never; throughDate?: never }
+  | { value: DateRange; onRangeChange: (range: DateRange) => void; throughDate?: string }
+);
 
 export function DateRangePresets({
   fromKey = "dateFrom",
   toKey = "dateTo",
   defaultPreset = "d90",
   className,
+  value,
   onRangeChange,
+  throughDate,
 }: DateRangePresetsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
+  // The report can stay open across midnight. Base its presets on the cutoff
+  // loaded with the report, interpreted as a calendar date in the product timezone.
+  const referenceDate = useMemo(
+    () => throughDate ? new Date(`${throughDate}T12:00:00Z`) : undefined,
+    [throughDate],
+  );
 
-  const curFrom = sp.get(fromKey);
-  const curTo = sp.get(toKey);
+  const curFrom = value?.dateFrom ?? sp.get(fromKey);
+  const curTo = value?.dateTo ?? sp.get(toKey);
 
   const activeId = useMemo<DateRangePresetId | null>(() => {
     if (!curFrom && !curTo) return defaultPreset ?? null;
     for (const preset of PRESETS) {
-      const range = computeDateRangePreset(preset.id);
+      const range = computeDateRangePreset(preset.id, referenceDate);
       if (range.dateFrom === curFrom && range.dateTo === curTo) return preset.id;
     }
     return null;
-  }, [curFrom, curTo, defaultPreset]);
+  }, [curFrom, curTo, defaultPreset, referenceDate]);
 
   function selectPreset(id: DateRangePresetId) {
-    const { dateFrom, dateTo } = computeDateRangePreset(id);
-    onRangeChange?.({ dateFrom, dateTo });
+    const { dateFrom, dateTo } = computeDateRangePreset(id, referenceDate);
+    if (onRangeChange) {
+      onRangeChange({ dateFrom, dateTo });
+      return;
+    }
     const params = new URLSearchParams(sp.toString());
     params.set(fromKey, dateFrom);
     params.set(toKey, dateTo);

@@ -32,11 +32,11 @@ function getInitials(name?: string | null, email?: string | null): string {
 
 export function PlatformHeader({ user }: { user: Session["user"] }) {
   return (
-    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-4 py-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
+    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 items-center justify-between border-b border-border/80 bg-background/90 px-3 py-2 shadow-sm backdrop-blur-md supports-[backdrop-filter]:bg-background/75 sm:px-6">
       <ShellHeaderLeading>
         <PlatformShellBreadcrumb />
       </ShellHeaderLeading>
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2 [&>button]:h-11 [&>button]:w-11 md:[&>button]:h-9 md:[&>button]:w-9">
         <Button variant="ghost" size="sm" asChild className="hidden text-muted-foreground sm:inline-flex">
           <Link href="/dashboard">Ir a la app</Link>
         </Button>
@@ -45,7 +45,8 @@ export function PlatformHeader({ user }: { user: Session["user"] }) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-2 rounded-full border border-transparent p-0.5 outline-none transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              aria-label="Menú de cuenta"
+              className="flex items-center justify-center rounded-full border border-transparent p-0.5 outline-none transition-colors hover:border-border hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage src={user?.image ?? undefined} alt={user?.name ?? "Usuario"} />

@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { RoleBadge } from "./role-badge";
 import type { ContactRoleType } from "@bloqer/database";
@@ -98,6 +98,8 @@ export function RoleManager({
   const [editTarget, setEditTarget] = useState<EditTarget | null>(null);
   const [error, setError] = useState<string | null>(null);
   const inFlight = useRef(false);
+  const assignFieldsRef = useRef<HTMLDivElement>(null);
+  const editFieldsRef = useRef<HTMLDivElement>(null);
   const formId = useId();
 
   function runMutation(action: () => Promise<void>) {
@@ -164,6 +166,7 @@ export function RoleManager({
   };
 
   const handleAssign = () => {
+    if (!reportInvalidDecimalInputs(assignFieldsRef.current)) return;
     setError(null);
     if (!selectedRole) {
       setError("Elegí un rol");
@@ -210,7 +213,7 @@ export function RoleManager({
   };
 
   const handleSaveProfile = () => {
-    if (!editTarget) return;
+    if (!editTarget || !reportInvalidDecimalInputs(editFieldsRef.current)) return;
     setError(null);
     const days = parseDays(editPaymentTermsDays);
     if ((editTarget === "CLIENT" || editTarget === "SUPPLIER") && !days.ok) {
@@ -358,7 +361,7 @@ export function RoleManager({
             <DialogDescription>Elegí el rol y completá sus datos opcionales.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div ref={assignFieldsRef} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor={`${formId}-role`}>Rol</Label>
               <Select value={selectedRole || undefined} onValueChange={(v) => setSelectedRole(v as ContactRoleType)}>
@@ -449,7 +452,7 @@ export function RoleManager({
             <DialogDescription>Actualizá los datos del perfil. Podés vaciar los datos opcionales para quitarlos.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div ref={editFieldsRef} className="space-y-4">
             {(editTarget === "CLIENT" || editTarget === "SUPPLIER") && (
               <>
                 <div className="space-y-1.5">

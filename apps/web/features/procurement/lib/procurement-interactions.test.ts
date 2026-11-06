@@ -12,8 +12,8 @@ import * as formatMoney from "../../../lib/format-money";
 import * as requestDrafts from "./purchase-request-form-lines";
 import * as quoteEdit from "./quote-line-edit-values";
 
-type Element = { type: string; props: Record<string, unknown> };
-const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>): Element => typeof type === "function" ? type(props) : ({ type, props });
+type Element = { type: string; props: Record<string, unknown>; key?: string | number };
+const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>, key?: string | number): Element => typeof type === "function" ? type(props) : ({ type, props, key });
 function elements(tree: unknown, type: string): Element[] {
   if (Array.isArray(tree)) return tree.flatMap((node) => elements(node, type));
   if (!tree || typeof tree !== "object" || !("props" in tree)) return [];
@@ -30,9 +30,9 @@ function load<T>(file: string, dependencies: Record<string, unknown>, globals: R
   const exports = {};
   runInNewContext(code, { exports, URLSearchParams, ...globals, require(name: string) {
     if (name === "react/jsx-runtime") return { jsx, jsxs: jsx, Fragment: "fragment" };
+    if (Object.hasOwn(dependencies, name)) return dependencies[name];
     if (name.startsWith("@/components/ui/")) return new Proxy({}, { get: (_, key) => String(key) });
-    assert.ok(Object.hasOwn(dependencies, name), `Unexpected dependency: ${name}`);
-    return dependencies[name];
+    assert.fail(`Unexpected dependency: ${name}`);
   } });
   return exports as T;
 }
@@ -61,6 +61,7 @@ function environment() {
   };
   const dependencies: Record<string, unknown> = {
     react,
+    "@/components/ui/decimal-input": { DecimalInput: "DecimalInput", reportInvalidDecimalInputs: () => true },
     sonner: { toast: { error: (message: string) => errors.push(message), success() {}, warning() {} } },
     "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => "/requests", useSearchParams: () => new URLSearchParams("create=1") },
   };
@@ -119,14 +120,20 @@ test("receipt sends a positive over-receipt quantity to canonical tolerance vali
   assert.equal(elements(withoutWarehouses, "SelectTrigger").some((node) => node.props.id === "receipt-warehouse"), false);
   assert.ok(text(withoutWarehouses).includes("sin producto asociado no generan stock"));
   assert.ok(text(withoutWarehouses).includes("si no aparece ninguno, revisá Inventario o pedí acceso"));
-  (elements(render(), "DecimalInput")[0]!.props.onValueChange as (value: string) => void)("1.0500");
+  const [quantity, ...duplicates] = elements(withoutWarehouses, "DecimalInput");
+  assert.ok(quantity);
+  assert.equal(duplicates.length, 0, "The same input must carry the draft across responsive layouts");
+  assert.equal(elements(withoutWarehouses, "Label").filter((node) => node.props.htmlFor === quantity.props.id).length, 1);
+  assert.equal(quantity.props["aria-label"], "Cantidad recibida de Material");
+  assert.equal(quantity.props.precision, 4);
+  (quantity.props.onValueChange as (value: string) => void)("1.0525");
   const event = { preventDefault() {}, currentTarget: { fields: { receiptDate: "2026-11-04" } } };
   const submit = elements(render(), "form")[0]!.props.onSubmit as (event: unknown) => void;
   submit(event); submit(event); assert.equal(payloads.length, 1);
-  assert.equal((payloads[0]!.lines as { quantityReceived: string }[])[0]!.quantityReceived, "1.0500");
+  assert.equal((payloads[0]!.lines as { quantityReceived: string }[])[0]!.quantityReceived, "1.0525");
   request.resolve({ error: "Cantidad fuera de la tolerancia permitida" }); await env.settle();
   assert.ok(text(render()).includes("Cantidad fuera de la tolerancia permitida"));
-  assert.equal(elements(render(), "DecimalInput")[0]!.props.value, "1.0500");
+  assert.equal(elements(render(), "DecimalInput")[0]!.props.value, "1.0525");
 });
 
 test("request return keeps its reason and overlay when transport fails and blocks closing while pending", async () => {
@@ -168,7 +175,7 @@ test("historical request header editing never serializes replacement lines", asy
   assert.equal(payload?.notes, "Only header"); assert.equal(Object.hasOwn(payload!, "lines"), false); assert.equal(Object.hasOwn(payload!, "neededByDate"), false);
 });
 
-test("APU selection copies its price only for a matching document currency", () => {
+test("APU selection replaces its quantity draft and copies its price only for a matching document currency", () => {
   for (const currency of ["ARS", "USD"]) {
     const env = environment(); let changed: { unitPrice: string; quantity: string }[] | undefined;
     const { PurchaseOrderLinesEditor } = load<{ PurchaseOrderLinesEditor: (props: unknown) => Element }>("../components/purchase-order-lines-editor.tsx", {
@@ -178,23 +185,70 @@ test("APU selection copies its price only for a matching document currency", () 
       "@/features/finance/components/iibb-perception-fields": { DocumentTaxTotalsFooter: "DocumentTaxTotalsFooter" },
       "@/lib/cost-category-colors": { COST_CATEGORY_OPTIONS: [{ value: "MATERIAL", label: "Materiales" }] },
     }, { crypto: { randomUUID: () => "row" } });
-    const tree = env.render(() => PurchaseOrderLinesEditor({ currency, lines: [{ wbsNodeId: "wbs", costType: "MATERIAL", productId: null, costAnalysisLineId: null, description: "Item", unit: "un", quantity: "2", unitPrice: "", taxRate: "21", discountPct: "0" }], onChange: (lines: typeof changed) => { changed = lines; }, wbsOptions: [{ id: "wbs", code: "1", name: "Item", budgetName: "Base", budgetCurrency: "USD", apuLines: [{ id: "apu", description: "APU", category: "MATERIAL", unit: "un", unitCost: "25.0000", quantity: "2" }] }] }));
+    const render = () => env.render(() => PurchaseOrderLinesEditor({ currency, lines: changed ?? [{ wbsNodeId: "wbs", costType: "MATERIAL", productId: null, costAnalysisLineId: null, description: "Item", unit: "un", quantity: "2", unitPrice: "", taxRate: "21", discountPct: "0" }], onChange: (lines: typeof changed) => { changed = lines; }, wbsOptions: [{ id: "wbs", code: "1", name: "Item", budgetName: "Base", budgetCurrency: "USD", apuLines: [{ id: "apu", description: "APU", category: "MATERIAL", unit: "un", unitCost: "25.0000", quantity: "2" }] }] }));
+    const tree = render();
     const apu = elements(tree, "SearchableCombobox").find((node) => String(node.props.id).endsWith("-apu"))!;
     (apu.props.onValueChange as (value: string) => void)("apu");
     assert.equal(changed?.[0]?.unitPrice, currency === "USD" ? "25.0000" : ""); assert.equal(changed?.[0]?.quantity, "2");
+    const after = render();
+    const decimal = (root: Element, suffix: string) => elements(root, "DecimalInput").find((node) => String(node.props.id).endsWith(suffix))!;
+    assert.notEqual(decimal(after, "-quantity").key, decimal(tree, "-quantity").key);
+    assert.equal(decimal(after, "-unit-price").key === decimal(tree, "-unit-price").key, currency !== "USD");
   }
+});
+
+test("reference and balance shortcuts replace only the decimal drafts they fill", () => {
+  const env = environment();
+  const discountScope = {};
+  let invalidScope: object | null = null;
+  let nextId = 0;
+  const { PurchaseOrderLinesEditor } = load<{ PurchaseOrderLinesEditor: (props: unknown) => Element }>("../components/purchase-order-lines-editor.tsx", {
+    ...env.dependencies, "@bloqer/utils": money, "@bloqer/domain": domain, "@bloqer/services/purchase-variance-pure": variance,
+    "@/lib/format-money": formatMoney, "@/lib/searchable-options": { SEARCHABLE_NONE: "none", productsToSearchableOptions: () => [], toSearchableOptions: (value: unknown) => value, withNoneOption: (value: unknown) => value, wbsToSearchableOptions: () => [] },
+    "@/features/budgets/components/unit-select": { UnitSelect: "UnitSelect" }, "@/lib/budget-units": { budgetUnitLabel: (value: string) => value },
+    "@/features/finance/components/iibb-perception-fields": { DocumentTaxTotalsFooter: "DocumentTaxTotalsFooter" },
+    "@/lib/cost-category-colors": { COST_CATEGORY_OPTIONS: [{ value: "MATERIAL", label: "Materiales" }] },
+    "@/components/ui/decimal-input": { DecimalInput: "DecimalInput", reportInvalidDecimalInputs: (scope: object | null) => !invalidScope || scope !== invalidScope },
+  }, { crypto: { randomUUID: () => `row-${nextId++}` } });
+  const line = { wbsNodeId: "wbs", costType: "MATERIAL", productId: null, costAnalysisLineId: null, description: "Item", unit: "un", quantity: "2.0000", unitPrice: "25.0000", taxRate: "21", discountPct: "0" };
+  let lines = [line, { ...line }];
+  const render = () => env.render(() => PurchaseOrderLinesEditor({ currency: "ARS", lines, onChange: (value: typeof lines) => { lines = value; }, wbsOptions: [{ id: "wbs", code: "1", name: "Item", budgetName: "Base", budgetCurrency: "ARS", budgetUnitCost: "25.0000", availableSaldo: "50.00", unit: "un" }] }));
+  const keys = (tree: Element) => elements(tree, "DecimalInput").filter((node) => /-(quantity|unit-price)$/.test(String(node.props.id))).map((node) => node.key);
+  const shortcut = (tree: Element, title: string) => elements(tree, "button").find((node) => node.props.title === title)!;
+  const before = render();
+  (shortcut(before, "Usar este costo como precio unitario").props.onClick as () => void)();
+  const priceFilled = render();
+  assert.deepEqual(keys(priceFilled), [0, 1, 0, 0]);
+  assert.equal(lines[0]!.unitPrice, line.unitPrice);
+
+  const fillBalance = (tree: Element) => (shortcut(tree, "Ajustar la cantidad para consumir este saldo").props.onClick as (event: unknown) => void)({
+    currentTarget: { closest: () => ({ querySelector: (selector: string) => selector.includes("discount") ? discountScope : null }) },
+  });
+  invalidScope = discountScope;
+  fillBalance(priceFilled);
+  assert.deepEqual(keys(render()), [0, 1, 0, 0]);
+  invalidScope = null;
+  fillBalance(render());
+  assert.deepEqual(keys(render()), [1, 1, 0, 0]);
+  assert.equal(lines[0]!.quantity, line.quantity);
 });
 
 test("foreign confirmation requires an explicit rate, preserves it and forwards it exactly once", async () => {
   const env = environment(), payloads: unknown[] = [];
+  let validDecimal = true;
   const { ConfirmPurchaseOrderButton } = load<{ ConfirmPurchaseOrderButton: (props: unknown) => Element }>("../components/confirm-purchase-order-button.tsx", {
     ...env.dependencies, "@/features/finance/components/manual-fx-field": { ManualFxField: "ManualFxField" },
+    "@/components/ui/decimal-input": { reportInvalidDecimalInputs: () => validDecimal },
     "@/app/(app)/proyectos/[id]/ordenes-compra/actions": { confirmPurchaseOrderAction: async (_id: string, _project: string, payload: unknown) => { payloads.push(payload); return { ok: true }; } },
   });
   const render = () => env.render(() => ConfirmPurchaseOrderButton({ poId: "order", projectId: "project", currency: "USD", initialFxRate: "" }));
   (elements(render(), "ConfirmAlertDialog")[0]!.props.onConfirm as () => void)(); await env.settle();
   assert.equal(payloads.length, 0); assert.ok(text(elements(render(), "ConfirmAlertDialog")[0]!.props.description).includes("Ingresá el tipo de cambio"));
   (elements(render(), "ManualFxField")[0]!.props.onValueChange as (value: string) => void)("1234.567890");
+  validDecimal = false;
+  (elements(render(), "ConfirmAlertDialog")[0]!.props.onConfirm as () => void)(); await env.settle();
+  assert.equal(payloads.length, 0, "an invalid visible rate cannot send the previous canonical rate");
+  validDecimal = true;
   const confirm = elements(render(), "ConfirmAlertDialog")[0]!.props.onConfirm as () => void;
   confirm(); confirm(); await env.settle();
   assert.equal(payloads.length, 1); assert.equal((payloads[0] as { fxRate: string }).fxRate, "1234.567890");

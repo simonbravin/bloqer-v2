@@ -2,7 +2,7 @@
 
 import type { StoredDocumentLineMoney } from "@bloqer/utils";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   addDecimal,
@@ -12,7 +12,7 @@ import {
 } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { formatDecimalArFromString } from "@/lib/format-money";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
@@ -124,6 +124,8 @@ export function InvoiceLinesEditor({
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const [headerDiscount, setHeaderDiscount] = useState("");
+  const [discountRevision, setDiscountRevision] = useState(0);
+  const headerDiscountRef = useRef<HTMLDivElement>(null);
   const [{ lineKeys, manualCostTypeKeys }, setLineState] = useState(() => {
     const keys = Array.from({ length: Math.max(lines.length, 1) }, createLineKey);
     const manual =
@@ -231,7 +233,7 @@ export function InvoiceLinesEditor({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-medium">Líneas</p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div ref={headerDiscountRef} className="flex flex-wrap items-center gap-2">
           <Label htmlFor="invoice-header-discount" className="text-xs text-muted-foreground whitespace-nowrap">
             Descuento general %
           </Label>
@@ -248,6 +250,7 @@ export function InvoiceLinesEditor({
             variant="outline"
             size="sm"
             onClick={() => {
+              if (!reportInvalidDecimalInputs(headerDiscountRef.current)) return;
               if (headerDiscount.trim() === "") {
                 toast.error("Ingresá un descuento entre 0 y 100");
                 return;
@@ -255,6 +258,7 @@ export function InvoiceLinesEditor({
               try {
                 const pct = normalizeDiscountPct(headerDiscount);
                 onChange(lines.map((l) => ({ ...l, discountPct: pct })));
+                setDiscountRevision((revision) => revision + 1);
                 toast.success("Descuento copiado a todas las líneas");
               } catch {
                 toast.error("El descuento debe estar entre 0 y 100");
@@ -406,6 +410,7 @@ export function InvoiceLinesEditor({
                     Desc. %
                   </Label>
                   <DecimalInput
+                    key={discountRevision}
                     precision={4}
                     id={`${lineKey}-discount`}
                     value={line.discountPct ?? "0"}

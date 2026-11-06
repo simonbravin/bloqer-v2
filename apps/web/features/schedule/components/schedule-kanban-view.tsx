@@ -15,6 +15,7 @@ import {
   KanbanProvider,
 } from "@/components/kibo-ui/kanban";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { moveScheduleItemStatusAction } from "../actions/schedule-actions";
 import { mapItemToKanbanCard, STATUS_LABELS } from "../adapters/schedule-view-types";
 import { ScheduleProgressDimensions } from "./schedule-progress-dimensions";
@@ -132,14 +133,14 @@ export function ScheduleKanbanView({
 
   function handleDragEnd(event: DragEndEvent) {
     if (!workspace.canEdit || isRunning()) {
-      syncDataFromServer();
+      queueMicrotask(syncDataFromServer);
       return;
     }
 
     const activeId = String(event.active.id);
     const item = itemById.get(activeId);
     if (!item) {
-      syncDataFromServer();
+      queueMicrotask(syncDataFromServer);
       return;
     }
 
@@ -189,11 +190,13 @@ export function ScheduleKanbanView({
   return (
     <>
       <KanbanProvider
+        label="Tablero Kanban del cronograma"
         className="auto-cols-[minmax(240px,1fr)]"
         columns={columns}
         data={data}
         onDataChange={setData}
         onDragEnd={handleDragEnd}
+        onDragCancel={syncDataFromServer}
       >
         {(column) => (
           <KanbanBoard id={column.id} key={column.id}>
@@ -203,22 +206,21 @@ export function ScheduleKanbanView({
                 const item = itemById.get(card.id);
                 if (!item) return null;
                 const col = item.status as ScheduleItemStatus;
+                const canDrag = workspace.canEdit && KANBAN_ALLOWED[col].length > 0;
                 return (
-                  <KanbanCard {...card} className="gap-2 p-0">
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      className="cursor-pointer space-y-2 p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      onClick={() => onSelect(item)}
-                      onKeyDown={(e) => {
-                        if (e.target !== e.currentTarget) return;
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSelect(item);
-                        }
-                      }}
-                    >
-                      <p className="font-medium text-sm leading-snug">{card.name}</p>
+                  <KanbanCard key={card.id} {...card} canDrag={canDrag} dragDisabled={pending} className="p-0">
+                    <div className="space-y-2 p-3">
+                      <button
+                        type="button"
+                        aria-haspopup="dialog"
+                        className={cn(
+                          "block min-h-6 break-words rounded text-left text-sm font-medium leading-snug hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          canDrag ? "w-[calc(100%-2rem)]" : "w-full",
+                        )}
+                        onClick={() => onSelect(item)}
+                      >
+                        {card.name}
+                      </button>
                       <ScheduleProgressDimensions item={item} compact />
                       <div className="flex flex-wrap gap-1">
                         {card.badges.map((b) => (
@@ -243,8 +245,7 @@ export function ScheduleKanbanView({
                               variant="ghost"
                               className="h-7 text-xs"
                               disabled={pending}
-                              onClick={(e) => {
-                                e.stopPropagation();
+                              onClick={() => {
                                 const next = NEXT_STATUS[col]!;
                                 if (next === "BLOCKED") setBlockTarget(item);
                                 else move(item.id, next);
@@ -259,24 +260,18 @@ export function ScheduleKanbanView({
                               variant="ghost"
                               className="h-7 text-xs"
                               disabled={pending}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                move(item.id, "COMPLETED");
-                              }}
+                              onClick={() => move(item.id, "COMPLETED")}
                             >
                               → Completado
                             </Button>
                           )}
-                          {col !== "BLOCKED" && col !== "COMPLETED" && (
+                          {KANBAN_ALLOWED[col].includes("BLOCKED") && (
                             <Button
                               size="sm"
                               variant="ghost"
                               className="h-7 text-xs text-destructive"
                               disabled={pending}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setBlockTarget(item);
-                              }}
+                              onClick={() => setBlockTarget(item)}
                             >
                               Bloquear
                             </Button>

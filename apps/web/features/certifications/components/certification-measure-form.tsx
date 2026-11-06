@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useOperationalAction } from "@/hooks/use-operational-action";
 import { useRouter } from "next/navigation";
 import { Sparkles } from "lucide-react";
@@ -9,7 +9,7 @@ import { previewCertificationMeasurement } from "@bloqer/services/certification-
 import type { CertificationMeasurementRow, CertificationMeasurementSheet } from "@bloqer/services";
 import type { SaveCertificationMeasurementInput } from "@bloqer/validators";
 import { Button } from "@/components/ui/button";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -47,7 +47,10 @@ export function CertificationMeasureForm({
   const { pending, run } = useOperationalAction({ onPendingChange, onError: setError });
   const [currentQty, setCurrentQty] = useState(row.currentQty ?? row.suggestedQty ?? "");
   const [physicalPct, setPhysicalPct] = useState(row.physicalPct ?? row.suggestedPhysicalPct ?? "");
+  const [quantityRevision, setQuantityRevision] = useState(0);
+  const [physicalRevision, setPhysicalRevision] = useState(0);
   const [source, setSource] = useState<string | null>(row.lineId ? null : "PHYSICAL");
+  const measurementFieldsRef = useRef<HTMLDivElement>(null);
   let preview: ReturnType<typeof previewCertificationMeasurement> | null = null;
   try {
     preview = previewCertificationMeasurement({ ...row, currentQty, physicalPct });
@@ -56,6 +59,7 @@ export function CertificationMeasureForm({
   }
 
   function handleSave(included = true) {
+    if (included && !reportInvalidDecimalInputs(measurementFieldsRef.current)) return;
     setError(null);
     try {
       if (included && (!currentQty || compareQty(currentQty, "0") <= 0)) {
@@ -132,9 +136,12 @@ export function CertificationMeasureForm({
               )}
               onClick={() => {
                 setCurrentQty(suggestion.quantity!);
+                setQuantityRevision((revision) => revision + 1);
                 setSource(suggestion.source);
-                if (suggestion.source === "PHYSICAL")
+                if (suggestion.source === "PHYSICAL") {
                   setPhysicalPct(row.suggestedPhysicalPct ?? "0");
+                  setPhysicalRevision((revision) => revision + 1);
+                }
               }}
             >
               <span className="flex flex-col items-start gap-1 font-medium sm:flex-row sm:items-center sm:justify-between">
@@ -163,10 +170,11 @@ export function CertificationMeasureForm({
           valores antes de guardar.
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div ref={measurementFieldsRef} className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label htmlFor="measurement-qty">Cantidad de este período</Label>
           <DecimalInput
+            key={quantityRevision}
             id="measurement-qty"
             precision={4}
             value={currentQty}
@@ -181,6 +189,7 @@ export function CertificationMeasureForm({
         <div className="space-y-1.5">
           <Label htmlFor="measurement-physical">% físico de este período</Label>
           <DecimalInput
+            key={physicalRevision}
             id="measurement-physical"
             precision={4}
             value={physicalPct}

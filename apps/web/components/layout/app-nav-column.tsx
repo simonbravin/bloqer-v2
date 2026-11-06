@@ -43,6 +43,7 @@ export function AppNavColumn({
     <Sidebar
       roles={roles}
       moduleGateSnapshot={moduleGateSnapshot}
+      isTenantUser={isTenantUser}
       hasTenantLogo={hasTenantLogo}
       tenantLogoVersion={tenantLogoVersion}
     />

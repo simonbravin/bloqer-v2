@@ -116,6 +116,60 @@ for (const kind of ["payment", "collection"] as const) {
   });
 }
 
+test("reconciliation cannot create a movement with the previous rate after an invalid FX edit", async () => {
+  const env = environment();
+  const payloads: unknown[] = [];
+  let validDecimal = true;
+  env.dependencies["@/components/ui/decimal-input"] = {
+    DecimalInput: "DecimalInput",
+    reportInvalidDecimalInputs: () => validDecimal,
+  };
+  env.dependencies["@/app/(app)/tesoreria/conciliacion/actions"] = {
+    createMovementFromStatementLineAction: async (payload: unknown) => {
+      payloads.push(payload);
+      return { ok: true };
+    },
+  };
+  const { BankReconciliationWorkspace } = load<{ BankReconciliationWorkspace: (props: unknown) => Element }>(
+    "../../treasury/components/bank-reconciliation-workspace.tsx",
+    env.dependencies,
+  );
+  const render = () => env.render(() => BankReconciliationWorkspace({
+    canEdit: true,
+    candidates: [],
+    session: {
+      id: "reconciliation",
+      status: "IN_PROGRESS",
+      currency: "USD",
+      accountName: "Cuenta USD",
+      openingBalance: "0",
+      closingBalance: "100",
+      impliedClosingBalance: "100",
+      systemClosingBalance: "0",
+      bankClosingDifference: "100",
+      statementBalances: true,
+      unmatchedLines: 1,
+      lines: [{ id: "line", amount: "100", lineDate: "2026-11-05", direction: "CREDIT", description: "Ingreso" }],
+    },
+  }));
+  const open = elements(render(), "Button").find((node) => String(node.props.children).trim() === "Crear movimiento")!;
+  (open.props.onClick as () => void)();
+  set(render(), "ManualFxField", "1234.567890");
+  const confirm = () => {
+    const dialog = elements(render(), "ConfirmAlertDialog").find((node) => node.props.confirmLabel === "Crear y emparejar")!;
+    (dialog.props.onConfirm as () => void)();
+  };
+  validDecimal = false;
+  confirm();
+  await env.settle();
+  assert.equal(payloads.length, 0);
+  validDecimal = true;
+  confirm();
+  await env.settle();
+  assert.equal(payloads.length, 1);
+  assert.equal((payloads[0] as { fxRate: string }).fxRate, "1234.567890");
+});
+
 test("manual sale keeps qty/unit-price/discount capture at four decimals and survives transport failure", async () => {
   const env = environment(), request = deferred<{ id: string }>(), calls: unknown[][] = [];
   env.dependencies["@/app/(app)/proyectos/[id]/facturas/actions"] = { createSalesInvoiceAction: (...args: unknown[]) => { calls.push(args); return request.promise; } };

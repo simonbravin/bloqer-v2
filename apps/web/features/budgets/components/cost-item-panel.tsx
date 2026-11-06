@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { DecimalInput } from "@/components/ui/decimal-input";
+import { DecimalInput, reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -61,9 +61,10 @@ export function CostItemPanel({
   const [unit, setUnit] = useState(costItem.unit);
   const [quantity, setQuantity] = useState(costItem.quantity);
   const [notes, setNotes] = useState(costItem.notes ?? "");
+  const itemFieldsRef = useRef<HTMLFieldSetElement>(null);
 
   function saveItemFields() {
-    if (!editable) return;
+    if (!editable || !reportInvalidDecimalInputs(itemFieldsRef.current)) return;
     setItemError(null);
     const nextQuantity = Number(quantity);
     if (!unit.trim() || !Number.isFinite(nextQuantity) || nextQuantity <= 0) {
@@ -113,7 +114,7 @@ export function CostItemPanel({
         </div>
 
         {editingItem ? (
-          <fieldset disabled={itemPending} className="min-w-0 space-y-3">
+          <fieldset ref={itemFieldsRef} disabled={itemPending} className="min-w-0 space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor={`${formId}-unit`} className="text-xs">Unidad</Label>

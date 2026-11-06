@@ -18,6 +18,7 @@ interface SidebarProps {
   roles: UserRole[];
   /** Phase 12B / 15A: serialized tenant module flags (default-on when key missing). */
   moduleGateSnapshot?: Partial<Record<PermissionModule, boolean>>;
+  isTenantUser: boolean;
   /** When true, show tenant brand logo instead of Bloqer ([D-071]). */
   hasTenantLogo?: boolean;
   tenantLogoVersion?: string | null;
@@ -26,6 +27,7 @@ interface SidebarProps {
 export function Sidebar({
   roles,
   moduleGateSnapshot,
+  isTenantUser,
   hasTenantLogo = false,
   tenantLogoVersion = null,
 }: SidebarProps) {
@@ -34,8 +36,10 @@ export function Sidebar({
   const { tenantCount } = usePendingInboxCount();
   const gate = useMemo(() => tenantGateFromSnapshot(moduleGateSnapshot ?? {}), [moduleGateSnapshot]);
   const sections = useMemo(
-    () => buildGlobalNavSections(roles, (m) => gate.isEnabled(m)),
-    [roles, gate],
+    () => isTenantUser
+      ? buildGlobalNavSections(roles, (m) => gate.isEnabled(m))
+      : [{ title: "General", items: [{ href: "/dashboard", label: "Inicio", matchExact: true }] }],
+    [roles, gate, isTenantUser],
   );
 
   const [openByTitle, setOpenByTitle] = useState<Record<string, boolean>>({});
@@ -95,7 +99,7 @@ export function Sidebar({
           );
         })}
       </nav>
-      <HelpSidebarFooter />
+      {isTenantUser ? <HelpSidebarFooter /> : null}
     </aside>
   );
 }
