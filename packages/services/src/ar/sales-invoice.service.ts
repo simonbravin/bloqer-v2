@@ -15,7 +15,7 @@ import type {
   UpdateSalesInvoiceInput,
 } from "@bloqer/validators";
 import { auditAr } from "./ar-audit";
-import { arInvoiceParents, assertArInvoiceParents, arCancellationReason, assertArDateRange, parseArInput, stripArParents, assertArTransactionModules } from "./ar-integrity";
+import { arInvoiceParents, arReceivableParents, assertArInvoiceParents, assertArReceivableParents, arCancellationReason, assertArDateRange, parseArInput, stripArParents, assertArTransactionModules } from "./ar-integrity";
 import { _lockCertificationProject } from "../certification/certification-calc.service";
 import { computeDocumentFxAmounts } from "../finance/fx-amount.service";
 import { assertCanCancelSalesInvoice } from "./sales-invoice-cancel-guards";
@@ -122,8 +122,8 @@ export function assertInvoiceEditable(invoice: SalesInvoice): void {
 export async function getSalesInvoiceById(
   id: string,
   ctx: ServiceContext,
-  /** When set (project workspace routes), corporate invoices and cross-project IDs are rejected. */
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {
@@ -257,6 +257,15 @@ export type ProjectSalesInvoiceListFilters = {
 
 export type ProjectSalesInvoiceListRow = Omit<SalesInvoiceWithLines, "lines">;
 
+export type CompanySalesInvoiceListFilters = Omit<ProjectSalesInvoiceListFilters, "class"> & {
+  status?: SalesInvoiceStatus;
+  includeCancelled?: boolean;
+};
+
+export type CompanySalesInvoiceListRow = ProjectSalesInvoiceListRow & {
+  receivable: { id: string; status: string; balanceDue: string } | null;
+};
+
 /** Parse "FAC-12", "NC-00003", "ND-1", or bare digits. */
 function parseSalesInvoiceNumberSearch(
   search: string,
@@ -340,6 +349,60 @@ export async function listInvoicesByProject(
   ]);
   invoices.forEach((invoice) => assertArInvoiceParents(invoice, ctx));
   return { data: invoices.map(serializeInvoiceListRow), total };
+}
+
+/** Corporate documents include drafts and NCs, which do not have a Receivable. */
+export async function listCompanySalesInvoices(
+  ctx: ServiceContext,
+  filters?: CompanySalesInvoiceListFilters,
+): Promise<{ data: CompanySalesInvoiceListRow[]; total: number }> {
+  await assertArTenantModule(ctx);
+  if (!canViewCompanyAr(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver facturas de venta a nivel empresa");
+  }
+  const { skip, take } = resolvePagination(filters ?? {});
+  const search = filters?.search?.trim();
+  const where: Prisma.SalesInvoiceWhereInput = {
+    tenantId: ctx.tenantId,
+    projectId: null,
+    // SalesInvoice.companyId is NOT NULL.
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
+    ...(filters?.status ? { status: filters.status } :
+      filters?.includeCancelled ? {} : { status: { not: "CANCELLED" } }),
+    ...(filters?.documentKind ? { documentKind: filters.documentKind } : {}),
+    ...(search ? salesInvoiceSearchWhere(search) : {}),
+  };
+  const [invoices, total] = await Promise.all([
+    prisma.salesInvoice.findMany({
+      where,
+      include: {
+        ...arInvoiceParents,
+        clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
+        receivable: { include: arReceivableParents },
+      },
+      orderBy: [{ issueDate: "desc" }, { number: "desc" }, { id: "desc" }],
+      skip,
+      take,
+    }),
+    prisma.salesInvoice.count({ where }),
+  ]);
+  return {
+    total,
+    data: invoices.map((invoice) => {
+      assertArInvoiceParents(invoice, ctx);
+      if (invoice.receivable) assertArReceivableParents(invoice.receivable, ctx);
+      return {
+        ...serializeInvoiceListRow(invoice),
+        receivable: invoice.receivable ? {
+          id: invoice.receivable.id,
+          status: invoice.receivable.status,
+          balanceDue: serializeMoneyDecimal(normalizeObligationBalanceDue(computeObligationBalanceDue(
+            invoice.receivable.originalAmount, invoice.receivable.paidAmount, invoice.receivable.creditedAmount,
+          ))),
+        } : null,
+      };
+    }),
+  };
 }
 
 // ─── Resolve company ──────────────────────────────────────────────────────────
@@ -750,7 +813,8 @@ export async function updateSalesInvoice(
   id: string,
   input: UpdateSalesInvoiceInput,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   input = parseArInput(updateSalesInvoiceSchema, input);
@@ -938,7 +1002,8 @@ export async function updateSalesInvoice(
 export async function issueSalesInvoice(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
 
@@ -1112,7 +1177,8 @@ export async function issueSalesInvoice(
 export async function cancelSalesInvoice(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
   reason?: string,
 ): Promise<SalesInvoice> {
   await assertArTenantModule(ctx);

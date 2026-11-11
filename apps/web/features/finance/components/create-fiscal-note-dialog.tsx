@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { compareDecimal, serializeMoney } from "@bloqer/utils";
 import { FISCAL_DOCUMENT_KIND_LABELS } from "@bloqer/domain";
@@ -49,6 +49,9 @@ type Props = {
   triggerLabel?: string;
   triggerVariant?: "outline" | "secondary" | "default";
   triggerSize?: "sm" | "default";
+  /** Company lists select an issued invoice inside the same dialog. */
+  parentSelector?: ReactNode;
+  onOpenChange?: (open: boolean) => void;
 };
 
 type CreateResult = { id: string } | { error: string };
@@ -63,6 +66,8 @@ export function CreateFiscalNoteDialog({
   triggerLabel,
   triggerVariant = "outline",
   triggerSize = "sm",
+  parentSelector,
+  onOpenChange,
 }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -72,8 +77,15 @@ export function CreateFiscalNoteDialog({
   const balanceSerialized = openBalance ? serializeMoney(openBalance) : "0.00";
   const [amount, setAmount] = useState(balanceSerialized);
   const [amountRevision, setAmountRevision] = useState(0);
+  const amountId = useId();
   const kindLabel = FISCAL_DOCUMENT_KIND_LABELS[kind];
   const buttonLabel = triggerLabel ?? (isCredit ? "Nota de crédito" : "Nota de débito");
+
+  useEffect(() => {
+    setAmount(balanceSerialized);
+    setAmountRevision((revision) => revision + 1);
+    setError(null);
+  }, [parentInvoiceId, balanceSerialized]);
 
   function detailHref(noteId: string): string {
     switch (scope.type) {
@@ -114,6 +126,10 @@ export function CreateFiscalNoteDialog({
     e.preventDefault();
     if (isBusy()) return;
     setError(null);
+    if (!parentInvoiceId) {
+      setError("Seleccioná la factura de referencia");
+      return;
+    }
     if (isCredit) {
       const normalized = serializeMoney(amount);
       if (compareDecimal(normalized, "0") <= 0) {
@@ -133,6 +149,7 @@ export function CreateFiscalNoteDialog({
           return;
         }
         setOpen(false);
+        onOpenChange?.(false);
         router.push(detailHref(result.id));
       });
       return;
@@ -144,6 +161,7 @@ export function CreateFiscalNoteDialog({
         return;
       }
       setOpen(false);
+      onOpenChange?.(false);
       router.push(detailHref(result.id));
     });
   }
@@ -154,6 +172,7 @@ export function CreateFiscalNoteDialog({
       onOpenChange={(next) => {
         if (!next && isBusy()) return;
         setOpen(next);
+        onOpenChange?.(next);
         if (next) {
           setError(null);
           setAmount(balanceSerialized);
@@ -169,7 +188,9 @@ export function CreateFiscalNoteDialog({
         <DialogHeader>
           <DialogTitle>{kindLabel}</DialogTitle>
           <DialogDescription>
-            {isCredit
+            {!parentInvoiceId
+              ? "Elegí una factura emitida de la empresa, sin proyecto, como referencia de la nota."
+              : isCredit
               ? `Sobre ${parentCode}. Reducí el saldo sin movimiento de caja. Podés dejar el total o una NC parcial.`
               : `Sobre ${parentCode}. Se crea un borrador que, al emitir, abre una obligación adicional.`}
           </DialogDescription>
@@ -179,7 +200,8 @@ export function CreateFiscalNoteDialog({
           {error ? (
             <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
           ) : null}
-          {isCredit ? (
+          {parentSelector}
+          {parentInvoiceId && isCredit ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Saldo pendiente</span>
@@ -188,10 +210,10 @@ export function CreateFiscalNoteDialog({
                 </span>
               </div>
               <div className="space-y-1">
-                <Label htmlFor="fiscal-note-amount">Monto de la NC</Label>
+                <Label htmlFor={amountId}>Monto de la NC</Label>
                 <DecimalInput
                   key={amountRevision}
-                  id="fiscal-note-amount"
+                  id={amountId}
                   value={amount}
                   onValueChange={setAmount}
                   required
@@ -210,20 +232,26 @@ export function CreateFiscalNoteDialog({
                   }}
                 />
               </div>
+              {compareDecimal(balanceSerialized, "0") <= 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Esta factura no tiene saldo pendiente para aplicar una nota de crédito.
+                </p>
+              ) : null}
             </div>
-          ) : (
+          ) : parentInvoiceId ? (
             <p className="text-sm text-muted-foreground">
               El borrador copia las líneas de la factura. Después podés editarlas antes de emitir.
             </p>
-          )}
+          ) : null}
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>
+            <Button type="button" variant="outline" onClick={() => { setOpen(false); onOpenChange?.(false); }} disabled={isPending}>
               Cancelar
             </Button>
             <Button
               type="submit"
               disabled={
                 isPending ||
+                !parentInvoiceId ||
                 (isCredit && (!openBalance || compareDecimal(balanceSerialized, "0") <= 0))
               }
             >

@@ -16,7 +16,7 @@ export function SalesInvoiceCards({
   emptyMessage = "Sin facturas. Cree la primera manualmente o desde una certificación aprobada.",
 }: {
   invoices: SalesInvoiceListItem[];
-  projectId: string;
+  projectId: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyMessage?: string;
@@ -38,7 +38,7 @@ export function SalesInvoiceCards({
         return (
           <Link
             key={inv.id}
-            href={`/proyectos/${projectId}/facturas/${inv.id}`}
+            href={projectId ? `/proyectos/${projectId}/facturas/${inv.id}` : `/finanzas/facturas/${inv.id}`}
             className="flex min-w-0 flex-col rounded-lg border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
           >
             <div className="flex items-start justify-between gap-2">

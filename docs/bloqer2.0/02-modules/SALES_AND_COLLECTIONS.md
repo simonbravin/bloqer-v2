@@ -38,6 +38,7 @@ Ver máquinas SalesInvoice y Receivable.
 - Venta directa simplificada (sin certificación).
 - **Adjuntos** en el alta (create-then-upload) y en el detalle de factura de venta (`SALES_INVOICE`) — foto/copia del comprobante ([D-052]). Aplica a obra y a ingresos corporativos (`projectId` null; panel en CxC empresa).
 - AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]).
+- **Oficina → Finanzas → Comprobantes de venta** (`/finanzas/facturas`): listado documental de empresa sin proyecto, con facturas, NC y ND, búsqueda por código/cliente y filtros por tipo/estado. Incluye borradores y notas de crédito sin CxC propia. **Nueva nota de crédito / Nueva nota de débito** permite buscar y elegir una factura de referencia emitida de empresa; el monto de la NC puede ser parcial. Desde CxC empresa, **Ver comprobantes** abre este listado. Las notas también se crean desde el detalle de la factura origen.
 
 ### Ingresos corporativos sin proyecto ([D-037], [D-049], [D-051])
 

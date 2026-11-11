@@ -58,6 +58,15 @@ Q-069/Q-070/Q-071 aprobadas en D-122/D-123/D-124: comprobar error funcional por 
 
 Record who ran the checklist, date, and environment.
 
+## Notas de crédito y débito de empresa — D-115
+
+Ejecutar después de publicar el cambio, con comprobantes sintéticos en un entorno de prueba autorizado. No acredita una ejecución en el portal.
+
+1. En Oficina, abrir **Finanzas → Comprobantes de venta** y **Facturas y gastos**, en escritorio y celular. **Nueva nota de crédito / Nueva nota de débito** permite buscar y seleccionar una **Factura de referencia** emitida sin proyecto. No ofrecer facturas de otra empresa/tenant, borradores, notas ni comprobantes de obra. Sin facturas elegibles, mostrar el estado vacío y el siguiente paso. **Ver comprobantes** desde CxC abre el listado de venta.
+2. Sobre una factura con saldo 100, crear NC parcial de 30, revisar el borrador y emitir. El saldo queda en 70, sin cobranza/pago ni movimiento de caja. La NC figura en el listado por tipo y en **Notas vinculadas**, aunque no tenga CxC/CxP propia. Anular con motivo restaura el saldo a 100 y actualiza el detalle de la factura.
+3. Crear ND desde la misma factura, editar el borrador a 20 y emitir. Crea una deuda propia de 20 y conserva la original. No permite anular el padre mientras exista una nota emitida; la ND con caja aplicada conserva los bloqueos de anulación de facturas.
+4. Probar monto NC mayor al saldo, saldo consumido después de abrir el diálogo, acceso directo a IDs ajenos y llamada de empresa con un ID de obra: rechazar sin mutaciones ni filtración. Permiso de consulta no debe ofrecer creación; AR/AP desactivado rechaza su operación. Los recorridos de proyecto conservan su ámbito.
+
 ## Exportaciones de listados — regresión Excel/PDF
 
 Ejecutar tras publicar este cambio, con datos sintéticos en un entorno de prueba autorizado. Estos pasos son criterios pendientes de smoke; no acreditan una ejecución en el portal.

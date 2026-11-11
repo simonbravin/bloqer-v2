@@ -20,16 +20,17 @@ import { getCurrentUser } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import {
   getReceivableAgingReport,
+  canEditCompanyAr,
   listCompanyReceivables,
   listReceivablesFieldBoard,
   parseAgingFilters,
   resolvePagination,
   ServiceError,
 } from "@bloqer/services";
-import { can } from "@bloqer/domain";
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
+import { NewCompanyFiscalNoteDialog } from "@/features/finance/components/new-company-fiscal-note-dialog";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
@@ -74,6 +75,20 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
 
   const hint = parseViewportHint((await cookies()).get(VIEWPORT_COOKIE)?.value);
   const loadField = isReceivablesFieldViewport(hint);
+  const canEditAr = canEditCompanyAr(ctx.roles);
+  const invoiceActions = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button asChild variant="outline" size="sm">
+        <Link href="/finanzas/facturas">Ver comprobantes</Link>
+      </Button>
+      {canEditAr ? (
+        <>
+          <NewCompanyFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ar" />
+          <NewCompanyFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ar" />
+        </>
+      ) : null}
+    </div>
+  );
 
   if (loadField) {
     const started = Date.now();
@@ -91,6 +106,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
           <h1 className="text-2xl font-bold tracking-tight">Cuentas por cobrar</h1>
           <p className="text-sm text-muted-foreground">Empresa</p>
         </div>
+        {invoiceActions}
         <ReceivablesFieldExperience rows={board.rows} queryMs={queryMs} />
       </PageShell>
     );
@@ -134,7 +150,6 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
     classLabel: r.classLabel,
     classFamily: r.classFamily,
   }));
-  const canEditAr = can(current.tenantCtx.roles, "EDIT", "AR");
 
   function listHref(listStatus?: string) {
     const p = new URLSearchParams();
@@ -168,6 +183,7 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
           <p className="text-xs text-muted-foreground">Saldos actuales · vencimientos al {formatDate(agingReport.asOfDate)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {invoiceActions}
           <ReportExportActions exportPath="/api/reports/finanzas/ar-aging.csv" params={sp} pdf />
           <ReportEmailSendDialog
             reportType="AR_AGING"
@@ -232,8 +248,8 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
               receivables={items}
               showProjectColumn
               canMutate={canEditAr}
-              invoicesHref="/proyectos"
-              invoicesActionLabel="Ir a proyectos"
+              invoicesHref="/finanzas/facturas"
+              invoicesActionLabel="Ver comprobantes"
             />
           </Suspense>
 

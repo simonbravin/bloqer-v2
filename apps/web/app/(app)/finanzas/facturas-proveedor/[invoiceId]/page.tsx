@@ -72,7 +72,7 @@ export default async function FinanzasFacturaProveedorDetailPage({
   try {
     invoice = await getCompanySupplierInvoiceById(invoiceId, ctx);
     if ((invoice.documentKind ?? "INVOICE") === "INVOICE") {
-      relatedNotes = await listCreditDebitNotesForSupplierInvoice(invoiceId, ctx);
+      relatedNotes = await listCreditDebitNotesForSupplierInvoice(invoiceId, ctx, null);
     }
     if (invoice.referencedSupplierInvoiceId) {
       const parent = await getCompanySupplierInvoiceById(

@@ -27,7 +27,7 @@ export function SalesInvoiceTable({
   emptyMessage = "Sin facturas. Cree la primera manualmente o desde una certificación aprobada.",
 }: {
   invoices: SalesInvoiceListItem[];
-  projectId: string;
+  projectId: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyMessage?: string;
@@ -64,7 +64,7 @@ export function SalesInvoiceTable({
               <TableRow key={inv.id}>
                 <TableCell className="font-mono text-sm font-medium">
                   <Link
-                    href={`/proyectos/${projectId}/facturas/${inv.id}`}
+                    href={projectId ? `/proyectos/${projectId}/facturas/${inv.id}` : `/finanzas/facturas/${inv.id}`}
                     className="text-primary hover:underline"
                   >
                     {inv.code}
