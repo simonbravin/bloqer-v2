@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-11T12:13:13.795Z",
-  "sourceHash": "ac0a81ff44db2ce9b9b917c1ccf5c41afb558649e43d34e04371f55caeafd08f",
+  "generatedAt": "2026-11-11T12:20:08.822Z",
+  "sourceHash": "922c7dd4bac1de7ecba260b810fd283e43f3c74f6ecf24af968ca13cece86a86",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "8b07c5cd03215c395218b3917df50e241ce7be2ad5624621d32c4368ca3a2207",
-      "bytes": 215985
+      "sha256": "be03461bd7227ced8be3af7fd553f503924d6ae3c31ac408e0132ee6e309ac45",
+      "bytes": 216004
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1399,7 +1399,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "9. Compras, materiales y abastecimiento (nivel proyecto)",
-      "text": "- El **Monto est.** de SC conserva la moneda de su base. El estimado presupuestario solo aparece si todos los ítems tienen precios y unidades comparables en una moneda; una base parcial o de monedas distintas no se presenta como total.\n- El tablero distingue **Sin cotizaciones recibidas** (sin ofertas Recibidas/Seleccionadas) de la suficiencia por ítem: tener una oferta no demuestra que se alcanzó el mínimo. **Adjudicadas** representa cobertura completa. Las secciones de OC/recepciones y los accesos a informes solo aparecen con sus permisos y módulos.\n- Si Facturación o Inventario no están disponibles, la pantalla lo informa: no muestra ceros como si se hubiera consultado ese módulo. Una factura de otra moneda puede seguir consultándose como documento original, pero el resumen monetario mezclado queda no calculable. Si hay una relación inconsistente entre documentos, se requiere revisar el origen antes de generar o emitir una factura.\n- En **Facturación de la OC**, recibido, facturado y pendiente de facturar se comparan en **neto + IVA**, sin percepciones (D-112). **Pagado total** conserva el importe efectivamente pagado y puede incluirlas. El paso de pago solo se completa con las "
+      "text": "- El **Monto est.** de SC conserva la moneda de su base. El estimado presupuestario solo aparece si todos los ítems tienen precios y unidades comparables en una moneda; una base parcial o de monedas distintas no se presenta como total.\n- El tablero distingue **Sin cotizaciones recibidas** (sin ofertas Recibidas/Seleccionadas) de la suficiencia por ítem: tener una oferta no demuestra que se alcanzó el mínimo. **Adjudicadas** representa cobertura completa. Las secciones de OC/recepciones y los accesos a informes solo aparecen con sus permisos y módulos.\n- Si Facturación o Inventario no están disponibles, la pantalla lo informa: no muestra ceros como si se hubiera consultado ese módulo. Una factura de otra moneda puede seguir consultándose como documento original, pero el resumen monetario mezclado queda no calculable. Si hay una relación inconsistente entre documentos, se requiere revisar el origen antes de generar o emitir una factura.\n- En **Facturación de la OC (D-112/D-115)**, se revisa el **saldo real**: el pago solo se completa con las cuentas por pagar válidas saldadas. Recibido, facturado y pendiente de facturar se comparan en **neto + IVA**, sin percepciones. **Pagado total*"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#164",
@@ -1407,7 +1407,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "9. Compras, materiales y abastecimiento (nivel proyecto)",
-      "text": "cuentas por pagar válidas saldadas según su saldo real (D-115), no comparando esos importes de bases distintas. Una nota de crédito puede dejar **sin saldo pendiente de pago** sin representar una salida de caja."
+      "text": "* conserva el importe efectivamente pagado y puede incluirlas; no se comparan esos importes de bases distintas para cerrar el pago. Una nota de crédito puede dejar **sin saldo pendiente de pago** sin representar una salida de caja."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#165",
