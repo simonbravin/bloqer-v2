@@ -1,4 +1,5 @@
 export * from "./report-pdf-export.service";
+export * from "./operational-list-pdf-export.service";
 export * from "./report-email.service";
 export * from "./scheduled-report-pdf-attachments";
 export * from "./branding/pdf-branding.service";

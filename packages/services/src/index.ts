@@ -251,6 +251,7 @@ export {
 export { formatNotificationTitle } from "./notifications/notification-copy";
 export * from "./report-exports/report-export.types";
 export * from "./report-exports/report-export.service";
+export * from "./report-exports/operational-list-export.service";
 export * from "./report-exports/project-progress-export.service";
 export {
   DEFAULT_CASH_DATE_RANGE_DAYS,

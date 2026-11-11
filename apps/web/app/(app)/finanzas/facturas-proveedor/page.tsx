@@ -155,6 +155,7 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             exportPath="/api/reports/finanzas/facturas-proveedor-corporativo.csv"
             params={{ status: status ?? "ACTIVE", from: sp.from, to: sp.to, class: sp.class, kind: sp.kind }}
             pdf
+            xlsx
             label="Exportar"
           />
           {canCreateInvoice ? (

@@ -11,6 +11,7 @@ import * as variance from "@bloqer/services/purchase-variance-pure";
 import * as formatMoney from "../../../lib/format-money";
 import * as requestDrafts from "./purchase-request-form-lines";
 import * as quoteEdit from "./quote-line-edit-values";
+import * as listStatus from "./matches-list-status-filter";
 
 type Element = { type: string; props: Record<string, unknown>; key?: string | number };
 const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>, key?: string | number): Element => typeof type === "function" ? type(props) : ({ type, props, key });
@@ -68,6 +69,45 @@ function environment() {
   const hook = load<{ useProcurementAction: (onPending?: (pending: boolean) => void) => { pending: boolean; run(action: () => Promise<unknown>): void; isRunning(): boolean } }>("./use-procurement-action.ts", dependencies);
   dependencies["../lib/use-procurement-action"] = hook;
   return { dependencies, hook, errors, render<T>(component: () => T) { index = 0; return component(); }, async settle() { await Promise.all(transitions.splice(0)); await setImmediate(); } };
+}
+
+for (const kind of ["order", "request"] as const) {
+  test(`${kind} export follows live local search and state filters, including cancelled and empty lists`, () => {
+    const env = environment();
+    const name = kind === "order" ? "PurchaseOrderListFilters" : "PurchaseRequestListFilters";
+    const section = kind === "order" ? "ordenes-compra" : "solicitudes-compra";
+    const { [name]: ListFilters } = load<Record<string, (props: unknown) => Element>>(`../components/purchase-${kind}-list-filters.tsx`, {
+      ...env.dependencies,
+      "next/link": { default: "Link" },
+      "lucide-react": { Search: "Search", X: "X" },
+      "@/lib/utils": { cn: (...parts: unknown[]) => parts.filter(Boolean).join(" ") },
+      "@/features/reports/report-export-actions": { ReportExportActions: "ReportExportActions" },
+      "../lib/matches-list-status-filter": listStatus,
+      "./purchase-order-list-section": { PurchaseOrderListSection: "PurchaseOrderListSection" },
+      "./purchase-request-mobile-cards": { PurchaseRequestMobileCards: "PurchaseRequestMobileCards" },
+      "./purchase-request-table": { PurchaseRequestTable: "PurchaseRequestTable" },
+    });
+    const row = { id: "document", code: "DOC-001", status: "SUBMITTED", supplierName: "Proveedor", lines: [] };
+    const props = { orders: [row], requests: [row], projectId: "project", initialStatus: "SUBMITTED", canCreate: false };
+    const render = (input: unknown = props) => env.render(() => ListFilters!(input));
+    const exportProps = (tree: Element) => elements(tree, "ReportExportActions")[0]!.props;
+    const initial = exportProps(render());
+    assert.equal(initial.exportPath, `/api/proyectos/project/${section}/export`);
+    assert.equal(initial.xlsx, true);
+    assert.equal(initial.pdf, true);
+    assert.equal(initial.csv, false);
+    assert.deepEqual({ ...(initial.params as object) }, { search: "", status: "SUBMITTED" });
+
+    (elements(render(), "Input")[0]!.props.onChange as (event: unknown) => void)({ target: { value: "  Materiales  " } });
+    assert.deepEqual({ ...(exportProps(render()).params as object) }, { search: "Materiales", status: "SUBMITTED" });
+    const cancelled = elements(render(), "Button").find((button) => text(button).startsWith("Anulada"))!;
+    (cancelled.props.onClick as () => void)();
+    assert.deepEqual({ ...(exportProps(render()).params as object) }, { search: "Materiales", status: "CANCELLED" });
+    const active = elements(render(), "Button").find((button) => text(button).startsWith("Activas"))!;
+    (active.props.onClick as () => void)();
+    assert.deepEqual({ ...(exportProps(render()).params as object) }, { search: "Materiales", status: undefined });
+    assert.equal(elements(render({ ...props, orders: [], requests: [] }), "ReportExportActions").length, 1);
+  });
 }
 
 test("procurement mutation locks before rerender, sanitizes network errors and allows retry", async () => {
