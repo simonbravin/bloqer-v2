@@ -60,7 +60,7 @@ async function assertProjectGuardIfPresent(
 async function requireNoteMutationProject(
   id: string,
   ctx: ServiceContext,
-  projectScopeId: string | undefined,
+  projectScopeId: string | null | undefined,
   permissionMessage: string,
 ): Promise<{ projectId: string | null; companyId: string }> {
   const preview = await prisma.supplierInvoice.findUnique({
@@ -453,7 +453,8 @@ export async function createSupplierDebitNoteFromInvoice(
 export async function issueSupplierCreditNote(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   const { projectId, companyId } = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de crédito");
@@ -645,7 +646,8 @@ export async function issueSupplierCreditNote(
 export async function issueSupplierDebitNote(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   const { projectId, companyId } = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de débito");
@@ -783,7 +785,8 @@ export async function issueSupplierDebitNote(
 export async function cancelSupplierCreditNote(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
   reason?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
@@ -976,7 +979,8 @@ export type RelatedSupplierFiscalNoteRow = {
 export async function listCreditDebitNotesForSupplierInvoice(
   supplierInvoiceId: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<RelatedSupplierFiscalNoteRow[]> {
   await assertApTenantModule(ctx);
   const parent = await prisma.supplierInvoice.findUnique({

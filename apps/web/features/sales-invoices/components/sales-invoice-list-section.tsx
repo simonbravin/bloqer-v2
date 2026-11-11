@@ -13,7 +13,7 @@ export function SalesInvoiceListSection({
   emptyMessage,
 }: {
   invoices: SalesInvoiceListItem[];
-  projectId: string;
+  projectId: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
   emptyMessage?: string;

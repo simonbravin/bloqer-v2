@@ -5,6 +5,8 @@
 
 ## Decisión
 
+**D-115 — NC/ND en Oficina y obra:** `SalesInvoice` y `SupplierInvoice` conservan `companyId` obligatorio y `projectId` nullable: null identifica un comprobante de empresa. `documentKind` y `referencedSalesInvoiceId` / `referencedSupplierInvoiceId` ya permiten operar los tres tipos en ambos ámbitos. Se reutilizan los servicios AR/AP y la migración `20260914120000_d115_fiscal_credit_debit_notes`; habilitar los accesos de Oficina no requiere nuevas tablas, campos ni migración. La nota hereda empresa, proyecto, contacto y moneda de la factura emitida de origen. `companyId = null` no se usa para este circuito.
+
 **D-127 — identificación de recepciones:** `PurchaseReceipt.number` es entero nullable con índice único `(tenantId, companyId, number)`. El service layer asigna correlativo por empresa bajo bloqueo de Company dentro de la transacción; no se reutiliza al anular. Los registros anteriores mantienen NULL/UUID, sin backfill. Migración aditiva `20261104183000_purchase_receipt_company_number`; aplicar antes del cliente nuevo. No cambia el modelo de aislamiento ni introduce una entidad.
 
 **D-118 — renglones de cotización:** `procurement_quote_lines.offerKind` es nullable, enum `QuoteLineOfferKind` (`QUOTED`, `NOT_QUOTED`, `BONIFIED`), sin default/backfill. Conserva PK/FK y la unicidad cotización/ítem; no agrega una entidad operativa. Históricos quedan null. Aplicar la migración aditiva antes del cliente nuevo; un rollback de código conserva columna/enum. Revisar ceros pendientes en el servicio, sin revalidar adjudicaciones existentes.
@@ -38,7 +40,12 @@ erDiagram
   PROJECT ||--o{ PURCHASE_ORDER : "optional"
   PURCHASE_ORDER ||--o{ RECEIPT : "1..N"
   PURCHASE_ORDER ||--o{ PURCHASE_INVOICE : "0..N"
-  PURCHASE_INVOICE ||--|| PAYABLE : "1..1"
+  PURCHASE_INVOICE ||--o| PAYABLE : "INVOICE o ND emitida"
+  PURCHASE_INVOICE }o--o| PURCHASE_INVOICE : "factura origen NC o ND"
+  PURCHASE_INVOICE ||--o| PAYABLE_CREDIT_APPLICATION : "NC emitida"
+  PAYABLE ||--o{ PAYABLE_CREDIT_APPLICATION : "credito sin caja"
+  PURCHASE_INVOICE }o--|| COMPANY : "empresa obligatoria"
+  PURCHASE_INVOICE }o--o| PROJECT : "null en Oficina"
 
   PROJECT ||--o{ SUBCONTRACT : "has"
   SUBCONTRACT ||--o{ SUBCONTRACT_CERTIFICATION : "has"
@@ -59,15 +66,18 @@ erDiagram
   ACCOUNT_MOVEMENT }o--o| PROJECT : "alloc optional"
   INTERNAL_TRANSFER ||--|{ ACCOUNT_MOVEMENT : "pair transfer_id"
 
-  SALES_INVOICE ||--|| RECEIVABLE : "1..1"
+  SALES_INVOICE ||--o| RECEIVABLE : "INVOICE o ND emitida"
+  SALES_INVOICE }o--o| SALES_INVOICE : "factura origen NC o ND"
+  SALES_INVOICE ||--o| RECEIVABLE_CREDIT_APPLICATION : "NC emitida"
+  RECEIVABLE ||--o{ RECEIVABLE_CREDIT_APPLICATION : "credito sin caja"
+  SALES_INVOICE }o--|| COMPANY : "empresa obligatoria"
+  SALES_INVOICE }o--o| PROJECT : "null en Oficina"
   SALES_INVOICE }o--o| CERTIFICATION : "link"
-  RECEIVABLE ||--o{ COLLECTION_APPLICATION : "partial D-010"
-  COLLECTION }o--|| ACCOUNT_MOVEMENT : "INCOME"
-  COLLECTION ||--o{ COLLECTION_APPLICATION : "applies"
+  RECEIVABLE ||--o{ COLLECTION : "parciales D-010 D-081"
+  COLLECTION }o--|| ACCOUNT_MOVEMENT : "INFLOW"
 
-  PAYABLE ||--o{ PAYMENT_APPLICATION : "partial D-010"
-  PAYMENT }o--|| ACCOUNT_MOVEMENT : "OUTCOME"
-  PAYMENT ||--o{ PAYMENT_APPLICATION : "applies"
+  PAYABLE ||--o{ PAYMENT : "parciales D-010 D-081"
+  PAYMENT }o--|| ACCOUNT_MOVEMENT : "OUTFLOW"
 
   BANK_RECONCILIATION ||--o{ BANK_RECONCILIATION_MATCH : "session"
   BANK_RECONCILIATION_MATCH }o--|| ACCOUNT_MOVEMENT : "reconciles"
@@ -112,7 +122,7 @@ erDiagram
     uuid id PK
     uuid tenant_id FK
     uuid account_id FK
-    string type "INCOME OUTCOME"
+    string type "INFLOW OUTFLOW"
     decimal amount
     string currency
     decimal fx_rate
@@ -123,23 +133,26 @@ erDiagram
   RECEIVABLE {
     uuid id PK
     uuid tenant_id FK
-    decimal total_amount
+    decimal original_amount
     decimal paid_amount
-    decimal balance "derived or stored"
+    decimal credited_amount "solo NC aplicadas"
+    decimal balance_due "derivado, no columna"
   }
   PAYABLE {
     uuid id PK
     uuid tenant_id FK
-    decimal total_amount
+    decimal original_amount
     decimal paid_amount
-    decimal balance "derived or stored"
+    decimal credited_amount "solo NC aplicadas"
+    decimal balance_due "derivado, no columna"
   }
 ```
 
 ### Notas sobre el diagrama
 
+- **NC/ND ([D-115]):** `PURCHASE_INVOICE` representa `SupplierInvoice` en Prisma. Una factura o ND emitida crea su obligación 1:1; un borrador o NC no tiene obligación propia. La NC crea `ReceivableCreditApplication` / `PayableCreditApplication`, con tenant y empresa propios, contra la deuda de su factura origen. Saldo = original − caja aplicada − crédito aplicado. Emitir/anular una NC no genera caja; anularla revierte el crédito. La FK de referencia es opcional físicamente para facturas y obligatoria en los servicios para NC/ND del mismo ámbito. La numeración es única por tenant, empresa, tipo y número.
 - **`user_membership` (Prisma `UserMembership`):** **una fila por `(user_id, tenant_id)`**; `company_id` opcional. Pertenencia simultánea del mismo usuario a **dos** `company` bajo el mismo tenant (**Q-001** variante 0B) **no** está modelada en Phase 1 — [D-036](../00-product/DECISION_LOG.md), [ADR-Phase1-06](./ARCHITECTURE_DECISION_RECORDS.md).
-- **`COLLECTION_APPLICATION` / `PAYMENT_APPLICATION`**: tablas puente explícitas para **cobranzas/pagos parciales** ([D-010](../00-product/DECISION_LOG.md)); alternativa válida es modelo equivalente de líneas embebidas en `collection` / `payment` — decidir en Prisma sin cambiar reglas.
+- **Cobranzas/pagos ([D-081]):** cada `Collection` / `Payment` se aplica a una sola `Receivable` / `Payable`; la parcialidad de D-010 se representa con varios registros. No hay tablas `CollectionApplication` / `PaymentApplication`. Las aplicaciones de crédito NC de D-115 sí son tablas propias y no registran caja.
 - **`Certification`**: **no** persiste `payment_status` como verdad maestra; si se materializa, es **derivado** de `Receivable` + aplicaciones ([D-026](../00-product/DECISION_LOG.md), [BR-CERT-PAYMENT-001](../01-domain/BUSINESS_RULES.md)).
 - **`SubcontractCertification`**: **`settlement_status`** derivado de `Payable` + `Payment` ([D-027](../00-product/DECISION_LOG.md)).
 - **Conciliación**: `BANK_RECONCILIATION_MATCH` es entidad técnica sugerida para no editar matches en sesión `CLOSED` sin reapertura ([D-032](../00-product/DECISION_LOG.md)).
@@ -157,7 +170,7 @@ erDiagram
 | Procurement | `purchase_order`, `purchase_order_line`, `receipt`, `receipt_line`, `purchase_invoice`, `purchase_invoice_line` |
 | Subcontracting | `subcontract`, `subcontract_certification`, `subcontract_certification_line` |
 | Inventory | `warehouse`, `product`, `stock_movement`, `stock_reservation` |
-| Treasury / AR / AP | `account`, `account_movement`, `internal_transfer`, `sales_invoice`, `receivable`, `collection`, `collection_application`, `payable`, `payment`, `payment_application`, `tax_line`, `movement_category`, `period`, `bank_reconciliation`, `bank_reconciliation_match` |
+| Treasury / AR / AP | `account`, `account_movement`, `internal_transfer`, `sales_invoice`, `receivable`, `collection`, `receivable_credit_application`, `payable`, `payment`, `payable_credit_application`, `tax_line`, `movement_category`, `period`, `bank_reconciliation`, `bank_reconciliation_match` |
 | Documents | `document_attachment` (metadata), blob en R2 |
 | Notifications | `notification`, `notification_preference` (futuro) |
 | Audit | `audit_log` |
@@ -166,8 +179,9 @@ erDiagram
 
 | Relación | Regla |
 |---|---|
-| `sales_invoice` → `receivable` | 1:1 por factura sistémica |
-| `purchase_invoice` → `payable` | 1:1 típico |
+| `sales_invoice` → `receivable` | 0..1; 1:1 al emitir INVOICE/ND, sin obligación propia para NC ([D-115]) |
+| `purchase_invoice` → `payable` | 0..1; 1:1 al emitir INVOICE/ND, sin obligación propia para NC ([D-115]) |
+| NC → aplicación de crédito → obligación origen | Una aplicación por NC; mismo tenant, empresa, contacto, moneda y proyecto (incluido null). Monto positivo ≤ saldo al emitir; anulación revierte crédito, sin caja |
 | `subcontract_certification` → `payable` | Solo si `status = APPROVED` ([BR-SUB-003](../01-domain/BUSINESS_RULES.md)) |
 | `internal_transfer` → `account_movement` | Exactamente **2** movimientos, mismo `transfer_id` ([R-INT-007](../01-domain/ENTITY_RELATIONSHIPS.md)) |
 | `stock_transfer` | 2× `stock_movement` con `transfer_id` ([R-INT-013](../01-domain/ENTITY_RELATIONSHIPS.md)) |
@@ -177,8 +191,8 @@ erDiagram
 ## Entidades a revisar antes del Prisma final
 
 1. **`company` vs `tenant`**: ver [`DATA_MODEL_OVERVIEW.md`](./DATA_MODEL_OVERVIEW.md) § Tenant / Company / Legal entity.  
-2. **Puente cobranza/pago**: tablas `*_application` vs líneas JSON — impacto en reportes y constraints.  
-3. **`balance` en AR/AP**: ¿solo derivado en query o columna mantenida por servicio? (consistencia vs simplicidad).  
+2. **Cobranza/pago (resuelto D-081):** una deuda por registro; no hay puente de aplicaciones de caja.
+3. **Saldo AR/AP (resuelto D-081/D-115):** `balanceDue` se deriva de `originalAmount − paidAmount − creditedAmount`; no se agrega una columna editable.
 4. **Polimorfismos**: lista cerrada de `entity_type` ([`../01-domain/ENTITY_RELATIONSHIPS.md`](../01-domain/ENTITY_RELATIONSHIPS.md) §10) — enum en app + check DB opcional.  
 5. **`tax_line`**: normalización vs duplicación por documento; impacto en reportes fiscales Fase 1 manual.  
 6. **`direct_sale`**: tabla explícita vs `sales_invoice` sin `certification_id` únicamente.  
@@ -190,6 +204,10 @@ erDiagram
 - No usar `float`/`double` para importes.  
 - No borrar físicamente `account_movement` / `stock_movement` confirmados sin compensación ([`LEDGER_TABLES_STRATEGY.md`](./LEDGER_TABLES_STRATEGY.md)).  
 - No fijar aún **todos** los índices — ver [`INDEXING_STRATEGY.md`](./INDEXING_STRATEGY.md).
+
+## Hallazgo — NC/ND de empresa y relaciones financieras
+
+La revisión del 11/11/2026 detectó que el diagrama histórico todavía atribuía una obligación propia a todo comprobante y mostraba puentes de aplicaciones de caja ya descartados. Se alinea con D-081/D-115 y el schema vigente: empresa obligatoria, proyecto opcional, deuda propia solo para factura/ND emitida y aplicación separada de crédito para NC. La ampliación de accesos en Oficina reutiliza ese modelo sin nueva arquitectura ni migración. En producción se verificaron la migración D-115 aplicada, las columnas de ambos comprobantes y de crédito, las tablas de aplicaciones y los índices únicos por tipo.
 
 ## Referencias
 

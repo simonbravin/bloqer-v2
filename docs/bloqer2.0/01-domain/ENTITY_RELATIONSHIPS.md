@@ -195,7 +195,10 @@ erDiagram
   PURCHASE_INVOICE_LINE }o--o| PURCHASE_ORDER_LINE : "factura (opcional)"
   PURCHASE_INVOICE_LINE }o--o| RECEIPT_LINE : "factura (opcional)"
   PURCHASE_INVOICE_LINE }o--o| WBS_NODE : "imputado a"
-  PURCHASE_INVOICE ||--|| PAYABLE : "genera"
+  PURCHASE_INVOICE ||--o| PAYABLE : "factura o ND emitida"
+  PURCHASE_INVOICE }o--o| PURCHASE_INVOICE : "factura origen de NC o ND"
+  PURCHASE_INVOICE }o--|| COMPANY : "empresa"
+  PURCHASE_INVOICE }o--o| PROJECT : "null en Oficina"
 
   SUBCONTRACT ||--|| CONTACT : "con subcontratista"
   SUBCONTRACT ||--o| CONTRACT : "respaldado por"
@@ -272,7 +275,13 @@ erDiagram
   COLLECTION ||--o{ TAX_LINE : "retenciones"
   PAYMENT ||--o{ TAX_LINE : "retenciones"
 
-  SALES_INVOICE ||--|| RECEIVABLE : "genera"
+  SALES_INVOICE ||--o| RECEIVABLE : "factura o ND emitida"
+  SALES_INVOICE }o--o| SALES_INVOICE : "factura origen de NC o ND"
+  SALES_INVOICE }o--|| COMPANY : "empresa"
+  SALES_INVOICE ||--o| RECEIVABLE_CREDIT_APPLICATION : "NC emitida"
+  RECEIVABLE ||--o{ RECEIVABLE_CREDIT_APPLICATION : "credito aplicado sin caja"
+  PURCHASE_INVOICE ||--o| PAYABLE_CREDIT_APPLICATION : "NC emitida"
+  PAYABLE ||--o{ PAYABLE_CREDIT_APPLICATION : "credito aplicado sin caja"
   SALES_INVOICE }o--|| CONTACT : "cliente"
   SALES_INVOICE }o--o| PROJECT : "imputable"
   SALES_INVOICE }o--o| CERTIFICATION : "respaldada por"
@@ -292,7 +301,7 @@ erDiagram
   ACCOUNT_MOVEMENT {
     uuid id PK
     uuid account_id FK
-    string type "INCOME|OUTCOME"
+    string type "INFLOW|OUTFLOW"
     decimal amount
     string currency
     decimal fx_rate
@@ -310,9 +319,10 @@ erDiagram
     uuid id PK
     uuid client_id FK
     uuid project_id FK "opcional"
-    decimal total_amount
+    decimal original_amount
     decimal paid_amount
-    decimal balance
+    decimal credited_amount
+    decimal balance_due "derivado"
     date due_date
     string status
   }
@@ -320,9 +330,10 @@ erDiagram
     uuid id PK
     uuid supplier_id FK
     uuid project_id FK "opcional"
-    decimal total_amount
+    decimal original_amount
     decimal paid_amount
-    decimal balance
+    decimal credited_amount
+    decimal balance_due "derivado"
     date due_date
     string status
   }
@@ -372,8 +383,10 @@ flowchart LR
 | PurchaseOrder | Receipt | 1:N | recepciones parciales |
 | PurchaseOrder | PurchaseInvoice | 1:N | múltiples facturas posibles |
 | PurchaseInvoice | PurchaseInvoiceLine | 1:N | imputaciones |
-| PurchaseInvoice | Payable | 1:1 | una factura = una CxP |
-| SalesInvoice | Receivable | 1:1 | una factura = una CxC |
+| PurchaseInvoice | Payable | 0..1 | factura/ND emitida = una CxP; NC/borrador sin obligación propia (D-115) |
+| SalesInvoice | Receivable | 0..1 | factura/ND emitida = una CxC; NC/borrador sin obligación propia (D-115) |
+| SalesInvoice / PurchaseInvoice | factura origen | N:1 | NC/ND con referencia obligatoria al emitir, misma empresa, contacto, moneda y proyecto, incluido null (Oficina) |
+| NC | ReceivableCreditApplication / PayableCreditApplication | 0..1 | al emitir aplica crédito a la obligación origen sin caja; anular revierte crédito |
 | Receivable | Collection | 1:N | parciales (D-010) |
 | Payable | Payment | 1:N | parciales (D-010) |
 | InternalTransfer | AccountMovement | 1:2 | par origen+destino (D-023) |
@@ -383,6 +396,8 @@ flowchart LR
 | BankReconciliation | AccountMovement | 1:N | conciliados |
 
 > **Clase financiera ([D-102]):** no es entidad ni columna. `SalesInvoice` / `SupplierInvoice` (en código; el ERD histórico dice `PurchaseInvoice` en sitios) y `AccountMovement` exponen `classCode`/`classLabel` derivados en el service layer. Recibo = Collection/Payment, no clase de factura.
+
+> **Oficina y obra ([D-115]):** los mismos comprobantes y aplicaciones se usan a nivel empresa (`projectId = null`) y proyecto. La empresa es obligatoria. Una NC no aparece como una deuda nueva en CxC/CxP: se consulta en los listados documentales y en las notas vinculadas de su factura. Saldo = original − cobrado/pagado − créditos aplicados.
 
 ---
 

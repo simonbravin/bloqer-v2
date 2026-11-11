@@ -93,7 +93,6 @@ function labelForSegment(segment: string): string {
 /** These URL containers have detail/create pages, but their lists live in the parent page. */
 function isNonPageContainer(path: string): boolean {
   return (
-    path === "/finanzas/facturas" ||
     path === "/finanzas/pagos-proveedor" ||
     /^\/proyectos\/[^/]+\/subcontratos\/[^/]+\/certificaciones$/.test(path) ||
     /^\/proyectos\/[^/]+\/ordenes-compra\/[^/]+\/recepciones$/.test(path)
@@ -163,7 +162,7 @@ export function resolveAppShellBreadcrumbs(
     }
 
     items.push({
-      label: labelForSegment(seg),
+      label: acc === "/finanzas/facturas" ? "Comprobantes de venta" : labelForSegment(seg),
       href: isLast || isNonPageContainer(acc) ? undefined : acc,
     });
   }

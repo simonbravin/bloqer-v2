@@ -41,6 +41,10 @@ export async function getFinanceSubnavLinks(ctx: ServiceContext): Promise<Financ
 
   if (gate.isEnabled("AR") && can(ctx.roles, "VIEW", "AR")) {
     links.push({
+      href: "/finanzas/facturas",
+      label: "Comprobantes de venta",
+    });
+    links.push({
       href: "/finanzas/cuentas-por-cobrar",
       label: "Cuentas por cobrar",
     });
