@@ -60,13 +60,13 @@ import { parseCurrencyView } from "../reports/report-currency-view";
 import { MAX_EXPORT_ROWS } from "../finance/pagination";
 import { listCompanyPayables, type CompanyPayableListFilters } from "../ap/payable.service";
 import {
-  listCompanySupplierInvoices,
   type CompanySupplierInvoiceListFilters,
 } from "../ap/supplier-invoice.service";
 import { ServiceContext, ServiceError } from "../types";
 import { buildCsv, parseBuiltCsv } from "./csv-export.service";
 import { safeReportFilename } from "./filename.service";
 import { buildXlsxSheet } from "./xlsx-export.service";
+import { readCompanySupplierInvoicesForExport } from "./operational-list-export.service";
 import {
   TREASURY_MOVEMENTS_EXPORT_LABELS,
   type MovementExportLabels,
@@ -574,17 +574,7 @@ export async function exportCompanySupplierInvoicesCsv(
   filters: CompanySupplierInvoiceListFilters,
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
-  const { data, total } = await listCompanySupplierInvoices(ctx, {
-    ...filters,
-    page: 1,
-    pageSize: MAX_EXPORT_ROWS,
-  });
-  if (total > MAX_EXPORT_ROWS) {
-    throw new ServiceError(
-      "VALIDATION",
-      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas de emisión.`,
-    );
-  }
+  const data = await readCompanySupplierInvoicesForExport(filters, ctx);
   const headers = [
     "Codigo",
     "Tipo",
@@ -619,6 +609,14 @@ export async function exportCompanySupplierInvoicesCsv(
     content: buildCsv(headers, rows),
     filename: safeReportFilename("finanzas_facturas_proveedor_corporativo", "csv"),
   };
+}
+
+export async function exportCompanySupplierInvoicesXlsx(
+  filters: CompanySupplierInvoiceListFilters,
+  ctx: ServiceContext,
+): Promise<ReportXlsxPayload> {
+  const { content, filename } = await exportCompanySupplierInvoicesCsv(filters, ctx);
+  return csvTextToXlsx(content, filename.replace(/\.csv$/i, ""), "Facturas y gastos");
 }
 
 export async function exportTreasuryCashFlowCsv(

@@ -30,7 +30,7 @@ import {
   getSubcontractVarianceReport,
   getTrialBalanceReport,
   listCompanyPayables,
-  listCompanySupplierInvoices,
+  readCompanySupplierInvoicesForExport,
   listPostedJournalBookForExport,
   MAX_ACCOUNT_LEDGER_ROWS,
   MAX_EXPORT_ROWS,
@@ -85,7 +85,7 @@ import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
 import { ProjectProgressPdfDocument } from "./pdf/project-progress-pdf";
 import { SchedulePdfDocument } from "./pdf/schedule-pdf";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
-import { MAX_AUDIT_LOG_PDF_ROWS } from "./pdf/pdf-export.types";
+import { MAX_AUDIT_LOG_PDF_ROWS, MAX_PROJECT_REPORT_PDF_ROWS } from "./pdf/pdf-export.types";
 import { renderReportPdfToBuffer } from "./pdf/pdf-renderer.service";
 import { buildPdfFilterLine } from "./pdf/pdf-filter-line";
 
@@ -1000,21 +1000,17 @@ export async function exportCompanySupplierInvoicesPdf(
   filters: CompanySupplierInvoiceListFilters,
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
-  const { data, total } = await listCompanySupplierInvoices(ctx, {
-    ...filters,
-    page: 1,
-    pageSize: MAX_EXPORT_ROWS,
-  });
-  if (total > MAX_EXPORT_ROWS) {
-    throw new ServiceError(
-      "VALIDATION",
-      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas de emisión.`,
-    );
-  }
+  const data = await readCompanySupplierInvoicesForExport(filters, ctx);
+  const notice = data.length > MAX_PROJECT_REPORT_PDF_ROWS
+    ? `Detalle truncado: ${data.length - MAX_PROJECT_REPORT_PDF_ROWS} filas omitidas (límite ${MAX_PROJECT_REPORT_PDF_ROWS}). Exportá Excel para el detalle completo.`
+    : undefined;
   return exportPdfDocument(ctx, {}, "finanzas_facturas_proveedor_corporativo", (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Facturas y gastos"
+      subtitle={`${data.length} registros encontrados`}
+      warnings={notice ? [notice] : undefined}
+      footerNote={notice}
       filterLine={buildPdfFilterLine({
         status: filters.status,
         issueDateFrom: filters.issueDateFrom,

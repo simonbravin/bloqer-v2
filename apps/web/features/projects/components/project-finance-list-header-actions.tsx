@@ -6,11 +6,13 @@ import { ListViewToggle } from "@/components/ui/list-view-toggle";
 export function ProjectFinanceListHeaderActions({
   listViewStorageKey,
   secondary,
+  exportSlot,
   primary,
   primarySlot,
 }: {
   listViewStorageKey: string;
   secondary?: { href: string; label: string };
+  exportSlot?: ReactNode;
   primary?: { href: string; label: string };
   /** Prefer over `primary` when create opens in a dialog (empresa UX). */
   primarySlot?: ReactNode;
@@ -20,6 +22,7 @@ export function ProjectFinanceListHeaderActions({
       <Suspense fallback={null}>
         <ListViewToggle storageKey={listViewStorageKey} />
       </Suspense>
+      {exportSlot}
       {secondary ? (
         <Button asChild variant="outline" size="sm">
           <Link href={secondary.href}>{secondary.label}</Link>

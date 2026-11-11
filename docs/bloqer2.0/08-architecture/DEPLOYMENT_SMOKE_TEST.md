@@ -58,6 +58,16 @@ Q-069/Q-070/Q-071 aprobadas en D-122/D-123/D-124: comprobar error funcional por 
 
 Record who ran the checklist, date, and environment.
 
+## Exportaciones de listados — regresión Excel/PDF
+
+Ejecutar tras publicar este cambio, con datos sintéticos en un entorno de prueba autorizado. Estos pasos son criterios pendientes de smoke; no acreditan una ejecución en el portal.
+
+1. En escritorio y celular, abrir los listados de obra **Facturas proveedor**, **Facturas emitidas**, **Órdenes de compra**, **Solicitudes de compra**, **Recepciones**, **Pagos** y **Cobranzas**. **Exportar → Excel / PDF** descarga un XLSX o PDF válido; **Generando…** evita repetir la descarga. El PDF identifica empresa, obra, usuario y filtros aplicables. En **Facturas y gastos** de empresa comprobar además que CSV sigue disponible junto con Excel/PDF.
+2. Buscar y filtrar facturas por clase/tipo y, en proveedor, estado. En SC/OC combinar búsqueda con estado, incluyendo Activas y Anulada; comprobar coincidencia entre resultados y archivo. Pagos, Cobranzas y Recepciones conservan todos sus estados autorizados. Con resultados vacíos, el archivo conserva encabezados sin registros ficticios.
+3. Con más de 100 facturas filtradas, descargar desde la segunda página: Excel incluye todos los resultados sin duplicados ni recorte a 20/100. Repetir con Facturas y gastos corporativos para CSV y Excel. Con más de 90 filas, comprobar aviso y cantidad omitida en PDF, y remisión a Excel para el detalle completo. Con más de 10.000 resultados se informa el límite y no se entrega un archivo parcial.
+4. Verificar fechas, estado en español y moneda de cada importe. Probar texto con acentos y un contacto cuyo nombre comience con `=` para comprobar que Excel lo conserva como texto, sin fórmula. No sumar monedas distintas ni alterar importes de documentos históricos.
+5. Sin sesión, sin acceso a la obra, con otra empresa activa, sin permiso del área o con su módulo deshabilitado: la ruta de exportación rechaza la consulta sin datos ajenos. Una descarga fallida informa el error y permite reintentar; no guarda como archivo una página de login ni una respuesta de error.
+
 ## Detalle de pago confirmado (regresión 26/10/2026)
 
 1. Con un usuario habilitado para pagos, abrir un pago **ya confirmado** desde la CxP de una obra o desde Transacciones. Verificar monto, fecha, cuenta y enlaces a factura/CxP, sin excepción del servidor.
