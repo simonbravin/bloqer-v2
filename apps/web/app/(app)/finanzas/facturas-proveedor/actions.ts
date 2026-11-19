@@ -2,6 +2,7 @@
 
 import {
   createSupplierInvoice,
+  listCompanySupplierInvoices,
   getCompanySupplierInvoiceById,
   issueSupplierInvoice,
   cancelSupplierInvoice,
@@ -13,6 +14,7 @@ import {
   cancelSupplierCreditNote,
   ServiceError,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import {
   createSupplierInvoiceSchema,
   updateSupplierInvoiceSchema,
@@ -51,6 +53,32 @@ function revalidateCompanyApPaths(invoiceId?: string, extra?: string[]) {
   for (const p of extra ?? []) revalidatePath(p);
 }
 
+export async function listCompanySupplierNoteParentsAction(search: string, page = 1) {
+  const ctx = await getCtx();
+  if (!can(ctx.roles, "EDIT", "AP")) return { error: "Sin permisos para crear notas de crédito/débito" };
+  try {
+    const result = await listCompanySupplierInvoices(ctx, {
+      status: "ISSUED",
+      documentKind: "INVOICE",
+      search: typeof search === "string" ? search.trim() : "",
+      page: Number.isSafeInteger(page) && page > 0 ? page : 1,
+      pageSize: 10,
+    });
+    return {
+      data: result.data.map((invoice) => ({
+        id: invoice.id,
+        code: invoice.code,
+        contactName: invoice.supplierName,
+        currency: invoice.currency,
+        balanceDue: invoice.payable?.balanceDue ?? "0.00",
+      })),
+      total: result.total,
+    };
+  } catch (err) {
+    return handle(err);
+  }
+}
+
 export async function createCompanySupplierInvoiceAction(
   data: Omit<CreateSupplierInvoiceInput, "projectId">,
 ): Promise<{ id: string } | { error: string }> {
@@ -76,7 +104,7 @@ export async function updateCompanySupplierInvoiceAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await getCompanySupplierInvoiceById(invoiceId, ctx);
-    const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx);
+    const inv = await updateSupplierInvoice(invoiceId, parsed.data, ctx, null);
     revalidateCompanyApPaths(inv.id);
     return { id: inv.id };
   } catch (err) {
@@ -90,7 +118,7 @@ export async function issueCompanySupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await getCompanySupplierInvoiceById(invoiceId, ctx);
-    await issueSupplierInvoice(invoiceId, ctx);
+    await issueSupplierInvoice(invoiceId, ctx, null);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {
@@ -105,7 +133,7 @@ export async function cancelCompanySupplierInvoiceAction(
   const ctx = await getCtx();
   try {
     await getCompanySupplierInvoiceById(invoiceId, ctx);
-    await cancelSupplierInvoice(invoiceId, ctx, undefined, reason);
+    await cancelSupplierInvoice(invoiceId, ctx, null, reason);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {
@@ -139,7 +167,7 @@ export async function createCompanySupplierCreditNoteFromInvoiceAction(
       },
       ctx,
     );
-    revalidateCompanyApPaths(undefined, [`${FIN_LIST}/${note.id}`]);
+    revalidateCompanyApPaths(parentInvoiceId, [`${FIN_LIST}/${note.id}`]);
     return { id: note.id };
   } catch (err) {
     return handle(err);
@@ -156,7 +184,7 @@ export async function createCompanySupplierDebitNoteFromInvoiceAction(
       { parentSupplierInvoiceId: parentInvoiceId },
       ctx,
     );
-    revalidateCompanyApPaths(undefined, [`${FIN_LIST}/${note.id}`]);
+    revalidateCompanyApPaths(parentInvoiceId, [`${FIN_LIST}/${note.id}`]);
     return { id: note.id };
   } catch (err) {
     return handle(err);
@@ -168,9 +196,11 @@ export async function issueCompanySupplierCreditNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await getCompanySupplierInvoiceById(invoiceId, ctx);
-    await issueSupplierCreditNote(invoiceId, ctx);
-    revalidateCompanyApPaths(invoiceId);
+    const note = await getCompanySupplierInvoiceById(invoiceId, ctx);
+    await issueSupplierCreditNote(invoiceId, ctx, null);
+    revalidateCompanyApPaths(invoiceId, note.referencedSupplierInvoiceId
+      ? [`${FIN_LIST}/${note.referencedSupplierInvoiceId}`]
+      : undefined);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -183,7 +213,7 @@ export async function issueCompanySupplierDebitNoteAction(
   const ctx = await getCtx();
   try {
     await getCompanySupplierInvoiceById(invoiceId, ctx);
-    await issueSupplierDebitNote(invoiceId, ctx);
+    await issueSupplierDebitNote(invoiceId, ctx, null);
     revalidateCompanyApPaths(invoiceId);
     return { ok: true };
   } catch (err) {
@@ -197,9 +227,11 @@ export async function cancelCompanySupplierCreditNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await getCompanySupplierInvoiceById(invoiceId, ctx);
-    await cancelSupplierCreditNote(invoiceId, ctx, undefined, reason);
-    revalidateCompanyApPaths(invoiceId);
+    const note = await getCompanySupplierInvoiceById(invoiceId, ctx);
+    await cancelSupplierCreditNote(invoiceId, ctx, null, reason);
+    revalidateCompanyApPaths(invoiceId, note.referencedSupplierInvoiceId
+      ? [`${FIN_LIST}/${note.referencedSupplierInvoiceId}`]
+      : undefined);
     return { ok: true };
   } catch (err) {
     return handle(err);

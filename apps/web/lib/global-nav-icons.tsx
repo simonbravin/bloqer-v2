@@ -49,6 +49,7 @@ const GLOBAL_NAV_ICON_BY_HREF: Record<string, LucideIcon> = {
   "/finanzas": LayoutDashboard,
   "/finanzas/transacciones": ArrowLeftRight,
   "/finanzas/cuentas-por-cobrar": Receipt,
+  "/finanzas/facturas": Receipt,
   "/finanzas/facturas-proveedor": Receipt,
   "/finanzas/gastos-generales": Briefcase,
   "/finanzas/cuentas-por-pagar": FileSpreadsheet,

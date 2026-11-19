@@ -33,7 +33,9 @@ Impagos y falta de visibilidad de obligaciones futuras (AP aging).
 
 ## 9. Pantallas y vistas necesarias
 - **Facturas y gastos:** listado documental con columna de **estado de pago** (Payable); desde OPEN/PARTIAL/OVERDUE se puede ir a pagar; alta corporativa en diálogo desde la misma pantalla.
-- **Alta de factura en proyecto:** formulario con borrador → emitir; opción express **“Emitir y pagar ahora”** (cuenta de tesorería + fecha), visible solo con permiso de tesorería ([D-052]).
+- **Oficina → Finanzas → Facturas y gastos** (`/finanzas/facturas-proveedor`): **Nueva nota de crédito / Nueva nota de débito** abre un selector de **Factura de referencia**, con búsqueda por código/proveedor y solo facturas emitidas de empresa sin proyecto. La nota queda en borrador para editar y emitir; la NC admite monto total o parcial hasta el saldo vigente. Se conserva el acceso desde el detalle de la factura y el filtro **Tipo de documento** para encontrar las notas.
+- **Proyecto → Facturas proveedor:** **Nueva nota de crédito / Nueva nota de débito** permite elegir una factura emitida de esa obra como referencia, con búsqueda paginada por código/proveedor. Se conserva el acceso desde el detalle. **Letra del comprobante** selecciona A/B/C/E y es independiente del tipo de documento.
+- **Alta de factura en proyecto:** formulario con borrador → emitir; opción express **"Emitir y pagar ahora"** (cuenta de tesorería + fecha), visible solo con permiso de tesorería ([D-052]).
 - **Adjuntos:** foto/copia de factura en el alta (create-then-upload) y en el detalle (`SUPPLIER_INVOICE`).
 - **Cuentas por pagar:** bandeja de obligaciones ordenadas por vencimiento; “Registrar pago” posterior (parcial o total).
 - **Transacciones:** ledger de **caja operativa** confirmada (cobros/pagos/ingresos/egresos); transferencias entre cuentas propias solo en Tesorería; no hay listado independiente de pagos.
@@ -49,6 +51,8 @@ Impagos y falta de visibilidad de obligaciones futuras (AP aging).
 - Payee de gasto/factura sin OC: Contact con rol `SUPPLIER` o `EMPLOYEE` ([BR-AP-001], [D-089]).
 - Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).
 - **Tipo de documento ([D-115]):** Factura / Nota de crédito / Nota de débito en `SupplierInvoice.documentKind`. NC aplica crédito a CxP sin caja; ND abre Payable nueva.
+- Las ND copian los importes guardados de las líneas de origen, incluido el redondeo de IVA; las líneas ingresadas o modificadas se calculan con el kernel vigente. La NC por monto conserva por defecto la partida y el tipo de costo de la primera línea de origen, como la NC por saldo completo; revisar la imputación del borrador si la factura contiene varias partidas. No se inventa un prorrateo ni se vinculan líneas de OC/APU automáticamente.
+- El alta de NC vuelve a comprobar dentro de la transacción que la CxP esté activa y tenga saldo positivo; si se saldó durante la espera, rechaza el alta. Las fechas explícitas `YYYY-MM-DD` se conservan como fechas calendario, sin convertirlas a un día anterior por zona horaria.
 - IVA y percepción IIBB no negativos, incluidos ajustes explícitos del importe de percepción; cero permitido. Un borrador negativo debe corregirse antes de emitir, sin alterar documentos históricos ([D-133]).
 
 ## 11. Validaciones

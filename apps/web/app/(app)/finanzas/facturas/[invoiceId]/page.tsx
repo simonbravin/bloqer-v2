@@ -93,9 +93,9 @@ export default async function FinanzasFacturaVentaDetailPage({
   let referencedCode: string | null = null;
   try {
     invoice = await getCompanySalesInvoiceById(invoiceId, ctx);
-    receivable = await getReceivableBySalesInvoiceId(invoiceId, ctx);
+    receivable = await getReceivableBySalesInvoiceId(invoiceId, ctx, null);
     if ((invoice.documentKind ?? "INVOICE") === "INVOICE") {
-      relatedNotes = await listCreditDebitNotesForSalesInvoice(invoiceId, ctx);
+      relatedNotes = await listCreditDebitNotesForSalesInvoice(invoiceId, ctx, null);
     }
     if (invoice.referencedSalesInvoiceId) {
       const parent = await getCompanySalesInvoiceById(invoice.referencedSalesInvoiceId, ctx);
@@ -160,6 +160,9 @@ export default async function FinanzasFacturaVentaDetailPage({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/finanzas/facturas">Ver comprobantes</Link>
+          </Button>
           {canEditAr && invoice.status === "DRAFT" ? (
             <>
               <Button variant="outline" size="sm" asChild>

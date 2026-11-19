@@ -2,6 +2,7 @@
 
 import {
   getCompanySalesInvoiceById,
+  listCompanySalesInvoices,
   updateSalesInvoice,
   cancelSalesInvoice,
   issueSalesInvoice,
@@ -43,13 +44,43 @@ function handle(err: unknown): Err {
 const FIN_LIST = "/finanzas/facturas";
 const CXC_LIST = "/finanzas/cuentas-por-cobrar";
 
-function revalidateCompanyArPaths(invoiceId?: string, extra?: string[]) {
+function revalidateCompanyArPaths(invoiceId?: string, referencedInvoiceId?: string | null) {
   revalidateOperationalFinancePaths();
   revalidatePath(FIN_LIST);
-  if (invoiceId) revalidatePath(`${FIN_LIST}/${invoiceId}`);
+  for (const id of [invoiceId, referencedInvoiceId]) {
+    if (!id) continue;
+    revalidatePath(`${FIN_LIST}/${id}`);
+    revalidatePath(`${FIN_LIST}/${id}/editar`);
+  }
   revalidatePath(CXC_LIST);
   revalidatePath("/finanzas/transacciones");
-  for (const p of extra ?? []) revalidatePath(p);
+  revalidatePath("/pendientes");
+}
+
+/** Parent candidates are always issued corporate invoices, never project documents or other notes. */
+export async function listCompanySalesNoteParentsAction(search: string, page = 1) {
+  const ctx = await getCtx();
+  try {
+    const result = await listCompanySalesInvoices(ctx, {
+      page,
+      pageSize: 10,
+      search,
+      documentKind: "INVOICE",
+      status: "ISSUED",
+    });
+    return {
+      data: result.data.map((invoice) => ({
+        id: invoice.id,
+        code: invoice.code,
+        contactName: invoice.clientName,
+        currency: invoice.currency,
+        balanceDue: invoice.receivable?.balanceDue ?? "0.00",
+      })),
+      total: result.total,
+    };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function updateCompanySalesInvoiceAction(
@@ -61,8 +92,8 @@ export async function updateCompanySalesInvoiceAction(
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await updateSalesInvoice(invoiceId, parsed.data, ctx);
-    revalidateCompanyArPaths(invoiceId);
+    const invoice = await updateSalesInvoice(invoiceId, parsed.data, ctx, null);
+    revalidateCompanyArPaths(invoice.id, invoice.referencedSalesInvoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -75,8 +106,8 @@ export async function issueCompanySalesInvoiceAction(
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await issueSalesInvoice(invoiceId, ctx);
-    revalidateCompanyArPaths(invoiceId);
+    const invoice = await issueSalesInvoice(invoiceId, ctx, null);
+    revalidateCompanyArPaths(invoice.id, invoice.referencedSalesInvoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -109,7 +140,7 @@ export async function createCompanySalesCreditNoteFromInvoiceAction(
       },
       ctx,
     );
-    revalidateCompanyArPaths(undefined, [`${FIN_LIST}/${note.id}`]);
+    revalidateCompanyArPaths(note.id, parentInvoiceId);
     return { id: note.id };
   } catch (err) {
     return handle(err);
@@ -126,7 +157,7 @@ export async function createCompanySalesDebitNoteFromInvoiceAction(
       { parentSalesInvoiceId: parentInvoiceId },
       ctx,
     );
-    revalidateCompanyArPaths(undefined, [`${FIN_LIST}/${note.id}`]);
+    revalidateCompanyArPaths(note.id, parentInvoiceId);
     return { id: note.id };
   } catch (err) {
     return handle(err);
@@ -139,8 +170,8 @@ export async function issueCompanySalesCreditNoteAction(
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await issueSalesCreditNote(invoiceId, ctx);
-    revalidateCompanyArPaths(invoiceId);
+    const note = await issueSalesCreditNote(invoiceId, ctx, null);
+    revalidateCompanyArPaths(note.id, note.referencedSalesInvoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -153,8 +184,8 @@ export async function issueCompanySalesDebitNoteAction(
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await issueSalesDebitNote(invoiceId, ctx);
-    revalidateCompanyArPaths(invoiceId);
+    const note = await issueSalesDebitNote(invoiceId, ctx, null);
+    revalidateCompanyArPaths(note.id, note.referencedSalesInvoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -168,8 +199,8 @@ export async function cancelCompanySalesCreditNoteAction(
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await cancelSalesCreditNote(invoiceId, ctx, undefined, reason);
-    revalidateCompanyArPaths(invoiceId);
+    const note = await cancelSalesCreditNote(invoiceId, ctx, null, reason);
+    revalidateCompanyArPaths(note.id, note.referencedSalesInvoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -183,8 +214,8 @@ export async function cancelCompanySalesInvoiceAction(
   const ctx = await getCtx();
   try {
     await getCompanySalesInvoiceById(invoiceId, ctx);
-    await cancelSalesInvoice(invoiceId, ctx, undefined, reason);
-    revalidateCompanyArPaths(invoiceId);
+    const invoice = await cancelSalesInvoice(invoiceId, ctx, null, reason);
+    revalidateCompanyArPaths(invoice.id, invoice.referencedSalesInvoiceId);
     return { ok: true };
   } catch (err) {
     return handle(err);

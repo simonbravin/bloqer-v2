@@ -6,6 +6,11 @@ import { searchKnowledge } from "./search";
 describe("AG-09 financial guidance from the distributed index", () => {
   const cases = [
     {
+      name: "finds corporate credit and debit notes without requiring a project or a new receivable",
+      query: "Oficina Comprobantes de venta Nueva nota de crédito Factura de referencia sin CxC propia",
+      expected: /Comprobantes de venta[\s\S]*(?:sin CxC propia|Factura de referencia)/i,
+    },
+    {
       name: "explains that settling debt with credit is different from paying cash",
       query: "CxP Saldada créditos NC pagos salida de caja",
       expected: /Saldada[\s\S]*(?:créditos|crédito)[\s\S]*(?:salida de caja|salida de dinero|caja)/i,

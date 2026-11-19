@@ -11,7 +11,7 @@ import { registerArSaleSchema } from "@bloqer/validators";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { clearProjectAccessModeCache } from "../security/access";
 import { ServiceError, type ServiceContext } from "../types";
-import { createSalesInvoice, getSalesInvoiceById, issueSalesInvoice, updateSalesInvoice, cancelSalesInvoice, listInvoicesByProject } from "./sales-invoice.service";
+import { createSalesInvoice, getSalesInvoiceById, issueSalesInvoice, updateSalesInvoice, cancelSalesInvoice, listInvoicesByProject, listCompanySalesInvoices } from "./sales-invoice.service";
 import { getReceivableById, getReceivableBySalesInvoiceId, listReceivablesByProject, summarizeReceivablesByProject } from "./receivable.service";
 import { createSalesCreditNoteFromInvoice, createSalesDebitNoteFromInvoice, issueSalesCreditNote, issueSalesDebitNote, cancelSalesCreditNote } from "./credit-debit-note.service";
 import { createCollection, cancelCollection, getCollectionById, listCollectionsByProject } from "../treasury/collection.service";
@@ -211,6 +211,33 @@ describe("AG09 AR sales, notes and collection SQL integrity", { skip: process.en
     const ids = [first, second].map((r) => r.traceChain.find((link) => link.entityType === "SalesInvoice")!.entityId);
     const notes = await Promise.all(ids.map((id) => createSalesDebitNoteFromInvoice({ parentSalesInvoiceId: id }, ctx)));
     assert.notEqual(notes[0]!.number, notes[1]!.number);
+  });
+  it("operates corporate NC and ND through draft editing, issue, document lists and reversal without cash", async () => {
+    const result = await registerArIncome(income(), ctx);
+    const invoiceId = result.traceChain.find(link => link.entityType === "SalesInvoice")!.entityId;
+    const receivable = await prisma.receivable.findUniqueOrThrow({ where: { salesInvoiceId: invoiceId } });
+    const movements = await prisma.accountMovement.count({ where: { tenantId } });
+    const nc = await createSalesCreditNoteFromInvoice({ parentSalesInvoiceId: invoiceId,
+      lines: [{ description: "Corporate credit", quantity: "1", unitPrice: "30" }] }, ctx);
+    assert.equal(nc.projectId, null); assert.equal(nc.companyId, companyId);
+    await updateSalesInvoice(nc.id, { lines: [{ description: "Corrected corporate credit", quantity: "1", unitPrice: "25", taxRate: "0", discountPct: "0", sortOrder: 0 }] }, ctx, null);
+    await issueSalesCreditNote(nc.id, ctx, null);
+    const credited = await getReceivableBySalesInvoiceId(invoiceId, ctx, null);
+    assert.equal(credited?.paidAmount, "0.00"); assert.equal(credited?.creditedAmount, "25.00"); assert.equal(credited?.balanceDue, "75.00");
+    assert.equal(await prisma.receivable.count({ where: { salesInvoiceId: nc.id } }), 0);
+    const ncRows = await listCompanySalesInvoices(ctx, { documentKind: "CREDIT_NOTE", search: nc.code });
+    assert.equal(ncRows.data.find(row => row.id === nc.id)?.receivable, null);
+    const nd = await createSalesDebitNoteFromInvoice({ parentSalesInvoiceId: invoiceId,
+      lines: [{ description: "Corporate debit", quantity: "1", unitPrice: "10" }] }, ctx);
+    await issueSalesDebitNote(nd.id, ctx, null);
+    const newDebt = await prisma.receivable.findUniqueOrThrow({ where: { salesInvoiceId: nd.id } });
+    assert.equal(newDebt.projectId, null); assert.equal(newDebt.originalAmount.toFixed(2), "10.00");
+    assert.equal((await prisma.receivable.findUniqueOrThrow({ where: { id: receivable.id } })).originalAmount.toFixed(2), "100.00");
+    await assert.rejects(() => cancelSalesInvoice(invoiceId, ctx, null, "Parent has notes"), conflict);
+    await cancelSalesInvoice(nd.id, ctx, null, "Corporate debit reversal");
+    await cancelSalesCreditNote(nc.id, ctx, null, "Corporate credit reversal");
+    assert.equal((await getReceivableBySalesInvoiceId(invoiceId, ctx, null))?.balanceDue, "100.00");
+    assert.equal(await prisma.accountMovement.count({ where: { tenantId } }), movements);
   });
   it("keeps cash and credit separate through partial application, reasons and reversal replay", async () => {
     const p = await project(), { invoice, receivable } = await issued(p.id), bank = await account();
