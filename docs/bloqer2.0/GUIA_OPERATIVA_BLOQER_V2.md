@@ -1408,6 +1408,8 @@ Siempre existe la cadena **Factura → Payable → Payment → movimiento de caj
 
 En el detalle de una factura de proveedor, la columna **Cantidad** identifica las unidades de cada línea.
 
+**Revisar el borrador NC/ND:** una ND copia los importes guardados de las líneas de la factura, incluido su redondeo de IVA. La NC por monto conserva por defecto la partida y el tipo de costo de la primera línea de origen, igual que la NC por saldo completo. Antes de emitir, revisá líneas, impuestos e imputación; si hay varias partidas, el crédito no se reparte automáticamente. Si otra operación saldó la factura mientras creabas la NC, se rechaza el alta y debés volver a consultar el saldo. Esto también aplica al control de saldo de NC de venta.
+
 **Exportar → Excel / PDF** en **Facturas proveedor** conserva la búsqueda, el estado, la clase y el tipo de documento; descarga todos los resultados filtrados, aunque ocupen varias páginas. En **Pagos**, la misma opción descarga el listado completo autorizado de la obra, incluidos sus estados. Ver §13.2.
 
 **Listado FP (obra y empresa):** por defecto **Activas** (oculta anuladas). Chips **Borrador / Emitidas / Anuladas** para filtrar; usá **Anuladas** para ver las canceladas. Buscador por código (`FP-` / `NC-` / `ND-`) o proveedor. Filtro **Tipo de documento** (Factura / Nota de crédito / Nota de débito); el vacío del listado nombra el tipo filtrado.

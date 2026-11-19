@@ -182,10 +182,10 @@ async function createNoteDraft(
   }
 
   const issueDate = input.issueDate
-    ? productCalendarDateUtc(new Date(input.issueDate))
+    ? new Date(input.issueDate)
     : productCalendarDateUtc();
   const dueDate = input.dueDate
-    ? productCalendarDateUtc(new Date(input.dueDate))
+    ? new Date(input.dueDate)
     : parent.dueDate;
 
   const parentId = parent.id;
@@ -204,6 +204,12 @@ async function createNoteDraft(
     if (kind === "CREDIT_NOTE") {
       if (!parent.payable || parent.payable.status === "CANCELLED") throw new ServiceError("CONFLICT", "La factura no tiene cuenta por pagar activa");
       assertApPayableMatchesInvoice(parent.payable, parent);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(
+        parent.payable.originalAmount, parent.payable.paidAmount, parent.payable.creditedAmount,
+      ));
+      if (!balance.greaterThan(0)) {
+        throw new ServiceError("CONFLICT", "La factura ya no tiene saldo pendiente para una NC.");
+      }
     }
     const number = await nextSupplierDocumentNumber(tx, {
       tenantId: ctx.tenantId,
@@ -257,7 +263,7 @@ async function createNoteDraft(
         discountPct: new Prisma.Decimal(l.discountPct ?? "0"),
         sortOrder: l.sortOrder ?? i,
         wbsNodeId: l.wbsNodeId ?? parent.lines[0]?.wbsNodeId ?? null,
-        costType: l.costType ?? null,
+        costType: l.costType ?? parent.lines[0]?.costType ?? null,
       }));
     } else if (kind === "CREDIT_NOTE" && parent.payable) {
       const balance = normalizeObligationBalanceDue(
@@ -296,9 +302,10 @@ async function createNoteDraft(
     await assertSupplierInvoiceLinesWbs(parent.projectId, sourceLines, ctx.tenantId, tx);
     assertNonnegativeInvoiceTaxes({ taxAmount: new Prisma.Decimal(0), iibbPerceptionRate: note.iibbPerceptionRate,
       iibbPerceptionAmount: new Prisma.Decimal(0), lines: sourceLines });
-    for (const line of sourceLines) {
+    for (const [index, line] of sourceLines.entries()) {
       const { lineSubtotal, lineTax, lineTotal } = resolveInvoiceLineMoney({ quantity: line.quantity,
-        unitPrice: line.unitPrice, taxRate: line.taxRate, discountPct: line.discountPct });
+        unitPrice: line.unitPrice, taxRate: line.taxRate, discountPct: line.discountPct,
+        previous: !input.lines && kind === "DEBIT_NOTE" ? parent.lines[index] : undefined });
       await tx.supplierInvoiceLine.create({
         data: {
           invoiceId: note.id,

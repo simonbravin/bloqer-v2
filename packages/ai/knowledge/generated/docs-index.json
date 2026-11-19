@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-19T16:19:32.880Z",
-  "sourceHash": "d9a78de699baf500e13212aaa37f76d2a3c7a23d0ab030b03607772d4595ae19",
+  "generatedAt": "2026-11-19T16:52:29.705Z",
+  "sourceHash": "57216232d4b7c76df24f174e18464bc88be3d3dd8c560e77acb6f8b9c22218ad",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "74db3032e14ae81905d42cb53988b1d862801b1e3ceb70ea5d36f7cf10c820b9",
-      "bytes": 218556
+      "sha256": "978263f793cd4b90552864f58b996cf309fa6fb02e5dcfb73b773a8198a46622",
+      "bytes": 219120
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -65,13 +65,13 @@
     },
     {
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
-      "sha256": "f9327ba3eba841fdb55f6bfdc30ede027bb6be056861ad95b8ddbd7696f1ba5f",
-      "bytes": 7000
+      "sha256": "bf1f8544bc6bf19423b228322ad26cb1c969ea27192a3356c9c174b09a03498b",
+      "bytes": 7737
     },
     {
       "path": "docs/bloqer2.0/02-modules/SALES_AND_COLLECTIONS.md",
-      "sha256": "b4848459637310b6754075cbf74a9d45ba604a3a907090cb702f85380316c5b0",
-      "bytes": 8244
+      "sha256": "6115310a7a7d746519623c6e12eba66f2c383c4b18da1769184baf9acd20afc4",
+      "bytes": 8635
     },
     {
       "path": "docs/bloqer2.0/02-modules/TREASURY.md",
@@ -1679,7 +1679,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "| Pagos (consulta) | `/proyectos/[id]/pagos` (también desde CxP / trazabilidad) |\n\nEn el detalle de una factura de proveedor, la columna **Cantidad** identifica las unidades de cada línea.\n\n**Exportar → Excel / PDF** en **Facturas proveedor** conserva la búsqueda, el estado, la clase y el tipo de documento; descarga todos los resultados filtrados, aunque ocupen varias páginas. En **Pagos**, la misma opción descarga el listado completo autorizado de la obra, incluidos sus estados. Ver §13.2.\n\n**Listado FP (obra y empresa):** por defecto **Activas** (oculta anuladas). Chips **Borrador / Emitidas / Anuladas** para filtrar; usá **Anuladas** para ver las canceladas. Buscador por código (`FP-` / `NC-` / `ND-`) o proveedor. Filtro **Tipo de documento** (Factura / Nota de crédito / Nota de débito); el vacío del listado nombra el tipo filtrado.\n\n**Alta en obra (`/nueva`):**\n\n1. Orden del formulario: **A quién se le paga** → **Letra del comprobante** (letra A/B/C/E) → fechas de emisión/vencimiento → **Imputación de costo** (toggle **Contra orden de compra** / **Costo directo**, con badge **Compra comprometida** o **Costo directo de obra**) → checkbox **El precio unitario incluye IVA**.\n2. Mo"
+      "text": "| Pagos (consulta) | `/proyectos/[id]/pagos` (también desde CxP / trazabilidad) |\n\nEn el detalle de una factura de proveedor, la columna **Cantidad** identifica las unidades de cada línea.\n\n**Revisar el borrador NC/ND:** una ND copia los importes guardados de las líneas de la factura, incluido su redondeo de IVA. La NC por monto conserva por defecto la partida y el tipo de costo de la primera línea de origen, igual que la NC por saldo completo. Antes de emitir, revisá líneas, impuestos e imputación; si hay varias partidas, el crédito no se reparte automáticamente. Si otra operación saldó la factura mientras creabas la NC, se rechaza el alta y debés volver a consultar el saldo. Esto también aplica al control de saldo de NC de venta.\n\n**Exportar → Excel / PDF** en **Facturas proveedor** conserva la búsqueda, el estado, la clase y el tipo de documento; descarga todos los resultados filtrados, aunque ocupen varias páginas. En **Pagos**, la misma opción descarga el listado completo autorizado de la obra, incluidos sus estados. Ver §13.2.\n\n**Listado FP (obra y empresa):** por defecto **Activas** (oculta anuladas). Chips **Borrador / Emitidas / Anuladas** para filtrar; usá **Anuladas** pa"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#199",
@@ -1687,7 +1687,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "do Contra OC: picker de OC (**confirmadas, parcialmente recibidas o recibidas** del mismo proveedor) + “Traer líneas” (baja el comprometido abierto; copia partida EDT, tipo de costo e **insumo APU** de la OC si había, [D-110]). Costo directo: sin OC; imputá partida y tipo de costo (no reduce comprometido). Desde Operación → **Mano de obra** / **Equipos** → **Factura**, el alta llega tipada LAB/EQP con vínculo APU prellenado. Borradores nacidos desde la OC (**Completar factura**) quedan fijos en Contra OC (proveedor y OC no se cambian)."
+      "text": "ra ver las canceladas. Buscador por código (`FP-` / `NC-` / `ND-`) o proveedor. Filtro **Tipo de documento** (Factura / Nota de crédito / Nota de débito); el vacío del listado nombra el tipo filtrado."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#200",
@@ -1695,7 +1695,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "3. Líneas (cada una con **partida EDT obligatoria**, D-055; **Tipo de costo**; **insumo APU** opcional — se limpia si cambiás la partida; **P. unit.** / **P. unit. (c/IVA)**; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), **Percepción IIBB** a nivel documento (alícuota editable, default **3%** sobre el neto; el total = subtotal + IVA + percepción [D-112]), **adjunto** opcional (foto/PDF del comprobante).\n4. Desde OC / recepción: botón **Registrar factura** del panel Facturación abre en modo Contra OC y copia la partida EDT (y APU) de cada línea.\n5. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).\n6. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.\n\n![Bloqer — Costo de obra: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png)\n\n*Caminito de costo de obra (gasto directo). Material con OC y subcontrato tienen su propio "
+      "text": "**Alta en obra (`/nueva`):**\n\n1. Orden del formulario: **A quién se le paga** → **Letra del comprobante** (letra A/B/C/E) → fechas de emisión/vencimiento → **Imputación de costo** (toggle **Contra orden de compra** / **Costo directo**, con badge **Compra comprometida** o **Costo directo de obra**) → checkbox **El precio unitario incluye IVA**.\n2. Modo Contra OC: picker de OC (**confirmadas, parcialmente recibidas o recibidas** del mismo proveedor) + “Traer líneas” (baja el comprometido abierto; copia partida EDT, tipo de costo e **insumo APU** de la OC si había, [D-110]). Costo directo: sin OC; imputá partida y tipo de costo (no reduce comprometido). Desde Operación → **Mano de obra** / **Equipos** → **Factura**, el alta llega tipada LAB/EQP con vínculo APU prellenado. Borradores nacidos desde la OC (**Completar factura**) quedan fijos en Contra OC (proveedor y OC no se cambian).\n3. Líneas (cada una con **partida EDT obligatoria**, D-055; **Tipo de costo**; **insumo APU** opcional — se limpia si cambiás la partida; **P. unit.** / **P. unit. (c/IVA)**; **Desc. %** opcional antes de IVA; **Descuento general %** para copiar el mismo % a todas), **Percepción IIBB** a nivel documento (a"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#201",
@@ -1703,7 +1703,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "flujo. Reintegro de obra = este camino, payee Empleado.*\n\n#### Empresa (corporativo)\n\n| Pantalla | Ruta / etiqueta |\n|----------|-----------------|\n| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto). Detalle: misma **pista de proceso** Borrador → Emitir → Pagar; también **NC/ND** [D-115] como en obra. |"
+      "text": "lícuota editable, default **3%** sobre el neto; el total = subtotal + IVA + percepción [D-112]), **adjunto** opcional (foto/PDF del comprobante).\n4. Desde OC / recepción: botón **Registrar factura** del panel Facturación abre en modo Contra OC y copia la partida EDT (y APU) de cada línea."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#202",
@@ -1711,7 +1711,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → **A quién se le paga** → opcional **Pagar ahora (egreso de caja)** |\n| CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |\n| Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |\n\n**Notas de crédito y débito de proveedor en Oficina:** desde **Facturas y gastos**, elegí **Nueva nota de crédito** o **Nueva nota de débito**. En **Factura de referencia**, buscá por código o proveedor y seleccioná una factura emitida **de empresa, sin proyecto**. NC permite un monto total o parcial hasta el saldo; ND copia las líneas al borrador para revisarlas. Abrí el borrador, editá si corresponde y **Emitir**. NC reduce CxP sin egreso de caja y ND abre una CxP nueva. También podés partir del detalle de la factura emitida. Buscá las notas por código o **Tipo de documento**; anular una NC restaura el saldo y exige motivo si estaba emitida.\n\n![Bloqer — Costo de empresa: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png)\n\n*Caminito de costo de empresa (alquiler, servicios, estructura). Si tiene partida EDT, no es este camino. Imputar GG a obras es otro menú.*\n"
+      "text": "5. Sin más: **Crear factura** → queda en **borrador** → luego **Emitir** en el detalle (crea CxP + **asiento DRAFT** en contabilidad, ver §15).\n6. Con permiso **EDIT tesorería** y módulo Tesorería activo: checkbox **Emitir y pagar ahora (egreso de caja)** → cuenta de pago + fecha → **Emitir y pagar**. Crea factura emitida + CxP + pago + egreso en un paso. Si no hay fondos suficientes, **bloquea**.\n\n![Bloqer — Costo de obra: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-costo-obra-si-no.png)\n\n*Caminito de costo de obra (gasto directo). Material con OC y subcontrato tienen su propio flujo. Reintegro de obra = este camino, payee Empleado.*\n\n#### Empresa (corporativo)\n\n| Pantalla | Ruta / etiqueta |\n|----------|-----------------|\n| Facturas y gastos | `/finanzas/facturas-proveedor` → diálogo **Nueva factura de gasto** (borrador sin proyecto). Detalle: misma **pista de proceso** Borrador → Emitir → Pagar; también **NC/ND** [D-115] como en obra. |\n| Alta rápida con pago | `/finanzas/transacciones` → **Gasto / factura** → **A quién se le paga** → opcional **Pagar ahora (egreso de caja)** |\n| CxP | `/finanzas/cuentas-por-pagar` → `/[payableId]/pagar` (**Registrar pago**) |\n|"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#203",
@@ -1719,7 +1719,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "\n#### 12.2.1 Pagar un sueldo (registro de costo, no nómina)\n\nBloqer **no** liquida haberes ni aportes. Se registra el egreso como gasto corporativo ligado al empleado.\n\n1. Directorio → el contacto existe con rol **Empleado** (activo)."
+      "text": " Detalle de pago | `/finanzas/pagos-proveedor/[paymentId]` |\n\n**Notas de crédito y débito de proveedor en Oficina:** desde **Facturas y gastos**, elegí **Nueva nota de crédito** o **Nueva nota de débito**. En **Factura de referencia**, buscá por código o proveedor y seleccioná una factura emitida **de empresa, sin proyecto**. NC permite un monto total o parcial hasta el saldo; ND copia las líneas al borrador para revisarlas. Abrí el borrador, editá si corresponde y **Emitir**. NC reduce CxP sin egreso de caja y ND abre una CxP nueva. También podés partir del detalle de la factura emitida. Buscá las notas por código o **Tipo de documento**; anular una NC restaura el saldo y exige motivo si estaba emitida."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#204",
@@ -1727,7 +1727,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "2. Finanzas → **Transacciones** (`/finanzas/transacciones`) → **Registrar transacción**.\n3. Tab **Gasto / factura**.\n4. **A quién se le paga:** elegir al empleado (en el listado figura `Razón social · Empleado`, con fantasía entre paréntesis si es distinta).\n5. Fecha, líneas (descripción p. ej. `Sueldo agosto 2026`, cantidad 1, importe).\n6. Marcar **Pagar ahora (egreso de caja)** → cuenta de tesorería + fecha + método.\n7. Confirmar. Queda factura emitida + CxP saldada + egreso de caja, **mapeado al contacto** (no solo en la descripción).\n\nVariante sin pagar en el acto: **Facturas y gastos** → **Nueva factura de gasto** → **Crear factura** (borrador) → **Emitir** → pagar después desde CxP.\n\n![Bloqer — Pagar un sueldo: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png)\n\n*Caminito de sueldo: no es nómina. Sin Empleado en Directorio no aparece. Sin fondos, Bloqer bloquea.*\n\n#### 12.2.2 Reintegrar un gasto a un empleado\n\nMismo flujo que el sueldo. El empleado adelantó plata (combustible, ferretería, etc.) y la empresa se la devuelve.\n\n1. Contacto con rol **Empleado**.\n2. Transacciones → **Gasto / factura** → elegir al **empleado** (no al comercio donde compró"
+      "text": "![Bloqer — Costo de empresa: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-gasto-empresa-si-no.png)\n\n*Caminito de costo de empresa (alquiler, servicios, estructura). Si tiene partida EDT, no es este camino. Imputar GG a obras es otro menú.*\n\n#### 12.2.1 Pagar un sueldo (registro de costo, no nómina)\n\nBloqer **no** liquida haberes ni aportes. Se registra el egreso como gasto corporativo ligado al empleado.\n\n1. Directorio → el contacto existe con rol **Empleado** (activo).\n2. Finanzas → **Transacciones** (`/finanzas/transacciones`) → **Registrar transacción**.\n3. Tab **Gasto / factura**.\n4. **A quién se le paga:** elegir al empleado (en el listado figura `Razón social · Empleado`, con fantasía entre paréntesis si es distinta).\n5. Fecha, líneas (descripción p. ej. `Sueldo agosto 2026`, cantidad 1, importe).\n6. Marcar **Pagar ahora (egreso de caja)** → cuenta de tesorería + fecha + método.\n7. Confirmar. Queda factura emitida + CxP saldada + egreso de caja, **mapeado al contacto** (no solo en la descripción).\n\nVariante sin pagar en el acto: **Facturas y gastos** → **Nueva factura de gasto** → **Crear factura** (borrador) → **Emitir** → pagar después desde CxP.\n\n![Bloqer —"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#205",
@@ -1735,7 +1735,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": ", salvo que quieras cargar la factura fiscal de ese proveedor).\n3. Descripción del gasto; **adjunto** del ticket/factura.\n4. **Pagar ahora (egreso de caja)** o emitir y pagar después.\n\n- **Empresa** (sueldo de estructura, reintegro de oficina): Transacciones / Facturas y gastos, **sin** proyecto."
+      "text": " Pagar un sueldo: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-sueldo-si-no.png)\n\n*Caminito de sueldo: no es nómina. Sin Empleado en Directorio no aparece. Sin fondos, Bloqer bloquea.*"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#206",
@@ -1743,7 +1743,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "- **Obra** (el capataz compró algo para la partida): Facturas de proveedor del **proyecto**, **sin OC**, cada línea con **partida EDT**, payee = empleado.\n\nSi el “empleado” es monotributista y te pasa factura C: cargalo como **Proveedor** (y Empleado si también es de la casa) y registrá la factura fiscal, no un reintegro genérico.\n\n**Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, **método de liquidación** + referencia opcional, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible. Si el movimiento de caja ya está **Conciliado**, hay que desemparejar antes de cancelar el pago.\n\n**Consultar el pago confirmado:** el detalle de obra (`/proyectos/[id]/pagos/[paymentId]`) muestra monto, fecha, cuenta y accesos a la CxP y la factura. **Cancelar pago** pide motivo y solo aparece con permiso de pago mientras esté confirmado. En moneda extranjera el alta pide FX manual del pago; ese tipo de cambio queda fijo al confirmar, igual que su equivalente ARS. **Pagar saldo total** usa el saldo guardado en servidor. La CxP **Saldada** puede combinar pago y créditos NC; el historial"
+      "text": "#### 12.2.2 Reintegrar un gasto a un empleado\n\nMismo flujo que el sueldo. El empleado adelantó plata (combustible, ferretería, etc.) y la empresa se la devuelve.\n\n1. Contacto con rol **Empleado**.\n2. Transacciones → **Gasto / factura** → elegir al **empleado** (no al comercio donde compró, salvo que quieras cargar la factura fiscal de ese proveedor).\n3. Descripción del gasto; **adjunto** del ticket/factura.\n4. **Pagar ahora (egreso de caja)** o emitir y pagar después.\n\n- **Empresa** (sueldo de estructura, reintegro de oficina): Transacciones / Facturas y gastos, **sin** proyecto.\n- **Obra** (el capataz compró algo para la partida): Facturas de proveedor del **proyecto**, **sin OC**, cada línea con **partida EDT**, payee = empleado.\n\nSi el “empleado” es monotributista y te pasa factura C: cargalo como **Proveedor** (y Empleado si también es de la casa) y registrá la factura fiscal, no un reintegro genérico.\n\n**Registrar pago (obra o empresa):** cuenta de tesorería (misma moneda), fecha, monto a 2 decimales, **método de liquidación** + referencia opcional, notas. El default es el **saldo pendiente**; usarlo para saldar sin residual. Fondos insuficientes → error con disponible. Si el "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#207",
@@ -1751,7 +1751,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": " distingue pagos confirmados y anulados. Si la pantalla falla al cargar después de registrar, revisá primero la **CxP** y **Transacciones**: el pago puede haberse guardado correctamente. Si ya figura confirmado, volvé a abrir su detalle; no registres otro pago por el error de visualización."
+      "text": "movimiento de caja ya está **Conciliado**, hay que desemparejar antes de cancelar el pago.\n\n**Consultar el pago confirmado:** el detalle de obra (`/proyectos/[id]/pagos/[paymentId]`) muestra monto, fecha, cuenta y accesos a la CxP y la factura. **Cancelar pago** pide motivo y solo aparece con permiso de pago mientras esté confirmado. En moneda extranjera el alta pide FX manual del pago; ese tipo de cambio queda fijo al confirmar, igual que su equivalente ARS. **Pagar saldo total** usa el saldo guardado en servidor. La CxP **Saldada** puede combinar pago y créditos NC; el historial distingue pagos confirmados y anulados. Si la pantalla falla al cargar después de registrar, revisá primero la **CxP** y **Transacciones**: el pago puede haberse guardado correctamente. Si ya figura confirmado, volvé a abrir su detalle; no registres otro pago por el error de visualización."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#208",
@@ -4224,10 +4224,18 @@
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
       "section": "10. Reglas de negocio",
-      "text": "## 10. Reglas de negocio\n- **BR-PAY-001**: pago no excede saldo Payable ([BR-TRZ-005]).\n- AP sin proyecto permitido ([D-009]).\n- Payee de gasto/factura sin OC: Contact con rol `SUPPLIER` o `EMPLOYEE` ([BR-AP-001], [D-089]).\n- Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).\n- **Tipo de documento ([D-115]):** Factura / Nota de crédito / Nota de débito en `SupplierInvoice.documentKind`. NC aplica crédito a CxP sin caja; ND abre Payable nueva.\n- IVA y percepción IIBB no negativos, incluidos ajustes explícitos del importe de percepción; cero permitido. Un borrador negativo debe corregirse antes de emitir, sin alterar documentos históricos ([D-133])."
+      "text": "## 10. Reglas de negocio\n- **BR-PAY-001**: pago no excede saldo Payable ([BR-TRZ-005]).\n- AP sin proyecto permitido ([D-009]).\n- Payee de gasto/factura sin OC: Contact con rol `SUPPLIER` o `EMPLOYEE` ([BR-AP-001], [D-089]).\n- Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).\n- **Tipo de documento ([D-115]):** Factura / Nota de crédito / Nota de débito en `SupplierInvoice.documentKind`. NC aplica crédito a CxP sin caja; ND abre Payable nueva.\n- Las ND copian los importes guardados de las líneas de origen, incluido el redondeo de IVA; las líneas ingresadas o modificadas se calculan con el kernel vigente. La NC por monto conserva por defecto la partida y el tipo de costo de la primera línea de origen, como la NC por saldo completo; revisar la imputación del borrador si la factura contiene varias partidas. No se inventa un prorrateo ni se vinculan líneas de OC/APU automáticamente.\n- El alta de NC vuelve a comprobar dentro de la transacción que la CxP esté activa y tenga saldo positivo; si se saldó durante la espera, rechaza el alta. Las fechas explícitas `YYYY-MM-DD` se conservan como fechas calendario, sin convertirlas a un día anterior p"
     },
     {
       "id": "02-modules/EXPENSES_AND_PAYMENTS.md#13",
+      "sourceType": "bloqer_docs",
+      "title": "Gastos, facturas de compra y pagos",
+      "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
+      "section": "10. Reglas de negocio",
+      "text": "or zona horaria.\n- IVA y percepción IIBB no negativos, incluidos ajustes explícitos del importe de percepción; cero permitido. Un borrador negativo debe corregirse antes de emitir, sin alterar documentos históricos ([D-133])."
+    },
+    {
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#14",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4235,7 +4243,7 @@
       "text": "## 11. Validaciones\n- Vínculo a OC, incluso manual solo de cabecera: misma empresa, tenant, obra, proveedor y moneda; OC y padres WBS/APU coherentes. Se revalida al crear/editar/emitir antes de mutar. No se atribuyen renglones por descripción/importe y la carga manual sin FK de línea sigue permitida con sus avisos.\n- Payee coherente en factura y pago ([BR-AP-001] / [D-089]): `SUPPLIER` o `EMPLOYEE` si no hay OC; `SUPPLIER` si hay OC.\n- Periodo abierto ([BR-TRZ-003]).\n- `invoice_letter` presente al emitir si empresa o proveedor tienen `country = AR` ([D-084]).\n- Pago en la misma moneda de la deuda y cuenta compatible con su empresa; moneda extranjera exige FX manual del pago (ARS por 1 unidad, hasta 6 decimales; D-008). **Pagar saldo total** usa el saldo guardado en servidor."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#14",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#15",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4243,7 +4251,7 @@
       "text": "## 12. Fórmulas relacionadas\n- [`TAX_FORMULAS.md`](../04-formulas/TAX_FORMULAS.md), [`TREASURY_BALANCE_FORMULAS.md`](../04-formulas/TREASURY_BALANCE_FORMULAS.md)."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#15",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#16",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4251,7 +4259,7 @@
       "text": "## 13. Casos borde\n- Anticipo sin factura y compensación posterior mediante cuenta puente: diseño futuro, sin procedimiento implementado de aplicación a CxP. El pago actual siempre se vincula a una obligación emitida.\n- Sueldo / reintegro: gasto AP al contacto `EMPLOYEE`; no es liquidación de haberes. Monotributista que factura: rol `SUPPLIER` (más `EMPLOYEE` si es personal interno)."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#16",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#17",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4259,7 +4267,7 @@
       "text": "## 14. Reportes relacionados\n- Aging AP, gastos por proveedor, cashflow egresos."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#17",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#18",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4267,7 +4275,7 @@
       "text": "## 15. Relación con otros módulos\n- **PROCUREMENT**, **Subcontratos**, **Tesorería**."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#18",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#19",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4275,7 +4283,7 @@
       "text": "## 16. Permisos\nFINANCE opera pagos; PROCUREMENT ve montos según política."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#19",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#20",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4283,7 +4291,7 @@
       "text": "## 17. Eventos disparados / consumidos\n- `purchase_invoice.*`, `payment.confirmed`, `payable.*`."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#20",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#21",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4291,7 +4299,7 @@
       "text": "## 18. Fase de implementación\n**Fase 1**."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#21",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#22",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4299,7 +4307,7 @@
       "text": "## 19. Preguntas abiertas\n- Pagos batch / archivos ([Q-007] relacionado)."
     },
     {
-      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#22",
+      "id": "02-modules/EXPENSES_AND_PAYMENTS.md#23",
       "sourceType": "bloqer_docs",
       "title": "Gastos, facturas de compra y pagos",
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
@@ -4408,7 +4416,7 @@
       "title": "Ventas y cobranzas",
       "path": "docs/bloqer2.0/02-modules/SALES_AND_COLLECTIONS.md",
       "section": "Tipo de documento ([D-115])",
-      "text": "## Tipo de documento ([D-115])\n\nCampo persistido `documentKind` en `SalesInvoice`:\n\n| Valor | UI | Al emitir |\n|---|---|---|\n| `INVOICE` | Factura | Crea `Receivable` 1:1 |\n| `CREDIT_NOTE` | Nota de crédito | Aplica crédito a CxC de la factura referenciada (sin caja) |\n| `DEBIT_NOTE` | Nota de débito | Crea `Receivable` nueva; referencia factura origen |\n\nNC/ND exigen factura `ISSUED` del mismo cliente/moneda/alcance. Series de numeración separadas por tipo."
+      "text": "## Tipo de documento ([D-115])\n\nCampo persistido `documentKind` en `SalesInvoice`:\n\n| Valor | UI | Al emitir |\n|---|---|---|\n| `INVOICE` | Factura | Crea `Receivable` 1:1 |\n| `CREDIT_NOTE` | Nota de crédito | Aplica crédito a CxC de la factura referenciada (sin caja) |\n| `DEBIT_NOTE` | Nota de débito | Crea `Receivable` nueva; referencia factura origen |\n\nNC/ND exigen factura `ISSUED` del mismo cliente/moneda/alcance. Series de numeración separadas por tipo.\n\nEl alta de NC vuelve a validar dentro de la transacción la CxC y su saldo positivo; si otra operación lo saldó durante la espera, rechaza el alta. Las fechas explícitas `YYYY-MM-DD` se guardan como fechas calendario sin desplazamiento por zona horaria. La ND copia los componentes monetarios guardados de las líneas; al editar valores monetarios se recalculan con el kernel vigente."
     },
     {
       "id": "02-modules/SALES_AND_COLLECTIONS.md#14",

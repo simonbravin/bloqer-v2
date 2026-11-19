@@ -51,6 +51,8 @@ Impagos y falta de visibilidad de obligaciones futuras (AP aging).
 - Payee de gasto/factura sin OC: Contact con rol `SUPPLIER` o `EMPLOYEE` ([BR-AP-001], [D-089]).
 - Letra de comprobante A/B/C/E sugerida y editable; requerida al emitir si operación AR ([D-084]).
 - **Tipo de documento ([D-115]):** Factura / Nota de crédito / Nota de débito en `SupplierInvoice.documentKind`. NC aplica crédito a CxP sin caja; ND abre Payable nueva.
+- Las ND copian los importes guardados de las líneas de origen, incluido el redondeo de IVA; las líneas ingresadas o modificadas se calculan con el kernel vigente. La NC por monto conserva por defecto la partida y el tipo de costo de la primera línea de origen, como la NC por saldo completo; revisar la imputación del borrador si la factura contiene varias partidas. No se inventa un prorrateo ni se vinculan líneas de OC/APU automáticamente.
+- El alta de NC vuelve a comprobar dentro de la transacción que la CxP esté activa y tenga saldo positivo; si se saldó durante la espera, rechaza el alta. Las fechas explícitas `YYYY-MM-DD` se conservan como fechas calendario, sin convertirlas a un día anterior por zona horaria.
 - IVA y percepción IIBB no negativos, incluidos ajustes explícitos del importe de percepción; cero permitido. Un borrador negativo debe corregirse antes de emitir, sin alterar documentos históricos ([D-133]).
 
 ## 11. Validaciones

@@ -74,6 +74,8 @@ Campo persistido `documentKind` en `SalesInvoice`:
 
 NC/ND exigen factura `ISSUED` del mismo cliente/moneda/alcance. Series de numeración separadas por tipo.
 
+El alta de NC vuelve a validar dentro de la transacción la CxC y su saldo positivo; si otra operación lo saldó durante la espera, rechaza el alta. Las fechas explícitas `YYYY-MM-DD` se guardan como fechas calendario sin desplazamiento por zona horaria. La ND copia los componentes monetarios guardados de las líneas; al editar valores monetarios se recalculan con el kernel vigente.
+
 ## 10. Reglas de negocio
 - Factura de venta **manual de proyecto**: “Emitir y cobrar ahora” opcional ([D-077] / Q-055); visible con `EDIT TREASURY`.
 - IVA por línea y percepción IIBB de cabecera, de carga manual ([D-011], [D-112]); el circuito fino de retenciones/`TaxLine` sigue pendiente.

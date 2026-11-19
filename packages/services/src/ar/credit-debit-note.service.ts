@@ -180,10 +180,10 @@ async function createNoteDraft(
   }
 
   const issueDate = input.issueDate
-    ? productCalendarDateUtc(new Date(input.issueDate))
+    ? new Date(input.issueDate)
     : productCalendarDateUtc();
   const dueDate = input.dueDate
-    ? productCalendarDateUtc(new Date(input.dueDate))
+    ? new Date(input.dueDate)
     : parent.dueDate;
 
   const created = await prisma.$transaction(async (tx) => {
@@ -194,6 +194,20 @@ async function createNoteDraft(
     const currentParent = await tx.salesInvoice.findUniqueOrThrow({ where: { id: parent.id }, include: { ...arInvoiceParents, receivable: { include: arReceivableParents } } });
     assertArInvoiceParents(currentParent, ctx);
     if (currentParent.status !== "ISSUED") throw new ServiceError("CONFLICT", "La factura de referencia ya no está emitida");
+    if (kind === "CREDIT_NOTE") {
+      if (!currentParent.receivable || currentParent.receivable.status === "CANCELLED") {
+        throw new ServiceError("CONFLICT", "La factura no tiene cuenta por cobrar activa.");
+      }
+      assertArReceivableParents(currentParent.receivable, ctx);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(
+        currentParent.receivable.originalAmount,
+        currentParent.receivable.paidAmount,
+        currentParent.receivable.creditedAmount,
+      ));
+      if (!balance.greaterThan(0)) {
+        throw new ServiceError("CONFLICT", "La factura ya no tiene saldo pendiente para una NC.");
+      }
+    }
     const number = await nextSalesDocumentNumber(tx, {
       tenantId: ctx.tenantId,
       companyId: parent.companyId,
