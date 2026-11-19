@@ -13,7 +13,7 @@ import {
   SalesInvoiceListSection,
   type SalesInvoiceListItem,
 } from "@/features/sales-invoices";
-import { NewCompanyFiscalNoteDialog } from "@/features/finance/components/new-company-fiscal-note-dialog";
+import { NewFiscalNoteDialog } from "@/features/finance/components/new-fiscal-note-dialog";
 import { getCurrentUser } from "@/lib/auth";
 import { parsePage } from "@/lib/parse-page";
 
@@ -82,8 +82,8 @@ export default async function CompanySalesInvoicesPage({ searchParams }: PagePro
           </Button>
           {canCreate ? (
             <>
-              <NewCompanyFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ar" />
-              <NewCompanyFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ar" />
+              <NewFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ar" />
+              <NewFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ar" />
             </>
           ) : null}
         </div>

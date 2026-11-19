@@ -30,7 +30,7 @@ import {
 import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 import { isReceivablesFieldViewport, parseViewportHint, VIEWPORT_COOKIE } from "@/lib/viewport-hint-cookie";
-import { NewCompanyFiscalNoteDialog } from "@/features/finance/components/new-company-fiscal-note-dialog";
+import { NewFiscalNoteDialog } from "@/features/finance/components/new-fiscal-note-dialog";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["OPEN", "PARTIAL", "PAID", "OVERDUE", "CANCELLED"] as const;
@@ -83,8 +83,8 @@ export default async function FinanzasCuentasPorCobrarPage({ searchParams }: Pag
       </Button>
       {canEditAr ? (
         <>
-          <NewCompanyFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ar" />
-          <NewCompanyFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ar" />
+          <NewFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ar" />
+          <NewFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ar" />
         </>
       ) : null}
     </div>

@@ -22,7 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 import { fiscalDocumentListEmptyCopy } from "@/features/finance/lib/fiscal-document-list-empty";
-import { NewCompanyFiscalNoteDialog } from "@/features/finance/components/new-company-fiscal-note-dialog";
+import { NewFiscalNoteDialog } from "@/features/finance/components/new-fiscal-note-dialog";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
@@ -161,8 +161,8 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
           />
           {canCreateInvoice ? (
             <>
-              <NewCompanyFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ap" />
-              <NewCompanyFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ap" />
+              <NewFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ap" />
+              <NewFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ap" />
               <Suspense fallback={null}>
                 <NewCompanySupplierInvoiceDialog
                   suppliers={suppliers}

@@ -140,6 +140,53 @@ for (const area of ["Sales", "Supplier"] as const) {
   });
 }
 
+for (const area of ["Sales", "Supplier"] as const) {
+  const route = area === "Sales" ? "facturas" : "facturas-proveedor";
+  const listService = area === "Sales" ? "listInvoicesByProject" : "listSupplierInvoicesByProject";
+  const path = `../../../app/(app)/proyectos/[id]/${route}/actions.ts`;
+
+  test(`${area}: project reference picker queries issued invoices in the selected project with current debt`, async () => {
+    const env = actionEnvironment({
+      [listService]: async (projectId: string, ctx: unknown, filters: Record<string, unknown>) => {
+        assert.equal(projectId, "project");
+        assert.deepEqual(JSON.parse(JSON.stringify(ctx)), env.ctx);
+        assert.deepEqual(JSON.parse(JSON.stringify(filters)), { status: "ISSUED", documentKind: "INVOICE", search: "12", page: 2, pageSize: 10 });
+        return { data: [{ id: "parent", code: "FAC-12", clientName: "Cliente", supplierName: "Proveedor", currency: "ARS", payable: { balanceDue: "70.00" } }], total: 11 };
+      },
+      getReceivableBySalesInvoiceId: async (id: string, _ctx: unknown, projectId: string) => {
+        assert.equal(id, "parent"); assert.equal(projectId, "project");
+        return { balanceDue: "70.00" };
+      },
+    });
+    const actions = load<Record<string, Action>>(path, env.dependencies);
+    const result = await actions[`listProject${area}NoteParentsAction`]!("project", " 12 ", 2);
+    assert.equal(result.total, 11);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.data)), [{ id: "parent", code: "FAC-12", contactName: area === "Sales" ? "Cliente" : "Proveedor", currency: "ARS", balanceDue: "70.00" }]);
+    assert.deepEqual(env.invalidated, []);
+  });
+
+  test(`${area}: a denied project returns no reference invoices`, async () => {
+    const env = actionEnvironment({ [listService]: async () => { throw new ServiceError("FORBIDDEN", "Sin acceso al proyecto"); } });
+    const actions = load<Record<string, Action>>(path, env.dependencies);
+    const result = await actions[`listProject${area}NoteParentsAction`]!("foreign-project", "");
+    assert.equal(result.error, "Sin acceso al proyecto");
+    assert.equal(result.data, undefined);
+  });
+}
+
+for (const operation of ["issueSupplierCreditNote", "issueSupplierDebitNote", "cancelSupplierCreditNote"] as const) {
+  test(`${operation}: project note refreshes its parent balance and related notes`, async () => {
+    const env = actionEnvironment({ [operation]: async (id: string, _ctx: unknown, projectId: string) => {
+      assert.equal(projectId, "project");
+      return { id, referencedSupplierInvoiceId: "parent" };
+    } });
+    const actions = load<Record<string, Action>>("../../../app/(app)/proyectos/[id]/facturas-proveedor/actions.ts", env.dependencies);
+    const result = await actions[`${operation}Action`]!("note", "project", "Duplicado");
+    assert.equal(result.ok, true);
+    for (const id of ["note", "parent"]) assert.ok(env.invalidated.includes(`/proyectos/project/facturas-proveedor/${id}`));
+  });
+}
+
 function uiEnvironment() {
   const slots: unknown[] = [], effects: (() => void)[] = [], transitions: Promise<unknown>[] = [];
   const timers = new Map<number, () => void>(), navigation: string[] = [];
@@ -183,15 +230,18 @@ function uiEnvironment() {
   };
 }
 
-for (const scope of ["company-ar", "company-ap"] as const) {
+for (const scope of ["company-ar", "company-ap", "project-ar", "project-ap"] as const) {
+  const isProject = scope.startsWith("project-");
   test(`${scope}: parent picker searches and selects the invoice before exposing note creation`, async () => {
     const env = uiEnvironment(), calls: unknown[][] = [];
     const list = async (...args: unknown[]) => { calls.push(args); return { data: [{ id: "parent", code: "FAC", contactName: "Contacto", currency: "USD", balanceDue: "30.25" }], total: 11 }; };
     env.dependencies["@/app/(app)/finanzas/facturas/actions"] = { listCompanySalesNoteParentsAction: scope === "company-ar" ? list : () => assert.fail("Wrong company scope") };
     env.dependencies["@/app/(app)/finanzas/facturas-proveedor/actions"] = { listCompanySupplierNoteParentsAction: scope === "company-ap" ? list : () => assert.fail("Wrong company scope") };
+    env.dependencies["@/app/(app)/proyectos/[id]/facturas/actions"] = { listProjectSalesNoteParentsAction: scope === "project-ar" ? list : () => assert.fail("Wrong project scope") };
+    env.dependencies["@/app/(app)/proyectos/[id]/facturas-proveedor/actions"] = { listProjectSupplierNoteParentsAction: scope === "project-ap" ? list : () => assert.fail("Wrong project scope") };
     env.dependencies["./create-fiscal-note-dialog"] = { CreateFiscalNoteDialog: "CreateFiscalNoteDialog" };
-    const { NewCompanyFiscalNoteDialog } = load<{ NewCompanyFiscalNoteDialog: (props: unknown) => Element }>("../components/new-company-fiscal-note-dialog.tsx", env.dependencies, env.globals);
-    const render = () => env.render(() => NewCompanyFiscalNoteDialog({ kind: "CREDIT_NOTE", scope }));
+    const { NewFiscalNoteDialog } = load<{ NewFiscalNoteDialog: (props: unknown) => Element }>("../components/new-fiscal-note-dialog.tsx", env.dependencies, env.globals);
+    const render = () => env.render(() => NewFiscalNoteDialog({ kind: "CREDIT_NOTE", scope, ...(isProject ? { projectId: "project" } : {}) }));
     assert.equal(render().props.parentInvoiceId, "");
     (render().props.onOpenChange as (next: boolean) => void)(true);
     render(); await env.flush();
@@ -200,10 +250,11 @@ for (const scope of ["company-ar", "company-ap"] as const) {
     render(); await env.flush();
     (elements(render().props.parentSelector, "Input")[0]!.props.onChange as (event: unknown) => void)({ target: { value: "FAC" } });
     render(); await env.flush();
-    assert.deepEqual(calls, [["", 1], ["", 2], ["FAC", 1]]);
+    assert.deepEqual(calls, isProject ? [["project", "", 1], ["project", "", 2], ["project", "FAC", 1]] : [["", 1], ["", 2], ["FAC", 1]]);
     const candidate = elements(render().props.parentSelector, "Button")[0]!;
     (candidate.props.onClick as () => void)();
     const selected = render();
+    assert.deepEqual(JSON.parse(JSON.stringify(selected.props.scope)), isProject ? { type: scope, projectId: "project" } : { type: scope });
     assert.equal(selected.props.parentInvoiceId, "parent");
     assert.equal(selected.props.currency, "USD");
     assert.equal(selected.props.openBalance, "30.25");
@@ -217,11 +268,12 @@ for (const scope of ["company-ar", "company-ap"] as const) {
     let finish!: (result: { id: string }) => void;
     const request = new Promise<{ id: string }>((resolve) => { finish = resolve; });
     const create = (...args: unknown[]) => { calls.push(args); return request; };
-    for (const path of ["@/app/(app)/proyectos/[id]/facturas/actions", "@/app/(app)/proyectos/[id]/facturas-proveedor/actions"]) env.dependencies[path] = {};
+    env.dependencies["@/app/(app)/proyectos/[id]/facturas/actions"] = { createSalesCreditNoteFromInvoiceAction: create };
+    env.dependencies["@/app/(app)/proyectos/[id]/facturas-proveedor/actions"] = { createSupplierCreditNoteFromInvoiceAction: create };
     env.dependencies["@/app/(app)/finanzas/facturas/actions"] = { createCompanySalesCreditNoteFromInvoiceAction: create };
     env.dependencies["@/app/(app)/finanzas/facturas-proveedor/actions"] = { createCompanySupplierCreditNoteFromInvoiceAction: create };
     const { CreateFiscalNoteDialog } = load<{ CreateFiscalNoteDialog: (props: unknown) => Element }>("../components/create-fiscal-note-dialog.tsx", env.dependencies);
-    const props = { kind: "CREDIT_NOTE", parentInvoiceId: "", parentCode: "FAC", currency: "ARS", openBalance: "30.25", scope: { type: scope } };
+    const props = { kind: "CREDIT_NOTE", parentInvoiceId: "", parentCode: "FAC", currency: "ARS", openBalance: "30.25", scope: { type: scope, ...(isProject ? { projectId: "project" } : {}) } };
     const render = () => env.render(() => CreateFiscalNoteDialog(props));
     const submit = () => { (elements(render(), "form")[0]!.props.onSubmit as (event: unknown) => void)({ preventDefault() {} }); };
     (elements(render(), "Dialog")[0]!.props.onOpenChange as (next: boolean) => void)(true);
@@ -231,11 +283,11 @@ for (const scope of ["company-ar", "company-ap"] as const) {
     setAmount("30.26"); submit(); assert.equal(calls.length, 0);
     setAmount("12.34"); submit(); submit();
     assert.equal(calls.length, 1);
-    assert.deepEqual(JSON.parse(JSON.stringify(calls[0])), ["parent", { amount: "12.34" }]);
+    assert.deepEqual(JSON.parse(JSON.stringify(calls[0])), isProject ? ["parent", "project", { amount: "12.34" }] : ["parent", { amount: "12.34" }]);
     assert.equal(elements(render(), "fieldset")[0]!.props.disabled, true);
     (elements(render(), "Dialog")[0]!.props.onOpenChange as (next: boolean) => void)(false);
     assert.equal(elements(render(), "Dialog")[0]!.props.open, true);
     finish({ id: "note" }); await env.settle();
-    assert.deepEqual(env.navigation, [scope === "company-ap" ? "/finanzas/facturas-proveedor/note" : "/finanzas/facturas/note"]);
+    assert.deepEqual(env.navigation, [`${isProject ? "/proyectos/project" : "/finanzas"}/${scope.endsWith("-ap") ? "facturas-proveedor" : "facturas"}/note`]);
   });
 }

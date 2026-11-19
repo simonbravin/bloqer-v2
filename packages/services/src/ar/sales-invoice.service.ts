@@ -249,6 +249,7 @@ export type ProjectSalesInvoiceListFilters = {
   page?: number;
   pageSize?: number;
   search?: string;
+  status?: SalesInvoiceStatus;
   /** Derived document class filter ([D-102]). */
   class?: string;
   /** Fiscal document kind filter ([D-115]). */
@@ -327,7 +328,7 @@ export async function listInvoicesByProject(
   const where: Prisma.SalesInvoiceWhereInput = {
     projectId,
     tenantId: ctx.tenantId,
-    status: { not: "CANCELLED" },
+    status: filters?.status ?? { not: "CANCELLED" },
     ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
     ...(classCode ? salesInvoiceClassWhere(classCode) : {}),
     ...(filters?.documentKind ? { documentKind: filters.documentKind } : {}),

@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { listCompanySalesNoteParentsAction } from "@/app/(app)/finanzas/facturas/actions";
 import { listCompanySupplierNoteParentsAction } from "@/app/(app)/finanzas/facturas-proveedor/actions";
+import { listProjectSalesNoteParentsAction } from "@/app/(app)/proyectos/[id]/facturas/actions";
+import { listProjectSupplierNoteParentsAction } from "@/app/(app)/proyectos/[id]/facturas-proveedor/actions";
 import { CreateFiscalNoteDialog } from "./create-fiscal-note-dialog";
 
 type ParentInvoice = {
@@ -19,13 +21,18 @@ type ParentInvoice = {
 
 type Props = {
   kind: "CREDIT_NOTE" | "DEBIT_NOTE";
-  scope: "company-ar" | "company-ap";
-};
+} & (
+  | { scope: "company-ar" | "company-ap"; projectId?: never }
+  | { scope: "project-ar" | "project-ap"; projectId: string }
+);
 
 const PAGE_SIZE = 10;
 
-/** Selects a corporate invoice without exposing project documents in Oficina. */
-export function NewCompanyFiscalNoteDialog({ kind, scope }: Props) {
+/** Reuses the note workflow with a reference picker restricted to the current workspace. */
+export function NewFiscalNoteDialog(props: Props) {
+  const { kind, scope, projectId } = props;
+  const isProject = scope === "project-ap" || scope === "project-ar";
+  const isSupplier = scope === "company-ap" || scope === "project-ap";
   const searchId = useId();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -40,10 +47,14 @@ export function NewCompanyFiscalNoteDialog({ kind, scope }: Props) {
     if (!open) return;
     let cancelled = false;
     const timer = setTimeout(() => {
-      const load = scope === "company-ap"
-        ? listCompanySupplierNoteParentsAction
-        : listCompanySalesNoteParentsAction;
-      void load(search, page).then((result) => {
+      const request = scope === "project-ap"
+        ? listProjectSupplierNoteParentsAction(projectId!, search, page)
+        : scope === "project-ar"
+          ? listProjectSalesNoteParentsAction(projectId!, search, page)
+          : scope === "company-ap"
+            ? listCompanySupplierNoteParentsAction(search, page)
+            : listCompanySalesNoteParentsAction(search, page);
+      void request.then((result) => {
         if (cancelled) return;
         if ("error" in result) {
           setError(result.error);
@@ -67,7 +78,7 @@ export function NewCompanyFiscalNoteDialog({ kind, scope }: Props) {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [open, search, page, scope]);
+  }, [open, search, page, scope, projectId]);
 
   return (
     <CreateFiscalNoteDialog
@@ -76,9 +87,9 @@ export function NewCompanyFiscalNoteDialog({ kind, scope }: Props) {
       parentCode={selected?.code ?? ""}
       currency={selected?.currency ?? "ARS"}
       openBalance={selected?.balanceDue}
-      scope={{ type: scope }}
+      scope={isProject ? { type: scope, projectId: projectId! } : { type: scope }}
       triggerLabel={kind === "CREDIT_NOTE" ? "Nueva nota de crédito" : "Nueva nota de débito"}
-      triggerSize="default"
+      triggerSize={isProject ? "sm" : "default"}
       onOpenChange={(next) => {
         setOpen(next);
         if (next) {
@@ -106,9 +117,11 @@ export function NewCompanyFiscalNoteDialog({ kind, scope }: Props) {
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.preventDefault();
               }}
-              placeholder={scope === "company-ap" ? "Buscar por código o proveedor…" : "Buscar por código o cliente…"}
+              placeholder={isSupplier ? "Buscar por código o proveedor…" : "Buscar por código o cliente…"}
             />
-            <p className="text-xs text-muted-foreground">Solo facturas emitidas de empresa, sin proyecto.</p>
+            <p className="text-xs text-muted-foreground">
+              {isProject ? "Solo facturas emitidas de este proyecto." : "Solo facturas emitidas de empresa, sin proyecto."}
+            </p>
           </div>
           {selected ? (
             <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm">
@@ -122,7 +135,7 @@ export function NewCompanyFiscalNoteDialog({ kind, scope }: Props) {
               <p role="alert" className="text-sm text-destructive">{error}</p>
             ) : parents.length === 0 ? (
               <p className="py-2 text-sm text-muted-foreground">
-                {search.trim() ? "No hay facturas emitidas con esta búsqueda." : "No hay facturas emitidas de empresa. Creá y emití la factura antes de registrar una nota."}
+                {search.trim() ? "No hay facturas emitidas con esta búsqueda." : `No hay facturas emitidas ${isProject ? "en este proyecto" : "de empresa"}. Creá y emití la factura antes de registrar una nota.`}
               </p>
             ) : parents.map((parent) => (
               <Button

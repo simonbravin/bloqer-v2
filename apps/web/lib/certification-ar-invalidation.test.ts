@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
+import * as domain from "@bloqer/domain";
 import * as validators from "@bloqer/validators";
 
 const ids = {
@@ -96,6 +97,7 @@ function environment({ note = false, linked = true, failRead = false, failWrite 
     roles: ["OWNER"],
   };
   const dependencies: Record<string, unknown> = {
+    "@bloqer/domain": domain,
     "@bloqer/services": services,
     "@bloqer/validators": validators,
     "@/lib/auth": {

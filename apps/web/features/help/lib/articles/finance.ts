@@ -243,7 +243,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "En Oficina → Finanzas, entrá a Comprobantes de venta para clientes o Facturas y gastos para proveedores. CxC empresa también tiene Ver comprobantes. Estos listados documentales muestran comprobantes de empresa sin proyecto.",
-      "Elegí Nueva nota de crédito o Nueva nota de débito. En Factura de referencia, buscá por código o cliente/proveedor y seleccioná una factura emitida de empresa. También podés abrir una factura emitida y usar las acciones de su detalle; en obra se parte de la factura del proyecto.",
+      "Elegí Nueva nota de crédito o Nueva nota de débito. En Factura de referencia, buscá por código o cliente/proveedor y seleccioná una factura emitida. En Oficina se ofrecen solo facturas de empresa sin proyecto; en Proyecto → Facturas emitidas / Facturas proveedor, los mismos botones ofrecen solo facturas de esa obra. También podés usar las acciones del detalle de la factura.",
       "Nota de crédito: en el diálogo ves el saldo pendiente y elegís el monto (total o parcial). Se crea borrador NC; emitila. Baja el saldo sin caja.",
       "Nota de débito: confirmá en el diálogo; se crea borrador ND (copiá/editá líneas) y al emitir abre CxC/CxP nueva.",
       "En el detalle de la factura padre aparecen las Notas vinculadas. Las acciones (NC/ND, Emitir, Anular) están en el encabezado.",
@@ -259,6 +259,7 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
     ],
     pitfalls: [
       "La NC no puede superar el saldo pendiente.",
+      "Letra del comprobante selecciona A/B/C/E. Para registrar una NC o ND usá Nueva nota de crédito / Nueva nota de débito en el listado; no se eligen dentro de Nueva factura.",
       "IVA y percepción IIBB deben ser cero o positivos también en NC/ND. Corregí los valores negativos de un borrador antes de emitir; no se reescriben documentos históricos. Una retención no se simula con IVA negativo.",
       "No hay NC/ND sin factura de referencia (crédito abierto fuera de v1).",
       "No uses anular factura si solo necesitás corregir un monto: usá NC.",

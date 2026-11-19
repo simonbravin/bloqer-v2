@@ -49,7 +49,7 @@ type Props = {
   triggerLabel?: string;
   triggerVariant?: "outline" | "secondary" | "default";
   triggerSize?: "sm" | "default";
-  /** Company lists select an issued invoice inside the same dialog. */
+  /** Lists select an issued invoice inside the same dialog. */
   parentSelector?: ReactNode;
   onOpenChange?: (open: boolean) => void;
 };
@@ -189,7 +189,9 @@ export function CreateFiscalNoteDialog({
           <DialogTitle>{kindLabel}</DialogTitle>
           <DialogDescription>
             {!parentInvoiceId
-              ? "Elegí una factura emitida de la empresa, sin proyecto, como referencia de la nota."
+              ? scope.type === "project-ap" || scope.type === "project-ar"
+                ? "Elegí una factura emitida de este proyecto como referencia de la nota."
+                : "Elegí una factura emitida de la empresa, sin proyecto, como referencia de la nota."
               : isCredit
               ? `Sobre ${parentCode}. Reducí el saldo sin movimiento de caja. Podés dejar el total o una NC parcial.`
               : `Sobre ${parentCode}. Se crea un borrador que, al emitir, abre una obligación adicional.`}

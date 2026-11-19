@@ -40,6 +40,8 @@ Ver máquinas SalesInvoice y Receivable.
 - AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]).
 - **Oficina → Finanzas → Comprobantes de venta** (`/finanzas/facturas`): listado documental de empresa sin proyecto, con facturas, NC y ND, búsqueda por código/cliente y filtros por tipo/estado. Incluye borradores y notas de crédito sin CxC propia. **Nueva nota de crédito / Nueva nota de débito** permite buscar y elegir una factura de referencia emitida de empresa; el monto de la NC puede ser parcial. Desde CxC empresa, **Ver comprobantes** abre este listado. Las notas también se crean desde el detalle de la factura origen.
 
+- **Proyecto → Facturas emitidas:** los botones **Nueva nota de crédito / Nueva nota de débito** ofrecen solo facturas emitidas de la obra actual, con búsqueda por código/cliente y saldo vigente. La nota conserva el alcance de su factura. **Letra del comprobante** selecciona A/B/C/E y es independiente del tipo de documento.
+
 ### Ingresos corporativos sin proyecto ([D-037], [D-049], [D-051])
 
 - **Con CxC (D-051):** `SalesInvoice` / `Receivable` / `Collection` admiten **`projectId` null**. Flujo en `/finanzas/transacciones` → “Ingreso / cobro” → **Factura / cuenta por cobrar** (`AR_INCOME`): líneas, vencimiento, N° comprobante externo opcional, cobro opcional. Listado y cobranza en `/finanzas/cuentas-por-cobrar`.

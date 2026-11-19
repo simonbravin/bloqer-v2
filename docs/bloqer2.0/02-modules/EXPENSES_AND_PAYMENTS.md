@@ -34,7 +34,8 @@ Impagos y falta de visibilidad de obligaciones futuras (AP aging).
 ## 9. Pantallas y vistas necesarias
 - **Facturas y gastos:** listado documental con columna de **estado de pago** (Payable); desde OPEN/PARTIAL/OVERDUE se puede ir a pagar; alta corporativa en diálogo desde la misma pantalla.
 - **Oficina → Finanzas → Facturas y gastos** (`/finanzas/facturas-proveedor`): **Nueva nota de crédito / Nueva nota de débito** abre un selector de **Factura de referencia**, con búsqueda por código/proveedor y solo facturas emitidas de empresa sin proyecto. La nota queda en borrador para editar y emitir; la NC admite monto total o parcial hasta el saldo vigente. Se conserva el acceso desde el detalle de la factura y el filtro **Tipo de documento** para encontrar las notas.
-- **Alta de factura en proyecto:** formulario con borrador → emitir; opción express **“Emitir y pagar ahora”** (cuenta de tesorería + fecha), visible solo con permiso de tesorería ([D-052]).
+- **Proyecto → Facturas proveedor:** **Nueva nota de crédito / Nueva nota de débito** permite elegir una factura emitida de esa obra como referencia, con búsqueda paginada por código/proveedor. Se conserva el acceso desde el detalle. **Letra del comprobante** selecciona A/B/C/E y es independiente del tipo de documento.
+- **Alta de factura en proyecto:** formulario con borrador → emitir; opción express **"Emitir y pagar ahora"** (cuenta de tesorería + fecha), visible solo con permiso de tesorería ([D-052]).
 - **Adjuntos:** foto/copia de factura en el alta (create-then-upload) y en el detalle (`SUPPLIER_INVOICE`).
 - **Cuentas por pagar:** bandeja de obligaciones ordenadas por vencimiento; “Registrar pago” posterior (parcial o total).
 - **Transacciones:** ledger de **caja operativa** confirmada (cobros/pagos/ingresos/egresos); transferencias entre cuentas propias solo en Tesorería; no hay listado independiente de pagos.
