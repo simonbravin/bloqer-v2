@@ -2798,12 +2798,6 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
     });
   }
 
-  await seedFieldScheduleItems(prisma, {
-    tenantId: tenant.id,
-    docsUserId: docsUser.id,
-    predecessorId: itemIds[1] ?? null,
-  });
-
   const issueDate = new Date("2026-03-01T12:00:00.000Z");
   const lineQty = "10.0000";
   const linePrice = "1500.0000";
@@ -2874,6 +2868,12 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   });
 
   await seedBudgetAndWbs(prisma, seedCtx);
+  // Schedule links require the WBS nodes even on a completely empty database.
+  await seedFieldScheduleItems(prisma, {
+    tenantId: tenant.id,
+    docsUserId: docsUser.id,
+    predecessorId: itemIds[1] ?? null,
+  });
   await prisma.schedule.update({
     where: { projectId: DOCS_GUIDE_IDS.projectId },
     data: { baselineBudgetId: DOCS_GUIDE_IDS.budgetId },

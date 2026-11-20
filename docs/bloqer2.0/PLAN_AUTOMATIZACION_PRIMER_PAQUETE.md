@@ -348,3 +348,19 @@ El intento de trasladar `.next` fue denegado y la copia aislada no logró enlaza
 - Relevamiento del 19/11/2026: las categorías e IDs A1–J4 se preservan en §4. Las capacidades de competidores fueron declaraciones públicas consultadas; no un benchmark con documentación propia ni una decisión de adoptar sus reglas financieras.
 
 Este archivo conserva el seguimiento del primer paquete dentro del repositorio. Las futuras etapas actualizan la matriz y agregan evidencia; no deben borrar el baseline ni convertir el backlog completo en capacidades disponibles.
+
+## 11. Integración y preparación del piloto — 19/11/2026
+
+Owner autorizó continuar con la integración y preparación del piloto propuesto. PR #16 integrado en `main` mediante `895cf09b5a35ae7caf6f11aa850bcd5c72f49422`. Su head `80a0141b` aprobó 2.955 pruebas, lint/tipos, índice de 623 chunks, build de producción y nueve pruebas públicas de Chromium. El despliegue automático del merge se sigue por su estado Vercel; no equiparar el merge con la comprobación del portal o la activación de extracción.
+
+Se incorpora una tanda autenticada independiente con Postgres 16 descartable en CI y las fixtures existentes de documentación. Reutiliza el build y prueba nueve casos en los tres tamaños: login real, carga manual con lectura deshabilitada, descarga de PDF de una OC sintética y cierre de acceso al quitar cookies. La ejecución y su resultado quedan en los checks del PR correspondiente; preparar el arnés no constituye una corrida aprobada.
+
+Este refuerzo no cambia rutas, etiquetas o flujos del producto: sin impacto funcional en Guía/Help/knowledge. No modifica schema, reglas financieras ni dependencias npm. Los servicios externos permanecen deshabilitados en este entorno; no se envían mensajes ni archivos reales.
+
+La primera corrida del PR #17 aprobó las migraciones en una base vacía, pero el seed de documentación falló por FK: `seedFieldScheduleItems` intentaba crear vínculos hacia nodos EDT antes de `seedBudgetAndWbs`. Se corrige el orden del seed existente, sin quitar constraints ni introducir parches SQL. La preparación de fixtures pasa al comienzo de CI para detectar esta clase de error antes del build. Los casos autenticados no se contabilizan como ejecutados en esa corrida fallida.
+
+El control de secretos señaló las contraseñas sintéticas fijas del primer borrador. Se reemplazan por valores aleatorios por ejecución, enmascarados y transmitidos por el entorno del job. Postgres queda ligado a loopback y se detiene al finalizar incluso tras fallos; no se deshabilita el control de secretos ni se modifica ninguna credencial operativa. La entrega se consolida en una rama nueva desde `main`, preservando el borrador anterior sin reescribir su historial.
+
+Para el piloto representativo siguen pendientes: entorno remoto comprobado, cuenta/empresa/obra acordadas, configuración efectiva de IA y almacenamiento, corpus y responsable de revisión. Las variables locales existentes no prueban la configuración de Vercel. La conexión Neon consultada no encontró el proyecto ni el compute de desarrollo; no se creó un proyecto alternativo ni se alteraron datos. Vercel se solicitó como conexión para inspeccionar el entorno en segundo plano.
+
+El checkout local conserva la rama original y sus cambios porque `.git` es de solo lectura en este entorno. La integración remota preserva las entregas previas de `main`; no se hizo reset, limpieza ni sustitución de los cambios locales. P0 distribuido/outbox/Q-093/Q-094/Q-095 y P1b/P1c mantienen los límites y decisiones de §§3 y 7.
