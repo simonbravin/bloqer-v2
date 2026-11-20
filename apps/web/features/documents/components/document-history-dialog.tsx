@@ -6,6 +6,7 @@ import type { DocumentHistoryEntry, DocumentHistoryPage } from "@bloqer/services
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatDateTime } from "@/lib/format";
+import { DocumentHistoryTools } from "./document-history-tools";
 
 const labels: Record<string, string> = {
   "document.created": "Registro creado",
@@ -87,7 +88,7 @@ function HistoryContent({ documentId }: { documentId: string }) {
   );
 }
 
-export function DocumentHistoryDialog({ documentId, fileName }: { documentId: string; fileName: string }) {
+export function DocumentHistoryDialog({ documentId, fileName, canVerifyFile = false }: { documentId: string; fileName: string; canVerifyFile?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -103,6 +104,7 @@ export function DocumentHistoryDialog({ documentId, fileName }: { documentId: st
         </DialogHeader>
         <p className="text-xs text-muted-foreground">Movimientos registrados en Bloqer, del más reciente al más antiguo. Iniciar una carga no confirma que el archivo haya quedado guardado.</p>
         {open ? <HistoryContent key={documentId} documentId={documentId} /> : null}
+        {open ? <DocumentHistoryTools key={`tools-${documentId}`} documentId={documentId} canVerifyFile={canVerifyFile} /> : null}
       </DialogContent>
     </Dialog>
   );
