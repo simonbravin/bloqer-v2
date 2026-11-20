@@ -17,6 +17,7 @@ import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
 import { companyScopeFilter } from "../company-scope";
 import { log } from "../audit/audit.service";
+import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
 import { createSystemNotification } from "../notifications/notification.service";
 import { filterNotificationAudienceForScope, resolveNotificationAudience } from "../notifications/notification-audience.service";
 import {
@@ -70,6 +71,16 @@ export {
 } from "./document-delete-policy";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+
+function requireConfiguredFileStorage(configured: boolean): void {
+  if (!configured) throw new ServiceError("CONFLICT",
+    "No se pudo guardar el archivo: el almacenamiento no está disponible. Conservá el original e intentá de nuevo cuando se restablezca.");
+}
+
+async function withUploaderNames(docs: DocumentAttachmentView[], ctx: ServiceContext): Promise<DocumentAttachmentView[]> {
+  const names = await resolveUserDisplayNames(docs.map((doc) => doc.uploadedBy), ctx);
+  return docs.map((doc) => ({ ...doc, uploadedByName: names.get(doc.uploadedBy) }));
+}
 
 /**
  * Trust extension + allowlist, not a client-claimed MIME alone.
@@ -132,6 +143,7 @@ export type DocumentAttachmentView = {
   /** Optional parent/receivable route for an authorized detail or confirmed upload. */
   relatedEntityId?: string;
   uploadedBy:       string;
+  uploadedByName?:  string;
   createdAt:        string;
   updatedAt:        string;
   /** Server-computed: archive/restore/delete/confirm allowed for this row given `linkedEntityType` + roles. */
@@ -416,6 +428,7 @@ export async function uploadDocument(
 
   const contentSha256 = sha256Hex(content);
   const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx);
+  requireConfiguredFileStorage(configured);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
@@ -429,7 +442,7 @@ export async function uploadDocument(
       where: { tenantId: ctx.tenantId, idempotencyKey },
     });
   const payloadsMatch = (existing: DocumentAttachment) =>
-    uploadIntentMatches(existing, input, plan, folderId, ctx) && documentReplayMatches(existing, {
+    existing.storageProvider === "R2" && uploadIntentMatches(existing, input, plan, folderId, ctx) && documentReplayMatches(existing, {
       contentSha256,
       linkedEntityType: plan.linkedEntityType,
       linkedEntityId: plan.linkedEntityId,
@@ -558,7 +571,7 @@ async function uploadResponse(doc: DocumentAttachment, configured: boolean, crea
 
 /**
  * Direct-to-R2 upload (browser PUT). Avoids Vercel’s 4.5 MB function body limit.
- * When R2 is not configured, creates ACTIVE PLACEHOLDER metadata (no uploadUrl).
+ * A file upload requires storage; metadata alone must never count as a saved file.
  */
 export async function initiateDocumentUpload(
   input: InitiateUploadInput,
@@ -582,6 +595,7 @@ export async function initiateDocumentUpload(
   }
 
   const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx);
+  requireConfiguredFileStorage(configured);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
@@ -597,6 +611,7 @@ export async function initiateDocumentUpload(
     });
 
   const payloadsMatch = (existing: DocumentAttachment) =>
+    existing.storageProvider === "R2" &&
     (existing.status === "UPLOADING" || existing.status === "ACTIVE") &&
     uploadIntentMatches(existing, { ...input, mimeType }, plan, folderId, ctx);
 
@@ -938,7 +953,8 @@ export async function getDocumentById(id: string, ctx: ServiceContext): Promise<
   }
   await requireDocumentLinkAccess(doc, ctx);
   const route = await resolveDocumentRouteTarget(doc);
-  return { ...serialize(doc, ctx, await getTenantModuleGate(ctx)), relatedEntityId: route.relatedEntityId };
+  const names = await resolveUserDisplayNames([doc.uploadedBy], ctx);
+  return { ...serialize(doc, ctx, await getTenantModuleGate(ctx)), uploadedByName: names.get(doc.uploadedBy), relatedEntityId: route.relatedEntityId };
 }
 
 export async function listProjectDocuments(
@@ -980,7 +996,7 @@ export async function listProjectDocuments(
 
   const visible = await filterProjectDocumentsByLink(docs, project, ctx);
   const gate = await getTenantModuleGate(ctx);
-  return visible.map((doc) => serialize(doc, ctx, gate));
+  return withUploaderNames(visible.map((doc) => serialize(doc, ctx, gate)), ctx);
 }
 
 export async function listEntityDocuments(
@@ -1038,9 +1054,9 @@ export async function listEntityDocuments(
   });
   const validCompanies = new Set(companyRows.map(({ id }) => id));
   const gate = await getTenantModuleGate(ctx);
-  return docs.filter((doc) => documentMatchesScope(doc, parent, ctx) &&
+  return withUploaderNames(docs.filter((doc) => documentMatchesScope(doc, parent, ctx) &&
     (parent.companyId !== null || doc.companyId === null || validCompanies.has(doc.companyId)))
-    .map((doc) => serialize(doc, ctx, gate));
+    .map((doc) => serialize(doc, ctx, gate)), ctx);
 }
 
 /**

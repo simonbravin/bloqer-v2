@@ -6,7 +6,7 @@ import type { PrismaClient } from "@bloqer/database";
 const name = "bloqer_audit_guard_test";
 const validUrl = `postgresql://test:synthetic@ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech/${name}`;
 function withEnv(t: TestContext) {
-  const keys = ["DATABASE_URL", "DIRECT_URL", "BLOQER_AUDIT_TEST_DATABASE"] as const;
+  const keys = ["DATABASE_URL", "DIRECT_URL", "BLOQER_AUDIT_TEST_DATABASE", "CI"] as const;
   const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
   t.after(() => {
     for (const key of keys) {
@@ -39,4 +39,20 @@ test("fixture guard verifies the effective SQL database before writes", async (t
   withEnv(t);
   const db = { $queryRaw: async () => [{ database: "neondb" }] } as unknown as PrismaClient;
   await assert.rejects(() => assertAuditDatabaseIdentity(db));
+});
+
+test("CI fixtures allow only the named disposable loopback database", (t) => {
+  withEnv(t);
+  process.env.CI = "true";
+  process.env.BLOQER_AUDIT_TEST_DATABASE = "bloqer_audit_documents_ci";
+  const local = "postgresql://bloqer_ci:synthetic@127.0.0.1:5432/bloqer_audit_documents_ci";
+  process.env.DATABASE_URL = process.env.DIRECT_URL = local;
+  assert.equal(assertAuditFixtureDatabase(), "bloqer_audit_documents_ci");
+  for (const bad of [local.replace("127.0.0.1", "production.example.test"), local.replace("5432", "5433"), local.replace("documents_ci", "other"), `${local}?host=production.example.test`]) {
+    process.env.DIRECT_URL = bad;
+    assert.throws(() => assertAuditFixtureDatabase());
+  }
+  process.env.DIRECT_URL = local;
+  delete process.env.CI;
+  assert.throws(() => assertAuditFixtureDatabase());
 });

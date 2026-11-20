@@ -1,5 +1,13 @@
 # Documentos adjuntos
 
+## Conservación y trazabilidad de cargas (2026-11-20)
+
+Las cargas de archivos requieren R2 disponible: `uploadDocument` e `initiateDocumentUpload` rechazan la operación antes de crear metadata si no puede conservarse el original. El cliente solo acepta un documento R2 confirmado; un registro PLACEHOLDER nunca equivale a una carga exitosa. Los registros históricos y la API explícita de metadata conservan su semántica, sin archivo recuperable.
+
+`uploadedBy`, `createdAt` y `updatedAt` ya existentes respaldan autor, fecha/hora de registro y última modificación. El nombre del autor se resuelve en lote, después de autorizar documentos y dentro del tenant; no se publican claves de almacenamiento. Las listas, tarjetas, adjuntos móviles y detalle muestran esos datos. La fecha de registro no es la fecha EXIF de captura de una foto. Los eventos de inicio, confirmación y archivo permanecen en auditoría; archivar evidencia operativa conserva sus bytes y no concede permisos adicionales.
+
+Se mantienen permisos por tenant, empresa, proyecto y entidad asociada, incluyendo los alcances compartidos documentados. Descarga y preview requieren autorización y usan URLs temporales. No se incorporan versionado, antivirus, retención inmutable ni una política de backup en esta entrega.
+
 > Ver [D-113](../00-product/DECISION_LOG.md) — carpetas SYSTEM + USER por proyecto; auto-filing operativo.
 
 ## 1. Objetivo

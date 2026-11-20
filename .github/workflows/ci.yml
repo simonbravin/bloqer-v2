@@ -65,6 +65,17 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec tsx src/seed.ts
 
+      - name: Document isolation and provenance on disposable SQL
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_documents_ci
+          DIRECT_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_documents_ci
+          BLOQER_AUDIT_TEST_DATABASE: bloqer_audit_documents_ci
+          BLOQER_AUDIT_LIVE: "1"
+        run: |
+          docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_documents_ci
+          pnpm --filter @bloqer/database exec prisma migrate deploy
+          pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
+
       - name: Lint
         run: pnpm lint
 

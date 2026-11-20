@@ -955,6 +955,10 @@ flowchart LR
 
 ### 8.4 Procedimiento — Documentos de obra
 
+**Conservación y trazabilidad:** una nueva carga de archivo requiere almacenamiento disponible y confirmación antes de considerarse guardada. Si falla, conservá el original y reintentá; registrar solo el nombre no equivale a guardar el archivo. Los registros históricos con **Archivo no almacenado** requieren recuperar el original por fuera de Bloqer y cargarlo nuevamente.
+
+En listas, tarjetas y adjuntos (también desde el celular), **Registrado por** muestra el autor y la fecha y hora de registro en Bloqer. No representa la fecha de captura de la foto. El detalle muestra además la última actualización. La descarga conserva el original; archivar adjuntos operativos conserva su evidencia. El acceso a lista, vista previa y descarga exige permisos para la empresa, la obra y el comprobante asociado. Los documentos compartidos dentro del tenant conservan su alcance documentado.
+
 **Ruta:** Operación → **Documentos** → `/proyectos/[id]/documentos`
 
 1. A la izquierda ves el **árbol de carpetas** de la obra. Hay carpetas de **sistema** (Libro de Obra, Solicitudes de compra, Órdenes de compra, Cotizaciones, Recepciones, Facturas, Certificaciones, Subcontratos, Presupuestos, **Planos**, **General**) que se crean solas y **no se renombran ni borran**. Los adjuntos que subís desde un parte, SC, OC, factura, etc. **caen solos** en la carpeta correspondiente.
@@ -1940,7 +1944,7 @@ flowchart LR
 | **Multi‑moneda en tesorería** | Cobros, pagos y transferencias exigen misma moneda. Contabilidad: bloques por moneda sin consolidación FX. |
 | **Valuación de inventario** | Sin política FIFO/promedio configurable; por eso el costeo de stock no auto-asienta aún. |
 | **Impuestos / retenciones** | IVA por línea + **Percepción IIBB** a nivel documento (alícuota editable, default 3% sobre neto [D-112]); otras retenciones manuales, sin módulo dedicado. |
-| **Documentos** | Si R2 no está configurado: metadata + badge **PLACEHOLDER**; la descarga explica el límite. |
+| **Documentos** | Si el almacenamiento no está disponible, las nuevas cargas se bloquean. Los registros históricos **PLACEHOLDER** no tienen original descargable. |
 | **Lectura asistida de facturas** | Solo cuando esté habilitada: alta manual de factura normal ARS, PDF/JPEG/PNG/WebP hasta 3 MiB, revisión y borrador. Sin deduplicación fiscal ni lectura para OC/NC/ND/otras monedas. Ver §12.2. |
 | **Compartir OC** | PDF individual desde la ficha y compartir archivo mediante el dispositivo cuando esté disponible. No hay envío automático por WhatsApp ni confirmación de entrega/aceptación del proveedor. Ver §9.2. |
 | **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |

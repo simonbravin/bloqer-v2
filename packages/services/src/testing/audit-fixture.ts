@@ -9,8 +9,12 @@ export function assertAuditFixtureDatabase(): string {
   for (const value of [process.env.DATABASE_URL, process.env.DIRECT_URL]) {
     assert.ok(value, "Both database URLs must be explicit; no .env fallback");
     const url = new URL(value);
-    assert.equal(url.hostname, "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
-      "Audit fixtures are restricted to the verified development compute");
+    const isolatedCI = process.env.CI === "true" &&
+      expected === "bloqer_audit_documents_ci" && url.hostname === "127.0.0.1" && url.port === "5432" &&
+      url.username === "bloqer_ci" && url.search === "";
+    assert.ok(isolatedCI || url.hostname === "ep-curly-math-aptjniho.c-7.us-east-1.aws.neon.tech",
+      "Audit fixtures require the verified development compute or the disposable CI loopback database");
+    assert.ok(url.protocol === "postgresql:" || url.protocol === "postgres:");
     assert.equal(decodeURIComponent(url.pathname.slice(1)), expected,
       "The URL must select the explicitly named isolated audit database");
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate } from "@/lib/format";
+import { DocumentProvenance } from "./document-provenance";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
 import type { DocumentAttachmentView } from "@bloqer/services";
 import { DocumentCategoryBadge } from "./document-category-badge";
@@ -50,8 +50,9 @@ export function DocumentCards({
             <DocumentStorageBadge storageProvider={doc.storageProvider} />
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            {fmtSize(doc.sizeBytes)} · {formatDate(doc.createdAt)}
+            {fmtSize(doc.sizeBytes)}
           </p>
+          <DocumentProvenance doc={doc} />
           <div className="mt-3">
             <DocumentLibraryActions doc={doc} projectId={projectId} className="justify-start" />
           </div>
