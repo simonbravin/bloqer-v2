@@ -346,6 +346,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Lista, detalle y enlaces directos respetan el acceso a la empresa, la obra y el comprobante asociado.",
       "Registrado por muestra quién inició la carga y la fecha y hora de registro en Bloqer, tanto en documentos como en fotos. No es la fecha en que se tomó la foto. El detalle también muestra la última actualización.",
       "El icono Historial abre los movimientos del archivo: registro, inicio y confirmación de carga, archivo, restauración y movimiento de carpeta. Cada movimiento muestra responsable, fecha y hora. Ver anteriores permite seguir consultando el historial.",
+      "Dentro de Historial, Exportar historial CSV descarga los movimientos autorizados completos, aunque todavía no hayas abierto todas las páginas. Incluye archivo, empresa/obra, evento, responsable y fecha/hora en UTC; no incluye los archivos originales. Si supera 5.000 movimientos, informa el límite sin descargar una lista incompleta.",
+      "Verificar archivo guardado comprueba que el archivo siga accesible y que su tamaño coincida. Si existe una huella original, compara también el contenido; si no, lo indica. Está disponible para archivos guardados activos o archivados y muestra cuándo se verificó. No crea un backup ni cambia el estado del documento.",
       "Descargar conserva el archivo original. Archivar un adjunto operativo no lo borra: sigue disponible con los permisos de su empresa, obra y comprobante.",
     ],
     pitfalls: [
@@ -367,6 +369,9 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "historial del archivo",
       "carga confirmada",
       "ver anteriores",
+      "exportar historial CSV",
+      "verificar archivo guardado",
+      "integridad",
       "original",
       "descargar",
       "icono ojo",

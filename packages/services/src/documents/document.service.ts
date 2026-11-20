@@ -42,6 +42,7 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 import { assertUploadContentMatchesDeclaredMime } from "./sniff-upload-content";
+import { verifyDocumentBytes } from "./document-integrity";
 import {
   canSoftDeleteDocumentByLink,
   LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE,
@@ -869,6 +870,17 @@ export async function getDocumentFileBytes(
   id: string,
   ctx: ServiceContext,
 ): Promise<DocumentFileBytes> {
+  const file = await readVerifiedDocument(id, ctx);
+  return { body: file.body, mimeType: file.mimeType, originalFileName: file.originalFileName, sizeBytes: file.sizeBytes };
+}
+
+/** Explicit read-only recovery check; does not restore status or replace missing bytes. */
+export async function verifyStoredDocument(id: string, ctx: ServiceContext) {
+  const { sizeBytes, checksumVerified } = await readVerifiedDocument(id, ctx);
+  return { sizeBytes, checksumVerified, checkedAt: new Date().toISOString() };
+}
+
+async function readVerifiedDocument(id: string, ctx: ServiceContext): Promise<DocumentFileBytes & { checksumVerified: boolean }> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
@@ -886,12 +898,14 @@ export async function getDocumentFileBytes(
 
   assertDocumentStorageObject(doc);
 
-  const { body } = await getObjectBytes(doc.storageKey);
-  if (body.length !== doc.sizeBytes || body.length > MAX_SIZE_BYTES) {
-    throw new ServiceError("CONFLICT", "El tamaño del archivo almacenado no coincide");
+  if (!Number.isSafeInteger(doc.sizeBytes) || doc.sizeBytes <= 0 || doc.sizeBytes > MAX_SIZE_BYTES) {
+    throw new ServiceError("CONFLICT", "El tamaño registrado del archivo no es válido");
   }
+  const { body } = await getObjectBytes(doc.storageKey);
+  const checksumVerified = verifyDocumentBytes(body, doc.sizeBytes, doc.contentSha256);
   return {
     body,
+    checksumVerified,
     mimeType: doc.mimeType,
     originalFileName: doc.originalFileName,
     sizeBytes: doc.sizeBytes,

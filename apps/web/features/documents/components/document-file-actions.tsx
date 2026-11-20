@@ -33,7 +33,7 @@ export function DocumentFileActions({
   className,
 }: DocumentFileActionsProps) {
   const gallery = useDocumentImageGallery();
-  const history = status !== "DELETED" ? <DocumentHistoryDialog documentId={documentId} fileName={originalFileName} /> : null;
+  const history = status !== "DELETED" ? <DocumentHistoryDialog documentId={documentId} fileName={originalFileName} canVerifyFile={storageProvider === "R2" && (status === "ACTIVE" || status === "ARCHIVED")} /> : null;
   const canAccess = canAccessDocumentFile({ storageProvider, status });
   if (!canAccess) {
     if (

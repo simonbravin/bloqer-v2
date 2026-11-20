@@ -399,3 +399,12 @@ Los diez bloques son las categorías A–J del relevamiento original, con cuatro
 3. Cerrar A2/B1/J3/J4 con esa evidencia; mantener visibles P0 distribuido/outbox/Q-093/Q-094/Q-095. Después abrir P1b WhatsApp y P1c audio con un alcance propio.
 
 Esta actualización es de preparación operativa y seguimiento. No incorpora una nueva funcionalidad financiera ni acredita un piloto ejecutado. Cada próximo cierre debe actualizar este registro con resultados, límites y el siguiente paso de los diez bloques.
+
+
+## 13. Continuación de bloques 1, 9 y 10 — 20/11/2026
+
+La auditoría de publicación confirmó los 174 archivos locales contra main b6bf7b54 y su despliegue Vercel exitoso. Exportaciones, NC/ND y documentación estaban integradas; las referencias locales de Git siguen atrasadas por el acceso de solo lectura a .git. No hay que volver a publicar el árbol antiguo.
+
+Corte en curso: exportación CSV del historial autorizado y comprobación de recuperación del archivo guardado, reutilizando R2, permisos y campos existentes. Restore permanece ARCHIVED → ACTIVE, con el mismo original y auditoría; no equivale a recuperación de un borrado físico. Sin migraciones ni servicios externos nuevos. Guía, ayuda e índice AI deben acompañar el cambio.
+
+Próximos cortes: 1/A, versionado simple que conserve cada original y permita seguir sus revisiones; 9/I, validación del piloto en el entorno existente; 10/J, backup independiente y ensayo de recuperación con alcance y retención acordados. No dar estos puntos por cerrados con una verificación de bytes. Después siguen 2/B WhatsApp, 3/C avisos y 4/D audio, con 5–8 conservados en la matriz de §12.

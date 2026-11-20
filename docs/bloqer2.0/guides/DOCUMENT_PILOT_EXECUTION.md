@@ -163,3 +163,10 @@ Se volvió a comprobar el acceso disponible: Neon devuelve 404 para crimson-dew-
 Siguientes pasos de 1/A, 9/I y 10/J: acceso efectivo al preview para cerrar el recorrido Demo; exportación del historial; versionado simple Q-008 y política de recuperación con prueba de restauración de objetos. La restauración de un adjunto archivado ya se verifica, pero no acredita recuperación de un objeto físicamente perdido. Luego siguen 2/B y 3/C (WhatsApp y avisos), 4/D (audio), y 5/E a 8/H según el plan.
 
 
+
+
+## Exportación y comprobación de recuperación — 20/11/2026
+
+Owner autorizó retomar los bloques 1/A, 9/I y 10/J tras comprobar que las entregas anteriores están integradas en main y publicadas. Este corte agrega CSV completo del historial autorizado y comprobación explícita de accesibilidad, tamaño y huella original cuando existe. No crea estados, tablas, dependencias ni eventos nuevos; no ejecuta restauraciones ni escribe datos de clientes. El versionado simple con migración y la política de backup/recuperación siguen como siguiente corte; verificar un objeto no acredita una copia independiente.
+
+Validación preparada: pruebas de bytes alterados aun con igual tamaño; guardas previas a R2; respuestas HTTP privadas; SQL aislado de empresa/tenant/proyecto, exportación más allá de la primera página, neutralización de fórmulas, límite sin truncamiento y restauración concurrente con un solo evento. Se agregan recorridos de navegador para endpoints sin sesión y documentos inexistentes. Las comprobaciones locales y la corrida completa de CI se informan en el PR; esta sección no convierte pruebas preparadas en ejecutadas ni cierra el piloto remoto.
