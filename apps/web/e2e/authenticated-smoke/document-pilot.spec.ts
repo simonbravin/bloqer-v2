@@ -37,6 +37,38 @@ test("authenticated manual invoice entry remains usable while extraction is disa
   await expect(dialog).toHaveCount(0);
 });
 
+test("manual company invoice persists as a draft after reload without issuing or paying", async ({ page }, testInfo) => {
+  // Real server action and disposable Postgres; no AI, storage or production credentials.
+  const description = `PRUEBA CI - borrador ${testInfo.project.name}`;
+  await page.goto("/finanzas/facturas-proveedor");
+  await page.getByRole("button", { name: "Nueva factura", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Nueva factura de gasto", exact: true });
+  await dialog.getByLabel("A quién se le paga", { exact: true }).click();
+  await page.getByRole("option").first().click();
+  await dialog.getByLabel("Letra del comprobante *", { exact: true }).click();
+  await page.getByRole("option", { name: "Factura C", exact: true }).click();
+  await dialog.getByLabel("Fecha de emisión", { exact: true }).fill("2026-11-20");
+  await dialog.getByLabel("Fecha de vencimiento", { exact: true }).fill("2026-12-20");
+  await dialog.getByLabel("Descripción", { exact: true }).fill(description);
+  await dialog.getByLabel("Cantidad", { exact: true }).fill("2");
+  await dialog.getByLabel("P. unit.", { exact: true }).fill("100");
+  await dialog.getByRole("button", { name: "Crear factura", exact: true }).click();
+  await expect(page).toHaveURL(/\/finanzas\/facturas-proveedor\/[0-9a-f-]{36}$/, { timeout: 30_000 });
+  const draftUrl = page.url();
+  await expect(page.getByText(description, { exact: true })).toHaveCount(1);
+  await expect(page.getByText(description, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Emitir factura", exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page).toHaveURL(draftUrl);
+  // Wait for the reload's streamed markup to settle, without hiding duplicate rows.
+  await expect(page.getByText(description, { exact: true })).toHaveCount(1);
+  await expect(page.getByText(description, { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Emitir factura", exact: true })).toBeVisible();
+  await testInfo.attach("persisted-manual-draft", {
+    body: await page.screenshot({ fullPage: true }), contentType: "image/png",
+  });
+});
+
 test("a signed-in user can prepare and download the existing order PDF", async ({ page }, testInfo) => {
   await page.goto(orderPath);
   await page.getByRole("button", { name: "PDF para proveedor", exact: true }).click();
