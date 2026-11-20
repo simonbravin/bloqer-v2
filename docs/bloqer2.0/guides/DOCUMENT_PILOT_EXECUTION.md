@@ -150,3 +150,16 @@ Referencias de alcance revisadas: [OWASP File Upload](https://cheatsheetseries.o
 
 Pendientes de los bloques 1/A, 9/I y 10/J: cerrar P-01 a P-07 en sesión demo acreditada; visibilidad del historial completo/exportación; versionado (Q-008), política de conservación y prueba de recuperación/backup; evaluación de antivirus antes de agregar un proveedor. No se asume que R2 sea un backup ni almacenamiento inmutable. Luego siguen 2/B y 3/C (WhatsApp y avisos), 4/D (audio), y 5/E a 8/H según el orden acordado. Ningún mensaje a terceros ni dato de clientes productivos se modifica en estas pruebas.
 
+## Historial documental — siguiente entrega, 2026-11-20
+
+La entrega anterior quedó publicada mediante PR #22, merge 226e0a7382fe2422f10874f2a066f811cf0df160. CI aprobó 2.965 pruebas unitarias, 18 pruebas SQL, 21 recorridos de navegador y build de 112 páginas. Producción Vercel 5vpQfDG9jWUJBW9VMexAY3AdSs22 confirmó éxito.
+
+Esta etapa expone el historial existente por documento, con autor, fecha/hora y acción, en páginas de 50 eventos. El acceso se comprueba de nuevo por tenant, empresa, proyecto y entidad padre en cada consulta. La respuesta no incluye payloads, IP ni información de almacenamiento. Se consultan también las cargas incompletas, diferenciando inicio de confirmación. Se corrige el texto que prometía limpieza automática de subidas: el servicio de limpieza todavía no tiene cron conectado.
+
+Se amplía la suite SQL con paginación bajo timestamps iguales, rechazo de cursores de otro documento, exclusión de ámbitos/eventos ajenos y comprobación de datos no expuestos. El smoke público verifica que la API exige sesión y prohíbe caché pública. No hay nuevas tablas, estados ni migraciones.
+
+Se volvió a comprobar el acceso disponible: Neon devuelve 404 para crimson-dew-50407633 y Vercel devuelve 404 para el deployment conocido del proyecto Bloqer. No hay contraseña DOCS/E2E/SEED local. Por eso P-01 a P-07 permanecen pendientes como recorrido integral remoto. No se cambia ninguna contraseña ni se intenta usar producción como reemplazo del preview.
+
+Siguientes pasos de 1/A, 9/I y 10/J: acceso efectivo al preview para cerrar el recorrido Demo; exportación del historial; versionado simple Q-008 y política de recuperación con prueba de restauración de objetos. La restauración de un adjunto archivado ya se verifica, pero no acredita recuperación de un objeto físicamente perdido. Luego siguen 2/B y 3/C (WhatsApp y avisos), 4/D (audio), y 5/E a 8/H según el plan.
+
+

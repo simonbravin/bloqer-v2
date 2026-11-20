@@ -9,6 +9,7 @@ import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { withSyntheticStorageSigning } from "../testing/storage-signing-fixture";
 import { ServiceError, type ServiceContext } from "../types";
 import { createDocumentFolder, listProjectDocumentFolders, moveDocumentFolder } from "./document-folder.service";
+import { getDocumentHistory } from "./document-history.service";
 import {
   archiveDocument,
   confirmDocumentUpload,
@@ -131,6 +132,8 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     assert.equal((await getDocumentById(foreign.id, sibling)).id, foreign.id);
     for (const ctx of [reader, owner]) await assert.rejects(getDocumentDownloadUrl(foreign.id, ctx), denied);
     await assert.rejects(getDocumentById(own.id, reader), denied);
+    await assert.rejects(getDocumentHistory(own.id, reader), denied);
+    await assert.rejects(getDocumentHistory(foreign.id, owner), denied);
     await assert.rejects(archiveDocument(foreign.id, owner), denied);
     await assert.rejects(initiateDocumentUpload(invoiceUpload(invoiceB, projectId), owner), denied);
   });
@@ -204,8 +207,10 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     const doc = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: companyA });
     const outsider = { ...reader, actorUserId: sibling.actorUserId };
     await assert.rejects(getDocumentById(doc.id, { ...owner, tenantId: randomUUID() }), missing);
+    await assert.rejects(getDocumentHistory(doc.id, { ...owner, tenantId: randomUUID() }), missing);
     await assert.rejects(getDocumentById(doc.id, outsider), denied);
     await assert.rejects(getDocumentDownloadUrl(doc.id, outsider), denied);
+    await assert.rejects(getDocumentHistory(doc.id, outsider), denied);
     const listed = await listProjectDocuments(projectId, {}, owner);
     assert.equal(listed.find(({ id }) => id === doc.id)?.uploadedByName, "Responsable de prueba");
   });
@@ -222,5 +227,37 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     await restoreDocument(original.id, owner);
     assert.equal((await getDocumentById(original.id, owner)).status, "ACTIVE");
     assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: original.id, action: { in: ["document.archived", "document.reactivated"] } } }), 2);
+    const history = await getDocumentHistory(original.id, owner);
+    assert.deepEqual(new Set(history.entries.map((entry) => entry.action)), new Set(["document.archived", "document.reactivated"]));
+    assert.ok(history.entries.every((entry) => entry.actorName === "Responsable de prueba" && Number.isFinite(Date.parse(entry.createdAt))));
+  });
+
+  it("paginates tied timestamps without losing events and excludes mismatched audit scopes and private payloads", async () => {
+    const doc = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: companyA });
+    const other = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: companyA });
+    const ids = Array.from({ length: 53 }, () => randomUUID());
+    const foreignCursor = randomUUID();
+    const base = {
+      tenantId, projectId, companyId: companyA, entityType: "DocumentAttachment", entityId: doc.id,
+      actorUserId: owner.actorUserId, action: "document.archived", createdAt: new Date("2026-11-20T10:00:00Z"),
+      after: { storageKey: "private-fixture-key", status: "ARCHIVED" }, ipAddress: "192.0.2.1",
+    };
+    await prisma.auditLog.createMany({ data: [
+      ...ids.map((id) => ({ ...base, id })),
+      { ...base, id: foreignCursor, entityId: other.id },
+      { ...base, id: randomUUID(), companyId: companyB },
+      { ...base, id: randomUUID(), action: "internal.private_event" },
+    ] });
+    const first = await getDocumentHistory(doc.id, owner);
+    assert.equal(first.entries.length, 50);
+    assert.ok(first.nextCursor);
+    const second = await getDocumentHistory(doc.id, owner, first.nextCursor);
+    assert.equal(second.entries.length, 3);
+    assert.equal(second.nextCursor, null);
+    assert.deepEqual(new Set([...first.entries, ...second.entries].map((entry) => entry.id)), new Set(ids));
+    assert.deepEqual(Object.keys(first.entries[0]!).sort(), ["action", "actorName", "createdAt", "id"]);
+    assert.doesNotMatch(JSON.stringify(first), /private-fixture-key|192\.0\.2\.1|storageKey|ipAddress/);
+    await assert.rejects(getDocumentHistory(doc.id, owner, foreignCursor), { code: "VALIDATION" });
+    await assert.rejects(getDocumentHistory(doc.id, owner, "invalid-cursor"), { code: "VALIDATION" });
   });
 });
