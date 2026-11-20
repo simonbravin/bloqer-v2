@@ -12,6 +12,20 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: bloqer_ci
+          POSTGRES_PASSWORD: bloqer-ci-disposable-only
+          POSTGRES_DB: bloqer_ci_pilot
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bloqer_ci -d bloqer_ci_pilot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v5
 
@@ -72,6 +86,37 @@ jobs:
           path: |
             apps/web/playwright-report/
             apps/web/test-results/public-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Prepare disposable authenticated fixtures
+        working-directory: packages/database
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:bloqer-ci-disposable-only@127.0.0.1:5432/bloqer_ci_pilot
+          DIRECT_URL: postgresql://bloqer_ci:bloqer-ci-disposable-only@127.0.0.1:5432/bloqer_ci_pilot
+          SEED_USER_EMAIL: pilot-ci@example.invalid
+          SEED_USER_PASSWORD: bloqer-ci-synthetic-user-only
+          DOCS_USER_EMAIL: pilot-ci@example.invalid
+          DOCS_DEMO_SEED: "1"
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/seed.ts
+
+      - name: Authenticated smoke with disposable Postgres
+        working-directory: apps/web
+        env:
+          E2E_USER_EMAIL: pilot-ci@example.invalid
+          E2E_USER_PASSWORD: bloqer-ci-synthetic-user-only
+        run: pnpm test:e2e:authenticated
+
+      - name: Upload authenticated smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-smoke-${{ github.sha }}
+          path: |
+            apps/web/playwright-report-authenticated/
+            apps/web/test-results/authenticated-smoke/
           if-no-files-found: ignore
           retention-days: 7
 

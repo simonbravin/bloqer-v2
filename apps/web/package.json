@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import ../../packages/services/node_modules/tsx/dist/loader.mjs --test \"components/**/*.test.ts\" \"features/**/*.test.ts\" \"hooks/**/*.test.ts\" \"lib/**/*.test.ts\" && node --conditions react-server --test \"features/**/*.test.mjs\"",
     "test:e2e": "playwright test",
-    "test:e2e:public": "playwright test --config playwright-smoke.config.ts"
+    "test:e2e:public": "playwright test --config playwright-smoke.config.ts",
+    "test:e2e:authenticated": "playwright test --config playwright-authenticated.config.ts"
   },
   "dependencies": {
     "@bloqer/auth": "workspace:*",
