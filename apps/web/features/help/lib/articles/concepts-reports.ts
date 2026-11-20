@@ -872,6 +872,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Desde una obra (Planificación → Reportes → Envíos programados) el catálogo es solo de proyecto; el parte diario se crea desde Configuración → Reportes programados (empresa).",
       "En el detalle de un envío Activo, usá **Enviar ahora** y confirmá. Una configuración compartida de alcance global se modifica desde una sesión con alcance global.",
       "En **Reportes de esta configuración** ves la selección guardada. **Reintentar fallidos** usa la fecha original de un fallo confirmado. Si figura **Sin confirmar**, revisá el historial. **Enviar ahora** inicia una entrega nueva con los permisos vigentes.",
+      "Enviado significa que el proveedor de correo aceptó el envío; Correcto indica que aceptó los nuevos envíos de la corrida. No confirman entrega ni lectura. Sin confirmar indica que no se pudo confirmar la aceptación y queda fuera de Reintentar fallidos.",
       "Presupuesto vs real ya no se programa: usá EDT y costos.",
     ],
     effects: [
@@ -886,6 +887,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Próxima ejecución se muestra en la zona del envío (ej. 23:00 Buenos Aires), no en UTC del servidor.",
       "En Vercel Hobby el cron de programados corre una vez al día (05:05 UTC): un envío vencido puede demorar hasta esa pasada. Usá Enviar ahora para no esperar.",
       "Enviar ahora solo está disponible si el envío está Activo (no pausado ni eliminado).",
+      "Sin confirmar no demuestra que el correo no salió. Revisá el historial antes de iniciar otra entrega con Enviar ahora.",
     ],
     relatedSlugs: [
       "hub-reportes-de-obra",
@@ -905,6 +907,9 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "libro de obra email",
       "enviar ahora",
       "envio manual",
+      "sin confirmar",
+      "enviado no recibido",
+      "aceptacion del correo",
     ],
     guideRef: "§13.2 · [D-100]",
   },

@@ -30,6 +30,10 @@ import {
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
 import {
+  resolveSupplierInvoiceDraftCreation,
+  type SupplierInvoiceDraftCreationResult,
+} from "@/features/ap/lib/supplier-invoice-draft-creation";
+import {
   revalidateProjectCostAndFinancePaths,
   revalidateOperationalFinancePaths,
   revalidateTreasuryPaths,
@@ -170,18 +174,17 @@ export async function registerProjectApExpenseAction(
 export async function createSupplierInvoiceAction(
   projectId: string,
   data: Omit<CreateSupplierInvoiceInput, "projectId"> & { projectId?: string | null },
-): Promise<{ id: string } | { error: string }> {
+): Promise<SupplierInvoiceDraftCreationResult> {
   const ctx = await getCtx();
   const payload: CreateSupplierInvoiceInput = { ...data, projectId };
   const parsed = createSupplierInvoiceSchema.safeParse(payload);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
-  try {
-    const inv = await createSupplierInvoice(parsed.data, ctx);
-    revalidateProjectApPaths(projectId);
-    return { id: inv.id };
-  } catch (err) {
-    return handle(err);
-  }
+  return resolveSupplierInvoiceDraftCreation({
+    create: () => createSupplierInvoice(parsed.data, ctx),
+    revalidate: () => revalidateProjectApPaths(projectId),
+    // This service raises business rejections before commit or within its transaction.
+    rejectionMessage: (error) => error instanceof ServiceError ? error.message : null,
+  });
 }
 
 export async function updateSupplierInvoiceAction(

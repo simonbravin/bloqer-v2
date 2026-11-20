@@ -5,7 +5,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -36,6 +36,44 @@ jobs:
 
       - name: Unit tests (all workspace test suites)
         run: pnpm test
+
+      - name: Check AI documentation index
+        run: pnpm ai:check-docs-index
+
+      - name: Production build with isolated services
+        working-directory: apps/web
+        env:
+          APP_ENV: test
+          AUTH_SECRET: bloqer-ci-public-smoke-synthetic-secret
+          AUTH_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          APP_URL: http://127.0.0.1:3100
+          DATABASE_URL: postgresql://build:build@127.0.0.1:1/build?connect_timeout=1
+          DIRECT_URL: postgresql://build:build@127.0.0.1:1/build?connect_timeout=1
+          BLOQER_AI_ENABLED: "false"
+          BLOQER_AI_ALLOW_PRODUCTION: "false"
+          BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED: "false"
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: pnpm build
+
+      - name: Install Chromium for public smoke
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Headless public smoke (desktop, tablet and phone)
+        working-directory: apps/web
+        run: pnpm test:e2e:public
+
+      - name: Upload public smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-smoke-${{ github.sha }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/public-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
 
   # Job-level `if` cannot reference `secrets` (GitHub rejects the workflow).
   # Probe secrets inside a step and expose a boolean output instead.

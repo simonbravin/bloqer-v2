@@ -9,6 +9,7 @@ import {
   getCompanies,
   getCompanyProcurementSettings,
   getTenantNotificationEmailPolicy,
+  getTenantDisplayTimezone,
   getTenantProjectAccessModeForAdmin,
   getTenantModuleGate,
   hasTenantWideProjectAccess,
@@ -24,6 +25,7 @@ import { CompanyProcurementNotificationSettingsForm } from "@/features/procureme
 import { ApprovedBudgetEditsPolicyForm } from "@/features/budgets/components/approved-budget-edits-policy-form";
 import { ProjectAccessModeSection } from "@/features/tenant-config/components/project-access-mode-section";
 import { TenantNotificationEmailPolicyForm } from "@/features/notifications/components/tenant-notification-email-policy-form";
+import { getDigestSchedulePreview } from "@/features/notifications/digest-schedule-preview";
 import { ScrollToHash } from "@/components/navigation/scroll-to-element";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -82,9 +84,11 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
   let emailPolicy: Awaited<ReturnType<typeof getTenantNotificationEmailPolicy>> | null = null;
   let emailPolicyMissingSchema = false;
   let emailPolicyError: string | null = null;
+  let digestSchedulePreview: ReturnType<typeof getDigestSchedulePreview> | null = null;
   if (canEditEmailPolicy) {
     try {
       emailPolicy = await getTenantNotificationEmailPolicy(ctx);
+      digestSchedulePreview = getDigestSchedulePreview(await getTenantDisplayTimezone(ctx), new Date());
     } catch (err) {
       if (isMissingNotificationEmailPrefsSchema(err)) {
         emailPolicyMissingSchema = true;
@@ -268,6 +272,7 @@ export default async function ConfiguracionPoliticasPage({ searchParams }: PageP
                 leadershipDailyFlowEmailCc={emailPolicy.leadershipDailyFlowEmailCc}
                 digestEnabledDefault={emailPolicy.digestEnabledDefault}
                 digestHourLocal={emailPolicy.digestHourLocal}
+                schedulePreview={digestSchedulePreview}
               />
             ) : null}
           </div>

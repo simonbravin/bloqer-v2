@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -69,9 +70,10 @@ export function NewCompanySupplierInvoiceDialog({
       <DialogTrigger asChild>
         <Button>Nueva factura</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Nueva factura de gasto</DialogTitle>
+          <DialogDescription className="sr-only">Completá los datos para registrar una factura de gasto de la empresa.</DialogDescription>
         </DialogHeader>
         {open ? (
           <SupplierInvoiceForm

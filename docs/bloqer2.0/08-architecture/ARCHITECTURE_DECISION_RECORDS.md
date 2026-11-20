@@ -47,6 +47,24 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-016 | Company vs project finance tools (D-056) | ACEPTADO |
 | ADR-017 | Bloqer AI: tool layer + provider-agnostic (`AiProvider`) sobre `@bloqer/services` | ACEPTADO |
 | ADR-018 | Aislamiento explícito y catálogo cerrado de hijos con tenant heredado | ACEPTADO |
+| ADR-019 | Lectura asistida efímera de comprobantes y documento individual de OC | ACEPTADO (primer paquete autorizado; activación separada) |
+
+---
+
+## ADR-019 — Lectura asistida efímera de comprobantes y documento individual de OC
+
+- **Fecha:** 2026-11-19.
+- **Estado:** ACEPTADO para implementar el primer paquete del relevamiento autorizado por Owner en esta fecha. No autoriza despliegue, nuevos proveedores, dependencias, persistencia ni reglas financieras.
+- **Contexto:** reducir la carga manual de una factura y preparar una OC para compartir, reutilizando servicios, permisos, proveedor AI y renderer PDF existentes.
+- **Decisión:**
+  1. Extender de manera compatible `AiProvider` para enviar un PDF o una imagen y solicitar una respuesta estructurada. Una sola extracción sin tools, sin agente de escritura, sin IDs propuestos por el modelo y sin seguir enlaces del documento. El SDK permanece dentro del adaptador existente.
+  2. El servicio AP autoriza empresa/obra/actor, comprueba formato y tamaño antes del proveedor y devuelve una propuesta **efímera**. El primer corte cubre alta manual de factura normal en ARS; NC/ND, moneda desconocida/otra moneda e impuestos no representables se derivan a carga manual. Los campos desconocidos se conservan como tales; los cálculos y la comparación de importes usan el kernel vigente.
+  3. La lectura requiere acción explícita y flags de AI/producción y capacidad. No se activa automáticamente al seleccionar un archivo. Aplicar la propuesta solo modifica el formulario. Guardar utiliza el servicio de borrador existente; no emite, paga, aprueba ni modifica stock. No reemplaza líneas de borradores provenientes de OC.
+  4. El original local se adjunta al borrador con el uploader actual. Una vez conocido el ID creado, un fallo de adjunto se recupera sobre ese mismo ID. Una respuesta de creación incierta exige revisar el listado antes de repetir; no se promete idempotencia persistente nueva. Número fiscal leído solo informativo: no se usa como numeración interna ni se promete deduplicación fiscal.
+  5. El documento individual de OC es una proyección de lectura autorizada y un PDF en `@bloqer/report-pdf`. Muestra su estado y datos comerciales; excluye notas, imputaciones, presupuesto, variaciones y aprobadores internos. Descargar o compartir el archivo desde el dispositivo no cambia estado ni acredita envío, recepción o aceptación del proveedor.
+  6. Refinamiento UX autorizado el 19/11/2026: separar impedimentos de compatibilidad/integridad de datos faltantes que pueden completarse por el usuario. `canApply` habilita únicamente trasladar una propuesta parcial al formulario, nunca guardarla como validada. La respuesta efímera distingue `reviewReasons` y `blockingReasons`; no se agregan campos persistidos. Comparar importes verificables aun si falta otra cabecera; conservar ausencias como null/vacío, sin valores habituales. La UI exige completar y confirmar la revisión del original antes del alta DRAFT habitual. Pruebas de layout y dispositivos se distinguen de verificación estática; no se habilita el piloto por este cambio.
+- **Consecuencias:** sin migraciones ni npm nuevos; chat conserva tools READ. Bandeja durable, número fiscal persistido, cuotas distribuidas, seguimiento multicanal y escritura conversacional requieren decisiones posteriores. Flags apagados por defecto y verificación de permisos/errores/aislamiento antes del piloto real.
+- **Referencias:** [plan del primer paquete](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md), [documentos](../02-modules/DOCUMENTS.md), [AP](../02-modules/EXPENSES_AND_PAYMENTS.md), ADR-014, ADR-017, D-053, D-090, D-108 y D-145.
 
 ---
 

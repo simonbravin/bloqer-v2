@@ -303,6 +303,8 @@ Las preferencias de correo no apagan la campana. Si la plataforma deshabilita el
 
 **Digest diario:** un mail a Propietario/Administrador con Pendientes y alertas críticas sin leer que puede consultar. La revisión automática ocurre una vez al día a las 10:05 UTC (07:05 en Argentina). El resumen puede salir si en la zona de la organización es la hora elegida o hasta tres horas después, dentro del mismo día.
 
+En **Políticas → Notificaciones** se muestra la próxima revisión prevista en la zona de la organización. Si la hora elegida queda fuera de su ventana, aparece un aviso con las horas compatibles; podés guardar, pero ese resumen no saldría en la revisión prevista. Por ejemplo, con zona de Argentina la pasada de 07:05 admite horas de 04 a 07; elegir 09 queda fuera. Guardar otra hora no aumenta la frecuencia automática.
+
 **Reportes de la empresa ([D-098]):** menú General → **Reportes** → `/reportes`. Las cards están agrupadas en **Financieros** (rentabilidad multi-obra, aging CxC/CxP, flujo de caja, GG por proyecto) y **Operativos** (portafolio, compras multi-obra, inventario). Los reportes de una obra siguen en Planificación → Reportes dentro del proyecto.
 
 | Superficie | Ruta / comportamiento |
@@ -1134,6 +1136,10 @@ Desde el listado, **Exportar → Excel / PDF** conserva la búsqueda y el estado
 
 La cabecera identifica código de OC y proveedor. **Ver solicitud de origen** lleva a la SC vinculada cuando existe; no se deduce la procedencia por el texto de las notas.
 
+**PDF individual para el proveedor:** en la ficha, **PDF para proveedor** abre la preparación del documento. **Preparando PDF…** cambia a **PDF listo para revisar**, con el nombre del archivo. Usá **Ver PDF** para revisar emisor/proveedor, obra, fechas, moneda, renglones, descuentos, impuestos y total. **Descargar PDF** guarda el archivo. Si el dispositivo admite compartir archivos, **Compartir archivo** abre sus opciones: elegí la aplicación y el destinatario y completá allí el envío. Si no aparece esa opción, descargá y adjuntá el PDF a tu correo o WhatsApp. **Qué contiene el archivo** despliega su alcance. **Cerrar** vuelve a la ficha y, si todavía se preparaba el PDF, interrumpe la espera.
+
+El PDF conserva el estado de la OC y advierte si es **BORRADOR**, **PENDIENTE DE APROBACIÓN**, **APROBADA INTERNAMENTE** pendiente de confirmación o **ANULADA**. No incluye notas, imputaciones EDT/APU, referencias presupuestarias, desvíos, FX ni aprobadores internos. Descargar o compartir no confirma la OC ni registra que el proveedor recibió o aceptó el pedido. **Confirmar al proveedor** sigue siendo la acción operativa que genera Comprometido; por sí sola tampoco acredita entrega de un mensaje. El PDF individual se prepara desde la ficha; **Exportar** en el listado descarga un listado.
+
 **Ruta:** Compras → **Órdenes de compra**
 
 **Estados en pantalla:** Borrador → Pend. aprobación → Aprobada → Confirmada → Recepción parcial / Recibida · Anulada.  
@@ -1442,6 +1448,19 @@ En el detalle de una factura de proveedor, la columna **Cantidad** identifica la
 
 *Caminito de costo de empresa (alquiler, servicios, estructura). Si tiene partida EDT, no es este camino. Imputar GG a obras es otro menú.*
 
+#### Lectura asistida del comprobante (cuando esté habilitada)
+
+En el alta de **Factura proveedor** de obra, en modo **Costo directo**, y en **Facturas y gastos → Nueva factura de gasto** de empresa, elegí **Carga manual** o **Desde un comprobante**. La segunda opción aparece cuando la función y el almacenamiento de archivos están habilitados. El primer alcance admite facturas normales en ARS y un PDF, JPEG, PNG o WebP de hasta **3 MiB**. Si la opción no aparece, continuá con la carga manual habitual. Para una factura contra OC, seguí usando las líneas de esa orden y adjuntá el comprobante.
+
+1. En **Desde un comprobante**, seleccioná el archivo o usá **Tomar foto** desde el celular. Pulsá **Leer comprobante**: recién entonces se envía al proveedor de IA configurado. **Cancelar lectura** interrumpe la espera sin registrar una factura. Si el formato/tamaño no admite lectura (por ejemplo HEIC), **Continuar con carga manual** conserva el archivo seleccionado como adjunto; no lo convierte automáticamente.
+2. **Revisá la lectura** muestra proveedor/CUIT, referencia y total, junto con **Para completar o verificar**. Abrí **Ver todos los datos leídos** para consultar fechas, impuestos y renglones. **Ver original (otra pestaña)** conserva abierto el formulario. La referencia fiscal es informativa: revisá el listado para evitar duplicados.
+3. Si no hay impedimentos de compatibilidad o importes, marcá **Revisé la lectura y sus observaciones…** y pulsá **Usar datos y completar**. Reemplaza los datos y renglones del formulario; todavía no guarda. Se puede aprovechar una lectura parcial: los campos faltantes quedan vacíos, sin asumir IVA, descuentos ni IIBB.
+4. En **Completá y revisá la factura**, los enlaces de **Pendientes para guardar** llevan a los campos correspondientes. Elegí el proveedor, completá letra/fechas y precios con o sin IVA, y revisá cada renglón. En obra, indicá partida EDT y tipo de costo. Ingresá explícitamente **0** en descuentos/impuestos que no correspondan. Mientras falten importes, el total muestra **Por completar**.
+5. Compará el cálculo con **Total leído del original**, o consultá el archivo si no pudo identificarse. Marcá **Verifiqué proveedor, fechas, renglones, impuestos y total contra el original…**; cambiar esos datos invalida la confirmación. Si encontrás cargos no representados, no confirmes: cancelá y revisá su carga manual. **Guardar borrador** crea la factura sin emitir ni pagar y adjunta el original obligatorio al mismo documento.
+6. Si falla el adjunto, **El borrador ya está guardado** ofrece **Reintentar adjunto** o **Abrir borrador** sobre esa factura; no la crees otra vez. Si la conexión no permitió saber si se creó, usá **Revisar listado** antes de repetir el alta.
+
+No se usa esta lectura para editar/completar borradores nacidos desde OC, NC/ND ni moneda extranjera. Moneda desconocida, impuestos no representables identificados, documento fuera del alcance e inconsistencias de importes comprobables requieren carga manual. Una ausencia no verificable de cargos exige revisar el original; no prueba que esos cargos sean cero. No se eligen automáticamente proveedor, partida ni unidad por parecido de texto. **Usar datos y completar** no genera CxP, pago, recepción ni aprobación; emisión y pago conservan sus acciones y permisos habituales. Si falla la lectura, conservá el archivo y completá manualmente.
+
 #### 12.2.1 Pagar un sueldo (registro de costo, no nómina)
 
 Bloqer **no** liquida haberes ni aportes. Se registra el egreso como gasto corporativo ligado al empleado.
@@ -1572,6 +1591,8 @@ Con filtros de fechas, los bloques del detalle se identifican como **Físico del
 - **Envíos programados por email:** `/proyectos/[id]/reportes/programados` (obra) y Configuración → **Reportes programados** → `/configuracion/reportes`. El listado muestra el catálogo por alcance (**Empresa general** / **Un proyecto**) y por sección (**Financieros** / **Operativos**). En el alta, elegí el alcance con las dos tarjetas. Formato **PDF** o **CSV (Excel)** según el reporte. *Presupuesto vs real* quedó absorbido por **EDT y costos** y no se ofrece en envíos nuevos. **Libro de obra — parte del día** ([D-100]): solo en alcance empresa, solo PDF, multi-obra ACTIVE, un adjunto por parte del día de la corrida (no aparece en el catálogo de una sola obra). En el detalle de un envío **Activo**, **Enviar ahora** (junto a Volver / Pausar / Eliminar) genera y manda el correo de inmediato; pide confirmación y **no** mueve la próxima ejecución programada. El job automático en Vercel Hobby corre **una vez al día** (05:05 UTC); si necesitás el adjunto ya, usá **Enviar ahora**.
 
   **Reportes de esta configuración** muestra la selección guardada, incluidos nombres legados si corresponde. **Reintentar fallidos** usa el día original de los fallos confirmados de los últimos siete días. Una entrega **Sin confirmar** queda en el historial y fuera del reintento. **Enviar ahora** crea una nueva entrega explícita y comprueba los permisos vigentes de cada destinatario. Si no queda un adjunto autorizado, la entrega figura **Omitida**. **Enviar por email** desde un reporte permite elegir una dirección si tenés permiso para exportarlo.
+
+  En el historial, **Enviado** significa que el proveedor de correo aceptó el envío; **Correcto** indica que aceptó los nuevos envíos de esa corrida. No confirman entrega al destinatario ni lectura. **Sin confirmar** significa que no se pudo confirmar esa aceptación y no entra en **Reintentar fallidos**; no asumas que el correo no salió ni lo repitas sin revisar el historial.
 
 ### 13.3 Avances del proyecto — lectura para dirección
 
@@ -1920,6 +1941,8 @@ flowchart LR
 | **Valuación de inventario** | Sin política FIFO/promedio configurable; por eso el costeo de stock no auto-asienta aún. |
 | **Impuestos / retenciones** | IVA por línea + **Percepción IIBB** a nivel documento (alícuota editable, default 3% sobre neto [D-112]); otras retenciones manuales, sin módulo dedicado. |
 | **Documentos** | Si R2 no está configurado: metadata + badge **PLACEHOLDER**; la descarga explica el límite. |
+| **Lectura asistida de facturas** | Solo cuando esté habilitada: alta manual de factura normal ARS, PDF/JPEG/PNG/WebP hasta 3 MiB, revisión y borrador. Sin deduplicación fiscal ni lectura para OC/NC/ND/otras monedas. Ver §12.2. |
+| **Compartir OC** | PDF individual desde la ficha y compartir archivo mediante el dispositivo cuando esté disponible. No hay envío automático por WhatsApp ni confirmación de entrega/aceptación del proveedor. Ver §9.2. |
 | **Anticipo a proveedor** | Servicio stub (ADR-013); **sin** CTA en UI. |
 | **Cobrar ahora en factura de obra** | Disponible en alta manual de factura de proyecto ([D-077] / Q-055); requiere `EDIT TREASURY`. Certificación sigue: emitir → cobrar aparte. Corporativo: cobro opcional en Transacciones. |
 | **Ajustes de caja** | **Hay UI** de ajuste manual por cuenta (§4.3). Ajustes de **stock** siguen sin pantalla dedicada de ajuste genérico. |
@@ -1938,6 +1961,7 @@ flowchart LR
 - Panorama ejecutivo: [`PANORAMA_GENERAL_BLOQER_V2.md`](./PANORAMA_GENERAL_BLOQER_V2.md)
 - Relevamiento técnico y clasificación A–G: [`RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md`](./RELEVAMIENTO_TECNICO_FUNCIONAL_BLOQER_V2.md)
 - Plan de mejoras corto plazo: [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md)
+- Primer paquete de automatización y estado de validación: [`PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md`](./PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md)
 - Smoke por rol (J-02): [`08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md)
 - Changelog UI Lotes 1–6 (autores): [`guides/CHANGELOG_UI_LOTES_1_6.md`](./guides/CHANGELOG_UI_LOTES_1_6.md)
 - Decisiones recientes: [D-050](./00-product/DECISION_LOG.md)–[D-055](./00-product/DECISION_LOG.md) (compras/EDT/AR/AP/decimales/notif) · [D-056](./00-product/DECISION_LOG.md) (company vs project finance) · [D-057](./00-product/DECISION_LOG.md)–[D-060](./00-product/DECISION_LOG.md) (EDT/APU) · [D-061](./00-product/DECISION_LOG.md)–[D-063](./00-product/DECISION_LOG.md) (contabilidad) · [D-064](./00-product/DECISION_LOG.md) (invitación por email) · [D-072](./00-product/DECISION_LOG.md) (cobranza CxC) · [D-074](./00-product/DECISION_LOG.md) (método de liquidación) · [D-075](./00-product/DECISION_LOG.md)–[D-080](./00-product/DECISION_LOG.md) (conciliación / OFX / reapertura) · [D-078](./00-product/DECISION_LOG.md) (cierre de período) · [D-089](./00-product/DECISION_LOG.md) (payee AP: proveedor o empleado; tres caminos de egreso)

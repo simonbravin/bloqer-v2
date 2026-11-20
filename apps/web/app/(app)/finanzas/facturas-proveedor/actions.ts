@@ -22,6 +22,10 @@ import {
   type UpdateSupplierInvoiceInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  resolveSupplierInvoiceDraftCreation,
+  type SupplierInvoiceDraftCreationResult,
+} from "@/features/ap/lib/supplier-invoice-draft-creation";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { revalidateOperationalFinancePaths } from "@/lib/revalidate-project-paths";
@@ -81,18 +85,17 @@ export async function listCompanySupplierNoteParentsAction(search: string, page 
 
 export async function createCompanySupplierInvoiceAction(
   data: Omit<CreateSupplierInvoiceInput, "projectId">,
-): Promise<{ id: string } | { error: string }> {
+): Promise<SupplierInvoiceDraftCreationResult> {
   const ctx = await getCtx();
   const payload: CreateSupplierInvoiceInput = { ...data, projectId: null, purchaseOrderId: null };
   const parsed = createSupplierInvoiceSchema.safeParse(payload);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
-  try {
-    const inv = await createSupplierInvoice(parsed.data, ctx);
-    revalidateCompanyApPaths(inv.id);
-    return { id: inv.id };
-  } catch (err) {
-    return handle(err);
-  }
+  return resolveSupplierInvoiceDraftCreation({
+    create: () => createSupplierInvoice(parsed.data, ctx),
+    revalidate: (invoiceId) => revalidateCompanyApPaths(invoiceId),
+    // This service raises business rejections before commit or within its transaction.
+    rejectionMessage: (error) => error instanceof ServiceError ? error.message : null,
+  });
 }
 
 export async function updateCompanySupplierInvoiceAction(

@@ -38,6 +38,7 @@ Bloqer AI debe evolucionar de **interfaz conversacional del ERP** a **plataforma
 | [`BLOQER_AI_EVAL_RUNBOOK.md`](./BLOQER_AI_EVAL_RUNBOOK.md) | Cómo correr evals |
 | [`BLOQER_AI_MANUAL_SMOKE.md`](./BLOQER_AI_MANUAL_SMOKE.md) | Smoke manual local |
 | [`CHANGE_IMPACT_POLICY.md`](./CHANGE_IMPACT_POLICY.md) | Help + Guía + AI en el mismo PR |
+| [`PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md`](./PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md) | Seguimiento P0/P1a desde el relevamiento del 19/11/2026; no sustituye V1–V4 ni habilita tools WRITE por sí solo |
 | [D-090](./00-product/DECISION_LOG.md) / [D-111](./00-product/DECISION_LOG.md) | Ayuda in-app; ACL de obras |
 
 Leyenda de estados en este roadmap:

@@ -1,0 +1,63 @@
+import { defineConfig } from "@playwright/test";
+
+// Runs the compiled app in an isolated process, never an existing desktop browser.
+const baseURL = "http://127.0.0.1:3100";
+
+export default defineConfig({
+  testDir: "./e2e/public-smoke",
+  outputDir: "test-results/public-smoke",
+  fullyParallel: false,
+  forbidOnly: true,
+  workers: 1,
+  retries: 0,
+  timeout: 30_000,
+  globalTimeout: 5 * 60_000,
+  reporter: [["list"], ["html", { open: "never" }]],
+  use: {
+    baseURL,
+    browserName: "chromium",
+    headless: true,
+    trace: "retain-on-failure",
+    screenshot: "only-on-failure",
+  },
+  projects: [
+    { name: "desktop", use: { viewport: { width: 1280, height: 900 } } },
+    { name: "tablet", use: { viewport: { width: 768, height: 1024 } } },
+    { name: "phone", use: { viewport: { width: 360, height: 800 }, isMobile: true, hasTouch: true } },
+  ],
+  webServer: {
+    command: "node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3100",
+    url: `${baseURL}/login`,
+    reuseExistingServer: false,
+    timeout: 120_000,
+    stdout: "pipe",
+    stderr: "pipe",
+    env: {
+      NODE_ENV: "production",
+      APP_ENV: "test",
+      AUTH_SECRET: "bloqer-ci-public-smoke-synthetic-secret",
+      AUTH_URL: baseURL,
+      AUTH_TRUST_HOST: "true",
+      NEXT_PUBLIC_APP_URL: baseURL,
+      APP_URL: baseURL,
+      DATABASE_URL: "postgresql://build:build@127.0.0.1:1/build?connect_timeout=1",
+      DIRECT_URL: "postgresql://build:build@127.0.0.1:1/build?connect_timeout=1",
+      BLOQER_AI_ENABLED: "false",
+      BLOQER_AI_ALLOW_PRODUCTION: "false",
+      BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED: "false",
+      AUTH_GOOGLE_ID: "",
+      AUTH_GOOGLE_SECRET: "",
+      GOOGLE_CLIENT_ID: "",
+      GOOGLE_CLIENT_SECRET: "",
+      OPENAI_API_KEY: "",
+      RESEND_API_KEY: "",
+      RESEND_FROM_EMAIL: "",
+      R2_ACCOUNT_ID: "",
+      R2_ACCESS_KEY_ID: "",
+      R2_SECRET_ACCESS_KEY: "",
+      R2_BUCKET_NAME: "",
+      CRON_SECRET: "",
+      NEXT_TELEMETRY_DISABLED: "1",
+    },
+  },
+});

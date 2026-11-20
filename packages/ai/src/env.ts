@@ -25,6 +25,11 @@ export function resolveBloqerAiEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return true;
 }
 
+/** ADR-019: document preview is independently opt-in and never bypasses AI/prod gates. */
+export function isSupplierInvoicePreviewEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return resolveBloqerAiEnabled(env) && parseTruthyFlag(env.BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED);
+}
+
 export type BloqerAiEnv = {
   enabled: boolean;
   providerId: string;

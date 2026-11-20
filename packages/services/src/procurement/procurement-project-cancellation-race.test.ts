@@ -339,6 +339,7 @@ function setup(
     "../budget/wbs-code-rules": {},
     "../user/resolve-user-display-names": {},
     "./purchase-request-list-enrichment": {},
+    "./procurement-search": {},
     "./procurement-notifications.service": {},
     "./procurement-constants": {},
     "./purchase-variance.service": {},

@@ -22,9 +22,9 @@ export const SCHEDULED_REPORT_RUN_STATUS_LABEL: Record<ScheduledReportRunStatus,
 
 /** Short tooltip / help under run badges — ops should not need server logs. */
 export const SCHEDULED_REPORT_RUN_STATUS_HINT: Record<ScheduledReportRunStatus, string> = {
-  SUCCESS: "Todos los envíos de la corrida se completaron.",
+  SUCCESS: "El proveedor aceptó los nuevos envíos de la corrida; no confirma su entrega o lectura.",
   PARTIAL: "Algunos destinatarios se enviaron y otros fallaron u omitieron.",
-  FAILED: "La corrida no pudo entregar el reporte (error de generación o de envío).",
+  FAILED: "La corrida no pudo confirmar el envío del reporte (error de generación o de envío).",
   SKIPPED:
     "La corrida no envió mails (p. ej. Resend no configurado, sin destinatarios, envío pausado o destinatarios ya procesados).",
 };
@@ -39,7 +39,7 @@ export const EMAIL_DELIVERY_STATUS_LABEL: Record<EmailDeliveryStatus, string> = 
 /** Clarifies SKIPPED (config) vs FAILED (error) for ops. */
 export const EMAIL_DELIVERY_STATUS_HINT: Record<EmailDeliveryStatus, string> = {
   PENDING: "El intento quedó registrado y aún no tiene resultado final.",
-  SENT: "El proveedor aceptó el envío.",
+  SENT: "El proveedor aceptó el envío; no confirma su entrega al destinatario ni su lectura.",
   SKIPPED:
     "No se intentó enviar (p. ej. Resend apagado, email inválido o destinatario sin casilla). No es un fallo del proveedor.",
   FAILED: "Se intentó enviar y el proveedor o la validación devolvieron error.",
@@ -56,7 +56,7 @@ export function scheduledReportDeliveryHint(status: EmailDeliveryStatus, errorMe
     return "No hay constancia de un rechazo del proveedor. No entra en Reintentar fallidos.";
   }
   return status === "PENDING"
-    ? "Todavía no se confirmó esta entrega. No entra en Reintentar fallidos."
+    ? "Todavía no se confirmó la aceptación del envío por el proveedor. No entra en Reintentar fallidos."
     : EMAIL_DELIVERY_STATUS_HINT[status];
 }
 
