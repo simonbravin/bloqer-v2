@@ -53,7 +53,8 @@ test("a signed-in user can prepare and download the existing order PDF", async (
   expect(bytes.length).toBeGreaterThan(1000);
   await testInfo.attach("purchase-order", { body: bytes, contentType: "application/pdf" });
   await testInfo.attach("purchase-order-dialog", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
-  await dialog.getByRole("button", { name: "Cerrar", exact: true }).click();
+  // The footer button precedes DialogContent's icon button with the same accessible name.
+  await dialog.getByRole("button", { name: "Cerrar", exact: true }).first().click();
   await expect(dialog).toHaveCount(0);
 });
 
