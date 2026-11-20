@@ -42,6 +42,19 @@ jobs:
       - name: Prisma generate (no DB required)
         run: pnpm ci:prisma
 
+      - name: Prepare disposable authenticated fixtures
+        working-directory: packages/database
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:bloqer-ci-disposable-only@127.0.0.1:5432/bloqer_ci_pilot
+          DIRECT_URL: postgresql://bloqer_ci:bloqer-ci-disposable-only@127.0.0.1:5432/bloqer_ci_pilot
+          SEED_USER_EMAIL: pilot-ci@example.invalid
+          SEED_USER_PASSWORD: bloqer-ci-synthetic-user-only
+          DOCS_USER_EMAIL: pilot-ci@example.invalid
+          DOCS_DEMO_SEED: "1"
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec tsx src/seed.ts
+
       - name: Lint
         run: pnpm lint
 
@@ -88,19 +101,6 @@ jobs:
             apps/web/test-results/public-smoke/
           if-no-files-found: ignore
           retention-days: 7
-
-      - name: Prepare disposable authenticated fixtures
-        working-directory: packages/database
-        env:
-          DATABASE_URL: postgresql://bloqer_ci:bloqer-ci-disposable-only@127.0.0.1:5432/bloqer_ci_pilot
-          DIRECT_URL: postgresql://bloqer_ci:bloqer-ci-disposable-only@127.0.0.1:5432/bloqer_ci_pilot
-          SEED_USER_EMAIL: pilot-ci@example.invalid
-          SEED_USER_PASSWORD: bloqer-ci-synthetic-user-only
-          DOCS_USER_EMAIL: pilot-ci@example.invalid
-          DOCS_DEMO_SEED: "1"
-        run: |
-          pnpm exec prisma migrate deploy
-          pnpm exec tsx src/seed.ts
 
       - name: Authenticated smoke with disposable Postgres
         working-directory: apps/web

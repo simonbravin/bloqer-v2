@@ -357,6 +357,8 @@ Se incorpora una tanda autenticada independiente con Postgres 16 descartable en 
 
 Este refuerzo no cambia rutas, etiquetas o flujos del producto: sin impacto funcional en Guía/Help/knowledge. No modifica schema, reglas financieras ni dependencias npm. Los servicios externos permanecen deshabilitados en este entorno; no se envían mensajes ni archivos reales.
 
+La primera corrida del PR #17 aprobó las migraciones en una base vacía, pero el seed de documentación falló por FK: `seedFieldScheduleItems` intentaba crear vínculos hacia nodos EDT antes de `seedBudgetAndWbs`. Se corrige el orden del seed existente, sin quitar constraints ni introducir parches SQL. La preparación de fixtures pasa al comienzo de CI para detectar esta clase de error antes del build. Los casos autenticados no se contabilizan como ejecutados en esa corrida fallida.
+
 Para el piloto representativo siguen pendientes: entorno remoto comprobado, cuenta/empresa/obra acordadas, configuración efectiva de IA y almacenamiento, corpus y responsable de revisión. Las variables locales existentes no prueban la configuración de Vercel. La conexión Neon consultada no encontró el proyecto ni el compute de desarrollo; no se creó un proyecto alternativo ni se alteraron datos. Vercel se solicitó como conexión para inspeccionar el entorno en segundo plano.
 
 El checkout local conserva la rama original y sus cambios porque `.git` es de solo lectura en este entorno. La integración remota preserva las entregas previas de `main`; no se hizo reset, limpieza ni sustitución de los cambios locales. P0 distribuido/outbox/Q-093/Q-094/Q-095 y P1b/P1c mantienen los límites y decisiones de §§3 y 7.
