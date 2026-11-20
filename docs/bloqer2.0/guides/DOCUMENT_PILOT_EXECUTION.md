@@ -8,6 +8,10 @@ El Owner reiteró autorización para usar **Bloqer Demo** en todas las pruebas n
 
 Se agregó un caso de navegador autenticado que crea una factura manual de empresa mediante el formulario y el servicio reales, recarga el detalle y comprueba que conserva el documento y la acción de emitir (sigue siendo borrador). Usa la demo sembrada en Postgres descartable de CI; se ejecuta en escritorio, tablet y celular. No activa IA, R2, emisión ni pagos; no utiliza la DB de Neon. El resultado se acredita con el check del commit, no con la existencia del test. Las capturas se adjuntan al reporte autenticado de CI.
 
+Primera corrida: `44743449756`, commit `a1970c3f8c74c3bdea7b15753781b68cc45c4b7a`. Lint, tipos, pruebas unitarias, índice, build, nueve casos públicos y los nueve autenticados anteriores pasaron. El caso nuevo falló en los tres tamaños antes de guardar: su selector omitía el asterisco del label obligatorio **Letra del comprobante \***. Se corrigió el selector; no se alteró el formulario ni se debilitó la prueba. El check de la revisión posterior es la evidencia de su resultado.
+
+El despliegue automático de esa rama (`4vdunZXSsmG9r1SVJXELKDcMpKNq`) terminó correctamente. Se verificó por navegación real que el alias del piloto abre `/login?callbackUrl=%2F` **en su propio dominio** y ya no redirige a `portal.bloqer.app`. No fue necesario retomar el redeploy manual ni pedir otro código. Esta verificación no acredita login autenticado, Google OAuth ni la DB efectiva del preview.
+
 ## Candidato encontrado
 
 Fuentes iniciales: `docs-demo-ids.json` (registro generado el 20/08/2026), `packages/database/src/seed.ts` y `packages/database/src/seed-docs-guide.ts`. El 20/11/2026 se confirmó por SQL de solo lectura la empresa y su pertenencia en `dev/neondb`; esto no acredita presencia en producción ni en el preview.

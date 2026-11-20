@@ -45,7 +45,7 @@ test("manual company invoice persists as a draft after reload without issuing or
   const dialog = page.getByRole("dialog", { name: "Nueva factura de gasto", exact: true });
   await dialog.getByLabel("A quién se le paga", { exact: true }).click();
   await page.getByRole("option").first().click();
-  await dialog.getByLabel("Letra del comprobante", { exact: true }).click();
+  await dialog.getByLabel("Letra del comprobante *", { exact: true }).click();
   await page.getByRole("option", { name: "Factura C", exact: true }).click();
   await dialog.getByLabel("Fecha de emisión", { exact: true }).fill("2026-11-20");
   await dialog.getByLabel("Fecha de vencimiento", { exact: true }).fill("2026-12-20");
