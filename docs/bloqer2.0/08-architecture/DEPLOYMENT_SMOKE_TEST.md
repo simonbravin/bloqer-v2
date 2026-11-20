@@ -28,6 +28,37 @@ Aplicar después de publicar una revisión que incluya AG-05; la publicación de
 
 Q-069/Q-070/Q-071 aprobadas en D-122/D-123/D-124: comprobar error funcional por moneda contribuyente distinta, cantidades de factura + ND − NC por recurso/unidad compatibles y costo/varianza de consumo **Sin valuación** cuando falta trazabilidad. UI/CSV/PDF conservan desconocido y advertencia; una ausencia comprobada admite cero. Exposición documental y cantidades siguen independientes. El cronograma temporal permanece disponible ante incompatibilidad económica y su exportación avisa sin importes ficticios. RFIs mantiene desarrollo posterior separado según D-122.
 
+## Primer paquete — preparación del piloto documental
+
+Historia a comprobar: **usuario autenticado → PDF/foto de factura → lectura revisable → confirmación humana → borrador AP con original adjunto**. El PDF de OC tiene un recorrido independiente: preparar, revisar y descargar sin cambiar su estado.
+
+Este procedimiento complementa el [plan del primer paquete](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md#12-seguimiento-de-los-diez-bloques--20112026). La tanda de CI con datos sintéticos ya comprueba login, alta manual abierta/cancelada y PDF privado en tres tamaños; no acredita extracción con el proveedor, guardado/adjunto real ni el piloto humano.
+
+### Antes de activar la lectura
+
+| Comprobación | Evidencia que registrar | Si falta |
+|---|---|---|
+| Acceso Vercel | Equipo, proyecto y deployment visibles con la conexión actual. Una conexión instalada o un equipo listado no prueban acceso al proyecto | Resolver el acceso del equipo/proyecto antes de modificar configuración |
+| Versión y dominio | SHA, deployment `READY`, entorno y alias que atiende el dominio elegido | No atribuir al portal lo comprobado solamente en CI o en el estado de GitHub |
+| Separación de datos | Destino de DB y almacenamiento del entorno de prueba confirmado; no copiar secretos al informe ni ejecutar seeds contra datos operativos | Mantener pendientes las pruebas mutantes |
+| Identidad y alcance | Cuenta, tenant, empresa/obra y responsable de revisión acordados; permisos AP/documentos vigentes | No crear roles ni elegir registros reales para hacer pasar el ensayo |
+| IA | Valores efectivos de los tres flags, proveedor/modelo y credencial presente en el entorno elegido; latch de producción también aplica a Preview con `NODE_ENV=production` | Conservar carga manual y registrar la causa; no activar globalmente |
+| Original | Cuatro variables obligatorias de R2, CORS del origen exacto y prueba de subida/descarga con archivo sintético en el ámbito acordado | No dar por completo el flujo por una extracción exitosa |
+| Corpus y medición | Documentos seleccionados, casos negativos y responsable; tiempo hasta registro correcto, correcciones y costo de las llamadas reales | No inventar resultados de OCR, ahorro ni deduplicación |
+
+Leer primero metadatos de variables y consultar solo la configuración necesaria. No volcar valores de credenciales, cookies, archivos ni resultados completos del proveedor a logs o reportes compartidos. Consultar las [variables canónicas](./ENVIRONMENT_VARIABLES.md#optional--bloqer-ai-and-supplier-invoice-preview).
+
+### Recorrido acotado de aceptación
+
+1. Con la función apagada, confirmar continuidad manual y de facturación contra OC.
+2. Con el piloto habilitado únicamente en su entorno acordado, seleccionar un PDF/JPEG/PNG/WebP de hasta 3 MiB: no iniciar lectura hasta **Leer comprobante**. Cancelar y cambiar de archivo no debe aplicar resultados anteriores.
+3. Verificar la lectura contra el original. Desconocidos permanecen vacíos; NC/ND, moneda distinta/desconocida e impuestos no representables se derivan a manual. El número fiscal leído no acredita persistencia o deduplicación fiscal.
+4. Completar proveedor/fechas/impuestos y, en obra, imputación. Confirmar revisión; editar un dato debe invalidar esa confirmación. No emitir ni pagar como parte de la extracción.
+5. Guardar una vez y verificar borrador más original. Ante falla controlada del adjunto en el entorno de prueba, reintentar sobre el mismo ID; ante creación incierta, consultar el listado antes de repetir. No afirmar idempotencia durable nueva.
+6. Preparar y descargar una OC de prueba; comprobar datos comerciales, permisos y estado sin cambios. El share a un destinatario requiere destino de prueba acordado y constatación aparte; descargar no prueba entrega.
+
+Registrar por caso: fecha, SHA/deployment, entorno, rol/alcance, documento de prueba, resultado observado y evidencia sin secretos. Cualquier acceso cruzado o escritura sin confirmación detiene el piloto. La desactivación restaura los valores de flags previos y se comprueba en el deployment que recibe tráfico; no borra borradores o adjuntos creados.
+
 ## Comprobaciones generales
 
 | # | Check | Pass criteria |

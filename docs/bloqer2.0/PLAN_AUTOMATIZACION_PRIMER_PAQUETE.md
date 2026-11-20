@@ -5,6 +5,8 @@
 > **Origen:** relevamiento «Bloqer: competencia, IA y automatización operativa», 19/11/2026: 40 oportunidades en 10 categorías.  
 > **Relación con otros planes:** complementa el [roadmap técnico](./08-architecture/IMPLEMENTATION_ROADMAP.md) y el [roadmap de Bloqer AI](./BLOQER_AI_ROADMAP.md). Sus etapas P0/P1a son lotes de esta iniciativa; no reemplazan las fases generales 0–5 ni las versiones V1–V4 de AI.
 
+**Seguimiento vigente:** [diez bloques y próximo corte (§12)](#12-seguimiento-de-los-diez-bloques--20112026). Por pedido del Owner, cada cierre de trabajo debe indicar qué se implementó, qué se comprobó, qué falta y los próximos pasos vinculados con los bloques A–J. Conservar estos diez bloques; no reemplazarlos por otra numeración ni confundirlos con las etapas P0/P1a/P1b/P1c.
+
 Diseño técnico autorizado: [ADR-019 — lectura asistida efímera de comprobantes y documento individual de OC](./08-architecture/ARCHITECTURE_DECISION_RECORDS.md#adr-019--lectura-asistida-efímera-de-comprobantes-y-documento-individual-de-oc). Su alcance no autoriza deploy, nuevos proveedores, dependencias, persistencia ni reglas financieras.
 
 ## 1. Objetivo y alcance autorizado
@@ -364,3 +366,36 @@ El control de secretos señaló las contraseñas sintéticas fijas del primer bo
 Para el piloto representativo siguen pendientes: entorno remoto comprobado, cuenta/empresa/obra acordadas, configuración efectiva de IA y almacenamiento, corpus y responsable de revisión. Las variables locales existentes no prueban la configuración de Vercel. La conexión Neon consultada no encontró el proyecto ni el compute de desarrollo; no se creó un proyecto alternativo ni se alteraron datos. Vercel se solicitó como conexión para inspeccionar el entorno en segundo plano.
 
 El checkout local conserva la rama original y sus cambios porque `.git` es de solo lectura en este entorno. La integración remota preserva las entregas previas de `main`; no se hizo reset, limpieza ni sustitución de los cambios locales. P0 distribuido/outbox/Q-093/Q-094/Q-095 y P1b/P1c mantienen los límites y decisiones de §§3 y 7.
+
+## 12. Seguimiento de los diez bloques — 20/11/2026
+
+Los diez bloques son las categorías A–J del relevamiento original, con cuatro oportunidades cada una (§4). Su estado describe esta iniciativa de automatización, no la ausencia de los módulos operativos que Bloqer ya tiene. La secuencia de entrega sigue siendo P0/P1a, después P1b/P1c y los lotes P2/P3.
+
+| # / bloque | Área original | Avance comprobado de esta iniciativa | Próximo paso sugerido |
+|---|---|---|---|
+| 1 / A | Captura y revisión documental | Factura normal ARS a propuesta revisable implementada e integrada; lectura apagada por defecto. Pruebas aisladas aprobadas; OCR real y guardado/adjunto del piloto pendientes | Comprobar entorno y ejecutar el piloto A2 completo; luego ampliar bandeja, remitos y deduplicación con sus decisiones |
+| 2 / B | WhatsApp y comunicaciones operativas | PDF individual de OC integrado; preparación/descarga autenticada aprobadas en CI en tres tamaños. Share real y entrega externa no acreditados | Cerrar B1 en piloto; luego diseñar B2/B3/B4 con número, consentimiento, plantillas y recuperación |
+| 3 / C | Avisos relevantes y pendientes | Horarios y significado de aceptación documentados; manejo de fallos del runner probado. Scheduler efectivo y recuperación durable pendientes | Verificar los cron desplegados y resolver Q-095/outbox antes de ampliar avisos |
+| 4 / D | Audio y asistente que prepara acciones | Consultas READ acotadas probadas; sin flujo nuevo de audio ni tools WRITE | P1c: elegir audio a SC o parte y mantener revisión/confirmación humana |
+| 5 / E | Compras y proveedores | Sin ampliaciones E1–E4 en este corte; los circuitos vigentes se preservan | P2: cotizaciones a matriz y excepciones sobre los contratos actuales |
+| 6 / F | Dirección, finanzas y análisis | Sin ampliaciones F1–F4 en este corte | P2: brief de dirección con cifras, alcance y fuentes verificables |
+| 7 / G | Obra, planificación y conectividad | Sin ampliaciones G1–G4 en este corte | P2: abastecimiento de próximas semanas; offline/búsqueda/inspecciones por lotes |
+| 8 / H | Contratos, cliente y cierre de obra | Sin ampliaciones H1–H4 en este corte | Definir RFI/cambio formal antes de implementar; luego portal/dossier con permisos propios |
+| 9 / I | Integraciones, APIs y ecosistema | GitHub/CI operativos. Conexión Vercel instalada; acceso a proyectos pendiente de autorización del equipo al inspeccionar. I1–I4 siguen en backlog | Resolver acceso de Vercel para el piloto; email/API/MCP/fiscal/bancos/BIM en iniciativas posteriores |
+| 10 / J | Confiabilidad, datos y adopción | Build, 2.955 pruebas y 18 casos de navegador aprobados; base descartable y credenciales efímeras en CI. Guía/Help disponibles | Medir calidad/costo/tiempo del piloto y cerrar sus límites operativos; cuotas distribuidas y datos maestros siguen separados |
+
+### Evidencia disponible
+
+- PR [#16](https://github.com/simonbravin/bloqer-v2/pull/16) integrado mediante `895cf09b`; PR [#18](https://github.com/simonbravin/bloqer-v2/pull/18) mediante `f12c5cdcf6cc0544ba2111975e6d772991766cff`.
+- [CI de #18](https://github.com/simonbravin/bloqer-v2/actions/runs/44663824009): migraciones desde base vacía y seed correctos, lint/tipos, 2.955 pruebas sin fallos/omitidas, índice AI de 623 chunks, build y nueve casos públicos más nueve autenticados. El job E2E de entorno externo quedó omitido por faltar sus secretos y no se cuenta entre los 18 ejecutados.
+- Vercel informó despliegue completado para `f12c5cdc` mediante el estado del commit. Eso acredita el resultado reportado por Vercel, no una inspección del alias/entorno ni un piloto real.
+- Inspección del 20/11: la conexión Vercel lista el equipo `Simon's projects`, pero la consulta por ID del equipo devuelve cero proyectos; proyecto, alias y deployment responden 404. Se solicitó acceso del equipo mediante el mecanismo oficial de la conexión. No se modificaron flags, credenciales, DB ni datos operativos.
+- Se corrigió la documentación de R2: hay cuatro variables obligatorias y `R2_PUBLIC_URL` es opcional. Se documentaron los gates reales de lectura y el [preflight del piloto](./08-architecture/DEPLOYMENT_SMOKE_TEST.md#primer-paquete--preparación-del-piloto-documental), incluido el latch de producción que también alcanza a Preview con `NODE_ENV=production`.
+
+### Próximo corte concreto
+
+1. Confirmar acceso al proyecto Vercel existente, versión/alias y configuración efectiva de IA/R2 y cron, sin copiar secretos ni crear un proyecto alternativo.
+2. Registrar entorno, cuenta, empresa/obra, corpus y responsable del piloto; ejecutar el procedimiento de aceptación y medir la tarea completa. Estos datos aún no están acordados y no se sustituyen por fixtures de CI.
+3. Cerrar A2/B1/J3/J4 con esa evidencia; mantener visibles P0 distribuido/outbox/Q-093/Q-094/Q-095. Después abrir P1b WhatsApp y P1c audio con un alcance propio.
+
+Esta actualización es de preparación operativa y seguimiento. No incorpora una nueva funcionalidad financiera ni acredita un piloto ejecutado. Cada próximo cierre debe actualizar este registro con resultados, límites y el siguiente paso de los diez bloques.
