@@ -336,6 +336,8 @@ La siguiente etapa técnica incorpora compilación de producción y nueve prueba
 
 La corrida local amplia detectó once fallos del arnés `fiscal-note-actions.test.ts`: los actions AP incorporaron el helper real de recuperación del borrador y el arnés no resolvía ese import. Se incorpora la dependencia real a la fixture, conservando las aserciones y los servicios simulados; no se omiten casos ni se debilitan controles. La validación final y el build se registran en los checks del commit enviado.
 
+La primera corrida Linux del PR #16 aprobó lint, tipos y todas las suites unitarias del monorepo, pero detuvo la entrega por un índice AI obsoleto. El manifiesto incluía los saltos CRLF del checkout Windows en sus hashes y tamaños. Se normalizan a LF antes de calcularlos y se agregan regresiones con ambos formatos y ediciones reales: el formato del checkout no invalida el índice, pero un cambio de contenido sí. Se regenera el índice con el generador existente; no se elimina el control de CI.
+
 El intento de trasladar `.next` fue denegado y la copia aislada no logró enlazar dependencias; no se alteraron ACL ni controles del sistema. La compilación de entrega se ejecuta en el runner Linux de CI. Un resultado remoto correcto no demuestra una reparación del bloqueo local. El alcance actual mantiene la lectura asistida deshabilitada por defecto y no incluye activación ni migración en producción.
 
 - [Documentos](./02-modules/DOCUMENTS.md), [notificaciones](./02-modules/NOTIFICATIONS.md), [OC y recepciones](./02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md), [gastos/facturas/pagos](./02-modules/EXPENSES_AND_PAYMENTS.md).

@@ -1,7 +1,7 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-19T23:48:16.368Z",
-  "sourceHash": "d468a2c1b3d20e7d4854dbe4814ffbaf70d2038a6328ec415a2d22730d59fa12",
+  "generatedAt": "2026-11-20T01:58:46.060Z",
+  "sourceHash": "ff0aa8ce77816b5b04330392978772b053a4e046601c485e8235ac472874cfb4",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -80,13 +80,13 @@
     },
     {
       "path": "docs/bloqer2.0/03-finance/ACCOUNTS_PAYABLE.md",
-      "sha256": "cd5d07684851b343c1a5b47767807302112683a3a8a528fbe3807213b9582f8c",
-      "bytes": 3447
+      "sha256": "9e8ee511dabd71adb95857c8cbacc9b3ab9676753437f762d2c9590d6f440fc5",
+      "bytes": 3397
     },
     {
       "path": "docs/bloqer2.0/03-finance/ACCOUNTS_RECEIVABLE.md",
-      "sha256": "c6f6b393e09a4157b3d6d687da382b78c7dbb9cc1b4144c94a1240cd82dc32d8",
-      "bytes": 3812
+      "sha256": "7f9bc67c04e89f723ca427b0444488a20350b6f565c9ff6e191895e167aa9f03",
+      "bytes": 3772
     },
     {
       "path": "docs/bloqer2.0/03-finance/TREASURY_MODEL.md",
