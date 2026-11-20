@@ -44,6 +44,7 @@ Pérdida de respaldo contractual y fiscal disperso en carpetas locales; bibliote
 - **Eliminar** (soft-delete, [D-111](../00-product/DECISION_LOG.md#d-111--eliminar-solo-documentos-de-biblioteca-no-adjuntos-operativos)): solo documentos de la **biblioteca de la obra** (`linkedEntityType = PROJECT`), p. ej. planos reemplazados. No se eliminan adjuntos de factura, libro de obra, cotización, OC, certificación, presupuesto ni subcontrato — ahí solo se archiva.
 
 ## 9. Pantallas y vistas necesarias
+- **Historial del archivo** desde el icono Historial en biblioteca, detalle y adjuntos corporativos/de proyecto: eventos existentes de auditoría, actor y fecha/hora, paginados de 50 en 50 con **Ver anteriores**. La consulta verifica permisos en cada página, no devuelve payloads internos, IP ni claves/URLs de almacenamiento, y no genera eventos sintéticos para llenar huecos históricos. Disponible también para registros PLACEHOLDER y UPLOADING autorizados. Una carga iniciada se distingue de una confirmada.
 - Pestaña “Documentos” en cada ficha entidad.
 - Biblioteca de obra con **árbol de carpetas** + listado ([D-113]).
 - Acciones Ver / Descargar como **iconos** (ojo / descarga) en lista, cards, panel de adjuntos de entidad y ficha del documento; en la biblioteca, Archivar y Eliminar (tacho) si el archivo no está ligado a un comprobante ([D-111]); preview in-page solo jpeg/png/webp en la ficha (nunca PDF embebido).

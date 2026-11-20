@@ -88,7 +88,7 @@ export default async function DocumentoDetailPage({ params }: PageProps) {
       {doc.status === "UPLOADING" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
           Esta subida quedó incompleta (por ejemplo, por un error de red). Podés cancelarla con el botón
-          de arriba o recargar la página; las subidas abandonadas se limpian solas al poco tiempo.
+          de arriba. Para completarla, reintentá desde la carga original. En Historial podés comprobar si llegó a confirmarse.
         </div>
       )}
 
