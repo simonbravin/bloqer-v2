@@ -21,6 +21,8 @@ Static pages build without DB; **any route that hits Prisma** needs a valid `DAT
 
 Validated together via `getDatabaseEnv()`. **Migrate deploy** and **seed** need these in the environment where the command runs.
 
+On Vercel, `vercel-migrate-if-needed.mjs` first validates that both URLs identify the same allowed destination. For Neon only, its migration child process gets a minimum `DIRECT_URL` `connect_timeout=15` when missing or between 1 and 14 seconds, allowing a suspended compute to start. Explicit limits of 15+ seconds and an explicit `0` (unlimited) are preserved. Duplicate or invalid timeout values fail closed. The runtime `DATABASE_URL`, original environment and credentials are unchanged; local builds still skip deployment migrations. A connection or migration failure still fails the build: no migration is skipped or marked successful. See [Prisma v6 / Neon connection timeouts](https://docs.prisma.io/docs/orm/v6/overview/databases/neon#resolving-connection-timeouts).
+
 ## Required for auth (runtime login / sessions)
 
 | Variable | Notes |

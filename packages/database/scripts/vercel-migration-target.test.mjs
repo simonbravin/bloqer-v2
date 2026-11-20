@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { resolveVercelMigrationTarget } from "./vercel-migration-target.mjs";
+import { prepareVercelMigrationEnvironment, resolveVercelMigrationTarget } from "./vercel-migration-target.mjs";
 
 const portal = "ep-cold-mouse-appkpn84";
 const preview = "ep-curly-math-aptjniho";
@@ -60,4 +61,63 @@ test("rejects ambiguous URL parameters before resolving the target", () => {
   for (const query of ["&schema=", "&schema=public&schema=other", "&host=other.test", "&dbname=other"]) {
     assert.throws(() => resolveVercelMigrationTarget({ ...env, DIRECT_URL: env.DIRECT_URL + query }), /unambiguous/);
   }
+});
+
+test("migration connection allows Neon startup without changing runtime URL, credentials or target", () => {
+  const env = vercelEnv("preview", "ep-young-forest-ap86bxcg", "bloqer_preview");
+  const syntheticPassword = encodeURIComponent(`${randomUUID()}:@`);
+  env.DIRECT_URL = env.DIRECT_URL.replace("test@", `demo:${syntheticPassword}@`) + "&schema=public&channel_binding=require";
+  const before = { ...env };
+  const migration = prepareVercelMigrationEnvironment(env);
+  const original = new URL(env.DIRECT_URL);
+  const effective = new URL(migration.env.DIRECT_URL);
+  assert.equal(migration.target, "preview");
+  assert.equal(effective.searchParams.get("connect_timeout"), "15");
+  for (const key of ["username", "password", "hostname", "port", "pathname"]) {
+    assert.equal(effective[key], original[key]);
+  }
+  for (const key of ["sslmode", "schema", "channel_binding"]) {
+    assert.equal(effective.searchParams.get(key), original.searchParams.get(key));
+  }
+  assert.equal(migration.env.DATABASE_URL, env.DATABASE_URL);
+  assert.deepEqual(env, before);
+});
+
+test("migration timeout raises short limits and preserves explicit longer or unlimited limits", () => {
+  for (const seconds of [1, 5, 14, 15, 30, 0]) {
+    const env = vercelEnv("production", portal);
+    env.DIRECT_URL += `&connect_timeout=${seconds}`;
+    const migration = prepareVercelMigrationEnvironment(env);
+    assert.equal(new URL(migration.env.DIRECT_URL).searchParams.get("connect_timeout"),
+      String(seconds > 0 && seconds < 15 ? 15 : seconds));
+    if (seconds === 0 || seconds >= 15) assert.equal(migration.env.DIRECT_URL, env.DIRECT_URL);
+  }
+});
+
+test("migration timeout rejects ambiguous or invalid values without revealing secrets", () => {
+  for (const value of ["", "-1", "1.5", "invalid-private-value", "9007199254740992", "5&connect_timeout=30"]) {
+    const env = vercelEnv("preview", preview);
+    env.DIRECT_URL += `&connect_timeout=${value}`;
+    assert.throws(() => prepareVercelMigrationEnvironment(env), {
+      message: "DIRECT_URL connect_timeout must be one non-negative integer",
+    });
+  }
+});
+
+test("migration preparation retains portal isolation checks before changing any connection", () => {
+  assert.throws(() => prepareVercelMigrationEnvironment(vercelEnv("preview", portal)), /outside the portal/);
+  assert.throws(() => prepareVercelMigrationEnvironment(vercelEnv("production", preview)), /Bloqer portal/);
+  const env = vercelEnv("preview", preview);
+  env.DIRECT_URL = env.DATABASE_URL;
+  assert.throws(() => prepareVercelMigrationEnvironment(env), /direct PostgreSQL/);
+});
+
+test("local builds stay skipped and non-Neon preview configuration remains unchanged", () => {
+  assert.equal(prepareVercelMigrationEnvironment({}), null);
+  const env = {
+    VERCEL: "1", VERCEL_ENV: "preview",
+    DATABASE_URL: "postgresql://demo@localhost/isolated?sslmode=require",
+    DIRECT_URL: "postgresql://demo@localhost/isolated?sslmode=require",
+  };
+  assert.deepEqual(prepareVercelMigrationEnvironment(env), { target: "preview", env });
 });

@@ -8,26 +8,29 @@
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveVercelMigrationTarget } from "./vercel-migration-target.mjs";
+import { prepareVercelMigrationEnvironment } from "./vercel-migration-target.mjs";
 
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-let target;
+let migration;
 try {
-  target = resolveVercelMigrationTarget(process.env);
+  migration = prepareVercelMigrationEnvironment(process.env);
 } catch (error) {
   console.error(`[vercel-migrate] ${error.message}`);
   process.exit(1);
 }
-if (target === null) process.exit(0);
+if (migration === null) process.exit(0);
 
 console.log(
-  `[vercel-migrate] prisma migrate deploy (VERCEL_ENV=${target})`,
+  `[vercel-migrate] prisma migrate deploy (VERCEL_ENV=${migration.target})`,
 );
+if (migration.env.DIRECT_URL !== process.env.DIRECT_URL) {
+  console.log("[vercel-migrate] Neon migration connect_timeout raised to 15 seconds");
+}
 
 const result = spawnSync("pnpm", ["exec", "prisma", "migrate", "deploy"], {
   cwd: packageRoot,
-  env: process.env,
+  env: migration.env,
   stdio: "inherit",
   shell: true,
 });
