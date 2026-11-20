@@ -101,3 +101,11 @@ test("removing the session prevents access to a previously downloaded private PD
   expect(new URL(anonymous.headers().location!).pathname).toBe("/login");
   expect(anonymous.headers()["content-disposition"]).toBeUndefined();
 });
+
+test("history lookup for a missing document stays private and returns no events", async ({ page }) => {
+  const response = await page.request.get("/api/documents/00000000-0000-4000-8000-000000000001/history", { maxRedirects: 0 });
+  expect(response.status()).toBe(404);
+  expect(response.headers()["cache-control"]).toContain("private");
+  expect(response.headers()["cache-control"]).toContain("no-store");
+  expect(await response.json()).toEqual({ error: "Documento no encontrado" });
+});
