@@ -6,6 +6,7 @@ import { prisma, type LinkedEntityType } from "@bloqer/database";
 import { buildStorageKey } from "@bloqer/storage";
 import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
+import { withSyntheticStorageSigning } from "../testing/storage-signing-fixture";
 import { ServiceError, type ServiceContext } from "../types";
 import { createDocumentFolder, listProjectDocumentFolders, moveDocumentFolder } from "./document-folder.service";
 import {
@@ -16,6 +17,9 @@ import {
   initiateDocumentUpload,
   listEntityDocuments,
   listProjectDocuments,
+  uploadDocument,
+  restoreDocument,
+  softDeleteDocument,
 } from "./document.service";
 
 const denied = (error: unknown) => error instanceof ServiceError && error.code === "FORBIDDEN";
@@ -75,7 +79,7 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     await prisma.$transaction(async (tx) => {
       await tx.tenant.create({ data: { id: tenantId, name: "Auditoría Documentos", slug: `audit-doc-${tenantId}`, projectAccessMode: "MEMBERSHIP_SCOPED" } });
       await tx.company.createMany({ data: [companyA, companyB].map((id) => ({ id, tenantId, name: `Empresa de prueba ${id}`, status: "ACTIVE" })) });
-      await tx.user.createMany({ data: actors.map(({ actorUserId }) => ({ id: actorUserId, email: `${actorUserId}@example.test`, status: "ACTIVE" })) });
+      await tx.user.createMany({ data: actors.map(({ actorUserId }) => ({ id: actorUserId, name: "Responsable de prueba", email: `${actorUserId}@example.test`, status: "ACTIVE" })) });
       await tx.userMembership.createMany({ data: actors.map(({ actorUserId, companyId, roles }) => ({
         tenantId, companyId, roles, userId: actorUserId, status: "ACTIVE",
       })) });
@@ -143,9 +147,23 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
 
   it("rejects another uploader's replay and hides old pending attempts without mutating on reads", async () => {
     const payload = invoiceUpload(invoiceA, projectId);
-    const created = await initiateDocumentUpload(payload, owner);
-    assert.equal((await initiateDocumentUpload(payload, owner)).documentId, created.documentId);
-    await assert.rejects(initiateDocumentUpload(payload, buyer), { code: "CONFLICT" });
+    await withSyntheticStorageSigning(async () => {
+      const started = Date.now();
+      const created = await initiateDocumentUpload(payload, owner);
+      assert.equal(created.status, "UPLOADING");
+      assert.equal(created.storageConfigured, true);
+      assert.equal((await initiateDocumentUpload(payload, owner)).documentId, created.documentId);
+      await assert.rejects(initiateDocumentUpload(payload, buyer), { code: "CONFLICT" });
+      const doc = await getDocumentById(created.documentId, owner);
+      assert.equal(doc.uploadedBy, owner.actorUserId);
+      assert.equal(doc.uploadedByName, "Responsable de prueba");
+      assert.ok(Date.parse(doc.createdAt) >= started - 1000);
+      assert.ok(!("storageKey" in doc) && !("publicUrl" in doc));
+      const event = await prisma.auditLog.findFirstOrThrow({ where: { tenantId, entityId: created.documentId, action: "document.upload_initiated" } });
+      assert.equal(event.actorUserId, owner.actorUserId);
+      assert.equal(event.companyId, companyA);
+      assert.equal(event.projectId, projectId);
+    });
     const stale = await addDocument({
       linkedEntityType: "SUPPLIER_INVOICE", linkedEntityId: invoiceA, projectId, companyId: companyA,
       status: "UPLOADING", createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
@@ -169,5 +187,40 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     const rejected = outcomes.find((outcome) => outcome.status === "rejected");
     assert.ok(rejected?.reason instanceof ServiceError && rejected.reason.code === "VALIDATION");
     assert.equal(await prisma.auditLog.count({ where: { tenantId, projectId, action: "document_folder.moved" } }), 1);
+  });
+
+  it("rejects both upload paths without storage and creates no attachment or upload audit", async () => {
+    const payload = invoiceUpload(invoiceA, projectId);
+    const before = await prisma.documentAttachment.count({ where: { tenantId } });
+    const beforeAudits = await prisma.auditLog.count({ where: { tenantId } });
+    await assert.rejects(initiateDocumentUpload(payload, owner), { code: "CONFLICT" });
+    const bytes = Buffer.from("%PDF-1.7\nfixture");
+    await assert.rejects(uploadDocument({ ...payload, sizeBytes: bytes.length }, bytes, owner), { code: "CONFLICT" });
+    assert.equal(await prisma.documentAttachment.count({ where: { tenantId } }), before);
+    assert.equal(await prisma.auditLog.count({ where: { tenantId } }), beforeAudits);
+  });
+
+  it("denies another tenant and a user without project membership before disclosing author or files", async () => {
+    const doc = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: companyA });
+    const outsider = { ...reader, actorUserId: sibling.actorUserId };
+    await assert.rejects(getDocumentById(doc.id, { ...owner, tenantId: randomUUID() }), missing);
+    await assert.rejects(getDocumentById(doc.id, outsider), denied);
+    await assert.rejects(getDocumentDownloadUrl(doc.id, outsider), denied);
+    const listed = await listProjectDocuments(projectId, {}, owner);
+    assert.equal(listed.find(({ id }) => id === doc.id)?.uploadedByName, "Responsable de prueba");
+  });
+
+  it("preserves original references and attribution when operational evidence is archived and restored", async () => {
+    const original = await addDocument({ linkedEntityType: "SUPPLIER_INVOICE", linkedEntityId: invoiceA, projectId, companyId: companyA });
+    await archiveDocument(original.id, owner);
+    const archived = await prisma.documentAttachment.findUniqueOrThrow({ where: { id: original.id } });
+    assert.equal(archived.status, "ARCHIVED");
+    assert.equal(archived.storageKey, original.storageKey);
+    assert.equal(archived.uploadedBy, original.uploadedBy);
+    assert.equal(archived.createdAt.toISOString(), original.createdAt.toISOString());
+    await assert.rejects(softDeleteDocument(original.id, owner), denied);
+    await restoreDocument(original.id, owner);
+    assert.equal((await getDocumentById(original.id, owner)).status, "ACTIVE");
+    assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: original.id, action: { in: ["document.archived", "document.reactivated"] } } }), 2);
   });
 });

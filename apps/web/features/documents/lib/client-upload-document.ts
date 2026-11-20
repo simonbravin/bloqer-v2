@@ -81,6 +81,9 @@ export async function clientUploadDocument(
   if (!documentId) {
     return { error: "Respuesta inesperada del servidor" };
   }
+  if (initiateData.storageConfigured !== true) {
+    return { error: "El archivo no quedó almacenado. Conservá el original e intentá de nuevo cuando se restablezca el almacenamiento." };
+  }
 
   const needsPut = Boolean(initiateData.uploadUrl);
 
@@ -122,7 +125,7 @@ export async function clientUploadDocument(
           "El archivo se subió pero no se pudo confirmar. Intentá de nuevo o contactá soporte.",
       };
     }
-  } else if (initiateData.status === "UPLOADING") {
+  } else if (initiateData.status !== "ACTIVE") {
     return {
       error: "No se pudo obtener la URL de subida. Recargá e intentá de nuevo.",
     };

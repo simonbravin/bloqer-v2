@@ -161,7 +161,7 @@ export function DocumentForm({
       {!storageConfigured && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300">
           {placeholderWarning ??
-            "El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."}
+            "El almacenamiento no está disponible. Conservá el original; podrás subirlo cuando se restablezca."}
         </div>
       )}
 
@@ -206,7 +206,7 @@ export function DocumentForm({
         <Button type="button" variant="outline" onClick={handleCancel} disabled={pending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={pending || !selectedFile}>
+        <Button type="submit" disabled={pending || !selectedFile || !storageConfigured}>
           {pending ? "Subiendo…" : submitLabel}
         </Button>
       </div>

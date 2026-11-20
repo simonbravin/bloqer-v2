@@ -12,12 +12,16 @@ function isUserId(id: string | null | undefined): id is string {
  */
 export async function resolveUserDisplayNames(
   userIds: Array<string | null | undefined>,
+  scope?: { tenantId: string },
 ): Promise<Map<string, string>> {
   const uniqueIds = [...new Set(userIds.filter(isUserId))];
   if (uniqueIds.length === 0) return new Map();
 
   const users = await prisma.user.findMany({
-    where: { id: { in: uniqueIds } },
+    where: {
+      id: { in: uniqueIds },
+      ...(scope ? { memberships: { some: { tenantId: scope.tenantId } } } : {}),
+    },
     select: { id: true, name: true, email: true },
   });
 

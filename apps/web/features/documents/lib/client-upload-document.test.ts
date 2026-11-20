@@ -26,3 +26,27 @@ it("does not report success for a pending attempt without a usable upload URL", 
   t.mock.method(globalThis, "fetch", async () => Response.json({ documentId: "test-doc", storageConfigured: false, status: "UPLOADING" }));
   assert.ok("error" in await clientUploadDocument(input));
 });
+
+for (const storageConfigured of [false, undefined]) {
+  it(`does not discard a selected file after metadata-only success (${storageConfigured})`, async (t) => {
+    t.mock.method(globalThis, "fetch", async () => Response.json({ documentId: "legacy-doc", storageConfigured, status: "ACTIVE" }));
+    assert.ok("error" in await clientUploadDocument(input));
+  });
+}
+
+it("accepts an already confirmed R2 replay without uploading a second object", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json({ documentId: "stored-doc", storageConfigured: true, status: "ACTIVE" }));
+  assert.deepEqual(await clientUploadDocument(input), { documentId: "stored-doc", storageConfigured: true });
+  assert.equal(fetch.mock.callCount(), 1);
+});
+
+it("keeps the file pending when confirmation fails", async (t) => {
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    if (calls === 1) return Response.json({ documentId: "test-doc", uploadUrl: "https://storage.example.test/test-doc", storageConfigured: true, status: "UPLOADING" });
+    if (calls === 2) return new Response(null, { status: 200 });
+    return Response.json({ error: "No se confirmó" }, { status: 409 });
+  });
+  assert.deepEqual(await clientUploadDocument(input), { error: "No se confirmó" });
+});
