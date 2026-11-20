@@ -73,7 +73,7 @@ La biblioteca, el enlace directo y la descarga comprueban tenant, empresa, acces
 - `document_folder.created` / `renamed` / `deleted` / `moved` (auditoría).
 
 ## 18. Fase de implementación
-**Fase 1** almacenamiento básico + carpetas ([D-113]); OCR/indexación **Fase 3**.
+**Fase 1** almacenamiento básico + carpetas ([D-113]); OCR/indexación general **Fase 3**. El primer paquete autorizado agrega un piloto de lectura efímera de una factura manual en ARS ([ADR-019](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md)): PDF/JPEG/PNG/WebP hasta 3 MiB, original local hasta guardar, adjunto al borrador y revisión humana. No es una bandeja persistente, procesamiento por lote ni búsqueda del contenido de documentos.
 
 ## 19. Preguntas abiertas
 - Versionado vs última versión ([Q-008]); tipos archivo ([Q-020]).

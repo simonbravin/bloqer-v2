@@ -37,6 +37,28 @@ Las pruebas unitarias no deben depender de una conexión DB heredada para aparen
 
 Evidencia y límites de la remediación: [AG-00](./platform-audit/2026-11-03-ag-00-remediation.md). Un resultado unitario no demuestra aislamiento SQL ni aprobación del portal.
 
+### Compilación local sin servicios reales
+
+Para validar únicamente el build de web con dependencias y cliente Prisma ya instalados, ejecutar desde `apps/web`:
+
+```text
+node node_modules/next/dist/bin/next build
+```
+
+Preparar **solo para ese proceso hijo** `NODE_ENV=production`, `APP_ENV=test`, `AUTH_SECRET` sintético, `AUTH_URL`/`NEXT_PUBLIC_APP_URL`/`APP_URL` de fixture y ambas URLs de DB hacia un destino local no operativo, por ejemplo `postgresql://build:build@127.0.0.1:1/build?connect_timeout=1`. Deshabilitar los tres flags `BLOQER_AI_ENABLED`, `BLOQER_AI_ALLOW_PRODUCTION` y `BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED`; mantener vacías las credenciales de OAuth, Resend, R2, OpenAI y cron. Sobrescribir también las variables declaradas en archivos `.env*` para que Next no recupere credenciales reales. No editar esos archivos ni registrar sus valores en los logs. El artefacto de esta comprobación usa fixtures y **no se publica**.
+
+No utilizar el script raíz `build` como sustituto de esta comprobación aislada: incluye `ci:prisma`, cuyo paso de migración depende del entorno Vercel. El comando directo no instala dependencias ni ejecuta migraciones. Mantener activos los controles de TypeScript y ESLint; compilar módulos sin completar generación de páginas y trazado no es un build aprobado.
+
+La fuente Inter se incluye en `apps/web/app/fonts/inter-variable.woff2` y el layout utiliza `next/font/local`. Su [procedencia, hash y licencia](../../../apps/web/app/fonts/README.md) deben acompañar cualquier actualización. No necesita descarga de Google Fonts durante el build ni una fuente instalada en Windows. El archivo upstream completo pesa 352.240 bytes; no equivale al subconjunto latino anterior.
+
+Ante `EPERM` dentro de `.next`, registrar la ruta exacta y comprobar procesos concurrentes, permisos y escritura en ese directorio. No cambiar ACL, desactivar controles del sistema ni atribuir una causa sin evidencia. Si hace falta regenerar artefactos, verificar primero que la ruta absoluta sea **solo** `apps/web/.next` del checkout y que ningún proceso la esté utilizando; no borrar fuentes ni configuración. Una repetición exitosa permite registrar que el fallo no se reprodujo, sin afirmar que se repararon permisos.
+
+### Compilación y navegador en CI — primer paquete documental
+
+El job `quality` ejecuta también `ai:check-docs-index`, el build de web directo (sin migraciones) con servicios aislados y `test:e2e:public`. El resultado de compilación incluye TypeScript, ESLint, generación de páginas y trazado. Playwright usa Chromium headless sobre ese artefacto y un servidor propio, con nueve casos públicos: tres recorridos en 1280, 768 y 360 px. Conserva capturas, reporte y trazas de fallos como artefactos de siete días. Configuración y alcance: [`apps/web/e2e/README.md`](../../../apps/web/e2e/README.md).
+
+El CI público no necesita credenciales de usuarios ni habilita el piloto IA. Un job autenticado omitido por falta de secrets no cuenta como aprobado. El build remoto verifica el commit de su corrida; no demuestra que se reparó el permiso de Windows. Este refuerzo de pruebas no cambia flujos visibles, permisos o reglas: **sin impacto documental/AI** en Guía, Help, tools y conocimiento funcional.
+
 ## Regresión reutilizable de identidad y acceso — AG-01
 
 `pnpm test` incluye ahora las regresiones de `@bloqer/auth`. Services ejecuta tanto `src/**/*.test.ts` como `src/**/*.test.mts`; los archivos `.mts` de autenticación usan la condición Node `react-server` por el marcador `server-only`. Las suites live se omiten sin activación explícita y no leen `.env` como fallback para decidir dónde escribir.

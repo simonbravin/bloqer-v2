@@ -315,3 +315,6 @@ export * from "./field/field-pending-access";
 export * from "./field/field-pending.service";
 export * from "./field/field-home.service";
 export * from "./ai";
+export * from "./procurement/purchase-order-document.service";
+export { previewSupplierInvoiceDocument, supplierInvoiceDocumentPreviewAvailable } from "./ap/supplier-invoice-document-preview.service";
+export type { SupplierInvoiceDocumentPreviewInput } from "./ap/supplier-invoice-document-preview.service";

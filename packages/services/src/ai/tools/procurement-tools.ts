@@ -1,9 +1,9 @@
 import { z } from "zod";
 import {
   getPurchaseOrderById,
-  listPurchaseOrdersByProject,
+  searchPurchaseOrdersByProject,
 } from "../../procurement/purchase-order.service";
-import { listPurchaseRequestsByProject } from "../../procurement/purchase-request.service";
+import { searchPurchaseRequestsByProject } from "../../procurement/purchase-request.service";
 import { getProjectProcurementHub } from "../../procurement/project-procurement-hub.service";
 import { resolveAiProjectId } from "../context";
 import { defineBloqerAiTool, nowIso } from "../types";
@@ -42,9 +42,8 @@ export const searchPurchaseRequestsTool = defineBloqerAiTool({
     const projectId = await resolveAiProjectId(ctx, args.projectId);
     if (!projectId) throw new ServiceError("VALIDATION", "Indicá un proyecto o abrí una obra.");
     const limit = args.limit ?? 20;
-    const all = await listPurchaseRequestsByProject(projectId, ctx.service);
-    const filtered = args.status ? all.filter((r) => r.status === args.status) : all;
-    const rows = filtered.slice(0, limit).map((r) => ({
+    const result = await searchPurchaseRequestsByProject(projectId, ctx.service, { status: args.status, limit });
+    const rows = result.requests.map((r) => ({
       id: r.id,
       number: r.number,
       status: r.status,
@@ -57,9 +56,9 @@ export const searchPurchaseRequestsTool = defineBloqerAiTool({
     }));
     const href = `/proyectos/${projectId}/solicitudes-compra`;
     return {
-      data: { total: filtered.length, requests: rows },
+      data: { total: result.total, requests: rows },
       provenance: { sourceType: "bloqer_data", entityType: "Project", entityId: projectId, route: href, asOf: nowIso() },
-      truncation: { total: filtered.length, returned: rows.length },
+      truncation: { total: result.total, returned: rows.length },
       ui: { links: [{ label: "Ver solicitudes", href }], summaryLabel: "Consultando solicitudes de compra…" },
     };
   },
@@ -100,16 +99,13 @@ export const searchPurchaseOrdersTool = defineBloqerAiTool({
     const projectId = await resolveAiProjectId(ctx, args.projectId);
     if (!projectId) throw new ServiceError("VALIDATION", "Indicá un proyecto o abrí una obra.");
     const limit = args.limit ?? 20;
-    const all = await listPurchaseOrdersByProject(projectId, ctx.service);
-    let filtered = all;
-    if (args.status) filtered = filtered.filter((o) => o.status === args.status);
-    if (args.pendingApproval) filtered = filtered.filter((o) => o.status === "SUBMITTED");
-    if (args.pendingReceipt) {
-      filtered = filtered.filter((o) =>
-        ["CONFIRMED", "PARTIALLY_RECEIVED"].includes(o.status),
-      );
-    }
-    const rows = filtered.slice(0, limit).map((o) => ({
+    const result = await searchPurchaseOrdersByProject(projectId, ctx.service, {
+      status: args.status,
+      pendingApproval: args.pendingApproval,
+      pendingReceipt: args.pendingReceipt,
+      limit,
+    });
+    const rows = result.orders.map((o) => ({
       id: o.id,
       code: o.code,
       status: o.status,
@@ -120,9 +116,9 @@ export const searchPurchaseOrdersTool = defineBloqerAiTool({
     }));
     const href = `/proyectos/${projectId}/ordenes-compra`;
     return {
-      data: { total: filtered.length, orders: rows },
+      data: { total: result.total, orders: rows },
       provenance: { sourceType: "bloqer_data", entityType: "Project", entityId: projectId, route: href, asOf: nowIso() },
-      truncation: { total: filtered.length, returned: rows.length },
+      truncation: { total: result.total, returned: rows.length },
       ui: { links: [{ label: "Ver órdenes", href }], summaryLabel: "Consultando órdenes de compra…" },
     };
   },
@@ -194,14 +190,13 @@ export const getPendingPurchaseOrdersTool = defineBloqerAiTool({
     const projectId = await resolveAiProjectId(ctx, args.projectId);
     if (!projectId) throw new ServiceError("VALIDATION", "Indicá un proyecto o abrí una obra.");
     const hub = await getProjectProcurementHub(projectId, ctx.service);
-    const orders = await listPurchaseOrdersByProject(projectId, ctx.service);
-    const pendingApproval = orders
-      .filter((o) => o.status === "SUBMITTED")
-      .slice(0, 10)
+    const [approval, receipt] = await Promise.all([
+      searchPurchaseOrdersByProject(projectId, ctx.service, { pendingApproval: true, limit: 10 }),
+      searchPurchaseOrdersByProject(projectId, ctx.service, { pendingReceipt: true, limit: 10 }),
+    ]);
+    const pendingApproval = approval.orders
       .map((o) => ({ id: o.id, code: o.code, supplierName: o.supplierName, totalAmount: o.totalAmount, currency: o.currency }));
-    const pendingReceipt = orders
-      .filter((o) => ["CONFIRMED", "PARTIALLY_RECEIVED"].includes(o.status))
-      .slice(0, 10)
+    const pendingReceipt = receipt.orders
       .map((o) => ({ id: o.id, code: o.code, status: o.status, supplierName: o.supplierName }));
     const href = `/proyectos/${projectId}/compras`;
     return {

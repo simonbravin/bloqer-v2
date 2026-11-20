@@ -15,6 +15,16 @@
 
 El inventario siguiente conserva el diagnóstico de septiembre de 2026. La revalidación AG-13 aplica al código posterior a las correcciones anteriores.
 
+## Ajuste de consultas de compras — 19/11/2026
+
+`search_purchase_requests` y `search_purchase_orders` usan ahora las variantes acotadas de sus servicios: los filtros se aplican en SQL antes de `take` y el total se obtiene con el mismo alcance en una transacción de lectura `RepeatableRead`. Se conservan el orden de solicitudes/órdenes, los DTOs, el total y la truncación informados. Estados desconocidos o filtros incompatibles devuelven cero coincidencias después de autorizar el acceso.
+
+`get_pending_purchase_orders` conserva los conteos del hub y consulta hasta diez órdenes por grupo de pendientes, sin cargar todas las órdenes del proyecto. Las variantes comparten permisos, tenant/empresa/obra y validación de relaciones con los listados actuales; estos mantienen su contrato sin límite para los callers existentes. Sin cambios de rutas, etiquetas o procedimientos de usuario: sin impacto en Guía/Help; sí se actualiza esta evidencia AI.
+
+Regresión: `packages/services/src/procurement/procurement-search.test.ts` verifica límites de consulta, filtros, total, DTO monetario, empresa activa y contexto global, obra compartida, módulos/permisos/ACL, relaciones inconsistentes y continuidad de los listados existentes. Sustituye únicamente I/O Prisma; no acredita comportamiento SQL ni rendimiento de producción. La verificación PostgreSQL requiere las fixtures aisladas del runbook.
+
+El limitador de consultas IA sigue en memoria (`apps/web/lib/ai-rate-limit.ts`). No se encontró infraestructura Redis/KV ni contador distribuido persistido existente; esta mejora de lecturas no convierte ese límite en una cuota global. La elección de infraestructura/persistencia distribuida y su política de fallo siguen requiriendo diseño/decisión, sin reutilizar tablas financieras o auditoría como contadores improvisados.
+
 ---
 
 ## Invariantes confirmados (transversales)

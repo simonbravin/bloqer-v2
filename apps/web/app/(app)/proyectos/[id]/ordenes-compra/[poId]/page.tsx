@@ -32,6 +32,7 @@ import {
   canRegisterApInvoice,
 } from "@/features/procurement";
 import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
+import { PurchaseOrderDocumentActions } from "@/features/procurement/components/purchase-order-document-actions";
 import { PurchaseOrderNextStep } from "@/features/procurement/components/purchase-order-next-step";
 import { ConfirmPurchaseOrderButton } from "@/features/procurement/components/confirm-purchase-order-button";
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
@@ -234,12 +235,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const invoiceSettled = billingAvailable && billing.allReceivedInvoiceLinesIssued;
   // Services resolve outstanding payables, including credit-note settlement (D-112/D-115).
   const fullyPaid = billingAvailable && billing.allIssuedInvoicesSettled === true;
-  const hasActions =
-    (isDraft && canEditPo) ||
-    (isSubmitted && (approvalAvailability.canApprove || approvalAvailability.canReturn || showAuthorizeAndCommit)) ||
-    (isApproved && canEditPo) ||
-    (isReceivable && canReceive) ||
-    canCancel;
   const actionBtn = procurementActionBtnClass;
 
   const poPath = `/proyectos/${id}/ordenes-compra/${poId}`;
@@ -281,8 +276,8 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
           <PurchaseOrderStatusBadge status={order.status} />
         </div>
-        {hasActions ? (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+            <PurchaseOrderDocumentActions projectId={id} purchaseOrderId={poId} code={order.code} />
             {isDraft && canEditPo && (
               <>
                 <Button asChild variant="outline" className={actionBtn}>
@@ -347,7 +342,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
               <CancelPurchaseOrderButton poId={poId} projectId={id} className={actionBtn} />
             )}
           </div>
-        ) : null}
       </div>
 
       <p className="text-sm text-muted-foreground">

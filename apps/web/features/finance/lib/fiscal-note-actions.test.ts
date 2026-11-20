@@ -8,6 +8,7 @@ import * as domain from "@bloqer/domain";
 import * as utils from "@bloqer/utils";
 import * as validators from "@bloqer/validators";
 import * as money from "../../../lib/format-money";
+import * as draftCreation from "../../ap/lib/supplier-invoice-draft-creation";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 type ActionResult = { ok?: true; id?: string; error?: string; data?: unknown[]; total?: number };
@@ -41,6 +42,7 @@ function actionEnvironment(services: Record<string, unknown>) {
     "@bloqer/services": { ServiceError, ...services },
     "@bloqer/domain": domain,
     "@bloqer/validators": validators,
+    "@/features/ap/lib/supplier-invoice-draft-creation": draftCreation,
     "@/lib/auth": { getCurrentUser: async () => ({ session: { user: { id: "actor" } }, tenantCtx: ctx }) },
     "next/navigation": { redirect: () => assert.fail("Unexpected redirect") },
     "next/cache": { revalidatePath: (path: string) => invalidated.push(path) },

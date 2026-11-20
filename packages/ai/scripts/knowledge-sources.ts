@@ -35,13 +35,13 @@ export const DOCS_ROOT = path.join(REPO_ROOT, "docs/bloqer2.0");
 export const DOCS_INDEX_PATH = path.join(__dirname, "../knowledge/generated/docs-index.json");
 
 export function hashFileContent(content: string): string {
-  return crypto.createHash("sha256").update(content, "utf8").digest("hex");
+  return crypto.createHash("sha256").update(content.replace(/\r\n/g, "\n"), "utf8").digest("hex");
 }
 
 export type SourceFileMeta = { path: string; sha256: string; bytes: number };
 
-/** Stable hash over INCLUDE list + file contents (missing files counted as absent). */
-export function computeKnowledgeSourceManifest(): {
+/** Stable across Git checkouts with LF or CRLF; byte counts describe canonical LF text. */
+export function computeKnowledgeSourceManifest(docsRoot = DOCS_ROOT): {
   sourceHash: string;
   sources: SourceFileMeta[];
 } {
@@ -50,13 +50,13 @@ export function computeKnowledgeSourceManifest(): {
   for (const rel of KNOWLEDGE_DOC_INCLUDE) {
     hash.update(rel);
     hash.update("\0");
-    const abs = path.join(DOCS_ROOT, rel);
+    const abs = path.join(docsRoot, rel);
     if (!fs.existsSync(abs)) {
       hash.update("MISSING");
       sources.push({ path: `docs/bloqer2.0/${rel}`, sha256: "MISSING", bytes: 0 });
       continue;
     }
-    const content = fs.readFileSync(abs, "utf8");
+    const content = fs.readFileSync(abs, "utf8").replace(/\r\n/g, "\n");
     const sha = hashFileContent(content);
     hash.update(sha);
     sources.push({

@@ -385,6 +385,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Por defecto: Compras / Jefe de obra / Depósito reciben el flujo diario SC/OC; Propietario/Administrador no (sí ven la campana). Escalamientos (SLA, umbral alto) sí llegan a dirección.",
       "Propietario/Administrador: Políticas → Notificaciones para alertas de empresa, canal CxP, CC del flujo diario a dirección, digest on/off y hora local.",
       "El resumen usa los Pendientes y alertas críticas que podés consultar. La revisión automática ocurre a las 10:05 UTC. El envío puede ocurrir en la hora local elegida o hasta tres horas después dentro del mismo día.",
+      "Políticas → Notificaciones muestra la próxima revisión prevista en la zona de la organización. Si elegís una hora fuera de la ventana, aparece un aviso con las horas compatibles. En Argentina la revisión de 07:05 admite horas de 04 a 07; elegir 09 queda fuera.",
     ],
     effects: [
       "El cambio aplica al próximo email de esa categoría (best-effort).",
@@ -394,6 +395,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "No confundir preferencias personales con Políticas → Notificaciones (empresa: alertas + canal CxP + CC dirección).",
       "Canal CxP «in-app + email» habilita mail de listo para pagar (categoría CxP) y de pago confirmado (categoría Compras — flujo diario).",
       "Apagar el email no saca el aviso de la campana ni de Pendientes.",
+      "La hora incompatible se puede guardar, pero el resumen no saldría en la revisión prevista. Cambiarla no aumenta la frecuencia automática, que sigue siendo diaria.",
     ],
     relatedSlugs: ["usar-notificaciones", "revisar-pendientes", "errores-operativos-frecuentes"],
     keywords: [
@@ -402,6 +404,9 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "notificaciones por correo",
       "digest",
       "resumen diario",
+      "hora del resumen",
+      "resumen no llega",
+      "ventana de revision",
       "configurar notificaciones",
       "apagar emails",
       "demasiados mails",

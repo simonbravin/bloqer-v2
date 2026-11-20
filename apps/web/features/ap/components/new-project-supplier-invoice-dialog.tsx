@@ -114,7 +114,7 @@ export function NewProjectSupplierInvoiceDialog({
       <DialogTrigger asChild>
         <Button size="sm">Nueva factura</Button>
       </DialogTrigger>
-      <DialogContent className="max-h-[90vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Nueva factura de proveedor</DialogTitle>
           <DialogDescription className="sr-only">

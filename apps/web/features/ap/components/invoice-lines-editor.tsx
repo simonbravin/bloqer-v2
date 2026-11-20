@@ -27,6 +27,7 @@ import {
 import { IVA_RATE_PRESETS, IVA_RATE_LABEL_ES, normalizeIvaRatePreset } from "@bloqer/domain";
 import { DocumentTaxTotalsFooter } from "@/features/finance/components/iibb-perception-fields";
 import { COST_CATEGORY_OPTIONS, type CostCategoryOptionValue } from "@/lib/cost-category-colors";
+import { cn } from "@/lib/utils";
 
 export type InvoiceLine = {
   id?: string;
@@ -110,6 +111,9 @@ interface Props {
   /** Document-level Percepción IIBB % ([D-112]). Controlled; omit both to hide. */
   iibbPerceptionRate?: string;
   onIibbPerceptionRateChange?: (v: string) => void;
+  /** Assisted entry keeps unread values empty until the user completes them. */
+  documentReview?: boolean;
+  amountsPending?: boolean;
 }
 
 export function InvoiceLinesEditor({
@@ -121,6 +125,8 @@ export function InvoiceLinesEditor({
   seedFirstLineCostTypeAsManual = false,
   iibbPerceptionRate,
   onIibbPerceptionRateChange,
+  documentReview = false,
+  amountsPending = false,
 }: Props) {
   const wbsCombobox = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
   const [headerDiscount, setHeaderDiscount] = useState("");
@@ -175,7 +181,7 @@ export function InvoiceLinesEditor({
           const dominant = wbs?.dominantCostType ?? null;
           patched.costType = dominant && COST_CATEGORY_OPTIONS.some((o) => o.value === dominant)
             ? dominant
-            : "MATERIAL";
+            : documentReview ? null : "MATERIAL";
         }
       }
       return patched;
@@ -198,7 +204,9 @@ export function InvoiceLinesEditor({
     setLineKeys((keys) => [...keys, createLineKey()]);
     onChange([
       ...lines,
-      { ...EMPTY_LINE },
+      documentReview
+        ? { ...EMPTY_LINE, quantity: "", taxRate: "", discountPct: "", costType: null }
+        : { ...EMPTY_LINE },
     ]);
   }
 
@@ -303,7 +311,7 @@ export function InvoiceLinesEditor({
                   <button
                     type="button"
                     onClick={() => removeLine(i)}
-                    className="text-muted-foreground hover:text-destructive text-xs"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive text-sm"
                     aria-label={`Eliminar línea ${i + 1}`}
                   >
                     ✕
@@ -328,7 +336,7 @@ export function InvoiceLinesEditor({
                       placeholder="Partida…"
                       searchPlaceholder="Buscar partida…"
                       emptyText="Sin partidas"
-                      className="h-9 text-xs"
+                      className={cn("h-9 text-xs", documentReview && "h-11 text-base sm:h-9 sm:text-xs")}
                     />
                   </div>
                   <div className="space-y-1">
@@ -336,14 +344,14 @@ export function InvoiceLinesEditor({
                       Tipo de costo
                     </Label>
                     <Select
-                      value={line.costType ?? "MATERIAL"}
+                      value={line.costType ?? (documentReview ? "" : "MATERIAL")}
                       onValueChange={(v) => updateCostType(i, v as CostCategoryOptionValue)}
                     >
                       <SelectTrigger
                         id={`invoice-line-${lineKey}-cost-type`}
-                        className="h-9 text-xs"
+                        className={cn("h-9 text-xs", documentReview && "h-11 text-base sm:h-9 sm:text-xs")}
                       >
-                        <SelectValue />
+                        <SelectValue placeholder="Seleccionar tipo" />
                       </SelectTrigger>
                       <SelectContent>
                         {COST_CATEGORY_OPTIONS.map((o) => (
@@ -372,7 +380,7 @@ export function InvoiceLinesEditor({
                   value={line.description}
                   onChange={(e) => update(i, "description", e.target.value)}
                   placeholder="Descripción del ítem"
-                  className="h-9 text-sm"
+                  className={cn("h-9 text-sm", documentReview && "h-11 text-base sm:h-9 sm:text-sm")}
                 />
               </div>
 
@@ -387,8 +395,8 @@ export function InvoiceLinesEditor({
                     required
                     value={line.quantity}
                     onValueChange={(v) => update(i, "quantity", v)}
-                    placeholder="1,00"
-                    className="h-9 text-sm"
+                    placeholder={documentReview ? "Completar" : "1,00"}
+                    className={cn("h-9 text-sm", documentReview && "h-11 text-base sm:h-9 sm:text-sm")}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
@@ -401,8 +409,8 @@ export function InvoiceLinesEditor({
                     required
                     value={line.unitPrice}
                     onValueChange={(v) => update(i, "unitPrice", v)}
-                    placeholder="0,00"
-                    className="h-9 text-sm"
+                    placeholder={documentReview ? "Completar" : "0,00"}
+                    className={cn("h-9 text-sm", documentReview && "h-11 text-base sm:h-9 sm:text-sm")}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
@@ -413,10 +421,11 @@ export function InvoiceLinesEditor({
                     key={discountRevision}
                     precision={4}
                     id={`${lineKey}-discount`}
+                    required={documentReview}
                     value={line.discountPct ?? "0"}
                     onValueChange={(v) => update(i, "discountPct", v)}
-                    placeholder="0"
-                    className="h-9 text-sm"
+                    placeholder={documentReview ? "Completar" : "0"}
+                    className={cn("h-9 text-sm", documentReview && "h-11 text-base sm:h-9 sm:text-sm")}
                   />
                 </div>
                 <div className="space-y-1 min-w-0">
@@ -424,11 +433,11 @@ export function InvoiceLinesEditor({
                     IVA %
                   </Label>
                   <Select
-                    value={normalizeIvaRatePreset(line.taxRate) ?? undefined}
+                    value={normalizeIvaRatePreset(line.taxRate) ?? ""}
                     onValueChange={(v) => update(i, "taxRate", v)}
                   >
-                    <SelectTrigger id={taxRateId} className="h-9 text-sm">
-                      <SelectValue placeholder={line.taxRate || "21"} />
+                    <SelectTrigger id={taxRateId} className={cn("h-9 text-sm", documentReview && "h-11 text-base sm:h-9 sm:text-sm")}>
+                      <SelectValue placeholder={line.taxRate || "Seleccionar"} />
                     </SelectTrigger>
                     <SelectContent>
                       {IVA_RATE_PRESETS.map((rate) => (
@@ -442,19 +451,19 @@ export function InvoiceLinesEditor({
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Subtotal</Label>
                   <p className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
-                    {formatDecimalArFromString(p.subtotal)}
+                    {amountsPending ? "Por completar" : formatDecimalArFromString(p.subtotal)}
                   </p>
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">IVA</Label>
                   <p className="flex h-9 items-center text-sm tabular-nums text-muted-foreground">
-                    {formatDecimalArFromString(p.tax)}
+                    {amountsPending ? "Por completar" : formatDecimalArFromString(p.tax)}
                   </p>
                 </div>
                 <div className="space-y-1 min-w-0">
                   <Label className="text-xs">Total</Label>
                   <p className="flex h-9 items-center text-sm tabular-nums font-semibold">
-                    {formatDecimalArFromString(p.total)}
+                    {amountsPending ? "Por completar" : formatDecimalArFromString(p.total)}
                   </p>
                 </div>
               </div>
@@ -464,11 +473,14 @@ export function InvoiceLinesEditor({
       </div>
 
       <DocumentTaxTotalsFooter
+        incomplete={amountsPending}
+        preserveEmptyRate={documentReview}
         subtotal={totals.subtotal}
         taxAmount={totals.tax}
         iibbPerceptionRate={iibbPerceptionRate}
         onIibbPerceptionRateChange={onIibbPerceptionRateChange}
       />
+      {amountsPending ? <p className="text-sm text-muted-foreground">Completá cantidades, precios, descuentos, IVA e IIBB e indicá si los precios incluyen IVA para ver el total. Ingresá 0 en los descuentos o impuestos que no correspondan.</p> : null}
       {requireWbs && wbsOptions.length === 0 ? (
         <p className="text-xs text-destructive" role="alert">
           No hay partidas EDT disponibles. Aprobá un presupuesto con ítems EDT antes de

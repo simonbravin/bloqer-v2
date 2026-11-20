@@ -47,11 +47,13 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 
 ## 8. Acciones disponibles
 - Crear/editar OC borrador (desde SC o directa) → **enviar** → **aprobar** o **rechazar/devolver** → **confirmar al proveedor**.
-- **Autorizar y comprometer ([D-105]):** si `CompanyProcurementSettings.allowAuthorizeAndCommit` (default off) y la OC no es de alto nivel, desde `DRAFT`/`SUBMITTED` se puede autorizar y confirmar en un acto (persiste APPROVED+CONFIRMED). Alto nivel sigue sin atajo.
-- Al enviar: calcular tiers de varianza ([BR-PUR-009]); si no hay alto nivel, puede auto-aprobarse en el mismo acto (con segregación [BR-APR-004]); **no** auto-confirma.
+- **Autorizar y comprometer ([D-105], ampliado por [D-106]):** con `CompanyProcurementSettings.allowAuthorizeAndCommit` (default off), desde `DRAFT`/`SUBMITTED` se puede autorizar y confirmar en un acto (persiste APPROVED+CONFIRMED). Alto nivel admite el atajo solo para OWNER/ADMIN habilitado, manteniendo segregación: el originador no puede auto-comprometer alto nivel. Compras/PM conservan el alcance bajo umbral.
+- Al enviar: calcular tiers de varianza ([BR-PUR-009]); si no hay alto nivel y el actor está autorizado respetando segregación [BR-APR-004], puede auto-aprobarse en el mismo acto. Con `autoConfirmOnApprove` OFF queda `APPROVED`; con ON también confirma y queda `CONFIRMED` ([D-107]). Si no cumple las condiciones de auto-aprobación, queda pendiente.
+- **Auto-confirmar al aprobar ([D-107]):** la aprobación explícita también puede confirmar en la misma transacción si la política está ON y la OC no es de alto nivel. Alto nivel conserva Confirmar o el atajo autorizado de D-106. Con política OFF la aprobación no compromete.
 - Mostrar **costo referencial** y **saldo de partida** al armar/enviar ([BR-PUR-011]).
 - Registrar recepción(es) parciales. **Cerrar saldo** no recibido ([BR-PUR-013]) requiere desarrollo separado (D-128); no hay acción disponible ni estado nuevo.
 - Anular solo si no hay recepciones confirmadas ni facturas activas.
+- **PDF para proveedor (ADR-019):** ver, descargar o preparar el archivo para compartir desde el dispositivo. Incluye datos comerciales, moneda/importes y advertencias de estado; omite todas las notas, imputaciones, presupuesto, desvíos y aprobadores internos. No cambia el estado de la OC ni registra envío/entrega/aceptación; la confirmación operativa sigue siendo una acción separada.
 
 ## 9. Pantallas y vistas necesarias
 - Listado y detalle OC con estado de aprobación, recepción y facturación por línea.
@@ -115,3 +117,7 @@ La afirmación de numeración ya cerrada omitía que el schema solo tenía UUID 
 
 ## 19. Preguntas abiertas
 - Q-075 resuelta en D-129: si cambia el FX al confirmar se renueva la aprobación con actor habilitado y segregación dentro de la misma transacción; si no, OC intacta. Numeración: D-050 para OC/SC y D-127 para recepciones nuevas, con históricos UUID preservados. Cierre parcial formal diferido expresamente por D-128.
+
+## Hallazgo — primer paquete 2026-11-19: atajo y comunicación externa
+
+El resumen de §8 seguía restringiendo el atajo de D-105, aunque D-106 ya lo amplió para OWNER/ADMIN bajo controles. También negaba toda auto-confirmación al enviar, mientras la guía y `submitPurchaseOrder` aplican D-107 cuando el actor puede auto-aprobar una OC estándar. Se alinea la descripción con las decisiones y el comportamiento vigente sin cambiar permisos ni transiciones. Confirmada identifica el compromiso registrado en Bloqer; el estado por sí solo no acredita que un mensaje haya sido enviado, recibido o aceptado por el proveedor. El PDF individual tampoco agrega esa evidencia.

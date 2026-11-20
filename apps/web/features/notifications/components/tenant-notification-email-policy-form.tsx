@@ -16,11 +16,13 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SwitchField } from "@/components/ui/switch-field";
 import { updateTenantNotificationEmailPolicyAction } from "@/app/(app)/configuracion/politicas/actions";
+import type { DigestSchedulePreview } from "../digest-schedule-preview";
 
 export type TenantEmailPolicyFormProps = {
   leadershipDailyFlowEmailCc: boolean;
   digestEnabledDefault: boolean;
   digestHourLocal: number;
+  schedulePreview: DigestSchedulePreview | null;
 };
 
 const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => h);
@@ -33,6 +35,7 @@ export function TenantNotificationEmailPolicyForm({
   leadershipDailyFlowEmailCc,
   digestEnabledDefault,
   digestHourLocal,
+  schedulePreview,
 }: TenantEmailPolicyFormProps) {
   const router = useRouter();
   const [cc, setCc] = useState(leadershipDailyFlowEmailCc);
@@ -124,6 +127,17 @@ export function TenantNotificationEmailPolicyForm({
             El resumen puede salir si en la zona de la organización es la hora elegida o hasta
             tres horas después, dentro del mismo día.
           </p>
+          {schedulePreview ? (
+            <p className="text-xs text-muted-foreground">
+              Próxima revisión prevista: {schedulePreview.reviewLabel} ({schedulePreview.timezone}).
+            </p>
+          ) : null}
+          {schedulePreview && !schedulePreview.eligibleHours.includes(Number(hour)) ? (
+            <p className="text-xs text-amber-800 dark:text-amber-200" role="status">
+              La hora elegida queda fuera de la ventana de esa revisión y el resumen no saldría.
+              {" "}Para incluirlo, elegí {schedulePreview.eligibleHours.map(formatHourLabel).join(", ")}.
+            </p>
+          ) : null}
         </div>
 
         {error ? (

@@ -17,7 +17,7 @@ export type CronScheduledReportsTenantSummary = {
 };
 
 export type CronScheduledReportsJobResult = {
-  ok: true;
+  ok: boolean;
   tenantsProcessed: number;
   totals: {
     schedulesProcessed: number;
@@ -58,34 +58,38 @@ export async function runScheduledReportsForTenant(
   tenantId: string,
   buildAttachment: BuildScheduledReportAttachmentFn,
 ): Promise<CronScheduledReportsJobResult> {
-  const tenant = await prisma.tenant.findFirst({
-    where: { id: tenantId, status: "ACTIVE" },
-    select: { id: true },
-  });
-  if (!tenant) {
-    return {
-      ok: true,
-      tenantsProcessed: 0,
-      totals: {
-        schedulesProcessed: 0,
-        sent: 0,
-        skipped: 0,
-        failed: 0,
-        duplicate: 0,
-        locked: 0,
-      },
-      tenants: [],
-    };
-  }
-
   try {
+    const tenant = await prisma.tenant.findFirst({
+      where: { id: tenantId, status: "ACTIVE" },
+      select: { id: true },
+    });
+    if (!tenant) {
+      return {
+        ok: true,
+        tenantsProcessed: 0,
+        totals: {
+          schedulesProcessed: 0,
+          sent: 0,
+          skipped: 0,
+          failed: 0,
+          duplicate: 0,
+          locked: 0,
+        },
+        tenants: [],
+      };
+    }
+
     const runs = await runDueScheduledReportsForTenant(tenantId, buildAttachment);
     const stats = summarizeRuns(runs);
+    // PARTIAL can include actual errors as well as intentional recipient skips.
+    const ok = !runs.some((run) =>
+      run.runStatus === "FAILED" || run.recipientsFailed > 0 || run.attachmentErrors.length > 0,
+    );
     return {
-      ok: true,
+      ok,
       tenantsProcessed: 1,
       totals: { ...stats },
-      tenants: [{ tenantId, ok: !runs.some((run) => run.runStatus === "FAILED"), ...stats }],
+      tenants: [{ tenantId, ok, ...stats }],
     };
   } catch (e) {
     console.error(
@@ -93,7 +97,7 @@ export async function runScheduledReportsForTenant(
       e instanceof Error ? e.message : e,
     );
     return {
-      ok: true,
+      ok: false,
       tenantsProcessed: 1,
       totals: {
         schedulesProcessed: 0,
@@ -152,7 +156,7 @@ export async function runScheduledReportsForAllActiveTenants(
   }
 
   return {
-    ok: true,
+    ok: tenants.every((tenant) => tenant.ok),
     tenantsProcessed: tenants.length,
     totals,
     tenants,

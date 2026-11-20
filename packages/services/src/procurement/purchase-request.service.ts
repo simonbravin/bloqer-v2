@@ -49,6 +49,11 @@ import {
   userDisplayNameFromMap,
 } from "../user/resolve-user-display-names";
 import { assertPurchaseRequestReturnable } from "./purchase-request-return-guards";
+import {
+  procurementSearchLimit,
+  purchaseRequestSearchStatuses,
+  type PurchaseRequestSearch,
+} from "./procurement-search";
 
 export type PurchaseRequestLineView = {
   id: string;
@@ -486,27 +491,57 @@ export async function listPurchaseRequestsByProject(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<PurchaseRequestView[]> {
+  return (await readPurchaseRequestsByProject(projectId, ctx)).requests;
+}
+
+/** Filter and bound records in SQL; total describes the full matching scope. */
+export async function searchPurchaseRequestsByProject(
+  projectId: string,
+  ctx: ServiceContext,
+  search: PurchaseRequestSearch = {},
+): Promise<{ requests: PurchaseRequestView[]; total: number }> {
+  return readPurchaseRequestsByProject(projectId, ctx, search);
+}
+
+async function readPurchaseRequestsByProject(
+  projectId: string,
+  ctx: ServiceContext,
+  search?: PurchaseRequestSearch,
+): Promise<{ requests: PurchaseRequestView[]; total: number }> {
   await assertProcurementTenantModule(ctx);
   if (!canViewPurchaseRequests(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos");
   }
   await requireProjectAccess(projectId, ctx);
-  const rows = await prisma.purchaseRequest.findMany({
-    where: {
-      projectId,
-      tenantId: ctx.tenantId,
-      ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
-    },
+  const take = search ? procurementSearchLimit(search.limit) : undefined;
+  const statuses = search ? purchaseRequestSearchStatuses(search.status) : undefined;
+  if (statuses?.length === 0) return { requests: [], total: 0 };
+  const where = {
+    projectId,
+    tenantId: ctx.tenantId,
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
+    ...(statuses ? { status: { in: statuses } } : {}),
+  } satisfies Prisma.PurchaseRequestWhereInput;
+  const query = {
+    where,
     include: {
       lines: prLineInclude,
       quotes: selectedQuoteInclude,
       purchaseOrders: activePoForEstimateInclude,
     },
     orderBy: { number: "desc" },
-  });
+    ...(take !== undefined ? { take } : {}),
+  } satisfies Prisma.PurchaseRequestFindManyArgs;
+  // One snapshot keeps the page and its count consistent during concurrent writes.
+  const [rows, total] = search
+    ? await prisma.$transaction([
+        prisma.purchaseRequest.findMany(query),
+        prisma.purchaseRequest.count({ where }),
+      ], { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead })
+    : await prisma.purchaseRequest.findMany(query).then((all) => [all, all.length] as const);
   rows.forEach(assertRequestReadRelations);
   const nameById = await resolveUserDisplayNames(rows.map((r) => r.requestedByUserId));
-  return rows.map((r) => {
+  const requests = rows.map((r) => {
     const { quotes, purchaseOrders, ...request } = r;
     const selected = selectedQuoteFromRows(quotes);
     const fromOrders = supplierNameFromOrders(purchaseOrders);
@@ -526,6 +561,7 @@ export async function listPurchaseRequestsByProject(
       ),
     );
   });
+  return { requests, total };
 }
 
 export async function getPurchaseRequestById(

@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "next-themes";
 import { ViewportHintSync } from "@/components/layout/viewport-hint-sync";
 import { AppSessionProvider } from "@/components/providers/app-session-provider";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = localFont({
+  src: "./fonts/inter-variable.woff2",
+  weight: "100 900",
+  style: "normal",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Bloqer",

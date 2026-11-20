@@ -300,6 +300,7 @@ Leer en este orden:
 |---|---|
 | [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md) | Higiene, nav, exports (lotes 1–4 hechos) |
 | [`PLAN_MEJORAS_OPERATIVAS_PROYECTO.md`](./PLAN_MEJORAS_OPERATIVAS_PROYECTO.md) | Hub compras, materiales look-ahead, integridad WBS ([D-055]) |
+| [`PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md`](./PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md) | Primer paquete de automatización: baseline, 40 oportunidades, P0/P1a y registro de pruebas/resultados |
 
 ---
 

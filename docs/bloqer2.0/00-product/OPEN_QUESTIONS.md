@@ -790,6 +790,26 @@
 - **Hallazgo:** al refrescar un borrador automático tras otra recepción, pueden perderse precios y otros datos fiscales ya editados y guardados por Finanzas. D-108 y P-IND-02 no definen la prioridad entre esas ediciones y la sugerencia de nuevas líneas.
 - **Propuesta:** [conservar la factura editada y pedir completarla manualmente](../08-architecture/platform-audit/2026-11-05-ag-14-edited-ap-draft-proposal.md).
 
+### Q-093 — Referencia fiscal y duplicados en captura de facturas
+
+- **Fecha:** 19/11/2026. **Estado:** ABIERTA; no bloquea el prellenado efímero de ADR-019.
+- **Hallazgo:** `SupplierInvoice.number` es el correlativo interno. No hay referencia fiscal externa persistida que permita comprobar un mismo comprobante entre web, correo y WhatsApp. La lectura inicial muestra la referencia y conserva el original, sin poblar campos alternativos ni afirmar deduplicación fiscal.
+- **Decisión pendiente:** definir alcance de una clave comercial (empresa, emisor, tipo, punto de venta y número cuando corresponda), comportamiento ante duplicados e históricos incompletos. Alternativas: advertencia revisable con referencia opcional, o unicidad obligatoria para nuevos comprobantes con circuito de excepción. No crear campo ni índice hasta aprobar representación y casos de uso.
+- **Seguimiento:** [primer paquete, A2/A4](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md).
+
+### Q-094 — Idempotencia durable del alta manual de borrador AP
+
+- **Fecha:** 19/11/2026. **Estado:** ABIERTA.
+- **Hallazgo:** `registerApExpense` tiene idempotencia pero emite/genera obligación; no reemplaza el alta DRAFT. El primer paquete conserva un ID confirmado frente a fallos de adjunto/refresco y bloquea repetición ante resultado incierto. No garantiza recuperación entre dispositivos ni después de perder una respuesta y cerrar el formulario.
+- **Decisión pendiente:** extender el contrato del alta DRAFT con clave de intento validada y un resultado recuperable, definiendo scope, payload distinto con misma clave, concurrencia, retención y reanudación. Puede reutilizar persistencia existente solo después de comprobar su semántica; no se habilita por analogía con gastos emitidos.
+- **Alternativa conservada:** revisión del listado antes de repetir una creación incierta; no automatizar reintentos de creación.
+
+### Q-095 — Horarios configurables del digest frente a ejecución diaria
+
+- **Fecha:** 19/11/2026. **Estado:** ABIERTA; D-114 sigue vigente.
+- **Hallazgo:** el cron diario a 10:05 UTC no cubre todas las horas configurables de todos los tenants con su ventana de tres horas. El primer paquete muestra la próxima revisión y advierte incompatibilidad, sin cambiar preferencias ni frecuencia en silencio.
+- **Decisión pendiente:** (1) mantener una revisión diaria y alinear opciones de horario a esa capacidad; o (2) habilitar ejecución frecuente con plan Vercel compatible o scheduler externo autenticado. La opción (2) exige definir disponibilidad/costo y actualizar D-114, configuración y smoke juntos. No prometer puntualidad exacta sin comprobar el scheduler real.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.
