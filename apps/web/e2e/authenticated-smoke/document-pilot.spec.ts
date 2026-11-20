@@ -55,10 +55,13 @@ test("manual company invoice persists as a draft after reload without issuing or
   await dialog.getByRole("button", { name: "Crear factura", exact: true }).click();
   await expect(page).toHaveURL(/\/finanzas\/facturas-proveedor\/[0-9a-f-]{36}$/, { timeout: 30_000 });
   const draftUrl = page.url();
+  await expect(page.getByText(description, { exact: true })).toHaveCount(1);
   await expect(page.getByText(description, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Emitir factura", exact: true })).toBeVisible();
   await page.reload();
   await expect(page).toHaveURL(draftUrl);
+  // Wait for the reload's streamed markup to settle, without hiding duplicate rows.
+  await expect(page.getByText(description, { exact: true })).toHaveCount(1);
   await expect(page.getByText(description, { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Emitir factura", exact: true })).toBeVisible();
   await testInfo.attach("persisted-manual-draft", {

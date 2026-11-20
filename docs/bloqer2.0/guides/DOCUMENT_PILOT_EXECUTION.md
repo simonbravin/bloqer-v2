@@ -10,6 +10,8 @@ Se agregó un caso de navegador autenticado que crea una factura manual de empre
 
 Primera corrida: `44743449756`, commit `a1970c3f8c74c3bdea7b15753781b68cc45c4b7a`. Lint, tipos, pruebas unitarias, índice, build, nueve casos públicos y los nueve autenticados anteriores pasaron. El caso nuevo falló en los tres tamaños antes de guardar: su selector omitía el asterisco del label obligatorio **Letra del comprobante \***. Se corrigió el selector; no se alteró el formulario ni se debilitó la prueba. El check de la revisión posterior es la evidencia de su resultado.
 
+Segunda corrida: `44745686705`, revisión `81d83fe313789f5b7035a4031fef39b98e311e91`: 11/12 casos autenticados aprobados. El caso nuevo pasó en tablet y celular; en escritorio falló después de recargar porque el selector de texto coincidió con dos celdas. Se agregó espera explícita de una única coincidencia antes de comprobar visibilidad, tanto al crear como al recargar. No se usa `.first()` ni se acepta una duplicación persistente. La compilación, unitarias y casos públicos volvieron a pasar.
+
 El despliegue automático de esa rama (`4vdunZXSsmG9r1SVJXELKDcMpKNq`) terminó correctamente. Se verificó por navegación real que el alias del piloto abre `/login?callbackUrl=%2F` **en su propio dominio** y ya no redirige a `portal.bloqer.app`. No fue necesario retomar el redeploy manual ni pedir otro código. Esta verificación no acredita login autenticado, Google OAuth ni la DB efectiva del preview.
 
 ## Candidato encontrado
