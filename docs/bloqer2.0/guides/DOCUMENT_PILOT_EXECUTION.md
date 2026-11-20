@@ -129,3 +129,11 @@ Estas evaluaciones no habilitan por sí mismas el piloto en la aplicación. Son 
 - **1/A + 9/I + 10/J:** queda unir lo ya probado: sesión demo en el entorno cuya DB esté acreditada, lectura, revisión, guardado único y apertura del original adjunto, incluyendo recuperación ante fallo. P-01 a P-07 siguen abiertos como recorrido integral remoto; las verificaciones de componentes anteriores no los cierran.
 - **2/B + 3/C:** siguiente lote del plan: WhatsApp y avisos, una vez cerrado el recorrido integral y sus prerrequisitos de entrega/recuperación. No se envían mensajes como parte de estas pruebas.
 - **4/D:** audio después. **5/E a 8/H** conservan su alcance y orden original. No hace falta sumar proveedores para terminar este piloto.
+
+### Incidencia de despliegue y corrección del arranque de conexión
+
+El Owner aportó el log del preview del commit `283c9dc`, del 20/11 a las 15:15 (Argentina). El build falló antes de Next.js: `prisma migrate deploy` seleccionó `bloqer_preview` en `ep-young-forest-ap86bxcg` y devolvió P1001 unos cinco segundos después. El log acredita el destino configurado para migraciones; no acredita una conexión exitosa ni el contenido de esa DB. La API de Neon siguió sin exponer ese proyecto a esta conexión.
+
+La duración es compatible con el timeout por defecto de Prisma y un compute de Neon todavía arrancando; es una hipótesis, no una causa confirmada. Según la [documentación oficial de Prisma v6](https://docs.prisma.io/docs/orm/v6/overview/databases/neon#resolving-connection-timeouts), aumentar `connect_timeout` permite esperar ese arranque. Se refuerza el script de build existente con mínimo 15 segundos **solo en la DIRECT_URL del subproceso de migración Neon**, conservando valores explícitos mayores o cero. No se cambian destinos, credenciales, schema, configuración de Vercel ni la conexión runtime; no se agregan reintentos ni se omiten errores de migración.
+
+Doce pruebas del guard de migraciones aprobaron, incluyendo cinco nuevas para timeout, conservación de credenciales/destino y parámetros, configuración inválida, aislamiento del portal y ausencia de efectos en builds locales/Postgres no Neon. La corrección requiere un nuevo despliegue exitoso para dar por resuelta esta incidencia; el build de CI con Postgres descartable no sustituye esa verificación Vercel/Neon.
