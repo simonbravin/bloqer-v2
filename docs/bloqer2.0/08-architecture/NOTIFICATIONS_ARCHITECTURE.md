@@ -141,7 +141,8 @@ Contexto de sistema: `buildOperationalAlertsCronServiceContext` + `runAllOperati
 
 - **Auth (obligatoria):** `Authorization: Bearer <CRON_SECRET>` **o** header `x-cron-secret: <CRON_SECRET>` (comparación *timing-safe* cuando las longitudes coinciden; si difieren → rechazo sin llamar a `timingSafeEqual`). Si enviás ambos headers, gana **`Authorization`** (se ignora `x-cron-secret`).
 - **Env:** `CRON_SECRET` en variables de entorno (`@bloqer/config` → `getOperationalAlertsCronSecret()`). Mínimo **16 caracteres**; si falta o es corto → **503** `cron_unconfigured` y **no** se ejecuta nada (dev y prod).
-- **Query opcional:** `?tenantId=<uuid>` — solo con secreto válido; filtra a ese tenant ACTIVE.
+- **Query opcional:** `?tenantId=<uuid>` — solo con secreto válido; filtra a ese tenant ACTIVE. Un valor vacío, inválido o repetido devuelve 400 sin ejecutar; solo la ausencia del parámetro selecciona todos los tenants activos.
+- **Contrato HTTP compartido:** alertas, digest y reportes programados usan `apps/web/lib/cron-request.ts`. Todas las respuestas son `private, no-store`. Un resultado `ok: false` devuelve 500 conservando el resumen; una excepción devuelve 500 `cron_failed` sin exponer detalles internos. Un resultado correcto devuelve 200. Esto permite detectar fallos desde el monitoreo; no agrega reintentos ni acredita entrega al destinatario. Horarios, audiencias, preferencias y deduplicación permanecen en sus servicios existentes.
 - **Respuesta JSON (sin PII):** `ok`, `tenantsProcessed`, `totals` { `checkedCount`, `createdCount`, `skippedCount`, `errorCount` }, `tenants[]` { `tenantId`, `ok`, mismos contadores }. Sin nombres de cliente/proyecto, sin `storageKey`, sin metadata, sin stack traces. Códigos de error genéricos: `unauthorized`, `cron_unconfigured`, `invalid_tenant_id`.
 
 **Idempotencia:** sin lógica nueva; sigue Phase 8B (ventana 7 días, etc.). El cron puede ejecutarse varias veces al día sin duplicar dentro de la ventana.

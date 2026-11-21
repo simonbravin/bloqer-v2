@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, FileText, Share2 } from "lucide-react";
+import { Copy, Download, FileText, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { readReportDownload } from "@/features/reports/report-download";
 
@@ -17,6 +18,7 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [message, setMessage] = useState("");
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => () => request.current?.abort(), []);
@@ -40,6 +42,7 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
     setOpen(true);
     setError(null);
     setFile(null);
+    setMessage(`Hola, te comparto la orden de compra ${code}. Por favor, confirmá la recepción del documento y la fecha de entrega prevista. Gracias.`);
     try {
       const response = await fetch(
         `/api/reports/proyectos/${projectId}/ordenes-compra/${purchaseOrderId}/export?format=pdf`,
@@ -62,7 +65,7 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
     setSharing(true);
     try {
       // The file is already prepared: this call keeps the user's transient activation.
-      await navigator.share({ files: [file], title: `Orden de compra ${code}` });
+      await navigator.share({ files: [file], title: `Orden de compra ${code}`, text: message });
       toast.info("Verificá el envío en la app elegida. El estado de la orden no cambió.");
     } catch (cause) {
       if (!(cause instanceof DOMException && cause.name === "AbortError")) {
@@ -70,6 +73,15 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
       }
     } finally {
       setSharing(false);
+    }
+  }
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(message);
+      toast.success("Mensaje copiado. Adjuntá el PDF y revisá el destinatario antes de enviarlo.");
+    } catch {
+      toast.error("No se pudo copiar. Seleccioná el mensaje y copialo manualmente.");
     }
   }
 
@@ -103,6 +115,13 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
                 <p role="status" className="text-sm font-medium">PDF listo para revisar</p>
                 <p className="mt-1 break-all text-xs text-muted-foreground">{file.name}</p>
               </div>
+              <label className="block space-y-2 text-sm">
+                <span>Mensaje para el proveedor</span>
+                <Textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} rows={4} disabled={sharing} />
+              </label>
+              <Button type="button" variant="outline" className="min-h-11" disabled={!message.trim() || sharing} onClick={() => void copyMessage()}>
+                <Copy className="mr-2 h-4 w-4" aria-hidden />Copiar mensaje
+              </Button>
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <Button asChild variant="outline" className="min-h-11"><a href={objectUrl} target="_blank" rel="noopener noreferrer">Ver PDF</a></Button>
                 <Button asChild variant="outline" className="min-h-11"><a href={objectUrl} download={file.name}><Download className="mr-2 h-4 w-4" aria-hidden />Descargar PDF</a></Button>
@@ -114,8 +133,8 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
               </div>
               <p className="text-xs text-muted-foreground">
                 {canShareFile
-                  ? "Elegí WhatsApp, correo u otra app disponible en tu dispositivo. Revisá el destinatario y completá el envío allí."
-                  : "Para enviarlo por WhatsApp o correo, descargá el PDF y adjuntalo en la app que uses."}
+                  ? "Elegí WhatsApp, correo u otra app disponible. Comprobá que incluya el PDF y el mensaje, revisá el destinatario y completá el envío allí."
+                  : "Para enviarlo por WhatsApp o correo, copiá el mensaje, descargá el PDF y adjuntalo en la app que uses."}
               </p>
               <details className="text-xs text-muted-foreground">
                 <summary className="min-h-11 cursor-pointer py-3">Qué contiene el archivo</summary>
