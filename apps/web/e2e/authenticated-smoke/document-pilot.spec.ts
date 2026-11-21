@@ -90,6 +90,41 @@ test("a signed-in user can prepare and download the existing order PDF", async (
   await expect(dialog).toHaveCount(0);
 });
 
+test("supplier message can be edited and shared with the PDF without recording a delivery", async ({ page }) => {
+  await page.addInitScript(() => {
+    const proof = { copied: "", text: "", signature: "", calls: 0, cancel: true };
+    Object.assign(window, { supplierShareProof: proof });
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: async (text: string) => { proof.copied = text; } } });
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+    Object.defineProperty(navigator, "share", { configurable: true, value: async (data: ShareData) => {
+      proof.calls += 1;
+      proof.text = data.text ?? "";
+      proof.signature = (await data.files![0]!.text()).slice(0, 4);
+      if (proof.cancel) { proof.cancel = false; throw new DOMException("Cancelled", "AbortError"); }
+    } });
+  });
+  await page.goto(orderPath);
+  await page.getByRole("button", { name: "PDF para proveedor", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const message = dialog.getByLabel("Mensaje para el proveedor", { exact: true });
+  await expect(message).toBeVisible({ timeout: 30_000 });
+  expect(await message.inputValue()).not.toMatch(/https?:|storageKey|\/api\//);
+  const edited = "Hola, revisá esta OC y confirmá recepción. PRUEBA SIN ENVÍO.";
+  await message.fill(edited);
+  await dialog.getByRole("button", { name: "Copiar mensaje", exact: true }).click();
+  const proof = () => page.evaluate(() => (window as unknown as { supplierShareProof: { copied: string; text: string; signature: string; calls: number } }).supplierShareProof);
+  expect((await proof()).copied).toBe(edited);
+  const share = dialog.getByRole("button", { name: "Compartir archivo", exact: true });
+  await share.click();
+  await expect(share).toBeEnabled();
+  await expect(message).toHaveValue(edited);
+  await share.click();
+  await expect(share).toBeEnabled();
+  expect(await proof()).toMatchObject({ text: edited, signature: "%PDF", calls: 2 });
+  await expect(page.getByText("Verificá el envío en la app elegida. El estado de la orden no cambió.", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("link", { name: "Descargar PDF", exact: true })).toBeVisible();
+});
+
 test("removing the session prevents access to a previously downloaded private PDF", async ({ page }) => {
   const authenticated = await page.request.get(pdfPath, { maxRedirects: 0 });
   expect(authenticated.status()).toBe(200);

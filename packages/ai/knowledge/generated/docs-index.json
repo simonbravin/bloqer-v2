@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-21T03:17:15.126Z",
-  "sourceHash": "2e2ee587f3bb1515184bca70aa66a62c1f2fda66fb6eb48b97474c44a63714b6",
+  "generatedAt": "2026-11-21T03:51:16.272Z",
+  "sourceHash": "e0e401de828a0e3c3ec78e66cbba2327329125aca641fcb56c914a55767e744f",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "905e4a88ed0398ffb76e773ec23a4ff838033b57489d786e67ff3774480ec18b",
-      "bytes": 229069
+      "sha256": "4364ca88e3078c36dbc0f4d0a4eb79a8ee2da2cc838fe0eaf4df5a0ceb807561",
+      "bytes": 229399
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1311,7 +1311,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "9. Compras, materiales y abastecimiento (nivel proyecto)",
-      "text": "La cabecera identifica código de OC y proveedor. **Ver solicitud de origen** lleva a la SC vinculada cuando existe; no se deduce la procedencia por el texto de las notas.\n\n**PDF individual para el proveedor:** en la ficha, **PDF para proveedor** abre la preparación del documento. **Preparando PDF…** cambia a **PDF listo para revisar**, con el nombre del archivo. Usá **Ver PDF** para revisar emisor/proveedor, obra, fechas, moneda, renglones, descuentos, impuestos y total. **Descargar PDF** guarda el archivo. Si el dispositivo admite compartir archivos, **Compartir archivo** abre sus opciones: elegí la aplicación y el destinatario y completá allí el envío. Si no aparece esa opción, descargá y adjuntá el PDF a tu correo o WhatsApp. **Qué contiene el archivo** despliega su alcance. **Cerrar** vuelve a la ficha y, si todavía se preparaba el PDF, interrumpe la espera.\n\nEl PDF conserva el estado de la OC y advierte si es **BORRADOR**, **PENDIENTE DE APROBACIÓN**, **APROBADA INTERNAMENTE** pendiente de confirmación o **ANULADA**. No incluye notas, imputaciones EDT/APU, referencias presupuestarias, desvíos, FX ni aprobadores internos. Descargar o compartir no confirma la OC ni registra que "
+      "text": "La cabecera identifica código de OC y proveedor. **Ver solicitud de origen** lleva a la SC vinculada cuando existe; no se deduce la procedencia por el texto de las notas.\n\n**PDF individual para el proveedor:** en la ficha, **PDF para proveedor** abre la preparación del documento. **Preparando PDF…** cambia a **PDF listo para revisar**, con el nombre del archivo. Usá **Ver PDF** para revisar emisor/proveedor, obra, fechas, moneda, renglones, descuentos, impuestos y total. **Descargar PDF** guarda el archivo. **Mensaje para el proveedor** permite editar el texto sugerido antes de **Copiar mensaje** o **Compartir archivo**. El mensaje se prepara solo en este diálogo; no se guarda como comunicación enviada. Si el dispositivo admite compartir archivos, **Compartir archivo** abre sus opciones con PDF y texto: comprobá que la aplicación elegida incluya ambos, elegí el destinatario y completá allí el envío. Si no aparece esa opción, copiá el mensaje, descargá y adjuntá el PDF a tu correo o WhatsApp. Si copiar falla, podés seleccionar el texto manualmente. **Qué contiene el archivo** despliega su alcance. **Cerrar** vuelve a la ficha y, si todavía se preparaba el PDF, interrumpe la espera.\n"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#153",
@@ -1319,7 +1319,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "9. Compras, materiales y abastecimiento (nivel proyecto)",
-      "text": "el proveedor recibió o aceptó el pedido. **Confirmar al proveedor** sigue siendo la acción operativa que genera Comprometido; por sí sola tampoco acredita entrega de un mensaje. El PDF individual se prepara desde la ficha; **Exportar** en el listado descarga un listado."
+      "text": "\nEl PDF conserva el estado de la OC y advierte si es **BORRADOR**, **PENDIENTE DE APROBACIÓN**, **APROBADA INTERNAMENTE** pendiente de confirmación o **ANULADA**. No incluye notas, imputaciones EDT/APU, referencias presupuestarias, desvíos, FX ni aprobadores internos. Descargar o compartir no confirma la OC ni registra que el proveedor recibió o aceptó el pedido. **Confirmar al proveedor** sigue siendo la acción operativa que genera Comprometido; por sí sola tampoco acredita entrega de un mensaje. El PDF individual se prepara desde la ficha; **Exportar** en el listado descarga un listado."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#154",

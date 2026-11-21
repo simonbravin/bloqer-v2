@@ -1181,8 +1181,9 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     steps: [
       "Abrí la OC que querés compartir y pulsá PDF para proveedor. Preparando PDF… cambia a PDF listo para revisar y muestra el nombre del archivo. Cerrar vuelve a la ficha; si todavía se estaba preparando, interrumpe la espera.",
       "Usá Ver PDF para revisar emisor y proveedor, identificación fiscal/domicilio, obra, fechas, moneda, renglones, descuentos, impuestos y total. El PDF muestra el estado actual y advierte si es borrador, pendiente de aprobación, aprobada internamente pendiente de confirmar o anulada.",
-      "Descargar PDF guarda el archivo en tu dispositivo. Si aparece Compartir archivo, elegí la aplicación y el destinatario en las opciones del dispositivo y completá allí el envío.",
-      "Si el dispositivo no admite compartir archivos PDF, descargá el documento y adjuntalo a tu correo o WhatsApp.",
+      "Revisá y editá Mensaje para el proveedor. Copiar mensaje lo lleva al portapapeles; si falla, seleccioná el texto manualmente. El mensaje no queda registrado como enviado.",
+      "Descargar PDF guarda el archivo en tu dispositivo. Si aparece Compartir archivo, comprobá que la aplicación elegida incluya PDF y mensaje, revisá el destinatario y completá allí el envío.",
+      "Si el dispositivo no admite compartir archivos PDF, copiá el mensaje, descargá el documento y adjuntalo a tu correo o WhatsApp.",
     ],
     effects: [
       "La consulta y la descarga respetan los permisos de la OC. No crean una URL pública ni cambian su estado.",
@@ -1202,6 +1203,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     keywords: [
       "pdf para proveedor",
+      "copiar mensaje",
+      "mensaje para el proveedor",
       "compartir archivo",
       "compartir oc",
       "enviar orden por whatsapp",
