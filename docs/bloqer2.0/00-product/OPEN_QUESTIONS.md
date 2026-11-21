@@ -118,7 +118,7 @@
 ### Q-008 — Documentos: versionado y check-in/check-out
 
 - **Categoría:** Documentos
-- **Estado:** ABIERTA
+- **Estado:** RESUELTA → D-146, opción 2 autorizada. Implementación y migración verificadas por entrega; check-in/check-out queda fuera.
 - **Impacto:** complejidad del módulo de documentos.
 - **Opciones:**
   1. Sin versionado, solo última versión.

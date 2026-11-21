@@ -2138,6 +2138,15 @@
 - **Evidencia:** el evento `supplier_invoice.updated` se verifica dentro del alcance del documento y bajo los bloqueos de la actualización. El evento acredita que hubo una edición. El comprobante del proveedor sigue siendo la fuente de sus importes.
 - **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-14-edited-ap-draft-proposal.md), módulo Compras, Guía y Ayuda.
 
+### D-146 — Versionado simple de adjuntos conservando cada original
+
+- **Fecha:** 2026-11-20. **Estado:** ACTIVA. Owner autorizó el versionado simple propuesto y cerrar los pendientes de 1/A, 9/I y 10/J antes de avanzar a 2/B y 3/C.
+- **Decisión:** Q-008 opción 2, sin check-in/check-out. Cada revisión crea otra fila `DocumentAttachment` y otro objeto privado; `replacesAttachmentId` enlaza su predecesora en el mismo tenant, empresa, proyecto y entidad. No sobrescribe bytes, autor ni fecha de la revisión anterior.
+- La anterior permanece activa mientras se sube la nueva. Confirmar la nueva revisión y archivar su predecesora es atómico. Una revisión confirmada solo puede tener una sucesora confirmada; los intentos incompletos no sustituyen el original y se pueden cancelar/reintentar.
+- Las revisiones confirmadas se conservan mediante archivo, sin eliminación lógica de la cadena. No altera permisos ni el estado del comprobante padre. Restaurar un documento archivado conserva la semántica existente; para continuar la cadena se usa la última revisión confirmada.
+- El historial de revisiones permite navegar y descargar cada original autorizado con autor y fecha/hora propios. No implica backup independiente, retención WORM, antivirus ni recuperación de bytes ausentes.
+- **Documentos afectados:** DOCUMENTS, DOCUMENT_STORAGE_DATA_MODEL, Guía, Help, Q-008 y pruebas de aislamiento/concurrencia. Migración aditiva, sin convertir ni eliminar archivos históricos.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

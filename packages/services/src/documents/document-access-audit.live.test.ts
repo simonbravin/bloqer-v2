@@ -6,7 +6,8 @@ import { prisma, type LinkedEntityType } from "@bloqer/database";
 import { buildStorageKey } from "@bloqer/storage";
 import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
-import { withSyntheticStorageSigning } from "../testing/storage-signing-fixture";
+import { withSyntheticStorageObjects, withSyntheticStorageSigning } from "../testing/storage-signing-fixture";
+import { getDocumentVersionLinks } from "./document-versions.service";
 import { ServiceError, type ServiceContext } from "../types";
 import { createDocumentFolder, listProjectDocumentFolders, moveDocumentFolder } from "./document-folder.service";
 import { exportDocumentHistory, getDocumentHistory } from "./document-history.service";
@@ -16,6 +17,7 @@ import {
   confirmDocumentUpload,
   getDocumentById,
   getDocumentDownloadUrl,
+  getDocumentFileBytes,
   initiateDocumentUpload,
   listEntityDocuments,
   listProjectDocuments,
@@ -106,6 +108,7 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
       await prisma.$transaction(async (tx) => {
         await tx.notification.deleteMany({ where: { tenantId } });
         await tx.auditLog.deleteMany({ where: { tenantId } });
+        await tx.documentAttachment.updateMany({ where: { tenantId }, data: { replacesAttachmentId: null } });
         await tx.documentAttachment.deleteMany({ where: { tenantId } });
         await tx.documentFolder.updateMany({ where: { tenantId, kind: "USER" }, data: { parentId: null } });
         await tx.documentFolder.deleteMany({ where: { tenantId } });
@@ -311,5 +314,59 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     assert.equal(restored.uploadedBy, doc.uploadedBy);
     assert.equal(restored.createdAt.toISOString(), doc.createdAt.toISOString());
     assert.equal(restored.status, "ACTIVE");
+  });
+
+  it("keeps original bytes during failed revisions and atomically confirms a revision with safe replay", async () => {
+    await withSyntheticStorageObjects(async (objects) => {
+      const originalBytes = Buffer.from("%PDF-1.7\noriginal evidence");
+      const first = await uploadDocument({ ...invoiceUpload(invoiceA, projectId), sizeBytes: originalBytes.length }, originalBytes, owner);
+      const original = await prisma.documentAttachment.findUniqueOrThrow({ where: { id: first.documentId } });
+      const bytes = Buffer.from("%PDF-1.7\nrevised evidence");
+      const input = { ...invoiceUpload(invoiceA, projectId), replacesAttachmentId: first.documentId, sizeBytes: bytes.length };
+      const pending = await initiateDocumentUpload(input, owner);
+      const row = await prisma.documentAttachment.findUniqueOrThrow({ where: { id: pending.documentId } });
+      await assert.rejects(confirmDocumentUpload(row.id, owner), { code: "VALIDATION" });
+      assert.equal((await getDocumentById(original.id, owner)).status, "ACTIVE");
+      assert.deepEqual((await getDocumentFileBytes(original.id, owner)).body, originalBytes);
+      assert.notEqual(original.storageKey, row.storageKey);
+      objects.set(row.storageKey, bytes);
+      const results = await Promise.all([confirmDocumentUpload(row.id, owner), confirmDocumentUpload(row.id, owner)]);
+      assert.ok(results.every((result) => result.id === row.id));
+      assert.equal((await getDocumentById(original.id, owner)).status, "ARCHIVED");
+      assert.equal((await getDocumentById(row.id, owner)).status, "ACTIVE");
+      assert.deepEqual((await getDocumentFileBytes(original.id, owner)).body, originalBytes);
+      assert.deepEqual((await getDocumentFileBytes(row.id, owner)).body, bytes);
+      assert.equal((await initiateDocumentUpload(input, owner)).documentId, row.id);
+      assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: row.id, action: "document.upload_confirmed" } }), 1);
+      assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: original.id, action: "document.archived" } }), 1);
+      assert.equal((await getDocumentVersionLinks(original.id, owner)).next?.id, row.id);
+      assert.equal((await getDocumentVersionLinks(row.id, owner)).previous?.id, original.id);
+      assert.equal((await getDocumentVersionLinks(original.id, owner)).canCreateVersion, false);
+      await assert.rejects(getDocumentVersionLinks(row.id, sibling), denied);
+      await assert.rejects(initiateDocumentUpload({ ...input, idempotencyKey: randomUUID(), linkedEntityId: invoiceB }, { ...owner, companyId: null }), denied);
+    });
+  });
+
+  it("allows only one concurrent successor and preserves versioned library evidence", async () => {
+    await withSyntheticStorageObjects(async (objects) => {
+      const bytes = Buffer.from("%PDF-1.7\nlibrary plan");
+      const input = { projectId, originalFileName: "plano.pdf", mimeType: "application/pdf" as const, sizeBytes: bytes.length, category: "PLAN" as const, idempotencyKey: randomUUID() };
+      const original = await uploadDocument(input, bytes, owner);
+      const revisions = await Promise.all([1, 2].map(() => initiateDocumentUpload({ ...input, idempotencyKey: randomUUID(), replacesAttachmentId: original.documentId }, owner)));
+      for (const revision of revisions) {
+        const row = await prisma.documentAttachment.findUniqueOrThrow({ where: { id: revision.documentId } });
+        objects.set(row.storageKey, bytes);
+      }
+      const outcomes = await Promise.allSettled(revisions.map((revision) => confirmDocumentUpload(revision.documentId, owner)));
+      assert.equal(outcomes.filter((outcome) => outcome.status === "fulfilled").length, 1);
+      assert.equal(await prisma.documentAttachment.count({ where: { tenantId, replacesAttachmentId: original.documentId, status: "ACTIVE" } }), 1);
+      const successor = await prisma.documentAttachment.findFirstOrThrow({ where: { tenantId, replacesAttachmentId: original.documentId, status: "ACTIVE" } });
+      await assert.rejects(softDeleteDocument(original.documentId, owner), denied);
+      await assert.rejects(softDeleteDocument(successor.id, owner), denied);
+      const cancelled = await prisma.documentAttachment.findFirstOrThrow({ where: { tenantId, replacesAttachmentId: original.documentId, status: "UPLOADING" } });
+      await softDeleteDocument(cancelled.id, owner);
+      assert.equal((await getDocumentVersionLinks(original.documentId, owner)).next?.id, successor.id);
+      assert.deepEqual((await getDocumentFileBytes(original.documentId, owner)).body, bytes);
+    });
   });
 });

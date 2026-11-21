@@ -6,14 +6,14 @@ import ts from "typescript";
 
 class ServiceError extends Error { constructor(public code: string, message: string) { super(message); } }
 
-function fixture(suffix: "history/export" | "integrity") {
+function fixture(suffix: "history/export" | "integrity" | "versions") {
   const ctx = { tenantId: "tenant", companyId: "company", roles: ["OWNER"] };
   const state = { signedIn: true, id: "00000000-0000-4000-8000-000000000001", error: null as Error | null, calls: [] as unknown[][] };
   const run = async (...args: unknown[]) => { state.calls.push(args); if (state.error) throw state.error; return suffix === "integrity" ? { checksumVerified: true } : "csv"; };
   class NextResponse extends Response { static json(body: unknown, init?: ResponseInit) { return new NextResponse(JSON.stringify(body), { ...init, headers: { ...init?.headers, "Content-Type": "application/json" } }); } }
   const dependencies: Record<string, unknown> = {
     "next/server": { NextResponse },
-    "@bloqer/services": { exportDocumentHistory: run, verifyStoredDocument: run, ServiceError },
+    "@bloqer/services": { exportDocumentHistory: run, verifyStoredDocument: run, getDocumentVersionLinks: run, ServiceError },
     "@bloqer/utils": { isUuid: (id: string) => /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i.test(id) },
     "@/lib/auth": { getCurrentUser: async () => state.signedIn ? { session: { user: { id: "actor" } }, tenantCtx: ctx } : null },
   };
@@ -23,7 +23,7 @@ function fixture(suffix: "history/export" | "integrity") {
   return { state, get: () => exports.GET!({}, { params: Promise.resolve({ documentId: state.id }) }) };
 }
 
-for (const suffix of ["history/export", "integrity"] as const) {
+for (const suffix of ["history/export", "integrity", "versions"] as const) {
   test(`${suffix}: authenticated context only, private success and no upload URL`, async () => {
     const f = fixture(suffix);
     const response = await f.get();

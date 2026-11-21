@@ -75,7 +75,12 @@ export function DocumentUploadDialog({
           key={formKey}
           {...formProps}
           layout="dialog"
-          onSuccess={() => handleOpenChange(false)}
+          onSuccess={() => {
+            setUploading(false);
+            setOpen(false);
+            setFormKey((key) => key + 1);
+            formProps.onSuccess?.();
+          }}
           onCancel={() => handleOpenChange(false)}
           onPendingChange={setUploading}
         />

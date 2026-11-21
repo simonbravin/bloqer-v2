@@ -138,6 +138,7 @@ export const initiateUploadSchema = z
       .optional(),
     linkedEntityId:   z.string().guid().optional(),
     idempotencyKey:   idempotencyKeySchema,
+    replacesAttachmentId: z.string().guid().optional().nullable(),
   })
   .superRefine((data, ctx) => {
     if (data.linkedEntityType && !data.linkedEntityId) {

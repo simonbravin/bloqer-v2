@@ -40,7 +40,8 @@ Seed lazy de carpetas SYSTEM por proyecto. Auto-filing fuerza `folder_id` en upl
 
 ## Versionado ([Q-008](../00-product/OPEN_QUESTIONS.md))
 
-- **Fase 1 recomendada:** cada nueva versión = **nueva fila** metadata + nuevo objeto R2; vínculo `replaces_attachment_id` opcional.  
+- **D-146:** cada nueva revisión = **nueva fila** metadata + nuevo objeto R2; `DocumentAttachment.replacesAttachmentId` nullable enlaza su predecesora. FK compuesta `(tenantId, replacesAttachmentId) → (tenantId, id)`, sin backfill histórico; servicios comprueban además empresa, obra y entidad. Índice único parcial para una sola sucesora ACTIVE/ARCHIVED, permitiendo intentos UPLOADING que no sustituyen el original. Un CHECK impide autorreferencia.
+- Se bloquea el proyecto cuando aplica y luego el registro implicado. Confirmación y archivo de predecesora se hacen en una transacción con eventos existentes `document.upload_confirmed` y `document.archived`. La API consulta vecinas autorizadas de la cadena sin devolver claves R2. El enum `DocumentStatus` no cambia y no se crea una tabla `DocumentVersion` paralela.
 - **No** sobrescribir objeto en R2 si el producto requiere trazabilidad legal.
 
 ## Acceso
