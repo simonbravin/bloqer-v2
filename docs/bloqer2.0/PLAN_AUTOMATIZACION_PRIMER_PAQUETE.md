@@ -407,4 +407,14 @@ La auditoría de publicación confirmó los 174 archivos locales contra main b6b
 
 Corte en curso: exportación CSV del historial autorizado y comprobación de recuperación del archivo guardado, reutilizando R2, permisos y campos existentes. Restore permanece ARCHIVED → ACTIVE, con el mismo original y auditoría; no equivale a recuperación de un borrado físico. Sin migraciones ni servicios externos nuevos. Guía, ayuda e índice AI deben acompañar el cambio.
 
-Próximos cortes: 1/A, versionado simple que conserve cada original y permita seguir sus revisiones; 9/I, validación del piloto en el entorno existente; 10/J, backup independiente y ensayo de recuperación con alcance y retención acordados. No dar estos puntos por cerrados con una verificación de bytes. Después siguen 2/B WhatsApp, 3/C avisos y 4/D audio, con 5–8 conservados en la matriz de §12.
+Próximos cortes: 1/A, versionado simple que conserve cada original y permita seguir sus revisiones; 9/I, validación del piloto en el entorno existente; 10/J, backup independiente y ensayo de recuperación con alcance y retención acordados. No dar estos puntos por cerrados con una verificación de bytes. Después siguen 2/B WhatsApp, 3/C avisos y 4/D audio, con 5-8 conservados en la matriz de §12.
+
+## 14. Cierre documental y preparación de 2/B y 3/C — 20/11/2026
+
+PR #24 integró exportación CSV y comprobación de bytes mediante main `61768fa5`. CI aprobó 2.978 pruebas unitarias, 22 SQL y 30 recorridos de navegador; Vercel informó producción exitosa `6LBZwhu2DADoyycgdVSBdDQ3CC55`.
+
+El Owner autorizó cerrar los pendientes y seguir con 2/B y 3/C. El nuevo corte 1/A implementa D-146/Q-008: revisiones enlazadas, cada original privado conservado, archivo anterior archivado solo al confirmar el siguiente, navegación autorizada por empresa/obra/entidad y protección frente a reemplazos concurrentes. Incluye una migración aditiva nullable, sin modificar registros históricos. Las revisiones confirmadas se archivan, no se eliminan desde la aplicación. Guía, ayuda e índice acompañan el cambio. Los resultados finales de CI y despliegue se registran en el PR; código preparado no implica migración aplicada.
+
+9/I permanece abierto: esta conexión sigue sin exponer el proyecto Bloqer en Vercel/Neon; no hay cuenta de piloto autenticada disponible para P-01 a P-07. 10/J requiere destino de copia separado, acceso y retención acordada, además de ensayo de restauración aislado de DB y objetos. Ni el versionado ni una lectura correcta de R2 sustituyen ese backup.
+
+2/B puede continuar sobre preparación/descarga/share manual de OC existente. Activar WhatsApp oficial exige cuenta y número del negocio, destino de prueba autorizado, consentimiento y plantillas; no se incorporan suscripciones ni se envían mensajes a terceros automáticamente. 3/C conserva los cron y preferencias existentes; Q-095 y recuperación durable/outbox siguen pendientes de decisión, sin inventar una frecuencia ni afirmar entregas efectivas. Se permite revisar y reforzar las rutas actuales mientras se resuelven esos prerrequisitos.

@@ -10,6 +10,7 @@ export type ClientUploadDocumentInput = {
   linkedEntityType?: string;
   linkedEntityId?: string;
   idempotencyKey: string;
+  replacesAttachmentId?: string;
 };
 
 export type ClientUploadDocumentResult =
@@ -49,6 +50,7 @@ export async function clientUploadDocument(
       category: input.category,
       description: input.description?.trim() ? input.description.trim() : null,
       idempotencyKey: input.idempotencyKey,
+      ...(input.replacesAttachmentId ? { replacesAttachmentId: input.replacesAttachmentId } : {}),
       ...(input.folderId ? { folderId: input.folderId } : {}),
       ...(input.linkedEntityType && input.linkedEntityId
         ? {

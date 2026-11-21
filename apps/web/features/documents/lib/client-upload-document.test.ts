@@ -40,6 +40,13 @@ it("accepts an already confirmed R2 replay without uploading a second object", a
   assert.equal(fetch.mock.callCount(), 1);
 });
 
+it("retains the predecessor identity when initiating a revision", async (t) => {
+  const fetch = t.mock.method(globalThis, "fetch", async () => Response.json({ documentId: "stored-doc", storageConfigured: true, status: "ACTIVE" }));
+  await clientUploadDocument({ ...input, replacesAttachmentId: "previous-document" });
+  const init = fetch.mock.calls[0]!.arguments[1] as RequestInit;
+  assert.equal(JSON.parse(init.body as string).replacesAttachmentId, "previous-document");
+});
+
 it("keeps the file pending when confirmation fails", async (t) => {
   let calls = 0;
   t.mock.method(globalThis, "fetch", async () => {

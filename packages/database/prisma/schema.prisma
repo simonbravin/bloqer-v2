@@ -3197,6 +3197,8 @@ model DocumentAttachment {
   companyId        String?
   projectId        String?
   folderId         String?
+  /// D-146: every revision has its own immutable file; no historical backfill.
+  replacesAttachmentId String?
   originalFileName String
   fileName         String
   mimeType         String
@@ -3222,7 +3224,11 @@ model DocumentAttachment {
   tenant  Tenant           @relation(fields: [tenantId], references: [id])
   project Project?         @relation(fields: [projectId], references: [id])
   folder  DocumentFolder?  @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  replacesAttachment DocumentAttachment? @relation("DocumentRevisions", fields: [tenantId, replacesAttachmentId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "document_attachments_revision_tenant_fkey")
+  revisions DocumentAttachment[] @relation("DocumentRevisions")
 
+  @@unique([tenantId, id])
+  @@index([tenantId, replacesAttachmentId])
   @@index([tenantId, projectId])
   @@index([tenantId, folderId])
   @@index([tenantId, linkedEntityType, linkedEntityId])

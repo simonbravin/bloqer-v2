@@ -349,6 +349,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Dentro de Historial, Exportar historial CSV descarga los movimientos autorizados completos, aunque todavía no hayas abierto todas las páginas. Incluye archivo, empresa/obra, evento, responsable y fecha/hora en UTC; no incluye los archivos originales. Si supera 5.000 movimientos, informa el límite sin descargar una lista incompleta.",
       "Verificar archivo guardado comprueba que el archivo siga accesible y que su tamaño coincida. Si existe una huella original, compara también el contenido; si no, lo indica. Está disponible para archivos guardados activos o archivados y muestra cuándo se verificó. No crea un backup ni cambia el estado del documento.",
       "Descargar conserva el archivo original. Archivar un adjunto operativo no lo borra: sigue disponible con los permisos de su empresa, obra y comprobante.",
+      "El icono Revisiones permite consultar y descargar cada revisión con su responsable y fecha, y navegar con Revisión anterior / siguiente. Desde la última revisión activa, Subir nueva revisión conserva el original y lo archiva solo cuando la nueva carga queda confirmada. Si falla la carga, la anterior sigue disponible.",
     ],
     pitfalls: [
       "Si el almacenamiento no está disponible, la nueva carga se bloquea: conservá el original y reintentá. No alcanza con registrar el nombre para que el archivo quede guardado.",
@@ -372,6 +373,8 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "exportar historial CSV",
       "verificar archivo guardado",
       "integridad",
+      "revisiones del archivo",
+      "subir nueva revisión",
       "original",
       "descargar",
       "icono ojo",

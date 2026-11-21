@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-20T21:25:13.917Z",
-  "sourceHash": "2371540ecafc03beac13321dc959409cd436d4867579e739d932211919d7403a",
+  "generatedAt": "2026-11-21T03:17:15.126Z",
+  "sourceHash": "2e2ee587f3bb1515184bca70aa66a62c1f2fda66fb6eb48b97474c44a63714b6",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "79d18798912b3f605350500d3d26071a14d7ae838b34ea95fa184f83ff71b635",
-      "bytes": 228393
+      "sha256": "905e4a88ed0398ffb76e773ec23a4ff838033b57489d786e67ff3774480ec18b",
+      "bytes": 229069
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1023,7 +1023,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "**Exportar historial CSV:** dentro del historial, descarga todos los movimientos autorizados del archivo, no solo la página visible. Incluye nombre e identificadores de documento, empresa, obra y entidad; evento, responsable y fecha/hora ISO en **UTC**. El límite es de 5.000 movimientos: si se supera se informa y no se descarga una lista incompleta. Los registros antiguos pueden tener historial vacío. El CSV no contiene los archivos originales ni reemplaza una copia de seguridad.\n\n**Verificar archivo guardado:** disponible en Historial para archivos guardados activos o archivados. Lee el archivo y comprueba tamaño; si hay una huella SHA-256 original, también compara el contenido. Si no existe esa huella, el resultado lo aclara y no acredita identidad del contenido. Muestra la fecha/hora de la comprobación. Un fallo no altera el original: conservá tu copia y solicitá revisión si persiste. No restaura eliminados ni cambia el estado: **Restaurar** sigue siendo la acción para volver un archivado a activo con sus permisos, autor y fecha originales.\n\n**Conservación y trazabilidad:** una nueva carga de archivo requiere almacenamiento disponible y confirmación antes de considerarse guardad"
+      "text": "**Revisiones del archivo:** el icono **Revisiones** abre la revisión seleccionada, con autor y fecha propios. Usá **Revisión anterior** / **Revisión siguiente** para recorrerlas y **Descargar esta revisión** para obtener su original. Desde la última revisión confirmada activa, **Subir nueva revisión** guarda otro archivo sin sobrescribir el anterior; lo archiva solo al confirmar la nueva carga. Una carga fallida conserva el original y puede reintentarse. Las revisiones confirmadas no se eliminan: se archivan. **Restaurar** no modifica la cadena; para continuarla, usá la última revisión confirmada. No hay bloqueo exclusivo de edición ni backup implícito.\n\n**Exportar historial CSV:** dentro del historial, descarga todos los movimientos autorizados del archivo, no solo la página visible. Incluye nombre e identificadores de documento, empresa, obra y entidad; evento, responsable y fecha/hora ISO en **UTC**. El límite es de 5.000 movimientos: si se supera se informa y no se descarga una lista incompleta. Los registros antiguos pueden tener historial vacío. El CSV no contiene los archivos originales ni reemplaza una copia de seguridad.\n\n**Verificar archivo guardado:** disponible en Histo"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#117",
@@ -1031,7 +1031,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "a. Si falla, conservá el original y reintentá; registrar solo el nombre no equivale a guardar el archivo. Los registros históricos con **Archivo no almacenado** requieren recuperar el original por fuera de Bloqer y cargarlo nuevamente."
+      "text": "rial para archivos guardados activos o archivados. Lee el archivo y comprueba tamaño; si hay una huella SHA-256 original, también compara el contenido. Si no existe esa huella, el resultado lo aclara y no acredita identidad del contenido. Muestra la fecha/hora de la comprobación. Un fallo no altera el original: conservá tu copia y solicitá revisión si persiste. No restaura eliminados ni cambia el estado: **Restaurar** sigue siendo la acción para volver un archivado a activo con sus permisos, autor y fecha originales."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#118",
@@ -1039,7 +1039,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "En listas, tarjetas y adjuntos (también desde el celular), **Registrado por** muestra el autor y la fecha y hora de registro en Bloqer. No representa la fecha de captura de la foto. El detalle muestra además la última actualización. La descarga conserva el original; archivar adjuntos operativos conserva su evidencia. El acceso a lista, vista previa y descarga exige permisos para la empresa, la obra y el comprobante asociado. Los documentos compartidos dentro del tenant conservan su alcance documentado.\n\n**Ruta:** Operación → **Documentos** → `/proyectos/[id]/documentos`\n\n1. A la izquierda ves el **árbol de carpetas** de la obra. Hay carpetas de **sistema** (Libro de Obra, Solicitudes de compra, Órdenes de compra, Cotizaciones, Recepciones, Facturas, Certificaciones, Subcontratos, Presupuestos, **Planos**, **General**) que se crean solas y **no se renombran ni borran**. Los adjuntos que subís desde un parte, SC, OC, factura, etc. **caen solos** en la carpeta correspondiente.\n2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías.\n3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o "
+      "text": "**Conservación y trazabilidad:** una nueva carga de archivo requiere almacenamiento disponible y confirmación antes de considerarse guardada. Si falla, conservá el original y reintentá; registrar solo el nombre no equivale a guardar el archivo. Los registros históricos con **Archivo no almacenado** requieren recuperar el original por fuera de Bloqer y cargarlo nuevamente.\n\nEn listas, tarjetas y adjuntos (también desde el celular), **Registrado por** muestra el autor y la fecha y hora de registro en Bloqer. No representa la fecha de captura de la foto. El detalle muestra además la última actualización. La descarga conserva el original; archivar adjuntos operativos conserva su evidencia. El acceso a lista, vista previa y descarga exige permisos para la empresa, la obra y el comprobante asociado. Los documentos compartidos dentro del tenant conservan su alcance documentado.\n\n**Ruta:** Operación → **Documentos** → `/proyectos/[id]/documentos`\n\n1. A la izquierda ves el **árbol de carpetas** de la obra. Hay carpetas de **sistema** (Libro de Obra, Solicitudes de compra, Órdenes de compra, Cotizaciones, Recepciones, Facturas, Certificaciones, Subcontratos, Presupuestos, **Planos**, **Gener"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#119",
@@ -1047,7 +1047,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto, **DWG/DXF**). No hay preview in-app de CAD: Ver/Descargar baja el archivo. Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad."
+      "text": "al**) que se crean solas y **no se renombran ni borran**. Los adjuntos que subís desde un parte, SC, OC, factura, etc. **caen solos** en la carpeta correspondiente.\n2. Bajo **Planos** o **General** podés crear **subcarpetas** (p. ej. Planos → Arq / Est / Elect), renombrarlas o borrarlas si están vacías."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#120",
@@ -1055,7 +1055,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "4. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo. En fotos **jpeg/png/webp**, clic en el **nombre** o en **Ver** abre un **visor a pantalla completa** (si hay varias en el listado, flechas / teclado para pasar); los **PDF** (y HEIC según el navegador) se abren en una pestaña nueva o desde el detalle. El icono de descarga **baja** el archivo. En el detalle, clic en la preview también amplía la foto.\n5. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archivar** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.\n6. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar (con el mismo visor de fotos) aparece en las tarjetas y en el detalle del documento. Esos archivos también aparecen en Documentos dentro de su carpeta de sistema.\n\nLa biblioteca, el detalle y los enlaces "
+      "text": "3. **Agregar documento** (solo en Planos, General o sus subcarpetas, o en la vista **Todos**) sube el archivo a la biblioteca de la obra (hasta **50 MB**; PDF, imágenes, Word, Excel, CSV, texto, **DWG/DXF**). No hay preview in-app de CAD: Ver/Descargar baja el archivo. Al subir, elegí el **tipo**: Contrato, Plano, Permiso, Técnico, Foto / evidencia, Factura, Remito, Certificado, Informe, Evidencia obra, **Presupuesto**, **Cotización** u Otro. El listado se puede filtrar por el mismo tipo. En carpetas operativas (Libro, OC, …) no hay botón de subir: se completan desde la ficha de la entidad.\n4. En la tabla, la columna **Acciones** no muestra texto: el icono de ojo **abre** el archivo. En fotos **jpeg/png/webp**, clic en el **nombre** o en **Ver** abre un **visor a pantalla completa** (si hay varias en el listado, flechas / teclado para pasar); los **PDF** (y HEIC según el navegador) se abren en una pestaña nueva o desde el detalle. El icono de descarga **baja** el archivo. En el detalle, clic en la preview también amplía la foto.\n5. Si el archivo es de la biblioteca (un plano, un permiso, un PDF suelto — **no** un adjunto de factura, parte, cotización, OC, etc.), también ves **Archi"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#121",
@@ -1063,7 +1063,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "directos muestran archivos de la empresa, obra y comprobante que podés consultar. Si una subida llegó al almacenamiento y faltó confirmarla, reintentá para completar el proceso. Los intentos abandonados quedan fuera del listado habitual."
+      "text": "var** (caja) y **Eliminar** (tacho). Eliminar pide confirmación y saca el archivo de la lista (queda de baja lógica). Sirve para borrar un plano viejo cuando subís la versión nueva.\n6. En los adjuntos de una ficha (parte de libro de obra, OC, factura, cotización, etc.) hay iconos de **Archivar** (caja), pero **no** se pueden eliminar: son respaldo del comprobante. El mismo par Ver/Descargar (con el mismo visor de fotos) aparece en las tarjetas y en el detalle del documento. Esos archivos también aparecen en Documentos dentro de su carpeta de sistema."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#122",
@@ -1071,7 +1071,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "8. Ejecución: Libro de obra, avances y consumos (nivel proyecto)",
-      "text": "> Ver [D-113](./00-product/DECISION_LOG.md): carpetas SYSTEM + USER; auto-filing; adjuntos sin obra no entran al árbol.\n\n<!-- capture:23 parte-de-obra-detalle -->\n![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)\n\n*Parte de obra (detalle).*\n\n<!-- capture:24 listado-de-consumos -->\n![Bloqer — Listado de consumos](./guides/assets/screenshots/24-listado-de-consumos.png)\n\n*Listado de consumos.*\n\n---"
+      "text": "La biblioteca, el detalle y los enlaces directos muestran archivos de la empresa, obra y comprobante que podés consultar. Si una subida llegó al almacenamiento y faltó confirmarla, reintentá para completar el proceso. Los intentos abandonados quedan fuera del listado habitual.\n\n> Ver [D-113](./00-product/DECISION_LOG.md): carpetas SYSTEM + USER; auto-filing; adjuntos sin obra no entran al árbol.\n\n<!-- capture:23 parte-de-obra-detalle -->\n![Bloqer — Parte de obra (detalle)](./guides/assets/screenshots/23-parte-de-obra-detalle.png)\n\n*Parte de obra (detalle).*\n\n<!-- capture:24 listado-de-consumos -->\n![Bloqer — Listado de consumos](./guides/assets/screenshots/24-listado-de-consumos.png)\n\n*Listado de consumos.*\n\n---"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#123",

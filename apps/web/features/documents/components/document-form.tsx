@@ -38,6 +38,7 @@ export type DocumentFormProps = {
   projectId: string | null;
   /** Library folder destination ([D-113]); ignored for operational linkedEntity. */
   folderId?: string | null;
+  replacesAttachmentId?: string;
   storageConfigured: boolean;
   linkedEntity?:
     | { type: "JOBSITE_LOG"; id: string }
@@ -66,6 +67,7 @@ export type DocumentFormProps = {
 export function DocumentForm({
   projectId,
   folderId,
+  replacesAttachmentId,
   storageConfigured,
   linkedEntity,
   defaultCategory = "OTHER",
@@ -108,6 +110,7 @@ export function DocumentForm({
         file: selectedFile,
         projectId,
         folderId,
+        replacesAttachmentId,
         category,
         description,
         linkedEntityType: linkedEntity?.type,
