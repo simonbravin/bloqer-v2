@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 
 // Existing seedDocsGuideDataset IDs. The fixture lives only in disposable CI Postgres.
@@ -13,6 +14,72 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("Contraseña", { exact: true }).fill(process.env.E2E_USER_PASSWORD!);
   await page.getByRole("button", { name: "Iniciar sesión", exact: true }).click();
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/, { timeout: 30_000 });
+});
+
+test("an interrupted upload keeps its original payload and retries without another attempt", async ({ page }) => {
+  const payloads: unknown[] = [];
+  let puts = 0;
+  let confirms = 0;
+  const documentId = randomUUID();
+  await page.route("**/api/documents/initiate-upload", async (route) => {
+    payloads.push(route.request().postDataJSON());
+    await route.fulfill({ json: { documentId, uploadUrl: "https://storage.example.test/pending", storageConfigured: true, status: "UPLOADING" } });
+  });
+  await page.route("https://storage.example.test/**", async (route) => {
+    puts += 1;
+    if (puts === 1) await route.abort("failed");
+    else await route.fulfill({ status: 412 });
+  });
+  await page.route(`**/api/documents/${documentId}/confirm`, async (route) => {
+    confirms += 1;
+    await route.fulfill({ json: { ok: true } });
+  });
+  await page.goto(`/proyectos/${projectId}/documentos`);
+  await page.getByRole("button", { name: "Agregar documento", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Agregar documento", exact: true });
+  await dialog.getByLabel("Descripción", { exact: true }).fill("Respaldo de prueba");
+  await dialog.locator('input[type="file"]').first().setInputFiles({ name: "respaldo.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\nfixture") });
+  await dialog.getByRole("button", { name: "Subir documento", exact: true }).click();
+  await expect(dialog.getByRole("alert")).toBeVisible();
+  await expect(dialog.getByLabel("Descripción", { exact: true })).toBeDisabled();
+  await expect(dialog.getByLabel("Categoría", { exact: true })).toBeDisabled();
+  await expect(dialog.locator('input[type="file"]').first()).toBeDisabled();
+  await dialog.getByRole("button", { name: "Reintentar carga", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(payloads).toHaveLength(2);
+  expect(payloads[1]).toEqual(payloads[0]);
+  expect(puts).toBe(2);
+  expect(confirms).toBe(1);
+});
+
+test("a pending document can be confirmed after reopening its detail, retaining errors for retry", async ({ page }, testInfo) => {
+  // Real metadata in disposable Postgres, synthetic signing, intercepted confirmation.
+  // The SQL suite separately verifies stored bytes, authorization and the transition.
+  const response = await page.request.post("/api/documents/initiate-upload", { data: {
+    projectId, originalFileName: `pendiente-${testInfo.project.name}.pdf`, mimeType: "application/pdf",
+    sizeBytes: 16, category: "OTHER", idempotencyKey: randomUUID(),
+  } });
+  expect(response.ok()).toBeTruthy();
+  const { documentId } = await response.json() as { documentId: string };
+  expect(documentId).toMatch(/^[0-9a-f-]{36}$/);
+  let attempts = 0;
+  await page.route(`**/api/documents/${documentId}/confirm`, async (route) => {
+    expect(route.request().method()).toBe("POST");
+    attempts += 1;
+    await route.fulfill(attempts === 1
+      ? { status: 400, json: { error: "Archivo todavía no disponible" } }
+      : { json: { ok: true } });
+  });
+  await page.goto(`/proyectos/${projectId}/documentos/${documentId}`);
+  await page.reload();
+  await page.getByRole("button", { name: "Completar carga", exact: true }).click();
+  const dialog = page.getByRole("alertdialog", { name: "¿Completar esta carga?", exact: true });
+  await dialog.getByRole("button", { name: "Verificar y confirmar", exact: true }).click();
+  await expect(page.getByText("Archivo todavía no disponible", { exact: true })).toBeVisible();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Verificar y confirmar", exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(attempts).toBe(2);
 });
 
 test("authenticated manual invoice entry remains usable while extraction is disabled", async ({ page }, testInfo) => {

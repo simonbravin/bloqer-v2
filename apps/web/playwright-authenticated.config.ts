@@ -30,6 +30,12 @@ export default defineConfig({
       APP_URL: baseURL,
       DATABASE_URL: databaseURL.toString(),
       DIRECT_URL: databaseURL.toString(),
+      // Synthetic signing only. Upload recovery tests intercept PUT/confirm in the
+      // browser; they never send files to R2 or use production credentials.
+      R2_ACCOUNT_ID: "00000000000000000000000000000000",
+      R2_ACCESS_KEY_ID: "isolated-browser-fixture",
+      R2_SECRET_ACCESS_KEY: "isolated-browser-fixture-not-a-real-secret",
+      R2_BUCKET_NAME: "isolated-browser-fixture",
     },
   },
 });

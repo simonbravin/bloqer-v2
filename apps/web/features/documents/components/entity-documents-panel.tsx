@@ -107,6 +107,8 @@ function AttachmentActionsRow({
         status={doc.status}
       />
       <DocumentMutateIconActions
+        documentId={doc.id}
+        storageProvider={doc.storageProvider}
         fileName={doc.originalFileName}
         status={doc.status}
         canMutate={doc.canMutate}
