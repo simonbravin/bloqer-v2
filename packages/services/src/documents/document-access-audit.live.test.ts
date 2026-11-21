@@ -347,6 +347,40 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     });
   });
 
+  it("recovers an interrupted photo on the same row after rejecting invalid bytes, with scope and provenance intact", async () => {
+    await withSyntheticStorageObjects(async (objects) => {
+      const bytes = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=", "base64");
+      const input = { ...invoiceUpload(invoiceA, projectId), originalFileName: "foto.png", mimeType: "image/png" as const, category: "PHOTO" as const, sizeBytes: bytes.length };
+      const pending = await initiateDocumentUpload(input, owner);
+      const original = await prisma.documentAttachment.findUniqueOrThrow({ where: { id: pending.documentId } });
+      await assert.rejects(confirmDocumentUpload(original.id, owner), { code: "VALIDATION" });
+      objects.set(original.storageKey, Buffer.from("incomplete"));
+      await assert.rejects(confirmDocumentUpload(original.id, sibling), denied);
+      await assert.rejects(confirmDocumentUpload(original.id, reader), denied);
+      await assert.rejects(confirmDocumentUpload(original.id, { ...owner, tenantId: randomUUID() }), missing);
+      assert.ok(objects.has(original.storageKey), "Denied callers must not alter the object");
+      await assert.rejects(confirmDocumentUpload(original.id, owner), { code: "VALIDATION" });
+      assert.equal(objects.has(original.storageKey), false);
+      const retry = await initiateDocumentUpload(input, owner);
+      assert.equal(retry.documentId, original.id);
+      assert.equal(retry.created, false);
+      const repaired = await prisma.documentAttachment.findUniqueOrThrow({ where: { id: original.id } });
+      assert.notEqual(repaired.storageKey, original.storageKey);
+      objects.set(repaired.storageKey, bytes);
+      await confirmDocumentUpload(repaired.id, owner);
+      await confirmDocumentUpload(repaired.id, owner);
+      const stored = await getDocumentById(repaired.id, owner);
+      assert.equal(stored.status, "ACTIVE");
+      assert.equal(stored.uploadedBy, original.uploadedBy);
+      assert.equal(stored.createdAt, original.createdAt.toISOString());
+      assert.equal(stored.companyId, companyA);
+      assert.deepEqual((await getDocumentFileBytes(stored.id, owner)).body, bytes);
+      assert.equal(await prisma.documentAttachment.count({ where: { tenantId, idempotencyKey: input.idempotencyKey } }), 1);
+      assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: stored.id, action: "document.upload_initiated" } }), 1);
+      assert.equal(await prisma.auditLog.count({ where: { tenantId, entityId: stored.id, action: "document.upload_confirmed" } }), 1);
+    });
+  });
+
   it("allows only one concurrent successor and preserves versioned library evidence", async () => {
     await withSyntheticStorageObjects(async (objects) => {
       const bytes = Buffer.from("%PDF-1.7\nlibrary plan");

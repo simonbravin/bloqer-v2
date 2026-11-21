@@ -17,6 +17,19 @@ export type ClientUploadDocumentResult =
   | { documentId: string; storageConfigured: boolean }
   | { error: string };
 
+/** Reuses the stored attempt; never creates metadata or uploads another object. */
+export async function clientConfirmDocumentUpload(documentId: string): Promise<ClientUploadDocumentResult> {
+  const response = await fetch(`/api/documents/${encodeURIComponent(documentId)}/confirm`, {
+    method: "POST",
+  }).catch(() => null);
+  if (!response) return { error: "No se pudo confirmar la subida. Revisá la conexión e intentá de nuevo." };
+  const data = await response.json().catch(() => null) as { ok?: boolean; error?: string } | null;
+  if (!response.ok || data?.ok !== true) {
+    return { error: data?.error ?? "No se pudo comprobar la confirmación. Reintentá sobre esta misma carga." };
+  }
+  return { documentId, storageConfigured: true };
+}
+
 /**
  * Browser upload: always direct-to-R2 (initiate → PUT → confirm).
  * Bypasses Vercel’s ~4.5 MB function body limit; requires bucket CORS
@@ -115,18 +128,7 @@ export async function clientUploadDocument(
       };
     }
 
-    const confirmRes = await fetch(`/api/documents/${documentId}/confirm`, {
-      method: "POST",
-    }).catch(() => null);
-    if (!confirmRes) return { error: "No se pudo confirmar la subida. Revisá la conexión e intentá de nuevo." };
-    const confirmData = (await confirmRes.json().catch(() => ({}))) as { error?: string };
-    if (!confirmRes.ok) {
-      return {
-        error:
-          confirmData.error ??
-          "El archivo se subió pero no se pudo confirmar. Intentá de nuevo o contactá soporte.",
-      };
-    }
+    return clientConfirmDocumentUpload(documentId);
   } else if (initiateData.status !== "ACTIVE") {
     return {
       error: "No se pudo obtener la URL de subida. Recargá e intentá de nuevo.",

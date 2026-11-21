@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { it } from "node:test";
-import { clientUploadDocument } from "./client-upload-document";
+import { clientConfirmDocumentUpload, clientUploadDocument } from "./client-upload-document";
 
 const input = {
   file: new File(["%PDF-1.7"], "prueba.pdf", { type: "application/pdf" }),
@@ -57,3 +57,29 @@ it("keeps the file pending when confirmation fails", async (t) => {
   });
   assert.deepEqual(await clientUploadDocument(input), { error: "No se confirmó" });
 });
+
+it("recovers a lost confirmation response by confirming the same document without another upload", async (t) => {
+  const calls: string[] = [];
+  t.mock.method(globalThis, "fetch", async (path: string) => {
+    calls.push(path);
+    if (calls.length === 1) throw new TypeError("Connection interrupted");
+    return Response.json({ ok: true });
+  });
+  assert.ok("error" in await clientConfirmDocumentUpload("pending-doc"));
+  assert.deepEqual(await clientConfirmDocumentUpload("pending-doc"), { documentId: "pending-doc", storageConfigured: true });
+  assert.deepEqual(calls, ["/api/documents/pending-doc/confirm", "/api/documents/pending-doc/confirm"]);
+});
+
+for (const status of [401, 403, 404, 409, 500]) {
+  it(`does not report confirmation success for HTTP ${status}`, async (t) => {
+    t.mock.method(globalThis, "fetch", async () => Response.json({ error: "No se confirmó" }, { status }));
+    assert.deepEqual(await clientConfirmDocumentUpload("pending-doc"), { error: "No se confirmó" });
+  });
+}
+
+for (const body of ["not JSON", "null", "{}", '{"ok":false}']) {
+  it(`does not discard a file after an invalid confirmation response: ${body}`, async (t) => {
+    t.mock.method(globalThis, "fetch", async () => new Response(body, { status: 200 }));
+    assert.ok("error" in await clientConfirmDocumentUpload("pending-doc"));
+  });
+}
