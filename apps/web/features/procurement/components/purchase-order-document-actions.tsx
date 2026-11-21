@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Copy, Download, FileText, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
   const [error, setError] = useState<string | null>(null);
   const [sharing, setSharing] = useState(false);
   const [message, setMessage] = useState("");
+  const messageId = useId();
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => () => request.current?.abort(), []);
@@ -115,10 +116,10 @@ export function PurchaseOrderDocumentActions({ projectId, purchaseOrderId, code 
                 <p role="status" className="text-sm font-medium">PDF listo para revisar</p>
                 <p className="mt-1 break-all text-xs text-muted-foreground">{file.name}</p>
               </div>
-              <label className="block space-y-2 text-sm">
-                <span>Mensaje para el proveedor</span>
-                <Textarea value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} rows={4} disabled={sharing} />
-              </label>
+              <div className="space-y-2 text-sm">
+                <label htmlFor={messageId}>Mensaje para el proveedor</label>
+                <Textarea id={messageId} value={message} onChange={(event) => setMessage(event.target.value)} maxLength={2000} rows={4} disabled={sharing} />
+              </div>
               <Button type="button" variant="outline" className="min-h-11" disabled={!message.trim() || sharing} onClick={() => void copyMessage()}>
                 <Copy className="mr-2 h-4 w-4" aria-hidden />Copiar mensaje
               </Button>
