@@ -76,6 +76,19 @@ jobs:
           pnpm --filter @bloqer/database exec prisma migrate deploy
           pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
 
+      - name: Restore rehearsal on disposable SQL and synthetic files
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_recovery_source_ci
+          DIRECT_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_recovery_source_ci
+          BLOQER_RECOVERY_TEST: "1"
+        run: |
+          docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_recovery_source_ci
+          docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_recovery_target_ci
+          pnpm --filter @bloqer/database exec prisma migrate deploy
+          export DATABASE_URL="postgresql://bloqer_ci:${CI_PILOT_POSTGRES_PASSWORD}@127.0.0.1:5432/bloqer_audit_recovery_target_ci"
+          export DIRECT_URL="$DATABASE_URL"
+          pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-recovery.live.test.ts
+
       - name: Lint
         run: pnpm lint
 

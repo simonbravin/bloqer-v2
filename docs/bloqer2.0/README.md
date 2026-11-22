@@ -280,6 +280,7 @@ Leer en este orden:
 | [`MVP_TECHNICAL_SCOPE.md`](./08-architecture/MVP_TECHNICAL_SCOPE.md) | Alcance primer piloto técnico |
 | [`PHASE_0_PROJECT_SETUP.md`](./08-architecture/PHASE_0_PROJECT_SETUP.md) … [`PHASE_5_HARDENING.md`](./08-architecture/PHASE_5_HARDENING.md) | Fases de implementación |
 | [`DEPLOYMENT_PLAN.md`](./08-architecture/DEPLOYMENT_PLAN.md) | Plan de despliegue |
+| [`BACKUP_RECOVERY_RUNBOOK.md`](./08-architecture/BACKUP_RECOVERY_RUNBOOK.md) | Ensayo aislado y pendientes de respaldo real |
 | [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md) | Smoke técnico post-deploy |
 | [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) | Smoke / UAT por rol (capacitación) |
 | [`RISK_REGISTER.md`](./08-architecture/RISK_REGISTER.md) | Registro de riesgos |
