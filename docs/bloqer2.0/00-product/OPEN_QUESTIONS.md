@@ -806,9 +806,9 @@
 
 ### Q-095 — Horarios configurables del digest frente a ejecución diaria
 
-- **Fecha:** 19/11/2026. **Estado:** ABIERTA; D-114 sigue vigente.
+- **Fecha:** 19/11/2026. **Estado:** RESUELTA → D-147 (22/11/2026); se conserva D-114 con la configuración compatible de D-147.
 - **Hallazgo:** el cron diario a 10:05 UTC no cubre todas las horas configurables de todos los tenants con su ventana de tres horas. El primer paquete muestra la próxima revisión y advierte incompatibilidad, sin cambiar preferencias ni frecuencia en silencio.
-- **Decisión pendiente:** (1) mantener una revisión diaria y alinear opciones de horario a esa capacidad; o (2) habilitar ejecución frecuente con plan Vercel compatible o scheduler externo autenticado. La opción (2) exige definir disponibilidad/costo y actualizar D-114, configuración y smoke juntos. No prometer puntualidad exacta sin comprobar el scheduler real.
+- **Decisión aprobada:** mantener revisión diaria y alinear nuevas elecciones de horario a esa capacidad, sin nuevos servicios. El servidor valida compatibilidad; los valores históricos se conservan con aviso y se corrigen por acción explícita. La campana y las demás categorías no cambian. No se promete puntualidad exacta ni se acredita recepción de correos con una prueba de configuración.
 
 ## Cómo se resuelve una pregunta
 

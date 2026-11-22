@@ -48,6 +48,22 @@ test.beforeEach(async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/, { timeout: 30_000 });
 });
 
+test("daily digest offers compatible hours and persists an explicit choice", async ({ page }) => {
+  await page.goto("/configuracion/politicas#notificaciones");
+  const hour = page.getByLabel("Hora mínima del resumen", { exact: true });
+  await expect(hour).toBeVisible();
+  await hour.click();
+  const enabled = page.locator('[role="option"]:not([aria-disabled="true"])');
+  // Seeded tenant uses Argentina: 04–07 can join the 07:05 daily review.
+  await expect(page.getByRole("option", { name: "09:00", exact: true })).toHaveCount(0);
+  await expect(enabled).toHaveCount(4);
+  await page.getByRole("option", { name: "06:00", exact: true }).click();
+  await page.getByRole("button", { name: "Guardar política de email", exact: true }).click();
+  await expect(page.getByText("Política de email guardada.", { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByLabel("Hora mínima del resumen", { exact: true })).toHaveText("06:00");
+});
+
 test("assisted review requires missing data and reconfirmation, then retries attachment on the same saved draft", async ({ page }, testInfo) => {
   const description = `Lectura CI ${testInfo.project.name} ${randomUUID()}`;
   const documentId = randomUUID();
@@ -81,10 +97,11 @@ test("assisted review requires missing data and reconfirmation, then retries att
   await page.getByRole("option").first().click();
   await dialog.getByLabel("Fecha de vencimiento", { exact: true }).fill("2026-12-20");
   await expect(dialog.getByLabel("Descripción", { exact: true })).toHaveValue(description);
-  await expect(dialog.getByLabel("Cantidad", { exact: true })).toHaveValue("2");
+  await expect(dialog.getByLabel("Cantidad", { exact: true })).toHaveValue("2,00");
   await review.check();
   await expect(save).toBeEnabled();
   await dialog.getByLabel("Cantidad", { exact: true }).fill("3");
+  await dialog.getByLabel("Cantidad", { exact: true }).blur();
   await expect(review).not.toBeChecked();
   await expect(save).toBeDisabled();
   await review.check();

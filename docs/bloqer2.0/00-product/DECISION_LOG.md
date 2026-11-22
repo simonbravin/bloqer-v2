@@ -2147,6 +2147,16 @@
 - El historial de revisiones permite navegar y descargar cada original autorizado con autor y fecha/hora propios. No implica backup independiente, retención WORM, antivirus ni recuperación de bytes ausentes.
 - **Documentos afectados:** DOCUMENTS, DOCUMENT_STORAGE_DATA_MODEL, Guía, Help, Q-008 y pruebas de aislamiento/concurrencia. Migración aditiva, sin convertir ni eliminar archivos históricos.
 
+### D-147 — Resumen diario con horarios compatibles y servicios actuales
+
+- **Fecha:** 2026-11-22. **Estado:** ACTIVA. Resuelve Q-095 por aprobación explícita del Owner: «Sí, resumen diario sin nuevos servicios».
+- **Decisión:** conservar el cron de resumen a las 10:05 UTC, sin contratar otro scheduler ni aumentar frecuencia. Las nuevas elecciones de hora deben estar dentro de la ventana de la próxima revisión en la zona horaria de la organización. Se conserva el margen de tres horas de D-114, sin cruzar medianoche.
+- **Interfaz:** «Hora mínima del resumen» ofrece solo opciones compatibles y muestra la próxima revisión prevista. Es una condición de inclusión; no un envío adicional a esa hora ni una garantía de llegada puntual.
+- **Históricos:** no migrar ni corregir preferencias guardadas automáticamente. Una hora histórica incompatible queda visible con advertencia y no puede elegirse como una nueva hora. Se permite editar otras preferencias sin reescribirla; cambiarla requiere una elección compatible y confirmación explícita al guardar. Los defaults existentes se conservan.
+- **Servidor:** vuelve a calcular compatibilidad al guardar un cambio de hora usando el tenant autenticado. Mantiene permisos, módulo, categorías, opt-out personal, audiencias y deduplicación existentes. No envía correos al guardar.
+- **Límites:** cambios de zona horaria/horario estacional pueden exigir revisar la preferencia; no se promete entrega observada ni recuperación durable. Q-093/Q-094 y outbox permanecen abiertos.
+- **Documentos afectados:** NOTIFICATIONS, Guía, Help, Q-095, plan y conocimiento AI. Sin campos, tablas, migraciones, proveedores ni dependencias nuevas.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.
