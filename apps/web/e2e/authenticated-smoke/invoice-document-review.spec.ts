@@ -102,6 +102,7 @@ test("assisted review requires missing data and reconfirmation, then retries att
   await expect(save).toBeEnabled();
   await dialog.getByLabel("Cantidad", { exact: true }).fill("3");
   await dialog.getByLabel("Cantidad", { exact: true }).blur();
+  await expect(dialog.getByLabel("Cantidad", { exact: true })).toHaveValue("3,00");
   await expect(review).not.toBeChecked();
   await expect(save).toBeDisabled();
   await review.check();
@@ -113,13 +114,17 @@ test("assisted review requires missing data and reconfirmation, then retries att
   await save.click();
   await expect(dialog.getByRole("alert")).toContainText("El borrador ya está guardado", { timeout: 30_000 });
   await expect(dialog.getByLabel("Descripción", { exact: true })).toBeDisabled();
+  // The error can render before the server-action transition settles. Wait for
+  // recovery to become actionable before asserting the final saved-draft state.
+  const retry = dialog.getByRole("button", { name: "Reintentar adjunto", exact: true });
+  await expect(retry).toBeEnabled({ timeout: 30_000 });
   await expect(save).toBeDisabled();
   expect(uploads).toHaveLength(1);
   expect(uploads[0]!.linkedEntityType).toBe("SUPPLIER_INVOICE");
   expect(uploads[0]!.projectId).toBeNull();
   const invoiceId = uploads[0]!.linkedEntityId;
   expect(invoiceId).toMatch(/^[0-9a-f-]{36}$/);
-  await dialog.getByRole("button", { name: "Reintentar adjunto", exact: true }).click();
+  await retry.click();
   await expect(page).toHaveURL(new RegExp(`/finanzas/facturas-proveedor/${invoiceId}$`), { timeout: 30_000 });
   expect(actions).toBe(1);
   expect(uploads).toHaveLength(2);
