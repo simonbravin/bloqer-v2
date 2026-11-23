@@ -67,7 +67,11 @@ test("audio proposal requires completion and renewed review before creating a re
   const draftUrl = page.url();
   await page.reload();
   await expect(page).toHaveURL(draftUrl);
-  await expect(page.getByText(description, { exact: true })).toBeVisible();
+  // The detail keeps both the mobile card and desktop table in the DOM.
+  // Assert one visible row, rather than counting the intentionally hidden layout.
+  const persistedLine = page.getByText(description, { exact: true }).and(page.locator(":visible"));
+  await expect(persistedLine).toHaveCount(1);
+  await expect(persistedLine).toBeVisible();
   await expect(page.getByRole("button", { name: "Enviar solicitud", exact: true })).toBeVisible();
   expect(transcriptions).toBe(1); expect(proposals).toBe(1);
   const layout = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
