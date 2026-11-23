@@ -100,7 +100,7 @@ El botón es circular y compacto: muestra el ícono de destellos y despliega el 
 **Qué no hace aún:**
 
 - **No modifica** información (no crea, aprueba, paga ni anula).
-- La conversación se conserva en memoria durante el contexto activo. El asistente usa los últimos mensajes para responder y empieza una conversación limpia al cambiar de cuenta, organización, empresa o permisos. Si se interrumpe la respuesta, podés volver a preguntar.
+- La conversación se conserva en memoria durante el contexto activo. El asistente usa los últimos mensajes para responder y empieza una conversación limpia al cambiar de cuenta, organización, empresa, permisos u obra (también al entrar o salir de una obra). Cambiar de sección dentro de la misma obra conserva la conversación. Al cambiar de contexto se cancela la respuesta en curso; volvé a abrir el chat y preguntá de nuevo. Si ya no tenés acceso a la obra, la consulta se detiene: no se convierte en una consulta general de la empresa.
 - No reemplaza el Centro de Ayuda (`/ayuda`); lo complementa.
 - **No amplía permisos:** solo ve lo que tu usuario podría consultar en Bloqer. Tesorería / finanzas de empresa quedan ocultas si tu rol no las tiene (p. ej. Jefe de obra).
 

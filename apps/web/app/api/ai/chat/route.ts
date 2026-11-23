@@ -229,14 +229,17 @@ export async function POST(req: Request) {
     );
   }
 
-  // Convenience context only — never authorization. Drop invalid/inaccessible project hints.
-  let safeProjectId = body.currentProjectId;
+  // Never turn a denied project request into a broader company-level consultation.
+  const safeProjectId = body.currentProjectId;
   if (safeProjectId) {
     try {
       const { requireProjectAccess } = await import("@bloqer/services");
       await requireProjectAccess(safeProjectId, service);
     } catch {
-      safeProjectId = undefined;
+      return Response.json(
+        { error: "No se pudo autorizar la consulta para esta obra. Volvé a abrir una obra a la que tengas acceso." },
+        { status: 403, headers: { "Cache-Control": "no-store" } },
+      );
     }
   }
 

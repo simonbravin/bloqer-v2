@@ -84,6 +84,14 @@ function withoutTrailingEmptyTurn(messages: ChatMessage[]): ChatMessage[] {
 
 export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
   const pathname = usePathname();
+  const projectId = currentProjectId ?? projectIdFromPath(pathname);
+  // A different project (including company scope) must not inherit conversation data.
+  // Unmounting also aborts an in-flight response before the new context can send.
+  return <BloqerAiChatSession key={projectId ?? "company"} enabled={enabled} currentProjectId={projectId} />;
+}
+
+function BloqerAiChatSession({ enabled, currentProjectId }: BloqerAiChatProps) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -322,7 +330,7 @@ export function BloqerAiChat({ enabled, currentProjectId }: BloqerAiChatProps) {
               </SheetTitle>
               <SheetDescription className="text-xs">
                 Ayuda del producto y datos autorizados (solo lectura). El historial vive
-                solo en esta sesión del navegador.
+                solo en esta sesión y se reinicia al cambiar de obra o empresa.
               </SheetDescription>
             </div>
           </SheetHeader>

@@ -25,6 +25,10 @@ export default defineConfig({
     url: `${baseURL}/login`,
     env: {
       ...server.env,
+      // Chat navigation is tested with intercepted responses and no provider credentials.
+      BLOQER_AI_ENABLED: "true",
+      BLOQER_AI_ALLOW_PRODUCTION: "true",
+      BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED: "false",
       AUTH_URL: baseURL,
       NEXT_PUBLIC_APP_URL: baseURL,
       APP_URL: baseURL,
