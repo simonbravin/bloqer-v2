@@ -36,8 +36,10 @@ test("quote file review maps request items and registers an offer without awardi
   await page.getByRole("button", { name: "Enviar solicitud", exact: true }).click();
   const submission = await submitted;
   expect([200, 303]).toContain(submission.status());
-  await submission.finished();
-  await expect(page.getByText("Enviada", { exact: true })).toBeVisible({ timeout: 30_000 });
+  // A server-action Flight stream can remain open after the mutation/redirect.
+  // Open the canonical detail to verify persisted state before exercising quotes.
+  await page.goto(requestUrl);
+  await expect(page.getByRole("heading", { level: 1 }).locator("..").getByText("Enviada", { exact: true })).toBeVisible({ timeout: 30_000 });
   const save = page.getByRole("button", { name: "Registrar cotización", exact: true });
   await expect(save).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Leer cotización desde archivo", exact: true }).click();
