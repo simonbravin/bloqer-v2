@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS } from "../lib/procurement-form-layout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
@@ -221,7 +222,7 @@ export function PurchaseRequestForm({
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
       <form
-        className="space-y-5"
+        className={`space-y-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}
         onSubmit={(event) => {
           event.preventDefault();
           const fd = new FormData(event.currentTarget);
@@ -382,7 +383,7 @@ export function PurchaseRequestForm({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  className="min-h-9"
+                  className="min-h-11 md:min-h-10"
                   disabled={!wbsNodeId}
                   onClick={addShortfallLines}
                 >
@@ -393,7 +394,7 @@ export function PurchaseRequestForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="min-h-9"
+                className="min-h-11 md:min-h-10"
                 disabled={!wbsNodeId}
                 onClick={addEmptyLine}
               >
@@ -447,7 +448,7 @@ export function PurchaseRequestForm({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="min-h-9 text-destructive hover:text-destructive"
+                          className="h-11 w-11 shrink-0 p-0 text-destructive hover:text-destructive md:h-10 md:w-10"
                           onClick={() => removeLine(line.rowKey)}
                           aria-label={`Quitar línea ${index + 1}`}
                         >
@@ -523,7 +524,7 @@ export function PurchaseRequestForm({
         </section>
 
         </fieldset>
-        <section className="space-y-4">
+        <section className="max-w-md space-y-4">
           <h2 className="text-sm font-semibold">Cuándo</h2>
           <div className="space-y-2">
             <Label htmlFor="neededByDate">
@@ -557,7 +558,7 @@ export function PurchaseRequestForm({
         </section>
 
         {requireAudioReview ? <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={audioReviewed} disabled={pending || !wbsNodeId || !neededByDateValue || lines.some((line) => !line.description.trim() || !line.quantity.trim() || !line.unit.trim())} onChange={(event) => setReviewedSnapshot(event.target.checked ? reviewSnapshot : null)} />Revisé la partida, los renglones, unidades, cantidades y fecha. Guardar crea solo un borrador.</label> : null}
-        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
           <Button
             type="button"
             variant="outline"

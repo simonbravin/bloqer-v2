@@ -21,6 +21,7 @@ import {
 import { buildPurchaseRequestAwardGroups, canAwardQuoteLine, quoteLineOfferLabel } from "../lib/purchase-request-award-selection";
 import type { QuoteLineOfferKind } from "@bloqer/domain";
 import { useProcurementAction } from "../lib/use-procurement-action";
+import { procurementActionBtnClass } from "../lib/procurement-ui";
 
 type PrLine = {
   id: string;
@@ -118,9 +119,9 @@ export function PurchaseRequestAwardMatrix({
   }
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <div className="min-w-0 space-y-4 rounded-lg border bg-card p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
+        <div className="min-w-0 flex-1 basis-72">
           <h3 className="text-sm font-semibold">Adjudicar por ítem</h3>
           <p className="text-xs text-muted-foreground">
             Elegí los ítems que querés adjudicar ahora. Cada ítem completo va a un solo proveedor;
@@ -130,6 +131,7 @@ export function PurchaseRequestAwardMatrix({
         <Button
           type="button"
           onClick={onGenerate}
+          className={procurementActionBtnClass}
           disabled={pending || selectedCount === 0}
           data-testid="award-generate-pos"
         >
@@ -159,10 +161,10 @@ export function PurchaseRequestAwardMatrix({
               </label>
               <select
                 id={`award-mobile-${line.id}`}
-                className="min-h-11 w-full rounded-md border bg-background px-2 text-sm"
+                className="min-h-11 w-full min-w-0 max-w-full rounded-md border border-input bg-background px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 value={selection[line.id] ?? ""}
                 disabled={pending}
-                onChange={(e) => setSelection((prev) => ({ ...prev, [line.id]: e.target.value }))}
+                onChange={(e) => { const quoteId = e.currentTarget.value; setSelection((prev) => ({ ...prev, [line.id]: quoteId })); }}
               >
                 <option value="">Dejar pendiente</option>
                 {awardableQuotes.map((q) => {
@@ -188,13 +190,13 @@ export function PurchaseRequestAwardMatrix({
         })}
       </div>
       <div className="hidden md:block">
-        <TableScroll>
-          <Table>
+        <TableScroll stickyFirstColumn>
+          <Table aria-label="Comparativa para adjudicar por ítem">
             <TableHeader>
               <TableRow>
-                <TableHead>Ítem</TableHead>
+                <TableHead className="w-56 min-w-56 max-w-56">Ítem</TableHead>
                 {awardableQuotes.map((q) => (
-                  <TableHead key={q.id} className="text-center min-w-[9rem]">
+                  <TableHead key={q.id} className="min-w-48 max-w-64 whitespace-normal py-3 text-center break-words">
                     {q.supplierName}
                     <span className="block text-xs font-normal text-muted-foreground">
                       {q.currency} · Unitario neto / Total línea con IVA
@@ -206,8 +208,8 @@ export function PurchaseRequestAwardMatrix({
             <TableBody>
               {freeLines.map((line) => (
                 <TableRow key={line.id}>
-                  <TableCell>
-                    <p className="font-medium">{line.description}</p>
+                  <TableCell className="w-56 min-w-56 max-w-56 whitespace-normal">
+                    <p className="break-words font-medium">{line.description}</p>
                     <p className="text-xs text-muted-foreground">
                       {formatQtyWithUnit(line.quantity, line.unit)}
                     </p>
@@ -229,7 +231,7 @@ export function PurchaseRequestAwardMatrix({
                     const checked = selection[line.id] === q.id;
                     return (
                       <TableCell key={q.id} className="text-center">
-                        <label className="inline-flex flex-col items-center gap-1 cursor-pointer">
+                        <label className={`flex min-h-24 cursor-pointer flex-col items-center justify-center gap-1 rounded-md border p-3 transition-colors focus-within:ring-2 focus-within:ring-ring ${checked ? "border-primary bg-primary/5" : "border-transparent hover:bg-muted/50"}`}>
                           <input
                             type="radio"
                             name={`award-${line.id}`}

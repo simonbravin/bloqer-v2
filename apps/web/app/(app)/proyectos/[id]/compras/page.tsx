@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
+import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -84,7 +85,7 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
         columns={4}
         actions={
           canCreateSc ? (
-            <Button asChild size="sm">
+            <Button asChild size="sm" className={procurementActionBtnClass}>
               <Link href={`${hub.links.solicitudes}?create=1`}>Nueva solicitud</Link>
             </Button>
           ) : null
@@ -117,7 +118,7 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
         columns={4}
         actions={
           canCreateOc ? (
-            <Button asChild size="sm">
+            <Button asChild size="sm" className={procurementActionBtnClass}>
               <Link href={`${hub.links.ordenes}?create=1`}>Nueva OC</Link>
             </Button>
           ) : null
@@ -149,7 +150,7 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Accesos rápidos</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2 text-sm">
+        <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3 [&>a]:h-auto [&>a]:min-h-14 [&>a]:justify-start [&>a]:whitespace-normal [&>a]:px-4 [&>a]:py-3 [&>a]:text-left">
           {hub.canViewOrders ? <>
           <Button asChild variant="outline" size="sm">
             <Link href={hub.links.recepciones}>

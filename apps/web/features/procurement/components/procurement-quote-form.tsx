@@ -15,6 +15,7 @@ import {
   type QuoteLineOfferKind,
 } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS } from "../lib/procurement-form-layout";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
@@ -342,7 +343,7 @@ export function ProcurementQuoteForm({
   return (
     <form
       key={isEdit ? editValues!.quoteId : `create-${createEpoch}`}
-      className="space-y-4 rounded-lg border p-4"
+      className={`w-full max-w-4xl space-y-5 rounded-lg border bg-card p-4 sm:p-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}
       onChangeCapture={(event) => { if (event.target.getAttribute("name") !== "quoteDocumentReviewed") invalidateReview(); }}
       onSubmit={(event) => {
             event.preventDefault();
@@ -412,7 +413,7 @@ export function ProcurementQuoteForm({
       }}
     >
 <fieldset disabled={pending} className="min-w-0 space-y-5">
-      <p className="font-medium text-sm">{isEdit ? "Editar cotización" : "Cargar cotización"} · {currency}</p>
+      <h3 className="text-base font-semibold">{isEdit ? "Editar cotización" : "Cargar cotización"} · {currency}</h3>
       {!isEdit ? <QuoteDocumentAssistant key={purchaseRequestId} projectId={projectId} purchaseRequestId={purchaseRequestId} lines={lines} disabled={pending} onApply={applyDocument} /> : null}
       {assisted ? <p className="text-sm text-muted-foreground">{assistedSummary} Los campos vacíos son datos pendientes, no importes cero. Los ítems sin vincular requieren clasificación manual.</p> : null}
       <div className="grid gap-3 sm:grid-cols-2">
@@ -434,7 +435,7 @@ export function ProcurementQuoteForm({
 
       {isEdit ? (
         <div className="space-y-1">
-          <Label htmlFor="quote-supplier">Proveedor</Label>
+          <p className="text-sm text-muted-foreground">Proveedor</p>
           <p className="text-sm font-medium">{editValues.supplierName}</p>
         </div>
       ) : (
@@ -558,9 +559,9 @@ export function ProcurementQuoteForm({
           lineInitialByPrId.get(line.id)?.originalMoney,
         );
         return (
-          <div key={line.id} className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
+          <div key={line.id} className="form-section min-w-0 space-y-4 p-3 text-sm sm:p-4">
             <div>
-              <p className="font-medium">{line.description}</p>
+              <p className="break-words font-medium">{line.description}</p>
               <p className="text-muted-foreground">
                 {formatQtyFromString(line.quantity)} {line.unit}
               </p>
@@ -602,7 +603,7 @@ export function ProcurementQuoteForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4 [&>div]:min-w-0">
               <div className="space-y-1">
                 <Label htmlFor={`unitPrice_${line.id}`}>
                   {pricesIncludeTax ? "Precio unitario con IVA" : "Precio unitario neto (sin IVA)"}
@@ -678,19 +679,19 @@ export function ProcurementQuoteForm({
         iibbPerceptionRate={iibbPerceptionRate}
         showIibbRateInput={false}
         totalLabel="Total cotización"
-        className="rounded-md bg-muted/40 px-3 py-2 border-0"
+        className="rounded-lg border bg-muted/30 p-4"
       />
 
       {assisted ? <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="quoteDocumentReviewed" checked={reviewed} onChange={event => { reviewedRef.current = event.target.checked; setReviewed(event.target.checked); }} />Revisé proveedor, moneda, cantidades, clasificación, IVA, IIBB, plazo, vigencia y total contra la oferta original.</label> : null}
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={pending || (!isEdit && suppliers.length === 0) || (assisted && !reviewed)}>
-          {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Registrar cotización"}
-        </Button>
+      <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
         {isEdit && onCancelEdit ? (
           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onCancelEdit}>
             Cancelar
           </Button>
         ) : null}
+        <Button type="submit" size="sm" disabled={pending || (!isEdit && suppliers.length === 0) || (assisted && !reviewed)}>
+          {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Registrar cotización"}
+        </Button>
       </div>
     </fieldset>
 </form>

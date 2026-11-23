@@ -32,6 +32,10 @@ Pipeline reproducible para generar screenshots reales de Bloqer v2 a partir de `
 - Password: `DOCS_USER_PASSWORD` o `SEED_USER_PASSWORD`
 - IDs estables: `guides/docs-demo-ids.json` (sin tokens ni secretos)
 
+### Uso por agentes (autorización de Simón, 2026-11-23)
+
+Usar la cuenta dedicada de **Bloqer Demo Construcciones** para las verificaciones; no volver a pedirle al usuario que inicie sesión por rutina. Recuperar primero las credenciales ya configuradas y comprobar el entorno y la empresa activa antes de operar. La cuenta y la obra demo existen también en datasets DEV/CI: eso no acredita acceso al portal productivo. Si no hay credencial disponible para ese entorno, registrar el límite y continuar con las pruebas aisladas; no resetear contraseñas ni crear accesos por SQL. Nunca guardar credenciales en Git ni usar datos de empresas reales para estas capturas.
+
 ## Fuera de la guía cliente
 
 La consola de plataforma (`/platform`) **no** se documenta en la guía operativa ni en el DOCX. Es administración interna del servicio.
