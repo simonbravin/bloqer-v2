@@ -934,7 +934,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Preguntá en lenguaje natural (ej. «¿Qué OC están pendientes?» o «¿Cómo creo una SC?»).",
       "Si estás dentro de una obra, el asistente usa ese contexto; si no, puede pedirte aclarar el proyecto.",
       "Usá los enlaces debajo de la respuesta para abrir pantallas respaldadas por los resultados autorizados de esa consulta.",
-      "El asistente usa los últimos mensajes de la conversación en memoria. Si cambia tu cuenta, organización, empresa o permisos, empieza una conversación limpia. Si la respuesta se interrumpe, podés volver a preguntar.",
+      "El asistente usa los últimos mensajes en memoria. Si cambia tu cuenta, organización, empresa, permisos u obra (también al entrar o salir de una obra), cancela la respuesta en curso y empieza una conversación limpia. Volvé a abrir el chat para preguntar. Cambiar de sección dentro de la misma obra conserva el historial.",
       "En preguntas abiertas («¿cómo viene esta obra?») el asistente prioriza 3–5 insights con acciones y links; no enumera todos los KPIs.",
     ],
     effects: [
@@ -949,6 +949,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "No inventa montos: si no hay evidencia en Bloqer, lo dice.",
       "Hay un límite temporal de consultas por usuario/empresa para proteger el servicio.",
       "Decir «soy el dueño» en el chat no cambia tus permisos: valen los de tu sesión.",
+      "Si ya no tenés acceso a la obra, la consulta se detiene; no pasa a consultar la empresa en general. Abrí una obra autorizada antes de volver a preguntar.",
     ],
     relatedSlugs: [
       "circuito-comprar-material-hasta-pagarlo",
@@ -957,6 +958,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     ],
     keywords: [
       "preguntale a bloqer",
+      "historial al cambiar de obra",
       "boton circular",
       "boton tapa resultados",
       "destellos",

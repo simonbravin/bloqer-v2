@@ -29,6 +29,16 @@ El limitador de consultas IA sigue en memoria (`apps/web/lib/ai-rate-limit.ts`).
 
 ## Invariantes confirmados (transversales)
 
+### Revisión de contexto — 23/11/2026
+
+La sesión del servidor determina usuario, tenant, empresa y roles. Cada herramienta revalida permisos y acceso a los proyectos; el historial no concede autorización. El alcance conserva D-111 y las reglas corporativas vigentes: acceso por asignación cuando corresponde, roles globales y datos compartidos dentro del tenant. Esto no implica que todos los usuarios estén limitados a registros que crearon personalmente ni cambia la política de tesorería corporativa.
+
+Se corrigió la continuidad del historial al navegar entre obras: el chat se desmonta y cancela la respuesta pendiente al cambiar de proyecto o entrar/salir del alcance de obra. Conserva la conversación dentro de la misma obra; la clave del layout ya reiniciaba por cuenta/tenant/empresa/roles. Un proyecto explícito inaccesible ahora detiene el endpoint antes de invocar al proveedor, en lugar de descartar el proyecto y continuar sin ese contexto.
+
+El audio de SC reutiliza el proveedor configurado y sus credenciales, con una operación/modelo de transcripción distinto y propuesta estructurada sin herramientas de lectura. Autoriza la obra antes de llamar al proveedor; permanece desactivado por defecto. No comparte el historial del chat, no guarda el audio/transcripción y solo prepara datos para revisión humana. No se modificaron permisos, políticas de acceso, servicios externos ni flags de producción.
+
+Regresión: `chat-context-route.test.ts` prueba el handler con sesión/ACL/proveedor simulados; `chat-context.spec.ts` verifica navegación e historial en navegador con respuestas sintéticas. Las suites de permisos y aislamiento prueban los controles existentes; sus mocks no sustituyen una auditoría SQL o un piloto con proveedor real. Los resultados ejecutados se registran en el PR.
+
 | Invariante | Evidencia |
 |---|---|
 | **No LLM-supplied `tenantId`** | `buildAiExecutionContext` toma `service` de sesión autenticada. Tools no aceptan `tenantId` en schema. |
