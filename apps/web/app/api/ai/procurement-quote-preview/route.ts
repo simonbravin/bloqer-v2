@@ -45,7 +45,7 @@ async function readFormData(req: Request): Promise<FormData> {
   try {
     return await new Response(Buffer.concat(chunks), { headers: { "Content-Type": contentType } }).formData();
   } catch {
-    throw new ServiceError("VALIDATION", "No se pudo leer el formulario dla cotización.");
+    throw new ServiceError("VALIDATION", "No se pudo leer el formulario de la cotización.");
   }
 }
 
@@ -67,7 +67,7 @@ export async function POST(req: Request) {
     const form = await readFormData(req);
     if ([...form.keys()].some((key) => key !== "file" && key !== "projectId" && key !== "purchaseRequestId") ||
       form.getAll("file").length !== 1 || form.getAll("projectId").length !== 1 || form.getAll("purchaseRequestId").length !== 1) {
-      throw new ServiceError("VALIDATION", "El formulario dla cotización es inválido.");
+      throw new ServiceError("VALIDATION", "El formulario de la cotización es inválido.");
     }
     const file = form.get("file");
     const project = form.get("projectId");
