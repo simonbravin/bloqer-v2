@@ -57,12 +57,18 @@ test("purchase forms align controls and preserve long values in light and dark t
     const submit = page.getByRole("button", { name: kind === "solicitudes-compra" ? "Crear solicitud" : "Crear orden de compra", exact: true });
     await expect(submit).toBeVisible();
     if (kind === "solicitudes-compra") {
+      // Streaming can briefly retain the server copy alongside the hydrated form.
+      await expect(page.locator("#pr-wbs")).toHaveCount(1);
       await page.locator("#pr-wbs").click();
       await page.getByRole("option").first().click();
     }
-    await page.getByLabel(kind === "solicitudes-compra" ? "Descripción / material" : "Descripción", { exact: true }).fill("Material de prueba con una descripción extensa para verificar el ancho disponible en escritorio, tablet y celular");
+    const description = page.getByLabel(kind === "solicitudes-compra" ? "Descripción / material" : "Descripción", { exact: true });
+    await expect(description).toHaveCount(1);
+    await description.fill("Material de prueba con una descripción extensa para verificar el ancho disponible en escritorio, tablet y celular");
     const form = submit.locator("xpath=ancestor::form");
-    const controls = await form.locator('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]), button[role="combobox"]').evaluateAll(elements => elements.filter(element => element.getClientRects().length > 0).map(element => {
+    // Measure user-facing fields, not the clipped file input behind the attachment button.
+    const fields = form.getByRole("textbox").or(form.getByRole("combobox")).or(form.locator('input[type="date"]'));
+    const controls = await fields.evaluateAll(elements => elements.filter(element => element.getClientRects().length > 0).map(element => {
       const rect = element.getBoundingClientRect();
       return { id: element.id, width: rect.width, height: rect.height };
     }));
