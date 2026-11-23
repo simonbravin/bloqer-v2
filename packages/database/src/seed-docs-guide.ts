@@ -2868,6 +2868,20 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   });
 
   await seedBudgetAndWbs(prisma, seedCtx);
+  // Dedicated maintained browser fixtures: never mutate an existing demo request.
+  // Each viewport owns one request so concurrent smoke runs cannot consume another's link.
+  if (process.env.CI === "true") {
+    for (const [index, viewport] of ["desktop", "tablet", "phone"].entries()) {
+      const id = `a0000e20-0000-4000-8000-00000000000${index + 1}`;
+      await prisma.purchaseRequest.upsert({ where: { id }, update: {}, create: {
+        id, tenantId: tenant.id, companyId: company.id, projectId: DOCS_GUIDE_IDS.projectId,
+        number: 900 + index, status: "SUBMITTED", submittedAt: new Date("2026-11-23T10:00:00Z"),
+        requestedByUserId: docsUser.id, createdBy: docsUser.id, notes: "Internal supplier link fixture",
+        neededByDate: new Date("2050-01-01T00:00:00Z"),
+        lines: { create: { description: `Material de prueba por enlace ${viewport}`, quantity: "2.5", unit: "kg", wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id } },
+      } });
+    }
+  }
   // Schedule links require the WBS nodes even on a completely empty database.
   await seedFieldScheduleItems(prisma, {
     tenantId: tenant.id,

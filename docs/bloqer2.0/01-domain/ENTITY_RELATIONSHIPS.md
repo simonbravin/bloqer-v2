@@ -483,3 +483,7 @@ Cuando se pase a la fase de modelo de datos técnico:
 4. Definir generadores de número (numeración de comprobantes — Q-002).
 5. Caches y materialized views para reportes.
 6. Estrategia de migrations.
+## Respuesta externa de cotizaciones (D-149)
+
+`ProcurementQuoteInvitation` pertenece obligatoriamente a Tenant, Company, Project, PurchaseRequest y Contact SUPPLIER. El servicio comprueba que todas las relaciones son coherentes con la SC autorizada. Una SC tiene múltiples invitaciones; como máximo una pendiente sin revocar por proveedor. Una invitación puede vincularse con una única ProcurementQuote incorporada (FK única nullable, borrado SET NULL); `importedAt` conserva el consumo aunque se elimine esa cotización. La respuesta original no se reemplaza con la revisión interna. Ver ADR-021.
+

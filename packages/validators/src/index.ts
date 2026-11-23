@@ -35,3 +35,4 @@ export * from "./scheduled-report";
 export * from "./notification-email-preferences";
 export * from "./money";
 export * from "./credentials-auth";
+export * from "./supplier-quote-invitation";

@@ -47,7 +47,9 @@ import { ProcurementSubmitButton } from "@/features/procurement/components/procu
 import { EntityDocumentsPanel } from "@/features/documents";
 import { ProcessStepper } from "@/components/ui/process-stepper";
 import { purchaseRequestProcessSteps } from "@/features/procurement/lib/purchase-request-process-steps";
-import { isStorageConfigured } from "@bloqer/config";
+import { isStorageConfigured, supplierQuoteLinksEnabled } from "@bloqer/config";
+import { listSupplierQuoteInvitations } from "@bloqer/services";
+import { SupplierQuoteInvitationsPanel } from "@/features/procurement/components/supplier-quote-invitations-panel";
 
 interface PageProps {
   params: Promise<{ id: string; prId: string }>;
@@ -104,6 +106,8 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
   }
   const canEditPr = canEditPurchaseRequests(current.tenantCtx.roles);
   const canQuote = canManageProcurementQuotes(current.tenantCtx.roles);
+  const supplierLinksEnabled = supplierQuoteLinksEnabled() && canQuote;
+  const supplierInvitations = supplierLinksEnabled ? await listSupplierQuoteInvitations(prId, ctx) : [];
   const frozenQuoteIds = [
     ...new Set(
       linkedOrders
@@ -270,6 +274,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         </details>
       ) : null}
 
+      {supplierLinksEnabled && <SupplierQuoteInvitationsPanel projectId={id} requestId={prId} suppliers={suppliers} invitations={supplierInvitations} allowCreate={pr.status === "SUBMITTED"} />}
       <PurchaseRequestDetailMobileSections
         pr={pr}
         projectId={id}

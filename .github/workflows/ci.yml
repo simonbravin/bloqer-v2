@@ -75,6 +75,7 @@ jobs:
           docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_documents_ci
           pnpm --filter @bloqer/database exec prisma migrate deploy
           pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/procurement/supplier-quote-invitation.live.test.ts
 
       - name: Restore rehearsal on disposable SQL and synthetic files
         env:

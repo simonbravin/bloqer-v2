@@ -1104,7 +1104,7 @@ Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño 
 
 ![Bloqer — Cinco caminos de egreso en obra](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png)
 
-### 9.1 Procedimiento — Solicitud de compra (SC)
+### 9.1 Procedimiento - Solicitud de compra (SC)
 
 **Ruta:** Compras → **Solicitudes de compra**
 
@@ -1151,6 +1151,16 @@ Desde la SC, desplegá **Si la compra ya se realizó o la oferta venció** y abr
 Para una compra nueva, pedí al proveedor condiciones y vigencia reales y usá la edición permitida por el estado. Para una compra ya realizada o pagada, reuní factura completa, remito o conformidad del servicio y comprobante de pago; anotá proveedor, fecha, cantidades, unidades y SC/OC. Consultá las OC vinculadas, sus **Facturas vinculadas** y el listado de facturas del proyecto: una carga por otra vía puede no estar vinculada a la OC. Compará el número fiscal, los renglones y los pagos; FP es un código interno y una coincidencia de importe no demuestra duplicación ni doble pago bancario.
 
 Con diferencias de unidad, producto, impuestos o varias OC en una factura, pedí el desglose y acordá el tratamiento con Administración y soporte. No copies el total completo en varias facturas, cambies fechas para sortear controles, anules una compra real para editar una oferta, simules recepción ni reduzcas la compra al anticipo. Los casos procesados o potencialmente duplicados requieren identificar qué conservar y una secuencia admitida por sus estados antes de actuar.
+
+### 9.1.1 Respuestas de proveedores por enlace (opcional)
+
+Disponible sólo cuando se habilita esta capacidad; permanece apagada por defecto. En el detalle de una SC **Enviada**, abrí **Respuestas por enlace**, elegí **Proveedor** y pulsá **Crear enlace**. Revisá **qué vas a compartir** y los ítems antes de **Copiar enlace**. Se comparte empresa, obra, código SC, proveedor y descripción/cantidad/unidad; no se comparten presupuesto, otras ofertas ni documentos internos.
+
+Compartilo manualmente con el proveedor. **Quien tenga el enlace puede usarlo**, sin iniciar sesión: vence en siete días y se puede **Revocar enlace**. No se envían mensajes automáticamente. El enlace completo sólo se muestra al crearlo. Crear otro para ese proveedor/SC revoca el anterior pendiente; si ya respondió, la evidencia se conserva.
+
+El proveedor abre `/cotizar/<invitación>`, completa moneda, precios con/sin IVA, percepción IIBB (0 si no corresponde), plazo, vigencia y todos los renglones. Puede indicar **Cotizado**, **No cotizado** o **Bonificado**, sin cambiar cantidades/unidades. Debe existir al menos un importe positivo. **Revisar respuesta** permite comprobar los datos; **Volver a editar** corrige; **Confirmar y enviar respuesta** guarda una única respuesta. Un reintento idéntico no la duplica. No hay adjuntos ni IA en este formulario.
+
+Compras vuelve a la SC y pulsa **Revisar respuesta**. Puede ajustar los datos para la cotización y debe completar el tipo de cambio si la moneda no es ARS. Después de **Revisar respuesta**, **Incorporar cotización** genera una cotización recibida en la comparación existente. No adjudica ni crea una OC. La respuesta original y quién la incorporó se conservan. Vencimiento/revocación no borran evidencia recibida; si cambió la solicitud, pedí una nueva respuesta. Si el enlace deja de estar disponible, verificá también permisos del emisor, acceso a la obra, estado del proveedor y que la SC siga Enviada.
 
 ### 9.2 Procedimiento — Orden de compra (OC)
 

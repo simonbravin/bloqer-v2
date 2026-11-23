@@ -29,6 +29,7 @@ export default defineConfig({
       BLOQER_AI_ENABLED: "true",
       BLOQER_AI_ALLOW_PRODUCTION: "true",
       BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED: "false",
+      BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED: "true",
       AUTH_URL: baseURL,
       NEXT_PUBLIC_APP_URL: baseURL,
       APP_URL: baseURL,

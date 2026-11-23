@@ -20,6 +20,7 @@ const PUBLIC_EXACT = new Set([
 ]);
 
 function isPublicPath(pathname: string): boolean {
+  if (/^\/cotizar\/[0-9a-f-]{36}(?:\/(?:access|response))?$/.test(pathname)) return true;
   if (PUBLIC_EXACT.has(pathname)) return true;
   if (pathname.startsWith("/invitaciones/aceptar/")) return true;
   // Cron routes authenticate via CRON_SECRET inside the handler (not session cookies).
@@ -91,6 +92,12 @@ export default auth((req) => {
     request: { headers: requestHeaders },
   });
   res.headers.set(REQUEST_ID_HEADER, requestId);
+  if (pathname.startsWith("/cotizar/")) {
+    res.headers.set("Cache-Control", "private, no-store, max-age=0");
+    res.headers.set("Referrer-Policy", "no-referrer");
+    res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
+    res.headers.set("Content-Security-Policy", "frame-ancestors 'none'; form-action 'self'; base-uri 'self'");
+  }
 
   // Access log only for API / mutations — avoid RSC prefetch noise.
   if (pathname.startsWith("/api/") || req.method !== "GET") {

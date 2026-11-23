@@ -1,5 +1,6 @@
 export {
   coreEnv,
+  supplierQuoteLinksEnabled,
   getDatabaseEnv,
   getAuthEnv,
   getEmailEnv,

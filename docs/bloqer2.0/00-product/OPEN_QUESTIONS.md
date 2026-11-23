@@ -819,6 +819,16 @@
 - **Arquitectura:** ADR-020 documenta audio/transcripción efímeros, límites y reutilización del proveedor. Sin nuevas dependencias, persistencia o servicios. El uso del proveedor actual no implica costo nulo de procesamiento; la función queda deshabilitada por defecto hasta su piloto.
 - **Seguimiento:** [primer paquete, bloque 4/D y P1c](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md).
 
+### Q-097 — Respuesta externa de proveedor por enlace (bloque 5/E2)
+
+- **Fecha:** 23/11/2026. **Estado:** RESUELTA → D-149. El Owner respondió «Sí, aprobar este alcance (recomendado)»: acceso sin cuenta, siete días, revocación, respuesta única con revisión interna y tabla nueva según ADR-021.
+- **Evidencia:** las cotizaciones actuales se registran con un usuario interno autorizado y nacen `RECEIVED`. `ServiceContext.actorUserId` es obligatorio. No existe una invitación externa de cotización ni un registro de respuesta pendiente; `VerificationToken` e invitaciones de membresía tienen otro propósito.
+- **Opción recomendada:** enlace sin cuenta, específico para una SC y un proveedor, válido siete días desde su creación, revocable y con una sola respuesta definitiva. Compras comparte el enlace manualmente. El proveedor ve empresa/obra identificadas e ítems/cantidades/unidades; responde precios, clasificación D-118, impuestos, moneda, plazo y vigencia. Compras revisa y completa FX antes de incorporar por el alta canónica. La respuesta no adjudica ni crea OC. Sin adjuntos ni IA en este primer corte.
+- **Límite explícito:** quien posea el enlace puede usarlo mientras siga vigente; no verifica la identidad personal ni la titularidad de un email. La pantalla de generación debe advertir que se comparta únicamente con el proveedor elegido. Si se requiere identidad verificada, elegir la alternativa con cuenta antes de programar.
+- **Persistencia propuesta:** una raíz `ProcurementQuoteInvitation`, con `tenantId` propio, vínculos de empresa/obra/SC/proveedor, hash de token, vencimiento/revocación, snapshot mínimo de lo compartido, una respuesta inmutable validada y vínculo único a la cotización incorporada. Contrato de campos, auditoría, concurrencia y pruebas en [ADR-021 propuesto](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md#adr-021--propuesta-de-respuesta-externa-de-cotizaciones-por-enlace).
+- **Alternativas:** (a) enlace limitado y revisión interna, con menor fricción y riesgo de reenvío explícito; (b) acceso con cuenta/identidad verificada, con alta y administración de usuarios externos y diseño adicional; (c) diferir E2 y conservar carga interna/lectura de archivo, avanzando E3.
+- **Aprobación solicitada:** opción (a), vencimiento de siete días, respuesta única con revisión interna y la migración aditiva descrita en ADR-021. No contratar servicios, enviar invitaciones reales ni activar el piloto por esta aprobación. Antes de migrar portal, aplicar el procedimiento de producción documentado y verificar el destino.
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

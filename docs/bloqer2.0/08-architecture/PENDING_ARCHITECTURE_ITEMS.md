@@ -186,6 +186,13 @@ Plan de trabajo: [INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md](./INDARI_CASA_HOGAR_IMP
 - **Propuesta:** elegir almacenamiento compartido y operaciones atómicas con caducidad; definir reserva/liberación entre límite de usuario y tenant, política ante indisponibilidad, tratamiento de reintentos y señales de consumo real. Si se requiere presupuesto monetario, aprobar unidades, períodos, tope y conciliación antes de agregar datos o reglas. Mantener aislamiento por tenant, autenticación y autorización de cada canal.
 - **Validación pendiente:** concurrencia desde dos instancias, expiración, reinicio, denegación por tenant sin consumir cupo de usuario, interrupción del proveedor y recuperación del contador. Confirmar que chat y extracción consumen el límite compartido según la política aprobada, sin ejecutar pruebas contra datos o proveedores reales.
 
+## P-PROC-E2-01 — Respuesta externa de cotizaciones
+
+- **Fecha:** 23/11/2026. **Estado:** diseño aprobado por Q-097/D-149; implementación en curso. No acredita migración ni piloto.
+- **Contrato propuesto:** [ADR-021](./ARCHITECTURE_DECISION_RECORDS.md#adr-021--propuesta-de-respuesta-externa-de-cotizaciones-por-enlace), permiso bearer para una SC/proveedor con siete días, revocación y respuesta única; revisión e incorporación por usuario interno real.
+- **Persistencia a aprobar:** raíz con tenant propio, alcance comprobable, token hasheado, snapshot público mínimo, respuesta inmutable y vínculo único a la cotización. No usar `VerificationToken`, sesión del emisor ni metadata de auditoría como sustituto.
+- **Límite pendiente de decisión:** el enlace puede reenviarse; si negocio exige identidad verificada, diseñar la alternativa con cuenta antes de programar. Sin nuevos servicios, emails automáticos ni acceso general del proveedor.
+
 ## AG-00 — Aislamiento: reconciliación documental resuelta
 
 Diagnóstico inicial del 03/11/2026: [subanálisis de arquitectura](./platform-audit/2026-11-03-ag-00-architecture.md). El usuario confirmó explícitamente la [propuesta de reconciliación](./platform-audit/2026-11-03-ag-00-isolation-proposal.md), formalizada en [ADR-018](./ARCHITECTURE_DECISION_RECORDS.md). El cierre siguiente es documental/arquitectónico; no equivale a comprobar SQL ni autorización de todos los recorridos y no introduce schema, migraciones o middleware.

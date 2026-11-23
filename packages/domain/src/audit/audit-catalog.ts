@@ -38,7 +38,7 @@ export const AUDIT_UI_MODULE_LABEL_ES: Record<AuditUiModule, string> = {
 };
 
 export const AUDIT_MODULE_ENTITY_TYPES: Record<AuditUiModule, readonly string[]> = {
-  PROCUREMENT: ["PurchaseRequest", "ProcurementQuote", "PurchaseOrder", "PurchaseReceipt", "CompanyProcurementSettings"],
+  PROCUREMENT: ["PurchaseRequest", "ProcurementQuote", "ProcurementQuoteInvitation", "PurchaseOrder", "PurchaseReceipt", "CompanyProcurementSettings"],
   AP: ["SupplierInvoice", "Payable", "Payment"],
   AR: ["SalesInvoice", "Receivable", "Collection"],
   TREASURY: [
@@ -102,6 +102,10 @@ export const AUDIT_ACTION_LABELS_ES: Record<string, string> = {
   "purchase_request.returned_for_changes": "Solicitud de compra devuelta a borrador",
   "purchase_request.cancelled": "Solicitud de compra anulada",
   "procurement_quote.received": "Cotización recibida",
+  "procurement_quote_invitation.created": "Enlace de cotización creado",
+  "procurement_quote_invitation.revoked": "Enlace de cotización revocado",
+  "procurement_quote_invitation.responded": "Respuesta externa de proveedor recibida",
+  "procurement_quote_invitation.imported": "Respuesta de proveedor incorporada",
   "procurement_quote.selected": "Cotización seleccionada",
   "procurement_quote.updated": "Cotización actualizada",
   "procurement_quote.deleted": "Cotización eliminada",
