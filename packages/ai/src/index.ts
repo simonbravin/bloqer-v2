@@ -62,3 +62,6 @@ export {
   searchBm25,
 } from "./knowledge";
 export type { KnowledgeChunk, KnowledgeIndex, KnowledgeHit } from "./knowledge";
+export { isPurchaseRequestAudioEnabled, getPurchaseRequestTranscriptionModel } from "./env";
+export { preparePurchaseRequestTranscript, parsePurchaseRequestProposal, validatePurchaseRequestTranscript, PURCHASE_REQUEST_AUDIO_MAX_BYTES } from "./audio/purchase-request-audio";
+export type { PurchaseRequestAudioProposal } from "./audio/purchase-request-audio";

@@ -195,6 +195,27 @@ Sin cambios de schema/ERD estructural ni migraciones. No hay backfill ni correcc
 - Auditoría: la suite rechaza vínculos a certificados inyectados en ventas manuales (encabezado y líneas), intercala edición/emisión para comprobar inmutabilidad y conciliación con CxC, y verifica acceso por membresía a las consultas auxiliares. Con AR deshabilitado la planilla sigue disponible y las consultas financieras no devuelven datos.
 - En lectura de emitidos, **Físico período** debe conservar el porcentaje guardado aunque difiera del **Avance real**; con cobro total el recorrido indica **sin saldo pendiente de cobro**.
 
+## Solicitud de compra por audio - D-148 / ADR-020
+
+Piloto únicamente en una empresa/obra de ensayo autorizada, con IA global, producción cuando corresponda y `BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED` habilitados. El proveedor actual debe admitir transcripción y salida estructurada. Su uso tiene consumo; CI intercepta IA y no acredita calidad real. No habilitar globalmente para presentar un test sintético como piloto.
+
+1. Con la capacidad apagada, comprobar creación manual disponible y POST de audio 503. Sin sesión, 401. Un rol sin EDIT, obra ajena/pausada/cerrada o empresa ajena no deben llegar al proveedor.
+2. En Nueva solicitud, dictar un pedido sintético de hasta 60 segundos o elegir WebM/MP4/WAV de hasta 3 MiB. Verificar reproducción local, transcripción y corrección de texto. Rechazar archivo vacío, excesivo o MIME/firma discordantes. Micrófono denegado debe conservar la alternativa de archivo/texto.
+3. Pedir material sin cantidad/unidad y con «el viernes». Revisar el texto antes de Preparar renglones; completar campos desconocidos y fecha explícita. La IA no elige partida, proveedor, APU ni IDs.
+4. Usar propuesta reemplaza renglones/fecha/notas con aviso. Elegir partida, completar los faltantes y confirmar revisión final. Editar un campo y revertirlo tampoco recupera la confirmación. Guardar debe crear exactamente un DRAFT mediante el servicio existente; recargar y comprobar ítems y fecha. No presionar Enviar solicitud durante este smoke.
+5. Cancelar grabación/procesamiento y cerrar: micrófono detenido, respuestas tardías ignoradas, sin nuevas solicitudes. Simular error del proveedor; conservar texto editable y permitir volver al formulario manual. No persistir audio/transcripción en Documentos, logs o auditoría.
+6. En escritorio, tablet y celular, comprobar controles accesibles, formulario sin desborde y alternativa manual. Registrar resultado, duración y exactitud del piloto real por separado de los checks de CI. Reponer el flag apagado al finalizar un piloto temporal.
+
+## Resumen diario - D-147, verificación posterior al despliegue
+
+Usar una organización de ensayo autorizada; guardar preferencias no envía correos.
+
+1. Como Propietario/Administrador, abrir `/configuracion/politicas#notificaciones`. Con zona Argentina, **Hora mínima del resumen** permite 04:00, 05:00, 06:00 y 07:00 para la revisión diaria prevista de 07:05. Comprobar la fecha y zona mostradas.
+2. Elegir 06:00, pulsar **Guardar política de email** y recargar: debe conservar 06:00. No aparece una segunda revisión ni un envío inmediato.
+3. Si el ensayo dispone de una hora histórica incompatible, comprobar que se muestra con advertencia. Cambiar solo el CC o la activación del resumen debe conservar esa hora; elegir una compatible y guardar debe corregirla. No modificar datos a mano para preparar el caso.
+4. Comprobar que un usuario sin permiso de políticas no puede guardar cambios y que la campana funciona independientemente de las preferencias de correo.
+5. La suite `notification-digest-policy.test.ts` verifica rechazos de horas incompatibles, permisos y conservación de históricos; `digest-schedule-preview.test.ts` verifica cron, zona horaria, cambio estacional y medianoche. El recorrido autenticado requiere SQL descartable en CI. Estos controles no acreditan recepción real de emails ni recuperación durable.
+
 ## Auditoría de pagos y cobranzas — regresión 2026-10-26
 
 Sin migraciones ni corrección de saldos históricos. Pruebas automatizadas sin DB: `packages/services/src/finance/payment-collection-access.test.ts` y `packages/services/src/accounting/accounting-auto-draft-failure.test.ts`. Cubren acceso D-111 antes de cualquier control financiero o sincronización contable, separación empresa/obra y rechazos asíncronos durante el auto-DRAFT posterior al commit (D-061).

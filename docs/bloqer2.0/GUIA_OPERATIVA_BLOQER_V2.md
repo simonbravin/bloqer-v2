@@ -1132,6 +1132,14 @@ Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño 
 
 En el detalle de la SC, las OC vinculadas muestran su **estado en español** y **Próximo paso**, con acceso a la ficha de cada orden, tanto en escritorio como en celular. **Enviada** indica envío a Compras, no una OC pendiente de aprobación. **Completada** no acredita facturación ni pago. En celular se ve también **Vigencia** y **Adjuntos por cotización**. Las ofertas y sus adjuntos continúan disponibles para consulta al completar la SC; esto no habilita edición ni nueva adjudicación.
 
+### Preparar una solicitud por audio
+
+Si está habilitado, **Nueva solicitud → Dictar solicitud** permite grabar hasta 60 segundos, elegir un audio WebM/MP4/WAV de hasta 3 MiB o escribir el pedido. **Transcribir audio** lo envía al proveedor de IA configurado; Bloqer no guarda el audio ni la transcripción. Podés escucharlo y corregir el texto. Confirmá **Revisé el texto: refleja mi pedido** y elegí **Preparar renglones**.
+
+Revisá la propuesta: las cantidades y unidades desconocidas quedan pendientes; una fecha relativa, como «el viernes», requiere que elijas una fecha concreta. **Usar propuesta y completar** reemplaza los renglones, la fecha y las observaciones del formulario actual. Elegí la partida EDT, completá descripción, cantidad, unidad y fecha requerida y marcá la revisión final. Cualquier edición exige revisar de nuevo. **Guardar borrador** crea una SC en Borrador; **Enviar solicitud** a Compras sigue siendo una acción posterior. No se adjudica ni aprueba automáticamente.
+
+Si falta permiso de micrófono o falla el procesamiento, podés elegir un archivo o escribir el pedido. **Cancelar procesamiento** descarta respuestas tardías; **Continuar manualmente** vuelve al formulario previo. Al cerrar el asistente se pierde la transcripción no guardada. La función puede estar deshabilitada; el formulario manual sigue disponible.
+
 ### 9.1.1 Compra realizada o cotización vencida
 
 Desde la SC, desplegá **Si la compra ya se realizó o la oferta venció** y abrí **Ver qué revisar antes de continuar**. La ayuda `/ayuda/revisar-compra-realizada-o-cotizacion-vencida` reúne los antecedentes necesarios para revisar el caso; no ejecuta una regularización.

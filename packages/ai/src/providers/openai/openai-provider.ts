@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import type {
   ChatCompletion,
   ChatCompletionChunk,
@@ -256,6 +256,21 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
       supportsStructuredOutput: true,
       supportsReasoning: false,
       supportsVision: true,
+    },
+
+    async transcribeAudio(request) {
+      try {
+        const extension = request.mimeType === "audio/mp4" ? "mp4" : request.mimeType === "audio/wav" ? "wav" : "webm";
+        const result = await client.audio.transcriptions.create({
+          model: request.model,
+          file: await toFile(request.bytes, `solicitud.${extension}`, { type: request.mimeType }),
+          language: "es",
+          response_format: "json",
+        }, { signal: request.signal, maxRetries: 0 });
+        return result.text;
+      } catch (error) {
+        return wrapProviderError(error, providerId);
+      }
     },
 
     async generateResponse(request: AiGenerateRequest): Promise<AiGenerateResponse> {

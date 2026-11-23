@@ -810,6 +810,15 @@
 - **Hallazgo:** el cron diario a 10:05 UTC no cubre todas las horas configurables de todos los tenants con su ventana de tres horas. El primer paquete muestra la próxima revisión y advierte incompatibilidad, sin cambiar preferencias ni frecuencia en silencio.
 - **Decisión aprobada:** mantener revisión diaria y alinear nuevas elecciones de horario a esa capacidad, sin nuevos servicios. El servidor valida compatibilidad; los valores históricos se conservan con aviso y se corrigen por acción explícita. La campana y las demás categorías no cambian. No se promete puntualidad exacta ni se acredita recepción de correos con una prueba de configuración.
 
+### Q-096 — Primer flujo de audio del bloque 4 / P1c
+
+- **Fecha:** 23/11/2026. **Estado:** RESUELTA → D-148. El Owner eligió «Solicitud de compra (recomendado)».
+- **Contexto:** el plan exige elegir un único flujo inicial: audio a solicitud de compra o a parte diario. Continuar el plan no define por sí solo esa elección ni habilita tools WRITE.
+- **Decisión aprobada:** solicitud de compra dentro de una obra autenticada, con propuesta efímera editable; el usuario elige la partida y completa datos desconocidos antes de guardar DRAFT mediante el servicio existente. No enviar a Compras, adjudicar ni aprobar automáticamente. D-148 define el alcance; las validaciones y el despliegue se registran por separado en el plan.
+- **Alternativas:** comenzar por parte diario, o diferir audio. El parte requiere conservar explícitamente los controles de avance/consumo y aprobación vigentes.
+- **Arquitectura:** ADR-020 documenta audio/transcripción efímeros, límites y reutilización del proveedor. Sin nuevas dependencias, persistencia o servicios. El uso del proveedor actual no implica costo nulo de procesamiento; la función queda deshabilitada por defecto hasta su piloto.
+- **Seguimiento:** [primer paquete, bloque 4/D y P1c](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md).
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

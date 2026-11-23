@@ -197,6 +197,51 @@ test("request return keeps its reason and overlay when transport fails and block
   assert.equal(elements(render(), "Sheet")[0]!.props.open, true); assert.equal(env.errors.length, 1);
 });
 
+test("audio assistant cancels stale proposals, keeps editable text and prevents duplicate requests", async () => {
+  const env = environment(), first = deferred<Response>(); let calls = 0, applied = 0;
+  const { PurchaseRequestAudioAssistant } = load<{ PurchaseRequestAudioAssistant: (props: unknown) => Element }>("../components/purchase-request-audio-assistant.tsx", env.dependencies, {
+    AbortController, FormData, setTimeout, clearTimeout,
+    fetch: () => { calls++; return first.promise; },
+  });
+  const render = () => env.render(() => PurchaseRequestAudioAssistant({ projectId: "project", onApply: () => applied++, onCancel() {} }));
+  const button = (name: string) => elements(render(), "Button").find((node) => text(node) === name)!;
+  const transcript = () => elements(render(), "AutoGrowTextarea")[0]!;
+  (transcript().props.onChange as (event: unknown) => void)({ target: { value: "Dos bolsas" } });
+  const check = elements(render(), "input").find((node) => node.props.type === "checkbox")!;
+  (check.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+  const prepare = button("Preparar renglones").props.onClick as () => void;
+  prepare(); prepare(); assert.equal(calls, 1);
+  (button("Cancelar procesamiento").props.onClick as () => void)();
+  assert.equal(transcript().props.value, "Dos bolsas"); assert.equal(transcript().props.disabled, false);
+  first.resolve(Response.json({ proposal: { neededByDate: null, observations: null, lines: [{ description: "STALE", quantity: "2", unit: "bolsa" }] } }));
+  await env.settle();
+  assert.equal(text(render()).includes("STALE"), false); assert.equal(applied, 0);
+});
+
+test("assisted request preserves missing units, enforces review and invalidates it even after reverting an edit", async () => {
+  const env = environment(); let writes = 0;
+  const { PurchaseRequestForm } = load<{ PurchaseRequestForm: (props: unknown) => Element }>("../components/purchase-request-form.tsx", {
+    ...env.dependencies, "lucide-react": { Trash2: "Trash2" },
+    "@/lib/searchable-options": { SEARCHABLE_NONE: "none", wbsToSearchableOptions: () => [], toSearchableOptions: (value: unknown) => value, withNoneOption: (value: unknown) => value },
+    "@/features/budgets/components/unit-select": { UnitSelect: "UnitSelect" }, "@/lib/budget-units": { budgetUnitLabel: (value: string) => value },
+    "@/lib/format-money": formatMoney, "../lib/purchase-request-form-lines": requestDrafts,
+    "../lib/procurement-ui": { procurementAmberCalloutClass: "warning" },
+    "@/app/(app)/proyectos/[id]/solicitudes-compra/actions": { createPurchaseRequestAction: async () => { writes++; return { id: "request" }; } },
+  }, { FormData: class { get(key: string) { return key === "neededByDate" ? "2026-12-01" : ""; } } });
+  const render = () => env.render(() => PurchaseRequestForm({ requireAudioReview: true, projectId: "project", wbsOptions: [{ id: "wbs", budgetUnit: "kg" }], initialValues: { wbsNodeId: "wbs", neededByDate: "2026-12-01", lines: [{ description: "Cemento", quantity: "2", unit: "" }] } }));
+  const review = () => elements(render(), "input").find((node) => node.props.type === "checkbox")!;
+  const save = () => elements(render(), "Button").find((node) => node.props.type === "submit")!;
+  assert.equal(elements(render(), "UnitSelect")[0]!.props.value, "");
+  assert.equal(review().props.disabled, true); assert.equal(save().props.disabled, true);
+  (elements(render(), "form")[0]!.props.onSubmit as (event: unknown) => void)({ preventDefault() {}, currentTarget: {} }); await env.settle(); assert.equal(writes, 0);
+  (elements(render(), "UnitSelect")[0]!.props.onChange as (value: string) => void)("un");
+  (review().props.onChange as (event: unknown) => void)({ target: { checked: true } }); assert.equal(save().props.disabled, false);
+  const changeQty = (value: string) => (elements(render(), "DecimalInput")[0]!.props.onValueChange as (value: string) => void)(value);
+  changeQty("3"); changeQty("2"); assert.equal(review().props.checked, false); assert.equal(save().props.disabled, true);
+  (review().props.onChange as (event: unknown) => void)({ target: { checked: true } });
+  (elements(render(), "form")[0]!.props.onSubmit as (event: unknown) => void)({ preventDefault() {}, currentTarget: {} }); await env.settle(); assert.equal(writes, 1);
+});
+
 test("historical request header editing never serializes replacement lines", async () => {
   const env = environment(); let payload: Record<string, unknown> | undefined;
   const { PurchaseRequestForm } = load<{ PurchaseRequestForm: (props: unknown) => Element }>("../components/purchase-request-form.tsx", {

@@ -2157,6 +2157,14 @@
 - **Límites:** cambios de zona horaria/horario estacional pueden exigir revisar la preferencia; no se promete entrega observada ni recuperación durable. Q-093/Q-094 y outbox permanecen abiertos.
 - **Documentos afectados:** NOTIFICATIONS, Guía, Help, Q-095, plan y conocimiento AI. Sin campos, tablas, migraciones, proveedores ni dependencias nuevas.
 
+### D-148 — Audio a solicitud de compra revisable
+
+- **Fecha:** 2026-11-23. **Estado:** ACTIVA. Q-096 resuelta por elección explícita del Owner: «Solicitud de compra (recomendado)».
+- **Alcance:** primer flujo del bloque 4/P1c dentro de Bloqer: audio → transcripción revisable → propuesta de renglones → formulario existente → guardar DRAFT. Enviar a Compras sigue siendo una acción posterior.
+- **Controles:** obra autenticada y activa; permisos de solicitudes y módulo de compras. La propuesta no elige IDs de empresa/obra/partida/producto/APU, no inventa cantidades ni fechas y no ejecuta tools. El usuario completa desconocidos, elige la partida y confirma la revisión; editar vuelve a exigir confirmarla. El servicio de creación vigente revalida todos los datos.
+- **Implementación acotada:** proveedor IA actual, sin nuevas dependencias ni persistencia del audio/transcripción/propuesta. Solo los datos revisados del formulario se guardan como solicitud. La grabación y el envío a transcribir requieren acciones explícitas; alternativa manual disponible. Piloto apagado por defecto y sujeto a los gates AI existentes. El procesamiento puede consumir la API ya contratada; no equivale a costo cero.
+- **Límites:** sin WhatsApp, partes diarios, envío automático, adjudicación, aprobación, compras ni pagos. No habilita tools WRITE ni reemplaza las garantías pendientes de idempotencia durable. Arquitectura: ADR-020.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.

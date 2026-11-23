@@ -113,5 +113,13 @@ Matriz canónica: [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md)
 
 La documentación anterior no distinguía ofertas históricas al devolver una SC y seguía enumerando funcionalidades ya existentes como pendientes. D-126 resuelve la primera contradicción; el inventario actual reemplaza la segunda. D-125 exige identificar la moneda de cada referencia, incluso en solicitudes con partidas de presupuestos diferentes.
 
+## 18.1 Preparación por audio revisada (D-148 / ADR-020)
+
+En **Nueva solicitud**, **Dictar solicitud** aparece únicamente con la capacidad habilitada. Grabar hasta 60 segundos o elegir WebM/MP4/WAV de hasta 3 MiB; también se puede escribir el texto. La transcripción y la propuesta pasan por el proveedor IA existente; no se guardan audio, transcripción ni propuesta en Bloqer. Solo el formulario revisado se persiste mediante el alta DRAFT vigente. El uso del proveedor puede tener costo; no se agrega un servicio ni una dependencia.
+
+El usuario revisa el texto antes de **Preparar renglones**. Los campos desconocidos quedan vacíos; fechas relativas requieren fecha explícita. **Usar propuesta y completar** reemplaza renglones, fecha y observaciones del formulario: el usuario elige partida, completa descripción/cantidad/unidad y fecha y confirma una segunda revisión. Cualquier edición invalida esa revisión. **Guardar borrador** no envía a Compras ni crea OC. El envío sigue siendo una acción posterior explícita.
+
+Los servicios verifican sesión, tenant, módulo, permisos EDIT y acceso/estado de obra antes del proveedor. No se aceptan IDs de negocio del modelo. Cancelar descarta respuestas tardías y detiene el micrófono; fallos conservan el texto editable y permiten continuar manualmente. Sin tools WRITE, nuevos campos, estados, eventos ni migraciones. Los recorridos con IA interceptada no acreditan calidad de transcripción real.
+
 ## 19. Preguntas abiertas
 - SLA exacto (horas) por defecto en settings — sugerido 48–72 h; no bloquea el procedimiento.

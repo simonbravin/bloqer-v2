@@ -1,6 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import type { PurchaseRequestAudioProposal } from "@bloqer/ai";
+import { Button } from "@/components/ui/button";
 import { PurchaseRequestForm } from "./purchase-request-form";
+import { PurchaseRequestAudioAssistant } from "./purchase-request-audio-assistant";
 import { PendingEvidencePicker } from "@/features/documents/components/pending-evidence-picker";
 import { PendingEvidenceRetryPanel } from "@/features/documents/components/pending-evidence-retry-panel";
 import { usePendingEntityEvidence } from "@/features/documents/lib/use-pending-entity-evidence";
@@ -38,6 +42,19 @@ export function PurchaseRequestCreateComposer({
   onSuccess,
   onPendingChange,
 }: Props) {
+  const [audioAvailable, setAudioAvailable] = useState(false);
+  const [audioOpen, setAudioOpen] = useState(false);
+  const [audioProposal, setAudioProposal] = useState<PurchaseRequestAudioProposal | null>(null);
+  const [operationPending, setOperationPending] = useState(false);
+  function pendingChanged(value: boolean) { setOperationPending(value); onPendingChange?.(value); }
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch("/api/ai/purchase-request-audio", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((data: { enabled?: boolean } | null) => { if (!controller.signal.aborted) setAudioAvailable(data?.enabled === true); })
+      .catch(() => { /* Manual entry remains available. */ });
+    return () => controller.abort();
+  }, []);
   const evidence = usePendingEntityEvidence({
     projectId,
     linkedEntityType: "PURCHASE_REQUEST",
@@ -85,16 +102,23 @@ export function PurchaseRequestCreateComposer({
   }
 
   return (
+    <>
+    {audioAvailable && !audioOpen && !audioProposal ? <Button type="button" variant="outline" disabled={operationPending} onClick={() => setAudioOpen(true)}>Dictar solicitud</Button> : null}
+    {audioOpen ? <PurchaseRequestAudioAssistant projectId={projectId} onPendingChange={pendingChanged} onCancel={() => setAudioOpen(false)} onApply={(proposal) => { setAudioProposal(proposal); setAudioOpen(false); }} /> : null}
+    <div hidden={audioOpen}>
     <PurchaseRequestForm
+      key={audioProposal ? "audio" : "manual"}
       projectId={projectId}
       wbsOptions={wbsOptions}
-      initialLine={initialLine}
-      prefilledFromMaterials={prefilledFromMaterials}
+      initialLine={audioProposal ? undefined : initialLine}
+      initialValues={audioProposal ? { neededByDate: audioProposal.neededByDate, notes: audioProposal.observations, lines: audioProposal.lines.map((line) => ({ description: line.description ?? "", quantity: line.quantity ?? "", unit: line.unit ?? "" })) } : undefined}
+      requireAudioReview={Boolean(audioProposal)}
+      prefilledFromMaterials={!audioProposal && prefilledFromMaterials}
       prefillFrom={prefillFrom}
       variant={variant}
       onCancel={onCancel}
       onSuccess={onSuccess}
-      onPendingChange={onPendingChange}
+      onPendingChange={pendingChanged}
       onCreated={evidence.handleCreated}
       extraSections={
         <PendingEvidencePicker
@@ -107,5 +131,7 @@ export function PurchaseRequestCreateComposer({
         />
       }
     />
+    </div>
+    </>
   );
 }
