@@ -88,15 +88,23 @@ export function PurchaseRequestAudioAssistant({ projectId, onApply, onCancel, on
       stream.current = media;
       const current = new MediaRecorder(media, { mimeType });
       recorder.current = current;
+      // A late event from a cancelled recorder must never stop a newer stream.
+      function stopThisRecording() {
+        if (recorder.current === current) stopMedia();
+        else {
+          if (current.state === "recording") current.stop();
+          media.getTracks().forEach((track) => track.stop());
+        }
+      }
       const chunks: BlobPart[] = [];
       let size = 0;
       current.ondataavailable = (event) => {
         size += event.data.size;
         if (size <= MAX_BYTES) chunks.push(event.data);
-        else stopMedia();
+        else stopThisRecording();
       };
       current.onstop = () => {
-        stopMedia();
+        stopThisRecording();
         if (generation.current !== token) return;
         setRecording(false); markBusy(false);
         if (size > MAX_BYTES || !size) { setError("La grabación está vacía o supera 3 MiB. Volvé a grabar un pedido más corto."); return; }
@@ -109,13 +117,12 @@ export function PurchaseRequestAudioAssistant({ projectId, onApply, onCancel, on
           setRecording(false); markBusy(false);
           setError("No se pudo grabar. Podés elegir un archivo o escribir el pedido.");
         }
-        stopMedia();
+        stopThisRecording();
       };
       current.start(1000); setRecording(true);
       timer.current = setTimeout(stopMedia, 60_000);
     } catch {
-      stopMedia();
-      if (generation.current === token) { markBusy(false); setError("No se pudo acceder al micrófono. Podés elegir un archivo o escribir el pedido."); }
+      if (generation.current === token) { stopMedia(); markBusy(false); setError("No se pudo acceder al micrófono. Podés elegir un archivo o escribir el pedido."); }
     }
   }
 

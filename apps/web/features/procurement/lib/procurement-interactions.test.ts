@@ -197,6 +197,32 @@ test("request return keeps its reason and overlay when transport fails and block
   assert.equal(elements(render(), "Sheet")[0]!.props.open, true); assert.equal(env.errors.length, 1);
 });
 
+test("late events from a cancelled recording cannot stop a newer microphone stream", async () => {
+  const env = environment();
+  const stopped = [0, 0]; let streamIndex = 0;
+  const recorders: FakeRecorder[] = [];
+  class FakeRecorder {
+    state = "inactive"; onstop?: () => void;
+    static isTypeSupported() { return true; }
+    constructor() { recorders.push(this); }
+    start() { this.state = "recording"; }
+    stop() { this.state = "inactive"; }
+  }
+  const { PurchaseRequestAudioAssistant } = load<{ PurchaseRequestAudioAssistant: (props: unknown) => Element }>("../components/purchase-request-audio-assistant.tsx", env.dependencies, {
+    AbortController, FormData, File, MediaRecorder: FakeRecorder,
+    setTimeout: () => 1, clearTimeout() {},
+    navigator: { mediaDevices: { getUserMedia: async () => { const index = streamIndex++; return { getTracks: () => [{ stop: () => { stopped[index]!++; } }] }; } } },
+  });
+  const render = () => env.render(() => PurchaseRequestAudioAssistant({ projectId: "project", onApply() {}, onCancel() {} }));
+  const click = (name: string) => (elements(render(), "Button").find((node) => text(node) === name)!.props.onClick as () => void)();
+  click("Grabar pedido"); await env.settle();
+  click("Cancelar procesamiento"); click("Grabar pedido"); await env.settle();
+  recorders[0]!.onstop?.();
+  assert.equal(recorders[1]!.state, "recording"); assert.equal(stopped[1], 0);
+  assert.ok(text(render()).includes("Detener grabación"));
+  click("Cancelar procesamiento"); assert.ok(stopped[1]! > 0);
+});
+
 test("audio assistant cancels stale proposals, keeps editable text and prevents duplicate requests", async () => {
   const env = environment(), first = deferred<Response>(); let calls = 0, applied = 0;
   const { PurchaseRequestAudioAssistant } = load<{ PurchaseRequestAudioAssistant: (props: unknown) => Element }>("../components/purchase-request-audio-assistant.tsx", env.dependencies, {
