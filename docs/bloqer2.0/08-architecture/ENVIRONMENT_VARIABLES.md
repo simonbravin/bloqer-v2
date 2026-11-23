@@ -133,3 +133,8 @@ For these flags, `true`, `1`, `yes` and `on` are enabled (case-insensitive, trim
 | Seed | `SEED_USER_EMAIL` |
 
 See also [`.env.example`](../../../.env.example).
+
+### Lectura de cotizaciones (5/E1)
+
+`BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED` es opt-in y su valor por defecto es `false`. Requiere también los gates `BLOQER_AI_ENABLED`/`BLOQER_AI_ALLOW_PRODUCTION` según entorno, y proveedor con visión/salida estructurada. Reutiliza modelo, credenciales, límite por sesión y timeout existentes; no configura servicios nuevos. No habilitar por desplegar el código: ejecutar primero el piloto sintético de lectura y revisión.
+

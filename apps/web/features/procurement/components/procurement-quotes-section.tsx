@@ -113,7 +113,8 @@ export function ProcurementQuotesSection({
     : undefined;
 
   return (
-    <div className="hidden md:block space-y-4">
+    <div className="space-y-4">
+      <div className="hidden md:block">
       <h2 className="text-lg font-semibold">Cotizaciones</h2>
       <TableScroll>
         <Table>
@@ -209,6 +210,7 @@ export function ProcurementQuotesSection({
           </TableBody>
         </Table>
       </TableScroll>
+      </div>
 
       {canQuote && editingQuote && editValues ? (
         <ProcurementQuoteForm

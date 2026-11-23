@@ -35,6 +35,11 @@ export function isPurchaseRequestAudioEnabled(env: NodeJS.ProcessEnv = process.e
   return resolveBloqerAiEnabled(env) && parseTruthyFlag(env.BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED);
 }
 
+/** Quote extraction is separately opt-in; it does not enable chat writes. */
+export function isProcurementQuotePreviewEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return resolveBloqerAiEnabled(env) && parseTruthyFlag(env.BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED);
+}
+
 export function getPurchaseRequestTranscriptionModel(env: NodeJS.ProcessEnv = process.env): string {
   return env.BLOQER_AI_TRANSCRIPTION_MODEL?.trim() || "gpt-4o-mini-transcribe";
 }
