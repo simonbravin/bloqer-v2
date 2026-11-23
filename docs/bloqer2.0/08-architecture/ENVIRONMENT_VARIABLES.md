@@ -90,6 +90,8 @@ Canonical parsing lives in [`packages/ai/src/env.ts`](../../../packages/ai/src/e
 | `BLOQER_AI_ENABLED` | Global AI opt-in; absent/empty/false disables AI. |
 | `BLOQER_AI_ALLOW_PRODUCTION` | Additional opt-in when **any** of `VERCEL_ENV`, `APP_ENV` or `NODE_ENV` equals `production`. A Vercel Preview / `next start` with `NODE_ENV=production` also requires this flag. |
 | `BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED` | Separate opt-in for document reading; requires both applicable AI gates above. It is off by default. |
+| `BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED` | D-148 / ADR-020: separate opt-in for reviewed purchase request dictation; also requires the global AI and applicable production gates. Off by default. |
+| `BLOQER_AI_TRANSCRIPTION_MODEL` | Defaults to `gpt-4o-mini-transcribe` through the existing provider. Structured proposal preparation uses `BLOQER_AI_MODEL`. No new service subscription; provider usage may incur charges. |
 | `BLOQER_AI_PROVIDER` | Defaults to `openai`; the current preview requires vision and structured output capabilities. Fake providers are blocked in production-like environments. |
 | `OPENAI_API_KEY` | Server-only credential for the existing OpenAI provider. Presence alone does not prove that a request will succeed. |
 | `BLOQER_AI_MODEL` | Defaults to `gpt-4.1-mini`; changing it requires checking the document capabilities used by the existing provider. |

@@ -358,6 +358,8 @@ Lote sugerido (**solo V1 cierre**, sin Admin ni WRITE):
 
 ## Changelog
 
+- **23/11/2026 — D-148 / ADR-020:** el Owner seleccionó audio a solicitud de compra como bloque 4 del plan de automatización. Flujo especializado de propuesta efímera, sin tools PREPARE/WRITE del chat: transcripción revisada, renglones editables y creación DRAFT por el formulario/servicio existentes. Sin persistencia adicional, dependencias ni proveedor nuevo; apagado por defecto. No equivale a habilitar V3 ni a acreditar el piloto con proveedor real. Ver alcance, validación y próximos pasos en el plan del primer paquete.
+
 | Fecha | Cambio |
 |---|---|
 | 2026-09-06 | Creación del roadmap canónico V1→V4 + reglas permanentes + lote post-smoke |

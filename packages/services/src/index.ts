@@ -320,3 +320,4 @@ export * from "./ai";
 export * from "./procurement/purchase-order-document.service";
 export { previewSupplierInvoiceDocument, supplierInvoiceDocumentPreviewAvailable } from "./ap/supplier-invoice-document-preview.service";
 export type { SupplierInvoiceDocumentPreviewInput } from "./ap/supplier-invoice-document-preview.service";
+export { purchaseRequestAudioAvailable, transcribePurchaseRequestAudio, previewPurchaseRequestTranscript } from "./procurement/purchase-request-audio.service";

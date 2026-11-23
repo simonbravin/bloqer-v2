@@ -297,6 +297,16 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 
 ---
 
+## ADR-020 — Preparación efímera de solicitudes desde audio
+
+- **Fecha:** 2026-11-23. **Estado:** ACEPTADO para el flujo elegido en D-148, aplicando las capas y el adaptador de ADR-017/019; sin cambios de persistencia.
+- **Diseño:** route autenticada acotada → service con autorización de obra/empresa/rol/módulo → `@bloqer/ai` con transcripción opcional del adaptador existente y generación estructurada sin tools. El SDK permanece dentro del adaptador; proveedores sin transcripción no habilitan audio. Modelo de transcripción configurable, con el mismo proveedor y credenciales actuales.
+- **Interacción:** grabación explícita (máximo 60 segundos en el navegador) o archivo WebM/MP4/WAV de hasta 3 MiB; validar tamaño y cabecera antes del proveedor. Transcripción editable y confirmación previa a preparar renglones. Texto y respuesta acotados; cantidades decimales como strings y desconocidos null. Las fechas relativas se conservan como observaciones para que el usuario elija una fecha exacta.
+- **Persistencia:** audio, transcripción y propuesta solo viven en memoria durante la preparación; no se envían a logs, R2, auditoría ni campos de notas automáticamente. La interfaz informa que se envía el audio al proveedor configurado. El alta sigue por la acción/servicio DRAFT existente, sin calls de escritura del modelo. No hay retención nueva en Bloqer; aplican las condiciones del proveedor de IA.
+- **Límites:** flag propio apagado y gates AI/producción, límite HTTP incluso sin Content-Length, timeout/cancelación, rechazo cross-origin, rate limit existente. No se presenta el rate limit en memoria como cuota distribuida. Cancelar/editar/reemplazar invalida resultados anteriores. Revisión ligada al contenido antes de guardar; todos los controles de negocio se repiten al crear.
+- **Verificación:** parser e instrucciones adversariales, permisos antes de llamadas al proveedor, bytes/tamaño/cancelación, revisión y edición en UI, borrador real en SQL descartable. Proveedores y grabación real se prueban después con un piloto autorizado; CI no demuestra calidad de transcripción.
+- **Referencias:** D-148, Q-096, `PURCHASE_REQUESTS.md`, `PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md` bloque 4/D.
+
 ### Formato sugerido para nuevos ADRs
 
 ```markdown
