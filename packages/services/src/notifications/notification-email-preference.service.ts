@@ -13,6 +13,8 @@ import {
 } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
 import { assertTenantModuleEnabled } from "../tenant-modules/tenant-module.service";
+import { getTenantDisplayTimezone } from "../tenant-settings/tenant-settings.service";
+import { getDigestSchedulePreview } from "./notification-digest-schedule";
 
 export type TenantNotificationEmailPolicyView = {
   tenantId: string;
@@ -142,6 +144,23 @@ export async function updateTenantNotificationEmailPolicy(
     }
   }
 
+  let changeHour = false;
+  if (input.digestHourLocal !== undefined) {
+    const current = await prisma.tenantNotificationEmailPolicy.findUnique({
+      where: { tenantId: ctx.tenantId }, select: { digestHourLocal: true },
+    });
+    changeHour = input.digestHourLocal !== current?.digestHourLocal;
+    if (changeHour) {
+      const schedule = getDigestSchedulePreview(await getTenantDisplayTimezone(ctx), new Date());
+      if (!schedule.eligibleHours.includes(input.digestHourLocal)) {
+        throw new ServiceError("VALIDATION",
+          "Elegí una hora compatible con la revisión diaria: " +
+          schedule.eligibleHours.map((hour) => String(hour).padStart(2, "0") + ":00").join(", ") +
+          " (" + schedule.timezone + "). Recargá la página para ver la próxima revisión.");
+      }
+    }
+  }
+
   const updated = await prisma.tenantNotificationEmailPolicy.upsert({
     where: { tenantId: ctx.tenantId },
     create: {
@@ -158,7 +177,8 @@ export async function updateTenantNotificationEmailPolicy(
       ...(input.digestEnabledDefault !== undefined
         ? { digestEnabledDefault: input.digestEnabledDefault }
         : {}),
-      ...(input.digestHourLocal !== undefined ? { digestHourLocal: input.digestHourLocal } : {}),
+      // Do not rewrite a legacy hour when only other preferences change.
+      ...(changeHour ? { digestHourLocal: input.digestHourLocal } : {}),
     },
   });
   return toPolicyView(updated);

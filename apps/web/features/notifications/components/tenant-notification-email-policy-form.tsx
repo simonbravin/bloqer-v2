@@ -25,8 +25,6 @@ export type TenantEmailPolicyFormProps = {
   schedulePreview: DigestSchedulePreview | null;
 };
 
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, h) => h);
-
 function formatHourLabel(h: number): string {
   return `${String(h).padStart(2, "0")}:00`;
 }
@@ -44,6 +42,8 @@ export function TenantNotificationEmailPolicyForm({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const compatibleHours = schedulePreview?.eligibleHours ?? [];
+  const hourOptions = [...new Set([...compatibleHours, digestHourLocal])].sort((a, b) => a - b);
 
   useEffect(() => {
     setCc(leadershipDailyFlowEmailCc);
@@ -59,7 +59,7 @@ export function TenantNotificationEmailPolicyForm({
       const result = await updateTenantNotificationEmailPolicyAction({
         leadershipDailyFlowEmailCc: cc,
         digestEnabledDefault: digestDefault,
-        digestHourLocal: digestHourLocalNum,
+        ...(digestHourLocalNum !== digestHourLocal ? { digestHourLocal: digestHourLocalNum } : {}),
       });
       if ("error" in result) {
         setError(result.error);
@@ -109,32 +109,33 @@ export function TenantNotificationEmailPolicyForm({
         <Separator />
 
         <div className="space-y-2 max-w-xs">
-          <Label htmlFor="digest-hour">Hora local del digest</Label>
-          <Select value={hour} onValueChange={setHour} disabled={pending}>
+          <Label htmlFor="digest-hour">Hora mínima del resumen</Label>
+          <Select value={hour} onValueChange={setHour} disabled={pending || !schedulePreview}>
             <SelectTrigger id="digest-hour" className="w-full">
               <SelectValue placeholder="Elegí una hora" />
             </SelectTrigger>
             <SelectContent>
-              {HOUR_OPTIONS.map((h) => (
-                <SelectItem key={h} value={String(h)}>
-                  {formatHourLabel(h)}
+              {hourOptions.map((h) => (
+                <SelectItem key={h} value={String(h)} disabled={!compatibleHours.includes(h)}>
+                  {formatHourLabel(h)}{compatibleHours.includes(h) ? "" : " (guardada; fuera de horario)"}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">
             La revisión automática ocurre una vez al día a las 10:05 UTC (07:05 en Argentina).
-            El resumen puede salir si en la zona de la organización es la hora elegida o hasta
-            tres horas después, dentro del mismo día.
+            Las horas disponibles habilitan el resumen para esa revisión; no programan otro envío.
+            La hora de llegada puede variar.
           </p>
           {schedulePreview ? (
             <p className="text-xs text-muted-foreground">
               Próxima revisión prevista: {schedulePreview.reviewLabel} ({schedulePreview.timezone}).
             </p>
           ) : null}
+          {!schedulePreview ? <p role="status" className="text-xs text-muted-foreground">No se pudo calcular el horario. Recargá la página antes de cambiarlo.</p> : null}
           {schedulePreview && !schedulePreview.eligibleHours.includes(Number(hour)) ? (
             <p className="text-xs text-amber-800 dark:text-amber-200" role="status">
-              La hora elegida queda fuera de la ventana de esa revisión y el resumen no saldría.
+              La hora guardada queda fuera de la próxima revisión y el resumen no saldría.
               {" "}Para incluirlo, elegí {schedulePreview.eligibleHours.map(formatHourLabel).join(", ")}.
             </p>
           ) : null}

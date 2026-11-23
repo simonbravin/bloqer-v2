@@ -432,3 +432,16 @@ Por indicación del Owner se difiere la reparación del conector Vercel; GitHub 
 Corte 1/A y 10/J: recuperación de cargas con archivo/metadata estables al reintentar y acción Completar carga sobre el registro existente cuando faltó confirmar. Se reutilizan permisos, estados, auditoría y servicios; sin migraciones, nuevas dependencias ni escrituras en DB operativa. Incluye pruebas de respuestas perdidas/malformadas, UI de reintento y una foto en SQL descartable con bytes inválidos, recuperación y control de ámbito/procedencia.
 
 Límites: las pruebas de navegador interceptan el transporte; las SQL usan objetos en memoria. No cierran P-01 a P-07 remotos ni acreditan backup independiente. 9/I queda diferido por el Owner. 10/J conserva destino/retención y restauración de copia independiente pendientes. 2/B conserva la preparación manual publicada; WhatsApp oficial requiere cuenta/número y destino de prueba. 3/C conserva los cron publicados; Q-095 sigue abierta. 4/D a 8/H mantienen el orden de §12. Resultados ejecutados se registran en el PR, no se infieren de la presencia de tests.
+
+
+## 16. Integración de lectura y recuperación de adjunto — 22/11/2026
+
+La restauración aislada quedó integrada en PR #28/main `433a1a57`: pg_dump/pg_restore reales, originales/revisiones/foto sintéticos, integridad y aislamiento aprobados. La [política inicial de respaldo](./08-architecture/BACKUP_RECOVERY_RUNBOOK.md) mantiene proveedores actuales sin contratar servicios nuevos; el backup independiente real sigue pendiente.
+
+Corte 1/A: recorridos autenticados que unen lectura simulada, revisión obligatoria, campos faltantes, invalidación de confirmación al editar, creación real de un borrador en SQL descartable y reintento del adjunto sobre el mismo ID y archivo. También cubren una nota de crédito bloqueada para prellenado de factura normal y conservación del original al volver a carga manual. Se prueban escritorio, tablet y teléfono.
+
+Límite de evidencia: sesión, acción de creación y persistencia de borrador son reales dentro de CI; extracción IA, inicio/PUT/confirmación del adjunto están interceptados. No prueban persistencia remota del archivo ni reemplazan P-01 a P-07 con proveedores reales. El estado final de ejecución se registra en el PR; disponer del test no implica que haya pasado.
+
+2/B conserva PDF + mensaje manual; WhatsApp oficial sigue pendiente de cuenta/número y destinatario de prueba. 9/I continúa diferido, 10/J mantiene backup real pendiente. 4/D y 5/E–8/H conservan su orden.
+
+Durante este corte el Owner aprobó mantener el resumen diario sin nuevos servicios. **3/C: Q-095 resuelta por D-147.** «Hora mínima del resumen» ofrece opciones compatibles con la próxima revisión y conserva visibles los históricos incompatibles. El servidor valida cambios de hora y no reescribe una hora sin cambios cuando se editan otras preferencias. Guía, Help y conocimiento AI acompañan el cambio. No se migran preferencias, se alteran audiencias ni se envían correos al guardar. La programación sigue diaria a las 10:05 UTC; una prueba de configuración no acredita entrega real ni cierra outbox/recuperación durable. Pruebas unitarias cubren autorización, aislamiento, zona horaria, validación y conservación de históricos; navegador comprueba selección y persistencia explícita en CI. Sin schema, dependencias ni proveedores nuevos.
