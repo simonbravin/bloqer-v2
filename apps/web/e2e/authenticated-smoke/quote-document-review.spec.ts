@@ -31,9 +31,15 @@ test("quote file review maps request items and registers an offer without awardi
   await page.getByLabel(/^Fecha requerida/).fill("2026-12-20");
   await page.getByRole("button", { name: "Crear solicitud", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/proyectos/${projectId}/solicitudes-compra/[0-9a-f-]{36}$`), { timeout: 30_000 });
+  const requestUrl = page.url();
+  const submitted = page.waitForResponse(response => response.request().method() === "POST" && response.url() === requestUrl, { timeout: 30_000 });
   await page.getByRole("button", { name: "Enviar solicitud", exact: true }).click();
+  const submission = await submitted;
+  expect(submission.ok()).toBe(true);
+  await submission.finished();
+  await expect(page.getByText("Enviada", { exact: true })).toBeVisible({ timeout: 30_000 });
   const save = page.getByRole("button", { name: "Registrar cotización", exact: true });
-  await expect(save).toBeVisible();
+  await expect(save).toBeVisible({ timeout: 30_000 });
   await page.getByRole("button", { name: "Leer cotización desde archivo", exact: true }).click();
   await page.getByLabel("Archivo de cotización", { exact: true }).setInputFiles({ name: "cotizacion.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\nSYNTHETIC QUOTE\n%%EOF") });
   await page.getByRole("button", { name: "Leer oferta", exact: true }).click();
