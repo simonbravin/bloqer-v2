@@ -25,6 +25,7 @@ test("quote file review maps request items and registers an offer without awardi
   await page.locator("#pr-wbs").click(); await page.getByRole("option").first().click();
   await page.getByLabel("Descripción / material", { exact: true }).fill(description);
   const quantity = page.getByLabel("Cantidad", { exact: true });
+  await quantity.focus(); await expect(quantity).toHaveValue("1,0000");
   await quantity.fill("2"); await quantity.blur(); await expect(quantity).toHaveValue("2,00");
   await page.getByLabel("Unidad", { exact: true }).click(); await page.getByRole("option", { name: "Unidad", exact: true }).click();
   await page.getByLabel(/^Fecha requerida/).fill("2026-12-20");
@@ -54,12 +55,15 @@ test("quote file review maps request items and registers an offer without awardi
   await expect(save).toBeDisabled();
   await page.locator("#quote-supplier").click(); await page.getByRole("option").first().click();
   const discount = page.getByLabel("Desc. %", { exact: true });
-  await expect(discount).toHaveValue(""); await discount.fill("0"); await discount.blur();
+  await discount.focus(); await expect(discount).toHaveValue(""); await discount.fill("0"); await discount.blur();
   const review = page.getByRole("checkbox", { name: /Revisé proveedor, moneda, cantidades/ });
   await review.check(); await expect(save).toBeEnabled();
   const price = page.getByLabel("Precio unitario neto (sin IVA)", { exact: true });
+  await price.focus(); await expect(price).toHaveValue("100,0000");
   await price.fill("101"); await price.blur(); await expect(review).not.toBeChecked();
-  await expect(save).toBeDisabled(); await price.fill("100"); await price.blur(); await expect(review).not.toBeChecked();
+  await expect(save).toBeDisabled();
+  await price.focus(); await expect(price).toHaveValue("101,0000");
+  await price.fill("100"); await price.blur(); await expect(review).not.toBeChecked();
   await review.check(); await save.click();
   await expect(page.getByText("Cotización registrada.", { exact: true })).toBeVisible();
   await page.reload();
