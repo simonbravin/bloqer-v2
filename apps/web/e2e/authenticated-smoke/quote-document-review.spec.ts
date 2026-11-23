@@ -35,7 +35,7 @@ test("quote file review maps request items and registers an offer without awardi
   const submitted = page.waitForResponse(response => response.request().method() === "POST" && response.url() === requestUrl, { timeout: 30_000 });
   await page.getByRole("button", { name: "Enviar solicitud", exact: true }).click();
   const submission = await submitted;
-  expect(submission.ok()).toBe(true);
+  expect([200, 303]).toContain(submission.status());
   await submission.finished();
   await expect(page.getByText("Enviada", { exact: true })).toBeVisible({ timeout: 30_000 });
   const save = page.getByRole("button", { name: "Registrar cotización", exact: true });
