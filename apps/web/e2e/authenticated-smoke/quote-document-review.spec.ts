@@ -81,4 +81,17 @@ test("quote file review maps request items and registers an offer without awardi
   expect(reads).toBe(2);
   const layout = await page.evaluate(() => ({ width: document.documentElement.clientWidth, scroll: document.documentElement.scrollWidth }));
   expect(layout.scroll).toBeLessThanOrEqual(layout.width + 1);
+  // Exercise the responsive selection UI without generating an order.
+  if (testInfo.project.name === "phone") {
+    const award = page.locator('select[id^="award-mobile-"]');
+    await award.selectOption({ index: 1 });
+    await expect(award).not.toHaveValue("");
+    await expect(page.getByTestId("award-generate-pos")).toBeEnabled();
+    await award.selectOption("");
+    await expect(page.getByTestId("award-generate-pos")).toBeDisabled();
+  } else {
+    const matrix = page.getByRole("table", { name: "Comparativa para adjudicar por ítem" });
+    await expect(matrix.locator("tbody tr td").first()).toHaveCSS("position", "sticky");
+  }
+  await testInfo.attach("quote-and-award-layout", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
 });

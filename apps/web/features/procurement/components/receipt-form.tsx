@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS, PROCUREMENT_FORM_PAGE_CLASS } from "../lib/procurement-form-layout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ConfirmAlertDialog } from "@/components/ui/reason-alert-dialog";
@@ -343,12 +344,12 @@ export function ReceiptForm(props: ReceiptFormProps) {
   const defaultNotes = isEdit ? (props.initialNotes ?? "") : "";
 
   return (
-    <div className="rounded-lg border bg-card p-4 sm:p-6">
+    <div className={`${PROCUREMENT_FORM_PAGE_CLASS} rounded-lg border bg-card p-4 sm:p-6`}>
       <p className="text-sm text-muted-foreground mb-4">OC: {purchaseOrderCode}</p>
       <form
         ref={formRef}
         onSubmit={isEdit ? handleSaveDraft : handleCreateSubmit}
-        className="space-y-5"
+        className={`space-y-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}
       >
 <fieldset disabled={isPending} className="min-w-0 space-y-5">
         {error && (
@@ -377,7 +378,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
           Las líneas sin producto asociado no generan stock. Para recibir productos de inventario necesitás un depósito autorizado; si no aparece ninguno, revisá Inventario o pedí acceso.
         </p>
 
-        <div className="space-y-1">
+        <div className="max-w-md space-y-2">
           <Label htmlFor="receiptDate">Fecha de recepción</Label>
           <Input
             id="receiptDate"
@@ -444,7 +445,7 @@ export function ReceiptForm(props: ReceiptFormProps) {
 
         {extraSections}
 
-        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:flex-wrap sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
           {isEdit ? (
             <>
               <Button

@@ -1002,7 +1002,9 @@ En obra **no todo pasa por OC**. Tres caminos de egreso:
 | Paquete de ejecución (albañil, electricista, etc.) | **Subcontrato** (§10) → certificar → factura → pago | **Subcontratista** |
 | Reintegro al empleado, gasto chico sin compra formal | Factura de proveedor **sin OC** (§12.2), con partida EDT | **Empleado** o **Proveedor** |
 
-**Tablero:** Compras → **Tablero de compras** → `/proyectos/[id]/compras` (pendientes SC / cotización / OC / recepción). Altas de SC/OC en **diálogo** desde el listado (`?create=1`; rutas `/nueva` redirigen). Es el tablero de **documentos** de abastecimiento; el control de **$** por partida está en **EDT y costos**.
+**Tablero:** Compras → **Tablero de compras** → `/proyectos/[id]/compras` (pendientes SC / cotización / OC / recepción). Altas de SC/OC en **diálogo** desde el listado en escritorio (`?create=1`); en celular se abre la página `/nueva`, que también admite acceso directo. Es el tablero de **documentos** de abastecimiento; el control de **$** por partida está en **EDT y costos**.
+
+**Lectura y carga:** los accesos rápidos del tablero se distribuyen en una grilla. Los formularios de solicitud, OC, cotización y recepción mantienen un ancho de lectura acotado, controles cómodos para tocar y acciones que se adaptan al espacio disponible. En las tablas de detalle de OC y **Adjudicar por ítem**, desplazá horizontalmente dentro del panel: la descripción del ítem permanece fija. En celular, la adjudicación conserva el selector de proveedor de cada ítem. Los totales se acomodan en varias filas cuando hace falta; no se cambian importes, permisos ni pasos de aprobación.
 
 **Cómo se mueve el flujo** (si esto, entonces aquello). El caminito: [`guides/assets/flujos/mapa-flujo-compras-si-no.png`](./guides/assets/flujos/mapa-flujo-compras-si-no.png).
 

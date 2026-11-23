@@ -5,6 +5,7 @@ import type { ProcurementQuoteDocumentPreview } from "@bloqer/ai";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { procurementActionBtnClass } from "../lib/procurement-ui";
 import { mapQuoteDocumentLines, type QuoteDocumentPrefill, type QuoteRequestLine } from "../lib/quote-document-mapping";
 
 const endpoint = "/api/ai/procurement-quote-preview";
@@ -45,8 +46,8 @@ export function QuoteDocumentAssistant({ projectId, purchaseRequestId, lines, di
   }
   if (!enabled) return null;
   const mapping = preview ? mapQuoteDocumentLines(preview, lines, choices) : null;
-  return <div className="space-y-3 rounded-md border p-3">
-    <Button type="button" variant="outline" disabled={disabled} onClick={() => { clear(); setFile(null); setOpen(!open); }}> {open ? "Cerrar lectura de cotización" : "Leer cotización desde archivo"} </Button>
+  return <div className="form-section min-w-0 space-y-4 p-3 sm:p-4 [&_button]:h-auto [&_button]:min-h-11 [&_button]:max-w-full [&_button]:whitespace-normal [&_button]:py-2 md:[&_button]:min-h-10">
+    <Button type="button" variant="outline" className={procurementActionBtnClass} disabled={disabled} onClick={() => { clear(); setFile(null); setOpen(!open); }}> {open ? "Cerrar lectura de cotización" : "Leer cotización desde archivo"} </Button>
     {open ? <div className="space-y-3">
       <p className="text-sm text-muted-foreground">Al leer, se envía el archivo al proveedor de IA configurado. Revisá la propuesta: aplicarla reemplaza los importes y condiciones de este formulario; no guarda ni adjudica. El archivo no queda adjunto: agregalo luego en los adjuntos de la cotización.</p>
       <Label htmlFor={`quote-file-${purchaseRequestId}`}>Archivo de cotización</Label>
@@ -61,7 +62,7 @@ export function QuoteDocumentAssistant({ projectId, purchaseRequestId, lines, di
         {preview.lines.map((line, i) => <div key={i} className="space-y-1 rounded border p-2">
           <p className="text-sm break-words">{i + 1}. {line.description ?? "Descripción pendiente"} · {line.quantity ?? "?"} {line.unit ?? "?"} · Precio: {line.unitPrice ?? "?"} · IVA: {line.taxRate ?? "?"}% · Desc.: {line.discountPct ?? "?"}%</p>
           <Label htmlFor={`quote-map-${purchaseRequestId}-${i}`}>Vincular renglón {i + 1}</Label>
-          <select id={`quote-map-${purchaseRequestId}-${i}`} className="w-full min-w-0 rounded-md border bg-background p-2 text-sm" disabled={disabled} value={choices[i] ?? ""} onChange={e => { const selected = e.currentTarget.value; setChoices(old => old.map((v, index) => index === i ? selected : v)); setReviewed(false); }}>
+          <select id={`quote-map-${purchaseRequestId}-${i}`} className="w-full min-w-0 max-w-full rounded-md border border-input bg-background p-2 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm" disabled={disabled} value={choices[i] ?? ""} onChange={e => { const selected = e.currentTarget.value; setChoices(old => old.map((v, index) => index === i ? selected : v)); setReviewed(false); }}>
             <option value="">Elegir ítem de la solicitud…</option>
             {lines.map(l => <option key={l.id} value={l.id}>{l.description} · {l.quantity} {l.unit}</option>)}
             <option value="exclude">Excluir de este formulario</option>

@@ -11,6 +11,7 @@ import { ReportExportActions } from "@/features/reports/report-export-actions";
 import { cn } from "@/lib/utils";
 import type { PurchaseRequestView } from "@bloqer/services";
 import { matchesListStatusFilter } from "../lib/matches-list-status-filter";
+import { procurementFilterBtnClass } from "../lib/procurement-ui";
 import { PurchaseRequestMobileCards } from "./purchase-request-mobile-cards";
 import { PurchaseRequestTable } from "./purchase-request-table";
 
@@ -189,7 +190,7 @@ export function PurchaseRequestListFilters({
               placeholder="Buscar por código, descripción, EDT, proveedor o solicitante…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-9"
+              className="h-11 pl-9 pr-12 md:h-10"
               data-testid="purchase-request-search"
             />
             {search ? (
@@ -197,7 +198,7 @@ export function PurchaseRequestListFilters({
                 type="button"
                 aria-label="Limpiar búsqueda"
                 onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10"
               >
                 <X className="size-4" aria-hidden />
               </button>
@@ -216,7 +217,7 @@ export function PurchaseRequestListFilters({
             size="sm"
             variant={status === null ? "secondary" : "outline"}
             onClick={() => setStatusFilter(null)}
-            className="h-8"
+            className={procurementFilterBtnClass}
             aria-pressed={status === null}
           >
             Activas
@@ -232,7 +233,7 @@ export function PurchaseRequestListFilters({
                 size="sm"
                 variant={active ? "secondary" : "outline"}
                 onClick={() => setStatusFilter(active ? null : f.value)}
-                className={cn("h-8", count === 0 && !active && "opacity-60")}
+                className={cn(procurementFilterBtnClass, count === 0 && !active && "opacity-60")}
                 aria-pressed={active}
               >
                 {f.label}

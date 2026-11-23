@@ -13,6 +13,8 @@ import * as requestDrafts from "./purchase-request-form-lines";
 import * as quoteEdit from "./quote-line-edit-values";
 import * as listStatus from "./matches-list-status-filter";
 import * as quoteDocumentMapping from "./quote-document-mapping";
+import * as procurementUi from "./procurement-ui";
+import * as procurementFormLayout from "./procurement-form-layout";
 
 type Element = { type: string; props: Record<string, unknown>; key?: string | number };
 const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>, key?: string | number): Element => typeof type === "function" ? type(props) : ({ type, props, key });
@@ -33,6 +35,8 @@ function load<T>(file: string, dependencies: Record<string, unknown>, globals: R
   runInNewContext(code, { exports, URLSearchParams, ...globals, require(name: string) {
     if (name === "react/jsx-runtime") return { jsx, jsxs: jsx, Fragment: "fragment" };
     if (Object.hasOwn(dependencies, name)) return dependencies[name];
+    if (name === "../lib/procurement-ui") return procurementUi;
+    if (name === "../lib/procurement-form-layout" || name === "@/features/procurement/lib/procurement-form-layout") return procurementFormLayout;
     if (name.startsWith("@/components/ui/")) return new Proxy({}, { get: (_, key) => String(key) });
     assert.fail(`Unexpected dependency: ${name}`);
   } });

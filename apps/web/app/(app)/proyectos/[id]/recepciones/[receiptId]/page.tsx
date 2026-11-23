@@ -241,14 +241,14 @@ export default async function RecepcionDetailPage({ params, searchParams }: Page
       {draftEditor ? (
         draftEditor
       ) : (
-        <div className="rounded-lg border bg-card p-6 space-y-4">
+        <div className="space-y-4 rounded-lg border bg-card p-4 sm:p-6">
           {isDraft && !canEditReceipt ? (
             <p className="rounded bg-muted px-3 py-2 text-sm text-muted-foreground">
               Recepción en borrador. Necesitás permiso de edición en Compras para modificarla o
               confirmarla.
             </p>
           ) : null}
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2 [&>div]:min-w-0 [&_p]:break-words">
             <div>
               <p className="text-muted-foreground">Proveedor</p>
               <p className="font-medium">{receipt.supplierName}</p>
