@@ -48,7 +48,8 @@ test("audio proposal requires completion and renewed review before creating a re
   await expect(page.getByLabel("Descripción / material", { exact: true })).toHaveValue(description);
   await page.getByLabel("Unidad", { exact: true }).click();
   await page.getByRole("option", { name: "Unidad", exact: true }).click();
-  await page.getByLabel("Fecha requerida", { exact: true }).fill("2026-12-04");
+  // The label includes its required marker; keep matching the semantic label.
+  await page.getByLabel(/^Fecha requerida/).fill("2026-12-04");
   const review = page.getByRole("checkbox", { name: /Revisé la partida, los renglones/ });
   await review.check();
   await expect(save).toBeEnabled();
@@ -81,5 +82,7 @@ test("disabled audio preserves manual creation and denies provider access", asyn
   expect((await page.request.post(endpoint)).status()).toBe(503);
   await page.goto(path);
   await expect(page.getByRole("button", { name: "Dictar solicitud", exact: true })).toHaveCount(0);
+  // Wait for streamed SSR markup to settle without accepting duplicate controls.
+  await expect(page.locator("#pr-wbs")).toHaveCount(1);
   await expect(page.locator("#pr-wbs")).toBeVisible();
 });
