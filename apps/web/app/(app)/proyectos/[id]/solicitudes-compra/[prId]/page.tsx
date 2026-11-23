@@ -274,7 +274,7 @@ export default async function SolicitudCompraDetailPage({ params, searchParams }
         </details>
       ) : null}
 
-      {supplierLinksEnabled && <SupplierQuoteInvitationsPanel projectId={id} requestId={prId} suppliers={suppliers} invitations={supplierInvitations} allowCreate={pr.status === "SUBMITTED"} />}
+      {supplierLinksEnabled && (pr.status === "SUBMITTED" || supplierInvitations.length > 0) && <SupplierQuoteInvitationsPanel projectId={id} requestId={prId} suppliers={suppliers} invitations={supplierInvitations} allowCreate={pr.status === "SUBMITTED"} />}
       <PurchaseRequestDetailMobileSections
         pr={pr}
         projectId={id}

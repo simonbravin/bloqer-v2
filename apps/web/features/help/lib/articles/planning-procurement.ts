@@ -15,6 +15,7 @@ export const PLANNING_ARTICLES: HelpArticle[] = [
       "Compartilo manualmente: vence en 7 días y cualquiera que lo tenga puede responder sin cuenta. Revocar enlace cancela el acceso.",
       "El proveedor completa condiciones y cada ítem, pulsa Revisar respuesta y Confirmar y enviar respuesta.",
       "En Compras, Revisar respuesta permite ajustar los valores y completar FX si corresponde. Revisar respuesta e Incorporar cotización la agregan a la comparación.",
+      "Ver respuesta original conserva la consulta de lo enviado por el proveedor, sin las correcciones posteriores de Compras.",
     ],
     effects: ["Guarda la evidencia original y el revisor; crea una cotización recibida sólo tras revisión interna. No adjudica ni crea OC."],
     pitfalls: ["No envía invitaciones automáticamente. No comparte presupuesto, otras ofertas, archivos ni chat.", "Sólo una respuesta por enlace. Un nuevo enlace revoca el anterior pendiente; la respuesta anterior no se borra.", "No modifica cantidades/unidades. No cotizado y Bonificado requieren importe cero; debe existir un ítem cotizado positivo.", "Un cambio en la SC o en los permisos del emisor puede invalidar el acceso. No se valida la identidad de quien usa el enlace."],

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { before, after, describe, it } from "node:test";
-import { prisma } from "@bloqer/database";
+import { prisma, quoteInvitationRepository as repo } from "@bloqer/database";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { clearProjectAccessModeCache } from "../security/access";
 import type { ServiceContext } from "../types";
@@ -102,6 +102,36 @@ describe("D-149 supplier quote links on isolated SQL", { skip: process.env.BLOQE
     await revokeSupplierQuoteInvitation(b.id, b.requestId, ctx);
     await prisma.purchaseRequestLine.updateMany({ where: { purchaseRequestId: c.requestId }, data: { quantity: "3" } });
     for (const row of [a, b, c]) { await assert.rejects(() => readSupplierQuoteInvitation(row.id, row.token)); await assert.rejects(() => respondToSupplierQuoteInvitation(row.id, row.token, payload(row))); }
+  });
+  it("rechecks access after waiting: revocation, replacement, expiry and SC cancellation win", async () => {
+    for (const change of ["revoke", "replace", "expire", "cancel"] as const) {
+      const a = await invitation();
+      const transact = repo.transaction;
+      let reached!: () => void, release!: () => void, intercepted = false;
+      const atTransaction = new Promise<void>(resolve => { reached = resolve; });
+      const gate = new Promise<void>(resolve => { release = resolve; });
+      repo.transaction = async work => {
+        if (!intercepted) { intercepted = true; reached(); await gate; }
+        return transact(work);
+      };
+      const pending = respondToSupplierQuoteInvitation(a.id, a.token, payload(a));
+      const rejected = assert.rejects(pending);
+      try {
+        await atTransaction;
+        if (change === "revoke") await revokeSupplierQuoteInvitation(a.id, a.requestId, ctx);
+        if (change === "replace") await createSupplierQuoteInvitation(a.requestId, supplierId, ctx);
+        if (change === "expire") await prisma.procurementQuoteInvitation.update({ where: { id: a.id }, data: { expiresAt: new Date(0) } });
+        if (change === "cancel") await prisma.purchaseRequest.update({ where: { id: a.requestId }, data: { status: "CANCELLED" } });
+        release(); await rejected;
+        assert.equal((await prisma.procurementQuoteInvitation.findUniqueOrThrow({ where: { id: a.id } })).respondedAt, null);
+      } finally { release(); repo.transaction = transact; await pending.catch(() => undefined); }
+    }
+  });
+  it("archiving the supplier blocks access and submission", async () => {
+    const a = await invitation();
+    await prisma.contact.update({ where: { id: supplierId }, data: { status: "ARCHIVED" } });
+    try { await assert.rejects(() => readSupplierQuoteInvitation(a.id, a.token)); await assert.rejects(() => respondToSupplierQuoteInvitation(a.id, a.token, payload(a))); }
+    finally { await prisma.contact.update({ where: { id: supplierId }, data: { status: "ACTIVE" } }); }
   });
   it("concurrent identical responses save one evidence and one external audit event", async () => {
     const a = await invitation();

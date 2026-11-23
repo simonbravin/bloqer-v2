@@ -311,22 +311,22 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 
 - **Fecha:** 2026-11-23. **Estado:** ACEPTADO por el Owner mediante Q-097/D-149. Contrato aprobado para implementar; resultados de pruebas, migración, despliegue y piloto se registran por separado. La aprobación no activa la capacidad ni autoriza envíos a proveedores reales.
 - **Problema:** E2 necesita recibir ofertas sin conceder membresía al tenant. La creación vigente exige actor interno y persiste `RECEIVED`; usarla como endpoint público o atribuir la respuesta al emisor del enlace falsearía autorización y autoría.
-- **Decisión propuesta:** separar invitación/respuesta externa de la cotización operativa. El vínculo autoriza solamente consulta mínima y una respuesta; una persona interna autorizada revisa e incorpora la oferta con el servicio canónico. Reutilizar PostgreSQL, `node:crypto`, Zod, componentes y kernel monetario existentes. Sin dependencias ni servicios nuevos.
+- **Decisión aprobada:** separar invitación/respuesta externa de la cotización operativa. El vínculo autoriza solamente consulta mínima y una respuesta; una persona interna autorizada revisa e incorpora la oferta con el servicio canónico. Reutilizar PostgreSQL, `node:crypto`, Zod, componentes y kernel monetario existentes. Sin dependencias ni servicios nuevos.
 
-### Experiencia propuesta
+### Experiencia aprobada
 
-1. En una SC `SUBMITTED`, Compras elige un proveedor activo y pulsa **Crear enlace para cotizar**. Una vista previa muestra exactamente lo compartido y la fecha/hora de vencimiento. El enlace se muestra una vez; **Copiar enlace** no afirma envío. Se advierte que cualquiera que lo reciba puede utilizarlo. Generar otro revoca el anterior pendiente del mismo proveedor/SC.
+1. En una SC `SUBMITTED`, Compras elige un proveedor activo y pulsa **Crear enlace**. Una vista previa muestra exactamente lo compartido y la fecha/hora de vencimiento. El enlace se muestra una vez; **Copiar enlace** no afirma envío. Se advierte que cualquiera que lo reciba puede utilizarlo. Generar otro revoca el anterior pendiente del mismo proveedor/SC.
 2. La página externa identifica empresa, obra, SC y proveedor, y presenta descripción, cantidad y unidad de cada ítem. Excluye presupuesto, saldo, EDT/APU, notas internas, otros proveedores/ofertas, aprobadores, adjuntos y navegación al ERP. Mismos componentes y densidades del formulario vigente, incluidos celular y teclado.
 3. El proveedor informa moneda, precios con/sin IVA, descuentos, IVA/IIBB, plazo, vigencia y observaciones comerciales. Debe clasificar todos los ítems como Cotizado/No cotizado/Bonificado; desconocidos no se completan con ceros por omisión. No modifica cantidades ni unidades. Se exige al menos un ítem cotizado positivo; una respuesta de indisponibilidad total queda fuera de este primer corte.
-4. **Revisar respuesta** muestra los datos antes de **Enviar respuesta**. Una única respuesta definitiva: el reintento idéntico confirma el resultado; un contenido distinto exige que Compras emita otro enlace. Al terminar se muestra un comprobante mínimo sin acceso posterior a la oferta mediante el enlace.
-5. En la SC, **Respuestas de proveedores** conserva el original recibido y permite **Revisar e incorporar**. Compras puede corregir el formulario, completa FX cuando corresponda y confirma. Solo entonces nace `ProcurementQuote.RECEIVED`; no adjudica ni crea OC. Importación y vínculo se confirman atómicamente. Una respuesta incorporada abre su cotización existente y no permite crear otra.
+4. **Revisar respuesta** muestra los datos antes de **Confirmar y enviar respuesta**. Una única respuesta definitiva: el reintento idéntico confirma el resultado; un contenido distinto exige que Compras emita otro enlace. Al terminar se muestra un comprobante mínimo sin acceso posterior a la oferta mediante el enlace.
+5. En la SC, **Respuestas por enlace** conserva el original recibido y permite **Revisar respuesta** y **Incorporar cotización**. Compras puede corregir el formulario, completa FX cuando corresponda y confirma. Solo entonces nace `ProcurementQuote.RECEIVED`; no adjudica ni crea OC. Importación y vínculo se confirman atómicamente. Una respuesta incorporada permite **Ver respuesta original**; la cotización figura en la comparación existente y no se permite importar otra vez.
 6. El vencimiento/revocación detiene el acceso externo; no borra una respuesta ya recibida ni impide su revisión interna posterior. La revisión respeta el estado actual de SC/obra, proveedor activo, máximos y oferta activa existente. Si la solicitud cambió, se requiere una nueva invitación, sin importar contra renglones diferentes.
 
-### Persistencia propuesta y acotada
+### Persistencia aprobada y acotada
 
-Una única raíz nueva `ProcurementQuoteInvitation` / `procurement_quote_invitations`. No reutilizar tablas de login/membresía ni esconder este permiso dentro de notas o auditoría. Todos los siguientes campos son propuesta, no schema aprobado:
+Una única raíz nueva `ProcurementQuoteInvitation` / `procurement_quote_invitations`. No reutilizar tablas de login/membresía ni esconder este permiso dentro de notas o auditoría. Los siguientes campos fueron aprobados con D-149:
 
-| Campos | Contrato propuesto |
+| Campos | Contrato aprobado |
 |---|---|
 | `id` | UUID interno; no concede acceso por sí solo. |
 | `tenantId`, `companyId`, `projectId`, `purchaseRequestId`, `supplierContactId` | Obligatorios y con FK; coherencia entre todas las relaciones comprobada por servicio en cada operación. No ampliar el catálogo de hijos sin tenant de ADR-018. |
@@ -357,7 +357,7 @@ Una única raíz nueva `ProcurementQuoteInvitation` / `procurement_quote_invitat
 
 - Orden de locks consistente con compras: obra → SC → invitación. Dentro de la transacción repetir vigencia/revocación, autoridad y pertenencia después de esperar los locks. Revocación/expiración concurrente debe ganar cuando es efectiva antes de confirmar la respuesta. Actualización condicional y `responseHash` garantizan que un reintento no sobrescriba evidencia.
 - Incorporación: extraer una operación interna transaccional de `createProcurementQuote`, conservando guards, cálculo, clasificación, capacidad y auditoría. El servicio autenticado de incorporación usa esa operación y enlaza `importedQuoteId` en la misma transacción. No hacer un alta y luego un update separado; no cambiar la firma pública de alta manual ni permitir que el endpoint externo la invoque.
-- Propuesta de eventos de auditoría: `procurement_quote_invitation.created`, `.revoked`, `.responded`, `.imported`. Registrar en catálogo antes de programar. Los internos llevan actor real; el externo usa actor nullable y procedencia explícita, sin etiquetarlo como acción de usuario o tarea automática. Contexto tenant/empresa/obra obligatorio, sin token, hash de token ni respuesta completa en logs. El original queda únicamente en el registro autorizado.
+- Eventos de auditoría: `procurement_quote_invitation.created`, `.revoked`, `.responded`, `.imported`. Registrar en catálogo antes de programar. Los internos llevan actor real; el externo usa actor nullable y procedencia explícita, sin etiquetarlo como acción de usuario o tarea automática. Contexto tenant/empresa/obra obligatorio, sin token, hash de token ni respuesta completa en logs. El original queda únicamente en el registro autorizado.
 - Proveedores/formularios: reutilizar `Contact` SUPPLIER, `canManageProcurementQuotes`/guards existentes, schemas monetarios, kernel, Select/Input/Button y clases compartidas de Compras. Repositorio nuevo en `packages/database`; orquestación en `packages/services`; route handlers delgados. No usar Prisma desde `apps/web`.
 
 ### Pruebas y publicación tras aprobación
@@ -372,7 +372,7 @@ Una única raíz nueva `ProcurementQuoteInvitation` / `procurement_quote_invitat
 
 - `packages/services/src/procurement/procurement-quote.service.ts`: alta interna, locks, estado `RECEIVED`, oferta activa por proveedor y máximo de cotizaciones.
 - `packages/services/src/types.ts`: actor obligatorio del contexto interno; no existe identidad externa de proveedor.
-- `packages/database/prisma/schema.prisma`: `ProcurementQuote`, `ProcurementQuoteLine`, `AuditLog`, `VerificationToken`; no existe permiso externo para responder cotizaciones.
+- `packages/database/prisma/schema.prisma`: `ProcurementQuote`, `ProcurementQuoteLine`, `AuditLog`, `VerificationToken`; se agrega la raíz de permiso externo de este ADR.
 - `apps/web/middleware.ts`: allowlist pública actual y patrón de separación de tokens de membresía; no reutilizar la membresía como acceso de proveedor.
 - [OWASP, controles de tokens](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html): referencia técnica sobre aleatoriedad, uso único, vencimiento y evitar filtraciones. Es un contexto de recuperación de contraseña, no una especificación de negocio de cotizaciones ni respaldo del plazo propuesto de siete días.
 

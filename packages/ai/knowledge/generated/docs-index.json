@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-23T23:39:09.045Z",
-  "sourceHash": "7589bd834a2621e7af09b6721b7597fdf97f9a3da37d54002703df1b4920d9f2",
+  "generatedAt": "2026-11-23T23:54:32.726Z",
+  "sourceHash": "dd6b75a91b637d22f0e691a2c1955fc1c6f3ce9f3b997c2851b1fa88a7205eba",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "4d0f45598106ca41c65d4fcac3905fe30a0506a0aca831cba82a6307e841ff6f",
-      "bytes": 235889
+      "sha256": "60e99ac95a99d55ecc372a11c4929a3d10d960924b355668c2a589c081cba947",
+      "bytes": 236014
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1351,7 +1351,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "9. Compras, materiales y abastecimiento (nivel proyecto)",
-      "text": "nfirmar y enviar respuesta** guarda una única respuesta. Un reintento idéntico no la duplica. No hay adjuntos ni IA en este formulario.\n\nCompras vuelve a la SC y pulsa **Revisar respuesta**. Puede ajustar los datos para la cotización y debe completar el tipo de cambio si la moneda no es ARS. Después de **Revisar respuesta**, **Incorporar cotización** genera una cotización recibida en la comparación existente. No adjudica ni crea una OC. La respuesta original y quién la incorporó se conservan. Vencimiento/revocación no borran evidencia recibida; si cambió la solicitud, pedí una nueva respuesta. Si el enlace deja de estar disponible, verificá también permisos del emisor, acceso a la obra, estado del proveedor y que la SC siga Enviada."
+      "text": "nfirmar y enviar respuesta** guarda una única respuesta. Un reintento idéntico no la duplica. No hay adjuntos ni IA en este formulario.\n\nCompras vuelve a la SC y pulsa **Revisar respuesta**. Puede ajustar los datos para la cotización y debe completar el tipo de cambio si la moneda no es ARS. Después de **Revisar respuesta**, **Incorporar cotización** genera una cotización recibida en la comparación existente. No adjudica ni crea una OC. La respuesta original y quién la incorporó se conservan. **Ver respuesta original** permite consultar la evidencia sin las correcciones de Compras, incluso después de incorporarla. Vencimiento/revocación no borran evidencia recibida; si cambió la solicitud, pedí una nueva respuesta. Si el enlace deja de estar disponible, verificá también permisos del emisor, acceso a la obra, estado del proveedor y que la SC siga Enviada."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#158",

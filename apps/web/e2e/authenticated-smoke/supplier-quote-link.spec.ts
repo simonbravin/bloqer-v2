@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test("supplier responds without a session, Compras reviews and imports once", async ({ page, browser }, testInfo) => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
   const index = ["desktop", "tablet", "phone"].indexOf(testInfo.project.name);
   expect(index).toBeGreaterThanOrEqual(0);
   const requestId = `a0000e20-0000-4000-8000-00000000000${index + 1}`;
@@ -64,7 +64,40 @@ test("supplier responds without a session, Compras reviews and imports once", as
     await page.reload();
     await expect(panel.getByText("Incorporada", { exact: true })).toHaveCount(1);
     await expect(panel.getByRole("button", { name: "Revisar respuesta", exact: true })).toHaveCount(0);
+    await panel.getByRole("button", { name: "Ver respuesta original", exact: true }).click();
+    await expect(panel.getByLabel("Observaciones (opcional)")).toHaveValue("");
+    await expect(panel.getByLabel("Precio unitario", { exact: true })).toBeDisabled();
+    await expect(panel.getByRole("button", { name: "Incorporar cotización", exact: true })).toHaveCount(0);
     await testInfo.attach("internal-reviewed-response", { body: await page.screenshot({ fullPage: true }), contentType: "image/png" });
+    // Real second company + second authenticated issuer. Both supplier tabs share
+    // one cookie jar, so path isolation is exercised without mocking the server.
+    const buyerBContext = await browser.newContext({ viewport: page.viewportSize()! });
+    try {
+      const buyerB = await buyerBContext.newPage();
+      await buyerB.goto(new URL(link).origin + "/login");
+      await buyerB.getByLabel("Email", { exact: true }).fill("supplier-link-b@example.invalid");
+      await buyerB.getByLabel("Contraseña", { exact: true }).fill(process.env.E2E_USER_PASSWORD!);
+      await buyerB.getByRole("button", { name: "Iniciar sesión", exact: true }).click();
+      await expect(buyerB).toHaveURL(/\/dashboard(?:\?|$)/, { timeout: 30_000 });
+      await buyerB.goto(`${new URL(link).origin}/proyectos/a0000e32-0000-4000-8000-000000000032/solicitudes-compra/a0000e21-0000-4000-8000-00000000000${index + 1}`);
+      const panelB = buyerB.getByRole("region", { name: "Respuestas por enlace" });
+      await panelB.getByLabel("Proveedor", { exact: true }).click(); await buyerB.getByRole("option").first().click();
+      await panelB.getByRole("button", { name: "Crear enlace", exact: true }).click();
+      const shareB = panelB.getByLabel("Enlace para el proveedor"); await expect(shareB).toBeVisible();
+      const linkB = await shareB.inputValue(); const tabB = await supplierContext.newPage();
+      await tabB.goto(linkB);
+      await expect(tabB.getByText(/Empresa B de prueba de enlaces · Obra B/)).toBeVisible();
+      await expect(tabB.getByLabel("Precio unitario", { exact: true })).toHaveValue("");
+      await supplier.reload(); await expect(supplier.getByRole("heading", { name: "Respuesta recibida", exact: true })).toBeVisible();
+      const swapped = await supplierContext.request.post(`${new URL(linkB).origin}${new URL(linkB).pathname}/access`, {
+        headers: { origin: new URL(linkB).origin }, data: { token: new URLSearchParams(new URL(link).hash.slice(1)).get("token") },
+      });
+      expect(swapped.status()).toBe(404);
+      await tabB.reload(); await expect(tabB.getByLabel("Precio unitario", { exact: true })).toHaveValue("");
+      await panelB.getByRole("button", { name: "Revocar enlace", exact: true }).click();
+      await expect(panelB.getByText("Revocado", { exact: true })).toBeVisible();
+      await tabB.reload(); await expect(tabB.getByRole("alert")).toContainText("El enlace no está disponible");
+    } finally { await buyerBContext.close(); }
     // A copied route without its capability cannot read this request in another session.
     const deniedContext = await browser.newContext();
     try {

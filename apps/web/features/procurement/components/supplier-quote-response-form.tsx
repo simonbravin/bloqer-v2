@@ -14,10 +14,11 @@ import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { formatQtyFromString } from "@/lib/format-money";
 import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS } from "../lib/procurement-form-layout";
 
-export function SupplierQuoteResponseForm({ snapshot, initial, internal = false, onSubmit, onCancel }: {
+export function SupplierQuoteResponseForm({ snapshot, initial, internal = false, readOnly = false, onSubmit, onCancel }: {
   snapshot: SupplierQuoteRequestSnapshot;
   initial?: SupplierQuoteResponse;
   internal?: boolean;
+  readOnly?: boolean;
   onSubmit: (response: SupplierQuoteResponse, fxRate: string) => Promise<{ error?: string }>;
   onCancel?: () => void;
 }) {
@@ -45,7 +46,7 @@ export function SupplierQuoteResponseForm({ snapshot, initial, internal = false,
   }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (running.current) return;
+    if (running.current || readOnly) return;
     if (!review) {
       const current = dataRef.current;
       const result = supplierQuoteResponseSchema.safeParse({ ...current, pricesIncludeTax: current.pricesIncludeTax === "true", leadTimeDays: current.leadTimeDays === "" ? undefined : Number(current.leadTimeDays) });
@@ -64,18 +65,18 @@ export function SupplierQuoteResponseForm({ snapshot, initial, internal = false,
     <div className="rounded-lg border bg-muted/30 p-4 text-sm">
       <p className="font-medium">{snapshot.companyName} · {snapshot.projectName}</p>
       <p className="mt-1 break-words">{snapshot.requestCode} · {snapshot.supplierName}</p>
-      <p className="mt-2 text-muted-foreground">{internal ? "Revisá la respuesta original y ajustá los datos que correspondan. La evidencia enviada por el proveedor se conserva." : "Completá tu oferta para los ítems solicitados. Compras la revisará; enviarla no confirma una orden de compra."}</p>
+      <p className="mt-2 text-muted-foreground">{readOnly ? "Respuesta original recibida por enlace. La identidad de quien usó el enlace no fue verificada. Estos datos se conservan sin las correcciones posteriores de Compras." : internal ? "Revisá la respuesta original y ajustá los datos que correspondan. La evidencia enviada por el proveedor se conserva." : "Completá tu oferta para los ítems solicitados. Compras la revisará; enviarla no confirma una orden de compra."}</p>
     </div>
     {review && <div role="status" className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm"><p className="font-semibold">Revisá los datos antes de confirmar</p><p className="mt-1">{internal ? "Se incorporará una cotización recibida para comparar. No se adjudicará ni se creará una orden." : "Sólo podés enviar una respuesta por enlace. Si necesitás corregirla después, pedí un nuevo enlace a Compras."}</p></div>}
-    <fieldset disabled={pending || !!review} className="min-w-0 space-y-5">
+    <fieldset disabled={pending || !!review || readOnly} className="min-w-0 space-y-5">
       <legend className="sr-only">Condiciones de la cotización</legend>
       <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-        <div className="space-y-1"><Label htmlFor={`${prefix}-currency`}>Moneda</Label><CurrencySelect id={`${prefix}-currency`} value={data.currency} disabled={pending || !!review} onValueChange={currency => update({ currency })} triggerClassName="min-w-0" /></div>
-        <div className="space-y-1"><Label htmlFor={`${prefix}-tax`}>Precios unitarios</Label><Select value={data.pricesIncludeTax} disabled={pending || !!review} onValueChange={pricesIncludeTax => update({ pricesIncludeTax })}><SelectTrigger id={`${prefix}-tax`}><SelectValue placeholder="Indicá si incluyen IVA" /></SelectTrigger><SelectContent><SelectItem value="false">Sin IVA incluido</SelectItem><SelectItem value="true">Con IVA incluido</SelectItem></SelectContent></Select></div>
+        <div className="space-y-1"><Label htmlFor={`${prefix}-currency`}>Moneda</Label><CurrencySelect id={`${prefix}-currency`} value={data.currency} disabled={pending || !!review || readOnly} onValueChange={currency => update({ currency })} triggerClassName="min-w-0" /></div>
+        <div className="space-y-1"><Label htmlFor={`${prefix}-tax`}>Precios unitarios</Label><Select value={data.pricesIncludeTax} disabled={pending || !!review || readOnly} onValueChange={pricesIncludeTax => update({ pricesIncludeTax })}><SelectTrigger id={`${prefix}-tax`}><SelectValue placeholder="Indicá si incluyen IVA" /></SelectTrigger><SelectContent><SelectItem value="false">Sin IVA incluido</SelectItem><SelectItem value="true">Con IVA incluido</SelectItem></SelectContent></Select></div>
         <div className="space-y-1"><Label htmlFor={`${prefix}-iibb`}>Percepción IIBB (%)</Label><DecimalInput id={`${prefix}-iibb`} required precision={4} value={data.iibbPerceptionRate} onValueChange={iibbPerceptionRate => update({ iibbPerceptionRate })} /><p className="text-xs text-muted-foreground">Indicá 0 si no corresponde.</p></div>
         <div className="space-y-1"><Label htmlFor={`${prefix}-days`}>Plazo de entrega (días)</Label><Input id={`${prefix}-days`} type="number" min={0} max={3650} step={1} required value={data.leadTimeDays} onChange={e => update({ leadTimeDays: e.target.value })} /></div>
         <div className="space-y-1"><Label htmlFor={`${prefix}-date`}>Oferta válida hasta</Label><Input id={`${prefix}-date`} type="date" required value={data.validUntil} onChange={e => update({ validUntil: e.target.value })} /></div>
-        {internal && data.currency && <ManualFxField id={`${prefix}-fx`} currency={data.currency} value={fxRate} disabled={pending || !!review} onValueChange={value => { fxRef.current = value; setFxRate(value); setReview(null); }} />}
+        {internal && data.currency && <ManualFxField id={`${prefix}-fx`} currency={data.currency} value={fxRate} disabled={pending || !!review || readOnly} onValueChange={value => { fxRef.current = value; setFxRate(value); setReview(null); }} />}
       </div>
       <div className="space-y-3">
         <h2 className="text-base font-semibold">Ítems solicitados</h2>
@@ -83,7 +84,7 @@ export function SupplierQuoteResponseForm({ snapshot, initial, internal = false,
         {snapshot.lines.map((line, index) => <section key={line.id} className="min-w-0 space-y-3 rounded-lg border p-4" aria-label={`Ítem ${index + 1}`}>
           <div><h3 className="break-words text-sm font-medium">{index + 1}. {line.description}</h3><p className="mt-1 text-sm text-muted-foreground">Cantidad solicitada: {formatQtyFromString(line.quantity)} {line.unit}</p></div>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="space-y-1"><Label htmlFor={`${prefix}-offer-${index}`}>Oferta</Label><Select value={data.lines[index]!.offerKind} disabled={pending || !!review} onValueChange={value => lineValue(index, { offerKind: value as SupplierQuoteResponse["lines"][number]["offerKind"] })}><SelectTrigger id={`${prefix}-offer-${index}`}><SelectValue /></SelectTrigger><SelectContent>{QUOTE_LINE_OFFER_KINDS.map(kind => <SelectItem key={kind} value={kind}>{QUOTE_LINE_OFFER_LABELS[kind]}</SelectItem>)}</SelectContent></Select></div>
+            <div className="space-y-1"><Label htmlFor={`${prefix}-offer-${index}`}>Oferta</Label><Select value={data.lines[index]!.offerKind} disabled={pending || !!review || readOnly} onValueChange={value => lineValue(index, { offerKind: value as SupplierQuoteResponse["lines"][number]["offerKind"] })}><SelectTrigger id={`${prefix}-offer-${index}`}><SelectValue /></SelectTrigger><SelectContent>{QUOTE_LINE_OFFER_KINDS.map(kind => <SelectItem key={kind} value={kind}>{QUOTE_LINE_OFFER_LABELS[kind]}</SelectItem>)}</SelectContent></Select></div>
             {([['unitPrice', 'Precio unitario'], ['taxRate', 'IVA (%)'], ['discountPct', 'Descuento (%)']] as const).map(([field, label]) => <div key={field} className="space-y-1"><Label htmlFor={`${prefix}-${field}-${index}`}>{label}</Label><DecimalInput id={`${prefix}-${field}-${index}`} required precision={4} value={data.lines[index]![field]} onValueChange={value => lineValue(index, { [field]: value })} /></div>)}
           </div>
         </section>)}
@@ -94,7 +95,7 @@ export function SupplierQuoteResponseForm({ snapshot, initial, internal = false,
     <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
       {onCancel && <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>Cerrar revisión</Button>}
       {review && <Button type="button" variant="outline" disabled={pending} onClick={() => { setReview(null); setError(null); }}>Volver a editar</Button>}
-      <Button type="submit" disabled={pending}>{pending ? "Guardando…" : !review ? "Revisar respuesta" : internal ? "Incorporar cotización" : "Confirmar y enviar respuesta"}</Button>
+      {!readOnly && <Button type="submit" disabled={pending}>{pending ? "Guardando…" : !review ? "Revisar respuesta" : internal ? "Incorporar cotización" : "Confirmar y enviar respuesta"}</Button>}
     </div>
   </form>;
 }
