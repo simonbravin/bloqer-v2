@@ -27,7 +27,7 @@ test("quote file review maps request items and registers an offer without awardi
   await page.getByLabel("Cantidad", { exact: true }).fill("2");
   await page.getByLabel("Unidad", { exact: true }).click(); await page.getByRole("option", { name: "Unidad", exact: true }).click();
   await page.getByLabel(/^Fecha requerida/).fill("2026-12-20");
-  await page.getByRole("button", { name: "Guardar borrador", exact: true }).click();
+  await page.getByRole("button", { name: "Crear solicitud", exact: true }).click();
   await expect(page).toHaveURL(new RegExp(`/proyectos/${projectId}/solicitudes-compra/[0-9a-f-]{36}$`), { timeout: 30_000 });
   await page.getByRole("button", { name: "Enviar solicitud", exact: true }).click();
   const save = page.getByRole("button", { name: "Registrar cotización", exact: true });
