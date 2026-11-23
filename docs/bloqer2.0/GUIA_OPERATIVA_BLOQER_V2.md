@@ -1104,7 +1104,7 @@ Igual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño 
 
 ![Bloqer — Cinco caminos de egreso en obra](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png)
 
-### 9.1 Procedimiento - Solicitud de compra (SC)
+### 9.1 Procedimiento — Solicitud de compra (SC)
 
 **Ruta:** Compras → **Solicitudes de compra**
 

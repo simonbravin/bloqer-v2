@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-23T23:54:32.726Z",
-  "sourceHash": "dd6b75a91b637d22f0e691a2c1955fc1c6f3ce9f3b997c2851b1fa88a7205eba",
+  "generatedAt": "2026-11-23T23:57:02.493Z",
+  "sourceHash": "ed521ba8beb3966448d1f6f04201f63d7cd93eea9c1f4eeb933f97b4c7c2f10b",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "60e99ac95a99d55ecc372a11c4929a3d10d960924b355668c2a589c081cba947",
-      "bytes": 236014
+      "sha256": "1307e292ccad843ab9145b918352e745981f10d978b4cfd99c5e7747e76a6501",
+      "bytes": 236016
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1199,7 +1199,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "9. Compras, materiales y abastecimiento (nivel proyecto)",
-      "text": "![Bloqer — Mano de obra y equipos: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png)\n\n### 9.0.2 Procedimiento — Equipos del proyecto\n\n**Ruta:** Operación → **Equipos** → `/proyectos/[id]/equipos`\n\nIgual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** lleva `costType=EQUIPMENT`; **Factura** → AP tipada **Equipos** con vínculo APU ([D-110]). Varianza y export CSV: presupuesto EQP vs facturado **neto** (sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]). Mismo caminito que §9.0.1.\n\n**Comparación de caminos** (Materiales / MO / Equipos / Subcontrato / gasto directo): [`guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png`](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png) · Ayuda → *Elegir el camino…*.\n\n![Bloqer — Cinco caminos de egreso en obra](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png)\n\n### 9.1 Procedimiento - Solicitud de compra (SC)\n\n**Ruta:** Compras → **Solicitudes de compra**\n\n**Exportar → Excel / PDF** descarga las solicitudes que coinciden con la búsqueda y el estado elegidos. **Activas** excluye las anuladas; para consultarlas elegí "
+      "text": "![Bloqer — Mano de obra y equipos: si esto, entonces aquello](./guides/assets/flujos/mapa-flujo-mano-obra-equipos-si-no.png)\n\n### 9.0.2 Procedimiento — Equipos del proyecto\n\n**Ruta:** Operación → **Equipos** → `/proyectos/[id]/equipos`\n\nIgual que §9.0.1 con categoría APU **EQUIPMENT** (alquileres, andamios, baño químico, etc.). **Pedir** lleva `costType=EQUIPMENT`; **Factura** → AP tipada **Equipos** con vínculo APU ([D-110]). Varianza y export CSV: presupuesto EQP vs facturado **neto** (sin IVA). Sin log de horas de equipo en v1 ([D-099] · [D-109]). Mismo caminito que §9.0.1.\n\n**Comparación de caminos** (Materiales / MO / Equipos / Subcontrato / gasto directo): [`guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png`](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png) · Ayuda → *Elegir el camino…*.\n\n![Bloqer — Cinco caminos de egreso en obra](./guides/assets/flujos/mapa-flujo-egresos-obra-comparacion.png)\n\n### 9.1 Procedimiento — Solicitud de compra (SC)\n\n**Ruta:** Compras → **Solicitudes de compra**\n\n**Exportar → Excel / PDF** descarga las solicitudes que coinciden con la búsqueda y el estado elegidos. **Activas** excluye las anuladas; para consultarlas elegí "
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#139",

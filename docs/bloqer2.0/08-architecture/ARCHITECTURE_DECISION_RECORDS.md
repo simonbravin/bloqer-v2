@@ -397,4 +397,3 @@ Una única raíz nueva `ProcurementQuoteInvitation` / `procurement_quote_invitat
 ### Aplicación del patrón ADR-019 al bloque 5/E1 — 23/11/2026
 
 El Owner autorizó continuar Compras y proveedores después del refuerzo de aislamiento del chat. La lectura de cotizaciones reutiliza el patrón efímero existente: archivo explícito → proveedor configurado sin tools/IDs → servicio autorizado → propuesta → revisión humana → acción de alta canónica. No cambia arquitectura, persistencia, estados, reglas monetarias ni selección/adjudicación. Se autoriza solicitud y obra antes de la extracción, se limita cuerpo/archivo/respuesta y se conserva el flag propio apagado. Correspondencia manual de renglones, sin conversiones ni cambios de cantidades de SC. La oferta se registra como RECEIVED por el servicio existente, no como un nuevo estado de borrador. Guía, Help y smoke describen el flujo y sus límites.
-
