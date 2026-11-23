@@ -122,4 +122,14 @@ El usuario revisa el texto antes de **Preparar renglones**. Los campos desconoci
 Los servicios verifican sesión, tenant, módulo, permisos EDIT y acceso/estado de obra antes del proveedor. No se aceptan IDs de negocio del modelo. Cancelar descarta respuestas tardías y detiene el micrófono; fallos conservan el texto editable y permiten continuar manualmente. Sin tools WRITE, nuevos campos, estados, eventos ni migraciones. Los recorridos con IA interceptada no acreditan calidad de transcripción real.
 
 ## 19. Preguntas abiertas
+
+### Bloque 5/E1 — lectura asistida de cotizaciones
+
+En una SC **Enviada**, con permiso de cargar cotizaciones, el formulario **Cargar cotización** está disponible también en celular. Si está habilitada la capacidad, **Leer cotización desde archivo** acepta PDF/JPG/PNG/WebP de hasta 3 MiB. **Leer oferta** envía el archivo al proveedor IA configurado y devuelve evidencia efímera, sin IDs internos ni herramientas operativas. El servicio autoriza tenant, empresa, usuario, obra y solicitud antes del proveedor y comprueba que la SC admite nuevas ofertas.
+
+El usuario vincula cada renglón leído con un ítem de la SC o lo excluye expresamente. No hay vinculación automática: las cantidades y unidades deben coincidir, sin conversiones ni modificación de la SC; las diferencias o datos de cantidad/unidad desconocidos requieren carga manual. Las omisiones no se clasifican como No cotizado y un cero no implica Bonificado. Las clasificaciones siguen D-118.
+
+**Aplicar propuesta al formulario** reemplaza los valores actuales, no guarda. El proveedor se elige manualmente; moneda, IVA, descuento e IIBB desconocidos quedan pendientes de completar, FX se ingresa manualmente y plazo/vigencia conservan el contrato vigente. Se revisan precios con/sin IVA, total, correspondencias y exclusiones. Cambiar los valores después de confirmar invalida la revisión, incluso si se vuelve al valor anterior. **Registrar cotización** usa el servicio canónico y crea una oferta **Recibida**; no selecciona proveedor ganador, no genera OC ni adjudica. Ofertas existentes/congeladas no reciben propuestas de archivo.
+
+La comparación de importes usa el kernel actual: cargos no representables o totales completos inconsistentes se derivan a carga manual. Los importes incompletos no se completan con supuestos. La evidencia no se persiste ni se adjunta automáticamente; después de registrar, el original se agrega por **Adjuntos por cotización**. Flag propio `BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED=false`, además de los gates globales/producción, sin nuevos servicios, dependencias o campos persistidos. La activación requiere piloto real separado; las pruebas con IA interceptada no acreditan precisión de lectura.
 - SLA exacto (horas) por defecto en settings — sugerido 48–72 h; no bloquea el procedimiento.

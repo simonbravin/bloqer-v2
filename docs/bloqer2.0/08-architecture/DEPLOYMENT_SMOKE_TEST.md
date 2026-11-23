@@ -227,3 +227,11 @@ Smoke pendiente de publicación, solo con datos de ensayo autorizados:
 3. El listado de pagos de una CxP y el detalle respetan tenant, empresa activa, proyecto de la ruta y rol corporativo. PROJECT_FINANCE no accede a pagos corporativos; sí a pagos de su obra asignada.
 4. Simular indisponibilidad de la generación contable con los tests de regresión. El resultado del auto-DRAFT debe ser omitido, sin propagar el error a una operación ya confirmada. Incluye pagos, cobranzas, movimientos, transferencias y facturas de venta/proveedor, aun si también falla la consulta de recuperación.
 5. En la UI, confirmar un pago de ensayo y abrir su detalle sin error de servidor; verificar una única operación y un único movimiento. La prueba React Flight `apps/web/features/ap/lib/payment-detail-rsc.test.mjs` cubre la preparación de acciones al renderizar el detalle.
+### Piloto de cotizaciones por archivo (5/E1, desactivado por defecto)
+
+En una empresa/obra de ensayo y con capacidad habilitada expresamente, crear una SC sintética Enviada; leer una oferta PDF/imagen de hasta 3 MiB. Verificar rechazo sin sesión, permiso, acceso a obra/empresa o SC autorizada. Comprobar que no se envía al proveedor antes de autorizar y que no se escriben archivos/transcripciones en logs.
+
+Vincular renglones manualmente; cantidad/unidad distinta debe impedir aplicar, omisiones no deben implicar No cotizado, cero no debe implicar Bonificado. Revisar/excluir cada renglón, aplicar, elegir proveedor y completar desconocidos. Cambiar precio/moneda/IVA/IIBB/clasificación/fecha después de revisar debe exigir una nueva revisión, incluso revirtiendo el cambio. Registrar crea oferta Recibida y mantiene SC Enviada sin nuevas OC; recargar y cotejar importes/moneda/clasificaciones. Adjuntar el original por el flujo normal después. Cancelar una lectura/reemplazar archivo no debe aplicar respuestas tardías ni borrar el formulario manual.
+
+CI usa respuestas sintéticas y SQL descartable: no equivale a verificar precisión, costo, tiempo ni retención del proveedor. Sin habilitación explícita, comprobar que el botón asistido no aparece y la carga manual funciona en escritorio y celular.
+

@@ -12,6 +12,7 @@ import * as formatMoney from "../../../lib/format-money";
 import * as requestDrafts from "./purchase-request-form-lines";
 import * as quoteEdit from "./quote-line-edit-values";
 import * as listStatus from "./matches-list-status-filter";
+import * as quoteDocumentMapping from "./quote-document-mapping";
 
 type Element = { type: string; props: Record<string, unknown>; key?: string | number };
 const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>, key?: string | number): Element => typeof type === "function" ? type(props) : ({ type, props, key });
@@ -65,11 +66,40 @@ function environment() {
     "@/components/ui/decimal-input": { DecimalInput: "DecimalInput", reportInvalidDecimalInputs: () => true },
     sonner: { toast: { error: (message: string) => errors.push(message), success() {}, warning() {} } },
     "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => "/requests", useSearchParams: () => new URLSearchParams("create=1") },
+    "./quote-document-assistant": { QuoteDocumentAssistant: "QuoteDocumentAssistant" },
   };
   const hook = load<{ useProcurementAction: (onPending?: (pending: boolean) => void) => { pending: boolean; run(action: () => Promise<unknown>): void; isRunning(): boolean } }>("./use-procurement-action.ts", dependencies);
   dependencies["../lib/use-procurement-action"] = hook;
   return { dependencies, hook, errors, render<T>(component: () => T) { index = 0; return component(); }, async settle() { await Promise.all(transitions.splice(0)); await setImmediate(); } };
 }
+
+test("quote mapping keeps the selected item when React defers the update and restores the select", () => {
+  const line = { id: "line", description: "Material", quantity: "2", unit: "un" };
+  const preview = { lines: [{ ...line, offerKind: "QUOTED", unitPrice: "100", taxRate: "21", discountPct: "0" }], blockingReasons: [], warnings: [] };
+  const slots: unknown[] = [true, true, null, preview, [""], false, false, null, null];
+  let index = 0;
+  const queued: Array<() => void> = [];
+  const react = {
+    useState(initial: unknown) {
+      const position = index++; if (!(position in slots)) slots[position] = initial;
+      return [slots[position], (next: unknown) => {
+        const update = () => { slots[position] = typeof next === "function" ? next(slots[position]) : next; };
+        if (typeof next === "function") queued.push(update); else update();
+      }];
+    },
+    useRef: () => ({ current: null }), useEffect() {},
+  };
+  const { QuoteDocumentAssistant } = load<{ QuoteDocumentAssistant: (props: unknown) => Element }>("../components/quote-document-assistant.tsx", {
+    react, "../lib/quote-document-mapping": quoteDocumentMapping,
+  });
+  const render = () => { index = 0; return QuoteDocumentAssistant({ projectId: "project", purchaseRequestId: "request", lines: [line], disabled: false, onApply() {} }); };
+  const target = { value: "line" };
+  (elements(render(), "select")[0]!.props.onChange as (event: unknown) => void)({ target, currentTarget: target });
+  target.value = ""; // Controlled DOM restoration before the queued state update runs.
+  queued.splice(0).forEach(update => update());
+  assert.equal(elements(render(), "select")[0]!.props.value, "line");
+  assert.equal(elements(render(), "input")[0]!.props.disabled, false);
+});
 
 for (const kind of ["order", "request"] as const) {
   test(`${kind} export follows live local search and state filters, including cancelled and empty lists`, () => {
@@ -384,6 +414,34 @@ test("quote form labels each budget currency and updates only comparison notices
   assert.ok(changed.includes("Referencia en ARS y cotización en USD: desvío no calculable"));
   assert.ok(!changed.includes("Referencia en USD y cotización en USD"));
   assert.ok(changed.includes(`${formatMoney.formatUnitPriceFromString("10")} USD`));
+});
+
+test("assisted quote leaves unknowns blank, requires review and invalidates it after reverting an edit", async () => {
+  const env = environment(), calls: Record<string, unknown>[] = [];
+  const { ProcurementQuoteForm } = load<{ ProcurementQuoteForm: (props: unknown) => Element }>("../components/procurement-quote-form.tsx", {
+    ...env.dependencies, "@bloqer/utils": money, "@bloqer/domain": domain, "@/lib/format-money": formatMoney,
+    "@/features/finance/components/manual-fx-field": { ManualFxField: "ManualFxField" }, "@/features/finance/components/invoice-letter-fields": { PricesIncludeTaxCheckbox: "PricesIncludeTaxCheckbox" },
+    "@/features/finance/components/iibb-perception-fields": { DocumentTaxTotalsFooter: "DocumentTaxTotalsFooter", IibbPerceptionFields: "IibbPerceptionFields" },
+    "@/lib/searchable-options": { toSearchableOptions: () => [] }, "../lib/quote-line-edit-values": quoteEdit, "./po-line-budget-ref": { PoLineBudgetRef: "PoLineBudgetRef" },
+    "@/app/(app)/proyectos/[id]/solicitudes-compra/actions": { createProcurementQuoteAction: async (_id: string, payload: Record<string, unknown>) => { calls.push(payload); return { error: "Fixture keeps form" }; } },
+  }, { FormData: class { get() { return null; } } });
+  const render = () => env.render(() => ProcurementQuoteForm({ projectId: "project", purchaseRequestId: "request", suppliers: [{ id: "supplier", name: "Fixture" }], lines: [{ id: "line", description: "Material", quantity: "2", unit: "un", budgetCurrency: "ARS" }] }));
+  const apply = (preview: Record<string, unknown>, line: Record<string, unknown>) => (elements(render(), "QuoteDocumentAssistant")[0]!.props.onApply as (value: unknown) => void)({ preview, lines: { line } });
+  const confirm = () => (elements(render(), "input").find(e => e.props.name === "quoteDocumentReviewed")!.props.onChange as (e: unknown) => void)({ target: { checked: true } });
+  const submit = async () => { (elements(render(), "form")[0]!.props.onSubmit as (e: unknown) => void)({ preventDefault() {}, currentTarget: {} }); await env.settle(); };
+  const preview = { currency: "ARS", iibbPerceptionRate: null, pricesIncludeTax: null, supplierName: null, total: null, validUntil: null, leadTimeDays: null };
+  apply(preview, { offerKind: "QUOTED", unitPrice: "100", taxRate: null, discountPct: null });
+  assert.equal(elements(render(), "IibbPerceptionFields")[0]!.props.rate, "");
+  assert.equal(elements(render(), "DecimalInput").find(e => e.props.id === "discountPct_line")!.props.value, "");
+  confirm(); await submit(); assert.equal(calls.length, 0);
+  apply({ ...preview, iibbPerceptionRate: "0", pricesIncludeTax: false }, { offerKind: "QUOTED", unitPrice: "100", taxRate: "21", discountPct: "0" });
+  (elements(render(), "SearchableCombobox")[0]!.props.onValueChange as (value: string) => void)("supplier");
+  confirm();
+  for (const value of ["200", "100"]) (elements(render(), "DecimalInput").find(e => e.props.id === "unitPrice_line")!.props.onValueChange as (value: string) => void)(value);
+  assert.equal(elements(render(), "input").find(e => e.props.name === "quoteDocumentReviewed")!.props.checked, false);
+  await submit(); assert.equal(calls.length, 0);
+  confirm(); await submit(); assert.equal(calls.length, 1); assert.equal(calls[0]!.supplierContactId, "supplier");
+  assert.equal(calls[0]!.purchaseRequestId, "request"); assert.equal(calls[0]!.iibbPerceptionRate, "0");
 });
 
 test("changed confirmation FX preserves canonical approval errors and the entered rate until the service accepts", async () => {

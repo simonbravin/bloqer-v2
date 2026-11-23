@@ -909,6 +909,8 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "Devolver a borrador: solo si está Enviada/Cotizando, nunca tuvo cotizaciones de ningún estado y no hay OC/cobertura que lo impida. Motivo obligatorio. Después editás y reenviás. En un borrador histórico con ofertas se conservan los ítems originales: podés actualizar la fecha requerida y las notas, sin reescribir cantidades ni referencias al reenviar.",
       "Cargar cotizaciones: elegí proveedor por razón social o nombre fantasía, precio unitario, Desc. % opcional (antes de IVA), alícuota IVA, Percepción IIBB (alícuota editable, default 3% sobre el neto) y —si el proveedor te dio el total con IVA— marcá El precio unitario incluye IVA. Ves neto, IVA, percepción y total antes de guardar. Plazo y vigencia según política. Cada cotización cubre todas las líneas. Solo se cargan cotizaciones nuevas mientras la SC está Enviada (no en Adjudicada).",
       "Cotización Recibida sin OC activa: Editar o Eliminar si te equivocaste. Si ya alimentó una OC activa, pedí revisión del caso. Anular una OC libera los ítems cuando corresponde cancelar esa compra; no anules una compra real solo para editar su cotización.",
+      "Si está habilitado, Cargar cotización → Leer cotización desde archivo permite leer PDF/JPG/PNG/WebP de hasta 3 MiB con el proveedor IA configurado, también desde celular. Abrir original seleccionado permite cotejarlo. Vinculá cada renglón con un ítem de la solicitud o excluilo expresamente; confirmá correspondencias y ausencia de cargos adicionales. Cantidades/unidades distintas o desconocidas requieren carga manual, sin conversiones.",
+      "Aplicar propuesta al formulario reemplaza sus valores, no guarda ni adjudica. Elegí el proveedor, completá moneda/FX, impuestos y descuentos pendientes, clasificá ítems sin vincular y revisá plazo, vigencia y total. Marcá la revisión final antes de Registrar cotización; editar obliga a revisar de nuevo. Queda Recibida en la matriz. El archivo no se adjunta solo: agregalo después por Adjuntos por cotización. Lectura apagada por defecto; no modifica ofertas existentes.",
       "Adjudicar por ítem: elegí proveedor solo para los ítems que querés comprar ahora, en la matriz de escritorio o en el selector de cada ítem en celular. El contador indica cuántos seleccionaste; Dejar pendiente quita una selección. Generar órdenes seleccionadas crea una o más OC en borrador y requiere al menos un ítem. Los demás quedan pendientes. Cada ítem entero va a un proveedor, sin partir cantidades. El atajo Adjudicar cotizados → OC toma solo ítems libres de importe positivo; los bonificados se eligen expresamente en Adjudicar por ítem.",
       "Importes: Unitario neto es el precio de una unidad antes del descuento. Total línea con IVA incluye descuento e IVA, sin IIBB. Total cotización con impuestos incluye la percepción IIBB, que también aparece separada. Al adjudicar parcialmente, IIBB se calcula sobre las líneas de cada OC según la cotización.",
       "Cobertura parcial: la SC sigue Enviada; en Pendientes el CTA es Adjudicar resto. Al cubrir el 100 % pasa a Adjudicada; Completada cuando todas las OC de cobertura están confirmadas. Anular la SC solo si no hay OC activas.",
@@ -946,6 +948,9 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
     ],
     keywords: [
       "solicitud",
+      "leer cotizacion desde archivo",
+      "cotizacion pdf",
+      "comparar ofertas",
       "sc",
       "cotizacion",
       "cotizar",
