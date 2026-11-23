@@ -100,11 +100,17 @@ test("assisted review requires missing data and reconfirmation, then retries att
   await expect(dialog.getByLabel("Cantidad", { exact: true })).toHaveValue("2,00");
   await review.check();
   await expect(save).toBeEnabled();
-  await dialog.getByLabel("Cantidad", { exact: true }).fill("3");
-  await dialog.getByLabel("Cantidad", { exact: true }).blur();
-  await expect(dialog.getByLabel("Cantidad", { exact: true })).toHaveValue("3,00");
+  const quantity = dialog.getByLabel("Cantidad", { exact: true });
+  // Focus switches the decimal field from display precision to its edit buffer.
+  // Wait for that render before replacing it, then observe the parent update
+  // before blurring. No sleeps or retries that could hide a lost edit.
+  await quantity.focus();
+  await expect(quantity).toHaveValue("2,0000");
+  await quantity.fill("3");
   await expect(review).not.toBeChecked();
   await expect(save).toBeDisabled();
+  await quantity.blur();
+  await expect(quantity).toHaveValue("3,00");
   await review.check();
 
   let actions = 0;
