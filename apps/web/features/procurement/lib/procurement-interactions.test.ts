@@ -12,6 +12,7 @@ import * as formatMoney from "../../../lib/format-money";
 import * as requestDrafts from "./purchase-request-form-lines";
 import * as quoteEdit from "./quote-line-edit-values";
 import * as listStatus from "./matches-list-status-filter";
+import * as quoteDocumentMapping from "./quote-document-mapping";
 
 type Element = { type: string; props: Record<string, unknown>; key?: string | number };
 const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>, key?: string | number): Element => typeof type === "function" ? type(props) : ({ type, props, key });
@@ -71,6 +72,34 @@ function environment() {
   dependencies["../lib/use-procurement-action"] = hook;
   return { dependencies, hook, errors, render<T>(component: () => T) { index = 0; return component(); }, async settle() { await Promise.all(transitions.splice(0)); await setImmediate(); } };
 }
+
+test("quote mapping keeps the selected item when React defers the update and restores the select", () => {
+  const line = { id: "line", description: "Material", quantity: "2", unit: "un" };
+  const preview = { lines: [{ ...line, offerKind: "QUOTED", unitPrice: "100", taxRate: "21", discountPct: "0" }], blockingReasons: [], warnings: [] };
+  const slots: unknown[] = [true, true, null, preview, [""], false, false, null, null];
+  let index = 0;
+  const queued: Array<() => void> = [];
+  const react = {
+    useState(initial: unknown) {
+      const position = index++; if (!(position in slots)) slots[position] = initial;
+      return [slots[position], (next: unknown) => {
+        const update = () => { slots[position] = typeof next === "function" ? next(slots[position]) : next; };
+        if (typeof next === "function") queued.push(update); else update();
+      }];
+    },
+    useRef: () => ({ current: null }), useEffect() {},
+  };
+  const { QuoteDocumentAssistant } = load<{ QuoteDocumentAssistant: (props: unknown) => Element }>("../components/quote-document-assistant.tsx", {
+    react, "../lib/quote-document-mapping": quoteDocumentMapping,
+  });
+  const render = () => { index = 0; return QuoteDocumentAssistant({ projectId: "project", purchaseRequestId: "request", lines: [line], disabled: false, onApply() {} }); };
+  const target = { value: "line" };
+  (elements(render(), "select")[0]!.props.onChange as (event: unknown) => void)({ target, currentTarget: target });
+  target.value = ""; // Controlled DOM restoration before the queued state update runs.
+  queued.splice(0).forEach(update => update());
+  assert.equal(elements(render(), "select")[0]!.props.value, "line");
+  assert.equal(elements(render(), "input")[0]!.props.disabled, false);
+});
 
 for (const kind of ["order", "request"] as const) {
   test(`${kind} export follows live local search and state filters, including cancelled and empty lists`, () => {

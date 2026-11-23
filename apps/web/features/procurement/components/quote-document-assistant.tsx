@@ -61,7 +61,7 @@ export function QuoteDocumentAssistant({ projectId, purchaseRequestId, lines, di
         {preview.lines.map((line, i) => <div key={i} className="space-y-1 rounded border p-2">
           <p className="text-sm break-words">{i + 1}. {line.description ?? "Descripción pendiente"} · {line.quantity ?? "?"} {line.unit ?? "?"} · Precio: {line.unitPrice ?? "?"} · IVA: {line.taxRate ?? "?"}% · Desc.: {line.discountPct ?? "?"}%</p>
           <Label htmlFor={`quote-map-${purchaseRequestId}-${i}`}>Vincular renglón {i + 1}</Label>
-          <select id={`quote-map-${purchaseRequestId}-${i}`} className="w-full min-w-0 rounded-md border bg-background p-2 text-sm" disabled={disabled} value={choices[i] ?? ""} onChange={e => { setChoices(old => old.map((v, index) => index === i ? e.target.value : v)); setReviewed(false); }}>
+          <select id={`quote-map-${purchaseRequestId}-${i}`} className="w-full min-w-0 rounded-md border bg-background p-2 text-sm" disabled={disabled} value={choices[i] ?? ""} onChange={e => { const selected = e.currentTarget.value; setChoices(old => old.map((v, index) => index === i ? selected : v)); setReviewed(false); }}>
             <option value="">Elegir ítem de la solicitud…</option>
             {lines.map(l => <option key={l.id} value={l.id}>{l.description} · {l.quantity} {l.unit}</option>)}
             <option value="exclude">Excluir de este formulario</option>
