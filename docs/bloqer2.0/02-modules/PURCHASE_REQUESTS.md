@@ -133,3 +133,13 @@ El usuario vincula cada renglón leído con un ítem de la SC o lo excluye expre
 
 La comparación de importes usa el kernel actual: cargos no representables o totales completos inconsistentes se derivan a carga manual. Los importes incompletos no se completan con supuestos. La evidencia no se persiste ni se adjunta automáticamente; después de registrar, el original se agrega por **Adjuntos por cotización**. Flag propio `BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED=false`, además de los gates globales/producción, sin nuevos servicios, dependencias o campos persistidos. La activación requiere piloto real separado; las pruebas con IA interceptada no acreditan precisión de lectura.
 - SLA exacto (horas) por defecto en settings — sugerido 48–72 h; no bloquea el procedimiento.
+## Respuesta externa por enlace — D-149 / ADR-021
+
+Capacidad opcional y apagada por defecto. En una SC Enviada de obra activa, Compras puede crear un enlace para un proveedor activo del tenant. Es un permiso acotado a esa SC, empresa y proyecto, sin cuenta externa. Vence en siete días; quien lo tenga puede responder. Un nuevo enlace revoca el anterior pendiente del mismo proveedor/SC. La entrega es manual: no envía emails ni WhatsApp.
+
+El proveedor sólo ve nombres de empresa, obra y proveedor, código SC y descripciones, cantidades y unidades solicitadas. No accede a presupuestos, WBS/APU, otras ofertas, archivos, IA ni navegación interna. Completa moneda, interpretación de IVA, IIBB, plazo, vigencia, observaciones y oferta/precio/IVA/descuento de cada ítem. No modifica cantidades ni unidades. D-118 y el kernel financiero se validan en servidor.
+
+Una única respuesta definitiva queda como evidencia inmutable en `ProcurementQuoteInvitation`; reintentos idénticos son idempotentes. No crea una cotización automáticamente. Compras revisa, puede corregir los valores a incorporar y completa FX si corresponde. La incorporación usa el servicio canónico de `ProcurementQuote` en la misma transacción que registra el vínculo: genera `RECEIVED`, nunca adjudica ni crea OC. Se conserva la respuesta original y el revisor. La expiración/revocación no elimina una respuesta ya recibida; cambios en la estructura o ciclo de envío de la SC bloquean su incorporación. Eliminar una cotización incorporada no permite volver a importar la evidencia.
+
+Límites: 200 ítems, cuerpo 256 KiB, observaciones 2000 caracteres, sin adjuntos. El emisor debe conservar membresía, rol, alcance de empresa y acceso al proyecto; módulo, empresa, tenant, proyecto y proveedor deben seguir habilitados. El guard público no construye un contexto de usuario interno. Ver ADR-021, guía §9.1.1 y pruebas SQL de aislamiento/concurrencia.
+

@@ -440,6 +440,10 @@ Toda esta cadena ocurre en transacciones atómicas o en transacciones encadenada
 
 ---
 
+## 7.1 Invitaciones externas de cotización (D-149)
+
+Auditoría transaccional, sin envío de mensajes: `procurement_quote_invitation.created`, `.revoked`, `.responded`, `.imported`. Scope tenant/empresa/obra obligatorio. Created/revoked/imported llevan usuario interno real. Responded lleva actor null y `source: supplier_link` con proveedor/invitación: no se identifica como usuario ni como tarea automática. Sin tokens, hashes de tokens ni oferta completa en el log; la respuesta original se conserva en su registro autorizado. La incorporación también conserva `procurement_quote.received` canónico. No se agregan notificaciones ni adjudicación automática.
+
 ## 8. Próximos pasos (Fase técnica)
 
 - Decidir bus de eventos (pgmq, Redis, RabbitMQ, Kafka, etc.).

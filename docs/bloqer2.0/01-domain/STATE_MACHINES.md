@@ -1038,3 +1038,18 @@ stateDiagram-v2
 5. Documentar derivaciones (cómo afecta a otras entidades).
 6. Actualizar [`EVENTS_AND_AUTOMATIONS.md`](./EVENTS_AND_AUTOMATIONS.md).
 7. Anotar en `CHANGELOG` interno.
+
+## 29. Invitación de cotización — etiquetas derivadas (D-149)
+
+`ProcurementQuoteInvitation` no incorpora enum de estado ni cambia la máquina de `ProcurementQuote`. Acceso externo: revocada (`revokedAt`), vencida (`expiresAt <= now`), respondida (`respondedAt`) o disponible, en ese orden. Revisión interna independiente: sin respuesta, pendiente de incorporar o incorporada (`importedAt`). Revocar/vencer no elimina la evidencia recibida. Crear otro enlace revoca el anterior pendiente del mismo proveedor/SC; responder es definitivo y el mismo payload se puede reintentar sin duplicación. Incorporación atómica produce `ProcurementQuote.RECEIVED` mediante actor interno. Si esa cotización se elimina por el procedimiento existente, `importedQuoteId` pasa a null pero `importedAt` impide una nueva incorporación del mismo original.
+
+```mermaid
+flowchart TD
+  A["Enlace disponible"] -->|Respuesta única| B["Respuesta para revisión"]
+  A -->|Revocar o vencer| C["Acceso cerrado"]
+  B -->|Revisión interna| D["Cotización recibida"]
+  B -->|Revocar o vencer| E["Acceso cerrado; evidencia conservada"]
+  E -->|Revisión interna| D
+```
+
+No se envía, aprueba ni adjudica una compra por recibir la respuesta. Guards, campos y eventos: ADR-021. Todos los eventos nuevos son auditoría transaccional; no implican mensajes externos.

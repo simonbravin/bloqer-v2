@@ -65,3 +65,7 @@ PROCUREMENT crea/edita; FINANCE ve montos y pagos.
 
 ## 19. Preguntas abiertas
 - Comparativa automática de cotizaciones entre proveedores (Fase 2).
+## Cotizar sin cuenta (D-149)
+
+Un contacto con rol SUPPLIER activo puede recibir manualmente un enlace a una SC concreta. No se crea un usuario ni se otorga acceso al directorio/ERP. El enlace es una capacidad transferible, válida siete días y revocable; no acredita identidad personal. La respuesta queda pendiente de revisión de Compras y no implica adjudicación. Ver `PURCHASE_REQUESTS.md`, ADR-021 y guía operativa §9.1.1. Capacidad desactivada por defecto; no incluye adjuntos ni envío automático.
+

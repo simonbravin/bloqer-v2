@@ -30,7 +30,7 @@ function load<T>(file: string, services: Record<string, unknown>, dependencies: 
     if (name === "next/link") return { default: "Link" };
     if (name === "next/navigation") return { notFound() { throw new Error("NOT_FOUND"); }, redirect() { throw new Error("REDIRECT"); } };
     if (name === "@bloqer/services") return services;
-    if (name === "@bloqer/config") return { isStorageConfigured: () => false };
+    if (name === "@bloqer/config") return { isStorageConfigured: () => false, supplierQuoteLinksEnabled: () => false };
     if (name === "@bloqer/domain") return { can: (_roles: string[], _action: string, module: string) => module === "PROJECTS", IIBB_PERCEPTION_LABEL_ES: "IIBB" };
     if (name === "@bloqer/utils") return { compareDecimal };
     if (name === "@/lib/auth") return dependencies[name] ?? { getCurrentUser: async () => ({ session: { user: { id: "actor" } }, tenantCtx: { tenantId: "tenant", companyId: "company", roles: ["FOREMAN"] } }) };

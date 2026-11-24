@@ -322,3 +322,4 @@ export { previewSupplierInvoiceDocument, supplierInvoiceDocumentPreviewAvailable
 export type { SupplierInvoiceDocumentPreviewInput } from "./ap/supplier-invoice-document-preview.service";
 export { purchaseRequestAudioAvailable, transcribePurchaseRequestAudio, previewPurchaseRequestTranscript } from "./procurement/purchase-request-audio.service";
 export { previewProcurementQuoteDocument, procurementQuoteDocumentAvailable, buildProcurementQuoteDocumentPreview } from "./procurement/procurement-quote-document.service";
+export * from "./procurement/supplier-quote-invitation.service";

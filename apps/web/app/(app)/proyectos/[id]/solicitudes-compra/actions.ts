@@ -14,7 +14,11 @@ import {
   selectProcurementQuoteAndCreatePo,
   createPurchaseOrdersFromAwards,
   ServiceError,
+  createSupplierQuoteInvitation,
+  revokeSupplierQuoteInvitation,
+  importSupplierQuoteInvitation,
 } from "@bloqer/services";
+import { getPublicAppBaseUrl } from "@bloqer/config";
 import {
   createPurchaseRequestSchema,
   updatePurchaseRequestSchema,
@@ -61,6 +65,38 @@ function revalidatePr(projectId: string, prId?: string) {
 async function assertRequestProject(prId: string, projectId: string, ctx: Awaited<ReturnType<typeof getCtx>>) {
   const request = await getPurchaseRequestById(prId, ctx);
   if (request.projectId !== projectId) throw new ServiceError("NOT_FOUND", "Solicitud no encontrada");
+}
+
+export async function createSupplierQuoteLinkAction(projectId: string, prId: string, supplierId: string) {
+  const ctx = await getCtx();
+  try {
+    await assertRequestProject(prId, projectId, ctx);
+    const origin = getPublicAppBaseUrl();
+    if (!origin) return { error: "Falta configurar la dirección pública de Bloqer." };
+    const result = await createSupplierQuoteInvitation(prId, supplierId, ctx);
+    revalidatePr(projectId, prId);
+    return { id: result.id, expiresAt: result.expiresAt, snapshot: result.snapshot, url: `${origin}/cotizar/${result.id}#token=${result.token}` };
+  } catch (error) { return handle(error); }
+}
+
+export async function revokeSupplierQuoteLinkAction(projectId: string, prId: string, invitationId: string) {
+  const ctx = await getCtx();
+  try {
+    await assertRequestProject(prId, projectId, ctx);
+    await revokeSupplierQuoteInvitation(invitationId, prId, ctx);
+    revalidatePr(projectId, prId);
+    return { ok: true };
+  } catch (error) { return handle(error); }
+}
+
+export async function importSupplierQuoteLinkAction(projectId: string, prId: string, invitationId: string, response: unknown, fxRate: string) {
+  const ctx = await getCtx();
+  try {
+    await assertRequestProject(prId, projectId, ctx);
+    const result = await importSupplierQuoteInvitation(invitationId, prId, response, fxRate, ctx);
+    revalidatePr(projectId, prId);
+    return result;
+  } catch (error) { return handle(error); }
 }
 
 export async function createPurchaseRequestAction(

@@ -2180,3 +2180,11 @@
 5. **Nunca** borrar decisiones; cambiar estado a `SUPERSEDED` y agregar la nueva.
 
 > Cierre Phases 3→4→5 (2026-08-08): [D-081] ERD Phase 3, [D-082] BR-SUB-005 + índices, [D-083] diferimientos inventario/reportes. Phase 5: CI+tests, isolation suite, E2E `apps/web/e2e`, ASVS-lite.
+
+## D-149 — Respuesta de cotizaciones por enlace limitado
+
+- **Fecha:** 23/11/2026. **Estado:** APROBADA por el Owner en Q-097.
+- Enlace sin cuenta para una SC/proveedor, siete días, revocable, una respuesta definitiva y revisión de Compras antes de incorporar. Quien posea el enlace puede usarlo: no verifica identidad personal. Compartir es manual; no envía invitaciones automáticamente.
+- Persistencia aditiva aprobada según ADR-021: `ProcurementQuoteInvitation` con tenant propio, alcance, hash, vencimiento/revocación, snapshot, respuesta inmutable y vínculo a la incorporación. Reintento idéntico no duplica respuesta ni cotización. No modificar cantidades, adjudicar, crear OC ni usar al emisor como actor externo.
+- La incorporación conserva el servicio canónico, clasificación D-118, FX manual, máximos y freeze. Sin nuevos servicios/dependencias, IA ni adjuntos externos en este corte. Capacidad apagada por defecto hasta piloto; la aprobación de diseño no acredita pruebas, migración ni activación.
+- Referencias: Q-097, ADR-021, `PURCHASE_REQUESTS.md`, `STATE_MACHINES.md`, `EVENTS_AND_AUTOMATIONS.md`, `TENANT_ISOLATION_MODEL.md`, `TECHNICAL_ERD.md`, Guía/Help y plan bloque 5/E2.

@@ -168,6 +168,19 @@ export async function createProcurementQuote(
   input: CreateProcurementQuoteInput,
   ctx: ServiceContext,
 ): Promise<{ id: string }> {
+  return createQuote(input, ctx);
+}
+
+/** Internal orchestration: caller owns the transaction; authorization still runs here. */
+export async function createProcurementQuoteInTransaction(
+  input: CreateProcurementQuoteInput, ctx: ServiceContext, tx: Prisma.TransactionClient,
+): Promise<{ id: string }> {
+  return createQuote(input, ctx, tx);
+}
+
+async function createQuote(
+  input: CreateProcurementQuoteInput, ctx: ServiceContext, transaction?: Prisma.TransactionClient,
+): Promise<{ id: string }> {
   await assertProcurementTenantModule(ctx);
   if (!canEditPurchaseOrders(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para cargar cotizaciones");
@@ -191,7 +204,7 @@ export async function createProcurementQuote(
   // Ephemeral input only ([D-086]). Never backfill or rewrite historical quotes.
   const pricesIncludeTax = Boolean(input.pricesIncludeTax);
 
-  const quote = await prisma.$transaction(async (tx) => {
+  const write = async (tx: Prisma.TransactionClient) => {
     await lockProjectForOperationalMutation(tx, pr.projectId, ctx);
     await tx.$queryRaw`SELECT id FROM purchase_requests WHERE id = ${pr.id} FOR UPDATE`;
     const current = await tx.purchaseRequest.findUniqueOrThrow({ where: { id: pr.id }, include: { lines: true } });
@@ -276,8 +289,8 @@ export async function createProcurementQuote(
     );
 
     return created;
-  }, QUOTE_TRANSACTION_OPTIONS);
-
+  };
+  const quote = transaction ? await write(transaction) : await prisma.$transaction(write, QUOTE_TRANSACTION_OPTIONS);
   return { id: quote.id };
 }
 

@@ -2868,6 +2868,34 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   });
 
   await seedBudgetAndWbs(prisma, seedCtx);
+  // Dedicated maintained browser fixtures: never mutate an existing demo request.
+  // Each viewport owns one request so concurrent smoke runs cannot consume another's link.
+  if (process.env.CI === "true") {
+    const secondCompanyId = "a0000e30-0000-4000-8000-000000000030";
+    const secondIssuerId = "a0000e31-0000-4000-8000-000000000031";
+    const secondProjectId = "a0000e32-0000-4000-8000-000000000032";
+    await prisma.company.upsert({ where: { id: secondCompanyId }, update: {}, create: { id: secondCompanyId, tenantId: tenant.id, name: "Empresa B de prueba de enlaces" } });
+    await prisma.user.upsert({ where: { id: secondIssuerId }, update: {}, create: { id: secondIssuerId, email: "supplier-link-b@example.invalid", name: "Compras B sintético", status: "ACTIVE", emailVerified: new Date(), passwordHash: await hash(password, 12), passwordUpdatedAt: new Date() } });
+    await prisma.userMembership.upsert({ where: { userId_tenantId: { userId: secondIssuerId, tenantId: tenant.id } }, update: {}, create: { userId: secondIssuerId, tenantId: tenant.id, companyId: secondCompanyId, roles: ["OWNER"] } });
+    await prisma.project.upsert({ where: { id: secondProjectId }, update: {}, create: { id: secondProjectId, tenantId: tenant.id, companyId: secondCompanyId, clientContactId: client.id, name: "Obra B de prueba de enlaces", code: "CI-LINK-B", status: "ACTIVE", country: "AR" } });
+    for (const [index, viewport] of ["desktop", "tablet", "phone"].entries()) {
+      const id = `a0000e20-0000-4000-8000-00000000000${index + 1}`;
+      await prisma.purchaseRequest.upsert({ where: { id }, update: {}, create: {
+        id, tenantId: tenant.id, companyId: company.id, projectId: DOCS_GUIDE_IDS.projectId,
+        number: 900 + index, status: "SUBMITTED", submittedAt: new Date("2026-11-23T10:00:00Z"),
+        requestedByUserId: docsUser.id, createdBy: docsUser.id, notes: "Internal supplier link fixture",
+        neededByDate: new Date("2050-01-01T00:00:00Z"),
+        lines: { create: { description: `Material de prueba por enlace ${viewport}`, quantity: "2.5", unit: "kg", wbsNodeId: DOCS_GUIDE_IDS.wbsItem0101Id } },
+      } });
+      const secondRequestId = `a0000e21-0000-4000-8000-00000000000${index + 1}`;
+      await prisma.purchaseRequest.upsert({ where: { id: secondRequestId }, update: {}, create: {
+        id: secondRequestId, tenantId: tenant.id, companyId: secondCompanyId, projectId: secondProjectId,
+        number: 900 + index, status: "SUBMITTED", submittedAt: new Date("2026-11-23T10:00:00Z"),
+        requestedByUserId: secondIssuerId, createdBy: secondIssuerId, neededByDate: new Date("2050-01-01T00:00:00Z"),
+        lines: { create: { description: `Material exclusivo empresa B ${viewport}`, quantity: "7", unit: "u" } },
+      } });
+    }
+  }
   // Schedule links require the WBS nodes even on a completely empty database.
   await seedFieldScheduleItems(prisma, {
     tenantId: tenant.id,

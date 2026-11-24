@@ -2,6 +2,28 @@ import type { HelpArticle } from "../types";
 
 export const PLANNING_ARTICLES: HelpArticle[] = [
   {
+    slug: "cotizacion-proveedor-por-enlace",
+    title: "Recibir una cotización por enlace",
+    summary: "El proveedor responde sin cuenta y Compras revisa antes de incorporar la oferta. Capacidad opcional apagada por defecto.",
+    intents: ["solicitud-compra", "comprar-material"], modules: ["compras"], level: "project",
+    typicalRoles: ["Compras", "OWNER / ADMIN"],
+    permissionHint: "Requiere gestionar cotizaciones, acceso a la empresa/obra y capacidad habilitada.",
+    where: { menu: "Compras → Solicitudes de compra → Detalle → Respuestas por enlace" },
+    hrefs: [{ kind: "project", suffix: "/solicitudes-compra", label: "Solicitudes de compra" }],
+    steps: [
+      "En una SC Enviada, elegí Proveedor y Crear enlace. Revisá qué vas a compartir y pulsá Copiar enlace.",
+      "Compartilo manualmente: vence en 7 días y cualquiera que lo tenga puede responder sin cuenta. Revocar enlace cancela el acceso.",
+      "El proveedor completa condiciones y cada ítem, pulsa Revisar respuesta y Confirmar y enviar respuesta.",
+      "En Compras, Revisar respuesta permite ajustar los valores y completar FX si corresponde. Revisar respuesta e Incorporar cotización la agregan a la comparación.",
+      "Ver respuesta original conserva la consulta de lo enviado por el proveedor, sin las correcciones posteriores de Compras.",
+    ],
+    effects: ["Guarda la evidencia original y el revisor; crea una cotización recibida sólo tras revisión interna. No adjudica ni crea OC."],
+    pitfalls: ["No envía invitaciones automáticamente. No comparte presupuesto, otras ofertas, archivos ni chat.", "Sólo una respuesta por enlace. Un nuevo enlace revoca el anterior pendiente; la respuesta anterior no se borra.", "No modifica cantidades/unidades. No cotizado y Bonificado requieren importe cero; debe existir un ítem cotizado positivo.", "Un cambio en la SC o en los permisos del emisor puede invalidar el acceso. No se valida la identidad de quien usa el enlace."],
+    relatedSlugs: ["solicitud-de-compra", "politicas-de-compras"],
+    keywords: ["enlace proveedor", "cotizar sin cuenta", "respuesta externa", "revocar enlace", "cotización", "siete días"],
+    guideRef: "§9.1.1",
+  },
+  {
     slug: "armar-presupuesto-edt-apu",
     title: "Armar presupuesto, EDT y APU",
     summary: "Estructura de partidas (EDT) con análisis de precios unitarios por ítem.",
@@ -945,6 +967,7 @@ export const PROCUREMENT_ARTICLES: HelpArticle[] = [
       "descuento-porcentual-en-lineas",
       "revisar-pendientes",
       "revisar-compra-realizada-o-cotizacion-vencida",
+      "cotizacion-proveedor-por-enlace",
       "exportar-reportes-csv-pdf",
     ],
     keywords: [

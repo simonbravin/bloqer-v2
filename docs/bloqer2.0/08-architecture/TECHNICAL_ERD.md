@@ -215,3 +215,9 @@ La revisión del 11/11/2026 detectó que el diagrama histórico todavía atribu�
 - [`DATABASE_CONVENTIONS.md`](./DATABASE_CONVENTIONS.md)
 - [`REPORTING_DATA_MODEL.md`](./REPORTING_DATA_MODEL.md)
 - Pendientes técnicos de cierre: [`PENDING_ARCHITECTURE_ITEMS.md`](./PENDING_ARCHITECTURE_ITEMS.md)
+## D-149 — ProcurementQuoteInvitation
+
+Tabla `procurement_quote_invitations`: PK UUID; FKs obligatorias `tenantId`, `companyId`, `projectId`, `purchaseRequestId`, `supplierContactId`. `tokenHash` SHA-256 único VARCHAR(64); `expiresAt`, `revokedAt/revokedBy`; `requestSnapshot` JSONB y `requestFingerprint` VARCHAR(64); `responsePayload` JSONB, `responseHash` VARCHAR(64), `respondedAt`; `importedQuoteId` FK única nullable con SET NULL, `importedAt/importedBy`; `createdBy/updatedBy`, timestamps. Referencias de actor escalares conservan trazabilidad histórica.
+
+Índices de listado `(tenantId,purchaseRequestId)` y `(tenantId,companyId,projectId)`. Índice único parcial pendiente `(tenantId,purchaseRequestId,supplierContactId)` con `revokedAt IS NULL AND respondedAt IS NULL`. CHECK de completitud de respuesta y de incorporación con respuesta/revisor. Las FKs simples no sustituyen las comprobaciones cruzadas del servicio. Bloqueos Project → PurchaseRequest → Invitation; incorporación y creación de cotización en una transacción. Migración aditiva `20261123180000_supplier_quote_invitations`, sin backfill.
+

@@ -445,3 +445,11 @@ ERD funcional con relaciones explícitas en [`ENTITY_RELATIONSHIPS.md`](./ENTITY
 - `EFInvoiceMapping` — mapeo a facturación electrónica AFIP.
 - `WorkflowApproval` — flujos multinivel (Fase 2).
 - `ReportTemplate` — plantillas guardadas del query builder.
+### ProcurementQuoteInvitation — D-149
+
+- **Propósito:** permiso revocable de respuesta externa a una SC y evidencia original del proveedor, independiente de la cotización operativa.
+- **Identidad:** UUID; hash único del token aleatorio. Nunca persiste el token en claro.
+- **Ámbito obligatorio:** tenant, empresa, proyecto, SC y proveedor coherentes. Nueva raíz con `tenantId`, no un nuevo hijo del catálogo heredado.
+- **Atributos:** emisor, vencimiento/revocación, snapshot mínimo/fingerprint SC, respuesta JSON validada/hash/fecha, vínculo opcional a cotización incorporada y revisor/fecha. Estados derivados en `STATE_MACHINES.md` §29; sin enum nuevo.
+- **Efecto:** incorporar tras revisión crea una única `ProcurementQuote` RECEIVED por el servicio canónico. La evidencia permanece inmutable; no adjudica ni crea OC.
+

@@ -235,3 +235,11 @@ Vincular renglones manualmente; cantidad/unidad distinta debe impedir aplicar, o
 
 CI usa respuestas sintéticas y SQL descartable: no equivale a verificar precisión, costo, tiempo ni retención del proveedor. Sin habilitación explícita, comprobar que el botón asistido no aparece y la carga manual funciona en escritorio y celular.
 
+## D-149 — enlaces de cotización (piloto opt-in)
+
+Publicar con `BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED=false`; Vercel aplica la migración aditiva con el guard de DB production ya existente. Comprobar build y deployment del commit final. No activar para clientes ni enviar mensajes por el despliegue.
+
+En un entorno aislado con datos sintéticos, habilitar explícitamente el flag y URL pública. Crear enlace en SC Enviada, comprobar preview mínimo, abrir en contexto sin sesión, verificar que se limpia el fragmento y cookie HttpOnly/SameSiteStrict/path por invitación. Responder, recargar sin duplicar, revisar/corregir en Compras e incorporar una única cotización RECEIVED. Confirmar ausencia de OC/adjudicación. Probar revocación, vencimiento, cambio de SC, baja del emisor/proveedor, cambio de permisos/empresa, token de otra invitación y dos contextos de empresa sin contaminación. Origin ajeno rechazado; respuestas no-store/no-referrer/noindex. No guardar el bearer en capturas/logs compartidos.
+
+Evidencia mantenida: `supplier-quote-invitation.test.ts` (política), `supplier-quote-invitation.live.test.ts` (SQL real descartable), `supplier-quote-link.spec.ts` (desktop/tablet/phone con login fixture e invitado). Un resultado de CI no acredita activación productiva ni entrega de un enlace a un proveedor real.
+

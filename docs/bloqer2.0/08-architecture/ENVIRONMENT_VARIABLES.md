@@ -138,3 +138,7 @@ See also [`.env.example`](../../../.env.example).
 
 `BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED` es opt-in y su valor por defecto es `false`. Requiere también los gates `BLOQER_AI_ENABLED`/`BLOQER_AI_ALLOW_PRODUCTION` según entorno, y proveedor con visión/salida estructurada. Reutiliza modelo, credenciales, límite por sesión y timeout existentes; no configura servicios nuevos. No habilitar por desplegar el código: ejecutar primero el piloto sintético de lectura y revisión.
 
+# Respuestas externas de proveedores (D-149)
+
+`BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED`: `true`/`false`, valor por defecto `false`. Controla creación, consulta, respuesta e incorporación de enlaces. Apagarlo bloquea todos esos accesos sin borrar evidencia. Requiere la URL pública configurada (`AUTH_URL`, `NEXT_PUBLIC_APP_URL` o `APP_URL`) y la migración `20261123180000_supplier_quote_invitations`. No hay credencial de proveedor, dependencia o servicio adicional. No activar por publicar código: el piloto sintético y su autorización son separados.
+
