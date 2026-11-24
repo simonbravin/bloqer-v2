@@ -318,7 +318,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
     slug: "reporte-proveedores-de-obra",
     title: "Ver el reporte de proveedores de la obra",
     summary:
-      "Quién concentra pedidos y gasto: líderes por monto, por OC y por saldo CxP, más la tabla con capas de costo.",
+      "Pedidos, gasto y entregas registradas: líderes, capas de costo y cobertura de fechas y recepciones por proveedor.",
     intents: ["reportes-obra", "exportar-reportes"],
     modules: ["compras", "finanzas"],
     level: "project",
@@ -336,6 +336,8 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Los tres rankings: líderes por monto (exposición), por pedidos (OC confirmadas) y por saldo a pagar.",
       "En la tabla ordená por columna. El nombre abre la ficha del directorio.",
       "Opcional: filtrá Desde/Hasta (recorta OC, facturas y recepciones; el saldo CxP sigue siendo el de hoy).",
+      "En **Entregas y cobertura de datos**, abrí un proveedor para ver estados, fechas previstas y últimas recepciones. El número de OC abre el documento de origen.",
+      "La cobertura indica cuántas OC tienen fecha prevista y recepción registrada. En esta sección el período filtra la emisión de la OC; sus recepciones pueden ser posteriores.",
       "Exportar → CSV o PDF.",
     ],
     effects: ["Ves concentración de compra y exposición sin mezclar subcontratos certificados."],
@@ -343,6 +345,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "No sumes comprometido + devengado: la exposición ya evita el doble conteo.",
       "El saldo CxP no respeta el filtro de fechas (es el abierto de hoy).",
       "OTIF / lead time de entrega todavía no está en este reporte.",
+      "Última recepción no es fecha de entrega completa. Sin dato no significa incumplimiento. CSV incluye ENTREGA_OC y PDF una tabla de entregas con el mismo recorte.",
       "En Análisis de compras, la varianza por renglón de OC conserva la referencia APU de la orden y usa su fecha de emisión. El detalle también se incluye en CSV y PDF.",
     ],
     relatedSlugs: [
@@ -361,6 +364,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "pedidos por proveedor",
       "gasto por proveedor",
       "saldo proveedor",
+      "desempeño proveedor", "entregas proveedor", "cobertura fechas", "recepción proveedor",
     ],
     guideRef: "§13.2",
   },

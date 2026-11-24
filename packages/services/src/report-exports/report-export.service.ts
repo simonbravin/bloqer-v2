@@ -1,4 +1,4 @@
-﻿import { projectStatusSchema } from "@bloqer/validators";
+import { projectStatusSchema } from "@bloqer/validators";
 import type { AgingBucket, AgingFilters } from "../aging/aging.service";
 import { getReceivableAgingReport, getPayableAgingReport } from "../aging/aging.service";
 import type {
@@ -1320,6 +1320,7 @@ export async function exportProjectSupplierReportCsv(
     "UltimaActividad",
     "Moneda",
     "APDisponible",
+    "TipoRegistro", "Orden", "EstadoActual", "FechaEmisionOC", "EntregaPrevista", "UltimaRecepcion",
   ];
   const rows: string[][] = result.rows.map((s) => [
     s.supplierName,
@@ -1338,6 +1339,7 @@ export async function exportProjectSupplierReportCsv(
     s.lastActivityDate ?? "",
     result.currency,
     apAvailable ? "Sí" : "No",
+    "PROVEEDOR",
   ]);
   rows.push([
     "TOTAL",
@@ -1357,8 +1359,24 @@ export async function exportProjectSupplierReportCsv(
     result.currency,
     apAvailable ? "Sí" : "No",
   ]);
+  rows[rows.length - 1]!.push("TOTAL");
+  for (const supplier of result.deliveryEvidence) {
+    for (const order of supplier.orders) {
+      const row = Array<string>(headers.length).fill("");
+      row[0] = supplier.supplierName;
+      row[14] = result.currency;
+      row[16] = "ENTREGA_OC";
+      row[17] = `OC-${String(order.number).padStart(3, "0")}`;
+      row[18] = order.status;
+      row[19] = order.issueDate;
+      row[20] = order.expectedDeliveryDate ?? "Sin dato";
+      row[21] = order.lastReceiptDate ?? "Sin recepción registrada";
+      rows.push(row);
+    }
+  }
+  rows.push(["__AVISO__", "OC por fecha de emisión y moneda; estados actuales y recepciones confirmadas de cualquier fecha. Última recepción no acredita entrega completa ni puntualidad."]);
   return {
-    content: buildCsv(headers, rows),
+    content: buildCsv(headers, rows.map(row => padCsvRow(row, headers.length))),
     filename: safeReportFilename(`proveedores_${projectId}`, "csv"),
   };
 }

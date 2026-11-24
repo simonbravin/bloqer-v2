@@ -243,3 +243,11 @@ En un entorno aislado con datos sintéticos, habilitar explícitamente el flag y
 
 Evidencia mantenida: `supplier-quote-invitation.test.ts` (política), `supplier-quote-invitation.live.test.ts` (SQL real descartable), `supplier-quote-link.spec.ts` (desktop/tablet/phone con login fixture e invitado). Un resultado de CI no acredita activación productiva ni entrega de un enlace a un proveedor real.
 
+## Verificación SQL mantenida del esquema al desplegar
+
+El build existente `packages/database/scripts/vercel-migrate-if-needed.mjs` ejecuta, después de `migrate deploy`, `verifyDeploymentSchema` sobre la misma `DIRECT_URL` validada por `vercel-migration-target.mjs`. Producción solo admite `ep-cold-mouse-appkpn84` / `neondb` / `public`; un preview no puede apuntar a ese compute. Usa las credenciales del despliegue sin copiarlas al repositorio ni imprimirlas.
+
+El contrato D-149 comprueba por SQL de solo lectura la migración `20261123180000_supplier_quote_invitations` terminada y sin intento pendiente, las 22 columnas, campos de ámbito obligatorios, nueve restricciones validadas y seis índices válidos/listos. Una falla impide completar el build; el log exitoso lleva `SQL schema verified`, entorno y conteos. No lee respuestas, tokens ni registros de clientes, no activa flags y no sustituye el piloto funcional. CI ejecuta la misma consulta sobre Postgres descartable después de migrar. Mantener este contrato al evolucionar la tabla; no borrar verificaciones para ocultar divergencias.
+
+Para verificar una entrega, revisar el SHA, el log de esta etapa y el estado de producción correspondiente. Si el conector no expone los logs, dejar explícito que la evidencia disponible es el despliegue exitoso de un SHA cuyo build exige esta consulta; no presentarlo como una consola SQL inspeccionada ni como prueba de todo el esquema de Bloqer.
+
