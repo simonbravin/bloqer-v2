@@ -256,9 +256,8 @@ Decisiones **confirmadas** como coherentes con docs existentes (no se modificó 
 ### 9.7 Prisma / ERD (Phase 13E)
 
 Resumen ejecutivo en [`08-architecture/PRISMA_ERD_AUDIT.md`](../08-architecture/PRISMA_ERD_AUDIT.md) (ledger único, adjuntos, soft-FKs aceptados, advertencias de migración).
-# Respuestas externas de proveedores — D-149
+## Respuestas externas de proveedores — D-149
 
 Este flujo no agrega un rol ni una membresía. Crear/revocar/listar/revisar/incorporar invitaciones requiere `canManageProcurementQuotes`, módulo Compras habilitado y el alcance vigente de tenant/empresa/proyecto de la SC. Crear e incorporar requieren SC Enviada y obra activa. Revocar no elimina evidencia recibida.
 
 El visitante sin cuenta sólo puede consultar el snapshot mínimo y enviar una respuesta para la invitación cuyo token posee. El permiso se deriva del registro, nunca de IDs de empresa/tenant indicados por el visitante. Se revalida la autoridad actual del emisor, proveedor, SC, vencimiento y revocación en cada acceso. No puede consultar ERP, archivos, presupuesto, otras ofertas, chat ni crear una cotización operativa. La auditoría de respuesta identifica «Proveedor por enlace (identidad no verificada)». Ver ADR-021; capacidad apagada por defecto.
-
