@@ -60,7 +60,11 @@ test("supplier responds without a session, Compras reviews and imports once", as
     await panel.getByLabel("Observaciones (opcional)").fill("Revisada por Compras en CI");
     await panel.getByRole("button", { name: "Revisar respuesta", exact: true }).last().click();
     await panel.getByRole("button", { name: "Incorporar cotización", exact: true }).click();
-    await expect(panel.getByText("Incorporada", { exact: true })).toBeVisible();
+    await expect(async () => {
+      const errors = await panel.getByRole("alert").allTextContents();
+      expect(errors, "Compras must accept the reviewed response").toEqual([]);
+      await expect(panel.getByText("Incorporada", { exact: true })).toBeVisible();
+    }).toPass({ timeout: 10_000 });
     await page.reload();
     await expect(panel.getByText("Incorporada", { exact: true })).toHaveCount(1);
     await expect(panel.getByRole("button", { name: "Revisar respuesta", exact: true })).toHaveCount(0);
