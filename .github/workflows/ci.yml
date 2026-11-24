@@ -61,8 +61,10 @@ jobs:
           SEED_USER_PASSWORD: ${{ env.E2E_USER_PASSWORD }}
           DOCS_USER_EMAIL: pilot-ci@example.invalid
           DOCS_DEMO_SEED: "1"
+          BLOQER_DEPLOYMENT_SCHEMA_TEST: "1"
         run: |
           pnpm exec prisma migrate deploy
+          node --test scripts/deployment-schema-verification.test.mjs
           pnpm exec tsx src/seed.ts
 
       - name: Document isolation and provenance on disposable SQL
@@ -76,6 +78,7 @@ jobs:
           pnpm --filter @bloqer/database exec prisma migrate deploy
           pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
           pnpm --filter @bloqer/services exec node --import tsx --test src/procurement/supplier-quote-invitation.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/reports/operational-reports-audit.live.test.ts
 
       - name: Restore rehearsal on disposable SQL and synthetic files
         env:

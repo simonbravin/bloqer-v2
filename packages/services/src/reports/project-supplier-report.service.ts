@@ -9,6 +9,8 @@ import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { validateResourceVarianceDates } from "../resources/resource-variance-filters";
 import { parseFilterDate } from "./report-month";
+import { buildSupplierDeliveryEvidence, type SupplierDeliveryEvidence } from "./supplier-delivery-evidence";
+export type { SupplierDeliveryEvidence } from "./supplier-delivery-evidence";
 import {
   buildProjectSupplierReport,
   type ProjectSupplierReportBuilt,
@@ -33,6 +35,7 @@ export type ProjectSupplierReport = ProjectSupplierReportBuilt & {
   apAvailable: boolean;
   warnings: string[];
   sectionsExcluded: TenantModuleSectionExcludedWarning[];
+  deliveryEvidence: SupplierDeliveryEvidence[];
 };
 
 const PO_COMMITTED_STATUSES = ["CONFIRMED", "PARTIALLY_RECEIVED", "RECEIVED"] as const;
@@ -94,9 +97,16 @@ export async function getProjectSupplierReport(
           },
           select: {
             id: true,
+            number: true,
             currency: true,
             status: true,
             issueDate: true,
+            expectedDeliveryDate: true,
+            // All confirmed receipts for this cohort, even after the selected PO issue period.
+            receipts: {
+              where: { ...scope, status: "CONFIRMED" },
+              select: { supplierContactId: true, receiptDate: true },
+            },
             supplierContact: { select: { id: true, legalName: true, fantasyName: true } },
             lines: { select: { lineSubtotal: true } },
           },
@@ -237,6 +247,13 @@ export async function getProjectSupplierReport(
     apAvailable,
     warnings,
     sectionsExcluded,
+    deliveryEvidence: buildSupplierDeliveryEvidence(purchaseOrders.filter(po => po.currency === currency).map(po => ({
+      id: po.id, number: po.number, supplierContactId: po.supplierContact.id,
+      supplierName: supplierLabel(po.supplierContact), status: po.status, issueDate: po.issueDate,
+      expectedDeliveryDate: po.expectedDeliveryDate,
+      receiptDates: po.receipts.filter(receipt => receipt.supplierContactId === po.supplierContact.id)
+        .map(receipt => receipt.receiptDate),
+    }))),
     ...built,
   };
 }

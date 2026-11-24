@@ -481,3 +481,13 @@ Entrega E2 en [PR #34](https://github.com/simonbravin/bloqer-v2/pull/34): consul
 
 Próximos cortes conservados tras validar e integrar #34: E3 desempeño con datos comparables, E4 excepciones OC-recepción-factura. 6/F-8/H mantienen su orden. 2/B sigue con envío manual; 9/I diferido y 10/J con copia independiente real pendiente. Audio, lectura asistida y enlaces conservan sus flags apagados por defecto y piloto separado.
 
+## 20. Verificación de esquema y evidencia de proveedores — 23/11/2026
+
+PR #34 integrado en `e4af4ae64d77592e3703069836989c37cd141c3c`, con CI 45303187376 aprobada y despliegue de producción exitoso. La verificación posterior desde esta sesión no pudo conectarse: red local bloqueada (DNS denegado/P1001) y conector Neon sin acceso al proyecto correcto. Se localizaron credenciales locales sin exponerlas; no se atribuye la falla a credenciales inexistentes ni se confunde dev con production.
+
+Se incorpora un contrato SQL mantenido al build ya existente: después de migrar, consulta `_prisma_migrations`, columnas, restricciones e índices de D-149 en transacción READ ONLY. Usa la misma conexión directa validada y credenciales propias de Vercel; un fallo impide completar la entrega. La consulta también corre sobre SQL descartable en CI. El resultado productivo debe comprobarse en la entrega correspondiente, sin inferirlo del test aislado.
+
+**5/E3, primer corte de evidencia:** se reutiliza R-AP-03 para mostrar **Entregas y cobertura de datos**, con OC confirmadas/parciales/recibidas de la moneda y período elegidos. Conteos de estados actuales, cobertura de fecha prevista/recepción, detalle de fechas y enlace a cada OC; sin alterar documentos, crear campos ni calcular un puntaje. Recepciones de cualquier fecha vinculadas al conjunto de OC, con filtros de tenant/empresa/obra/proveedor y exclusión de anuladas. La actividad financiera conserva sus filtros y fórmulas actuales. CSV/PDF incluyen el detalle y sus límites. Guía, Help e índice AI acompañan la UI responsive con componentes existentes.
+
+No se declara OTIF ni lead time: la última recepción no acredita la fecha en que se completó cada renglón ni una responsabilidad del proveedor. Ampliar esa evaluación requiere definir previamente la base comparable y documentar la decisión. **E4** sigue como próximo corte: revisar diferencias OC–recepción–factura sobre reconciliación y avisos existentes; cualquier excepción financiera nueva necesita diseño previo. No se activan audio, lectura IA o enlaces, ni se envían mensajes. CI y despliegue finales se registran en el PR de esta entrega.
+

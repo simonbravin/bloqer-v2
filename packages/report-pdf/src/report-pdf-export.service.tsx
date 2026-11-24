@@ -668,7 +668,29 @@ export async function exportProjectSupplierReportPdf(
         share: result.apAvailable && r.shareOfExposurePct ? `${r.shareOfExposurePct}%` : "—",
         payable: result.apAvailable ? r.payableBalance : "—",
       }))}
-      warnings={result.warnings}
+      warnings={[...result.warnings,
+        "Entregas: OC por fecha de emisión y moneda; estados actuales y recepciones confirmadas de cualquier fecha. Última recepción no acredita entrega completa ni puntualidad.",
+        ...result.deliveryEvidence.map(s => `${s.supplierName}: fecha prevista en ${s.withExpectedDateCount}/${s.orderCount} OC; recepción registrada en ${s.withReceiptCount}/${s.orderCount} OC.`),
+      ]}
+      additionalTable={result.deliveryEvidence.length > 0 ? {
+        title: "Entregas y cobertura de datos",
+        columns: [
+          { key: "supplier", label: "Proveedor", flex: 1.5 },
+          { key: "order", label: "OC", flex: 0.65 },
+          { key: "status", label: "Estado actual", flex: 1.1 },
+          { key: "issued", label: "Emitida", flex: 0.85 },
+          { key: "expected", label: "Entrega prevista", flex: 0.85 },
+          { key: "receipt", label: "Última recepción", flex: 1 },
+        ],
+        rows: result.deliveryEvidence.flatMap(supplier => supplier.orders.map(order => ({
+          supplier: supplier.supplierName,
+          order: `OC-${String(order.number).padStart(3, "0")}`,
+          status: order.status === "RECEIVED" ? "Recibida" : order.status === "PARTIALLY_RECEIVED" ? "Recepción parcial" : "Confirmada",
+          issued: order.issueDate,
+          expected: order.expectedDeliveryDate ?? "Sin dato",
+          receipt: order.lastReceiptDate ?? "Sin recepción registrada",
+        }))),
+      } : undefined}
     />
   ));
 }

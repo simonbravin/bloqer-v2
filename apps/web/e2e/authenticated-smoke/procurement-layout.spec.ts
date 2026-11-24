@@ -51,6 +51,29 @@ test("procurement pages contain their tables, totals and touch controls at every
   }
 });
 
+test("supplier delivery evidence opens its source and preserves scope in exports", async ({ page }, testInfo) => {
+  await page.goto(`${project}/reportes/proveedores?currency=ARS`);
+  const panel = page.getByRole("region", { name: "Entregas y cobertura de datos" });
+  await expect(panel).toBeVisible();
+  const supplier = panel.locator("details").filter({ has: page.locator(`a[href="${order}"]`) });
+  await expect(supplier).toHaveCount(1);
+  await supplier.locator("summary").click();
+  await expect(supplier.getByRole("table")).toBeVisible();
+  await expect(supplier.locator(`a[href="${order}"]`)).toBeVisible();
+  await expect(supplier.getByText(/Fecha prevista:/)).toBeVisible();
+  await captureLayout(page, testInfo, "supplier-delivery-evidence");
+  const endpoint = `/api/reports${project}/proveedores.csv?currency=ARS`;
+  const csv = await page.request.get(endpoint);
+  expect(csv.ok()).toBe(true);
+  expect(await csv.text()).toContain("ENTREGA_OC");
+  const empty = await page.request.get(`${endpoint}&dateFrom=2050-01-01`);
+  expect(empty.ok()).toBe(true);
+  expect(await empty.text()).not.toContain("ENTREGA_OC");
+  await supplier.locator(`a[href="${order}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`${order}$`));
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
 test("purchase forms align controls and preserve long values in light and dark themes", async ({ page }, testInfo) => {
   for (const kind of ["solicitudes-compra", "ordenes-compra"] as const) {
     await page.goto(`${project}/${kind}/nueva`);

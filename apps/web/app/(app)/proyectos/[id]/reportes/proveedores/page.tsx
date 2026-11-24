@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { formatMoneyAmount, isPositiveMoneyAmount } from "@/lib/format-money";
+import { SupplierDeliveryEvidencePanel } from "@/features/reports/supplier-delivery-evidence";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -156,6 +157,8 @@ export default async function ReporteProveedoresProyectoPage({ params, searchPar
         <ProjectSupplierLeaders kind="orders" rows={report.leadersByOrders} currency={currency} />
         {apAvailable ? <ProjectSupplierLeaders kind="payable" rows={report.leadersByPayable} currency={currency} /> : null}
       </div>
+
+      <SupplierDeliveryEvidencePanel rows={report.deliveryEvidence} projectId={projectId} />
 
       <Card>
         <CardHeader className="pb-2">
