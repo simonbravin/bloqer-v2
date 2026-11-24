@@ -36,7 +36,7 @@ export function SupplierQuoteLanding({ invitationId, enabled }: { invitationId: 
   if (error) return <div className="space-y-4 rounded-lg border p-5"><p role="alert" className="text-sm">{error}</p>{enabled && <Button variant="outline" onClick={() => void load()}>Reintentar</Button>}</div>;
   if (!state) return <p role="status" className="text-sm text-muted-foreground">Comprobando enlace…</p>;
   if (state.state === "sent") return <div role="status" className="space-y-2 rounded-lg border bg-muted/30 p-6"><h2 className="text-xl font-semibold">Respuesta recibida</h2><p className="text-sm text-muted-foreground">Compras revisará tu cotización. Para modificarla, pedí un nuevo enlace. Ya podés cerrar esta página.</p></div>;
-  return <div className="space-y-5"><p className="text-sm text-muted-foreground">El enlace vence el {new Date(state.expiresAt).toLocaleString("es-AR")}.</p>
+  return <div className="space-y-5"><p className="text-sm text-muted-foreground">El enlace vence el {new Date(state.expiresAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}.</p>
     <SupplierQuoteResponseForm snapshot={state.snapshot} onSubmit={async response => {
       const result = await fetch(`/cotizar/${invitationId}/response`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(response), cache: "no-store" });
       const body = await result.json();

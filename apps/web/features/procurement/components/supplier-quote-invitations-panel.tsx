@@ -66,7 +66,7 @@ export function SupplierQuoteInvitationsPanel({ projectId, requestId, suppliers,
     <ul className="space-y-3">{invitations.map(row => {
       const status = row.importedAt ? "Incorporada" : row.respondedAt ? "Respuesta recibida" : row.revokedAt ? "Revocado" : new Date(row.expiresAt).getTime() <= Date.now() ? "Vencido" : "Esperando respuesta";
       return <li key={row.id} className="flex min-w-0 flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 space-y-1"><p className="break-words text-sm font-medium">{row.snapshot.supplierName}</p><Badge variant="secondary">{status}</Badge><p className="text-xs text-muted-foreground">Vence: {new Date(row.expiresAt).toLocaleString("es-AR")}{row.revokedAt && row.respondedAt ? " · Acceso revocado" : ""}</p></div>
+        <div className="min-w-0 space-y-1"><p className="break-words text-sm font-medium">{row.snapshot.supplierName}</p><Badge variant="secondary">{status}</Badge><p className="text-xs text-muted-foreground">Vence: {new Date(row.expiresAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}{row.revokedAt && row.respondedAt ? " · Acceso revocado" : ""}</p></div>
         <div className="flex flex-wrap gap-2">
           {row.response && <Button variant="ghost" disabled={pending} className="min-h-11" onClick={() => { setReviewId(null); setOriginalId(row.id); }}>Ver respuesta original</Button>}
           {row.response && !row.importedAt && allowCreate && <Button variant="outline" disabled={pending} className="min-h-11" onClick={() => { setOriginalId(null); setReviewId(row.id); }}>Revisar respuesta</Button>}
