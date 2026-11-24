@@ -60,11 +60,17 @@ test("supplier responds without a session, Compras reviews and imports once", as
     await panel.getByLabel("Observaciones (opcional)").fill("Revisada por Compras en CI");
     await panel.getByRole("button", { name: "Revisar respuesta", exact: true }).last().click();
     await panel.getByRole("button", { name: "Incorporar cotización", exact: true }).click();
-    await expect(async () => {
-      const errors = await panel.getByRole("alert").allTextContents();
-      expect(errors, "Compras must accept the reviewed response").toEqual([]);
-      await expect(panel.getByText("Incorporada", { exact: true })).toBeVisible();
-    }).toPass({ timeout: 10_000 });
+    try {
+      await expect(panel.getByText("Incorporada", { exact: true })).toBeVisible({ timeout: 10_000 });
+    } catch (error) {
+      // This panel contains only isolated fixture data; the share token was cleared on reload.
+      const state = await panel.evaluate(element => ({
+        text: element.textContent,
+        invalid: Array.from(element.querySelectorAll<HTMLInputElement>("input:invalid")).map(input => ({ id: input.id, message: input.validationMessage })),
+        buttons: Array.from(element.querySelectorAll<HTMLButtonElement>("button")).map(button => ({ text: button.textContent, disabled: button.disabled })),
+      }));
+      throw new Error(`Reviewed response did not become incorporated: ${JSON.stringify(state)}`, { cause: error });
+    }
     await page.reload();
     await expect(panel.getByText("Incorporada", { exact: true })).toHaveCount(1);
     await expect(panel.getByRole("button", { name: "Revisar respuesta", exact: true })).toHaveCount(0);
