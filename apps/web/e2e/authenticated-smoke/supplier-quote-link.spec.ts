@@ -64,7 +64,8 @@ test("supplier responds without a session, Compras reviews and imports once", as
       await expect(panel.getByText("Incorporada", { exact: true })).toBeVisible({ timeout: 10_000 });
     } catch (error) {
       // This panel contains only isolated fixture data; the share token was cleared on reload.
-      const state = await panel.evaluate(element => ({
+      const diagnosticScope = await panel.count() ? panel : page.locator("body");
+      const state = await diagnosticScope.evaluate(element => ({
         text: element.textContent,
         invalid: Array.from(element.querySelectorAll<HTMLInputElement>("input:invalid")).map(input => ({ id: input.id, message: input.validationMessage })),
         buttons: Array.from(element.querySelectorAll<HTMLButtonElement>("button")).map(button => ({ text: button.textContent, disabled: button.disabled })),
