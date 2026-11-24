@@ -108,13 +108,13 @@ test("supplier responds without a session, Compras reviews and imports once", as
       await tabB.reload(); await expect(tabB.getByLabel("Precio unitario", { exact: true })).toHaveValue("");
       await panelB.getByRole("button", { name: "Revocar enlace", exact: true }).click();
       await expect(panelB.getByText("Revocado", { exact: true })).toBeVisible();
-      await tabB.reload(); await expect(tabB.getByRole("alert")).toContainText("El enlace no está disponible");
+      await tabB.reload(); await expect(tabB.getByRole("alert").filter({ hasText: "El enlace no está disponible" })).toContainText("El enlace no está disponible");
     } finally { await buyerBContext.close(); }
     // A copied route without its capability cannot read this request in another session.
     const deniedContext = await browser.newContext();
     try {
       const denied = await deniedContext.newPage(); await denied.goto(new URL(link).origin + new URL(link).pathname);
-      await expect(denied.getByRole("alert")).toContainText("El enlace no está disponible");
+      await expect(denied.getByRole("alert").filter({ hasText: "El enlace no está disponible" })).toContainText("El enlace no está disponible");
       await expect(denied.getByLabel("Precio unitario", { exact: true })).toHaveCount(0);
     } finally { await deniedContext.close(); }
   } finally { await supplierContext.close(); }
