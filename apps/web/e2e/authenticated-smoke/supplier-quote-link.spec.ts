@@ -60,6 +60,7 @@ test("supplier responds without a session, Compras reviews and imports once", as
     await panel.getByLabel("Observaciones (opcional)").fill("Revisada por Compras en CI");
     await panel.getByRole("button", { name: "Revisar respuesta", exact: true }).last().click();
     await panel.getByRole("button", { name: "Incorporar cotización", exact: true }).click();
+    await expect(panel.getByRole("status")).toHaveText("Cotización incorporada. Ya podés compararla con las demás ofertas.");
     try {
       await expect(panel.getByText("Incorporada", { exact: true })).toBeVisible({ timeout: 10_000 });
     } catch (error) {

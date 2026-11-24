@@ -27,6 +27,10 @@ export function SupplierQuoteInvitationsPanel({ projectId, requestId, suppliers,
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  // Keep acknowledged mutations visible while the server-component refresh catches up.
+  // These flags are set only after the server confirms the corresponding write.
+  const [confirmedImports, setConfirmedImports] = useState<Set<string>>(() => new Set());
+  const [confirmedRevocations, setConfirmedRevocations] = useState<Set<string>>(() => new Set());
   const running = useRef(false);
   const review = invitations.find(row => row.id === reviewId);
   const original = invitations.find(row => row.id === originalId);
@@ -44,6 +48,7 @@ export function SupplierQuoteInvitationsPanel({ projectId, requestId, suppliers,
         <Button className="min-h-11 shrink-0 md:min-h-10" disabled={pending || !supplierId} onClick={() => void run(async () => {
           const result = await createSupplierQuoteLinkAction(projectId, requestId, supplierId);
           if ("error" in result) { setError(result.error ?? "No pudimos crear el enlace."); return; }
+          setConfirmedRevocations(previous => new Set([...previous, ...invitations.filter(row => row.supplierContactId === supplierId && !row.respondedAt && !row.revokedAt && !row.importedAt).map(row => row.id)]));
           setCreated(result); router.refresh();
         })}>{pending ? "Guardando…" : "Crear enlace"}</Button>
       </div>
@@ -64,15 +69,18 @@ export function SupplierQuoteInvitationsPanel({ projectId, requestId, suppliers,
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {!invitations.length && <p className="py-3 text-sm text-muted-foreground">Todavía no hay enlaces para esta solicitud.</p>}
     <ul className="space-y-3">{invitations.map(row => {
-      const status = row.importedAt ? "Incorporada" : row.respondedAt ? "Respuesta recibida" : row.revokedAt ? "Revocado" : new Date(row.expiresAt).getTime() <= Date.now() ? "Vencido" : "Esperando respuesta";
+      const imported = Boolean(row.importedAt) || confirmedImports.has(row.id);
+      const revoked = Boolean(row.revokedAt) || confirmedRevocations.has(row.id);
+      const status = imported ? "Incorporada" : row.respondedAt ? "Respuesta recibida" : revoked ? "Revocado" : new Date(row.expiresAt).getTime() <= Date.now() ? "Vencido" : "Esperando respuesta";
       return <li key={row.id} className="flex min-w-0 flex-col gap-3 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0 space-y-1"><p className="break-words text-sm font-medium">{row.snapshot.supplierName}</p><Badge variant="secondary">{status}</Badge><p className="text-xs text-muted-foreground">Vence: {new Date(row.expiresAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}{row.revokedAt && row.respondedAt ? " · Acceso revocado" : ""}</p></div>
+        <div className="min-w-0 space-y-1"><p className="break-words text-sm font-medium">{row.snapshot.supplierName}</p><Badge variant="secondary">{status}</Badge><p className="text-xs text-muted-foreground">Vence: {new Date(row.expiresAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}{revoked && row.respondedAt ? " · Acceso revocado" : ""}</p></div>
         <div className="flex flex-wrap gap-2">
           {row.response && <Button variant="ghost" disabled={pending} className="min-h-11" onClick={() => { setReviewId(null); setOriginalId(row.id); }}>Ver respuesta original</Button>}
-          {row.response && !row.importedAt && allowCreate && <Button variant="outline" disabled={pending} className="min-h-11" onClick={() => { setOriginalId(null); setReviewId(row.id); }}>Revisar respuesta</Button>}
-          {!row.revokedAt && !row.importedAt && <Button variant="ghost" disabled={pending} className="min-h-11" onClick={() => void run(async () => {
+          {row.response && !imported && allowCreate && <Button variant="outline" disabled={pending} className="min-h-11" onClick={() => { setOriginalId(null); setReviewId(row.id); }}>Revisar respuesta</Button>}
+          {!revoked && !imported && <Button variant="ghost" disabled={pending} className="min-h-11" onClick={() => void run(async () => {
             const result = await revokeSupplierQuoteLinkAction(projectId, requestId, row.id);
             if ("error" in result) { setError(result.error); return; }
+            setConfirmedRevocations(previous => new Set(previous).add(row.id));
             if (created?.id === row.id) setCreated(null);
             setNotice("Acceso revocado. Las respuestas recibidas se conservan."); router.refresh();
           })}>Revocar enlace</Button>}
@@ -83,6 +91,7 @@ export function SupplierQuoteInvitationsPanel({ projectId, requestId, suppliers,
     {review?.response && <div className="space-y-4 border-t pt-5"><h3 className="font-semibold">Revisión de Compras</h3><SupplierQuoteResponseForm key={review.id} snapshot={review.snapshot} initial={review.response} internal onCancel={() => setReviewId(null)} onSubmit={async (response, fxRate) => {
       const result = await importSupplierQuoteLinkAction(projectId, requestId, review.id, response, fxRate);
       if ("error" in result) return result;
+      setConfirmedImports(previous => new Set(previous).add(review.id));
       setReviewId(null); setNotice("Cotización incorporada. Ya podés compararla con las demás ofertas."); router.refresh(); return {};
     }} /></div>}
   </section>;
