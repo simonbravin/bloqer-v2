@@ -45,7 +45,13 @@ Emisión y consumo de tokens de ambos propósitos se serializan por email normal
 ## Integración con multitenancy
 
 - Tras autenticar, resolver **tenant activo** (selector en UI si aplica).
-- Toda mutación lleva **actor** (`user_id`) para auditoría.
+- Las mutaciones internas llevan **actor** (`user_id`) para auditoría. D-149/ADR-021 define la respuesta externa de proveedor como una capacidad acotada: `actorUserId=null`, `source=supplier_link` y vínculo a la invitación, sin atribuir identidad al emisor ni al visitante.
+
+### Respuesta externa de cotizaciones (D-149)
+
+No crea sesión Auth.js, cuenta, membresía ni rol de proveedor. La allowlist pública admite únicamente `/cotizar/<uuid>` y sus handlers `access`/`response`; todo handler comprueba el flag, origen y permiso delegado vigente. El bearer de 32 bytes llega en fragmento, se elimina de la URL en el cliente y se intercambia por cookie HttpOnly/Secure en HTTPS/SameSiteStrict con nombre y path por invitación. DB conserva sólo SHA-256; expira en siete días y es revocable. No-store, no-referrer, noindex y bloqueo de framing. ID, token y contexto quedan vinculados, incluso con varias empresas abiertas en pestañas simultáneas.
+
+Crear/revocar/revisar/incorporar siguen requiriendo autenticación interna y permisos actuales de cotizaciones, empresa y obra. La respuesta pública no construye un ServiceContext ni invoca alta/adjudicación. Ver ADR-021 y TENANT_ISOLATION_MODEL.
 
 ## Referencias funcionales
 

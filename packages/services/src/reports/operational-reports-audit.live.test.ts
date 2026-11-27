@@ -13,6 +13,7 @@ import { getMultiProjectProcurementReport, getProcurementDeviationReport } from 
 import { getProjectSupplierReport } from "./project-supplier-report.service";
 import { getPurchaseOrderVarianceReport } from "./purchase-order-variance-report.service";
 import { getSubcontractVarianceReport } from "./subcontract-variance.service";
+import { getProjectProcurementFollowUp } from "../procurement/project-procurement-follow-up.service";
 
 const denied = (error: unknown) => error instanceof ServiceError && error.code === "FORBIDDEN";
 const invalid = (error: unknown) => error instanceof ServiceError && error.code === "VALIDATION";
@@ -93,7 +94,7 @@ describe("AG-12 operational reports on isolated SQL", {
         { companyId: companyB, projectId: shared, number: 3, currency: "ARS", issueDate: nov, subtotal: "700", supplierContactId: otherSupplierId },
         { companyId: companyA, projectId: hidden, number: 4, currency: "ARS", issueDate: nov, subtotal: "900", supplierContactId: otherSupplierId },
       ]) {
-        await tx.purchaseOrder.create({ data: {
+        const createdOrder = await tx.purchaseOrder.create({ data: {
           ...order, tenantId, totalAmount: order.subtotal, status: "CONFIRMED",
           lines: { create: { description: "Material de prueba", quantity: "1", unitPrice: order.subtotal,
             lineSubtotal: order.subtotal, lineTotal: order.subtotal,
@@ -101,6 +102,15 @@ describe("AG-12 operational reports on isolated SQL", {
             wbsNodeId: order.number === 1 || order.number === 2 ? wbs : null,
           } },
         } });
+        if (order.number === 1) {
+          await tx.purchaseOrder.update({ where: { id: createdOrder.id }, data: { expectedDeliveryDate: nov } });
+          await tx.purchaseReceipt.createMany({ data: [
+            { companyId: companyA, supplierContactId: supplierId, receiptDate: new Date("2026-12-05"), status: "CONFIRMED" as const },
+            { companyId: companyA, supplierContactId: supplierId, receiptDate: new Date("2027-01-01"), status: "CANCELLED" as const },
+            { companyId: companyB, supplierContactId: supplierId, receiptDate: new Date("2027-02-01"), status: "CONFIRMED" as const },
+            { companyId: companyA, supplierContactId: otherSupplierId, receiptDate: new Date("2027-03-01"), status: "CONFIRMED" as const },
+          ].map(receipt => ({ ...receipt, tenantId, projectId: shared, purchaseOrderId: createdOrder.id })) });
+        }
       }
       const cert = await tx.certification.create({ data: {
         tenantId, companyId: companyA, projectId: shared, budgetId: budgetA, number: 1, periodStart: oct,
@@ -137,6 +147,7 @@ describe("AG-12 operational reports on isolated SQL", {
         await tx.salesInvoice.deleteMany({ where: { tenantId } });
         await tx.supplierInvoice.deleteMany({ where: { tenantId } });
         await tx.certification.deleteMany({ where: { tenantId } });
+        await tx.purchaseReceipt.deleteMany({ where: { tenantId } });
         await tx.purchaseOrderLine.deleteMany({ where: { purchaseOrder: { tenantId } } });
         await tx.purchaseOrder.deleteMany({ where: { tenantId } });
         await tx.costItem.deleteMany({ where: { budgetId: budgetA } });
@@ -155,6 +166,49 @@ describe("AG-12 operational reports on isolated SQL", {
       clearProjectAccessModeCache();
       await prisma.$disconnect();
     }
+  });
+
+  it("E4 keeps follow-up within company, tenant, membership and module scope without mutations", async () => {
+    const beforeOrders = await prisma.purchaseOrder.findMany({ where: { tenantId }, orderBy: { id: "asc" } });
+    const result = await getProjectProcurementFollowUp(shared, ctx);
+    assert.equal(result.total, 2);
+    assert.deepEqual(result.rows.map((row) => row.code), ["OC-002", "OC-001"]);
+    assert.deepEqual(result.rows.map((row) => row.billing?.currency), ["USD", "ARS"]);
+    assert.ok(result.rows.every((row) => row.billing?.hasReceivedQuantity === false));
+    assert.equal((await getProjectProcurementFollowUp(shared, ctx, 2)).rows.length, 0);
+    assert.equal((await getProjectProcurementFollowUp(shared, ctx, 2)).total, 2);
+    await assert.rejects(getProjectProcurementFollowUp(hidden, ctx), denied);
+    await assert.rejects(getProjectProcurementFollowUp(shared, viewOnly), denied);
+    await assert.rejects(getProjectProcurementFollowUp(shared, { ...ctx, tenantId: randomUUID() }));
+    await assert.rejects(getProjectProcurementFollowUp(shared, ctx, 0), invalid);
+    const setting = await prisma.tenantModuleSetting.create({ data: { tenantId, moduleKey: "AP", isEnabled: false } });
+    try {
+      const unavailable = await getProjectProcurementFollowUp(shared, ctx);
+      assert.ok(unavailable.rows.every((row) => row.billing === null && row.billingNotice?.includes("No se puede comprobar")));
+    } finally {
+      await prisma.tenantModuleSetting.delete({ where: { id: setting.id } });
+    }
+    const orderId = result.rows.find((row) => row.code === "OC-001")!.id;
+    const inconsistent = await prisma.supplierInvoice.create({ data: {
+      tenantId, companyId: companyB, projectId: shared, supplierContactId: otherSupplierId,
+      purchaseOrderId: orderId, number: 91, issueDate: nov, dueDate: nov,
+      currency: "ARS", status: "DRAFT", subtotal: "98765", totalAmount: "98765",
+    } });
+    try {
+      const conflict = await getProjectProcurementFollowUp(shared, ctx);
+      assert.equal(conflict.rows.find((row) => row.id === orderId)?.billing, null);
+      assert.ok(conflict.rows.find((row) => row.id === orderId)?.billingNotice?.includes("No se pudo comprobar"));
+      assert.ok(!JSON.stringify(conflict).includes("98765"));
+      await prisma.supplierInvoice.update({ where: { id: inconsistent.id }, data: {
+        companyId: companyA, supplierContactId: supplierId, currency: "USD",
+      } });
+      const currencyMismatch = await getProjectProcurementFollowUp(shared, ctx);
+      assert.equal(currencyMismatch.rows.find((row) => row.id === orderId)?.billing, null);
+      assert.ok(currencyMismatch.rows.find((row) => row.code === "OC-002")?.billing);
+    } finally {
+      await prisma.supplierInvoice.delete({ where: { id: inconsistent.id } });
+    }
+    assert.deepEqual(await prisma.purchaseOrder.findMany({ where: { tenantId }, orderBy: { id: "asc" } }), beforeOrders);
   });
 
   it("groups multi-project procurement by currency and intersects company and assigned projects", async () => {
@@ -197,6 +251,27 @@ describe("AG-12 operational reports on isolated SQL", {
     assert.equal(subcontracts.type, "REPORT");
     if (subcontracts.type === "REPORT") assert.equal(subcontracts.apAvailable, false);
     await assert.rejects(getSubcontractVarianceReport(hidden, {}, viewOnly), denied);
+  });
+
+  it("delivery evidence follows the authorized PO cohort and rejects foreign receipt relationships", async () => {
+    const report = await getProjectSupplierReport(shared, { currency: "ARS", dateFrom: "2026-11-01", dateTo: "2026-11-30" }, warehouse);
+    assert.equal(report.apAvailable, false);
+    assert.equal(report.deliveryEvidence.length, 1);
+    const evidence = report.deliveryEvidence[0]!;
+    assert.equal(evidence.supplierContactId, supplierId);
+    assert.equal(evidence.orderCount, 1);
+    assert.equal(evidence.withExpectedDateCount, 1);
+    assert.equal(evidence.withReceiptCount, 1);
+    assert.equal(evidence.orders[0]!.number, 1);
+    assert.equal(evidence.orders[0]!.lastReceiptDate, "2026-12-05");
+    assert.equal(report.totals.receiptCount, 0); // Financial activity retains its receipt-date filter.
+    const usd = await getProjectSupplierReport(shared, { currency: "USD" }, warehouse);
+    assert.equal(usd.deliveryEvidence[0]!.withExpectedDateCount, 0);
+    assert.equal(usd.deliveryEvidence[0]!.withReceiptCount, 0);
+    assert.equal(usd.deliveryEvidence[0]!.orders[0]!.number, 2);
+    assert.deepEqual((await getProjectSupplierReport(shared, { dateFrom: "2050-01-01" }, warehouse)).deliveryEvidence, []);
+    await assert.rejects(getProjectSupplierReport(hidden, {}, ctx), denied);
+    await assert.rejects(getProjectSupplierReport(shared, {}, viewOnly), denied);
   });
 
   it("retains certification metrics but suppresses billing and collections without AR access", async () => {

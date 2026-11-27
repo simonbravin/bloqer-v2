@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ManualFxField } from "@/features/finance/components/manual-fx-field";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
-import { PROCUREMENT_FORM_PAGE_CLASS } from "@/features/procurement/lib/procurement-form-layout";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS, PROCUREMENT_FORM_PAGE_CLASS } from "@/features/procurement/lib/procurement-form-layout";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, toSearchableOptions } from "@/lib/searchable-options";
 import { toDateInput } from "@/lib/date-input";
@@ -141,7 +141,7 @@ export function PurchaseOrderEditForm({
 
   return (
     <div className={`${PROCUREMENT_FORM_PAGE_CLASS} rounded-lg border bg-card p-4 sm:p-6`}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className={`space-y-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}>
 <fieldset disabled={isPending} className="min-w-0 space-y-5">
         {error && (
           <p
@@ -231,7 +231,7 @@ export function PurchaseOrderEditForm({
           <AutoGrowTextarea id="notes" name="notes" defaultValue={order.notes ?? ""} />
         </div>
 
-        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
           <Button type="button" variant="outline" className="min-h-11 md:min-h-9" onClick={() => router.back()}>
             Cancelar
           </Button>

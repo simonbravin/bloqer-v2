@@ -1,4 +1,17 @@
 export type * from "./types";
+export { isSupplierInvoicePreviewEnabled } from "./env";
+export {
+  extractSupplierInvoiceDocument,
+  parseSupplierInvoiceDocumentExtraction,
+  SUPPLIER_INVOICE_PREVIEW_MAX_BYTES,
+  SUPPLIER_INVOICE_PREVIEW_MIME_TYPES,
+} from "./document-extraction/supplier-invoice-document";
+export type {
+  SupplierInvoiceDocumentFields,
+  SupplierInvoiceDocumentPreview,
+  SupplierInvoiceDocumentExtraction,
+  SupplierInvoicePreviewMime,
+} from "./document-extraction/supplier-invoice-document";
 export { AiProviderError, userFacingAiProviderErrorMessage, userFacingOpenAiErrorMessage } from "./errors";
 export type { AiProviderErrorCode } from "./errors";
 export type { AiProvider } from "./provider";
@@ -49,3 +62,9 @@ export {
   searchBm25,
 } from "./knowledge";
 export type { KnowledgeChunk, KnowledgeIndex, KnowledgeHit } from "./knowledge";
+export { isPurchaseRequestAudioEnabled, getPurchaseRequestTranscriptionModel } from "./env";
+export { preparePurchaseRequestTranscript, parsePurchaseRequestProposal, validatePurchaseRequestTranscript, PURCHASE_REQUEST_AUDIO_MAX_BYTES } from "./audio/purchase-request-audio";
+export type { PurchaseRequestAudioProposal } from "./audio/purchase-request-audio";
+export { isProcurementQuotePreviewEnabled } from "./env";
+export { extractProcurementQuoteDocument, parseProcurementQuoteDocument } from "./document-extraction/procurement-quote-document";
+export type { ProcurementQuoteDocumentExtraction, ProcurementQuoteDocumentPreview } from "./document-extraction/procurement-quote-document";

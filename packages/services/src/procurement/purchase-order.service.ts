@@ -56,6 +56,11 @@ import {
 } from "../user/resolve-user-display-names";
 import { loadMaterialApuCommitmentByLineId } from "../materials/material-commitment";
 import { assertProductUnitCompatible, lockProductsForUnitReferences } from "../inventory/product-unit";
+import {
+  procurementSearchLimit,
+  purchaseOrderSearchStatuses,
+  type PurchaseOrderSearch,
+} from "./procurement-search";
 
 export {
   submitPurchaseOrder,
@@ -576,28 +581,61 @@ export async function listPurchaseOrdersByProject(
   projectId: string,
   ctx: ServiceContext,
 ): Promise<PurchaseOrderView[]> {
+  return (await readPurchaseOrdersByProject(projectId, ctx)).orders;
+}
+
+/** Filter and bound records in SQL; total describes the full matching scope. */
+export async function searchPurchaseOrdersByProject(
+  projectId: string,
+  ctx: ServiceContext,
+  search: PurchaseOrderSearch = {},
+): Promise<{ orders: PurchaseOrderView[]; total: number }> {
+  return readPurchaseOrdersByProject(projectId, ctx, search);
+}
+
+async function readPurchaseOrdersByProject(
+  projectId: string,
+  ctx: ServiceContext,
+  search?: PurchaseOrderSearch,
+): Promise<{ orders: PurchaseOrderView[]; total: number }> {
   await assertProcurementTenantModule(ctx);
   if (!canViewProcurementProjectArea(ctx.roles)) {
     throw new ServiceError("FORBIDDEN", "Sin permisos para ver órdenes de compra");
   }
   await requireProjectAccess(projectId, ctx);
-
-  const orders = await prisma.purchaseOrder.findMany({
-    where: { projectId, tenantId: ctx.tenantId, ...(ctx.companyId ? { companyId: ctx.companyId } : {}) }, // companyId NOT NULL
+  const take = search ? procurementSearchLimit(search.limit) : undefined;
+  const statuses = search ? purchaseOrderSearchStatuses(search) : undefined;
+  if (statuses?.length === 0) return { orders: [], total: 0 };
+  const where = {
+    projectId,
+    tenantId: ctx.tenantId,
+    ...(ctx.companyId ? { companyId: ctx.companyId } : {}), // companyId NOT NULL
+    ...(statuses ? { status: { in: statuses } } : {}),
+  } satisfies Prisma.PurchaseOrderWhereInput;
+  const query = {
+    where,
     include: poInclude,
     orderBy: { number: "asc" },
-  });
+    ...(take !== undefined ? { take } : {}),
+  } satisfies Prisma.PurchaseOrderFindManyArgs;
+  // One snapshot keeps the page and its count consistent during concurrent writes.
+  const [orders, total] = search
+    ? await prisma.$transaction([
+        prisma.purchaseOrder.findMany(query),
+        prisma.purchaseOrder.count({ where }),
+      ], { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead })
+    : await prisma.purchaseOrder.findMany(query).then((all) => [all, all.length] as const);
   for (const order of orders) assertPurchaseOrderRelations(order);
   const nameById = await resolveUserDisplayNames(
     orders.flatMap((o) => [o.approvedByUserId, o.createdBy, o.originRequestedByUserId ?? o.purchaseRequest?.requestedByUserId]),
   );
-  return orders.map((o) =>
+  return { total, orders: orders.map((o) =>
     serializePO(o, {
       approvedByName: userDisplayNameFromMap(nameById, o.approvedByUserId),
       createdByName: userDisplayNameFromMap(nameById, o.createdBy),
       originRequestedByName: userDisplayNameFromMap(nameById, o.originRequestedByUserId ?? o.purchaseRequest?.requestedByUserId),
     }),
-  );
+  ) };
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

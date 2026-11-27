@@ -289,7 +289,9 @@ function mapRow(r: {
     actorUserId: r.actorUserId,
     actorName: r.actor?.name ?? null,
     actorEmail: r.actor?.email ?? null,
-    actorLabel: formatAuditActorLabel(r.actorUserId, r.actor?.name, r.actor?.email),
+    actorLabel: r.actorUserId === null && r.action === "procurement_quote_invitation.responded"
+      ? "Proveedor por enlace (identidad no verificada)"
+      : formatAuditActorLabel(r.actorUserId, r.actor?.name, r.actor?.email),
     projectId: r.projectId,
     projectName: r.project?.name ?? null,
     companyId: r.companyId,

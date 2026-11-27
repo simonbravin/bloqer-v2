@@ -235,6 +235,7 @@ export type SupplierInvoiceView = Omit<
 export type SupplierInvoiceListPayable = {
   id: string;
   status: string;
+  balanceDue: string;
 } | null;
 
 // ─── Guard ────────────────────────────────────────────────────────────────────
@@ -405,8 +406,8 @@ export function assertSupplierInvoiceEditable(invoice: SupplierInvoice): void {
 export async function getSupplierInvoiceById(
   id: string,
   ctx: ServiceContext,
-  /** When set (project workspace routes), corporate invoices (projectId null) and cross-project IDs are rejected. */
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
   if (!canViewApProjectArea(ctx.roles)) {
@@ -528,7 +529,7 @@ export async function listSupplierInvoicesByProject(
       where,
       include: {
         ...apInvoiceParents,
-        payable: { select: { id: true, status: true } },
+        payable: true,
         lines: {
           where: { purchaseOrderLineId: { not: null } },
           select: { id: true },
@@ -542,7 +543,10 @@ export async function listSupplierInvoicesByProject(
     prisma.supplierInvoice.count({ where }),
   ]);
 
-  invoices.forEach(invoice => assertApReadRoot(invoice, ctx));
+  invoices.forEach(invoice => {
+    assertApReadRoot(invoice, ctx);
+    if (invoice.payable) assertApPayableMatchesInvoice(invoice.payable, invoice, invoice.payable.status !== "CANCELLED");
+  });
   return { data: invoices.map(serializeInvoiceListRow), total };
 }
 
@@ -631,7 +635,7 @@ export async function listCompanySupplierInvoices(
       where,
       include: {
         ...apInvoiceParents,
-        payable: { select: { id: true, status: true } },
+        payable: true,
         lines: {
           where: { purchaseOrderLineId: { not: null } },
           select: { id: true },
@@ -645,7 +649,10 @@ export async function listCompanySupplierInvoices(
     prisma.supplierInvoice.count({ where }),
   ]);
 
-  invoices.forEach(invoice => assertApReadRoot(invoice, ctx));
+  invoices.forEach(invoice => {
+    assertApReadRoot(invoice, ctx);
+    if (invoice.payable) assertApPayableMatchesInvoice(invoice.payable, invoice, invoice.payable.status !== "CANCELLED");
+  });
   const data = invoices.map(serializeInvoiceListRow);
   return { data, total };
 }
@@ -923,8 +930,8 @@ export async function updateSupplierInvoice(
   id: string,
   input: UpdateSupplierInvoiceInput,
   ctx: ServiceContext,
-  /** When set, rejects corporate invoices and cross-project edits (project workspace). */
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
 
@@ -1274,8 +1281,8 @@ export async function updateSupplierInvoice(
 export async function issueSupplierInvoice(
   id: string,
   ctx: ServiceContext,
-  /** When set, rejects corporate invoices and cross-project issue (project workspace). */
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
 
@@ -1517,8 +1524,8 @@ export async function issueSupplierInvoice(
 export async function cancelSupplierInvoice(
   id: string,
   ctx: ServiceContext,
-  /** When set, rejects corporate invoices and cross-project cancel (project workspace). */
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
   reason?: string,
 ): Promise<SupplierInvoiceView> {
   await assertApTenantModule(ctx);
@@ -1708,7 +1715,7 @@ type RawInvoice = SupplierInvoice & {
 
 type RawInvoiceListRow = SupplierInvoice & {
   supplierContact: { legalName: string; fantasyName: string | null };
-  payable?: { id: string; status: string } | null;
+  payable?: { id: string; status: string; originalAmount: Prisma.Decimal; paidAmount: Prisma.Decimal; creditedAmount: Prisma.Decimal } | null;
   lines?: Array<{ id: string }>;
 };
 
@@ -1740,7 +1747,13 @@ function serializeInvoiceListRow(inv: RawInvoiceListRow): CompanySupplierInvoice
     supplierName: inv.supplierContact.fantasyName ?? inv.supplierContact.legalName,
     subcontractCertificationCode: null,
     subcontractId: null,
-    payable: inv.payable ? { id: inv.payable.id, status: inv.payable.status } : null,
+    payable: inv.payable ? {
+      id: inv.payable.id,
+      status: inv.payable.status,
+      balanceDue: serializeMoneyDecimal(normalizeObligationBalanceDue(computeObligationBalanceDue(
+        inv.payable.originalAmount, inv.payable.paidAmount, inv.payable.creditedAmount,
+      ))),
+    } : null,
     ...classFields,
   };
 }

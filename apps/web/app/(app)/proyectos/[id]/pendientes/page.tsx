@@ -59,3 +59,4 @@ export default async function ProyectoPendientesPage({ params, searchParams }: P
     </PageShell>
   );
 }
+

@@ -2,7 +2,7 @@
 
 import { FileText } from "lucide-react";
 import type { DocumentAttachmentView } from "@bloqer/services";
-import { formatDate } from "@/lib/format";
+import { DocumentProvenance } from "./document-provenance";
 import { cn } from "@/lib/utils";
 import { DocumentCategoryBadge } from "./document-category-badge";
 import { DocumentStatusBadge } from "./document-status-badge";
@@ -43,9 +43,6 @@ import {
   softDeleteCompanyFinanzasAttachmentAction,
 } from "@/app/(app)/finanzas/facturas-proveedor/attachment-actions";
 
-function fmtDate(iso: string) {
-  return formatDate(iso);
-}
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -110,6 +107,8 @@ function AttachmentActionsRow({
         status={doc.status}
       />
       <DocumentMutateIconActions
+        documentId={doc.id}
+        storageProvider={doc.storageProvider}
         fileName={doc.originalFileName}
         status={doc.status}
         canMutate={doc.canMutate}
@@ -195,6 +194,7 @@ function EntityDocumentMobileList({
                   projectId={projectId}
                   className="block w-full text-sm"
                 />
+                <DocumentProvenance doc={doc} />
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   <DocumentCategoryBadge category={doc.category} />
                 </div>
@@ -406,7 +406,7 @@ export function EntityDocumentsPanel({
               title="Adjuntar archivo"
               description={uploadHint ?? undefined}
               submitLabel="Subir adjunto"
-              placeholderWarning="El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."
+              placeholderWarning="El almacenamiento no está disponible. Conservá el original; podrás subirlo cuando se restablezca."
             />
           )}
         </div>
@@ -416,8 +416,7 @@ export function EntityDocumentsPanel({
             role="note"
             className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300"
           >
-            Almacenamiento no configurado: las nuevas subidas quedarán como{" "}
-            <strong>Archivo no almacenado</strong> (solo metadata).
+            Almacenamiento no disponible: las nuevas cargas están deshabilitadas. Conservá los originales para volver a intentar.
           </div>
         ) : null}
 
@@ -439,7 +438,7 @@ export function EntityDocumentsPanel({
                     <TableHead className="h-9">Categoría</TableHead>
                     <TableHead className="h-9">Estado</TableHead>
                     <TableHead className="h-9">Tamaño</TableHead>
-                    <TableHead className="h-9">Fecha</TableHead>
+                    <TableHead className="h-9">Registro</TableHead>
                     <TableHead className="h-9 w-px text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -472,7 +471,7 @@ export function EntityDocumentsPanel({
                           {fmtSize(doc.sizeBytes)}
                         </TableCell>
                         <TableCell className="whitespace-nowrap py-1.5 text-xs text-muted-foreground">
-                          {fmtDate(doc.createdAt)}
+                          <DocumentProvenance doc={doc} />
                         </TableCell>
                         <TableCell className="w-px py-1.5 text-right">
                           <AttachmentActionsRow doc={doc} mutations={mutations} />

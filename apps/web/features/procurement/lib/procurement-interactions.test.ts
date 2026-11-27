@@ -11,6 +11,10 @@ import * as variance from "@bloqer/services/purchase-variance-pure";
 import * as formatMoney from "../../../lib/format-money";
 import * as requestDrafts from "./purchase-request-form-lines";
 import * as quoteEdit from "./quote-line-edit-values";
+import * as listStatus from "./matches-list-status-filter";
+import * as quoteDocumentMapping from "./quote-document-mapping";
+import * as procurementUi from "./procurement-ui";
+import * as procurementFormLayout from "./procurement-form-layout";
 
 type Element = { type: string; props: Record<string, unknown>; key?: string | number };
 const jsx = (type: string | ((props: Record<string, unknown>) => Element), props: Record<string, unknown>, key?: string | number): Element => typeof type === "function" ? type(props) : ({ type, props, key });
@@ -31,6 +35,8 @@ function load<T>(file: string, dependencies: Record<string, unknown>, globals: R
   runInNewContext(code, { exports, URLSearchParams, ...globals, require(name: string) {
     if (name === "react/jsx-runtime") return { jsx, jsxs: jsx, Fragment: "fragment" };
     if (Object.hasOwn(dependencies, name)) return dependencies[name];
+    if (name === "../lib/procurement-ui") return procurementUi;
+    if (name === "../lib/procurement-form-layout" || name === "@/features/procurement/lib/procurement-form-layout") return procurementFormLayout;
     if (name.startsWith("@/components/ui/")) return new Proxy({}, { get: (_, key) => String(key) });
     assert.fail(`Unexpected dependency: ${name}`);
   } });
@@ -64,10 +70,78 @@ function environment() {
     "@/components/ui/decimal-input": { DecimalInput: "DecimalInput", reportInvalidDecimalInputs: () => true },
     sonner: { toast: { error: (message: string) => errors.push(message), success() {}, warning() {} } },
     "next/navigation": { useRouter: () => ({ push() {}, replace() {}, refresh() {} }), usePathname: () => "/requests", useSearchParams: () => new URLSearchParams("create=1") },
+    "./quote-document-assistant": { QuoteDocumentAssistant: "QuoteDocumentAssistant" },
   };
   const hook = load<{ useProcurementAction: (onPending?: (pending: boolean) => void) => { pending: boolean; run(action: () => Promise<unknown>): void; isRunning(): boolean } }>("./use-procurement-action.ts", dependencies);
   dependencies["../lib/use-procurement-action"] = hook;
   return { dependencies, hook, errors, render<T>(component: () => T) { index = 0; return component(); }, async settle() { await Promise.all(transitions.splice(0)); await setImmediate(); } };
+}
+
+test("quote mapping keeps the selected item when React defers the update and restores the select", () => {
+  const line = { id: "line", description: "Material", quantity: "2", unit: "un" };
+  const preview = { lines: [{ ...line, offerKind: "QUOTED", unitPrice: "100", taxRate: "21", discountPct: "0" }], blockingReasons: [], warnings: [] };
+  const slots: unknown[] = [true, true, null, preview, [""], false, false, null, null];
+  let index = 0;
+  const queued: Array<() => void> = [];
+  const react = {
+    useState(initial: unknown) {
+      const position = index++; if (!(position in slots)) slots[position] = initial;
+      return [slots[position], (next: unknown) => {
+        const update = () => { slots[position] = typeof next === "function" ? next(slots[position]) : next; };
+        if (typeof next === "function") queued.push(update); else update();
+      }];
+    },
+    useRef: () => ({ current: null }), useEffect() {},
+  };
+  const { QuoteDocumentAssistant } = load<{ QuoteDocumentAssistant: (props: unknown) => Element }>("../components/quote-document-assistant.tsx", {
+    react, "../lib/quote-document-mapping": quoteDocumentMapping,
+  });
+  const render = () => { index = 0; return QuoteDocumentAssistant({ projectId: "project", purchaseRequestId: "request", lines: [line], disabled: false, onApply() {} }); };
+  const target = { value: "line" };
+  (elements(render(), "select")[0]!.props.onChange as (event: unknown) => void)({ target, currentTarget: target });
+  target.value = ""; // Controlled DOM restoration before the queued state update runs.
+  queued.splice(0).forEach(update => update());
+  assert.equal(elements(render(), "select")[0]!.props.value, "line");
+  assert.equal(elements(render(), "input")[0]!.props.disabled, false);
+});
+
+for (const kind of ["order", "request"] as const) {
+  test(`${kind} export follows live local search and state filters, including cancelled and empty lists`, () => {
+    const env = environment();
+    const name = kind === "order" ? "PurchaseOrderListFilters" : "PurchaseRequestListFilters";
+    const section = kind === "order" ? "ordenes-compra" : "solicitudes-compra";
+    const { [name]: ListFilters } = load<Record<string, (props: unknown) => Element>>(`../components/purchase-${kind}-list-filters.tsx`, {
+      ...env.dependencies,
+      "next/link": { default: "Link" },
+      "lucide-react": { Search: "Search", X: "X" },
+      "@/lib/utils": { cn: (...parts: unknown[]) => parts.filter(Boolean).join(" ") },
+      "@/features/reports/report-export-actions": { ReportExportActions: "ReportExportActions" },
+      "../lib/matches-list-status-filter": listStatus,
+      "./purchase-order-list-section": { PurchaseOrderListSection: "PurchaseOrderListSection" },
+      "./purchase-request-mobile-cards": { PurchaseRequestMobileCards: "PurchaseRequestMobileCards" },
+      "./purchase-request-table": { PurchaseRequestTable: "PurchaseRequestTable" },
+    });
+    const row = { id: "document", code: "DOC-001", status: "SUBMITTED", supplierName: "Proveedor", lines: [] };
+    const props = { orders: [row], requests: [row], projectId: "project", initialStatus: "SUBMITTED", canCreate: false };
+    const render = (input: unknown = props) => env.render(() => ListFilters!(input));
+    const exportProps = (tree: Element) => elements(tree, "ReportExportActions")[0]!.props;
+    const initial = exportProps(render());
+    assert.equal(initial.exportPath, `/api/proyectos/project/${section}/export`);
+    assert.equal(initial.xlsx, true);
+    assert.equal(initial.pdf, true);
+    assert.equal(initial.csv, false);
+    assert.deepEqual({ ...(initial.params as object) }, { search: "", status: "SUBMITTED" });
+
+    (elements(render(), "Input")[0]!.props.onChange as (event: unknown) => void)({ target: { value: "  Materiales  " } });
+    assert.deepEqual({ ...(exportProps(render()).params as object) }, { search: "Materiales", status: "SUBMITTED" });
+    const cancelled = elements(render(), "Button").find((button) => text(button).startsWith("Anulada"))!;
+    (cancelled.props.onClick as () => void)();
+    assert.deepEqual({ ...(exportProps(render()).params as object) }, { search: "Materiales", status: "CANCELLED" });
+    const active = elements(render(), "Button").find((button) => text(button).startsWith("Activas"))!;
+    (active.props.onClick as () => void)();
+    assert.deepEqual({ ...(exportProps(render()).params as object) }, { search: "Materiales", status: undefined });
+    assert.equal(elements(render({ ...props, orders: [], requests: [] }), "ReportExportActions").length, 1);
+  });
 }
 
 test("procurement mutation locks before rerender, sanitizes network errors and allows retry", async () => {
@@ -155,6 +229,77 @@ test("request return keeps its reason and overlay when transport fails and block
   request.reject(new Error("private")); await env.settle();
   assert.equal(elements(render(), "Textarea")[0]!.props.value, "Conservar este motivo");
   assert.equal(elements(render(), "Sheet")[0]!.props.open, true); assert.equal(env.errors.length, 1);
+});
+
+test("late events from a cancelled recording cannot stop a newer microphone stream", async () => {
+  const env = environment();
+  const stopped = [0, 0]; let streamIndex = 0;
+  const recorders: FakeRecorder[] = [];
+  class FakeRecorder {
+    state = "inactive"; onstop?: () => void;
+    static isTypeSupported() { return true; }
+    constructor() { recorders.push(this); }
+    start() { this.state = "recording"; }
+    stop() { this.state = "inactive"; }
+  }
+  const { PurchaseRequestAudioAssistant } = load<{ PurchaseRequestAudioAssistant: (props: unknown) => Element }>("../components/purchase-request-audio-assistant.tsx", env.dependencies, {
+    AbortController, FormData, File, MediaRecorder: FakeRecorder,
+    setTimeout: () => 1, clearTimeout() {},
+    navigator: { mediaDevices: { getUserMedia: async () => { const index = streamIndex++; return { getTracks: () => [{ stop: () => { stopped[index]!++; } }] }; } } },
+  });
+  const render = () => env.render(() => PurchaseRequestAudioAssistant({ projectId: "project", onApply() {}, onCancel() {} }));
+  const click = (name: string) => (elements(render(), "Button").find((node) => text(node) === name)!.props.onClick as () => void)();
+  click("Grabar pedido"); await env.settle();
+  click("Cancelar procesamiento"); click("Grabar pedido"); await env.settle();
+  recorders[0]!.onstop?.();
+  assert.equal(recorders[1]!.state, "recording"); assert.equal(stopped[1], 0);
+  assert.ok(text(render()).includes("Detener grabación"));
+  click("Cancelar procesamiento"); assert.ok(stopped[1]! > 0);
+});
+
+test("audio assistant cancels stale proposals, keeps editable text and prevents duplicate requests", async () => {
+  const env = environment(), first = deferred<Response>(); let calls = 0, applied = 0;
+  const { PurchaseRequestAudioAssistant } = load<{ PurchaseRequestAudioAssistant: (props: unknown) => Element }>("../components/purchase-request-audio-assistant.tsx", env.dependencies, {
+    AbortController, FormData, setTimeout, clearTimeout,
+    fetch: () => { calls++; return first.promise; },
+  });
+  const render = () => env.render(() => PurchaseRequestAudioAssistant({ projectId: "project", onApply: () => applied++, onCancel() {} }));
+  const button = (name: string) => elements(render(), "Button").find((node) => text(node) === name)!;
+  const transcript = () => elements(render(), "AutoGrowTextarea")[0]!;
+  (transcript().props.onChange as (event: unknown) => void)({ target: { value: "Dos bolsas" } });
+  const check = elements(render(), "input").find((node) => node.props.type === "checkbox")!;
+  (check.props.onChange as (event: unknown) => void)({ target: { checked: true } });
+  const prepare = button("Preparar renglones").props.onClick as () => void;
+  prepare(); prepare(); assert.equal(calls, 1);
+  (button("Cancelar procesamiento").props.onClick as () => void)();
+  assert.equal(transcript().props.value, "Dos bolsas"); assert.equal(transcript().props.disabled, false);
+  first.resolve(Response.json({ proposal: { neededByDate: null, observations: null, lines: [{ description: "STALE", quantity: "2", unit: "bolsa" }] } }));
+  await env.settle();
+  assert.equal(text(render()).includes("STALE"), false); assert.equal(applied, 0);
+});
+
+test("assisted request preserves missing units, enforces review and invalidates it even after reverting an edit", async () => {
+  const env = environment(); let writes = 0;
+  const { PurchaseRequestForm } = load<{ PurchaseRequestForm: (props: unknown) => Element }>("../components/purchase-request-form.tsx", {
+    ...env.dependencies, "lucide-react": { Trash2: "Trash2" },
+    "@/lib/searchable-options": { SEARCHABLE_NONE: "none", wbsToSearchableOptions: () => [], toSearchableOptions: (value: unknown) => value, withNoneOption: (value: unknown) => value },
+    "@/features/budgets/components/unit-select": { UnitSelect: "UnitSelect" }, "@/lib/budget-units": { budgetUnitLabel: (value: string) => value },
+    "@/lib/format-money": formatMoney, "../lib/purchase-request-form-lines": requestDrafts,
+    "../lib/procurement-ui": { procurementAmberCalloutClass: "warning" },
+    "@/app/(app)/proyectos/[id]/solicitudes-compra/actions": { createPurchaseRequestAction: async () => { writes++; return { id: "request" }; } },
+  }, { FormData: class { get(key: string) { return key === "neededByDate" ? "2026-12-01" : ""; } } });
+  const render = () => env.render(() => PurchaseRequestForm({ requireAudioReview: true, projectId: "project", wbsOptions: [{ id: "wbs", budgetUnit: "kg" }], initialValues: { wbsNodeId: "wbs", neededByDate: "2026-12-01", lines: [{ description: "Cemento", quantity: "2", unit: "" }] } }));
+  const review = () => elements(render(), "input").find((node) => node.props.type === "checkbox")!;
+  const save = () => elements(render(), "Button").find((node) => node.props.type === "submit")!;
+  assert.equal(elements(render(), "UnitSelect")[0]!.props.value, "");
+  assert.equal(review().props.disabled, true); assert.equal(save().props.disabled, true);
+  (elements(render(), "form")[0]!.props.onSubmit as (event: unknown) => void)({ preventDefault() {}, currentTarget: {} }); await env.settle(); assert.equal(writes, 0);
+  (elements(render(), "UnitSelect")[0]!.props.onChange as (value: string) => void)("un");
+  (review().props.onChange as (event: unknown) => void)({ target: { checked: true } }); assert.equal(save().props.disabled, false);
+  const changeQty = (value: string) => (elements(render(), "DecimalInput")[0]!.props.onValueChange as (value: string) => void)(value);
+  changeQty("3"); changeQty("2"); assert.equal(review().props.checked, false); assert.equal(save().props.disabled, true);
+  (review().props.onChange as (event: unknown) => void)({ target: { checked: true } });
+  (elements(render(), "form")[0]!.props.onSubmit as (event: unknown) => void)({ preventDefault() {}, currentTarget: {} }); await env.settle(); assert.equal(writes, 1);
 });
 
 test("historical request header editing never serializes replacement lines", async () => {
@@ -273,6 +418,34 @@ test("quote form labels each budget currency and updates only comparison notices
   assert.ok(changed.includes("Referencia en ARS y cotización en USD: desvío no calculable"));
   assert.ok(!changed.includes("Referencia en USD y cotización en USD"));
   assert.ok(changed.includes(`${formatMoney.formatUnitPriceFromString("10")} USD`));
+});
+
+test("assisted quote leaves unknowns blank, requires review and invalidates it after reverting an edit", async () => {
+  const env = environment(), calls: Record<string, unknown>[] = [];
+  const { ProcurementQuoteForm } = load<{ ProcurementQuoteForm: (props: unknown) => Element }>("../components/procurement-quote-form.tsx", {
+    ...env.dependencies, "@bloqer/utils": money, "@bloqer/domain": domain, "@/lib/format-money": formatMoney,
+    "@/features/finance/components/manual-fx-field": { ManualFxField: "ManualFxField" }, "@/features/finance/components/invoice-letter-fields": { PricesIncludeTaxCheckbox: "PricesIncludeTaxCheckbox" },
+    "@/features/finance/components/iibb-perception-fields": { DocumentTaxTotalsFooter: "DocumentTaxTotalsFooter", IibbPerceptionFields: "IibbPerceptionFields" },
+    "@/lib/searchable-options": { toSearchableOptions: () => [] }, "../lib/quote-line-edit-values": quoteEdit, "./po-line-budget-ref": { PoLineBudgetRef: "PoLineBudgetRef" },
+    "@/app/(app)/proyectos/[id]/solicitudes-compra/actions": { createProcurementQuoteAction: async (_id: string, payload: Record<string, unknown>) => { calls.push(payload); return { error: "Fixture keeps form" }; } },
+  }, { FormData: class { get() { return null; } } });
+  const render = () => env.render(() => ProcurementQuoteForm({ projectId: "project", purchaseRequestId: "request", suppliers: [{ id: "supplier", name: "Fixture" }], lines: [{ id: "line", description: "Material", quantity: "2", unit: "un", budgetCurrency: "ARS" }] }));
+  const apply = (preview: Record<string, unknown>, line: Record<string, unknown>) => (elements(render(), "QuoteDocumentAssistant")[0]!.props.onApply as (value: unknown) => void)({ preview, lines: { line } });
+  const confirm = () => (elements(render(), "input").find(e => e.props.name === "quoteDocumentReviewed")!.props.onChange as (e: unknown) => void)({ target: { checked: true } });
+  const submit = async () => { (elements(render(), "form")[0]!.props.onSubmit as (e: unknown) => void)({ preventDefault() {}, currentTarget: {} }); await env.settle(); };
+  const preview = { currency: "ARS", iibbPerceptionRate: null, pricesIncludeTax: null, supplierName: null, total: null, validUntil: null, leadTimeDays: null };
+  apply(preview, { offerKind: "QUOTED", unitPrice: "100", taxRate: null, discountPct: null });
+  assert.equal(elements(render(), "IibbPerceptionFields")[0]!.props.rate, "");
+  assert.equal(elements(render(), "DecimalInput").find(e => e.props.id === "discountPct_line")!.props.value, "");
+  confirm(); await submit(); assert.equal(calls.length, 0);
+  apply({ ...preview, iibbPerceptionRate: "0", pricesIncludeTax: false }, { offerKind: "QUOTED", unitPrice: "100", taxRate: "21", discountPct: "0" });
+  (elements(render(), "SearchableCombobox")[0]!.props.onValueChange as (value: string) => void)("supplier");
+  confirm();
+  for (const value of ["200", "100"]) (elements(render(), "DecimalInput").find(e => e.props.id === "unitPrice_line")!.props.onValueChange as (value: string) => void)(value);
+  assert.equal(elements(render(), "input").find(e => e.props.name === "quoteDocumentReviewed")!.props.checked, false);
+  await submit(); assert.equal(calls.length, 0);
+  confirm(); await submit(); assert.equal(calls.length, 1); assert.equal(calls[0]!.supplierContactId, "supplier");
+  assert.equal(calls[0]!.purchaseRequestId, "request"); assert.equal(calls[0]!.iibbPerceptionRate, "0");
 });
 
 test("changed confirmation FX preserves canonical approval errors and the entered rate until the service accepts", async () => {

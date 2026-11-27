@@ -62,6 +62,7 @@ export default async function EditarFacturaVentaCorporativaPage({ params }: Page
       const parentReceivable = await getReceivableBySalesInvoiceId(
         invoice.referencedSalesInvoiceId,
         ctx,
+        null,
       );
       maxCreditAmount = parentReceivable?.balanceDue ?? null;
     } catch {

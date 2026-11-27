@@ -28,6 +28,37 @@ Aplicar después de publicar una revisión que incluya AG-05; la publicación de
 
 Q-069/Q-070/Q-071 aprobadas en D-122/D-123/D-124: comprobar error funcional por moneda contribuyente distinta, cantidades de factura + ND − NC por recurso/unidad compatibles y costo/varianza de consumo **Sin valuación** cuando falta trazabilidad. UI/CSV/PDF conservan desconocido y advertencia; una ausencia comprobada admite cero. Exposición documental y cantidades siguen independientes. El cronograma temporal permanece disponible ante incompatibilidad económica y su exportación avisa sin importes ficticios. RFIs mantiene desarrollo posterior separado según D-122.
 
+## Primer paquete — preparación del piloto documental
+
+Historia a comprobar: **usuario autenticado → PDF/foto de factura → lectura revisable → confirmación humana → borrador AP con original adjunto**. El PDF de OC tiene un recorrido independiente: preparar, revisar y descargar sin cambiar su estado.
+
+Este procedimiento complementa el [plan del primer paquete](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md#12-seguimiento-de-los-diez-bloques--20112026). La tanda de CI con datos sintéticos ya comprueba login, alta manual abierta/cancelada y PDF privado en tres tamaños; no acredita extracción con el proveedor, guardado/adjunto real ni el piloto humano.
+
+### Antes de activar la lectura
+
+| Comprobación | Evidencia que registrar | Si falta |
+|---|---|---|
+| Acceso Vercel | Equipo, proyecto y deployment visibles con la conexión actual. Una conexión instalada o un equipo listado no prueban acceso al proyecto | Resolver el acceso del equipo/proyecto antes de modificar configuración |
+| Versión y dominio | SHA, deployment `READY`, entorno y alias que atiende el dominio elegido | No atribuir al portal lo comprobado solamente en CI o en el estado de GitHub |
+| Separación de datos | Destino de DB y almacenamiento del entorno de prueba confirmado; no copiar secretos al informe ni ejecutar seeds contra datos operativos | Mantener pendientes las pruebas mutantes |
+| Identidad y alcance | Cuenta, tenant, empresa/obra y responsable de revisión acordados; permisos AP/documentos vigentes | No crear roles ni elegir registros reales para hacer pasar el ensayo |
+| IA | Valores efectivos de los tres flags, proveedor/modelo y credencial presente en el entorno elegido; latch de producción también aplica a Preview con `NODE_ENV=production` | Conservar carga manual y registrar la causa; no activar globalmente |
+| Original | Cuatro variables obligatorias de R2, CORS del origen exacto y prueba de subida/descarga con archivo sintético en el ámbito acordado | No dar por completo el flujo por una extracción exitosa |
+| Corpus y medición | Documentos seleccionados, casos negativos y responsable; tiempo hasta registro correcto, correcciones y costo de las llamadas reales | No inventar resultados de OCR, ahorro ni deduplicación |
+
+Leer primero metadatos de variables y consultar solo la configuración necesaria. No volcar valores de credenciales, cookies, archivos ni resultados completos del proveedor a logs o reportes compartidos. Consultar las [variables canónicas](./ENVIRONMENT_VARIABLES.md#optional--bloqer-ai-and-supplier-invoice-preview).
+
+### Recorrido acotado de aceptación
+
+1. Con la función apagada, confirmar continuidad manual y de facturación contra OC.
+2. Con el piloto habilitado únicamente en su entorno acordado, seleccionar un PDF/JPEG/PNG/WebP de hasta 3 MiB: no iniciar lectura hasta **Leer comprobante**. Cancelar y cambiar de archivo no debe aplicar resultados anteriores.
+3. Verificar la lectura contra el original. Desconocidos permanecen vacíos; NC/ND, moneda distinta/desconocida e impuestos no representables se derivan a manual. El número fiscal leído no acredita persistencia o deduplicación fiscal.
+4. Completar proveedor/fechas/impuestos y, en obra, imputación. Confirmar revisión; editar un dato debe invalidar esa confirmación. No emitir ni pagar como parte de la extracción.
+5. Guardar una vez y verificar borrador más original. Ante falla controlada del adjunto en el entorno de prueba, reintentar sobre el mismo ID; ante creación incierta, consultar el listado antes de repetir. No afirmar idempotencia durable nueva.
+6. Preparar y descargar una OC de prueba; comprobar datos comerciales, permisos y estado sin cambios. El share a un destinatario requiere destino de prueba acordado y constatación aparte; descargar no prueba entrega.
+
+Registrar por caso: fecha, SHA/deployment, entorno, rol/alcance, documento de prueba, resultado observado y evidencia sin secretos. Cualquier acceso cruzado o escritura sin confirmación detiene el piloto. La desactivación restaura los valores de flags previos y se comprueba en el deployment que recibe tráfico; no borra borradores o adjuntos creados.
+
 ## Comprobaciones generales
 
 | # | Check | Pass criteria |
@@ -57,6 +88,26 @@ Q-069/Q-070/Q-071 aprobadas en D-122/D-123/D-124: comprobar error funcional por 
 | 21 | Notifications inbox UX | `/notificaciones` paginates (20/page); `?page=` beyond range still shows last page (no empty false-negative). Severity badges in Spanish (Info / Éxito / Aviso / Error). |
 
 Record who ran the checklist, date, and environment.
+
+## Notas de crédito y débito de empresa — D-115
+
+Ejecutar después de publicar el cambio, con comprobantes sintéticos en un entorno de prueba autorizado. No acredita una ejecución en el portal.
+
+1. En Oficina, abrir **Finanzas → Comprobantes de venta** y **Facturas y gastos**, en escritorio y celular. **Nueva nota de crédito / Nueva nota de débito** permite buscar y seleccionar una **Factura de referencia** emitida sin proyecto. No ofrecer facturas de otra empresa/tenant, borradores, notas ni comprobantes de obra. Sin facturas elegibles, mostrar el estado vacío y el siguiente paso. **Ver comprobantes** desde CxC abre el listado de venta.
+2. Repetir el selector desde **Proyecto → Facturas emitidas / Facturas proveedor**: los dos botones de notas están junto a **Nueva factura**, y la búsqueda solo ofrece facturas emitidas de esa obra. Verificar escritorio y celular, paginación y estado vacío. **Letra del comprobante** en el alta/edición sigue mostrando A/B/C/E.
+3. Sobre una factura con saldo 100, crear NC parcial de 30, revisar el borrador y emitir. El saldo queda en 70, sin cobranza/pago ni movimiento de caja. La NC figura en el listado por tipo y en **Notas vinculadas**, aunque no tenga CxC/CxP propia. Anular con motivo restaura el saldo a 100 y actualiza el detalle de la factura, también en obra.
+4. Crear ND desde la misma factura, editar el borrador a 20 y emitir. Crea una deuda propia de 20 y conserva la original. No permite anular el padre mientras exista una nota emitida; la ND con caja aplicada conserva los bloqueos de anulación de facturas.
+5. Probar monto NC mayor al saldo, saldo consumido después de abrir el diálogo, acceso directo a IDs ajenos y llamada de empresa con un ID de obra: rechazar sin mutaciones ni filtración. Permiso de consulta no debe ofrecer creación; AR/AP desactivado rechaza su operación. Los recorridos de proyecto conservan su ámbito.
+
+## Exportaciones de listados — regresión Excel/PDF
+
+Ejecutar tras publicar este cambio, con datos sintéticos en un entorno de prueba autorizado. Estos pasos son criterios pendientes de smoke; no acreditan una ejecución en el portal.
+
+1. En escritorio y celular, abrir los listados de obra **Facturas proveedor**, **Facturas emitidas**, **Órdenes de compra**, **Solicitudes de compra**, **Recepciones**, **Pagos** y **Cobranzas**. **Exportar → Excel / PDF** descarga un XLSX o PDF válido; **Generando…** evita repetir la descarga. El PDF identifica empresa, obra, usuario y filtros aplicables. En **Facturas y gastos** de empresa comprobar además que CSV sigue disponible junto con Excel/PDF.
+2. Buscar y filtrar facturas por clase/tipo y, en proveedor, estado. En SC/OC combinar búsqueda con estado, incluyendo Activas y Anulada; comprobar coincidencia entre resultados y archivo. Pagos, Cobranzas y Recepciones conservan todos sus estados autorizados. Con resultados vacíos, el archivo conserva encabezados sin registros ficticios.
+3. Con más de 100 facturas filtradas, descargar desde la segunda página: Excel incluye todos los resultados sin duplicados ni recorte a 20/100. Repetir con Facturas y gastos corporativos para CSV y Excel. Con más de 90 filas, comprobar aviso y cantidad omitida en PDF, y remisión a Excel para el detalle completo. Con más de 10.000 resultados se informa el límite y no se entrega un archivo parcial.
+4. Verificar fechas, estado en español y moneda de cada importe. Probar texto con acentos y un contacto cuyo nombre comience con `=` para comprobar que Excel lo conserva como texto, sin fórmula. No sumar monedas distintas ni alterar importes de documentos históricos.
+5. Sin sesión, sin acceso a la obra, con otra empresa activa, sin permiso del área o con su módulo deshabilitado: la ruta de exportación rechaza la consulta sin datos ajenos. Una descarga fallida informa el error y permite reintentar; no guarda como archivo una página de login ni una respuesta de error.
 
 ## Detalle de pago confirmado (regresión 26/10/2026)
 
@@ -144,6 +195,27 @@ Sin cambios de schema/ERD estructural ni migraciones. No hay backfill ni correcc
 - Auditoría: la suite rechaza vínculos a certificados inyectados en ventas manuales (encabezado y líneas), intercala edición/emisión para comprobar inmutabilidad y conciliación con CxC, y verifica acceso por membresía a las consultas auxiliares. Con AR deshabilitado la planilla sigue disponible y las consultas financieras no devuelven datos.
 - En lectura de emitidos, **Físico período** debe conservar el porcentaje guardado aunque difiera del **Avance real**; con cobro total el recorrido indica **sin saldo pendiente de cobro**.
 
+## Solicitud de compra por audio - D-148 / ADR-020
+
+Piloto únicamente en una empresa/obra de ensayo autorizada, con IA global, producción cuando corresponda y `BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED` habilitados. El proveedor actual debe admitir transcripción y salida estructurada. Su uso tiene consumo; CI intercepta IA y no acredita calidad real. No habilitar globalmente para presentar un test sintético como piloto.
+
+1. Con la capacidad apagada, comprobar creación manual disponible y POST de audio 503. Sin sesión, 401. Un rol sin EDIT, obra ajena/pausada/cerrada o empresa ajena no deben llegar al proveedor.
+2. En Nueva solicitud, dictar un pedido sintético de hasta 60 segundos o elegir WebM/MP4/WAV de hasta 3 MiB. Verificar reproducción local, transcripción y corrección de texto. Rechazar archivo vacío, excesivo o MIME/firma discordantes. Micrófono denegado debe conservar la alternativa de archivo/texto.
+3. Pedir material sin cantidad/unidad y con «el viernes». Revisar el texto antes de Preparar renglones; completar campos desconocidos y fecha explícita. La IA no elige partida, proveedor, APU ni IDs.
+4. Usar propuesta reemplaza renglones/fecha/notas con aviso. Elegir partida, completar los faltantes y confirmar revisión final. Editar un campo y revertirlo tampoco recupera la confirmación. Guardar debe crear exactamente un DRAFT mediante el servicio existente; recargar y comprobar ítems y fecha. No presionar Enviar solicitud durante este smoke.
+5. Cancelar grabación/procesamiento y cerrar: micrófono detenido, respuestas tardías ignoradas, sin nuevas solicitudes. Simular error del proveedor; conservar texto editable y permitir volver al formulario manual. No persistir audio/transcripción en Documentos, logs o auditoría.
+6. En escritorio, tablet y celular, comprobar controles accesibles, formulario sin desborde y alternativa manual. Registrar resultado, duración y exactitud del piloto real por separado de los checks de CI. Reponer el flag apagado al finalizar un piloto temporal.
+
+## Resumen diario - D-147, verificación posterior al despliegue
+
+Usar una organización de ensayo autorizada; guardar preferencias no envía correos.
+
+1. Como Propietario/Administrador, abrir `/configuracion/politicas#notificaciones`. Con zona Argentina, **Hora mínima del resumen** permite 04:00, 05:00, 06:00 y 07:00 para la revisión diaria prevista de 07:05. Comprobar la fecha y zona mostradas.
+2. Elegir 06:00, pulsar **Guardar política de email** y recargar: debe conservar 06:00. No aparece una segunda revisión ni un envío inmediato.
+3. Si el ensayo dispone de una hora histórica incompatible, comprobar que se muestra con advertencia. Cambiar solo el CC o la activación del resumen debe conservar esa hora; elegir una compatible y guardar debe corregirla. No modificar datos a mano para preparar el caso.
+4. Comprobar que un usuario sin permiso de políticas no puede guardar cambios y que la campana funciona independientemente de las preferencias de correo.
+5. La suite `notification-digest-policy.test.ts` verifica rechazos de horas incompatibles, permisos y conservación de históricos; `digest-schedule-preview.test.ts` verifica cron, zona horaria, cambio estacional y medianoche. El recorrido autenticado requiere SQL descartable en CI. Estos controles no acreditan recepción real de emails ni recuperación durable.
+
 ## Auditoría de pagos y cobranzas — regresión 2026-10-26
 
 Sin migraciones ni corrección de saldos históricos. Pruebas automatizadas sin DB: `packages/services/src/finance/payment-collection-access.test.ts` y `packages/services/src/accounting/accounting-auto-draft-failure.test.ts`. Cubren acceso D-111 antes de cualquier control financiero o sincronización contable, separación empresa/obra y rechazos asíncronos durante el auto-DRAFT posterior al commit (D-061).
@@ -155,6 +227,31 @@ Smoke pendiente de publicación, solo con datos de ensayo autorizados:
 3. El listado de pagos de una CxP y el detalle respetan tenant, empresa activa, proyecto de la ruta y rol corporativo. PROJECT_FINANCE no accede a pagos corporativos; sí a pagos de su obra asignada.
 4. Simular indisponibilidad de la generación contable con los tests de regresión. El resultado del auto-DRAFT debe ser omitido, sin propagar el error a una operación ya confirmada. Incluye pagos, cobranzas, movimientos, transferencias y facturas de venta/proveedor, aun si también falla la consulta de recuperación.
 5. En la UI, confirmar un pago de ensayo y abrir su detalle sin error de servidor; verificar una única operación y un único movimiento. La prueba React Flight `apps/web/features/ap/lib/payment-detail-rsc.test.mjs` cubre la preparación de acciones al renderizar el detalle.
+### Piloto de cotizaciones por archivo (5/E1, desactivado por defecto)
+
+En una empresa/obra de ensayo y con capacidad habilitada expresamente, crear una SC sintética Enviada; leer una oferta PDF/imagen de hasta 3 MiB. Verificar rechazo sin sesión, permiso, acceso a obra/empresa o SC autorizada. Comprobar que no se envía al proveedor antes de autorizar y que no se escriben archivos/transcripciones en logs.
+
+Vincular renglones manualmente; cantidad/unidad distinta debe impedir aplicar, omisiones no deben implicar No cotizado, cero no debe implicar Bonificado. Revisar/excluir cada renglón, aplicar, elegir proveedor y completar desconocidos. Cambiar precio/moneda/IVA/IIBB/clasificación/fecha después de revisar debe exigir una nueva revisión, incluso revirtiendo el cambio. Registrar crea oferta Recibida y mantiene SC Enviada sin nuevas OC; recargar y cotejar importes/moneda/clasificaciones. Adjuntar el original por el flujo normal después. Cancelar una lectura/reemplazar archivo no debe aplicar respuestas tardías ni borrar el formulario manual.
+
+CI usa respuestas sintéticas y SQL descartable: no equivale a verificar precisión, costo, tiempo ni retención del proveedor. Sin habilitación explícita, comprobar que el botón asistido no aparece y la carga manual funciona en escritorio y celular.
+
+## D-149 — enlaces de cotización (piloto opt-in)
+
+Publicar con `BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED=false`; Vercel aplica la migración aditiva con el guard de DB production ya existente. Comprobar build y deployment del commit final. No activar para clientes ni enviar mensajes por el despliegue.
+
+En un entorno aislado con datos sintéticos, habilitar explícitamente el flag y URL pública. Crear enlace en SC Enviada, comprobar preview mínimo, abrir en contexto sin sesión, verificar que se limpia el fragmento y cookie HttpOnly/SameSiteStrict/path por invitación. Responder, recargar sin duplicar, revisar/corregir en Compras e incorporar una única cotización RECEIVED. Confirmar ausencia de OC/adjudicación. Probar revocación, vencimiento, cambio de SC, baja del emisor/proveedor, cambio de permisos/empresa, token de otra invitación y dos contextos de empresa sin contaminación. Origin ajeno rechazado; respuestas no-store/no-referrer/noindex. No guardar el bearer en capturas/logs compartidos.
+
+Evidencia mantenida: `supplier-quote-invitation.test.ts` (política), `supplier-quote-invitation.live.test.ts` (SQL real descartable), `supplier-quote-link.spec.ts` (desktop/tablet/phone con login fixture e invitado). Un resultado de CI no acredita activación productiva ni entrega de un enlace a un proveedor real.
+
+## Verificación SQL mantenida del esquema al desplegar
+
+El build existente `packages/database/scripts/vercel-migrate-if-needed.mjs` ejecuta, después de `migrate deploy`, `verifyDeploymentSchema` sobre la misma `DIRECT_URL` validada por `vercel-migration-target.mjs`. Producción solo admite `ep-cold-mouse-appkpn84` / `neondb` / `public`; un preview no puede apuntar a ese compute. Usa las credenciales del despliegue sin copiarlas al repositorio ni imprimirlas.
+
+El contrato D-149 comprueba por SQL de solo lectura la migración `20261123180000_supplier_quote_invitations` terminada y sin intento pendiente, las 22 columnas, campos de ámbito obligatorios, nueve restricciones validadas y seis índices válidos/listos. Una falla impide completar el build; el log exitoso lleva `SQL schema verified`, entorno y conteos. No lee respuestas, tokens ni registros de clientes, no activa flags y no sustituye el piloto funcional. CI ejecuta la misma consulta sobre Postgres descartable después de migrar. Mantener este contrato al evolucionar la tabla; no borrar verificaciones para ocultar divergencias.
+
+Para verificar una entrega, revisar el SHA, el log de esta etapa y el estado de producción correspondiente. Si el conector no expone los logs, dejar explícito que la evidencia disponible es el despliegue exitoso de un SHA cuyo build exige esta consulta; no presentarlo como una consola SQL inspeccionada ni como prueba de todo el esquema de Bloqer.
+
+
 
 ## Pendientes: lectura completa, organización y exportación (27/11/2026)
 

@@ -137,6 +137,7 @@ export { canViewSubcontractsArea } from "./subcontracts/subcontract-access";
 export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";
 export * from "./procurement/project-procurement-hub.service";
+export * from "./procurement/project-procurement-follow-up.service";
 export * from "./materials/project-materials-board.service";
 export * from "./materials/material-commitment";
 export * from "./resources/resource-board-pure";
@@ -232,6 +233,8 @@ export * from "./inventory-reports/inventory-reports.service";
 export * from "./project-cash-flow/project-cash-flow.service";
 export * from "./project-cash-flow/project-cash-position-projection.service";
 export * from "./documents/document.service";
+export * from "./documents/document-history.service";
+export * from "./documents/document-versions.service";
 export * from "./documents/document-folder.service";
 export * from "./notifications/notification.service";
 export * from "./notifications/notification-audience.service";
@@ -251,6 +254,7 @@ export {
 export { formatNotificationTitle } from "./notifications/notification-copy";
 export * from "./report-exports/report-export.types";
 export * from "./report-exports/report-export.service";
+export * from "./report-exports/operational-list-export.service";
 export * from "./report-exports/project-progress-export.service";
 export {
   DEFAULT_CASH_DATE_RANGE_DAYS,
@@ -315,3 +319,10 @@ export * from "./field/field-pending.service";
 export * from "./field/field-pending-export.service";
 export * from "./field/field-home.service";
 export * from "./ai";
+export * from "./procurement/purchase-order-document.service";
+export { previewSupplierInvoiceDocument, supplierInvoiceDocumentPreviewAvailable } from "./ap/supplier-invoice-document-preview.service";
+export type { SupplierInvoiceDocumentPreviewInput } from "./ap/supplier-invoice-document-preview.service";
+export { purchaseRequestAudioAvailable, transcribePurchaseRequestAudio, previewPurchaseRequestTranscript } from "./procurement/purchase-request-audio.service";
+export { previewProcurementQuoteDocument, procurementQuoteDocumentAvailable, buildProcurementQuoteDocumentPreview } from "./procurement/procurement-quote-document.service";
+export * from "./procurement/supplier-quote-invitation.service";
+

@@ -280,6 +280,7 @@ Leer en este orden:
 | [`MVP_TECHNICAL_SCOPE.md`](./08-architecture/MVP_TECHNICAL_SCOPE.md) | Alcance primer piloto técnico |
 | [`PHASE_0_PROJECT_SETUP.md`](./08-architecture/PHASE_0_PROJECT_SETUP.md) … [`PHASE_5_HARDENING.md`](./08-architecture/PHASE_5_HARDENING.md) | Fases de implementación |
 | [`DEPLOYMENT_PLAN.md`](./08-architecture/DEPLOYMENT_PLAN.md) | Plan de despliegue |
+| [`BACKUP_RECOVERY_RUNBOOK.md`](./08-architecture/BACKUP_RECOVERY_RUNBOOK.md) | Ensayo aislado y pendientes de respaldo real |
 | [`DEPLOYMENT_SMOKE_TEST.md`](./08-architecture/DEPLOYMENT_SMOKE_TEST.md) | Smoke técnico post-deploy |
 | [`OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md`](./08-architecture/OPERATIONAL_SMOKE_CHECKLIST_BY_ROLE.md) | Smoke / UAT por rol (capacitación) |
 | [`RISK_REGISTER.md`](./08-architecture/RISK_REGISTER.md) | Registro de riesgos |
@@ -300,6 +301,7 @@ Leer en este orden:
 |---|---|
 | [`PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md`](./PLAN_MEJORAS_CORTO_PLAZO_BLOQER_V2.md) | Higiene, nav, exports (lotes 1–4 hechos) |
 | [`PLAN_MEJORAS_OPERATIVAS_PROYECTO.md`](./PLAN_MEJORAS_OPERATIVAS_PROYECTO.md) | Hub compras, materiales look-ahead, integridad WBS ([D-055]) |
+| [`PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md`](./PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md) | Primer paquete de automatización: baseline, 40 oportunidades, P0/P1a y registro de pruebas/resultados |
 
 ---
 

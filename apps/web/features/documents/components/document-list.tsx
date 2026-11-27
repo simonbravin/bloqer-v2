@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDate } from "@/lib/format";
+import { DocumentProvenance } from "./document-provenance";
 import {
   Table,
   TableBody,
@@ -19,9 +19,6 @@ import { DocumentStorageBadge } from "./document-storage-badge";
 import { DocumentLibraryActions } from "./document-library-actions";
 import { DocumentGalleryFileName } from "./document-gallery-file-name";
 
-function fmtDate(iso: string) {
-  return formatDate(iso);
-}
 
 function fmtSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -48,7 +45,7 @@ export function DocumentList({ docs, projectId }: Props) {
             <TableHead>Categoría</TableHead>
             <TableHead>Estado</TableHead>
             <TableHead>Tamaño</TableHead>
-            <TableHead>Fecha</TableHead>
+            <TableHead>Registro</TableHead>
             <TableHead className="w-px text-right">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -80,7 +77,7 @@ export function DocumentList({ docs, projectId }: Props) {
               <TableCell className="text-xs tabular-nums text-muted-foreground">
                 {fmtSize(doc.sizeBytes)}
               </TableCell>
-              <TableCell className="text-xs text-muted-foreground">{fmtDate(doc.createdAt)}</TableCell>
+              <TableCell className="text-xs text-muted-foreground"><DocumentProvenance doc={doc} /></TableCell>
               <TableCell className="w-px whitespace-nowrap text-right">
                 <DocumentLibraryActions doc={doc} projectId={projectId} />
               </TableCell>

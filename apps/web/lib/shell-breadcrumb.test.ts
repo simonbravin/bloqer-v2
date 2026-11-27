@@ -6,6 +6,16 @@ import { resolveAppShellBreadcrumbs, resolvePlatformShellBreadcrumbs } from "./s
 
 const uuid = "11111111-1111-4111-8111-111111111111";
 
+test("corporate note details link back to the sales document list", () => {
+  const crumbs = resolveAppShellBreadcrumbs(`/finanzas/facturas/${uuid}`, {
+    tenantName: "Empresa",
+    tailLabel: "NC-00001",
+  });
+  assert.ok(crumbs.some(({ label, href }) => label === "Comprobantes de venta" && href === "/finanzas/facturas"));
+  const projectCrumbs = resolveAppShellBreadcrumbs(`/proyectos/${uuid}/facturas`, { tenantName: "Empresa" });
+  assert.equal(projectCrumbs.at(-1)?.label, "Facturas emitidas");
+});
+
 function routeFromFile(file: string): string {
   return "/" + file.replaceAll("\\", "/").split("/").slice(1, -1).filter((part) => !part.startsWith("(")).join("/");
 }

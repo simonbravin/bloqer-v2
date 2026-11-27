@@ -57,7 +57,7 @@ async function assertProjectGuardIfPresent(
 async function requireNoteMutationProject(
   id: string,
   ctx: ServiceContext,
-  projectScopeId: string | undefined,
+  projectScopeId: string | null | undefined,
   permissionMessage: string,
 ): Promise<string | null> {
   const preview = await prisma.salesInvoice.findUnique({
@@ -180,10 +180,10 @@ async function createNoteDraft(
   }
 
   const issueDate = input.issueDate
-    ? productCalendarDateUtc(new Date(input.issueDate))
+    ? new Date(input.issueDate)
     : productCalendarDateUtc();
   const dueDate = input.dueDate
-    ? productCalendarDateUtc(new Date(input.dueDate))
+    ? new Date(input.dueDate)
     : parent.dueDate;
 
   const created = await prisma.$transaction(async (tx) => {
@@ -194,6 +194,20 @@ async function createNoteDraft(
     const currentParent = await tx.salesInvoice.findUniqueOrThrow({ where: { id: parent.id }, include: { ...arInvoiceParents, receivable: { include: arReceivableParents } } });
     assertArInvoiceParents(currentParent, ctx);
     if (currentParent.status !== "ISSUED") throw new ServiceError("CONFLICT", "La factura de referencia ya no está emitida");
+    if (kind === "CREDIT_NOTE") {
+      if (!currentParent.receivable || currentParent.receivable.status === "CANCELLED") {
+        throw new ServiceError("CONFLICT", "La factura no tiene cuenta por cobrar activa.");
+      }
+      assertArReceivableParents(currentParent.receivable, ctx);
+      const balance = normalizeObligationBalanceDue(computeObligationBalanceDue(
+        currentParent.receivable.originalAmount,
+        currentParent.receivable.paidAmount,
+        currentParent.receivable.creditedAmount,
+      ));
+      if (!balance.greaterThan(0)) {
+        throw new ServiceError("CONFLICT", "La factura ya no tiene saldo pendiente para una NC.");
+      }
+    }
     const number = await nextSalesDocumentNumber(tx, {
       tenantId: ctx.tenantId,
       companyId: parent.companyId,
@@ -428,7 +442,8 @@ export async function createSalesDebitNoteFromInvoice(
 export async function issueSalesCreditNote(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de crédito");
@@ -625,7 +640,8 @@ export async function issueSalesCreditNote(
 export async function issueSalesDebitNote(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
   const projectId = await requireNoteMutationProject(id, ctx, projectScopeId, "Sin permisos para emitir notas de débito");
@@ -769,7 +785,8 @@ export async function issueSalesDebitNote(
 export async function cancelSalesCreditNote(
   id: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
   reason?: string,
 ): Promise<SalesInvoiceWithLines> {
   await assertArTenantModule(ctx);
@@ -949,7 +966,8 @@ export type RelatedFiscalNoteRow = {
 export async function listCreditDebitNotesForSalesInvoice(
   salesInvoiceId: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<RelatedFiscalNoteRow[]> {
   await assertArTenantModule(ctx);
   const parent = await prisma.salesInvoice.findUnique({

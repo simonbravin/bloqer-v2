@@ -38,6 +38,9 @@ Ver máquinas SalesInvoice y Receivable.
 - Venta directa simplificada (sin certificación).
 - **Adjuntos** en el alta (create-then-upload) y en el detalle de factura de venta (`SALES_INVOICE`) — foto/copia del comprobante ([D-052]). Aplica a obra y a ingresos corporativos (`projectId` null; panel en CxC empresa).
 - AR corporativo: alta rápida con cobro opcional vía Registrar transacción ([D-051]).
+- **Oficina → Finanzas → Comprobantes de venta** (`/finanzas/facturas`): listado documental de empresa sin proyecto, con facturas, NC y ND, búsqueda por código/cliente y filtros por tipo/estado. Incluye borradores y notas de crédito sin CxC propia. **Nueva nota de crédito / Nueva nota de débito** permite buscar y elegir una factura de referencia emitida de empresa; el monto de la NC puede ser parcial. Desde CxC empresa, **Ver comprobantes** abre este listado. Las notas también se crean desde el detalle de la factura origen.
+
+- **Proyecto → Facturas emitidas:** los botones **Nueva nota de crédito / Nueva nota de débito** ofrecen solo facturas emitidas de la obra actual, con búsqueda por código/cliente y saldo vigente. La nota conserva el alcance de su factura. **Letra del comprobante** selecciona A/B/C/E y es independiente del tipo de documento.
 
 ### Ingresos corporativos sin proyecto ([D-037], [D-049], [D-051])
 
@@ -70,6 +73,8 @@ Campo persistido `documentKind` en `SalesInvoice`:
 | `DEBIT_NOTE` | Nota de débito | Crea `Receivable` nueva; referencia factura origen |
 
 NC/ND exigen factura `ISSUED` del mismo cliente/moneda/alcance. Series de numeración separadas por tipo.
+
+El alta de NC vuelve a validar dentro de la transacción la CxC y su saldo positivo; si otra operación lo saldó durante la espera, rechaza el alta. Las fechas explícitas `YYYY-MM-DD` se guardan como fechas calendario sin desplazamiento por zona horaria. La ND copia los componentes monetarios guardados de las líneas; al editar valores monetarios se recalculan con el kernel vigente.
 
 ## 10. Reglas de negocio
 - Factura de venta **manual de proyecto**: “Emitir y cobrar ahora” opcional ([D-077] / Q-055); visible con `EDIT TREASURY`.

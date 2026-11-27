@@ -385,6 +385,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "Por defecto: Compras / Jefe de obra / Depósito reciben el flujo diario SC/OC; Propietario/Administrador no (sí ven la campana). Escalamientos (SLA, umbral alto) sí llegan a dirección.",
       "Propietario/Administrador: Políticas → Notificaciones para alertas de empresa, canal CxP, CC del flujo diario a dirección, digest on/off y hora local.",
       "El resumen usa los Pendientes y alertas críticas que podés consultar. La revisión automática ocurre a las 10:05 UTC. El envío puede ocurrir en la hora local elegida o hasta tres horas después dentro del mismo día.",
+      "En Políticas → Notificaciones, Hora mínima del resumen ofrece opciones compatibles con la próxima revisión. En Argentina admite 04 a 07 para la misma pasada de 07:05; no son envíos separados. Elegí la hora y pulsá Guardar política de email.",
     ],
     effects: [
       "El cambio aplica al próximo email de esa categoría (best-effort).",
@@ -394,6 +395,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "No confundir preferencias personales con Políticas → Notificaciones (empresa: alertas + canal CxP + CC dirección).",
       "Canal CxP «in-app + email» habilita mail de listo para pagar (categoría CxP) y de pago confirmado (categoría Compras — flujo diario).",
       "Apagar el email no saca el aviso de la campana ni de Pendientes.",
+      "Una hora histórica incompatible queda visible con aviso y se conserva al editar otras preferencias. Para corregirla, elegí una opción compatible y guardá. El servidor revalida el cambio; recargá si cambiaron las opciones. La llegada del email puede variar y la frecuencia sigue siendo diaria.",
     ],
     relatedSlugs: ["usar-notificaciones", "revisar-pendientes", "errores-operativos-frecuentes"],
     keywords: [
@@ -402,6 +404,9 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
       "notificaciones por correo",
       "digest",
       "resumen diario",
+      "hora del resumen",
+      "resumen no llega",
+      "ventana de revision",
       "configurar notificaciones",
       "apagar emails",
       "demasiados mails",
@@ -584,3 +589,4 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     guideRef: "§17",
   },
 ];
+

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition, type ReactNode } from "react";
-import { Archive, ArchiveRestore, Trash2, CircleX } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Archive, ArchiveRestore, Trash2, CircleX, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { rethrowNextNavigationError } from "@/lib/next-errors";
 import { cn } from "@/lib/utils";
+import { clientConfirmDocumentUpload } from "../lib/client-upload-document";
 
 const iconBtn = "h-7 w-7 shrink-0";
 const iconSvg = "h-3.5 w-3.5";
@@ -88,6 +90,8 @@ function ConfirmIconButton({
 }
 
 export function DocumentMutateIconActions({
+  documentId,
+  storageProvider,
   fileName,
   status,
   canMutate,
@@ -97,6 +101,8 @@ export function DocumentMutateIconActions({
   onRestore,
   onDelete,
 }: {
+  documentId: string;
+  storageProvider: string;
   fileName: string;
   status: string;
   canMutate: boolean;
@@ -107,22 +113,38 @@ export function DocumentMutateIconActions({
   onRestore?: () => Promise<void>;
   onDelete?: () => Promise<void>;
 }) {
+  const router = useRouter();
   if (!canMutate) return null;
 
   const quoted = `«${fileName}»`;
   const deleteHandler = canDelete ? onDelete : undefined;
 
-  if (status === "UPLOADING" && deleteHandler) {
+  if (status === "UPLOADING") {
     return (
-      <ConfirmIconButton
-        label="Cancelar subida"
-        title="¿Cancelar la subida?"
-        description={`Se cancela la subida de ${quoted}.`}
-        confirmLabel="Cancelar subida"
-        destructive
-        icon={<CircleX className={iconSvg} aria-hidden />}
-        onConfirm={deleteHandler}
-      />
+      <>
+        {storageProvider === "R2" ? <ConfirmIconButton
+          label="Completar carga"
+          title="¿Completar esta carga?"
+          description={`Se verificará el archivo ya recibido de ${quoted}. No se vuelve a subir ni se crea otro documento. Si es una nueva revisión, la anterior se archivará solo al confirmar.`}
+          confirmLabel="Verificar y confirmar"
+          icon={<Upload className={iconSvg} aria-hidden />}
+          onConfirm={async () => {
+            const result = await clientConfirmDocumentUpload(documentId);
+            if ("error" in result) throw new Error(result.error);
+            toast.success("Carga confirmada.");
+            router.refresh();
+          }}
+        /> : null}
+        {deleteHandler ? <ConfirmIconButton
+          label="Cancelar subida"
+          title="¿Cancelar la subida?"
+          description={`Se cancela la subida de ${quoted}.`}
+          confirmLabel="Cancelar subida"
+          destructive
+          icon={<CircleX className={iconSvg} aria-hidden />}
+          onConfirm={deleteHandler}
+        /> : null}
+      </>
     );
   }
 

@@ -1,13 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FileSearch, PencilLine } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { PurchaseOrderInvoiceDraftPreview } from "@bloqer/services";
+import type { SupplierInvoiceDocumentPreview } from "@bloqer/ai";
 import { requiresArInvoiceLetter, suggestInvoiceLetter, defaultTaxRateForInvoiceLetter, isZeroIvaRate, type InvoiceLetterCode, type IvaConditionCode, invoiceLetterHint, DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { reportInvalidDecimalInputs } from "@/components/ui/decimal-input";
 import { SearchableCombobox } from "@/components/ui/searchable-combobox";
 import { CONTACT_PICKER_SEARCH_PLACEHOLDER, SEARCHABLE_NONE, toSearchableOptions } from "@/lib/searchable-options";
 import { formatMoneyAmount } from "@/lib/format-money";
@@ -30,6 +34,10 @@ import { classifySupplierInvoice } from "@bloqer/domain";
 import { DocumentClassCreateHint } from "@/features/finance/components/document-class-badge";
 import { cn } from "@/lib/utils";
 import { useOperationalAction } from "@/hooks/use-operational-action";
+import { SupplierInvoiceDocumentAssistant } from "./supplier-invoice-document-assistant";
+import { mapSupplierInvoiceDocumentPrefill } from "../lib/supplier-invoice-document-prefill";
+import { submitSupplierInvoiceDraft } from "../lib/supplier-invoice-draft-submission";
+import { getSupplierInvoiceDocumentReview } from "../lib/supplier-invoice-document-review";
 
 export type SupplierOption = {
   id: string;
@@ -136,6 +144,23 @@ export function SupplierInvoiceForm({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const { pending: isPending, run, isBusy } = useOperationalAction({ onError: setError, onPendingChange });
+  const [previewPending, setPreviewPending] = useState(false);
+  const [documentAvailable, setDocumentAvailable] = useState(false);
+  const [entryMode, setEntryMode] = useState<"manual" | "document">("manual");
+  const [appliedPreview, setAppliedPreview] = useState<SupplierInvoiceDocumentPreview | null>(null);
+  const [priceBasisKnown, setPriceBasisKnown] = useState(true);
+  const [reviewedSnapshot, setReviewedSnapshot] = useState<string | null>(null);
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const completionRef = useRef<HTMLDivElement>(null);
+  const outcomeRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+  const [assistedDocument, setAssistedDocument] = useState<File | null>(null);
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
+  const [draftAttachmentError, setDraftAttachmentError] = useState<string | null>(null);
+  const [draftResultUncertain, setDraftResultUncertain] = useState(false);
+  const [issueDate, setIssueDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [supplierContactId, setSupplierContactId] = useState("");
   const [invoiceLetter, setInvoiceLetter] = useState<InvoiceLetterCode | null>(null);
   const [letterTouched, setLetterTouched] = useState(false);
@@ -157,6 +182,39 @@ export function SupplierInvoiceForm({
   const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
+    if (!storageConfigured) return;
+    const controller = new AbortController();
+    void fetch("/api/ai/supplier-invoice-preview", { signal: controller.signal, cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((data: { enabled?: boolean } | null) => {
+        if (!controller.signal.aborted) setDocumentAvailable(data?.enabled === true);
+      }).catch(() => { /* Manual entry remains available. */ });
+    return () => controller.abort();
+  }, [storageConfigured]);
+
+  useEffect(() => {
+    if (!attachment || !["application/pdf", "image/jpeg", "image/png", "image/webp"].includes(attachment.type)) {
+      setOriginalUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(attachment);
+    setOriginalUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [attachment]);
+
+  useEffect(() => { if (assistedDocument) completionRef.current?.focus(); }, [assistedDocument]);
+  useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
+  useEffect(() => {
+    if (draftAttachmentError || draftResultUncertain) outcomeRef.current?.focus();
+  }, [draftAttachmentError, draftResultUncertain]);
+
+  function handlePreviewBusyChange(pending: boolean) {
+    setPreviewPending(pending);
+    // Same synchronous dialog guard as mutations; the two operations cannot overlap.
+    onPendingChange?.(pending);
+  }
+
+  useEffect(() => {
     rotateAttachmentKey();
   }, [attachment, rotateAttachmentKey]);
 
@@ -164,7 +222,7 @@ export function SupplierInvoiceForm({
     () => suppliers.find((s) => s.id === supplierContactId),
     [suppliers, supplierContactId],
   );
-  const showLetter = requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
+  const showLetter = Boolean(assistedDocument) || requiresArInvoiceLetter(companyCountry, selectedSupplier?.country ?? null);
 
   useEffect(() => {
     if (!supplierContactId || letterTouched) return;
@@ -315,7 +373,66 @@ export function SupplierInvoiceForm({
     [compatibleAccounts],
   );
 
-  const showPayNow = Boolean(projectId) && !companyFinanzas && canPayNow;
+  const showPayNow = Boolean(projectId) && !companyFinanzas && canPayNow && !assistedDocument;
+  const invoiceListHref = companyFinanzas ? "/finanzas/facturas-proveedor" : `/proyectos/${projectId}/facturas-proveedor`;
+  const showForm = entryMode === "manual" || Boolean(assistedDocument);
+  const documentReview = getSupplierInvoiceDocumentReview({
+    supplierContactId, invoiceLetter, requireLetter: showLetter, issueDate, dueDate,
+    pricesIncludeTax: priceBasisKnown ? pricesIncludeTax : null,
+    iibbPerceptionRate, lines, requireWbs: supportsPoPreview,
+  });
+  const currentReviewSnapshot = JSON.stringify({ supplierContactId, invoiceLetter, issueDate, dueDate, pricesIncludeTax, priceBasisKnown, iibbPerceptionRate, lines });
+  const documentReviewed = reviewedSnapshot === currentReviewSnapshot;
+
+  function focusCompletionTarget(target: string) {
+    const element = formRef.current?.querySelector<HTMLElement>(`[id="${target}"]`);
+    const control = element?.matches("input,button") ? element : element?.querySelector<HTMLElement>("input,button,[tabindex]");
+    (control ?? element)?.focus();
+  }
+
+  function applyDocumentPreview(preview: SupplierInvoiceDocumentPreview, file: File) {
+    if (isBusy() || savedDraftId || draftResultUncertain || purchaseOrderId || apSpendMode !== "DIRECT") return;
+    const values = mapSupplierInvoiceDocumentPrefill(preview);
+    if (!values) { setError("La propuesta requiere carga manual. Revisá los campos no identificados."); return; }
+    setSupplierContactId("");
+    setLetterTouched(true);
+    setPricesIncludeTaxTouched(true);
+    setInvoiceLetter(values.invoiceLetter);
+    setIssueDate(values.issueDate);
+    setDueDate(values.dueDate);
+    setPriceBasisKnown(values.pricesIncludeTax !== null);
+    setPricesIncludeTax(values.pricesIncludeTax ?? false);
+    setIibbPerceptionRate(values.iibbPerceptionRate);
+    setLines(values.lines);
+    setPayNow(false);
+    setAttachment(file);
+    setAssistedDocument(file);
+    setAppliedPreview(preview);
+    setReviewedSnapshot(null);
+    setError(null);
+  }
+
+  function openDraft(invoiceId: string) {
+    onSuccess?.();
+    router.push(`${invoiceListHref}/${invoiceId}`);
+  }
+
+  async function saveDraft(create: () => Promise<{ id: string } | { error: string }>) {
+    const result = await submitSupplierInvoiceDraft({
+      knownInvoiceId: savedDraftId, create, onCreated: setSavedDraftId,
+      upload: (invoiceId) => uploadAttachmentIfAny(invoiceId, companyFinanzas ? null : projectId ?? null),
+    });
+    if (result.kind === "saved") {
+      setDraftAttachmentError(null);
+      toast.success(attachment ? "Borrador guardado con el comprobante adjunto." : "Borrador guardado.");
+      openDraft(result.invoiceId);
+    } else if (result.kind === "attachment_failed") {
+      setDraftAttachmentError(result.error);
+    } else {
+      setError(result.error);
+      if (result.kind === "uncertain") setDraftResultUncertain(true);
+    }
+  }
 
   async function uploadAttachmentIfAny(invoiceId: string, scopeProjectId: string | null) {
     if (!attachment || !storageConfigured) return null;
@@ -339,8 +456,17 @@ export function SupplierInvoiceForm({
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (isBusy()) return;
+    if (isBusy() || previewPending || savedDraftId || draftResultUncertain || !showForm) return;
     setError(null);
+    if (!reportInvalidDecimalInputs(e.currentTarget)) return;
+    if (assistedDocument && (documentReview.pending.length || !documentReviewed)) {
+      setError("Completá los datos pendientes y confirmá la revisión contra el original antes de guardar.");
+      return;
+    }
+    if (assistedDocument && (!attachment || attachment !== assistedDocument || !storageConfigured)) {
+      setError("Conservá el comprobante original para adjuntarlo al borrador.");
+      return;
+    }
     if (!supplierContactId) { setError("Debe seleccionar a quién se le paga"); return; }
     if (showLetter && !invoiceLetter) {
       setError("Seleccioná el comprobante (A, B, C o E)");
@@ -373,7 +499,7 @@ export function SupplierInvoiceForm({
     const pricesIncludeTaxPayload = forceZeroTax ? false : pricesIncludeTax;
     void run(async () => {
       if (companyFinanzas) {
-        const res = await createCompanySupplierInvoiceAction({
+        await saveDraft(() => createCompanySupplierInvoiceAction({
           supplierContactId,
           issueDate:     fd.get("issueDate") as string,
           dueDate:       fd.get("dueDate") as string,
@@ -388,17 +514,7 @@ export function SupplierInvoiceForm({
             taxRate: forceZeroTax ? "0" : l.taxRate,
             sortOrder: i,
           })),
-        });
-        if ("error" in res) {
-          setError(res.error);
-          return;
-        }
-        const uploadRes = await uploadAttachmentIfAny(res.id, null);
-        if (uploadRes && "error" in uploadRes) {
-          notifyAttachFailure(uploadRes.error, false);
-        }
-        onSuccess?.();
-        router.push(`/finanzas/facturas-proveedor/${res.id}`);
+        }));
         return;
       }
       if (!projectId) {
@@ -455,7 +571,7 @@ export function SupplierInvoiceForm({
         return;
       }
 
-      const res = await createSupplierInvoiceAction(projectId, {
+      await saveDraft(() => createSupplierInvoiceAction(projectId, {
         projectId,
         supplierContactId,
         issueDate:       fd.get("issueDate")  as string,
@@ -473,32 +589,64 @@ export function SupplierInvoiceForm({
           sortOrder: i,
           purchaseOrderLineId: apSpendMode === "DIRECT" ? null : l.purchaseOrderLineId,
         })),
-      });
-      if ("error" in res) {
-        setError(res.error);
-        return;
-      }
-      const uploadRes = await uploadAttachmentIfAny(res.id, projectId);
-      if (uploadRes && "error" in uploadRes) {
-        notifyAttachFailure(uploadRes.error, false);
-      }
-      onSuccess?.();
-      router.push(`/proyectos/${projectId}/facturas-proveedor/${res.id}`);
+      }));
     });
   }
 
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-5 sm:p-6" : undefined}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <fieldset disabled={isPending} aria-busy={isPending} className="min-w-0 space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="min-w-0 space-y-4">
+        <fieldset disabled={isPending || Boolean(savedDraftId) || draftResultUncertain} aria-busy={isPending || previewPending} className="min-w-0 space-y-4">
         <p className="text-xs text-muted-foreground">Esta alta manual se registra en ARS.{supportsPoPreview ? " Para facturar una OC en otra moneda, abrí esa orden y usá su panel de facturación." : ""}</p>
         {error && (
-          <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
+          <p ref={errorRef} tabIndex={-1} role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>
         )}
 
+        {documentAvailable && !assistedDocument ? <div className="space-y-2">
+          <p className="text-sm font-medium" id="invoice-entry-label">¿Cómo querés cargar la factura?</p>
+          <div role="group" aria-labelledby="invoice-entry-label" className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {([
+              ["manual", "Carga manual", "Completá los datos o traé las líneas de una OC.", PencilLine],
+              ["document", "Desde un comprobante", "Subí una foto o PDF, revisá y completá la lectura.", FileSearch],
+            ] as const).map(([mode, label, description, Icon]) => <button key={mode} type="button" aria-pressed={entryMode === mode}
+              disabled={isPending || previewPending || (mode === "document" && apSpendMode === "AGAINST_PO")}
+              onClick={() => { setEntryMode(mode); setError(null); }}
+              className={cn("flex min-h-16 items-start gap-3 rounded-lg border p-3 text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50", entryMode === mode ? "border-primary bg-primary/5" : "bg-background hover:bg-muted/40")}>
+              <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden /><span><span className="block text-sm font-semibold">{label}</span><span className="mt-1 block text-xs text-muted-foreground">{description}</span></span>
+            </button>)}
+          </div>
+          {apSpendMode === "AGAINST_PO" ? <p className="text-xs text-muted-foreground">Para facturas contra una OC, usá las líneas de esa orden y adjuntá el comprobante.</p> : null}
+        </div> : null}
+
+        {storageConfigured && !assistedDocument && (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">{entryMode === "document" ? "1. Elegí el comprobante" : "Comprobante (opcional)"}</p>
+            <p className="text-xs text-muted-foreground">{entryMode === "document" ? "PDF, JPEG, PNG o WebP, hasta 3 MiB. Desde el celular podés usar Tomar foto. Revisá que se vean todas las líneas y el total." : "Foto o PDF de la factura. Se adjunta después de guardar el borrador."}</p>
+            <DocumentUploadZone selectedFile={attachment} onFileSelect={setAttachment} onValidationError={setError}
+              fileInputAccept={entryMode === "document" ? ".pdf,.jpg,.jpeg,.png,.webp" : undefined}
+              formatsHint={entryMode === "document" ? "Para lectura: PDF, JPEG, PNG o WebP · hasta 3 MiB" : undefined}
+              disabled={isPending || previewPending || Boolean(assistedDocument) || Boolean(savedDraftId)} />
+            {entryMode === "document" ? <SupplierInvoiceDocumentAssistant
+              file={attachment} originalUrl={originalUrl} projectId={companyFinanzas ? undefined : projectId}
+              disabled={isPending || Boolean(savedDraftId) || draftResultUncertain || apSpendMode === "AGAINST_PO"}
+              onApply={applyDocumentPreview} onBusyChange={handlePreviewBusyChange} onManual={() => setEntryMode("manual")}
+            /> : null}
+          </div>
+        )}
+
+        <fieldset hidden={!showForm} disabled={!showForm || previewPending} className="min-w-0 space-y-4">
+        {assistedDocument ? <div ref={completionRef} tabIndex={-1} className="space-y-3 rounded-lg border bg-muted/20 p-3 sm:p-4 focus:outline-none" aria-label="Completar factura desde comprobante">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0"><h3 className="font-semibold">Completá y revisá la factura</h3><p className="mt-1 break-all text-xs text-muted-foreground">Original: {assistedDocument.name}</p></div>
+            {originalUrl ? <a href={originalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 shrink-0 items-center text-sm text-primary underline underline-offset-4">Ver original (otra pestaña)</a> : null}
+          </div>
+          {appliedPreview?.supplierName ? <p className="break-words text-sm">Proveedor leído: <strong>{appliedPreview.supplierName}</strong>{appliedPreview.supplierTaxId ? ` · CUIT ${appliedPreview.supplierTaxId}` : ""}. Elegí el contacto correspondiente abajo.</p> : null}
+          <p className="text-xs text-muted-foreground">Todavía no está guardada. El original se adjuntará al borrador; revisá el listado para evitar cargarlo dos veces.</p>
+          {documentReview.pending.length ? <div className="space-y-1"><p className="text-sm font-medium">Pendientes para guardar</p><ul className="space-y-1">{documentReview.pending.map(({ label, target }) => <li key={label}><button type="button" onClick={() => focusCompletionTarget(target)} className="min-h-11 text-left text-sm text-primary underline underline-offset-4">{label}</button></li>)}</ul></div> : <p className="text-sm">Datos completos. Compará los importes con el original y confirmá la revisión al pie.</p>}
+        </div> : null}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
           <div className={cn("space-y-1", showLetter ? "sm:col-span-4" : "sm:col-span-6")}>
-            <Label>A quién se le paga</Label>
+            <Label htmlFor="invoice-payee">A quién se le paga</Label>
             {suppliers.length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 No hay proveedores ni empleados activos. En Directorio el contacto tiene que tener
@@ -506,11 +654,12 @@ export function SupplierInvoiceForm({
               </p>
             ) : (
               <SearchableCombobox
+                id="invoice-payee"
                 options={toSearchableOptions(suppliers)}
                 value={supplierContactId}
                 onValueChange={(id) => {
                   setSupplierContactId(id);
-                  setLetterTouched(false);
+                  setLetterTouched(Boolean(assistedDocument));
                 }}
                 placeholder="Seleccionar proveedor o empleado…"
                 searchPlaceholder={CONTACT_PICKER_SEARCH_PLACEHOLDER}
@@ -529,6 +678,7 @@ export function SupplierInvoiceForm({
               onValueChange={(v) => {
                 setLetterTouched(true);
                 setInvoiceLetter(v);
+                if (assistedDocument) return;
                 if (v === "C" || v === "E") {
                   setPricesIncludeTax(false);
                 } else if (!pricesIncludeTaxTouched) {
@@ -554,11 +704,11 @@ export function SupplierInvoiceForm({
 
           <div className="space-y-1 sm:col-span-3">
             <Label htmlFor="issueDate">Fecha de emisión</Label>
-            <Input id="issueDate" name="issueDate" type="date" required />
+            <Input id="issueDate" name="issueDate" type="date" required value={issueDate} onChange={(event) => setIssueDate(event.target.value)} />
           </div>
           <div className="space-y-1 sm:col-span-3">
             <Label htmlFor="dueDate">Fecha de vencimiento</Label>
-            <Input id="dueDate" name="dueDate" type="date" required />
+            <Input id="dueDate" name="dueDate" type="date" required value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
           </div>
 
           {Boolean(projectId) && !companyFinanzas ? (
@@ -580,7 +730,7 @@ export function SupplierInvoiceForm({
                 >
                   <button
                     type="button"
-                    disabled={isPending}
+                    disabled={isPending || Boolean(assistedDocument)}
                     aria-pressed={apSpendMode === "AGAINST_PO"}
                     onClick={() => selectApSpendMode("AGAINST_PO")}
                     className={cn(
@@ -626,7 +776,7 @@ export function SupplierInvoiceForm({
                   </div>
                 )}
               </div>
-              <PricesIncludeTaxCheckbox
+              {!assistedDocument ? <PricesIncludeTaxCheckbox
                 compact
                 className="sm:col-span-3"
                 checked={pricesIncludeTax}
@@ -634,7 +784,7 @@ export function SupplierInvoiceForm({
                   setPricesIncludeTaxTouched(true);
                   setPricesIncludeTax(v);
                 }}
-              />
+              /> : null}
             </>
           ) : (
             <>
@@ -649,7 +799,7 @@ export function SupplierInvoiceForm({
                   <p className="text-xs text-muted-foreground">{classHint}</p>
                 ) : null}
               </div>
-              <PricesIncludeTaxCheckbox
+              {!assistedDocument ? <PricesIncludeTaxCheckbox
                 compact
                 className="sm:col-span-3"
                 checked={pricesIncludeTax}
@@ -657,9 +807,16 @@ export function SupplierInvoiceForm({
                   setPricesIncludeTaxTouched(true);
                   setPricesIncludeTax(v);
                 }}
-              />
+              /> : null}
             </>
           )}
+          {assistedDocument ? <div className="space-y-1.5 sm:col-span-3">
+            <Label htmlFor="document-price-basis">¿Los precios unitarios incluyen IVA?</Label>
+            <Select value={priceBasisKnown ? pricesIncludeTax ? "gross" : "net" : ""} onValueChange={(value) => { setPricesIncludeTaxTouched(true); setPriceBasisKnown(true); setPricesIncludeTax(value === "gross"); }}>
+              <SelectTrigger id="document-price-basis" className="min-h-11"><SelectValue placeholder="Seleccioná según el original" /></SelectTrigger>
+              <SelectContent><SelectItem value="net">No, son precios sin IVA</SelectItem><SelectItem value="gross">Sí, son precios con IVA</SelectItem></SelectContent>
+            </Select>
+          </div> : null}
         </div>
 
         {supportsPoPreview && purchaseOrderId && (
@@ -670,8 +827,11 @@ export function SupplierInvoiceForm({
           />
         )}
 
-        <div className="border-t border-border/60 pt-4">
+        <div id="invoice-lines" tabIndex={-1} className="border-t border-border/60 pt-4">
           <InvoiceLinesEditor
+            key={assistedDocument ? "document" : "manual"}
+            documentReview={Boolean(assistedDocument)}
+            amountsPending={Boolean(assistedDocument) && documentReview.amountsPending}
             lines={lines}
             onChange={setLines}
             requireWbs={Boolean(projectId) && !companyFinanzas}
@@ -691,20 +851,18 @@ export function SupplierInvoiceForm({
 
         <ExpandableNotesField />
 
-        {storageConfigured && (
-          <div className="space-y-1.5">
-            <Label>Comprobante (opcional)</Label>
-            <p className="text-xs text-muted-foreground">
-              Foto o PDF de la factura. Se adjunta después de crear el documento.
-            </p>
-            <DocumentUploadZone
-              selectedFile={attachment}
-              onFileSelect={setAttachment}
-              onValidationError={setError}
-              disabled={isPending}
-            />
-          </div>
-        )}
+        {assistedDocument ? <div className="space-y-3 rounded-lg border bg-muted/20 p-3 sm:p-4">
+          <p className="text-sm font-semibold">Antes de guardar el borrador</p>
+          <p className="text-sm">Total leído del original: <strong>{appliedPreview?.total ? formatMoneyAmount(appliedPreview.total, "ARS") : "No identificado: consultá el comprobante"}</strong>.</p>
+          {originalUrl ? <a href={originalUrl} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-sm text-primary underline underline-offset-4">Volver a ver el original</a> : null}
+          {documentReview.pending.length ? <p className="text-sm text-muted-foreground">Completá los pendientes indicados arriba para confirmar la revisión.</p> : null}
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 text-sm">
+            <input type="checkbox" className="mt-1 h-4 w-4 shrink-0 accent-primary" checked={documentReviewed} disabled={documentReview.pending.length > 0}
+              onChange={(event) => setReviewedSnapshot(event.target.checked ? currentReviewSnapshot : null)} />
+            <span>Verifiqué proveedor, fechas, renglones, impuestos y total contra el original. No hay cargos fuera de los registrados. Si cambio algún dato, debo volver a confirmar.</span>
+          </label>
+          <p className="text-xs text-muted-foreground">Se guarda un borrador con el original. Emitir y pagar son acciones posteriores desde el detalle.</p>
+        </div> : null}
 
         {showPayNow && (
           <div className="space-y-3 rounded-md border bg-muted/10 p-3">
@@ -756,15 +914,18 @@ export function SupplierInvoiceForm({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-border/60 pt-4">
-          <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}>
+        <div className="flex flex-col-reverse gap-2 border-t border-border/60 pt-4 sm:flex-row sm:justify-end">
+          <Button type="button" className="min-h-11" variant="outline" disabled={isPending || previewPending} onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}>
             Cancelar
           </Button>
           <Button
             type="submit"
+            className="min-h-11"
             disabled={
               isPending
+              || previewPending
               || suppliers.length === 0
+              || (Boolean(assistedDocument) && (documentReview.pending.length > 0 || !documentReviewed))
               || (payNow && showPayNow && compatibleAccounts.length === 0)
             }
           >
@@ -772,10 +933,30 @@ export function SupplierInvoiceForm({
               ? "Guardando…"
               : payNow && showPayNow
                 ? "Emitir y pagar"
-                : "Crear factura"}
+                : assistedDocument ? "Guardar borrador" : "Crear factura"}
           </Button>
         </div>
         </fieldset>
+        {!showForm ? <Button type="button" variant="outline" className="w-full sm:w-auto" disabled={isPending || previewPending} onClick={() => { if (!isBusy()) (onCancel ?? (() => router.back()))(); }}>Cancelar</Button> : null}
+        </fieldset>
+        <div ref={outcomeRef} tabIndex={-1} className="focus:outline-none">
+        {savedDraftId && draftAttachmentError ? (
+          <div role="alert" className="space-y-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:bg-amber-950/20 dark:text-amber-100">
+            <p>El borrador ya está guardado. No se pudo adjuntar el comprobante: {draftAttachmentError}</p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" disabled={isPending} onClick={() => { if (!isBusy()) void run(() => saveDraft(async () => ({ error: "El borrador ya existe." }))); }}>{isPending ? "Adjuntando…" : "Reintentar adjunto"}</Button>
+              <Button type="button" variant="outline" disabled={isPending} onClick={() => openDraft(savedDraftId)}>Abrir borrador</Button>
+            </div>
+            <p className="text-xs">Reintentar conserva el mismo borrador. Si abrís el detalle, el archivo pendiente sigue disponible en tu dispositivo para adjuntarlo allí.</p>
+          </div>
+        ) : null}
+        {draftResultUncertain ? (
+          <div role="alert" className="space-y-2 rounded-md border p-3 text-sm">
+            <p>No se repetirá la creación desde este formulario. Revisá si el borrador aparece en el listado antes de volver a cargarlo.</p>
+            <Button type="button" variant="outline" onClick={() => { onSuccess?.(); router.push(invoiceListHref); }}>Revisar listado</Button>
+          </div>
+        ) : null}
+        </div>
       </form>
     </div>
   );

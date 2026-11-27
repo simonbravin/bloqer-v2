@@ -2138,6 +2138,33 @@
 - **Evidencia:** el evento `supplier_invoice.updated` se verifica dentro del alcance del documento y bajo los bloqueos de la actualización. El evento acredita que hubo una edición. El comprobante del proveedor sigue siendo la fuente de sus importes.
 - **Documentos afectados:** [propuesta aprobada](../08-architecture/platform-audit/2026-11-05-ag-14-edited-ap-draft-proposal.md), módulo Compras, Guía y Ayuda.
 
+### D-146 — Versionado simple de adjuntos conservando cada original
+
+- **Fecha:** 2026-11-20. **Estado:** ACTIVA. Owner autorizó el versionado simple propuesto y cerrar los pendientes de 1/A, 9/I y 10/J antes de avanzar a 2/B y 3/C.
+- **Decisión:** Q-008 opción 2, sin check-in/check-out. Cada revisión crea otra fila `DocumentAttachment` y otro objeto privado; `replacesAttachmentId` enlaza su predecesora en el mismo tenant, empresa, proyecto y entidad. No sobrescribe bytes, autor ni fecha de la revisión anterior.
+- La anterior permanece activa mientras se sube la nueva. Confirmar la nueva revisión y archivar su predecesora es atómico. Una revisión confirmada solo puede tener una sucesora confirmada; los intentos incompletos no sustituyen el original y se pueden cancelar/reintentar.
+- Las revisiones confirmadas se conservan mediante archivo, sin eliminación lógica de la cadena. No altera permisos ni el estado del comprobante padre. Restaurar un documento archivado conserva la semántica existente; para continuar la cadena se usa la última revisión confirmada.
+- El historial de revisiones permite navegar y descargar cada original autorizado con autor y fecha/hora propios. No implica backup independiente, retención WORM, antivirus ni recuperación de bytes ausentes.
+- **Documentos afectados:** DOCUMENTS, DOCUMENT_STORAGE_DATA_MODEL, Guía, Help, Q-008 y pruebas de aislamiento/concurrencia. Migración aditiva, sin convertir ni eliminar archivos históricos.
+
+### D-147 — Resumen diario con horarios compatibles y servicios actuales
+
+- **Fecha:** 2026-11-22. **Estado:** ACTIVA. Resuelve Q-095 por aprobación explícita del Owner: «Sí, resumen diario sin nuevos servicios».
+- **Decisión:** conservar el cron de resumen a las 10:05 UTC, sin contratar otro scheduler ni aumentar frecuencia. Las nuevas elecciones de hora deben estar dentro de la ventana de la próxima revisión en la zona horaria de la organización. Se conserva el margen de tres horas de D-114, sin cruzar medianoche.
+- **Interfaz:** «Hora mínima del resumen» ofrece solo opciones compatibles y muestra la próxima revisión prevista. Es una condición de inclusión; no un envío adicional a esa hora ni una garantía de llegada puntual.
+- **Históricos:** no migrar ni corregir preferencias guardadas automáticamente. Una hora histórica incompatible queda visible con advertencia y no puede elegirse como una nueva hora. Se permite editar otras preferencias sin reescribirla; cambiarla requiere una elección compatible y confirmación explícita al guardar. Los defaults existentes se conservan.
+- **Servidor:** vuelve a calcular compatibilidad al guardar un cambio de hora usando el tenant autenticado. Mantiene permisos, módulo, categorías, opt-out personal, audiencias y deduplicación existentes. No envía correos al guardar.
+- **Límites:** cambios de zona horaria/horario estacional pueden exigir revisar la preferencia; no se promete entrega observada ni recuperación durable. Q-093/Q-094 y outbox permanecen abiertos.
+- **Documentos afectados:** NOTIFICATIONS, Guía, Help, Q-095, plan y conocimiento AI. Sin campos, tablas, migraciones, proveedores ni dependencias nuevas.
+
+### D-148 — Audio a solicitud de compra revisable
+
+- **Fecha:** 2026-11-23. **Estado:** ACTIVA. Q-096 resuelta por elección explícita del Owner: «Solicitud de compra (recomendado)».
+- **Alcance:** primer flujo del bloque 4/P1c dentro de Bloqer: audio → transcripción revisable → propuesta de renglones → formulario existente → guardar DRAFT. Enviar a Compras sigue siendo una acción posterior.
+- **Controles:** obra autenticada y activa; permisos de solicitudes y módulo de compras. La propuesta no elige IDs de empresa/obra/partida/producto/APU, no inventa cantidades ni fechas y no ejecuta tools. El usuario completa desconocidos, elige la partida y confirma la revisión; editar vuelve a exigir confirmarla. El servicio de creación vigente revalida todos los datos.
+- **Implementación acotada:** proveedor IA actual, sin nuevas dependencias ni persistencia del audio/transcripción/propuesta. Solo los datos revisados del formulario se guardan como solicitud. La grabación y el envío a transcribir requieren acciones explícitas; alternativa manual disponible. Piloto apagado por defecto y sujeto a los gates AI existentes. El procesamiento puede consumir la API ya contratada; no equivale a costo cero.
+- **Límites:** sin WhatsApp, partes diarios, envío automático, adjudicación, aprobación, compras ni pagos. No habilita tools WRITE ni reemplaza las garantías pendientes de idempotencia durable. Arquitectura: ADR-020.
+
 ## Decisiones SUPERSEDED
 
 - D-004 → D-119. Se conserva su contenido original arriba.
@@ -2153,3 +2180,11 @@
 5. **Nunca** borrar decisiones; cambiar estado a `SUPERSEDED` y agregar la nueva.
 
 > Cierre Phases 3→4→5 (2026-08-08): [D-081] ERD Phase 3, [D-082] BR-SUB-005 + índices, [D-083] diferimientos inventario/reportes. Phase 5: CI+tests, isolation suite, E2E `apps/web/e2e`, ASVS-lite.
+
+## D-149 — Respuesta de cotizaciones por enlace limitado
+
+- **Fecha:** 23/11/2026. **Estado:** APROBADA por el Owner en Q-097.
+- Enlace sin cuenta para una SC/proveedor, siete días, revocable, una respuesta definitiva y revisión de Compras antes de incorporar. Quien posea el enlace puede usarlo: no verifica identidad personal. Compartir es manual; no envía invitaciones automáticamente.
+- Persistencia aditiva aprobada según ADR-021: `ProcurementQuoteInvitation` con tenant propio, alcance, hash, vencimiento/revocación, snapshot, respuesta inmutable y vínculo a la incorporación. Reintento idéntico no duplica respuesta ni cotización. No modificar cantidades, adjudicar, crear OC ni usar al emisor como actor externo.
+- La incorporación conserva el servicio canónico, clasificación D-118, FX manual, máximos y freeze. Sin nuevos servicios/dependencias, IA ni adjuntos externos en este corte. Capacidad apagada por defecto hasta piloto; la aprobación de diseño no acredita pruebas, migración ni activación.
+- Referencias: Q-097, ADR-021, `PURCHASE_REQUESTS.md`, `STATE_MACHINES.md`, `EVENTS_AND_AUTOMATIONS.md`, `TENANT_ISOLATION_MODEL.md`, `TECHNICAL_ERD.md`, Guía/Help y plan bloque 5/E2.

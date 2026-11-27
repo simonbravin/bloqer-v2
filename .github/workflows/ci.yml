@@ -5,7 +5,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.repo.full_name || github.repository }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
@@ -28,6 +28,71 @@ jobs:
       - name: Prisma generate (no DB required)
         run: pnpm ci:prisma
 
+      - name: Generate disposable fixture credentials
+        run: |
+          node <<'NODE'
+          const { randomBytes } = require("node:crypto");
+          const { appendFileSync } = require("node:fs");
+          for (const name of ["CI_PILOT_POSTGRES_PASSWORD", "E2E_USER_PASSWORD"]) {
+            const value = randomBytes(24).toString("hex");
+            process.stdout.write(`::add-mask::${value}\n`);
+            appendFileSync(process.env.GITHUB_ENV, `${name}=${value}\n`);
+          }
+          NODE
+
+      - name: Start disposable Postgres on loopback
+        env:
+          POSTGRES_PASSWORD: ${{ env.CI_PILOT_POSTGRES_PASSWORD }}
+        run: |
+          docker run --detach --rm --name bloqer-ci-postgres \
+            --publish 127.0.0.1:5432:5432 \
+            --env POSTGRES_USER=bloqer_ci \
+            --env POSTGRES_DB=bloqer_ci_pilot \
+            --env POSTGRES_PASSWORD \
+            postgres:16
+          timeout 60s bash -c 'until docker exec bloqer-ci-postgres pg_isready -h 127.0.0.1 -U bloqer_ci -d bloqer_ci_pilot; do sleep 2; done'
+
+      - name: Prepare disposable authenticated fixtures
+        working-directory: packages/database
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_ci_pilot
+          DIRECT_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_ci_pilot
+          SEED_USER_EMAIL: pilot-ci@example.invalid
+          SEED_USER_PASSWORD: ${{ env.E2E_USER_PASSWORD }}
+          DOCS_USER_EMAIL: pilot-ci@example.invalid
+          DOCS_DEMO_SEED: "1"
+          BLOQER_DEPLOYMENT_SCHEMA_TEST: "1"
+        run: |
+          pnpm exec prisma migrate deploy
+          node --test scripts/deployment-schema-verification.test.mjs
+          pnpm exec tsx src/seed.ts
+
+      - name: Document isolation and provenance on disposable SQL
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_documents_ci
+          DIRECT_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_documents_ci
+          BLOQER_AUDIT_TEST_DATABASE: bloqer_audit_documents_ci
+          BLOQER_AUDIT_LIVE: "1"
+        run: |
+          docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_documents_ci
+          pnpm --filter @bloqer/database exec prisma migrate deploy
+          pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/procurement/supplier-quote-invitation.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/reports/operational-reports-audit.live.test.ts
+
+      - name: Restore rehearsal on disposable SQL and synthetic files
+        env:
+          DATABASE_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_recovery_source_ci
+          DIRECT_URL: postgresql://bloqer_ci:${{ env.CI_PILOT_POSTGRES_PASSWORD }}@127.0.0.1:5432/bloqer_audit_recovery_source_ci
+          BLOQER_RECOVERY_TEST: "1"
+        run: |
+          docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_recovery_source_ci
+          docker exec bloqer-ci-postgres createdb -U bloqer_ci bloqer_audit_recovery_target_ci
+          pnpm --filter @bloqer/database exec prisma migrate deploy
+          export DATABASE_URL="postgresql://bloqer_ci:${CI_PILOT_POSTGRES_PASSWORD}@127.0.0.1:5432/bloqer_audit_recovery_target_ci"
+          export DIRECT_URL="$DATABASE_URL"
+          pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-recovery.live.test.ts
+
       - name: Lint
         run: pnpm lint
 
@@ -36,6 +101,68 @@ jobs:
 
       - name: Unit tests (all workspace test suites)
         run: pnpm test
+
+      - name: Check AI documentation index
+        run: pnpm ai:check-docs-index
+
+      - name: Production build with isolated services
+        working-directory: apps/web
+        env:
+          APP_ENV: test
+          AUTH_SECRET: bloqer-ci-public-smoke-synthetic-secret
+          AUTH_URL: http://127.0.0.1:3100
+          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3100
+          APP_URL: http://127.0.0.1:3100
+          DATABASE_URL: postgresql://build:build@127.0.0.1:1/build?connect_timeout=1
+          DIRECT_URL: postgresql://build:build@127.0.0.1:1/build?connect_timeout=1
+          BLOQER_AI_ENABLED: "false"
+          BLOQER_AI_ALLOW_PRODUCTION: "false"
+          BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED: "false"
+          NEXT_TELEMETRY_DISABLED: "1"
+        run: pnpm build
+
+      - name: Install Chromium for public smoke
+        working-directory: apps/web
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Headless public smoke (desktop, tablet and phone)
+        working-directory: apps/web
+        run: pnpm test:e2e:public
+
+      - name: Upload public smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-smoke-${{ github.sha }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/public-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Authenticated smoke with disposable Postgres
+        working-directory: apps/web
+        env:
+          E2E_USER_EMAIL: pilot-ci@example.invalid
+        run: pnpm test:e2e:authenticated
+
+      - name: Upload authenticated smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-smoke-${{ github.sha }}
+          path: |
+            apps/web/playwright-report-authenticated/
+            apps/web/test-results/authenticated-smoke/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop disposable Postgres
+        if: always()
+        run: |
+          if docker container inspect bloqer-ci-postgres >/dev/null 2>&1; then
+            docker stop bloqer-ci-postgres
+          fi
 
   # Job-level `if` cannot reference `secrets` (GitHub rejects the workflow).
   # Probe secrets inside a step and expose a boolean output instead.

@@ -53,3 +53,28 @@ export function resolveVercelMigrationTarget(env) {
 
   return environment;
 }
+
+/** Give a sleeping Neon compute time to start, only in the migration child process. */
+export function prepareVercelMigrationEnvironment(env) {
+  const target = resolveVercelMigrationTarget(env);
+  if (target === null) return null;
+
+  const direct = new URL(env.DIRECT_URL);
+  const migrationEnv = { ...env };
+  if (direct.hostname.toLowerCase().endsWith(".neon.tech")) {
+    const values = direct.searchParams.getAll("connect_timeout");
+    if (values.length > 1 || (values.length === 1 && !/^\d+$/.test(values[0]))) {
+      throw new Error("DIRECT_URL connect_timeout must be one non-negative integer");
+    }
+    const seconds = values.length === 0 ? 5 : Number(values[0]);
+    if (!Number.isSafeInteger(seconds)) {
+      throw new Error("DIRECT_URL connect_timeout must be one non-negative integer");
+    }
+    // Preserve explicitly unbounded (0) and longer operator settings.
+    if (seconds > 0 && seconds < 15) {
+      direct.searchParams.set("connect_timeout", "15");
+      migrationEnv.DIRECT_URL = direct.href;
+    }
+  }
+  return { target, env: migrationEnv };
+}

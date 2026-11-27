@@ -32,6 +32,7 @@ import {
   canRegisterApInvoice,
 } from "@/features/procurement";
 import { PurchaseOrderMobileFiche } from "@/features/procurement/components/purchase-order-mobile-fiche";
+import { PurchaseOrderDocumentActions } from "@/features/procurement/components/purchase-order-document-actions";
 import { PurchaseOrderNextStep } from "@/features/procurement/components/purchase-order-next-step";
 import { ConfirmPurchaseOrderButton } from "@/features/procurement/components/confirm-purchase-order-button";
 import { PurchaseOrderApprovalActions } from "@/features/procurement/components/purchase-order-approval-actions";
@@ -234,12 +235,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
   const invoiceSettled = billingAvailable && billing.allReceivedInvoiceLinesIssued;
   // Services resolve outstanding payables, including credit-note settlement (D-112/D-115).
   const fullyPaid = billingAvailable && billing.allIssuedInvoicesSettled === true;
-  const hasActions =
-    (isDraft && canEditPo) ||
-    (isSubmitted && (approvalAvailability.canApprove || approvalAvailability.canReturn || showAuthorizeAndCommit)) ||
-    (isApproved && canEditPo) ||
-    (isReceivable && canReceive) ||
-    canCancel;
   const actionBtn = procurementActionBtnClass;
 
   const poPath = `/proyectos/${id}/ordenes-compra/${poId}`;
@@ -276,13 +271,13 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
   return (
     <PageShell variant="default" className="space-y-6" breadcrumbLabel={order.code}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div className="flex min-w-0 flex-col gap-4 md:flex-row md:flex-wrap md:items-start md:justify-between">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-bold tracking-tight">{order.code}</h1>
           <PurchaseOrderStatusBadge status={order.status} />
         </div>
-        {hasActions ? (
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
+            <PurchaseOrderDocumentActions projectId={id} purchaseOrderId={poId} code={order.code} />
             {isDraft && canEditPo && (
               <>
                 <Button asChild variant="outline" className={actionBtn}>
@@ -347,7 +342,6 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
               <CancelPurchaseOrderButton poId={poId} projectId={id} className={actionBtn} />
             )}
           </div>
-        ) : null}
       </div>
 
       <p className="text-sm text-muted-foreground">
@@ -436,7 +430,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
       />
 
       <div className="hidden md:block rounded-lg border bg-card p-6 space-y-4">
-        <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="grid grid-cols-2 gap-4 text-sm [&>div]:min-w-0 [&_p]:break-words">
           <div>
             <p className="text-muted-foreground">Proveedor</p>
             <p className="font-medium">{order.supplierName}</p>
@@ -459,11 +453,11 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
 
         <hr />
 
-        <TableScroll>
-          <Table>
+        <TableScroll stickyFirstColumn>
+          <Table aria-label="Líneas de la orden de compra">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[30%]">Descripción</TableHead>
+                <TableHead className="w-56 min-w-56 max-w-56">Descripción</TableHead>
                 <TableHead>EDT</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead className="text-right">Unidad</TableHead>
@@ -484,7 +478,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
             <TableBody>
               {order.lines.map((line) => (
                 <TableRow key={line.id}>
-                  <TableCell>{line.description}</TableCell>
+                  <TableCell className="w-56 min-w-56 max-w-56 whitespace-normal break-words">{line.description}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">
                     {line.wbsNodeCode ? `${line.wbsNodeCode} — ${line.wbsNodeName}` : "—"}
                   </TableCell>
@@ -536,7 +530,7 @@ export default async function OrdenCompraDetailPage({ params, searchParams }: Pa
           </Table>
         </TableScroll>
 
-        <div className="flex justify-end gap-8 text-sm">
+        <div className="flex flex-wrap justify-end gap-x-8 gap-y-4 rounded-lg bg-muted/30 p-4 text-sm [&>div]:min-w-0 [&_p]:break-words">
           <div className="text-right">
             <p className="text-muted-foreground">Subtotal</p>
             <p className="tabular-nums">{formatMoneyAmount(order.subtotal, order.currency)}</p>

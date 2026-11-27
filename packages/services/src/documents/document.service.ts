@@ -17,6 +17,7 @@ import { can, type PermissionModule } from "@bloqer/domain";
 import { ServiceContext, ServiceError } from "../types";
 import { companyScopeFilter } from "../company-scope";
 import { log } from "../audit/audit.service";
+import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
 import { createSystemNotification } from "../notifications/notification.service";
 import { filterNotificationAudienceForScope, resolveNotificationAudience } from "../notifications/notification-audience.service";
 import {
@@ -41,6 +42,8 @@ import {
   withIdempotentCreate,
 } from "../idempotency/idempotency";
 import { assertUploadContentMatchesDeclaredMime } from "./sniff-upload-content";
+import { verifyDocumentBytes } from "./document-integrity";
+import { archiveRevisionPredecessor, lockRevisionPredecessor } from "./document-revision";
 import {
   canSoftDeleteDocumentByLink,
   LINKED_DOCUMENT_DELETE_BLOCKED_MESSAGE,
@@ -70,6 +73,21 @@ export {
 } from "./document-delete-policy";
 
 const MAX_SIZE_BYTES = 50 * 1024 * 1024;
+
+function requireConfiguredFileStorage(configured: boolean): void {
+  if (!configured) throw new ServiceError("CONFLICT",
+    "No se pudo guardar el archivo: el almacenamiento no está disponible. Conservá el original e intentá de nuevo cuando se restablezca.");
+}
+
+async function withUploaderNames(docs: DocumentAttachmentView[], ctx: ServiceContext): Promise<DocumentAttachmentView[]> {
+  const names = await resolveUserDisplayNames(docs.map((doc) => doc.uploadedBy), ctx);
+  const candidates = docs.filter((doc) => doc.canDelete && doc.status !== "UPLOADING").map((doc) => doc.id);
+  const successors = candidates.length ? await prisma.documentAttachment.findMany({ where: {
+    tenantId: ctx.tenantId, replacesAttachmentId: { in: candidates }, status: { in: ["ACTIVE", "ARCHIVED"] },
+  }, select: { replacesAttachmentId: true } }) : [];
+  const preserved = new Set(successors.map((row) => row.replacesAttachmentId));
+  return docs.map((doc) => ({ ...doc, canDelete: doc.canDelete && !preserved.has(doc.id), uploadedByName: names.get(doc.uploadedBy) }));
+}
 
 /**
  * Trust extension + allowlist, not a client-claimed MIME alone.
@@ -132,6 +150,7 @@ export type DocumentAttachmentView = {
   /** Optional parent/receivable route for an authorized detail or confirmed upload. */
   relatedEntityId?: string;
   uploadedBy:       string;
+  uploadedByName?:  string;
   createdAt:        string;
   updatedAt:        string;
   /** Server-computed: archive/restore/delete/confirm allowed for this row given `linkedEntityType` + roles. */
@@ -223,6 +242,7 @@ export async function createDocumentMetadata(
 }
 
 type DocumentUploadPlan = {
+  revision: DocumentAttachment | null;
   id: string;
   anchorProjectId: string | null;
   companyId: string | null;
@@ -282,11 +302,21 @@ async function resolveDocumentUploadPlan(
   assertLinkedEntityTenantModuleEnabled(await getTenantModuleGate(ctx), linkedEntityType);
   await assertDocumentCompanyInTenant(target.companyId ?? ctx.companyId, ctx.tenantId);
 
+  const revision = input.replacesAttachmentId
+    ? await getOwned(input.replacesAttachmentId, ctx, await getTenantModuleGate(ctx)) : null;
+  if (revision && (revision.status === "DELETED" || revision.status === "UPLOADING" ||
+    revision.projectId !== target.projectId || (revision.companyId !== null && revision.companyId !== (target.companyId ?? ctx.companyId)) ||
+    (revision.linkedEntityType ?? "PROJECT") !== linkedEntityType ||
+    (revision.linkedEntityId ?? revision.projectId) !== linkedEntityId)) {
+    throw new ServiceError("FORBIDDEN", "La nueva revisión debe conservar la empresa, obra y entidad de origen");
+  }
+
   const id = crypto.randomUUID();
   return {
+    revision,
     id,
     anchorProjectId: target.projectId,
-    companyId: target.companyId ?? ctx.companyId,
+    companyId: revision ? revision.companyId : target.companyId ?? ctx.companyId,
     fileName: sanitize(input.originalFileName),
     storageKey: buildStorageKey(ctx.tenantId, target.projectId, id, input.originalFileName),
     linkedEntityType,
@@ -416,10 +446,11 @@ export async function uploadDocument(
 
   const contentSha256 = sha256Hex(content);
   const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx);
+  requireConfiguredFileStorage(configured);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
-    requestedFolderId: input.folderId,
+    requestedFolderId: plan.revision ? plan.revision.folderId : input.folderId,
     ctx,
   });
   const provider = configured ? "R2" : "PLACEHOLDER";
@@ -429,7 +460,7 @@ export async function uploadDocument(
       where: { tenantId: ctx.tenantId, idempotencyKey },
     });
   const payloadsMatch = (existing: DocumentAttachment) =>
-    uploadIntentMatches(existing, input, plan, folderId, ctx) && documentReplayMatches(existing, {
+    existing.storageProvider === "R2" && uploadIntentMatches(existing, input, plan, folderId, ctx) && documentReplayMatches(existing, {
       contentSha256,
       linkedEntityType: plan.linkedEntityType,
       linkedEntityId: plan.linkedEntityId,
@@ -464,6 +495,10 @@ export async function uploadDocument(
       create: async () => {
         const row = await prisma.$transaction(async (tx) => {
           await lockDocumentUploadProject(tx, plan.anchorProjectId, plan.companyId, ctx);
+          const previous = await lockRevisionPredecessor(tx, input.replacesAttachmentId, {
+            id: plan.id, projectId: plan.anchorProjectId, companyId: plan.companyId,
+            linkedEntityType: plan.linkedEntityType, linkedEntityId: plan.linkedEntityId,
+          }, ctx);
           const row = await tx.documentAttachment.create({
             data: {
               id:               plan.id,
@@ -484,6 +519,7 @@ export async function uploadDocument(
               linkedEntityId:   plan.linkedEntityId,
               contentSha256,
               idempotencyKey,
+              replacesAttachmentId: input.replacesAttachmentId ?? null,
               uploadedBy:       ctx.actorUserId,
             },
           });
@@ -497,6 +533,7 @@ export async function uploadDocument(
             companyId: row.companyId,
             after: { originalFileName: row.originalFileName, storageProvider: row.storageProvider, status: row.status },
           }, tx);
+          await archiveRevisionPredecessor(tx, previous, row.id, ctx);
           return row;
         });
         createdNow = true;
@@ -532,6 +569,7 @@ function uploadIntentMatches(
   ctx: ServiceContext,
 ): boolean {
   return row.uploadedBy === ctx.actorUserId && row.projectId === plan.anchorProjectId &&
+    (row.replacesAttachmentId ?? null) === (input.replacesAttachmentId ?? null) &&
     // Older rows may have inherited their company only through the parent.
     (row.companyId === null || row.companyId === plan.companyId) &&
     row.folderId === folderId && row.originalFileName === input.originalFileName &&
@@ -558,7 +596,7 @@ async function uploadResponse(doc: DocumentAttachment, configured: boolean, crea
 
 /**
  * Direct-to-R2 upload (browser PUT). Avoids Vercel’s 4.5 MB function body limit.
- * When R2 is not configured, creates ACTIVE PLACEHOLDER metadata (no uploadUrl).
+ * A file upload requires storage; metadata alone must never count as a saved file.
  */
 export async function initiateDocumentUpload(
   input: InitiateUploadInput,
@@ -582,10 +620,11 @@ export async function initiateDocumentUpload(
   }
 
   const plan = await resolveDocumentUploadPlan({ ...input, mimeType }, ctx);
+  requireConfiguredFileStorage(configured);
   const folderId = await resolveFolderIdForUpload({
     projectId: plan.anchorProjectId,
     linkedEntityType: plan.linkedEntityType,
-    requestedFolderId: input.folderId,
+    requestedFolderId: plan.revision ? plan.revision.folderId : input.folderId,
     ctx,
   });
   const provider = configured ? "R2" : "PLACEHOLDER";
@@ -597,6 +636,7 @@ export async function initiateDocumentUpload(
     });
 
   const payloadsMatch = (existing: DocumentAttachment) =>
+    existing.storageProvider === "R2" &&
     (existing.status === "UPLOADING" || existing.status === "ACTIVE") &&
     uploadIntentMatches(existing, { ...input, mimeType }, plan, folderId, ctx);
 
@@ -618,6 +658,10 @@ export async function initiateDocumentUpload(
     create: async () => {
       const row = await prisma.$transaction(async (tx) => {
         await lockDocumentUploadProject(tx, plan.anchorProjectId, plan.companyId, ctx);
+        await lockRevisionPredecessor(tx, input.replacesAttachmentId, {
+          id: plan.id, projectId: plan.anchorProjectId, companyId: plan.companyId,
+          linkedEntityType: plan.linkedEntityType, linkedEntityId: plan.linkedEntityId,
+        }, ctx);
         const row = await tx.documentAttachment.create({
           data: {
             id: plan.id,
@@ -637,6 +681,7 @@ export async function initiateDocumentUpload(
             linkedEntityType: plan.linkedEntityType,
             linkedEntityId: plan.linkedEntityId,
             idempotencyKey,
+            replacesAttachmentId: input.replacesAttachmentId ?? null,
             uploadedBy: ctx.actorUserId,
           },
         });
@@ -727,6 +772,11 @@ export async function confirmDocumentUpload(
   // Atomic transition: only one concurrent confirm wins and notifies.
   const activated = await prisma.$transaction(async (tx) => {
     await lockDocumentUploadProject(tx, doc.projectId, companyId, ctx);
+    // A concurrent successful replay must not try to archive its predecessor twice.
+    await tx.$queryRaw`SELECT "id" FROM "document_attachments" WHERE "id" = ${id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+    const current = await tx.documentAttachment.findFirst({ where: { id, tenantId: ctx.tenantId } });
+    if (current?.status === "ACTIVE" && current.storageKey === doc.storageKey) return { count: 0 };
+    const previous = await lockRevisionPredecessor(tx, doc.replacesAttachmentId, { ...doc, companyId }, ctx);
     const result = await tx.documentAttachment.updateMany({
       where: {
         id,
@@ -738,6 +788,7 @@ export async function confirmDocumentUpload(
       data: { status: "ACTIVE" },
     });
     if (result.count === 1) {
+      await archiveRevisionPredecessor(tx, previous, id, ctx);
       await log({
         tenantId: ctx.tenantId,
         actorUserId: ctx.actorUserId,
@@ -854,6 +905,17 @@ export async function getDocumentFileBytes(
   id: string,
   ctx: ServiceContext,
 ): Promise<DocumentFileBytes> {
+  const file = await readVerifiedDocument(id, ctx);
+  return { body: file.body, mimeType: file.mimeType, originalFileName: file.originalFileName, sizeBytes: file.sizeBytes };
+}
+
+/** Explicit read-only recovery check; does not restore status or replace missing bytes. */
+export async function verifyStoredDocument(id: string, ctx: ServiceContext) {
+  const { sizeBytes, checksumVerified } = await readVerifiedDocument(id, ctx);
+  return { sizeBytes, checksumVerified, checkedAt: new Date().toISOString() };
+}
+
+async function readVerifiedDocument(id: string, ctx: ServiceContext): Promise<DocumentFileBytes & { checksumVerified: boolean }> {
   const doc = await prisma.documentAttachment.findUnique({ where: { id } });
   if (!doc || doc.tenantId !== ctx.tenantId) throw new ServiceError("NOT_FOUND", "Documento no encontrado");
   if (!canViewDocumentByLink(doc.linkedEntityType, ctx.roles, doc.projectId)) {
@@ -871,12 +933,14 @@ export async function getDocumentFileBytes(
 
   assertDocumentStorageObject(doc);
 
-  const { body } = await getObjectBytes(doc.storageKey);
-  if (body.length !== doc.sizeBytes || body.length > MAX_SIZE_BYTES) {
-    throw new ServiceError("CONFLICT", "El tamaño del archivo almacenado no coincide");
+  if (!Number.isSafeInteger(doc.sizeBytes) || doc.sizeBytes <= 0 || doc.sizeBytes > MAX_SIZE_BYTES) {
+    throw new ServiceError("CONFLICT", "El tamaño registrado del archivo no es válido");
   }
+  const { body } = await getObjectBytes(doc.storageKey);
+  const checksumVerified = verifyDocumentBytes(body, doc.sizeBytes, doc.contentSha256);
   return {
     body,
+    checksumVerified,
     mimeType: doc.mimeType,
     originalFileName: doc.originalFileName,
     sizeBytes: doc.sizeBytes,
@@ -890,6 +954,13 @@ async function changeDocumentStatus(
   ctx: ServiceContext,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
+    if (status === "DELETED") {
+      await tx.$queryRaw`SELECT "id" FROM "document_attachments" WHERE "id" = ${doc.id} AND "tenantId" = ${ctx.tenantId} FOR UPDATE`;
+      const current = await tx.documentAttachment.findFirst({ where: { id: doc.id, tenantId: ctx.tenantId } });
+      if (current && current.status !== "UPLOADING" && (current.replacesAttachmentId || await tx.documentAttachment.count({
+        where: { tenantId: ctx.tenantId, replacesAttachmentId: doc.id, status: { in: ["ACTIVE", "ARCHIVED"] } },
+      }))) throw new ServiceError("FORBIDDEN", "Las revisiones se conservan para trazabilidad. Podés archivar el documento.");
+    }
     const flipped = await tx.documentAttachment.updateMany({
       where: { id: doc.id, tenantId: ctx.tenantId, status: doc.status },
       data: { status },
@@ -938,7 +1009,8 @@ export async function getDocumentById(id: string, ctx: ServiceContext): Promise<
   }
   await requireDocumentLinkAccess(doc, ctx);
   const route = await resolveDocumentRouteTarget(doc);
-  return { ...serialize(doc, ctx, await getTenantModuleGate(ctx)), relatedEntityId: route.relatedEntityId };
+  const [view] = await withUploaderNames([serialize(doc, ctx, await getTenantModuleGate(ctx))], ctx);
+  return { ...view!, relatedEntityId: route.relatedEntityId };
 }
 
 export async function listProjectDocuments(
@@ -980,7 +1052,7 @@ export async function listProjectDocuments(
 
   const visible = await filterProjectDocumentsByLink(docs, project, ctx);
   const gate = await getTenantModuleGate(ctx);
-  return visible.map((doc) => serialize(doc, ctx, gate));
+  return withUploaderNames(visible.map((doc) => serialize(doc, ctx, gate)), ctx);
 }
 
 export async function listEntityDocuments(
@@ -1038,9 +1110,9 @@ export async function listEntityDocuments(
   });
   const validCompanies = new Set(companyRows.map(({ id }) => id));
   const gate = await getTenantModuleGate(ctx);
-  return docs.filter((doc) => documentMatchesScope(doc, parent, ctx) &&
+  return withUploaderNames(docs.filter((doc) => documentMatchesScope(doc, parent, ctx) &&
     (parent.companyId !== null || doc.companyId === null || validCompanies.has(doc.companyId)))
-    .map((doc) => serialize(doc, ctx, gate));
+    .map((doc) => serialize(doc, ctx, gate)), ctx);
 }
 
 /**
@@ -1144,6 +1216,7 @@ function serialize(
   doc: {
     id: string; tenantId: string; companyId: string | null; projectId: string | null;
     folderId?: string | null;
+    replacesAttachmentId?: string | null;
     originalFileName: string; fileName: string; mimeType: string; sizeBytes: number;
     storageProvider: string; category: string; description: string | null;
     status: string; linkedEntityType: LinkedEntityType | null; linkedEntityId: string | null;
@@ -1177,6 +1250,7 @@ function serialize(
     canMutate,
     canDelete:
       canMutate &&
+      (doc.status === "UPLOADING" || !doc.replacesAttachmentId) &&
       canSoftDeleteDocumentByLink({
         status: doc.status,
         linkedEntityType: doc.linkedEntityType,

@@ -6,8 +6,8 @@ import { useDebouncedSearchParam } from "@/hooks/use-debounced-search-param";
 import { DocumentClassFilter } from "@/features/finance/components/document-class-filter";
 import { FiscalDocumentKindFilter } from "@/features/finance/components/fiscal-document-kind-filter";
 
-/** Filters for project AR facturas list (`?search=` `?kind=` `?class=`). */
-export function SalesInvoiceListFilters() {
+/** Filters for AR invoice lists (`?search=` `?kind=` `?class=`). */
+export function SalesInvoiceListFilters({ company = false }: { company?: boolean }) {
   const { defaultValue, setDebounced } = useDebouncedSearchParam("search");
 
   return (
@@ -26,7 +26,7 @@ export function SalesInvoiceListFilters() {
         />
       </div>
       <FiscalDocumentKindFilter />
-      <DocumentClassFilter scope="sales-project" />
+      {!company ? <DocumentClassFilter scope="sales-project" /> : null}
     </div>
   );
 }

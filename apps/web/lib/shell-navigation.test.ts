@@ -48,6 +48,16 @@ test("enabled child modules cannot offer navigation into a disabled treasury or 
   assert.ok(sections.some((section) => section.title === "Finanzas"));
 });
 
+test("corporate sales documents require company finance access and the AR module", () => {
+  const hrefs = (roles: Parameters<typeof buildGlobalNavSections>[0], enabled = true) =>
+    buildGlobalNavSections(roles, (module) => module !== "AR" || enabled)
+      .flatMap(({ items }) => items).map(({ href }) => href);
+  assert.ok(hrefs(["OWNER"]).includes("/finanzas/facturas"));
+  assert.ok(!hrefs(["OWNER"], false).includes("/finanzas/facturas"));
+  assert.ok(!hrefs(["PROJECT_MANAGER"]).includes("/finanzas/facturas"));
+  assert.equal(isNavLinkActive("/finanzas/facturas-proveedor", null, "/finanzas/facturas"), false);
+});
+
 test("active account navigation includes its transfer flow and preserves exact summary matching", () => {
   assert.equal(isNavLinkActive("/tesoreria/transferencias", null, "/tesoreria/cuentas"), true);
   assert.equal(isNavLinkActive("/tesoreria/transferencias/nueva", null, "/tesoreria/cuentas"), true);

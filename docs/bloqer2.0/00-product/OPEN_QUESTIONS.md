@@ -118,7 +118,7 @@
 ### Q-008 — Documentos: versionado y check-in/check-out
 
 - **Categoría:** Documentos
-- **Estado:** ABIERTA
+- **Estado:** RESUELTA → D-146, opción 2 autorizada. Implementación y migración verificadas por entrega; check-in/check-out queda fuera.
 - **Impacto:** complejidad del módulo de documentos.
 - **Opciones:**
   1. Sin versionado, solo última versión.
@@ -789,6 +789,45 @@
 - **Fecha:** 05/11/2026. **Estado:** RESUELTA → D-145. El Owner aprobó conservar la edición y avisar.
 - **Hallazgo:** al refrescar un borrador automático tras otra recepción, pueden perderse precios y otros datos fiscales ya editados y guardados por Finanzas. D-108 y P-IND-02 no definen la prioridad entre esas ediciones y la sugerencia de nuevas líneas.
 - **Propuesta:** [conservar la factura editada y pedir completarla manualmente](../08-architecture/platform-audit/2026-11-05-ag-14-edited-ap-draft-proposal.md).
+
+### Q-093 — Referencia fiscal y duplicados en captura de facturas
+
+- **Fecha:** 19/11/2026. **Estado:** ABIERTA; no bloquea el prellenado efímero de ADR-019.
+- **Hallazgo:** `SupplierInvoice.number` es el correlativo interno. No hay referencia fiscal externa persistida que permita comprobar un mismo comprobante entre web, correo y WhatsApp. La lectura inicial muestra la referencia y conserva el original, sin poblar campos alternativos ni afirmar deduplicación fiscal.
+- **Decisión pendiente:** definir alcance de una clave comercial (empresa, emisor, tipo, punto de venta y número cuando corresponda), comportamiento ante duplicados e históricos incompletos. Alternativas: advertencia revisable con referencia opcional, o unicidad obligatoria para nuevos comprobantes con circuito de excepción. No crear campo ni índice hasta aprobar representación y casos de uso.
+- **Seguimiento:** [primer paquete, A2/A4](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md).
+
+### Q-094 — Idempotencia durable del alta manual de borrador AP
+
+- **Fecha:** 19/11/2026. **Estado:** ABIERTA.
+- **Hallazgo:** `registerApExpense` tiene idempotencia pero emite/genera obligación; no reemplaza el alta DRAFT. El primer paquete conserva un ID confirmado frente a fallos de adjunto/refresco y bloquea repetición ante resultado incierto. No garantiza recuperación entre dispositivos ni después de perder una respuesta y cerrar el formulario.
+- **Decisión pendiente:** extender el contrato del alta DRAFT con clave de intento validada y un resultado recuperable, definiendo scope, payload distinto con misma clave, concurrencia, retención y reanudación. Puede reutilizar persistencia existente solo después de comprobar su semántica; no se habilita por analogía con gastos emitidos.
+- **Alternativa conservada:** revisión del listado antes de repetir una creación incierta; no automatizar reintentos de creación.
+
+### Q-095 — Horarios configurables del digest frente a ejecución diaria
+
+- **Fecha:** 19/11/2026. **Estado:** RESUELTA → D-147 (22/11/2026); se conserva D-114 con la configuración compatible de D-147.
+- **Hallazgo:** el cron diario a 10:05 UTC no cubre todas las horas configurables de todos los tenants con su ventana de tres horas. El primer paquete muestra la próxima revisión y advierte incompatibilidad, sin cambiar preferencias ni frecuencia en silencio.
+- **Decisión aprobada:** mantener revisión diaria y alinear nuevas elecciones de horario a esa capacidad, sin nuevos servicios. El servidor valida compatibilidad; los valores históricos se conservan con aviso y se corrigen por acción explícita. La campana y las demás categorías no cambian. No se promete puntualidad exacta ni se acredita recepción de correos con una prueba de configuración.
+
+### Q-096 — Primer flujo de audio del bloque 4 / P1c
+
+- **Fecha:** 23/11/2026. **Estado:** RESUELTA → D-148. El Owner eligió «Solicitud de compra (recomendado)».
+- **Contexto:** el plan exige elegir un único flujo inicial: audio a solicitud de compra o a parte diario. Continuar el plan no define por sí solo esa elección ni habilita tools WRITE.
+- **Decisión aprobada:** solicitud de compra dentro de una obra autenticada, con propuesta efímera editable; el usuario elige la partida y completa datos desconocidos antes de guardar DRAFT mediante el servicio existente. No enviar a Compras, adjudicar ni aprobar automáticamente. D-148 define el alcance; las validaciones y el despliegue se registran por separado en el plan.
+- **Alternativas:** comenzar por parte diario, o diferir audio. El parte requiere conservar explícitamente los controles de avance/consumo y aprobación vigentes.
+- **Arquitectura:** ADR-020 documenta audio/transcripción efímeros, límites y reutilización del proveedor. Sin nuevas dependencias, persistencia o servicios. El uso del proveedor actual no implica costo nulo de procesamiento; la función queda deshabilitada por defecto hasta su piloto.
+- **Seguimiento:** [primer paquete, bloque 4/D y P1c](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md).
+
+### Q-097 — Respuesta externa de proveedor por enlace (bloque 5/E2)
+
+- **Fecha:** 23/11/2026. **Estado:** RESUELTA → D-149. El Owner respondió «Sí, aprobar este alcance (recomendado)»: acceso sin cuenta, siete días, revocación, respuesta única con revisión interna y tabla nueva según ADR-021.
+- **Evidencia:** las cotizaciones actuales se registran con un usuario interno autorizado y nacen `RECEIVED`. `ServiceContext.actorUserId` es obligatorio. No existe una invitación externa de cotización ni un registro de respuesta pendiente; `VerificationToken` e invitaciones de membresía tienen otro propósito.
+- **Opción recomendada:** enlace sin cuenta, específico para una SC y un proveedor, válido siete días desde su creación, revocable y con una sola respuesta definitiva. Compras comparte el enlace manualmente. El proveedor ve empresa/obra identificadas e ítems/cantidades/unidades; responde precios, clasificación D-118, impuestos, moneda, plazo y vigencia. Compras revisa y completa FX antes de incorporar por el alta canónica. La respuesta no adjudica ni crea OC. Sin adjuntos ni IA en este primer corte.
+- **Límite explícito:** quien posea el enlace puede usarlo mientras siga vigente; no verifica la identidad personal ni la titularidad de un email. La pantalla de generación debe advertir que se comparta únicamente con el proveedor elegido. Si se requiere identidad verificada, elegir la alternativa con cuenta antes de programar.
+- **Persistencia propuesta:** una raíz `ProcurementQuoteInvitation`, con `tenantId` propio, vínculos de empresa/obra/SC/proveedor, hash de token, vencimiento/revocación, snapshot mínimo de lo compartido, una respuesta inmutable validada y vínculo único a la cotización incorporada. Contrato de campos, auditoría, concurrencia y pruebas en [ADR-021 propuesto](../08-architecture/ARCHITECTURE_DECISION_RECORDS.md#adr-021--propuesta-de-respuesta-externa-de-cotizaciones-por-enlace).
+- **Alternativas:** (a) enlace limitado y revisión interna, con menor fricción y riesgo de reenvío explícito; (b) acceso con cuenta/identidad verificada, con alta y administración de usuarios externos y diseño adicional; (c) diferir E2 y conservar carga interna/lectura de archivo, avanzando E3.
+- **Aprobación solicitada:** opción (a), vencimiento de siete días, respuesta única con revisión interna y la migración aditiva descrita en ADR-021. No contratar servicios, enviar invitaciones reales ni activar el piloto por esta aprobación. Antes de migrar portal, aplicar el procedimiento de producción documentado y verificar el destino.
 
 ## Cómo se resuelve una pregunta
 

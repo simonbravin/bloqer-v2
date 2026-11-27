@@ -10,6 +10,8 @@ import {
   documentDownloadHref,
 } from "../lib/document-file-utils";
 import { useDocumentImageGallery } from "./document-image-gallery-provider";
+import { DocumentHistoryDialog } from "./document-history-dialog";
+import { DocumentVersionsDialog } from "./document-versions-dialog";
 
 const iconButtonClass = "h-7 w-7 shrink-0";
 const iconSvgClass = "h-3.5 w-3.5";
@@ -32,7 +34,9 @@ export function DocumentFileActions({
   className,
 }: DocumentFileActionsProps) {
   const gallery = useDocumentImageGallery();
+  const history = status !== "DELETED" ? <DocumentHistoryDialog documentId={documentId} fileName={originalFileName} canVerifyFile={storageProvider === "R2" && (status === "ACTIVE" || status === "ARCHIVED")} /> : null;
   const canAccess = canAccessDocumentFile({ storageProvider, status });
+  const versions = status === "ACTIVE" || status === "ARCHIVED" ? <DocumentVersionsDialog documentId={documentId} /> : null;
   if (!canAccess) {
     if (
       storageProvider === "PLACEHOLDER" &&
@@ -50,10 +54,12 @@ export function DocumentFileActions({
           >
             <FileX className={iconSvgClass} aria-hidden />
           </Button>
+          {history}
+          {versions}
         </div>
       );
     }
-    return null;
+    return history;
   }
 
   const showView = canPreviewInBrowser(mimeType, originalFileName);
@@ -104,6 +110,8 @@ export function DocumentFileActions({
           <Download className={iconSvgClass} aria-hidden />
         </a>
       </Button>
+      {history}
+      {versions}
     </div>
   );
 }

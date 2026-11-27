@@ -30,7 +30,7 @@ import {
   getSubcontractVarianceReport,
   getTrialBalanceReport,
   listCompanyPayables,
-  listCompanySupplierInvoices,
+  readCompanySupplierInvoicesForExport,
   listPostedJournalBookForExport,
   MAX_ACCOUNT_LEDGER_ROWS,
   MAX_EXPORT_ROWS,
@@ -85,7 +85,7 @@ import { ProjectSimpleTablePdfDocument } from "./pdf/project-simple-table-pdf";
 import { ProjectProgressPdfDocument } from "./pdf/project-progress-pdf";
 import { SchedulePdfDocument } from "./pdf/schedule-pdf";
 import type { ReportPdfPayload } from "./pdf/pdf-export.types";
-import { MAX_AUDIT_LOG_PDF_ROWS } from "./pdf/pdf-export.types";
+import { MAX_AUDIT_LOG_PDF_ROWS, MAX_PROJECT_REPORT_PDF_ROWS } from "./pdf/pdf-export.types";
 import { renderReportPdfToBuffer } from "./pdf/pdf-renderer.service";
 import { buildPdfFilterLine } from "./pdf/pdf-filter-line";
 
@@ -668,7 +668,29 @@ export async function exportProjectSupplierReportPdf(
         share: result.apAvailable && r.shareOfExposurePct ? `${r.shareOfExposurePct}%` : "—",
         payable: result.apAvailable ? r.payableBalance : "—",
       }))}
-      warnings={result.warnings}
+      warnings={[...result.warnings,
+        "Entregas: OC por fecha de emisión y moneda; estados actuales y recepciones confirmadas de cualquier fecha. Última recepción no acredita entrega completa ni puntualidad.",
+        ...result.deliveryEvidence.map(s => `${s.supplierName}: fecha prevista en ${s.withExpectedDateCount}/${s.orderCount} OC; recepción registrada en ${s.withReceiptCount}/${s.orderCount} OC.`),
+      ]}
+      additionalTable={result.deliveryEvidence.length > 0 ? {
+        title: "Entregas y cobertura de datos",
+        columns: [
+          { key: "supplier", label: "Proveedor", flex: 1.5 },
+          { key: "order", label: "OC", flex: 0.65 },
+          { key: "status", label: "Estado actual", flex: 1.1 },
+          { key: "issued", label: "Emitida", flex: 0.85 },
+          { key: "expected", label: "Entrega prevista", flex: 0.85 },
+          { key: "receipt", label: "Última recepción", flex: 1 },
+        ],
+        rows: result.deliveryEvidence.flatMap(supplier => supplier.orders.map(order => ({
+          supplier: supplier.supplierName,
+          order: `OC-${String(order.number).padStart(3, "0")}`,
+          status: order.status === "RECEIVED" ? "Recibida" : order.status === "PARTIALLY_RECEIVED" ? "Recepción parcial" : "Confirmada",
+          issued: order.issueDate,
+          expected: order.expectedDeliveryDate ?? "Sin dato",
+          receipt: order.lastReceiptDate ?? "Sin recepción registrada",
+        }))),
+      } : undefined}
     />
   ));
 }
@@ -1000,21 +1022,17 @@ export async function exportCompanySupplierInvoicesPdf(
   filters: CompanySupplierInvoiceListFilters,
   ctx: ServiceContext,
 ): Promise<ReportPdfPayload> {
-  const { data, total } = await listCompanySupplierInvoices(ctx, {
-    ...filters,
-    page: 1,
-    pageSize: MAX_EXPORT_ROWS,
-  });
-  if (total > MAX_EXPORT_ROWS) {
-    throw new ServiceError(
-      "VALIDATION",
-      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas de emisión.`,
-    );
-  }
+  const data = await readCompanySupplierInvoicesForExport(filters, ctx);
+  const notice = data.length > MAX_PROJECT_REPORT_PDF_ROWS
+    ? `Detalle truncado: ${data.length - MAX_PROJECT_REPORT_PDF_ROWS} filas omitidas (límite ${MAX_PROJECT_REPORT_PDF_ROWS}). Exportá Excel para el detalle completo.`
+    : undefined;
   return exportPdfDocument(ctx, {}, "finanzas_facturas_proveedor_corporativo", (branding) => (
     <ProjectSimpleTablePdfDocument
       branding={branding}
       title="Facturas y gastos"
+      subtitle={`${data.length} registros encontrados`}
+      warnings={notice ? [notice] : undefined}
+      footerNote={notice}
       filterLine={buildPdfFilterLine({
         status: filters.status,
         issueDateFrom: filters.issueDateFrom,

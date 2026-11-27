@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
+import { ReportExportActions } from "@/features/reports";
 import { PurchaseReceiptListSection } from "@/features/procurement";
 import type { PurchaseReceiptListItem } from "@/features/procurement";
 import { getCurrentUser } from "@/lib/auth";
@@ -65,6 +66,11 @@ export default async function RecepcionesPage({ params }: PageProps) {
         subtitle={`${items.length} ${items.length === 1 ? "recepción" : "recepciones"}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <ReportExportActions
+              exportPath={`/api/proyectos/${id}/recepciones/export`}
+              params={{}}
+              pdf xlsx csv={false}
+            />
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`recepciones-${id}`} />
             </Suspense>

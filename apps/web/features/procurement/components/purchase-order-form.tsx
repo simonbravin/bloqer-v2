@@ -6,6 +6,7 @@ import { DEFAULT_IIBB_PERCEPTION_RATE_PCT } from "@bloqer/domain";
 import { compareDecimal } from "@bloqer/utils";
 import type { VarianceSettings } from "@bloqer/services/purchase-variance-pure";
 import { Button } from "@/components/ui/button";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS } from "../lib/procurement-form-layout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CurrencySelect } from "@/components/ui/currency-select";
@@ -124,7 +125,7 @@ export function PurchaseOrderForm({
 
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className={`space-y-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}>
 <fieldset disabled={isPending} className="min-w-0 space-y-5">
         {error && (
           <p
@@ -208,7 +209,7 @@ export function PurchaseOrderForm({
           <AutoGrowTextarea id="notes" name="notes" />
         </div>
 
-        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
           <Button
             type="button"
             variant="outline"

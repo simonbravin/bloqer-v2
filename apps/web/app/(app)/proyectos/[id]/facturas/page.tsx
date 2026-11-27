@@ -5,6 +5,8 @@ import { Pagination } from "@/components/ui/pagination";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
+import { NewFiscalNoteDialog } from "@/features/finance/components/new-fiscal-note-dialog";
+import { ReportExportActions } from "@/features/reports/report-export-actions";
 import {
   NewProjectSalesInvoiceDialog,
   SalesInvoiceListFilters,
@@ -166,10 +168,21 @@ export default async function FacturasPage({ params, searchParams }: PageProps) 
         actions={
           <ProjectFinanceListHeaderActions
             listViewStorageKey={`facturas-${id}`}
+            exportSlot={
+              <ReportExportActions
+                exportPath={`/api/proyectos/${id}/facturas/export`}
+                params={{ search, class: sp.class, kind: documentKind }}
+                pdf
+                xlsx
+                csv={false}
+              />
+            }
             secondary={{ href: `/proyectos/${id}/cobranzas`, label: "Ver cobranzas" }}
             primarySlot={
               canCreate ? (
                 <Suspense fallback={<Button size="sm" disabled>Nueva factura</Button>}>
+                  <NewFiscalNoteDialog kind="CREDIT_NOTE" scope="project-ar" projectId={id} />
+                  <NewFiscalNoteDialog kind="DEBIT_NOTE" scope="project-ar" projectId={id} />
                   <NewProjectSalesInvoiceDialog
                     projectId={id}
                     clients={clients}

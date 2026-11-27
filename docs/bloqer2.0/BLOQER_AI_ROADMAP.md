@@ -38,6 +38,7 @@ Bloqer AI debe evolucionar de **interfaz conversacional del ERP** a **plataforma
 | [`BLOQER_AI_EVAL_RUNBOOK.md`](./BLOQER_AI_EVAL_RUNBOOK.md) | Cómo correr evals |
 | [`BLOQER_AI_MANUAL_SMOKE.md`](./BLOQER_AI_MANUAL_SMOKE.md) | Smoke manual local |
 | [`CHANGE_IMPACT_POLICY.md`](./CHANGE_IMPACT_POLICY.md) | Help + Guía + AI en el mismo PR |
+| [`PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md`](./PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md) | Seguimiento P0/P1a desde el relevamiento del 19/11/2026; no sustituye V1–V4 ni habilita tools WRITE por sí solo |
 | [D-090](./00-product/DECISION_LOG.md) / [D-111](./00-product/DECISION_LOG.md) | Ayuda in-app; ACL de obras |
 
 Leyenda de estados en este roadmap:
@@ -356,6 +357,8 @@ Lote sugerido (**solo V1 cierre**, sin Admin ni WRITE):
 ---
 
 ## Changelog
+
+- **23/11/2026 — D-148 / ADR-020:** el Owner seleccionó audio a solicitud de compra como bloque 4 del plan de automatización. Flujo especializado de propuesta efímera, sin tools PREPARE/WRITE del chat: transcripción revisada, renglones editables y creación DRAFT por el formulario/servicio existentes. Sin persistencia adicional, dependencias ni proveedor nuevo; apagado por defecto. No equivale a habilitar V3 ni a acreditar el piloto con proveedor real. Ver alcance, validación y próximos pasos en el plan del primer paquete.
 
 | Fecha | Cambio |
 |---|---|

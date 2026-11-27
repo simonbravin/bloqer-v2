@@ -5,7 +5,7 @@ import type { StoredDocumentLineMoney } from "@bloqer/utils";
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { addDecimal, compareDecimal, resolveDocumentLineAmounts, calcIibbPerceptionAmount, roundMoney } from "@bloqer/utils";
+import { addDecimal, compareDecimal, resolveDocumentLineAmounts, calcIibbPerceptionAmount, roundMoney, AMERICAS_CURRENCY_OPTIONS } from "@bloqer/utils";
 import {
   DEFAULT_IIBB_PERCEPTION_RATE_PCT,
   IVA_RATE_LABEL_ES,
@@ -15,6 +15,7 @@ import {
   type QuoteLineOfferKind,
 } from "@bloqer/domain";
 import { Button } from "@/components/ui/button";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS } from "../lib/procurement-form-layout";
 import { Input } from "@/components/ui/input";
 import { DecimalInput } from "@/components/ui/decimal-input";
 import { Label } from "@/components/ui/label";
@@ -46,6 +47,8 @@ import {
 } from "@/app/(app)/proyectos/[id]/solicitudes-compra/actions";
 import { useProcurementAction } from "../lib/use-procurement-action";
 import { PoLineBudgetRef } from "./po-line-budget-ref";
+import { QuoteDocumentAssistant } from "./quote-document-assistant";
+import type { QuoteDocumentPrefill } from "../lib/quote-document-mapping";
 
 /** Default alícuota IVA for new quote forms (matches IVA_RATE_PRESETS). */
 const DEFAULT_QUOTE_TAX_RATE = "21";
@@ -159,6 +162,12 @@ export function ProcurementQuoteForm({
   );
   /** Remount create form after success so uncontrolled date/plazo + DecimalInput drafts reset. */
   const [createEpoch, setCreateEpoch] = useState(0);
+  const [assisted, setAssisted] = useState(false);
+  const [reviewed, setReviewed] = useState(false);
+  const reviewedRef = useRef(false);
+  const [assistedDates, setAssistedDates] = useState<{ validUntil: string; leadTimeDays: string } | null>(null);
+  const [assistedSummary, setAssistedSummary] = useState("");
+  function invalidateReview() { reviewedRef.current = false; setReviewed(false); }
   const [lineMoney, setLineMoney] = useState<Record<string, LineMoney>>(() =>
     Object.fromEntries(
       lines.map((l) => {
@@ -200,6 +209,7 @@ export function ProcurementQuoteForm({
   }
 
   function resetCreateForm() {
+    setAssisted(false); invalidateReview(); setAssistedDates(null); setAssistedSummary("");
     setCurrency("ARS"); setFxRate(""); fxRateRef.current = "";
     const rate = DEFAULT_QUOTE_TAX_RATE;
     const nextMoney = blankLineMoney(rate);
@@ -221,6 +231,7 @@ export function ProcurementQuoteForm({
   }
 
   function applyGlobalTaxRate(next: string) {
+    invalidateReview();
     setTaxRate(next);
     taxRateRef.current = next;
     setLineMoney((prev) => {
@@ -241,6 +252,27 @@ export function ProcurementQuoteForm({
         return false;
       }
     });
+  }
+
+  function applyDocument(value: QuoteDocumentPrefill) {
+    if (isEdit || isRunning()) return;
+    const p = value.preview;
+    const nextMoney = Object.fromEntries(lines.map(line => {
+      const source = value.lines[line.id];
+      return [line.id, { unitPrice: source?.offerKind === "NOT_QUOTED" ? "0" : source?.unitPrice ?? "",
+        discountPct: source?.offerKind === "NOT_QUOTED" ? "0" : source?.discountPct ?? "", taxRate: source?.offerKind === "NOT_QUOTED" ? "0" : source?.taxRate ?? "" }];
+    }));
+    const nextKinds = Object.fromEntries(lines.map(line => [line.id, value.lines[line.id]?.offerKind ?? null]));
+    setSupplierId(""); supplierIdRef.current = "";
+    setCurrency(AMERICAS_CURRENCY_OPTIONS.some(c => c.code === p.currency) ? p.currency! : ""); setFxRate(""); fxRateRef.current = "";
+    setLineMoney(nextMoney); lineMoneyRef.current = nextMoney;
+    setOfferKinds(nextKinds); offerKindsRef.current = nextKinds;
+    setTaxRate(""); taxRateRef.current = "";
+    setPricesIncludeTax(p.pricesIncludeTax ?? false); pricesIncludeTaxRef.current = p.pricesIncludeTax ?? false;
+    setIibbPerceptionRate(p.iibbPerceptionRate ?? ""); iibbPerceptionRateRef.current = p.iibbPerceptionRate ?? "";
+    setAssistedDates({ validUntil: p.validUntil ?? "", leadTimeDays: p.leadTimeDays == null ? "" : String(p.leadTimeDays) });
+    setAssistedSummary(`Proveedor leído: ${p.supplierName ?? "Sin identificar"}. Total leído: ${p.total ?? "Sin identificar"} ${p.currency ?? ""}. ${p.pricesIncludeTax === null ? "No se identificó si incluye IVA: confirmá el modo de precios." : "Confirmá el modo de precios y los impuestos."}`);
+    setAssisted(true); invalidateReview(); setError(null); setCreateEpoch(n => n + 1);
   }
 
   const quoteTotals = useMemo(() => {
@@ -311,7 +343,8 @@ export function ProcurementQuoteForm({
   return (
     <form
       key={isEdit ? editValues!.quoteId : `create-${createEpoch}`}
-      className="space-y-4 rounded-lg border p-4"
+      className={`w-full max-w-4xl space-y-5 rounded-lg border bg-card p-4 sm:p-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}
+      onChangeCapture={(event) => { if (event.target.getAttribute("name") !== "quoteDocumentReviewed") invalidateReview(); }}
       onSubmit={(event) => {
             event.preventDefault();
             if (isRunning()) return;
@@ -323,6 +356,12 @@ export function ProcurementQuoteForm({
           const currentTaxRate = taxRateRef.current;
           const currentIibb = iibbPerceptionRateRef.current;
           const currentPricesIncludeTax = pricesIncludeTaxRef.current;
+
+          if (assisted && (!reviewedRef.current || !currency || !currentIibb.trim() ||
+            lines.some(line => !offerKindsRef.current[line.id] || (offerKindsRef.current[line.id] !== "NOT_QUOTED" &&
+              [currentLineMoney[line.id]?.unitPrice, currentLineMoney[line.id]?.taxRate, currentLineMoney[line.id]?.discountPct].some(value => !value?.trim()))))) {
+            setError("Completá moneda, impuestos, importes y clasificación de cada ítem; revisá el total y confirmá la revisión antes de registrar."); return;
+          }
 
           if (!isEdit && !currentSupplierId) {
             setError("Seleccioná un proveedor");
@@ -374,16 +413,19 @@ export function ProcurementQuoteForm({
       }}
     >
 <fieldset disabled={pending} className="min-w-0 space-y-5">
-      <p className="font-medium text-sm">{isEdit ? "Editar cotización" : "Cargar cotización"} · {currency}</p>
+      <h3 className="text-base font-semibold">{isEdit ? "Editar cotización" : "Cargar cotización"} · {currency}</h3>
+      {!isEdit ? <QuoteDocumentAssistant key={purchaseRequestId} projectId={projectId} purchaseRequestId={purchaseRequestId} lines={lines} disabled={pending} onApply={applyDocument} /> : null}
+      {assisted ? <p className="text-sm text-muted-foreground">{assistedSummary} Los campos vacíos son datos pendientes, no importes cero. Los ítems sin vincular requieren clasificación manual.</p> : null}
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label htmlFor="quote-currency">Moneda de la cotización</Label>
           <CurrencySelect id="quote-currency" value={currency} disabled={pending} onValueChange={(next) => {
             if (next === currency) return;
+            invalidateReview();
             setCurrency(next); setFxRate(""); fxRateRef.current = "";
           }} />
         </div>
-        <ManualFxField id="quote-fx-rate" currency={currency} value={fxRate} onValueChange={(next) => { setFxRate(next); fxRateRef.current = next; }} disabled={pending} />
+        <ManualFxField id="quote-fx-rate" currency={currency} value={fxRate} onValueChange={(next) => { invalidateReview(); setFxRate(next); fxRateRef.current = next; }} disabled={pending} />
       </div>
       {error && (
         <p className="text-sm text-destructive" role="alert">
@@ -393,7 +435,7 @@ export function ProcurementQuoteForm({
 
       {isEdit ? (
         <div className="space-y-1">
-          <Label htmlFor="quote-supplier">Proveedor</Label>
+          <p className="text-sm text-muted-foreground">Proveedor</p>
           <p className="text-sm font-medium">{editValues.supplierName}</p>
         </div>
       ) : (
@@ -410,6 +452,7 @@ export function ProcurementQuoteForm({
               options={toSearchableOptions(suppliers)}
               value={supplierId}
               onValueChange={(id) => {
+                invalidateReview();
                 setSupplierId(id);
                 supplierIdRef.current = id;
               }}
@@ -430,7 +473,7 @@ export function ProcurementQuoteForm({
             type="number"
             min={0}
             placeholder="ej. 7"
-            defaultValue={editValues?.leadTimeDays ?? undefined}
+            defaultValue={assistedDates?.leadTimeDays ?? editValues?.leadTimeDays ?? undefined}
           />
         </div>
         <div className="space-y-1">
@@ -439,7 +482,7 @@ export function ProcurementQuoteForm({
             id={isEdit ? "editValidUntil" : "validUntil"}
             name="validUntil"
             type="date"
-            defaultValue={editValues?.validUntil ?? undefined}
+            defaultValue={assistedDates?.validUntil ?? editValues?.validUntil ?? undefined}
           />
         </div>
       </div>
@@ -464,6 +507,7 @@ export function ProcurementQuoteForm({
           id={isEdit ? "editQuoteIibbRate" : "quoteIibbRate"}
           rate={iibbPerceptionRate}
           onRateChange={(v) => {
+            invalidateReview();
             setIibbPerceptionRate(v);
             iibbPerceptionRateRef.current = v;
           }}
@@ -472,6 +516,7 @@ export function ProcurementQuoteForm({
         <PricesIncludeTaxCheckbox
           checked={pricesIncludeTax}
           onCheckedChange={(v) => {
+            invalidateReview();
             setPricesIncludeTax(v);
             pricesIncludeTaxRef.current = v;
           }}
@@ -514,9 +559,9 @@ export function ProcurementQuoteForm({
           lineInitialByPrId.get(line.id)?.originalMoney,
         );
         return (
-          <div key={line.id} className="space-y-2 rounded-md border bg-muted/20 p-3 text-sm">
+          <div key={line.id} className="form-section min-w-0 space-y-4 p-3 text-sm sm:p-4">
             <div>
-              <p className="font-medium">{line.description}</p>
+              <p className="break-words font-medium">{line.description}</p>
               <p className="text-muted-foreground">
                 {formatQtyFromString(line.quantity)} {line.unit}
               </p>
@@ -531,6 +576,7 @@ export function ProcurementQuoteForm({
                 value={offerKinds[line.id] ?? "LEGACY"}
                 disabled={pending}
                 onValueChange={(value) => {
+                  invalidateReview();
                   const kind = value === "LEGACY" ? null : value as QuoteLineOfferKind;
                   const nextKinds = { ...offerKindsRef.current, [line.id]: kind };
                   offerKindsRef.current = nextKinds;
@@ -538,7 +584,7 @@ export function ProcurementQuoteForm({
                   if (kind === "NOT_QUOTED" || (kind === "BONIFIED" &&
                     (!preview || compareDecimal(preview.lineTotal, "0") !== 0))) {
                     const nextMoney = { ...lineMoneyRef.current,
-                      [line.id]: { ...money, unitPrice: "0", discountPct: "0" },
+                      [line.id]: { ...money, unitPrice: "0", discountPct: "0", taxRate: kind === "NOT_QUOTED" ? "0" : money.taxRate },
                     };
                     lineMoneyRef.current = nextMoney;
                     setLineMoney(nextMoney);
@@ -547,6 +593,7 @@ export function ProcurementQuoteForm({
               >
                 <SelectTrigger id={`offerKind_${line.id}`}><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  {assisted && offerKinds[line.id] == null ? <SelectItem value="LEGACY" disabled>Sin revisar</SelectItem> : null}
                   {isEdit && lineInitialByPrId.get(line.id)?.offerKind == null ? (
                     <SelectItem value="LEGACY">Sin clasificar (histórico)</SelectItem>
                   ) : null}
@@ -556,7 +603,7 @@ export function ProcurementQuoteForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-4 [&>div]:min-w-0">
               <div className="space-y-1">
                 <Label htmlFor={`unitPrice_${line.id}`}>
                   {pricesIncludeTax ? "Precio unitario con IVA" : "Precio unitario neto (sin IVA)"}
@@ -566,8 +613,8 @@ export function ProcurementQuoteForm({
                   id={`unitPrice_${line.id}`}
                   disabled={pending || offerKinds[line.id] === "NOT_QUOTED" || offerKinds[line.id] === "BONIFIED"}
                   value={money.unitPrice}
-                  onValueChange={(v) =>
-                    setLineMoney((prev) => {
+                  onValueChange={(v) => {
+                    invalidateReview(); setLineMoney((prev) => {
                       const next = {
                         ...prev,
                         [line.id]: {
@@ -578,8 +625,8 @@ export function ProcurementQuoteForm({
                       };
                       lineMoneyRef.current = next;
                       return next;
-                    })
-                  }
+                    });
+                  }}
                   placeholder="0,00"
                 />
               </div>
@@ -590,8 +637,8 @@ export function ProcurementQuoteForm({
                   id={`discountPct_${line.id}`}
                   disabled={pending || offerKinds[line.id] === "NOT_QUOTED" || offerKinds[line.id] === "BONIFIED"}
                   value={money.discountPct}
-                  onValueChange={(v) =>
-                    setLineMoney((prev) => {
+                  onValueChange={(v) => {
+                    invalidateReview(); setLineMoney((prev) => {
                       const next = {
                         ...prev,
                         [line.id]: {
@@ -602,8 +649,8 @@ export function ProcurementQuoteForm({
                       };
                       lineMoneyRef.current = next;
                       return next;
-                    })
-                  }
+                    });
+                  }}
                   placeholder="0"
                 />
               </div>
@@ -632,18 +679,19 @@ export function ProcurementQuoteForm({
         iibbPerceptionRate={iibbPerceptionRate}
         showIibbRateInput={false}
         totalLabel="Total cotización"
-        className="rounded-md bg-muted/40 px-3 py-2 border-0"
+        className="rounded-lg border bg-muted/30 p-4"
       />
 
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" size="sm" disabled={pending || (!isEdit && suppliers.length === 0)}>
-          {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Registrar cotización"}
-        </Button>
+      {assisted ? <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="quoteDocumentReviewed" checked={reviewed} onChange={event => { reviewedRef.current = event.target.checked; setReviewed(event.target.checked); }} />Revisé proveedor, moneda, cantidades, clasificación, IVA, IIBB, plazo, vigencia y total contra la oferta original.</label> : null}
+      <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
         {isEdit && onCancelEdit ? (
           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={onCancelEdit}>
             Cancelar
           </Button>
         ) : null}
+        <Button type="submit" size="sm" disabled={pending || (!isEdit && suppliers.length === 0) || (assisted && !reviewed)}>
+          {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Registrar cotización"}
+        </Button>
       </div>
     </fieldset>
 </form>

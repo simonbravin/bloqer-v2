@@ -4,6 +4,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
+import { ReportExportActions } from "@/features/reports";
 import { PaymentListSection } from "@/features/ap";
 import type { PaymentListItem } from "@/features/ap";
 import { getCurrentUser } from "@/lib/auth";
@@ -69,6 +70,13 @@ export default async function PagosPage({ params, searchParams }: PageProps) {
         actions={
           <ProjectFinanceListHeaderActions
             listViewStorageKey={`pagos-${id}`}
+            exportSlot={
+              <ReportExportActions
+                exportPath={`/api/proyectos/${id}/pagos/export`}
+                params={{}}
+                pdf xlsx csv={false}
+              />
+            }
             secondary={{ href: `/proyectos/${id}/facturas-proveedor`, label: "Ver facturas proveedor" }}
           />
         }

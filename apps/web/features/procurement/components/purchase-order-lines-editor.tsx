@@ -458,25 +458,27 @@ export function PurchaseOrderLinesEditor({
             <section
               key={lineKey}
               aria-label={`Línea ${i + 1}`}
-              className="form-section p-3 space-y-3"
+              className="form-section min-w-0 space-y-4 p-3 sm:p-4"
             >
               <div className="flex items-start justify-between gap-2">
                 <p className="text-xs font-medium text-muted-foreground">Línea {i + 1}</p>
                 {lines.length > 1 && !structureLocked && (
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="icon"
                     onClick={() => removeLine(i)}
-                    className="text-muted-foreground hover:text-destructive text-xs"
+                    className="h-11 w-11 shrink-0 text-muted-foreground hover:text-destructive md:h-10 md:w-10"
                     aria-label={`Eliminar línea ${i + 1}`}
                   >
                     ✕
-                  </button>
+                  </Button>
                 )}
               </div>
 
               {/* Row 1: EDT + Insumo APU */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>div]:min-w-0">
+                <div className="space-y-1 sm:col-span-2">
                   <Label htmlFor={`po-line-${lineKey}-wbs`} className="text-xs">EDT (obligatorio)</Label>
                   <SearchableCombobox id={`po-line-${lineKey}-wbs`}
                     popoverWidth="wide"
@@ -710,7 +712,7 @@ export function PurchaseOrderLinesEditor({
                 )}
               </p>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 items-end gap-3 sm:grid-cols-3">
                 <div className="space-y-1 min-w-0" data-po-decimal="discount">
                   <Label htmlFor={`po-line-${lineKey}-discount`} className="text-xs">Desc. %</Label>
                   <DecimalInput key={discountRevision} id={`po-line-${lineKey}-discount`}
@@ -739,9 +741,9 @@ export function PurchaseOrderLinesEditor({
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-1 min-w-0">
-                  <Label className="text-xs">Total</Label>
-                  <p className="flex min-h-11 items-center text-sm tabular-nums font-semibold md:min-h-9">
+                <div className="col-span-2 min-w-0 space-y-1 rounded-md bg-background/60 px-3 sm:col-span-1">
+                  <p className="text-xs text-muted-foreground">Total</p>
+                  <p className="flex min-h-11 items-center break-all text-sm font-semibold tabular-nums md:min-h-10">
                     {formatDecimalArFromString(p.total)}
                   </p>
                 </div>

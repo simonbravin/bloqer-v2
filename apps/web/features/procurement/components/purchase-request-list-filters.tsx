@@ -7,9 +7,11 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { ReportExportActions } from "@/features/reports/report-export-actions";
 import { cn } from "@/lib/utils";
 import type { PurchaseRequestView } from "@bloqer/services";
 import { matchesListStatusFilter } from "../lib/matches-list-status-filter";
+import { procurementFilterBtnClass } from "../lib/procurement-ui";
 import { PurchaseRequestMobileCards } from "./purchase-request-mobile-cards";
 import { PurchaseRequestTable } from "./purchase-request-table";
 
@@ -114,6 +116,16 @@ export function PurchaseRequestListFilters({
     setStatusFilter(null);
   };
 
+  const exportActions = (
+    <ReportExportActions
+      exportPath={`/api/proyectos/${projectId}/solicitudes-compra/export`}
+      params={{ search: trimmedSearch, status: status ?? undefined }}
+      pdf
+      xlsx
+      csv={false}
+    />
+  );
+
   const noBaseRequests = requests.length === 0;
   const emptyStateForTable = (
     <ListEmptyState
@@ -138,7 +150,8 @@ export function PurchaseRequestListFilters({
   // Hide the search/status toolbar when there is no data at all: filters over an empty list add no value.
   if (noBaseRequests) {
     return (
-      <>
+      <div className="space-y-4">
+        <div className="flex justify-end">{exportActions}</div>
         <div className="md:hidden">
           <PurchaseRequestMobileCards
             requests={requests}
@@ -159,36 +172,39 @@ export function PurchaseRequestListFilters({
             emptyState={emptyStateForTable}
           />
         </div>
-      </>
+      </div>
     );
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            aria-label="Buscar solicitudes de compra"
-            placeholder="Buscar por código, descripción, EDT, proveedor o solicitante…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-9"
-            data-testid="purchase-request-search"
-          />
-          {search ? (
-            <button
-              type="button"
-              aria-label="Limpiar búsqueda"
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 basis-64">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              aria-label="Buscar solicitudes de compra"
+              placeholder="Buscar por código, descripción, EDT, proveedor o solicitante…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 pl-9 pr-12 md:h-10"
+              data-testid="purchase-request-search"
+            />
+            {search ? (
+              <button
+                type="button"
+                aria-label="Limpiar búsqueda"
+                onClick={() => setSearch("")}
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          {exportActions}
         </div>
 
         <div
@@ -201,7 +217,7 @@ export function PurchaseRequestListFilters({
             size="sm"
             variant={status === null ? "secondary" : "outline"}
             onClick={() => setStatusFilter(null)}
-            className="h-8"
+            className={procurementFilterBtnClass}
             aria-pressed={status === null}
           >
             Activas
@@ -217,7 +233,7 @@ export function PurchaseRequestListFilters({
                 size="sm"
                 variant={active ? "secondary" : "outline"}
                 onClick={() => setStatusFilter(active ? null : f.value)}
-                className={cn("h-8", count === 0 && !active && "opacity-60")}
+                className={cn(procurementFilterBtnClass, count === 0 && !active && "opacity-60")}
                 aria-pressed={active}
               >
                 {f.label}

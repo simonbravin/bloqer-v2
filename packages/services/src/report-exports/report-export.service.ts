@@ -1,4 +1,4 @@
-﻿import { projectStatusSchema } from "@bloqer/validators";
+import { projectStatusSchema } from "@bloqer/validators";
 import type { AgingBucket, AgingFilters } from "../aging/aging.service";
 import { getReceivableAgingReport, getPayableAgingReport } from "../aging/aging.service";
 import type {
@@ -60,13 +60,13 @@ import { parseCurrencyView } from "../reports/report-currency-view";
 import { MAX_EXPORT_ROWS } from "../finance/pagination";
 import { listCompanyPayables, type CompanyPayableListFilters } from "../ap/payable.service";
 import {
-  listCompanySupplierInvoices,
   type CompanySupplierInvoiceListFilters,
 } from "../ap/supplier-invoice.service";
 import { ServiceContext, ServiceError } from "../types";
 import { buildCsv, parseBuiltCsv } from "./csv-export.service";
 import { safeReportFilename } from "./filename.service";
 import { buildXlsxSheet } from "./xlsx-export.service";
+import { readCompanySupplierInvoicesForExport } from "./operational-list-export.service";
 import {
   TREASURY_MOVEMENTS_EXPORT_LABELS,
   type MovementExportLabels,
@@ -574,17 +574,7 @@ export async function exportCompanySupplierInvoicesCsv(
   filters: CompanySupplierInvoiceListFilters,
   ctx: ServiceContext,
 ): Promise<ReportCsvPayload> {
-  const { data, total } = await listCompanySupplierInvoices(ctx, {
-    ...filters,
-    page: 1,
-    pageSize: MAX_EXPORT_ROWS,
-  });
-  if (total > MAX_EXPORT_ROWS) {
-    throw new ServiceError(
-      "VALIDATION",
-      `El export supera ${MAX_EXPORT_ROWS} filas. Acotá el rango de fechas de emisión.`,
-    );
-  }
+  const data = await readCompanySupplierInvoicesForExport(filters, ctx);
   const headers = [
     "Codigo",
     "Tipo",
@@ -619,6 +609,14 @@ export async function exportCompanySupplierInvoicesCsv(
     content: buildCsv(headers, rows),
     filename: safeReportFilename("finanzas_facturas_proveedor_corporativo", "csv"),
   };
+}
+
+export async function exportCompanySupplierInvoicesXlsx(
+  filters: CompanySupplierInvoiceListFilters,
+  ctx: ServiceContext,
+): Promise<ReportXlsxPayload> {
+  const { content, filename } = await exportCompanySupplierInvoicesCsv(filters, ctx);
+  return csvTextToXlsx(content, filename.replace(/\.csv$/i, ""), "Facturas y gastos");
 }
 
 export async function exportTreasuryCashFlowCsv(
@@ -1322,6 +1320,7 @@ export async function exportProjectSupplierReportCsv(
     "UltimaActividad",
     "Moneda",
     "APDisponible",
+    "TipoRegistro", "Orden", "EstadoActual", "FechaEmisionOC", "EntregaPrevista", "UltimaRecepcion",
   ];
   const rows: string[][] = result.rows.map((s) => [
     s.supplierName,
@@ -1340,6 +1339,7 @@ export async function exportProjectSupplierReportCsv(
     s.lastActivityDate ?? "",
     result.currency,
     apAvailable ? "Sí" : "No",
+    "PROVEEDOR",
   ]);
   rows.push([
     "TOTAL",
@@ -1359,8 +1359,24 @@ export async function exportProjectSupplierReportCsv(
     result.currency,
     apAvailable ? "Sí" : "No",
   ]);
+  rows[rows.length - 1]!.push("TOTAL");
+  for (const supplier of result.deliveryEvidence) {
+    for (const order of supplier.orders) {
+      const row = Array<string>(headers.length).fill("");
+      row[0] = supplier.supplierName;
+      row[14] = result.currency;
+      row[16] = "ENTREGA_OC";
+      row[17] = `OC-${String(order.number).padStart(3, "0")}`;
+      row[18] = order.status;
+      row[19] = order.issueDate;
+      row[20] = order.expectedDeliveryDate ?? "Sin dato";
+      row[21] = order.lastReceiptDate ?? "Sin recepción registrada";
+      rows.push(row);
+    }
+  }
+  rows.push(["__AVISO__", "OC por fecha de emisión y moneda; estados actuales y recepciones confirmadas de cualquier fecha. Última recepción no acredita entrega completa ni puntualidad."]);
   return {
-    content: buildCsv(headers, rows),
+    content: buildCsv(headers, rows.map(row => padCsvRow(row, headers.length))),
     filename: safeReportFilename(`proveedores_${projectId}`, "csv"),
   };
 }

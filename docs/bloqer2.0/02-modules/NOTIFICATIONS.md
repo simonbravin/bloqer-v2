@@ -50,6 +50,7 @@ Errores por desconocimiento de estado del sistema y cuellos de botella de aproba
 - **Título identificable:** el título in-app (y el Subject del mail) es `{evento} · {identificador}` — p. ej. `Documento listo · Factura FP-00005`, `Listo para pagar · FP-00005`, `Parte pendiente · 24/08/2026`, `Parte devuelto · 24/08/2026`, `Nueva solicitud · SC-003`. El cuerpo conserva archivo, montos y notas. Helper: `packages/services/src/notifications/notification-copy.ts`. Las filas ya persistidas no se reescriben.
 
 ## 11. Validaciones
+- **Resumen diario [D-147]:** nuevas elecciones de hora deben ser compatibles con la próxima revisión de las 10:05 UTC en la zona de la organización y el margen D-114. «Hora mínima del resumen» muestra las opciones válidas; no programa otro envío. El servidor revalida cada cambio. Los históricos incompatibles se muestran con aviso y no se reescriben al cambiar otras preferencias; no hay migración automática. La próxima revisión es orientativa, no una garantía de entrega puntual.
 - Payload JSON schema-valid por tipo de evento.
 - `actionUrl` solo ruta relativa in-app.
 

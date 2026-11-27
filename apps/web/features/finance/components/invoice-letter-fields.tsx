@@ -87,7 +87,7 @@ export function InvoiceLetterSelect({
   name,
   value,
   onValueChange,
-  label = "Comprobante",
+  label = "Letra del comprobante",
   hint,
   className,
   required,

@@ -15,9 +15,29 @@
 
 El inventario siguiente conserva el diagnóstico de septiembre de 2026. La revalidación AG-13 aplica al código posterior a las correcciones anteriores.
 
+## Ajuste de consultas de compras — 19/11/2026
+
+`search_purchase_requests` y `search_purchase_orders` usan ahora las variantes acotadas de sus servicios: los filtros se aplican en SQL antes de `take` y el total se obtiene con el mismo alcance en una transacción de lectura `RepeatableRead`. Se conservan el orden de solicitudes/órdenes, los DTOs, el total y la truncación informados. Estados desconocidos o filtros incompatibles devuelven cero coincidencias después de autorizar el acceso.
+
+`get_pending_purchase_orders` conserva los conteos del hub y consulta hasta diez órdenes por grupo de pendientes, sin cargar todas las órdenes del proyecto. Las variantes comparten permisos, tenant/empresa/obra y validación de relaciones con los listados actuales; estos mantienen su contrato sin límite para los callers existentes. Sin cambios de rutas, etiquetas o procedimientos de usuario: sin impacto en Guía/Help; sí se actualiza esta evidencia AI.
+
+Regresión: `packages/services/src/procurement/procurement-search.test.ts` verifica límites de consulta, filtros, total, DTO monetario, empresa activa y contexto global, obra compartida, módulos/permisos/ACL, relaciones inconsistentes y continuidad de los listados existentes. Sustituye únicamente I/O Prisma; no acredita comportamiento SQL ni rendimiento de producción. La verificación PostgreSQL requiere las fixtures aisladas del runbook.
+
+El limitador de consultas IA sigue en memoria (`apps/web/lib/ai-rate-limit.ts`). No se encontró infraestructura Redis/KV ni contador distribuido persistido existente; esta mejora de lecturas no convierte ese límite en una cuota global. La elección de infraestructura/persistencia distribuida y su política de fallo siguen requiriendo diseño/decisión, sin reutilizar tablas financieras o auditoría como contadores improvisados.
+
 ---
 
 ## Invariantes confirmados (transversales)
+
+### Revisión de contexto — 23/11/2026
+
+La sesión del servidor determina usuario, tenant, empresa y roles. Cada herramienta revalida permisos y acceso a los proyectos; el historial no concede autorización. El alcance conserva D-111 y las reglas corporativas vigentes: acceso por asignación cuando corresponde, roles globales y datos compartidos dentro del tenant. Esto no implica que todos los usuarios estén limitados a registros que crearon personalmente ni cambia la política de tesorería corporativa.
+
+Se corrigió la continuidad del historial al navegar entre obras: el chat se desmonta y cancela la respuesta pendiente al cambiar de proyecto o entrar/salir del alcance de obra. Conserva la conversación dentro de la misma obra; la clave del layout ya reiniciaba por cuenta/tenant/empresa/roles. Un proyecto explícito inaccesible ahora detiene el endpoint antes de invocar al proveedor, en lugar de descartar el proyecto y continuar sin ese contexto.
+
+El audio de SC reutiliza el proveedor configurado y sus credenciales, con una operación/modelo de transcripción distinto y propuesta estructurada sin herramientas de lectura. Autoriza la obra antes de llamar al proveedor; permanece desactivado por defecto. No comparte el historial del chat, no guarda el audio/transcripción y solo prepara datos para revisión humana. No se modificaron permisos, políticas de acceso, servicios externos ni flags de producción.
+
+Regresión: `chat-context-route.test.ts` prueba el handler con sesión/ACL/proveedor simulados; `chat-context.spec.ts` verifica navegación e historial en navegador con respuestas sintéticas. Las suites de permisos y aislamiento prueban los controles existentes; sus mocks no sustituyen una auditoría SQL o un piloto con proveedor real. Los resultados ejecutados se registran en el PR.
 
 | Invariante | Evidencia |
 |---|---|

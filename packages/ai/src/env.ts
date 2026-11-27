@@ -25,6 +25,25 @@ export function resolveBloqerAiEnabled(env: NodeJS.ProcessEnv = process.env): bo
   return true;
 }
 
+/** ADR-019: document preview is independently opt-in and never bypasses AI/prod gates. */
+export function isSupplierInvoicePreviewEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return resolveBloqerAiEnabled(env) && parseTruthyFlag(env.BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED);
+}
+
+/** D-148: preparing a purchase request is independently opt-in. */
+export function isPurchaseRequestAudioEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return resolveBloqerAiEnabled(env) && parseTruthyFlag(env.BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED);
+}
+
+/** Quote extraction is separately opt-in; it does not enable chat writes. */
+export function isProcurementQuotePreviewEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return resolveBloqerAiEnabled(env) && parseTruthyFlag(env.BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED);
+}
+
+export function getPurchaseRequestTranscriptionModel(env: NodeJS.ProcessEnv = process.env): string {
+  return env.BLOQER_AI_TRANSCRIPTION_MODEL?.trim() || "gpt-4o-mini-transcribe";
+}
+
 export type BloqerAiEnv = {
   enabled: boolean;
   providerId: string;

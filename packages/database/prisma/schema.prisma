@@ -639,6 +639,7 @@ model VerificationToken {
 // ─── Tenant & company ─────────────────────────────────────────────────────────
 
 model Tenant {
+  quoteInvitations ProcurementQuoteInvitation[]
   id                    String             @id @default(uuid())
   name                  String
   slug                  String             @unique
@@ -770,6 +771,7 @@ model PlatformAuditLog {
 }
 
 model Company {
+  quoteInvitations ProcurementQuoteInvitation[]
   id                     String                 @id @default(uuid())
   tenantId               String
   name                   String
@@ -1015,6 +1017,7 @@ model AuditLog {
 // BR-DIR-001: tax_id unique per tenant when non-null (Postgres allows multiple NULLs in unique index).
 
 model Contact {
+  quoteInvitations ProcurementQuoteInvitation[]
   id           String        @id @default(uuid())
   tenantId     String
   legalName    String
@@ -1131,6 +1134,7 @@ model SubcontractorProfile {
 // BR-PROJ-003: COMPLETED/CANCELLED projects are read-only.
 
 model Project {
+  quoteInvitations ProcurementQuoteInvitation[]
   id                       String         @id @default(uuid())
   tenantId                 String
   companyId                String?
@@ -2353,6 +2357,7 @@ model CompanyProcurementSettings {
 }
 
 model PurchaseRequest {
+  quoteInvitations ProcurementQuoteInvitation[]
   id                      String                @id @default(uuid())
   tenantId                String
   companyId               String
@@ -2424,6 +2429,7 @@ model PurchaseRequestLine {
 }
 
 model ProcurementQuote {
+  sourceInvitation ProcurementQuoteInvitation?
   id                String                 @id @default(uuid())
   tenantId          String
   purchaseRequestId String
@@ -2457,6 +2463,43 @@ model ProcurementQuote {
   @@index([tenantId, purchaseRequestId])
   @@index([purchaseRequestId, supplierContactId])
   @@map("procurement_quotes")
+}
+
+/// D-149 / ADR-021: external capability and immutable evidence, never ERP membership.
+model ProcurementQuoteInvitation {
+  id String @id @default(uuid())
+  tenantId String
+  companyId String
+  projectId String
+  purchaseRequestId String
+  supplierContactId String
+  tokenHash String @unique @db.VarChar(64)
+  expiresAt DateTime
+  revokedAt DateTime?
+  revokedBy String?
+  requestSnapshot Json
+  requestFingerprint String @db.VarChar(64)
+  responsePayload Json?
+  responseHash String? @db.VarChar(64)
+  respondedAt DateTime?
+  importedQuoteId String? @unique
+  importedAt DateTime?
+  importedBy String?
+  createdBy String
+  updatedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], map: "quote_invitation_tenant_fk")
+  company Company @relation(fields: [companyId], references: [id], map: "quote_invitation_company_fk")
+  project Project @relation(fields: [projectId], references: [id], map: "quote_invitation_project_fk")
+  purchaseRequest PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], map: "quote_invitation_request_fk")
+  supplierContact Contact @relation(fields: [supplierContactId], references: [id], map: "quote_invitation_supplier_fk")
+  importedQuote ProcurementQuote? @relation(fields: [importedQuoteId], references: [id], onDelete: SetNull, map: "quote_invitation_import_fk")
+
+  @@index([tenantId, purchaseRequestId])
+  @@index([tenantId, companyId, projectId])
+  @@map("procurement_quote_invitations")
 }
 
 model ProcurementQuoteLine {
@@ -3197,6 +3240,8 @@ model DocumentAttachment {
   companyId        String?
   projectId        String?
   folderId         String?
+  /// D-146: every revision has its own immutable file; no historical backfill.
+  replacesAttachmentId String?
   originalFileName String
   fileName         String
   mimeType         String
@@ -3222,7 +3267,11 @@ model DocumentAttachment {
   tenant  Tenant           @relation(fields: [tenantId], references: [id])
   project Project?         @relation(fields: [projectId], references: [id])
   folder  DocumentFolder?  @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  replacesAttachment DocumentAttachment? @relation("DocumentRevisions", fields: [tenantId, replacesAttachmentId], references: [tenantId, id], onDelete: Restrict, onUpdate: Restrict, map: "document_attachments_revision_tenant_fkey")
+  revisions DocumentAttachment[] @relation("DocumentRevisions")
 
+  @@unique([tenantId, id])
+  @@index([tenantId, replacesAttachmentId])
   @@index([tenantId, projectId])
   @@index([tenantId, folderId])
   @@index([tenantId, linkedEntityType, linkedEntityId])

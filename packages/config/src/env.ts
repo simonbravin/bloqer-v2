@@ -1,5 +1,12 @@
 import { z } from "zod";
 
+const supplierQuoteLinksSchema = z.object({
+  BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED: z.enum(["true", "false"]).default("false"),
+});
+export function supplierQuoteLinksEnabled(): boolean {
+  return supplierQuoteLinksSchema.parse(process.env).BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED === "true";
+}
+
 // ─── Core ────────────────────────────────────────────────────────────────────
 // Validated eagerly at startup. Both fields have defaults so local dev
 // never crashes without a .env file.

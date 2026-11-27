@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PROCUREMENT_FORM_ACTIONS_CLASS, PROCUREMENT_FORM_FIELDS_CLASS } from "../lib/procurement-form-layout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AutoGrowTextarea } from "@/components/ui/auto-grow-textarea";
@@ -74,6 +75,8 @@ interface PurchaseRequestFormProps {
   /** Historical quotes or multiple WBS: edit header without replacing source line IDs. */
   readOnlyLines?: boolean;
   onCreated?: (id: string) => Promise<{ navigate?: boolean; message?: string } | void>;
+  /** D-148: an applied proposal must be completed and explicitly reviewed. */
+  requireAudioReview?: boolean;
 }
 
 function apuComboboxOptions(apuLines: PurchaseRequestApuLine[]) {
@@ -109,10 +112,14 @@ export function PurchaseRequestForm({
   onPendingChange,
   readOnlyLines = false,
   onCreated,
+  requireAudioReview = false,
 }: PurchaseRequestFormProps) {
   const router = useRouter();
   const { pending, run: startTransition } = useProcurementAction(onPendingChange);
   const [error, setError] = useState<string | null>(null);
+  const [neededByDateValue, setNeededByDateValue] = useState(initialValues?.neededByDate ?? "");
+  const [notesValue, setNotesValue] = useState(initialValues?.notes ?? "");
+  const [reviewedSnapshot, setReviewedSnapshot] = useState<string | null>(null);
   const isEdit = mode === "edit" && Boolean(purchaseRequestId);
   const requireNeededByDate = !isEdit || Boolean(initialValues?.neededByDate);
   const [wbsNodeId, setWbsNodeId] = useState<string>(
@@ -149,6 +156,8 @@ export function PurchaseRequestForm({
   });
 
   const wbsComboboxOptions = useMemo(() => wbsToSearchableOptions(wbsOptions), [wbsOptions]);
+  const reviewSnapshot = JSON.stringify({ wbsNodeId, lines, neededByDateValue, notesValue });
+  const audioReviewed = reviewedSnapshot === reviewSnapshot;
   const selectedWbs = useMemo(
     () => wbsOptions.find((w) => w.id === wbsNodeId),
     [wbsOptions, wbsNodeId],
@@ -165,16 +174,23 @@ export function PurchaseRequestForm({
   );
 
   function onWbsChange(nextWbsId: string) {
+    setReviewedSnapshot(null);
     setWbsNodeId(nextWbsId);
     const wbs = wbsOptions.find((w) => w.id === nextWbsId);
+    if (requireAudioReview) {
+      setLines((prev) => prev.map((line) => ({ ...line, costAnalysisLineId: null, productId: null })));
+      return;
+    }
     setLines([createEmptyPurchaseRequestLine(wbs?.budgetUnit ?? "")]);
   }
 
   function updateLine(rowKey: string, patch: Partial<PurchaseRequestLineDraft>) {
+    setReviewedSnapshot(null);
     setLines((prev) => prev.map((l) => (l.rowKey === rowKey ? { ...l, ...patch } : l)));
   }
 
   function applyApuOnLine(rowKey: string, apuId: string | null) {
+    setReviewedSnapshot(null);
     const apu = apuId ? apuCatalog.find((a) => a.id === apuId) : null;
     setLines((prev) =>
       prev.map((l) =>
@@ -184,16 +200,19 @@ export function PurchaseRequestForm({
   }
 
   function addEmptyLine() {
+    setReviewedSnapshot(null);
     setLines((prev) => [...prev, createEmptyPurchaseRequestLine(selectedWbs?.budgetUnit ?? "")]);
   }
 
   function addShortfallLines() {
+    setReviewedSnapshot(null);
     setLines((prev) =>
       mergeApuShortfallLines(apuCatalog, prev, selectedWbs?.budgetUnit ?? ""),
     );
   }
 
   function removeLine(rowKey: string) {
+    setReviewedSnapshot(null);
     setLines((prev) => {
       if (prev.length <= 1) return prev;
       return prev.filter((l) => l.rowKey !== rowKey);
@@ -203,12 +222,16 @@ export function PurchaseRequestForm({
   return (
     <div className={variant === "card" ? "rounded-lg border bg-card p-4 sm:p-6" : undefined}>
       <form
-        className="space-y-5"
+        className={`space-y-6 ${PROCUREMENT_FORM_FIELDS_CLASS}`}
         onSubmit={(event) => {
           event.preventDefault();
           const fd = new FormData(event.currentTarget);
           startTransition(async () => {
             setError(null);
+            if (requireAudioReview && (!audioReviewed || lines.some((line) => !line.description.trim() || !line.quantity.trim() || !line.unit.trim()))) {
+              setError("Completá descripción, cantidad y unidad de cada renglón y confirmá la revisión antes de guardar.");
+              return;
+            }
             if (!readOnlyLines && !wbsNodeId) {
               setError("Seleccioná un ítem EDT");
               return;
@@ -287,6 +310,7 @@ export function PurchaseRequestForm({
           });
         }}
       >
+        {requireAudioReview ? <p className={procurementAmberCalloutClass}>Propuesta desde audio. Elegí la partida y verificá cantidades, unidades y fecha. Se guardará un borrador; enviar a Compras es una acción posterior.</p> : null}
         {prefilledFromMaterials ? (
           <p className={procurementAmberCalloutClass}>
             Solicitud iniciada desde{" "}
@@ -359,7 +383,7 @@ export function PurchaseRequestForm({
                   type="button"
                   variant="secondary"
                   size="sm"
-                  className="min-h-9"
+                  className="min-h-11 md:min-h-10"
                   disabled={!wbsNodeId}
                   onClick={addShortfallLines}
                 >
@@ -370,7 +394,7 @@ export function PurchaseRequestForm({
                 type="button"
                 variant="outline"
                 size="sm"
-                className="min-h-9"
+                className="min-h-11 md:min-h-10"
                 disabled={!wbsNodeId}
                 onClick={addEmptyLine}
               >
@@ -424,7 +448,7 @@ export function PurchaseRequestForm({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          className="min-h-9 text-destructive hover:text-destructive"
+                          className="h-11 w-11 shrink-0 p-0 text-destructive hover:text-destructive md:h-10 md:w-10"
                           onClick={() => removeLine(line.rowKey)}
                           aria-label={`Quitar línea ${index + 1}`}
                         >
@@ -474,7 +498,8 @@ export function PurchaseRequestForm({
                       <div className="space-y-2">
                         <Label htmlFor={`unit-${line.rowKey}`}>Unidad</Label>
                         <UnitSelect
-                          value={line.unit || selectedWbs?.budgetUnit || "un"}
+                          id={`unit-${line.rowKey}`}
+                          value={requireAudioReview ? line.unit : line.unit || selectedWbs?.budgetUnit || "un"}
                           onChange={(v) => updateLine(line.rowKey, { unit: v })}
                         />
                       </div>
@@ -499,7 +524,7 @@ export function PurchaseRequestForm({
         </section>
 
         </fieldset>
-        <section className="space-y-4">
+        <section className="max-w-md space-y-4">
           <h2 className="text-sm font-semibold">Cuándo</h2>
           <div className="space-y-2">
             <Label htmlFor="neededByDate">
@@ -511,7 +536,8 @@ export function PurchaseRequestForm({
               type="date"
               required={requireNeededByDate}
               aria-required={requireNeededByDate}
-              defaultValue={initialValues?.neededByDate ?? undefined}
+              value={neededByDateValue}
+              onChange={(event) => { setNeededByDateValue(event.target.value); setReviewedSnapshot(null); }}
               disabled={pending}
               className="min-h-11 md:min-h-9"
             />
@@ -527,11 +553,12 @@ export function PurchaseRequestForm({
           <h2 className="text-sm font-semibold">Observaciones</h2>
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>
-            <AutoGrowTextarea id="notes" name="notes" disabled={pending} defaultValue={initialValues?.notes ?? undefined} />
+            <AutoGrowTextarea id="notes" name="notes" disabled={pending} value={notesValue} onChange={(event) => { setNotesValue(event.target.value); setReviewedSnapshot(null); }} />
           </div>
         </section>
 
-        <div className="sticky bottom-0 z-20 -mx-1 flex flex-col-reverse gap-2 border-t bg-background/95 p-3 backdrop-blur sm:flex-row sm:justify-end md:static md:mx-0 md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
+        {requireAudioReview ? <label className="flex items-start gap-2 text-sm"><input type="checkbox" className="mt-1" checked={audioReviewed} disabled={pending || !wbsNodeId || !neededByDateValue || lines.some((line) => !line.description.trim() || !line.quantity.trim() || !line.unit.trim())} onChange={(event) => setReviewedSnapshot(event.target.checked ? reviewSnapshot : null)} />Revisé la partida, los renglones, unidades, cantidades y fecha. Guardar crea solo un borrador.</label> : null}
+        <div className={PROCUREMENT_FORM_ACTIONS_CLASS}>
           <Button
             type="button"
             variant="outline"
@@ -545,9 +572,9 @@ export function PurchaseRequestForm({
             type="submit"
             className="min-h-11 md:min-h-9"
             data-testid={isEdit ? "purchase-request-edit-submit" : "purchase-request-create-submit"}
-            disabled={pending || (!readOnlyLines && (wbsOptions.length === 0 || !wbsNodeId))}
+            disabled={pending || (requireAudioReview && !audioReviewed) || (!readOnlyLines && (wbsOptions.length === 0 || !wbsNodeId))}
           >
-            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : "Crear solicitud"}
+            {pending ? "Guardando…" : isEdit ? "Guardar cambios" : requireAudioReview ? "Guardar borrador" : "Crear solicitud"}
           </Button>
         </div>
       </form>

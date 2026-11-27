@@ -85,7 +85,8 @@ export async function getReceivableById(
 export async function getReceivableBySalesInvoiceId(
   salesInvoiceId: string,
   ctx: ServiceContext,
-  projectScopeId?: string,
+  /** null = corporate; string = that project; omitted = entity scope with normal access checks. */
+  projectScopeId?: string | null,
 ): Promise<ReceivableView | null> {
   await assertArTenantModule(ctx);
   if (!canViewArProjectArea(ctx.roles)) {

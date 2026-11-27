@@ -42,6 +42,7 @@ function environment(options: { requestProject?: string; quoteIds?: string[]; de
   const validators = new Proxy({}, { get: () => schema });
   const dependencies = {
     "@bloqer/services": services,
+    "@bloqer/config": { getPublicAppBaseUrl: () => "https://portal.example.invalid" },
     "@bloqer/validators": validators,
     "@/lib/auth": { getCurrentUser: async () => ({ session: { user: { id: "actor" } }, tenantCtx: { tenantId: "tenant", companyId: "company", roles: ["OWNER"] } }) },
     "next/navigation": { redirect() { throw new Error("Redirect"); } },
@@ -74,6 +75,9 @@ test("quote create, edit, delete and batch award bind the parent request to the 
     ["updateProcurementQuoteAction", ["project", "quote", "request", {}]],
     ["deleteProcurementQuoteAction", ["quote", "project", "request"]],
     ["createPurchaseOrdersFromAwardsAction", ["project", { purchaseRequestId: "request", groups: [] }]],
+    ["createSupplierQuoteLinkAction", ["project", "request", "supplier"]],
+    ["revokeSupplierQuoteLinkAction", ["project", "request", "invitation"]],
+    ["importSupplierQuoteLinkAction", ["project", "request", "invitation", {}, ""]],
   ];
   for (const [name, args] of calls) {
     const env = environment({ requestProject: "other" });

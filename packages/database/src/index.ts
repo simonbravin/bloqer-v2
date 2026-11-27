@@ -1,5 +1,7 @@
 export { prisma } from "./client";
+export * from "./repositories/supplier-quote-invitation.repository";
 export * from "./repositories/project-progress.repository";
+export * from "./repositories/purchase-order-document.repository";
 // Prisma exported as value+type so services can use new Prisma.Decimal()
 export { Prisma } from "@prisma/client";
 export type { PrismaClient } from "@prisma/client";

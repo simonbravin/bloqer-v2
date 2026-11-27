@@ -6,8 +6,10 @@ import { Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ListEmptyState } from "@/components/ui/list-empty-state";
+import { ReportExportActions } from "@/features/reports/report-export-actions";
 import { cn } from "@/lib/utils";
 import { matchesListStatusFilter } from "../lib/matches-list-status-filter";
+import { procurementFilterBtnClass } from "../lib/procurement-ui";
 import { PurchaseOrderListSection } from "./purchase-order-list-section";
 import type { PurchaseOrderListItem } from "./purchase-order-list";
 
@@ -95,36 +97,54 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
     setStatusFilter(null);
   };
 
+  const exportActions = (
+    <ReportExportActions
+      exportPath={`/api/proyectos/${projectId}/ordenes-compra/export`}
+      params={{ search: trimmedSearch, status: status ?? undefined }}
+      pdf
+      xlsx
+      csv={false}
+    />
+  );
+
   if (orders.length === 0) {
-    return <PurchaseOrderListSection orders={orders} projectId={projectId} />;
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-end">{exportActions}</div>
+        <PurchaseOrderListSection orders={orders} projectId={projectId} />
+      </div>
+    );
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden
-          />
-          <Input
-            aria-label="Buscar órdenes de compra"
-            placeholder="Buscar por código, proveedor o aprobador…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-9"
-            data-testid="purchase-order-search"
-          />
-          {search ? (
-            <button
-              type="button"
-              aria-label="Limpiar búsqueda"
-              onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
-          ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1 basis-64">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              aria-label="Buscar órdenes de compra"
+              placeholder="Buscar por código, proveedor o aprobador…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="h-11 pl-9 pr-12 md:h-10"
+              data-testid="purchase-order-search"
+            />
+            {search ? (
+              <button
+                type="button"
+                aria-label="Limpiar búsqueda"
+                onClick={() => setSearch("")}
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:h-10"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+          {exportActions}
         </div>
 
         <div
@@ -137,7 +157,7 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
             size="sm"
             variant={status === null ? "secondary" : "outline"}
             onClick={() => setStatusFilter(null)}
-            className="h-8"
+            className={procurementFilterBtnClass}
             aria-pressed={status === null}
           >
             Activas
@@ -154,7 +174,7 @@ export function PurchaseOrderListFilters({ orders, projectId, initialStatus }: P
                 variant={active ? "secondary" : "outline"}
                 onClick={() => setStatusFilter(active ? null : f.value)}
                 className={cn(
-                  "h-8",
+                  procurementFilterBtnClass,
                   count === 0 && !active && "opacity-60",
                 )}
                 aria-pressed={active}

@@ -12,11 +12,14 @@ import {
   issueSalesDebitNote,
   cancelSalesCreditNote,
   getSalesInvoiceById,
+  listInvoicesByProject,
+  getReceivableBySalesInvoiceId,
   cancelReceivable,
   registerArAdvance,
   registerArSale,
   ServiceError,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import {
   createSalesInvoiceSchema,
   createInvoiceFromCertificationSchema,
@@ -55,6 +58,33 @@ async function getCtx() {
 function handle(err: unknown): Err {
   if (err instanceof ServiceError) return { error: err.message };
   return { error: "Error inesperado" };
+}
+
+export async function listProjectSalesNoteParentsAction(projectId: string, search: string, page = 1) {
+  const ctx = await getCtx();
+  if (!can(ctx.roles, "EDIT", "AR")) return { error: "Sin permisos para crear notas de crédito/débito" };
+  try {
+    const result = await listInvoicesByProject(projectId, ctx, {
+      status: "ISSUED",
+      documentKind: "INVOICE",
+      search: typeof search === "string" ? search.trim() : "",
+      page: Number.isSafeInteger(page) && page > 0 ? page : 1,
+      pageSize: 10,
+    });
+    const data = await Promise.all(result.data.map(async (invoice) => {
+      const receivable = await getReceivableBySalesInvoiceId(invoice.id, ctx, projectId);
+      return {
+        id: invoice.id,
+        code: invoice.code,
+        contactName: invoice.clientName,
+        currency: invoice.currency,
+        balanceDue: receivable?.balanceDue ?? "0.00",
+      };
+    }));
+    return { data, total: result.total };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 type InvoiceCacheReference = Pick<

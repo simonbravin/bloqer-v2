@@ -21,6 +21,8 @@ Static pages build without DB; **any route that hits Prisma** needs a valid `DAT
 
 Validated together via `getDatabaseEnv()`. **Migrate deploy** and **seed** need these in the environment where the command runs.
 
+On Vercel, `vercel-migrate-if-needed.mjs` first validates that both URLs identify the same allowed destination. For Neon only, its migration child process gets a minimum `DIRECT_URL` `connect_timeout=15` when missing or between 1 and 14 seconds, allowing a suspended compute to start. Explicit limits of 15+ seconds and an explicit `0` (unlimited) are preserved. Duplicate or invalid timeout values fail closed. The runtime `DATABASE_URL`, original environment and credentials are unchanged; local builds still skip deployment migrations. A connection or migration failure still fails the build: no migration is skipped or marked successful. See [Prisma v6 / Neon connection timeouts](https://docs.prisma.io/docs/orm/v6/overview/databases/neon#resolving-connection-timeouts).
+
 ## Required for auth (runtime login / sessions)
 
 | Variable | Notes |
@@ -53,7 +55,7 @@ If either is missing/invalid, email features no-op; **boot continues**.
 
 | Variable | Notes |
 |----------|--------|
-| `R2_ACCOUNT_ID` | All five required together for `isStorageConfigured()`. |
+| `R2_ACCOUNT_ID` | Required together with `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET_NAME` for `isStorageConfigured()`. `R2_PUBLIC_URL` is optional. |
 | `R2_ACCESS_KEY_ID` | Object read/write. Prefer a token that can also set bucket CORS (or set CORS in the Cloudflare dashboard). |
 | `R2_SECRET_ACCESS_KEY` | |
 | `R2_BUCKET_NAME` | |
@@ -78,6 +80,26 @@ Browser uploads go **direct to R2** (presigned PUT) to bypass the Vercel functio
 Configure in Cloudflare Dashboard → R2 → bucket → Settings → CORS policy. Without this, browser uploads fail after `initiate-upload`.
 
 If you use Vercel **preview** URLs, add those exact origins too (R2 does not expand `*.vercel.app`).
+
+## Optional — Bloqer AI and supplier invoice preview
+
+Canonical parsing lives in [`packages/ai/src/env.ts`](../../../packages/ai/src/env.ts). These flags are independent of storage readiness and never authorize a financial operation.
+
+| Variable | Current behavior |
+|----------|------------------|
+| `BLOQER_AI_ENABLED` | Global AI opt-in; absent/empty/false disables AI. |
+| `BLOQER_AI_ALLOW_PRODUCTION` | Additional opt-in when **any** of `VERCEL_ENV`, `APP_ENV` or `NODE_ENV` equals `production`. A Vercel Preview / `next start` with `NODE_ENV=production` also requires this flag. |
+| `BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED` | Separate opt-in for document reading; requires both applicable AI gates above. It is off by default. |
+| `BLOQER_AI_PURCHASE_REQUEST_AUDIO_ENABLED` | D-148 / ADR-020: separate opt-in for reviewed purchase request dictation; also requires the global AI and applicable production gates. Off by default. |
+| `BLOQER_AI_TRANSCRIPTION_MODEL` | Defaults to `gpt-4o-mini-transcribe` through the existing provider. Structured proposal preparation uses `BLOQER_AI_MODEL`. No new service subscription; provider usage may incur charges. |
+| `BLOQER_AI_PROVIDER` | Defaults to `openai`; the current preview requires vision and structured output capabilities. Fake providers are blocked in production-like environments. |
+| `OPENAI_API_KEY` | Server-only credential for the existing OpenAI provider. Presence alone does not prove that a request will succeed. |
+| `BLOQER_AI_MODEL` | Defaults to `gpt-4.1-mini`; changing it requires checking the document capabilities used by the existing provider. |
+| `BLOQER_AI_BASE_URL` | Optional provider endpoint; absent or invalid uses the current provider default. Do not use it to route business documents to an unapproved service. |
+
+For these flags, `true`, `1`, `yes` and `on` are enabled (case-insensitive, trimmed). Do not set them globally just to run a pilot. Confirm the intended environment, DB, account and document corpus first; preserve the previous values for rollback.
+
+`GET /api/ai/supplier-invoice-preview` requires a session and reports provider/flag availability. It does **not** prove R2 connectivity, extraction quality or the full business flow. The invoice form offers **Desde un comprobante** only when storage is configured and that capability returns `enabled: true`. Browser upload additionally requires R2 CORS for the exact application origin. See the [pilot preflight](./DEPLOYMENT_SMOKE_TEST.md#primer-paquete--preparación-del-piloto-documental).
 
 ## Optional — Operational alerts cron
 
@@ -111,3 +133,12 @@ If you use Vercel **preview** URLs, add those exact origins too (R2 does not exp
 | Seed | `SEED_USER_EMAIL` |
 
 See also [`.env.example`](../../../.env.example).
+
+### Lectura de cotizaciones (5/E1)
+
+`BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED` es opt-in y su valor por defecto es `false`. Requiere también los gates `BLOQER_AI_ENABLED`/`BLOQER_AI_ALLOW_PRODUCTION` según entorno, y proveedor con visión/salida estructurada. Reutiliza modelo, credenciales, límite por sesión y timeout existentes; no configura servicios nuevos. No habilitar por desplegar el código: ejecutar primero el piloto sintético de lectura y revisión.
+
+# Respuestas externas de proveedores (D-149)
+
+`BLOQER_PROCUREMENT_SUPPLIER_LINKS_ENABLED`: `true`/`false`, valor por defecto `false`. Controla creación, consulta, respuesta e incorporación de enlaces. Apagarlo bloquea todos esos accesos sin borrar evidencia. Requiere la URL pública configurada (`AUTH_URL`, `NEXT_PUBLIC_APP_URL` o `APP_URL`) y la migración `20261123180000_supplier_quote_invitations`. No hay credencial de proveedor, dependencia o servicio adicional. No activar por publicar código: el piloto sintético y su autorización son separados.
+

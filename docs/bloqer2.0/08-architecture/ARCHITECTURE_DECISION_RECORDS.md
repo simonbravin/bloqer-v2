@@ -47,6 +47,24 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 | ADR-016 | Company vs project finance tools (D-056) | ACEPTADO |
 | ADR-017 | Bloqer AI: tool layer + provider-agnostic (`AiProvider`) sobre `@bloqer/services` | ACEPTADO |
 | ADR-018 | Aislamiento explícito y catálogo cerrado de hijos con tenant heredado | ACEPTADO |
+| ADR-019 | Lectura asistida efímera de comprobantes y documento individual de OC | ACEPTADO (primer paquete autorizado; activación separada) |
+
+---
+
+## ADR-019 — Lectura asistida efímera de comprobantes y documento individual de OC
+
+- **Fecha:** 2026-11-19.
+- **Estado:** ACEPTADO para implementar el primer paquete del relevamiento autorizado por Owner en esta fecha. No autoriza despliegue, nuevos proveedores, dependencias, persistencia ni reglas financieras.
+- **Contexto:** reducir la carga manual de una factura y preparar una OC para compartir, reutilizando servicios, permisos, proveedor AI y renderer PDF existentes.
+- **Decisión:**
+  1. Extender de manera compatible `AiProvider` para enviar un PDF o una imagen y solicitar una respuesta estructurada. Una sola extracción sin tools, sin agente de escritura, sin IDs propuestos por el modelo y sin seguir enlaces del documento. El SDK permanece dentro del adaptador existente.
+  2. El servicio AP autoriza empresa/obra/actor, comprueba formato y tamaño antes del proveedor y devuelve una propuesta **efímera**. El primer corte cubre alta manual de factura normal en ARS; NC/ND, moneda desconocida/otra moneda e impuestos no representables se derivan a carga manual. Los campos desconocidos se conservan como tales; los cálculos y la comparación de importes usan el kernel vigente.
+  3. La lectura requiere acción explícita y flags de AI/producción y capacidad. No se activa automáticamente al seleccionar un archivo. Aplicar la propuesta solo modifica el formulario. Guardar utiliza el servicio de borrador existente; no emite, paga, aprueba ni modifica stock. No reemplaza líneas de borradores provenientes de OC.
+  4. El original local se adjunta al borrador con el uploader actual. Una vez conocido el ID creado, un fallo de adjunto se recupera sobre ese mismo ID. Una respuesta de creación incierta exige revisar el listado antes de repetir; no se promete idempotencia persistente nueva. Número fiscal leído solo informativo: no se usa como numeración interna ni se promete deduplicación fiscal.
+  5. El documento individual de OC es una proyección de lectura autorizada y un PDF en `@bloqer/report-pdf`. Muestra su estado y datos comerciales; excluye notas, imputaciones, presupuesto, variaciones y aprobadores internos. Descargar o compartir el archivo desde el dispositivo no cambia estado ni acredita envío, recepción o aceptación del proveedor.
+  6. Refinamiento UX autorizado el 19/11/2026: separar impedimentos de compatibilidad/integridad de datos faltantes que pueden completarse por el usuario. `canApply` habilita únicamente trasladar una propuesta parcial al formulario, nunca guardarla como validada. La respuesta efímera distingue `reviewReasons` y `blockingReasons`; no se agregan campos persistidos. Comparar importes verificables aun si falta otra cabecera; conservar ausencias como null/vacío, sin valores habituales. La UI exige completar y confirmar la revisión del original antes del alta DRAFT habitual. Pruebas de layout y dispositivos se distinguen de verificación estática; no se habilita el piloto por este cambio.
+- **Consecuencias:** sin migraciones ni npm nuevos; chat conserva tools READ. Bandeja durable, número fiscal persistido, cuotas distribuidas, seguimiento multicanal y escritura conversacional requieren decisiones posteriores. Flags apagados por defecto y verificación de permisos/errores/aislamiento antes del piloto real.
+- **Referencias:** [plan del primer paquete](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md), [documentos](../02-modules/DOCUMENTS.md), [AP](../02-modules/EXPENSES_AND_PAYMENTS.md), ADR-014, ADR-017, D-053, D-090, D-108 y D-145.
 
 ---
 
@@ -279,6 +297,85 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 
 ---
 
+## ADR-020 — Preparación efímera de solicitudes desde audio
+
+- **Fecha:** 2026-11-23. **Estado:** ACEPTADO para el flujo elegido en D-148, aplicando las capas y el adaptador de ADR-017/019; sin cambios de persistencia.
+- **Diseño:** route autenticada acotada → service con autorización de obra/empresa/rol/módulo → `@bloqer/ai` con transcripción opcional del adaptador existente y generación estructurada sin tools. El SDK permanece dentro del adaptador; proveedores sin transcripción no habilitan audio. Modelo de transcripción configurable, con el mismo proveedor y credenciales actuales.
+- **Interacción:** grabación explícita (máximo 60 segundos en el navegador) o archivo WebM/MP4/WAV de hasta 3 MiB; validar tamaño y cabecera antes del proveedor. Transcripción editable y confirmación previa a preparar renglones. Texto y respuesta acotados; cantidades decimales como strings y desconocidos null. Las fechas relativas se conservan como observaciones para que el usuario elija una fecha exacta.
+- **Persistencia:** audio, transcripción y propuesta solo viven en memoria durante la preparación; no se envían a logs, R2, auditoría ni campos de notas automáticamente. La interfaz informa que se envía el audio al proveedor configurado. El alta sigue por la acción/servicio DRAFT existente, sin calls de escritura del modelo. No hay retención nueva en Bloqer; aplican las condiciones del proveedor de IA.
+- **Límites:** flag propio apagado y gates AI/producción, límite HTTP incluso sin Content-Length, timeout/cancelación, rechazo cross-origin, rate limit existente. No se presenta el rate limit en memoria como cuota distribuida. Cancelar/editar/reemplazar invalida resultados anteriores. Revisión ligada al contenido antes de guardar; todos los controles de negocio se repiten al crear.
+- **Verificación:** parser e instrucciones adversariales, permisos antes de llamadas al proveedor, bytes/tamaño/cancelación, revisión y edición en UI, borrador real en SQL descartable. Proveedores y grabación real se prueban después con un piloto autorizado; CI no demuestra calidad de transcripción.
+- **Referencias:** D-148, Q-096, `PURCHASE_REQUESTS.md`, `PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md` bloque 4/D.
+
+## ADR-021 — Propuesta de respuesta externa de cotizaciones por enlace
+
+- **Fecha:** 2026-11-23. **Estado:** ACEPTADO por el Owner mediante Q-097/D-149. Contrato aprobado para implementar; resultados de pruebas, migración, despliegue y piloto se registran por separado. La aprobación no activa la capacidad ni autoriza envíos a proveedores reales.
+- **Problema:** E2 necesita recibir ofertas sin conceder membresía al tenant. La creación vigente exige actor interno y persiste `RECEIVED`; usarla como endpoint público o atribuir la respuesta al emisor del enlace falsearía autorización y autoría.
+- **Decisión aprobada:** separar invitación/respuesta externa de la cotización operativa. El vínculo autoriza solamente consulta mínima y una respuesta; una persona interna autorizada revisa e incorpora la oferta con el servicio canónico. Reutilizar PostgreSQL, `node:crypto`, Zod, componentes y kernel monetario existentes. Sin dependencias ni servicios nuevos.
+
+### Experiencia aprobada
+
+1. En una SC `SUBMITTED`, Compras elige un proveedor activo y pulsa **Crear enlace**. Una vista previa muestra exactamente lo compartido y la fecha/hora de vencimiento. El enlace se muestra una vez; **Copiar enlace** no afirma envío. Se advierte que cualquiera que lo reciba puede utilizarlo. Generar otro revoca el anterior pendiente del mismo proveedor/SC.
+2. La página externa identifica empresa, obra, SC y proveedor, y presenta descripción, cantidad y unidad de cada ítem. Excluye presupuesto, saldo, EDT/APU, notas internas, otros proveedores/ofertas, aprobadores, adjuntos y navegación al ERP. Mismos componentes y densidades del formulario vigente, incluidos celular y teclado.
+3. El proveedor informa moneda, precios con/sin IVA, descuentos, IVA/IIBB, plazo, vigencia y observaciones comerciales. Debe clasificar todos los ítems como Cotizado/No cotizado/Bonificado; desconocidos no se completan con ceros por omisión. No modifica cantidades ni unidades. Se exige al menos un ítem cotizado positivo; una respuesta de indisponibilidad total queda fuera de este primer corte.
+4. **Revisar respuesta** muestra los datos antes de **Confirmar y enviar respuesta**. Una única respuesta definitiva: el reintento idéntico confirma el resultado; un contenido distinto exige que Compras emita otro enlace. Al terminar se muestra un comprobante mínimo sin acceso posterior a la oferta mediante el enlace.
+5. En la SC, **Respuestas por enlace** conserva el original recibido y permite **Revisar respuesta** y **Incorporar cotización**. Compras puede corregir el formulario, completa FX cuando corresponda y confirma. Solo entonces nace `ProcurementQuote.RECEIVED`; no adjudica ni crea OC. Importación y vínculo se confirman atómicamente. Una respuesta incorporada permite **Ver respuesta original**; la cotización figura en la comparación existente y no se permite importar otra vez.
+6. El vencimiento/revocación detiene el acceso externo; no borra una respuesta ya recibida ni impide su revisión interna posterior. La revisión respeta el estado actual de SC/obra, proveedor activo, máximos y oferta activa existente. Si la solicitud cambió, se requiere una nueva invitación, sin importar contra renglones diferentes.
+
+### Persistencia aprobada y acotada
+
+Una única raíz nueva `ProcurementQuoteInvitation` / `procurement_quote_invitations`. No reutilizar tablas de login/membresía ni esconder este permiso dentro de notas o auditoría. Los siguientes campos fueron aprobados con D-149:
+
+| Campos | Contrato aprobado |
+|---|---|
+| `id` | UUID interno; no concede acceso por sí solo. |
+| `tenantId`, `companyId`, `projectId`, `purchaseRequestId`, `supplierContactId` | Obligatorios y con FK; coherencia entre todas las relaciones comprobada por servicio en cada operación. No ampliar el catálogo de hijos sin tenant de ADR-018. |
+| `tokenHash` | SHA-256 del token aleatorio de 32 bytes; único; nunca devolver el hash ni persistir el token en claro. |
+| `expiresAt` | Instante UTC: creación + siete días; mostrar hora Argentina. Es la vigencia del acceso, separada de `validUntil` de la oferta. |
+| `revokedAt`, `revokedBy` | Nulos inicialmente; revocación explícita o sustitución por otro enlace con actor interno. |
+| `requestSnapshot` | JSON tipado versión 1 con etiquetas públicas de empresa/obra/SC/proveedor y por renglón ID, descripción, cantidad decimal y unidad. Solo DTO permitido, nunca serialización completa del modelo. |
+| `requestFingerprint` | Hash del contenido operativo relevante y versión de solicitud al crear; detectar cambios posteriores incluso con mismos IDs. |
+| `responsePayload`, `responseHash`, `respondedAt` | Nulos hasta respuesta; JSON tipado versión 1 inmutable, hash de payload normalizado e instante de recepción. Una respuesta por invitación. |
+| `importedQuoteId`, `importedAt`, `importedBy` | Nulos hasta incorporación; FK única a la cotización, instante y actor interno real. |
+| `createdBy`, `updatedBy`, `createdAt`, `updatedAt` | Auditoría interna. En respuesta externa no atribuir la modificación a un usuario: `updatedBy` nullable, con procedencia externa explícita en auditoría. |
+
+`responsePayload` versión 1: `currency`, `pricesIncludeTax`, `iibbPerceptionRate`, `leadTimeDays`, `validUntil`, `notes` y `lines` con `purchaseRequestLineId`, `offerKind`, `unitPrice`, `taxRate`, `discountPct`. Decimales como strings validadas, fechas calendario y reglas D-118 existentes. No recibe tenant/empresa/obra/proveedor, FX, cantidades, totales derivados ni IDs de usuario. FX y totales operativos se resuelven al incorporar con el usuario interno. Los campos y versión del JSON tienen schema cerrado: no es un contenedor genérico extensible sin revisión.
+
+Índices propuestos: hash único, `(tenantId, purchaseRequestId)`, `(tenantId, companyId, projectId)` y `importedQuoteId` único. Una invitación pendiente no revocada por SC/proveedor mediante índice parcial y serialización bajo lock de SC; al reemplazar se revoca también la anterior ya vencida. No crear enum de estado nuevo: etiquetas derivadas de vencimiento, revocación, respuesta e incorporación, documentadas en `STATE_MACHINES.md` antes de implementación. Conservar historial; sin borrado físico ni backfill de cotizaciones existentes.
+
+### Acceso externo y aislamiento
+
+- Capacidad bearer distinta de una sesión Auth.js. Ruta externa sin shell de empresa, chatbot, navegación ni loaders internos. Nunca fabricar `ServiceContext` ni usar el emisor como actor de la respuesta. La creación/revocación/revisión usan sesión y permisos internos reales.
+- Token solo en fragmento de la URL compartida; página de entrada elimina el fragmento de su historial y lo intercambia por cookie `HttpOnly`, `Secure` en producción, `SameSite=Strict`, limitada a `/cotizar/[invitationId]`. Los handlers de esa invitación viven debajo de la misma ruta; el servidor exige coincidencia del ID de ruta con la invitación resuelta por hash. Cookies separadas por ruta evitan que pestañas de dos empresas reemplacen sus permisos entre sí. El intercambio no consume la respuesta ni modifica datos operativos. La cookie no excede el vencimiento de la invitación; no es sesión de ERP. El token no llega a query strings, rutas, logs ni telemetría. Recarga y reemplazo de invitación comprueban nuevamente el permiso.
+- Origen permitido desde configuración confiable, `Cache-Control: no-store`, `Referrer-Policy: no-referrer`, sin indexación ni recursos/analítica de terceros en esa pantalla. Las mutaciones exigen Origin coincidente y contenido/tamaño estrictos; middleware solo exceptúa las rutas exactas nuevas y cada handler verifica la capacidad en servidor.
+- Consulta y respuesta cargan por hash, derivan el alcance del registro y comprueban tenant activo, empresa/obra/SC coherentes, proveedor activo, SC `SUBMITTED`, obra operable, fingerprint y autoridad vigente del emisor para delegar esa SC. Los IDs recibidos de renglones deben pertenecer exactamente al snapshot y a la SC actual. Usuario interno autenticado en otra empresa no amplía ni sustituye el alcance del enlace.
+- Token inexistente, revocado, vencido o contexto no autorizado devuelve un aviso genérico sin datos. Con respuesta ya consumida, solo recibo mínimo de envío; no devolver snapshot, precios ni datos de empresa. Reintento idéntico puede confirmar éxito si el enlace no fue revocado/vencido; después se informa indisponibilidad y Compras conserva la respuesta.
+- Límites propuestos del corte: cuerpo de hasta 256 KiB, hasta 200 ítems, observaciones hasta 2.000 caracteres; rechazar explícitamente solicitudes fuera de estos límites sin recortar datos. Reutilizar el patrón de limitación en memoria para ráfagas del canal; no presentarlo como cuota distribuida ni protección DDoS completa. La recepción única queda protegida por DB incluso entre instancias. Ningún acceso externo llama IA, envía email ni crea documentos/archivos.
+- La posesión del enlace no verifica identidad personal ni email. La auditoría indica `source: supplier_link`, invitación y proveedor de destino; nunca afirma quién físicamente respondió. Verificación de identidad exige la alternativa con cuenta de Q-097.
+
+### Concurrencia, auditoría y reutilización
+
+- Orden de locks consistente con compras: obra → SC → invitación. Dentro de la transacción repetir vigencia/revocación, autoridad y pertenencia después de esperar los locks. Revocación/expiración concurrente debe ganar cuando es efectiva antes de confirmar la respuesta. Actualización condicional y `responseHash` garantizan que un reintento no sobrescriba evidencia.
+- Incorporación: extraer una operación interna transaccional de `createProcurementQuote`, conservando guards, cálculo, clasificación, capacidad y auditoría. El servicio autenticado de incorporación usa esa operación y enlaza `importedQuoteId` en la misma transacción. No hacer un alta y luego un update separado; no cambiar la firma pública de alta manual ni permitir que el endpoint externo la invoque.
+- Eventos de auditoría: `procurement_quote_invitation.created`, `.revoked`, `.responded`, `.imported`. Registrar en catálogo antes de programar. Los internos llevan actor real; el externo usa actor nullable y procedencia explícita, sin etiquetarlo como acción de usuario o tarea automática. Contexto tenant/empresa/obra obligatorio, sin token, hash de token ni respuesta completa en logs. El original queda únicamente en el registro autorizado.
+- Proveedores/formularios: reutilizar `Contact` SUPPLIER, `canManageProcurementQuotes`/guards existentes, schemas monetarios, kernel, Select/Input/Button y clases compartidas de Compras. Repositorio nuevo en `packages/database`; orquestación en `packages/services`; route handlers delgados. No usar Prisma desde `apps/web`.
+
+### Pruebas y publicación tras aprobación
+
+1. Unitarias: DTO público por lista permitida, campos extra rechazados, token/hash, vencimiento, permisos, fingerprint, clasificación/decimales y payload idéntico/distinto.
+2. SQL descartable: dos tenants y empresas, obra compartida, IDs cruzados, proveedor archivado, emisor sin permisos, SC modificada/anulada, carreras respuesta/revocación/reemplazo y doble incorporación. Comprobar rollback y una sola cotización.
+3. Navegador: crear/copiar sin enviar, entrada externa sin sesión, revisión y respuesta, recarga, enlace vencido/revocado, reintento, importación interna y ambas vistas en escritorio/tablet/celular. Abrir simultáneamente invitaciones de dos empresas en dos pestañas y comprobar que cookies, respuestas y contexto no se mezclan. Confirmar que no aparecen presupuesto, ofertas ajenas, navegación ERP ni tokens en URL después del intercambio.
+4. Actualizar módulo, entidades/estados derivados/eventos, ERD, permisos, guía y Help en el PR funcional. Indexar conocimiento solo después de aprobado e implementado; no enseñar al chat que la función está disponible durante la propuesta. Sin tool WRITE nueva.
+5. Migración aditiva en entorno aislado, CI y revisión; despliegue/migración de portal en branch Neon `production` según procedimiento. Flag de capacidad apagado por defecto; piloto con proveedor/datos sintéticos antes de habilitar. No enviar enlaces reales ni activar por el solo merge.
+
+### Fuentes del relevamiento
+
+- `packages/services/src/procurement/procurement-quote.service.ts`: alta interna, locks, estado `RECEIVED`, oferta activa por proveedor y máximo de cotizaciones.
+- `packages/services/src/types.ts`: actor obligatorio del contexto interno; no existe identidad externa de proveedor.
+- `packages/database/prisma/schema.prisma`: `ProcurementQuote`, `ProcurementQuoteLine`, `AuditLog`, `VerificationToken`; se agrega la raíz de permiso externo de este ADR.
+- `apps/web/middleware.ts`: allowlist pública actual y patrón de separación de tokens de membresía; no reutilizar la membresía como acceso de proveedor.
+- [OWASP, controles de tokens](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html): referencia técnica sobre aleatoriedad, uso único, vencimiento y evitar filtraciones. Es un contexto de recuperación de contraseña, no una especificación de negocio de cotizaciones ni respaldo del plazo propuesto de siete días.
+
 ### Formato sugerido para nuevos ADRs
 
 ```markdown
@@ -297,3 +394,6 @@ Mantener **ADRs** en esta carpeta como registro de **decisiones técnicas** (có
 - Visión técnica: [`ARCHITECTURE_OVERVIEW.md`](./ARCHITECTURE_OVERVIEW.md)
 - Stack: [`TECH_STACK.md`](./TECH_STACK.md)
 - Decisiones de producto: [`../00-product/DECISION_LOG.md`](../00-product/DECISION_LOG.md)
+### Aplicación del patrón ADR-019 al bloque 5/E1 — 23/11/2026
+
+El Owner autorizó continuar Compras y proveedores después del refuerzo de aislamiento del chat. La lectura de cotizaciones reutiliza el patrón efímero existente: archivo explícito → proveedor configurado sin tools/IDs → servicio autorizado → propuesta → revisión humana → acción de alta canónica. No cambia arquitectura, persistencia, estados, reglas monetarias ni selección/adjudicación. Se autoriza solicitud y obra antes de la extracción, se limita cuerpo/archivo/respuesta y se conserva el flag propio apagado. Correspondencia manual de renglones, sin conversiones ni cambios de cantidades de SC. La oferta se registra como RECEIVED por el servicio existente, no como un nuevo estado de borrador. Guía, Help y smoke describen el flujo y sus límites.

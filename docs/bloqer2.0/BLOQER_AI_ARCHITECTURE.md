@@ -720,6 +720,12 @@ Preguntas respondibles con datos/autorización reales:
 
 ## Changelog
 
+### Lectura documental del primer paquete (2026-11-19)
+
+[ADR-019](./08-architecture/ARCHITECTURE_DECISION_RECORDS.md) agrega al adaptador existente contenido inline PDF/imagen y salida estructurada compatible con el chat textual. El servicio AP devuelve una propuesta efímera mediante una sola llamada sin tools; no incorpora escrituras al registry READ. La UI normal revisa/aplica los campos y guarda mediante el servicio de borrador existente. Requiere flags de AI/producción y `BLOQER_AI_SUPPLIER_INVOICE_PREVIEW_ENABLED`, apagado por defecto. El alcance inicial es alta manual directa, factura normal ARS, con original y recuperación de adjunto. No es habilitación de V3 conversacional, historial, deduplicación fiscal ni bandeja persistente. Seguimiento y límites en [plan del primer paquete](./PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md).
+
+El refinamiento UX autorizado en la misma fecha incorpora **Carga manual / Desde un comprobante** dentro del alta existente. La propuesta distingue impedimentos de integridad/compatibilidad (`blockingReasons`) de datos que puede completar el usuario (`reviewReasons`). `canApply` permite prellenar parcialmente, no certifica una factura lista para guardar. El servicio coteja los importes verificables aunque falten fechas u otra cabecera; no calcula con ceros inventados. El formulario mantiene ausencias, enumera pendientes, oculta totales incompletos y requiere confirmar la comparación con el original después de completar; las modificaciones invalidan la confirmación. Sin cambio de proveedor, prompt de extracción, tools READ, persistencia ni reglas financieras.
+
 | Fecha | Cambio |
 |---|---|
 | 2026-09-04 | FASE 0 audit + arquitectura propuesta; STOP en D-AI-01…04 |

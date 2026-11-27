@@ -22,6 +22,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { PageShell } from "@/components/layout/page-shell";
 import { parsePage } from "@/lib/parse-page";
 import { fiscalDocumentListEmptyCopy } from "@/features/finance/lib/fiscal-document-list-empty";
+import { NewFiscalNoteDialog } from "@/features/finance/components/new-fiscal-note-dialog";
 
 const PAGE_SIZE = 20;
 const STATUSES = ["DRAFT", "ISSUED", "CANCELLED"] as const;
@@ -155,18 +156,23 @@ export default async function FinanzasFacturasProveedorPage({ searchParams }: Pa
             exportPath="/api/reports/finanzas/facturas-proveedor-corporativo.csv"
             params={{ status: status ?? "ACTIVE", from: sp.from, to: sp.to, class: sp.class, kind: sp.kind }}
             pdf
+            xlsx
             label="Exportar"
           />
           {canCreateInvoice ? (
-            <Suspense fallback={null}>
-              <NewCompanySupplierInvoiceDialog
-                suppliers={suppliers}
-                companyCountry={companyCountry}
-                companyIvaCondition={companyIvaCondition}
-                defaultOpen={sp.create === "1"}
-                storageConfigured={isStorageConfigured()}
-              />
-            </Suspense>
+            <>
+              <NewFiscalNoteDialog kind="CREDIT_NOTE" scope="company-ap" />
+              <NewFiscalNoteDialog kind="DEBIT_NOTE" scope="company-ap" />
+              <Suspense fallback={null}>
+                <NewCompanySupplierInvoiceDialog
+                  suppliers={suppliers}
+                  companyCountry={companyCountry}
+                  companyIvaCondition={companyIvaCondition}
+                  defaultOpen={sp.create === "1"}
+                  storageConfigured={isStorageConfigured()}
+                />
+              </Suspense>
+            </>
           ) : null}
         </div>
       </div>

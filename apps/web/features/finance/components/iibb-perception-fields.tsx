@@ -75,6 +75,9 @@ export type DocumentTaxTotalsFooterProps = {
   disabled?: boolean;
   totalLabel?: string;
   className?: string;
+  /** Incomplete assisted evidence must not look like a calculated zero. */
+  incomplete?: boolean;
+  preserveEmptyRate?: boolean;
 };
 
 /**
@@ -90,6 +93,8 @@ export function DocumentTaxTotalsFooter({
   disabled = false,
   totalLabel = "Total (vista previa)",
   className,
+  incomplete = false,
+  preserveEmptyRate = false,
 }: DocumentTaxTotalsFooterProps) {
   const showIibb = iibbPerceptionRate != null;
   const canEditRate =
@@ -118,13 +123,13 @@ export function DocumentTaxTotalsFooter({
       <div className="text-right">
         <p className="text-xs text-muted-foreground">Subtotal</p>
         <p className="flex h-9 items-center justify-end tabular-nums font-medium">
-          {formatDecimalArFromString(subtotal)}
+          {incomplete ? "Por completar" : formatDecimalArFromString(subtotal)}
         </p>
       </div>
       <div className="text-right">
         <p className="text-xs text-muted-foreground">IVA</p>
         <p className="flex h-9 items-center justify-end tabular-nums font-medium">
-          {formatDecimalArFromString(taxAmount)}
+          {incomplete ? "Por completar" : formatDecimalArFromString(taxAmount)}
         </p>
       </div>
       {canEditRate ? (
@@ -137,13 +142,15 @@ export function DocumentTaxTotalsFooter({
           </Label>
           <DecimalInput
             id="document-iibb-rate"
+            required={preserveEmptyRate}
+            precision={preserveEmptyRate ? 4 : undefined}
             value={iibbPerceptionRate}
             onValueChange={(v) =>
-              onIibbPerceptionRateChange(v.trim() === "" ? "0" : v)
+              onIibbPerceptionRateChange(!preserveEmptyRate && v.trim() === "" ? "0" : v)
             }
             disabled={disabled}
-            placeholder="3"
-            className="h-9 w-[5.5rem] text-right text-sm"
+            placeholder={preserveEmptyRate ? "Completar" : "3"}
+            className={cn("h-9 w-[5.5rem] text-right text-sm", preserveEmptyRate && "h-11 w-28 text-base sm:h-9 sm:text-sm")}
           />
         </div>
       ) : null}
@@ -151,14 +158,14 @@ export function DocumentTaxTotalsFooter({
         <div className="text-right">
           <p className="text-xs text-muted-foreground">{IIBB_PERCEPTION_LABEL_ES}</p>
           <p className="flex h-9 items-center justify-end tabular-nums font-medium">
-            {formatDecimalArFromString(iibbAmount)}
+            {incomplete ? "Por completar" : formatDecimalArFromString(iibbAmount)}
           </p>
         </div>
       ) : null}
       <div className="text-right">
         <p className="text-xs text-muted-foreground font-semibold">{totalLabel}</p>
         <p className="flex h-9 items-center justify-end tabular-nums font-semibold">
-          {formatDecimalArFromString(total)}
+          {incomplete ? "Por completar" : formatDecimalArFromString(total)}
         </p>
       </div>
     </div>

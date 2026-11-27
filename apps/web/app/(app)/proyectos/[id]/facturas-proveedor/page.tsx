@@ -6,6 +6,8 @@ import { Pagination } from "@/components/ui/pagination";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
 import { ProjectPageHeader } from "@/components/layout/project-page-header";
 import { ProjectFinanceListHeaderActions } from "@/features/projects/components/project-finance-list-header-actions";
+import { NewFiscalNoteDialog } from "@/features/finance/components/new-fiscal-note-dialog";
+import { ReportExportActions } from "@/features/reports/report-export-actions";
 import {
   NewProjectSupplierInvoiceDialog,
   SupplierInvoiceListFilters,
@@ -217,10 +219,21 @@ export default async function FacturasProveedorPage({ params, searchParams }: Pa
         actions={
           <ProjectFinanceListHeaderActions
             listViewStorageKey={`facturas-proveedor-${id}`}
+            exportSlot={
+              <ReportExportActions
+                exportPath={`/api/proyectos/${id}/facturas-proveedor/export`}
+                params={{ search: sp.search, dir: sp.dir, class: sp.class, status, kind: documentKind }}
+                pdf
+                xlsx
+                csv={false}
+              />
+            }
             secondary={{ href: `/proyectos/${id}/pagos`, label: "Ver pagos" }}
             primarySlot={
               canCreateInvoice ? (
                 <Suspense fallback={<Button size="sm" disabled>Nueva factura</Button>}>
+                  <NewFiscalNoteDialog kind="CREDIT_NOTE" scope="project-ap" projectId={id} />
+                  <NewFiscalNoteDialog kind="DEBIT_NOTE" scope="project-ap" projectId={id} />
                   <NewProjectSupplierInvoiceDialog
                     projectId={id}
                     suppliers={suppliers}

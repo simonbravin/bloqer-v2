@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
@@ -38,6 +38,7 @@ export type DocumentFormProps = {
   projectId: string | null;
   /** Library folder destination ([D-113]); ignored for operational linkedEntity. */
   folderId?: string | null;
+  replacesAttachmentId?: string;
   storageConfigured: boolean;
   linkedEntity?:
     | { type: "JOBSITE_LOG"; id: string }
@@ -66,6 +67,7 @@ export type DocumentFormProps = {
 export function DocumentForm({
   projectId,
   folderId,
+  replacesAttachmentId,
   storageConfigured,
   linkedEntity,
   defaultCategory = "OTHER",
@@ -84,6 +86,10 @@ export function DocumentForm({
   const [category, setCategory] = useState(defaultCategory);
   const [description, setDescription] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [attemptStarted, setAttemptStarted] = useState(false);
+  const submitting = useRef(false);
+  const categoryId = useId();
+  const descriptionId = useId();
   const { idempotencyKey, rotateIdempotencyKey } = useIdempotencyKey();
 
   function handleFileSelect(file: File | null) {
@@ -93,6 +99,7 @@ export function DocumentForm({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitting.current) return;
     setError(null);
 
     if (!selectedFile) {
@@ -100,6 +107,8 @@ export function DocumentForm({
       return;
     }
 
+    submitting.current = true;
+    setAttemptStarted(true);
     setPending(true);
     onPendingChange?.(true);
 
@@ -108,6 +117,7 @@ export function DocumentForm({
         file: selectedFile,
         projectId,
         folderId,
+        replacesAttachmentId,
         category,
         description,
         linkedEntityType: linkedEntity?.type,
@@ -125,6 +135,7 @@ export function DocumentForm({
       const { documentId } = result;
       toast.success("Documento guardado.");
       rotateIdempotencyKey();
+      setAttemptStarted(false);
       setSelectedFile(null);
       setDescription("");
       setCategory(defaultCategory);
@@ -145,6 +156,8 @@ export function DocumentForm({
       setError("Error al subir el archivo. Intentá de nuevo.");
       setPending(false);
       onPendingChange?.(false);
+    } finally {
+      submitting.current = false;
     }
   }
 
@@ -161,7 +174,7 @@ export function DocumentForm({
       {!storageConfigured && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/10 dark:text-amber-300">
           {placeholderWarning ??
-            "El almacenamiento de archivos no está configurado en este entorno. Solo se guardará la metadata; no habrá un archivo descargable."}
+            "El almacenamiento no está disponible. Conservá el original; podrás subirlo cuando se restablezca."}
         </div>
       )}
 
@@ -169,13 +182,13 @@ export function DocumentForm({
         selectedFile={selectedFile}
         onFileSelect={handleFileSelect}
         onValidationError={setError}
-        disabled={pending}
+        disabled={pending || attemptStarted}
       />
 
       <div className="space-y-1">
-        <Label>Categoría</Label>
-        <Select value={category} onValueChange={setCategory} disabled={pending}>
-          <SelectTrigger>
+        <Label htmlFor={categoryId}>Categoría</Label>
+        <Select value={category} onValueChange={setCategory} disabled={pending || attemptStarted}>
+          <SelectTrigger id={categoryId}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -189,25 +202,26 @@ export function DocumentForm({
       </div>
 
       <div className="space-y-1">
-        <Label htmlFor="description">Descripción</Label>
+        <Label htmlFor={descriptionId}>Descripción</Label>
         <Textarea
-          id="description"
+          id={descriptionId}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Descripción opcional…"
           rows={layout === "dialog" ? 2 : 3}
-          disabled={pending}
+          disabled={pending || attemptStarted}
         />
       </div>
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {attemptStarted && !pending ? <p className="text-sm text-muted-foreground">Se conservan el archivo y sus datos para reintentar la misma carga. Antes de cancelar o iniciar otra, revisá si ya aparece en Documentos.</p> : null}
+      {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <div className="flex gap-2 justify-end">
         <Button type="button" variant="outline" onClick={handleCancel} disabled={pending}>
           Cancelar
         </Button>
-        <Button type="submit" disabled={pending || !selectedFile}>
-          {pending ? "Subiendo…" : submitLabel}
+        <Button type="submit" disabled={pending || !selectedFile || !storageConfigured}>
+          {pending ? "Subiendo…" : attemptStarted ? "Reintentar carga" : submitLabel}
         </Button>
       </div>
     </form>

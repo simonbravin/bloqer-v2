@@ -107,7 +107,7 @@ export function NewPurchaseOrderDialog({
         <Button variant={triggerVariant}>{triggerLabel}</Button>
       </DialogTrigger>
       <DialogContent className={PROCUREMENT_FORM_DIALOG_CLASS}>
-        <DialogHeader>
+        <DialogHeader className="pr-10">
           <DialogTitle>Nueva orden de compra</DialogTitle>
           <DialogDescription className="sr-only">
             Completá los datos para crear una orden de compra del proyecto.

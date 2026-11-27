@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { withSyntheticStorageSigning } from "../testing/storage-signing-fixture";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { after, before, describe, it } from "node:test";
@@ -349,10 +350,17 @@ describe("AG-11 jobsite lifecycle and evidence on isolated SQL", {
       linkedEntityType: "JOBSITE_LOG" as const, linkedEntityId, projectId, originalFileName,
       mimeType: "image/png" as const, category: "JOBSITE_EVIDENCE" as const, sizeBytes: 128, idempotencyKey: randomUUID(),
     });
-    const ownDoc = await initiateDocumentUpload(upload(sharedPartId, sharedProject, "frente-a.png"), foreman);
-    assert.equal(ownDoc.storageConfigured, false);
-    const sisterDoc = await initiateDocumentUpload(upload(sisterPartId, sharedProject, "frente-b.png"), sister);
-    const hiddenDoc = await initiateDocumentUpload(upload(hiddenPartId, hiddenProject, "frente-oculto.png"), owner);
+    const [ownDoc, sisterDoc, hiddenDoc] = await withSyntheticStorageSigning(async () => [
+      await initiateDocumentUpload(upload(sharedPartId, sharedProject, "frente-a.png"), foreman),
+      await initiateDocumentUpload(upload(sisterPartId, sharedProject, "frente-b.png"), sister),
+      await initiateDocumentUpload(upload(hiddenPartId, hiddenProject, "frente-oculto.png"), owner),
+    ] as const);
+    assert.equal(ownDoc.storageConfigured, true);
+    // Synthetic evidence metadata for scope tests; no object is sent to storage.
+    await prisma.documentAttachment.updateMany({
+      where: { tenantId, id: { in: [ownDoc.documentId, sisterDoc.documentId, hiddenDoc.documentId] } },
+      data: { status: "ACTIVE" },
+    });
     await prisma.documentAttachment.update({
       where: { id: sisterDoc.documentId },
       data: { companyId: null },

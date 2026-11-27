@@ -113,5 +113,33 @@ Matriz canónica: [`PERMISSIONS_MATRIX.md`](../00-product/PERMISSIONS_MATRIX.md)
 
 La documentación anterior no distinguía ofertas históricas al devolver una SC y seguía enumerando funcionalidades ya existentes como pendientes. D-126 resuelve la primera contradicción; el inventario actual reemplaza la segunda. D-125 exige identificar la moneda de cada referencia, incluso en solicitudes con partidas de presupuestos diferentes.
 
+## 18.1 Preparación por audio revisada (D-148 / ADR-020)
+
+En **Nueva solicitud**, **Dictar solicitud** aparece únicamente con la capacidad habilitada. Grabar hasta 60 segundos o elegir WebM/MP4/WAV de hasta 3 MiB; también se puede escribir el texto. La transcripción y la propuesta pasan por el proveedor IA existente; no se guardan audio, transcripción ni propuesta en Bloqer. Solo el formulario revisado se persiste mediante el alta DRAFT vigente. El uso del proveedor puede tener costo; no se agrega un servicio ni una dependencia.
+
+El usuario revisa el texto antes de **Preparar renglones**. Los campos desconocidos quedan vacíos; fechas relativas requieren fecha explícita. **Usar propuesta y completar** reemplaza renglones, fecha y observaciones del formulario: el usuario elige partida, completa descripción/cantidad/unidad y fecha y confirma una segunda revisión. Cualquier edición invalida esa revisión. **Guardar borrador** no envía a Compras ni crea OC. El envío sigue siendo una acción posterior explícita.
+
+Los servicios verifican sesión, tenant, módulo, permisos EDIT y acceso/estado de obra antes del proveedor. No se aceptan IDs de negocio del modelo. Cancelar descarta respuestas tardías y detiene el micrófono; fallos conservan el texto editable y permiten continuar manualmente. Sin tools WRITE, nuevos campos, estados, eventos ni migraciones. Los recorridos con IA interceptada no acreditan calidad de transcripción real.
+
 ## 19. Preguntas abiertas
+
+### Bloque 5/E1 — lectura asistida de cotizaciones
+
+En una SC **Enviada**, con permiso de cargar cotizaciones, el formulario **Cargar cotización** está disponible también en celular. Si está habilitada la capacidad, **Leer cotización desde archivo** acepta PDF/JPG/PNG/WebP de hasta 3 MiB. **Leer oferta** envía el archivo al proveedor IA configurado y devuelve evidencia efímera, sin IDs internos ni herramientas operativas. El servicio autoriza tenant, empresa, usuario, obra y solicitud antes del proveedor y comprueba que la SC admite nuevas ofertas.
+
+El usuario vincula cada renglón leído con un ítem de la SC o lo excluye expresamente. No hay vinculación automática: las cantidades y unidades deben coincidir, sin conversiones ni modificación de la SC; las diferencias o datos de cantidad/unidad desconocidos requieren carga manual. Las omisiones no se clasifican como No cotizado y un cero no implica Bonificado. Las clasificaciones siguen D-118.
+
+**Aplicar propuesta al formulario** reemplaza los valores actuales, no guarda. El proveedor se elige manualmente; moneda, IVA, descuento e IIBB desconocidos quedan pendientes de completar, FX se ingresa manualmente y plazo/vigencia conservan el contrato vigente. Se revisan precios con/sin IVA, total, correspondencias y exclusiones. Cambiar los valores después de confirmar invalida la revisión, incluso si se vuelve al valor anterior. **Registrar cotización** usa el servicio canónico y crea una oferta **Recibida**; no selecciona proveedor ganador, no genera OC ni adjudica. Ofertas existentes/congeladas no reciben propuestas de archivo.
+
+La comparación de importes usa el kernel actual: cargos no representables o totales completos inconsistentes se derivan a carga manual. Los importes incompletos no se completan con supuestos. La evidencia no se persiste ni se adjunta automáticamente; después de registrar, el original se agrega por **Adjuntos por cotización**. Flag propio `BLOQER_AI_PROCUREMENT_QUOTE_PREVIEW_ENABLED=false`, además de los gates globales/producción, sin nuevos servicios, dependencias o campos persistidos. La activación requiere piloto real separado; las pruebas con IA interceptada no acreditan precisión de lectura.
 - SLA exacto (horas) por defecto en settings — sugerido 48–72 h; no bloquea el procedimiento.
+## Respuesta externa por enlace — D-149 / ADR-021
+
+Capacidad opcional y apagada por defecto. En una SC Enviada de obra activa, Compras puede crear un enlace para un proveedor activo del tenant. Es un permiso acotado a esa SC, empresa y proyecto, sin cuenta externa. Vence en siete días; quien lo tenga puede responder. Un nuevo enlace revoca el anterior pendiente del mismo proveedor/SC. La entrega es manual: no envía emails ni WhatsApp.
+
+El proveedor sólo ve nombres de empresa, obra y proveedor, código SC y descripciones, cantidades y unidades solicitadas. No accede a presupuestos, WBS/APU, otras ofertas, archivos, IA ni navegación interna. Completa moneda, interpretación de IVA, IIBB, plazo, vigencia, observaciones y oferta/precio/IVA/descuento de cada ítem. No modifica cantidades ni unidades. D-118 y el kernel financiero se validan en servidor.
+
+Una única respuesta definitiva queda como evidencia inmutable en `ProcurementQuoteInvitation`; reintentos idénticos son idempotentes. No crea una cotización automáticamente. Compras revisa, puede corregir los valores a incorporar y completa FX si corresponde. La incorporación usa el servicio canónico de `ProcurementQuote` en la misma transacción que registra el vínculo: genera `RECEIVED`, nunca adjudica ni crea OC. Se conserva la respuesta original y el revisor. La expiración/revocación no elimina una respuesta ya recibida; cambios en la estructura o ciclo de envío de la SC bloquean su incorporación. Eliminar una cotización incorporada no permite volver a importar la evidencia.
+
+Límites: 200 ítems, cuerpo 256 KiB, observaciones 2000 caracteres, sin adjuntos. El emisor debe conservar membresía, rol, alcance de empresa y acceso al proyecto; módulo, empresa, tenant, proyecto y proveedor deben seguir habilitados. El guard público no construye un contexto de usuario interno. Ver ADR-021, guía §9.1.1 y pruebas SQL de aislamiento/concurrencia.
+

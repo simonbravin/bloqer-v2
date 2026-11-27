@@ -17,6 +17,9 @@ const IMAGE_ACCEPT = "image/*";
 type BaseProps = {
   onValidationError: (message: string | null) => void;
   disabled?: boolean;
+  /** Picker guidance only; normal attachment validation still applies to dropped/camera files. */
+  fileInputAccept?: string;
+  formatsHint?: string;
 };
 
 type SingleFileProps = BaseProps & {
@@ -145,7 +148,7 @@ export function DocumentUploadZone(props: DocumentUploadZoneProps) {
   }
 
   const hasSelection = multiple ? selectedFiles.length > 0 : Boolean(selectedFile);
-  const formatsHint = uploadFormatsHint(
+  const formatsHint = props.formatsHint ?? uploadFormatsHint(
     multiple
       ? { maxTotalBytes: props.maxTotalBytes, maxFiles: props.maxFiles }
       : undefined,
@@ -232,7 +235,7 @@ export function DocumentUploadZone(props: DocumentUploadZoneProps) {
         ref={fileInputRef}
         type="file"
         className="sr-only"
-        accept={DOCUMENT_FILE_INPUT_ACCEPT}
+        accept={props.fileInputAccept ?? DOCUMENT_FILE_INPUT_ACCEPT}
         multiple={multiple}
         disabled={disabled}
         tabIndex={-1}

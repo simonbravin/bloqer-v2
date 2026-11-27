@@ -13,10 +13,12 @@ import {
   issueSupplierDebitNote,
   cancelSupplierCreditNote,
   getSupplierInvoiceById,
+  listSupplierInvoicesByProject,
   registerApExpense,
   ServiceError,
   type PurchaseOrderInvoiceDraftPreview,
 } from "@bloqer/services";
+import { can } from "@bloqer/domain";
 import {
   createSupplierInvoiceSchema,
   createSupplierInvoiceFromPurchaseOrderSchema,
@@ -27,6 +29,10 @@ import {
   type UpdateSupplierInvoiceInput,
 } from "@bloqer/validators";
 import { getCurrentUser } from "@/lib/auth";
+import {
+  resolveSupplierInvoiceDraftCreation,
+  type SupplierInvoiceDraftCreationResult,
+} from "@/features/ap/lib/supplier-invoice-draft-creation";
 import {
   revalidateProjectCostAndFinancePaths,
   revalidateOperationalFinancePaths,
@@ -60,6 +66,32 @@ function revalidateProjectApPaths(projectId: string, extra?: string[]) {
   revalidateProjectCostAndFinancePaths(projectId);
   revalidateTreasuryPaths();
   for (const p of extra ?? []) revalidatePath(p);
+}
+
+export async function listProjectSupplierNoteParentsAction(projectId: string, search: string, page = 1) {
+  const ctx = await getCtx();
+  if (!can(ctx.roles, "EDIT", "AP")) return { error: "Sin permisos para crear notas de crédito/débito" };
+  try {
+    const result = await listSupplierInvoicesByProject(projectId, ctx, {
+      status: "ISSUED",
+      documentKind: "INVOICE",
+      search: typeof search === "string" ? search.trim() : "",
+      page: Number.isSafeInteger(page) && page > 0 ? page : 1,
+      pageSize: 10,
+    });
+    return {
+      data: result.data.map((invoice) => ({
+        id: invoice.id,
+        code: invoice.code,
+        contactName: invoice.supplierName,
+        currency: invoice.currency,
+        balanceDue: invoice.payable?.balanceDue ?? "0.00",
+      })),
+      total: result.total,
+    };
+  } catch (err) {
+    return handle(err);
+  }
 }
 
 export async function createSupplierInvoiceFromPurchaseOrderAction(
@@ -142,18 +174,17 @@ export async function registerProjectApExpenseAction(
 export async function createSupplierInvoiceAction(
   projectId: string,
   data: Omit<CreateSupplierInvoiceInput, "projectId"> & { projectId?: string | null },
-): Promise<{ id: string } | { error: string }> {
+): Promise<SupplierInvoiceDraftCreationResult> {
   const ctx = await getCtx();
   const payload: CreateSupplierInvoiceInput = { ...data, projectId };
   const parsed = createSupplierInvoiceSchema.safeParse(payload);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Datos inválidos" };
-  try {
-    const inv = await createSupplierInvoice(parsed.data, ctx);
-    revalidateProjectApPaths(projectId);
-    return { id: inv.id };
-  } catch (err) {
-    return handle(err);
-  }
+  return resolveSupplierInvoiceDraftCreation({
+    create: () => createSupplierInvoice(parsed.data, ctx),
+    revalidate: () => revalidateProjectApPaths(projectId),
+    // This service raises business rejections before commit or within its transaction.
+    rejectionMessage: (error) => error instanceof ServiceError ? error.message : null,
+  });
 }
 
 export async function updateSupplierInvoiceAction(
@@ -230,6 +261,7 @@ export async function createSupplierCreditNoteFromInvoiceAction(
       ctx,
     );
     revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${parentInvoiceId}`,
       `/proyectos/${projectId}/facturas-proveedor/${note.id}`,
     ]);
     return { id: note.id };
@@ -250,6 +282,7 @@ export async function createSupplierDebitNoteFromInvoiceAction(
       ctx,
     );
     revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${parentInvoiceId}`,
       `/proyectos/${projectId}/facturas-proveedor/${note.id}`,
     ]);
     return { id: note.id };
@@ -264,8 +297,11 @@ export async function issueSupplierCreditNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await issueSupplierCreditNote(invoiceId, ctx, projectId);
-    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
+    const note = await issueSupplierCreditNote(invoiceId, ctx, projectId);
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${invoiceId}`,
+      ...(note.referencedSupplierInvoiceId ? [`/proyectos/${projectId}/facturas-proveedor/${note.referencedSupplierInvoiceId}`] : []),
+    ]);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -278,8 +314,11 @@ export async function issueSupplierDebitNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await issueSupplierDebitNote(invoiceId, ctx, projectId);
-    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
+    const note = await issueSupplierDebitNote(invoiceId, ctx, projectId);
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${invoiceId}`,
+      ...(note.referencedSupplierInvoiceId ? [`/proyectos/${projectId}/facturas-proveedor/${note.referencedSupplierInvoiceId}`] : []),
+    ]);
     return { ok: true };
   } catch (err) {
     return handle(err);
@@ -293,8 +332,11 @@ export async function cancelSupplierCreditNoteAction(
 ): Promise<{ ok: true } | { error: string }> {
   const ctx = await getCtx();
   try {
-    await cancelSupplierCreditNote(invoiceId, ctx, projectId, reason);
-    revalidateProjectApPaths(projectId, [`/proyectos/${projectId}/facturas-proveedor/${invoiceId}`]);
+    const note = await cancelSupplierCreditNote(invoiceId, ctx, projectId, reason);
+    revalidateProjectApPaths(projectId, [
+      `/proyectos/${projectId}/facturas-proveedor/${invoiceId}`,
+      ...(note.referencedSupplierInvoiceId ? [`/proyectos/${projectId}/facturas-proveedor/${note.referencedSupplierInvoiceId}`] : []),
+    ]);
     return { ok: true };
   } catch (err) {
     return handle(err);

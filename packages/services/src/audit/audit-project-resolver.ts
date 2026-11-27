@@ -17,6 +17,8 @@ function sharedProjectCompanyWhere(ctx: ServiceContext, projectId: string) {
 const entityIdPage = { select: { id: true }, orderBy: { id: "asc" }, take: MAX_ENTITY_IDS } as const;
 
 const DIRECT_PROJECT_ID_RESOLVERS: Record<string, Resolver> = {
+  ProcurementQuoteInvitation: async (ctx, projectId) =>
+    ids(await prisma.procurementQuoteInvitation.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
   PurchaseRequest: async (ctx, projectId) =>
     ids(await prisma.purchaseRequest.findMany({ where: projectCompanyWhere(ctx, projectId), ...entityIdPage })),
   ProcurementQuote: async (ctx, projectId) =>

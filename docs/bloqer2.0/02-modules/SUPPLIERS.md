@@ -32,6 +32,7 @@ Hereda `ACTIVE` / `ARCHIVED` del Contact.
 - Lista proveedores con filtros por rubro, provincia.
 - Ficha: datos fiscales, contactos operativos, histórico de compras.
 - **Reporte de obra** `/proyectos/[id]/reportes/proveedores` (R-AP-03): tabla, líderes por pedidos / monto / saldo CxP.
+- **Entregas y cobertura de datos** (E3): sobre las mismas OC confirmadas/parciales/recibidas, filtradas por fecha de emisión y moneda, muestra conteos por estado actual, cuántas tienen fecha prevista y recepción confirmada, y detalle con enlace a la OC. Las recepciones pueden ser posteriores al período; se comprueban tenant, empresa, obra, OC y proveedor. Un dato ausente se muestra como tal. La última recepción no acredita cuándo se completó la entrega; no se calcula OTIF, lead time, calidad ni puntaje del proveedor. CSV/PDF conservan el recorte y explican esa cobertura.
 
 ## 10. Reglas de negocio
 - **BR-SUP-001**: OC solo puede seleccionar Contact con rol SUPPLIER (o aviso si se fuerza alta rápida).
@@ -65,3 +66,7 @@ PROCUREMENT crea/edita; FINANCE ve montos y pagos.
 
 ## 19. Preguntas abiertas
 - Comparativa automática de cotizaciones entre proveedores (Fase 2).
+## Cotizar sin cuenta (D-149)
+
+Un contacto con rol SUPPLIER activo puede recibir manualmente un enlace a una SC concreta. No se crea un usuario ni se otorga acceso al directorio/ERP. El enlace es una capacidad transferible, válida siete días y revocable; no acredita identidad personal. La respuesta queda pendiente de revisión de Compras y no implica adjudicación. Ver `PURCHASE_REQUESTS.md`, ADR-021 y guía operativa §9.1.1. Capacidad desactivada por defecto; no incluye adjuntos ni envío automático.
+

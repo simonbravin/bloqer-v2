@@ -67,3 +67,4 @@ export default async function PendientesPage({ searchParams }: PageProps) {
     </PageShell>
   );
 }
+

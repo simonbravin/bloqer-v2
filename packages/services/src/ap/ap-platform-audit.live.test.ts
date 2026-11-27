@@ -12,7 +12,7 @@ import { getAccountBalance } from "../treasury/balance.service";
 import { closeTreasuryAccount, createTreasuryAccount } from "../treasury/treasury-account.service";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { ServiceError, type ServiceContext } from "../types";
-import { createSupplierInvoice, issueSupplierInvoice, updateSupplierInvoice, cancelSupplierInvoice, getCompanySupplierInvoiceById } from "./supplier-invoice.service";
+import { createSupplierInvoice, issueSupplierInvoice, updateSupplierInvoice, cancelSupplierInvoice, getCompanySupplierInvoiceById, listCompanySupplierInvoices } from "./supplier-invoice.service";
 import { createPayment, cancelPayment } from "./payment.service";
 import { getCompanyPayableById } from "./payable.service";
 import { registerApExpense } from "./register-ap-expense.service";
@@ -239,6 +239,34 @@ describe("AG-09 AP on isolated SQL", { skip: process.env.BLOQER_AUDIT_LIVE !== "
       lines: [0, 1].map(sortOrder => ({ description: "Synthetic tiny line", quantity: "1", unitPrice: "0.05", taxRate: "10", sortOrder })) }, ctx)));
     assert.equal(new Set(notes.map(n => n.number)).size, 3);
     for (const note of notes) { assert.equal(note.totalAmount, "0.12"); assert.equal(note.lines[0]!.lineTax, "0.01"); }
+  });
+  it("operates corporate NC and ND through editing, issuing, list balances and reversal without cash", async () => {
+    const s = await issued();
+    const movements = await prisma.accountMovement.count({ where: { tenantId } });
+    const nc = await createSupplierCreditNoteFromInvoice({ parentSupplierInvoiceId: s.invoiceId,
+      lines: [{ description: "Corporate credit", quantity: "1", unitPrice: "30" }] }, ctx);
+    assert.equal(nc.projectId, null); assert.equal(nc.companyId, companyId);
+    await updateSupplierInvoice(nc.id, { lines: [{ description: "Corrected corporate credit", quantity: "1", unitPrice: "25", taxRate: "0", discountPct: "0", sortOrder: 0 }] }, ctx, null);
+    await issueSupplierCreditNote(nc.id, ctx, null);
+    const credited = await getCompanyPayableById(s.payable.id, ctx);
+    assert.equal(credited.paidAmount, "0.00"); assert.equal(credited.creditedAmount, "25.00"); assert.equal(credited.balanceDue, "75.00");
+    assert.equal(await prisma.payable.count({ where: { supplierInvoiceId: nc.id } }), 0);
+    const ncRows = await listCompanySupplierInvoices(ctx, { documentKind: "CREDIT_NOTE", search: nc.code });
+    assert.equal(ncRows.data.find(row => row.id === nc.id)?.payable, null);
+    const parent = await getCompanySupplierInvoiceById(s.invoiceId, ctx);
+    const parentRows = await listCompanySupplierInvoices(ctx, { documentKind: "INVOICE", search: parent.code });
+    assert.equal(parentRows.data.find(row => row.id === s.invoiceId)?.payable?.balanceDue, "75.00");
+    const nd = await createSupplierDebitNoteFromInvoice({ parentSupplierInvoiceId: s.invoiceId,
+      lines: [{ description: "Corporate debit", quantity: "1", unitPrice: "10" }] }, ctx);
+    await issueSupplierDebitNote(nd.id, ctx, null);
+    const newDebt = await prisma.payable.findUniqueOrThrow({ where: { supplierInvoiceId: nd.id } });
+    assert.equal(newDebt.projectId, null); assert.equal(newDebt.originalAmount.toFixed(2), "10.00");
+    assert.equal((await prisma.payable.findUniqueOrThrow({ where: { id: s.payable.id } })).originalAmount.toFixed(2), "100.00");
+    await assert.rejects(() => cancelSupplierInvoice(s.invoiceId, ctx, null, "Parent has notes"), conflict);
+    await cancelSupplierInvoice(nd.id, ctx, null, "Corporate debit reversal");
+    await cancelSupplierCreditNote(nc.id, ctx, null, "Corporate credit reversal");
+    assert.equal((await getCompanyPayableById(s.payable.id, ctx)).balanceDue, "100.00");
+    assert.equal(await prisma.accountMovement.count({ where: { tenantId } }), movements);
   });
   it("foreign WBS cannot enter a note or be emitted from a malformed historical draft", async () => {
     const s = await issued("ARS", true);

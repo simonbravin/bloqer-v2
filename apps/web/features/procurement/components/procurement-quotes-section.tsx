@@ -113,10 +113,11 @@ export function ProcurementQuotesSection({
     : undefined;
 
   return (
-    <div className="hidden md:block space-y-4">
+    <div className="space-y-4">
+      <div className="hidden space-y-3 md:block">
       <h2 className="text-lg font-semibold">Cotizaciones</h2>
       <TableScroll>
-        <Table>
+        <Table className="min-w-[52rem]" aria-label="Cotizaciones de la solicitud">
           <TableHeader>
             <TableRow>
               <TableHead>Proveedor</TableHead>
@@ -137,10 +138,10 @@ export function ProcurementQuotesSection({
             ) : (
               quotes.map((q) => (
                 <TableRow key={q.id}>
-                  <TableCell>
+                  <TableCell className="min-w-64 max-w-sm align-top">
                     <p>{q.supplierName}</p>
                     {q.lines.length > 0 ? (
-                      <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                      <ul className="mt-2 space-y-2 whitespace-normal break-words text-xs leading-relaxed text-muted-foreground">
                         {q.lines.map((l, i) => (
                           <li key={`${q.id}-${i}`}>
                             <strong>{quoteLineOfferLabel(l, freeLineIds.has(l.purchaseRequestLineId))}</strong>{" · "}
@@ -209,6 +210,7 @@ export function ProcurementQuotesSection({
           </TableBody>
         </Table>
       </TableScroll>
+      </div>
 
       {canQuote && editingQuote && editValues ? (
         <ProcurementQuoteForm

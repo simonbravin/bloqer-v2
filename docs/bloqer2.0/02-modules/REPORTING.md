@@ -71,3 +71,4 @@ D-140: la entrega programada reutiliza el alcance de la configuraci√≥n, la sesi√
 
 ## 19. Preguntas abiertas
 - UI query builder ([Q-010]).
+

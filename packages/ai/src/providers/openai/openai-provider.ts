@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import OpenAI, { toFile } from "openai";
 import type {
   ChatCompletion,
   ChatCompletionChunk,
@@ -23,7 +23,7 @@ import type {
 /** Re-export for existing imports from this module. */
 export { userFacingOpenAiErrorMessage } from "../../errors";
 
-function toOpenAiMessages(system: string | undefined, messages: AiMessage[]): ChatCompletionMessageParam[] {
+export function toOpenAiMessages(system: string | undefined, messages: AiMessage[]): ChatCompletionMessageParam[] {
   const out: ChatCompletionMessageParam[] = [];
   if (system?.trim()) {
     out.push({ role: "system", content: system });
@@ -34,7 +34,17 @@ function toOpenAiMessages(system: string | undefined, messages: AiMessage[]): Ch
       continue;
     }
     if (m.role === "user") {
-      out.push({ role: "user", content: m.content });
+      out.push({ role: "user", content: typeof m.content === "string" ? m.content : m.content.map((part) => {
+        if (part.type === "text") return { type: "text" as const, text: part.text };
+        if (part.type === "image") return {
+          type: "image_url" as const,
+          image_url: { url: `data:${part.mimeType};base64,${part.base64}` },
+        };
+        return { type: "file" as const, file: {
+          filename: part.filename,
+          file_data: `data:${part.mimeType};base64,${part.base64}`,
+        } };
+      }) });
       continue;
     }
     if (m.role === "assistant") {
@@ -60,6 +70,13 @@ function toOpenAiMessages(system: string | undefined, messages: AiMessage[]): Ch
     });
   }
   return out;
+}
+
+export function toOpenAiStructuredOutput(request: AiGenerateRequest) {
+  return request.structuredOutput ? { response_format: {
+    type: "json_schema" as const,
+    json_schema: { name: request.structuredOutput.name, strict: true, schema: request.structuredOutput.schema },
+  } } : {};
 }
 
 function toOpenAiTools(tools: AiToolDefinition[] | undefined): ChatCompletionTool[] | undefined {
@@ -241,6 +258,21 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
       supportsVision: true,
     },
 
+    async transcribeAudio(request) {
+      try {
+        const extension = request.mimeType === "audio/mp4" ? "mp4" : request.mimeType === "audio/wav" ? "wav" : "webm";
+        const result = await client.audio.transcriptions.create({
+          model: request.model,
+          file: await toFile(request.bytes, `solicitud.${extension}`, { type: request.mimeType }),
+          language: "es",
+          response_format: "json",
+        }, { signal: request.signal, maxRetries: 0 });
+        return result.text;
+      } catch (error) {
+        return wrapProviderError(error, providerId);
+      }
+    },
+
     async generateResponse(request: AiGenerateRequest): Promise<AiGenerateResponse> {
       try {
         const tools = toOpenAiTools(request.tools);
@@ -249,6 +281,7 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
           model: request.model,
           messages: toOpenAiMessages(request.system, request.messages),
           tools,
+          ...toOpenAiStructuredOutput(request),
           ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
           // GPT-5.x rejects max_tokens; max_completion_tokens works on 4.x and 5.x.
           ...(request.maxOutputTokens !== undefined
@@ -272,6 +305,7 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
             ...(toolCalls?.length ? { toolCalls } : {}),
           },
           finishReason: mapFinishReason(choice.finish_reason),
+          refused: Boolean(choice.message.refusal),
           usage: {
             provider: providerId,
             model: request.model,
@@ -294,6 +328,7 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): AiProvider {
             model: request.model,
             messages: toOpenAiMessages(request.system, request.messages),
             tools,
+            ...toOpenAiStructuredOutput(request),
             ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
             ...(request.maxOutputTokens !== undefined
               ? { max_completion_tokens: request.maxOutputTokens }

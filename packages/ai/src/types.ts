@@ -16,9 +16,15 @@ export type AiJsonValue =
 
 export type AiMessage =
   | { role: "system"; content: string }
-  | { role: "user"; content: string }
+  | { role: "user"; content: string | AiUserContentPart[] }
   | { role: "assistant"; content: string | null; toolCalls?: AiToolCall[] }
   | { role: "tool"; toolCallId: string; toolName: string; content: string };
+
+/** Inline, server-validated document data; adapters never fetch arbitrary URLs. */
+export type AiUserContentPart =
+  | { type: "text"; text: string }
+  | { type: "image"; mimeType: "image/jpeg" | "image/png" | "image/webp"; base64: string }
+  | { type: "file"; mimeType: "application/pdf"; filename: string; base64: string };
 
 export type AiToolDefinition = {
   name: string;
@@ -88,6 +94,8 @@ export type AiGenerateRequest = {
   temperature?: number;
   maxOutputTokens?: number;
   signal?: AbortSignal;
+  /** Strict vendor-neutral JSON Schema, separate from function tools. */
+  structuredOutput?: { name: string; schema: Record<string, unknown> };
 };
 
 export type AiGenerateResponse = {
@@ -95,6 +103,7 @@ export type AiGenerateResponse = {
   finishReason: AiFinishReason;
   usage: Partial<AiUsage>;
   rawProviderMeta?: Record<string, unknown>;
+  refused?: boolean;
 };
 
 export type AiStreamEvent =
