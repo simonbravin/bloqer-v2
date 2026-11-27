@@ -1,5 +1,4 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
 import { Suspense } from "react";
 import { ListViewToggle } from "@/components/ui/list-view-toggle";
 import { ListSectionSkeleton } from "@/components/ui/list-section-skeleton";
@@ -119,7 +118,7 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
         actions={
           <>
             <Button asChild variant="outline" className="min-h-11">
-              <Link href={`/proyectos/${id}/documentos/indice-entrega`}>Índice de entrega</Link>
+              <a href={`/proyectos/${id}/documentos/indice-entrega`}>Índice de entrega</a>
             </Button>
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`documentos-${id}`} />

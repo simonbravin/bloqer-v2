@@ -17,7 +17,7 @@ test("project collection scenario compares applied values, clears drafts and rem
   const delay = panel.getByLabel("Atraso hipotético (días corridos)", { exact: true });
   const today = await dateInput.inputValue();
   const apply = panel.getByRole("button", { name: "Aplicar", exact: true });
-  const clear = panel.getByRole("button", { name: "Limpiar", exact: true });
+  const clear = panel.getByRole("link", { name: "Limpiar", exact: true });
   await compare.check();
   await delay.fill("0");
   await apply.click();

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import type { ScheduleWorkspaceItemDto } from "@bloqer/services";
 import { formatGroupedDecimal } from "@bloqer/utils";
 import { Button } from "@/components/ui/button";
@@ -27,7 +26,7 @@ export function ScheduleProcurementDetails({ projectId, procurement }: {
               <p className="break-words tabular-nums">Pedido {formatGroupedDecimal(line.quantity, 4)} {line.unit} · Recibido {formatGroupedDecimal(line.receivedQuantity, 4)} {line.unit}</p>
               <p className="break-words font-medium tabular-nums">Pendiente {formatGroupedDecimal(line.remainingQuantity, 4)} {line.unit}</p>
               <Button variant="outline" size="sm" className="min-h-11" asChild>
-                <Link href={`/proyectos/${projectId}/ordenes-compra/${line.purchaseOrderId}`}>Abrir {line.purchaseOrderCode}</Link>
+                <a href={`/proyectos/${projectId}/ordenes-compra/${line.purchaseOrderId}`}>Abrir {line.purchaseOrderCode}</a>
               </Button>
             </li>
           ))}

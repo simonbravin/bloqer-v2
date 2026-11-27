@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { ProjectCashPositionProjectionContext, ProjectCashPositionProjectionReport } from "@bloqer/services";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Input } from "@/components/ui/input";
@@ -24,15 +23,18 @@ type Props = {
 };
 
 export function ProjectCashPositionProjectionPanel({ projectId, report, active, appliedAsOfDate, context }: Props) {
-  const router = useRouter();
   const pathname = usePathname();
   const sp = useSearchParams();
-  const [pending, startTransition] = useTransition();
   const appliedDate = sp.get("projectionDate") ?? appliedAsOfDate;
   const appliedDelay = sp.get("projectionCollectionDelayDays");
   const [draftDate, setDraftDate] = useState(appliedDate);
   const [compare, setCompare] = useState(appliedDelay !== null);
   const [draftDelay, setDraftDelay] = useState(appliedDelay ?? "0");
+  const [expanded, setExpanded] = useState(active ? "proyeccion" : "");
+
+  useEffect(() => {
+    if (window.location.hash === `#${PROJECTION_ANCHOR}`) setExpanded("proyeccion");
+  }, []);
 
   useEffect(() => {
     setDraftDate(appliedDate);
@@ -40,25 +42,17 @@ export function ProjectCashPositionProjectionPanel({ projectId, report, active, 
     setDraftDelay(appliedDelay ?? "0");
   }, [appliedDate, appliedDelay]);
 
-  function navigate(params: URLSearchParams) {
-    const qs = params.toString();
-    startTransition(() => router.push(`${pathname}${qs ? `?${qs}` : ""}#${PROJECTION_ANCHOR}`));
-  }
-  function apply() {
-    const params = new URLSearchParams(sp.toString());
-    params.set("projectionDate", draftDate);
-    if (compare && context.receivablesAvailable) params.set("projectionCollectionDelayDays", draftDelay);
-    else params.delete("projectionCollectionDelayDays");
-    navigate(params);
-  }
-  function clear() {
+  // The URL is this report's read contract. A complete GET avoids the stalled
+  // RSC transitions observed in CI; see the implementation plan, section 25.
+  const baseParams = new URLSearchParams(sp.toString());
+  baseParams.delete("projectionDate");
+  baseParams.delete("projectionCollectionDelayDays");
+  const baseQuery = baseParams.toString();
+  const clearHref = `${pathname}${baseQuery ? `?${baseQuery}` : ""}#${PROJECTION_ANCHOR}`;
+  function clearDraft() {
     setDraftDate(context.today);
     setCompare(false);
     setDraftDelay("0");
-    const params = new URLSearchParams(sp.toString());
-    params.delete("projectionDate");
-    params.delete("projectionCollectionDelayDays");
-    navigate(params);
   }
 
   const inflowsAvailable = context.receivablesAvailable;
@@ -69,7 +63,7 @@ export function ProjectCashPositionProjectionPanel({ projectId, report, active, 
     (compare && draftDelay !== (appliedDelay ?? "0"));
 
   return <div id={PROJECTION_ANCHOR} className="scroll-mt-6">
-    <Accordion type="single" collapsible defaultValue={active ? "proyeccion" : undefined} className="rounded-lg border bg-card">
+    <Accordion type="single" collapsible value={expanded} onValueChange={setExpanded} className="rounded-lg border bg-card">
       <AccordionItem value="proyeccion" className="border-0">
         <AccordionTrigger className="min-h-11 px-4 py-3 text-sm font-semibold hover:no-underline">Proyección de caja</AccordionTrigger>
         <AccordionContent className="space-y-4 px-4 pb-4 pt-0">
@@ -77,14 +71,15 @@ export function ProjectCashPositionProjectionPanel({ projectId, report, active, 
             <h3 className="text-sm font-medium">Proyección de caja (proyecto)</h3>
             <p className="text-xs text-muted-foreground">Combina los movimientos confirmados hasta la fecha con los saldos abiertos actuales de CxC y CxP que vencen en esa fecha o antes. No reconstruye saldos históricos.</p>
           </div>
-          <form onSubmit={(event) => { event.preventDefault(); apply(); }} className="space-y-3 rounded-lg border shell-surface-inset p-4">
+          <form method="get" action={`${pathname}#${PROJECTION_ANCHOR}`} className="space-y-3 rounded-lg border shell-surface-inset p-4">
+            {Array.from(baseParams.entries()).map(([name, value], index) => <input key={`${name}-${index}`} type="hidden" name={name} value={value} />)}
             <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label htmlFor="projection-date" className="text-xs text-muted-foreground">Fecha de proyección</Label>
-                <Input id="projection-date" type="date" required min={compare ? context.today : undefined} max="9999-12-31" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} className="min-h-11 w-44" />
+                <Input id="projection-date" name="projectionDate" type="date" required min={compare ? context.today : undefined} max="9999-12-31" value={draftDate} onChange={(event) => setDraftDate(event.target.value)} className="min-h-11 w-44" />
               </div>
-              <Button type="submit" size="sm" className="min-h-11" disabled={pending}>{pending ? "Calculando…" : "Aplicar"}</Button>
-              <Button type="button" variant="ghost" size="sm" className="min-h-11" onClick={clear} disabled={pending}>Limpiar</Button>
+              <Button type="submit" size="sm" className="min-h-11">Aplicar</Button>
+              <Button asChild variant="ghost" size="sm" className="min-h-11"><a href={clearHref} onClick={clearDraft}>Limpiar</a></Button>
             </div>
             <label className="flex min-h-11 items-center gap-2 text-sm">
               <input type="checkbox" checked={compare} disabled={!inflowsAvailable} onChange={(event) => setCompare(event.target.checked)} className="h-5 w-5 shrink-0 accent-primary" />
@@ -94,7 +89,7 @@ export function ProjectCashPositionProjectionPanel({ projectId, report, active, 
             {compare && inflowsAvailable ? <div className="space-y-2">
               <div className="space-y-1">
                 <Label htmlFor="projection-delay">Atraso hipotético (días corridos)</Label>
-                <Input id="projection-delay" type="number" min="0" max={context.maxCollectionDelayDays} step="1" required value={draftDelay} onChange={(event) => setDraftDelay(event.target.value)} className="min-h-11 w-44" />
+                <Input id="projection-delay" name="projectionCollectionDelayDays" type="number" min="0" max={context.maxCollectionDelayDays} step="1" required value={draftDelay} onChange={(event) => setDraftDelay(event.target.value)} className="min-h-11 w-44" />
               </div>
               <p className="text-xs text-muted-foreground">Para las vencidas, los días parten de hoy ({formatDate(context.today)}); para las futuras, de su vencimiento. Se aplica a todas las CxC abiertas de este alcance. Los pagos y movimientos confirmados se conservan.</p>
               <p className="text-xs text-muted-foreground">Usá una fecha de hoy o posterior. Límite técnico: {context.maxCollectionDelayDays.toLocaleString("es-AR")} días. Cero días reproduce la proyección base.</p>
@@ -103,7 +98,7 @@ export function ProjectCashPositionProjectionPanel({ projectId, report, active, 
           </form>
 
           {report?.scenarioError ? <p role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/20 dark:text-amber-200">{report.scenarioError} Se muestra solamente la proyección base.</p> : null}
-          {!active ? <p className="text-sm text-muted-foreground">Elegí una fecha y presioná Aplicar para ver los indicadores.</p> : report ? <div aria-busy={pending} className="space-y-4">
+          {!active ? <p className="text-sm text-muted-foreground">Elegí una fecha y presioná Aplicar para ver los indicadores.</p> : report ? <div className="space-y-4">
             <p className="text-xs text-muted-foreground">Cálculo al {formatDate(context.today)} · Zona horaria: {context.timeZone}. Importes separados por moneda.</p>
             <ul className="list-inside list-disc space-y-1 text-xs text-muted-foreground">{report.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
             {report.collectionDelayDays !== null ? <p role="status" className="rounded-lg border bg-muted/40 p-3 text-sm">Escenario aplicado: {report.collectionDelayDays} {report.collectionDelayDays === 1 ? "día corrido" : "días corridos"} de atraso · fecha de proyección: {asOfLabel}. Es una comparación hipotética; no modifica vencimientos, documentos ni saldos reales.</p> : null}
@@ -131,8 +126,8 @@ export function ProjectCashPositionProjectionPanel({ projectId, report, active, 
             </section>)}
             {report.collectionDelayDays !== null ? <p className="text-xs text-muted-foreground">Esta comparación se consulta en pantalla. La exportación de Flujo de caja corresponde a los movimientos reales.</p> : null}
             <div className="flex flex-wrap gap-2 pt-1">
-              {inflowsAvailable ? <Button asChild variant="outline" size="sm" className="min-h-11"><Link href={`/proyectos/${projectId}/cuentas-por-cobrar`}>Ver CxC</Link></Button> : null}
-              {outflowsAvailable ? <Button asChild variant="outline" size="sm" className="min-h-11"><Link href={`/proyectos/${projectId}/cuentas-por-pagar`}>Ver CxP</Link></Button> : null}
+              {inflowsAvailable ? <Button asChild variant="outline" size="sm" className="min-h-11"><a href={`/proyectos/${projectId}/cuentas-por-cobrar`}>Ver CxC</a></Button> : null}
+              {outflowsAvailable ? <Button asChild variant="outline" size="sm" className="min-h-11"><a href={`/proyectos/${projectId}/cuentas-por-pagar`}>Ver CxP</a></Button> : null}
             </div>
           </div> : null}
         </AccordionContent>
