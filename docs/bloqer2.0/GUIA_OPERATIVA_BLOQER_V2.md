@@ -1371,6 +1371,10 @@ stateDiagram-v2
 
 ## 12. Facturar, cobrar y pagar (nivel proyecto y empresa)
 
+**Resumen para decidir (empresa):** en **Finanzas → Tablero** (`/finanzas`), revisá **Por cobrar** y **Por pagar**. Cada bloque permite elegir **Vencidos** o **Hoy y próximos 7 días**; hoy todavía no cuenta como vencido y el último día indicado está incluido. El resumen identifica su fecha de corte y si corresponde a la empresa activa o a toda la organización. Incluye obligaciones corporativas y de obras dentro del alcance financiero autorizado.
+
+Cada grupo muestra su cantidad completa y el saldo pendiente separado por moneda, después de pagos y créditos. Debajo aparecen hasta cinco documentos, ordenados por vencimiento, con contraparte, empresa, obra y fecha. Los totales incluyen todo el grupo, no solo esas cinco filas. **Ver obligación** abre la CxC/CxP correspondiente para revisar la factura y continuar el circuito habitual. Una fuente no disponible por permisos/configuración no equivale a deuda cero. Consultar no cobra, paga ni concilia; los saldos son deuda vigente, no caja ni borradores. El rango mensual del gráfico no modifica este resumen actual.
+
 ### 12.0 Clase del documento ([D-102])
 
 Cada factura, CxC/CxP o movimiento de caja muestra un badge **Clase** (solo lectura). No se elige a mano: se deriva de si hay obra, OC, certificación, etc. En listados de caja, **Pago** va en rojo y **Ingreso / Cobranza** en verde.

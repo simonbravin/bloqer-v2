@@ -4,13 +4,13 @@ import { test } from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import * as access from "./field-pending-access";
-import { assertOperationalExportLimit } from "../report-exports/operational-list-export-pure";
+import { assertOperationalExportLimit, OperationalExportLimitError } from "../report-exports/operational-list-export-pure";
 import { ServiceError, type ServiceContext } from "../types";
 
 const projectId = "00000000-0000-4000-8000-000000000010";
 const ctx: ServiceContext = { tenantId: "tenant-a", companyId: "company-a", actorUserId: "user-a", roles: ["WAREHOUSE"] };
 
-function loadInbox(total = 123, denied = false) {
+function loadInbox(total = 123, denied = false, readError?: Error) {
   const queries: Array<{ take?: number; where: Record<string, unknown> }> = [];
   const rows = Array.from({ length: Math.min(total, 123) }, (_, i) => ({
     id: `order-${i}`, number: i, totalAmount: "123.45", currency: "ARS", createdAt: new Date("2026-11-01"),
@@ -19,7 +19,6 @@ function loadInbox(total = 123, denied = false) {
     project: { code: "PR-1", name: "Obra" }, supplierContact: { legalName: "Proveedor", fantasyName: null },
   }));
   const dependencies: Record<string, unknown> = {
-    "../types": { ServiceError },
     "@bloqer/database": { Prisma: {}, prisma: { purchaseOrder: {
       findMany: async (query: typeof queries[number]) => { queries.push(query); return rows.slice(0, query.take); },
       count: async (query: typeof queries[number]) => { queries.push(query); return total; },
@@ -28,8 +27,8 @@ function loadInbox(total = 123, denied = false) {
     "../ap/supplier-invoice-from-po-pure": {},
     "../finance/money-decimal": { serializeMoneyDecimal: (value: string) => value },
     "../finance/pagination": { MAX_EXPORT_ROWS: 10_000 },
-    "../report-exports/operational-list-export-pure": { assertOperationalExportLimit },
-    "../tenant-modules/tenant-module.service": { getTenantModuleGate: async () => ({ isEnabled: () => true }) },
+    "../report-exports/operational-list-export-pure": { assertOperationalExportLimit, OperationalExportLimitError },
+    "../tenant-modules/tenant-module.service": { getTenantModuleGate: async () => { if (readError) throw readError; return { isEnabled: () => true }; } },
     "../user/resolve-user-display-names": { resolveUserDisplayNames: async () => new Map([["user-a", "Solicitante"]]) },
     "../company-scope": { companyScopeFilter: () => ({ companyId: "company-a" }) },
     "./field-pending-access": access,
@@ -76,6 +75,13 @@ test("count-only reads do not load details; inaccessible project fails before qu
 
 test("over-limit full read rejects instead of silently returning a partial export", async () => {
   await assert.rejects(loadInbox(10_001).api.getMyFieldPendingItems(ctx, { complete: true }), /Acotá los filtros/);
+});
+
+test("inbox does not mask unrelated conflicts as a size limit", async () => {
+  const conflict = new ServiceError("CONFLICT", "Otro conflicto operativo");
+  const loaded = loadInbox(123, false, conflict);
+  await assert.rejects(loaded.api.getMyFieldPendingInbox(ctx, { projectId }), (error) => error === conflict);
+  assert.equal(loaded.queries.length, 0);
 });
 
 test("oversized inbox retains scoped actions with a warning while exports still reject", async () => {

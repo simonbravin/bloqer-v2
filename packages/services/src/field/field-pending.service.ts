@@ -8,9 +8,9 @@ import {
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
-import { ServiceError, type ServiceContext } from "../types";
+import type { ServiceContext } from "../types";
 import { MAX_EXPORT_ROWS } from "../finance/pagination";
-import { assertOperationalExportLimit } from "../report-exports/operational-list-export-pure";
+import { assertOperationalExportLimit, OperationalExportLimitError } from "../report-exports/operational-list-export-pure";
 import { companyScopeFilter } from "../company-scope";
 import {
   FIELD_PENDING_GROUP_BY_SOURCE,
@@ -875,7 +875,7 @@ export async function getMyFieldPendingInbox(
   try {
     return await getMyFieldPendingItems(ctx, { ...filters, complete: true });
   } catch (error) {
-    if (!(error instanceof ServiceError) || error.code !== "CONFLICT") throw error;
+    if (!(error instanceof OperationalExportLimitError)) throw error;
     const bounded = await getMyFieldPendingItems(ctx, filters);
     return {
       ...bounded,

@@ -14,13 +14,19 @@ export function matchesOperationalListStatus(status: string, selected?: string):
   return selected ? status === selected : status !== "CANCELLED";
 }
 
-export function assertOperationalExportLimit(total: number): void {
-  if (total > MAX_EXPORT_ROWS) {
-    throw new ServiceError(
+/** Distinguishes a size limit from other operational conflicts. */
+export class OperationalExportLimitError extends ServiceError {
+  constructor() {
+    super(
       "CONFLICT",
       `La exportación supera ${MAX_EXPORT_ROWS} filas. Acotá los filtros para descargar el listado completo.`,
     );
+    this.name = "OperationalExportLimitError";
   }
+}
+
+export function assertOperationalExportLimit(total: number): void {
+  if (total > MAX_EXPORT_ROWS) throw new OperationalExportLimitError();
 }
 
 /** Never request MAX_EXPORT_ROWS as pageSize: list services cap pages at 100. */
