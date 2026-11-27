@@ -468,11 +468,14 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
     steps: [
       "Tesorería → Conciliación → Nueva.",
       "Importá CSV/OFX o cargá líneas del extracto. Si el OFX/QFX declara otra moneda, elegí el extracto de esa cuenta y moneda. Podés importar archivos sin moneda declarada. Si una fila XFER de OFX no indica + o -, corregí el archivo o ingresá esa línea manualmente.",
-      "Emparejá movimientos del sistema con el extracto. Si creás un movimiento desde una línea de una cuenta extranjera, ingresá el tipo de cambio de esa operación.",
+      "En el extracto, elegí Pendientes o Todas. Buscá por descripción o referencia y recorré las páginas de diez líneas. Los filtros no cambian saldos ni condiciones de cierre.",
+      "Elegí una línea. Revisá las coincidencias posibles del mismo importe y dirección; podés buscar por descripción del movimiento. Compará las fechas y descripciones: incluso una única coincidencia requiere revisión manual.",
+      "Seleccioná un movimiento, revisá Par a confirmar y usá Emparejar seleccionados. Cambiar línea, búsqueda o página descarta la selección correspondiente. Si creás un movimiento desde una línea de una cuenta extranjera, ingresá el tipo de cambio de esa operación.",
       "Revisá Saldo de libros al cierre y Diferencia banco − sistema. Cerrá cuando el extracto cuadre y queden emparejadas sus líneas y movimientos del período.",
     ],
     pitfalls: [
       "No canceles un pago/cobranza si el movimiento ya está Conciliado: desemparejá primero.",
+      "Varias coincidencias del mismo importe no prueban cuál es la correcta. Buscar oculta candidatos, pero conserva el conteo completo de coincidencias posibles.",
     ],
     figure: {
       src: "/help/mapa-tesoreria-conciliacion.png",
@@ -480,7 +483,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
       caption: "Movimientos de caja y empareje del extracto hasta cerrar la sesión.",
     },
     relatedSlugs: ["ajuste-manual-de-caja", "cerrar-el-mes", "ver-movimientos-de-tesoreria"],
-    keywords: ["conciliacion", "extracto", "ofx", "banco"],
+    keywords: ["conciliacion", "extracto", "ofx", "banco", "coincidencias", "emparejar", "pendientes", "referencia", "par a confirmar"],
     guideRef: "§4.2",
   },
   {

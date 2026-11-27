@@ -739,6 +739,39 @@ async function seedTreasury(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
   });
 }
 
+/** Maintained review fixtures: one account per viewport, with ambiguous matches and multiple pages. */
+async function seedReconciliationReview(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
+  for (const [viewport, offset] of [["desktop", 0], ["tablet", 100], ["phone", 200]] as const) {
+    const id = (number: number) => `a00002f0-0000-4000-8000-${String(offset + number).padStart(12, "0")}`;
+    await prisma.treasuryAccount.upsert({ where: { id: id(1) }, update: {}, create: {
+      id: id(1), tenantId: ctx.tenantId, companyId: ctx.companyId, name: `Demo revisión ${viewport}`,
+      type: "BANK", currency: "ARS", openingBalance: "0.00", status: "ACTIVE", createdBy: ctx.docsUserId,
+    } });
+    await prisma.bankReconciliation.upsert({ where: { id: id(2) }, update: {}, create: {
+      id: id(2), tenantId: ctx.tenantId, companyId: ctx.companyId, accountId: id(1), currency: "ARS",
+      periodStart: new Date("2026-03-01T00:00:00Z"), periodEnd: new Date("2026-03-31T00:00:00Z"),
+      openingBalance: "0.00", closingBalance: "111.00", status: "IN_PROGRESS", createdBy: ctx.docsUserId,
+    } });
+    for (const [number, description, date] of [[3, "Cobranza revisión Alfa", "2026-03-10"], [4, "Cobranza revisión Beta", "2026-03-11"]] as const) {
+      await prisma.accountMovement.upsert({ where: { id: id(number) }, update: {}, create: {
+        id: id(number), tenantId: ctx.tenantId, companyId: ctx.companyId, accountId: id(1),
+        movementDate: new Date(`${date}T12:00:00Z`), valueDate: new Date(`${date}T12:00:00Z`),
+        type: "INFLOW", sourceType: "MANUAL_ADJUSTMENT", currency: "ARS", amount: "100.00", amountArs: "100.00",
+        fxRate: "1.000000", description, status: "CONFIRMED", createdBy: ctx.docsUserId,
+      } });
+    }
+    for (let row = 0; row < 12; row += 1) {
+      await prisma.bankStatementLine.upsert({ where: { id: id(20 + row) }, update: {}, create: {
+        id: id(20 + row), tenantId: ctx.tenantId, reconciliationId: id(2),
+        lineDate: new Date(`2026-03-${String(10 + row).padStart(2, "0")}T12:00:00Z`),
+        description: row === 0 ? "Transferencia para revisar" : `Línea de revisión ${row}`,
+        reference: row === 0 ? "REV-ALFA" : `REV-${row}`, amount: row === 0 ? "100.00" : "1.00",
+        direction: "CREDIT", sortOrder: row,
+      } });
+    }
+  }
+}
+
 async function seedSubcontractChain(prisma: PrismaClient, ctx: SeedCtx): Promise<void> {
   const lineQty = "100.0000";
   const linePrice = "8500.0000";
@@ -2909,6 +2942,7 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   await seedFieldProcurementCatalog(prisma, seedCtx);
   await seedFieldMaterialsBoard(prisma, seedCtx);
   await seedTreasury(prisma, seedCtx);
+  await seedReconciliationReview(prisma, seedCtx);
   await seedFieldPayables(prisma, seedCtx);
   await seedSubcontractChain(prisma, seedCtx);
   await seedCertificationAndSales(prisma, seedCtx);

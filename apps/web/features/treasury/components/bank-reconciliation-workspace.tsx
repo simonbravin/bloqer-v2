@@ -70,17 +70,37 @@ type PendingDialog =
   | { kind: "create-movement"; lineId: string; dirLabel: string; amount: string }
   | { kind: "remove-line"; lineId: string };
 
+const PAGE_SIZE = 10;
+
+function ReconciliationPager({ page, total, pending, onPage }: { page: number; total: number; pending: boolean; onPage: (page: number) => void }) {
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if (pages === 1) return null;
+  return <div className="flex flex-wrap items-center justify-between gap-3 border-t p-3 text-xs text-muted-foreground">
+    <span>Página {page} de {pages} · {total} resultados</span>
+    <div className="flex gap-2">
+      <Button type="button" variant="outline" size="sm" className="min-h-11" disabled={pending || page <= 1} onClick={() => onPage(page - 1)}>Anterior</Button>
+      <Button type="button" variant="outline" size="sm" className="min-h-11" disabled={pending || page >= pages} onClick={() => onPage(page + 1)}>Siguiente</Button>
+    </div>
+  </div>;
+}
+
 export function BankReconciliationWorkspace({ session, candidates, canEdit }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const { pending: isPending, run: runOperation, isBusy } = useOperationalAction({ onError: setError });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [selectedMovementId, setSelectedMovementId] = useState<string | null>(null);
+  const [lineFilter, setLineFilter] = useState<"pending" | "all">(session.status === "DRAFT" || session.status === "IN_PROGRESS" ? "pending" : "all");
+  const [lineSearch, setLineSearch] = useState("");
+  const [movementSearch, setMovementSearch] = useState("");
+  const [linePage, setLinePage] = useState(1);
+  const [movementPage, setMovementPage] = useState(1);
   const [direction, setDirection] = useState<"CREDIT" | "DEBIT">("CREDIT");
   const [lineAmount, setLineAmount] = useState("");
   const [movementFxRate, setMovementFxRate] = useState("");
   const [movementFxError, setMovementFxError] = useState<string | null>(null);
   const movementFieldsRef = useRef<HTMLDivElement>(null);
+  const movementPanelRef = useRef<HTMLElement>(null);
   const [dialog, setDialog] = useState<PendingDialog | null>(null);
 
   const editable = canEdit && (session.status === "DRAFT" || session.status === "IN_PROGRESS");
@@ -100,6 +120,22 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
       return directionOk && m.amount === selectedLine.amount;
     });
   }, [candidates, selectedLine]);
+
+  const pendingLineCount = session.lines.filter((line) => !line.match).length;
+  const visibleLines = session.lines.filter((line) => (lineFilter === "all" || !line.match)
+    && `${line.description} ${line.reference ?? ""}`.toLocaleLowerCase("es-AR").includes(lineSearch.trim().toLocaleLowerCase("es-AR")));
+  const visibleCandidates = filteredCandidates.filter((movement) => movement.description.toLocaleLowerCase("es-AR").includes(movementSearch.trim().toLocaleLowerCase("es-AR")));
+  const currentLinePage = Math.min(linePage, Math.max(1, Math.ceil(visibleLines.length / PAGE_SIZE)));
+  const currentMovementPage = Math.min(movementPage, Math.max(1, Math.ceil(visibleCandidates.length / PAGE_SIZE)));
+  // A refreshed candidate list must invalidate a stale selection before enabling confirmation.
+  const selectedMovement = visibleCandidates.find((movement) => movement.id === selectedMovementId) ?? null;
+
+  function clearSelection() {
+    setSelectedLineId(null);
+    setSelectedMovementId(null);
+    setMovementSearch("");
+    setMovementPage(1);
+  }
 
   function run(
     action: () => Promise<{ ok: true } | { error: string }>,
@@ -405,7 +441,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
       {editable && (
         <form onSubmit={handleAddLine} className="space-y-3 rounded-lg border bg-card p-4">
           <h3 className="font-semibold">Agregar línea de extracto</h3>
-          <div className="grid gap-3 sm:grid-cols-5">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div className="space-y-1">
               <Label htmlFor="lineDate">Fecha</Label>
               <Input id="lineDate" name="lineDate" type="date" required />
@@ -455,171 +491,106 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         </form>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-4 py-3">
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-2">
+        <section aria-label="Líneas del extracto" className="min-w-0 rounded-lg border bg-card">
+          <div className="space-y-3 border-b p-4">
             <h3 className="font-semibold">Extracto ({session.lines.length})</h3>
-          </div>
-          <ul className="divide-y">
-            {session.lines.length === 0 && (
-              <li className="px-4 py-6 text-sm text-muted-foreground">Sin líneas aún.</li>
-            )}
-            {session.lines.map((line) => {
-              const active = selectedLineId === line.id;
-              return (
-                <li
-                  key={line.id}
-                  className={`px-4 py-3 text-sm ${active ? "bg-muted/60" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="w-full text-left"
-                    aria-pressed={active}
-                    disabled={isPending}
-                    onClick={() => {
-                      setSelectedLineId(line.id);
-                      setSelectedMovementId(null);
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium">{line.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(line.lineDate)} ·{" "}
-                          {line.direction === "CREDIT" ? "Crédito" : "Débito"}
-                          {line.reference ? ` · ${line.reference}` : ""}
-                        </p>
-                        {line.match && (
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            Emparejado: {line.match.movement.description} · {formatDate(line.match.movement.valueDate ?? line.match.movement.movementDate)}
-                          </p>
-                        )}
-                      </div>
-                      <p className="font-mono tabular-nums">
-                        {formatMoneyAmount(line.amount, session.currency)}
-                      </p>
-                    </div>
-                  </button>
-                  {editable && (
-                    <div className="mt-2 flex gap-2">
-                      {line.match ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={isPending}
-                          onClick={() =>
-                            run(() =>
-                              unmatchBankReconciliationLineAction(line.match!.id, session.id),
-                            )
-                          }
-                        >
-                          Desconciliar
-                        </Button>
-                      ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={isPending}
-                            onClick={() => {
-                              setMovementFxRate("");
-                              setMovementFxError(null);
-                              setDialog({
-                                kind: "create-movement",
-                                lineId: line.id,
-                                dirLabel:
-                                  line.direction === "CREDIT" ? "ingreso" : "egreso",
-                                amount: line.amount,
-                              });
-                            }}
-                          >
-                            Crear movimiento
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={isPending}
-                            onClick={() => setDialog({ kind: "remove-line", lineId: line.id })}
-                          >
-                            Quitar
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-
-        <div className="rounded-lg border bg-card">
-          <div className="border-b px-4 py-3">
-            <h3 className="font-semibold">
-              Movimientos del sistema ({filteredCandidates.length}
-              {selectedLine ? " compatibles" : ""})
-            </h3>
-          </div>
-          <ul className="divide-y">
-            {filteredCandidates.length === 0 && (
-              <li className="px-4 py-6 text-sm text-muted-foreground">
-                {selectedLine
-                  ? "No hay movimientos confirmados con mismo monto y dirección."
-                  : "Seleccioná una línea del extracto o no hay candidatos en el período."}
-              </li>
-            )}
-            {filteredCandidates.map((m) => {
-              const active = selectedMovementId === m.id;
-              return (
-                <li key={m.id} className={`px-4 py-3 text-sm ${active ? "bg-muted/60" : ""}`}>
-                  <button
-                    type="button"
-                    className="w-full text-left"
-                    aria-pressed={active}
-                    onClick={() => setSelectedMovementId(m.id)}
-                    disabled={isPending || !editable || !selectedLine || Boolean(selectedLine.match)}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-medium">{m.description}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatDate(m.valueDate ?? m.movementDate)} · {TYPE_LABEL[m.type] ?? m.type}
-                          {m.valueDate ? " · Fecha valor" : " · Fecha contable"}
-                        </p>
-                      </div>
-                      <p className="font-mono tabular-nums">
-                        {formatMoneyAmount(m.amount, session.currency)}
-                      </p>
-                    </div>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {editable && selectedLine && !selectedLine.match && selectedMovementId && (
-            <div className="border-t p-4">
-              <Button
-                size="sm"
-                disabled={isPending}
-                onClick={() =>
-                  run(
-                    () =>
-                      matchBankReconciliationLineAction({
-                        reconciliationId: session.id,
-                        statementLineId: selectedLine.id,
-                        accountMovementId: selectedMovementId,
-                      }),
-                    "Línea emparejada",
-                  )
-                }
-              >
-                Emparejar seleccionados
-              </Button>
+            <div role="group" aria-label="Filtrar extracto" className="grid grid-cols-2 gap-2">
+              <Button type="button" variant={lineFilter === "pending" ? "secondary" : "outline"} className="min-h-11 whitespace-normal" aria-pressed={lineFilter === "pending"} disabled={isPending} onClick={() => { setLineFilter("pending"); setLinePage(1); clearSelection(); }}>Pendientes ({pendingLineCount})</Button>
+              <Button type="button" variant={lineFilter === "all" ? "secondary" : "outline"} className="min-h-11 whitespace-normal" aria-pressed={lineFilter === "all"} disabled={isPending} onClick={() => { setLineFilter("all"); setLinePage(1); clearSelection(); }}>Todas ({session.lines.length})</Button>
             </div>
-          )}
-        </div>
-      </div>
+            <Label htmlFor="reconciliation-line-search">Buscar en el extracto</Label>
+            <Input id="reconciliation-line-search" placeholder="Descripción o referencia" value={lineSearch} disabled={isPending} onChange={(event) => { setLineSearch(event.target.value); setLinePage(1); clearSelection(); }} />
+            <p className="text-xs text-muted-foreground">{visibleLines.length} líneas en este filtro · Hasta {PAGE_SIZE} por página. Los filtros no cambian saldos ni condiciones de cierre.</p>
+          </div>
+          <ul className="divide-y">
+            {visibleLines.length === 0 && <li className="px-4 py-6 text-sm text-muted-foreground">Sin líneas para este filtro. Revisá la búsqueda o elegí Todas.</li>}
+            {visibleLines.slice((currentLinePage - 1) * PAGE_SIZE, currentLinePage * PAGE_SIZE).map((line) => {
+              const active = selectedLineId === line.id;
+              return <li key={line.id} className={`min-w-0 px-4 py-3 text-sm ${active ? "bg-muted/60" : ""}`}>
+                <button type="button" className="min-h-11 w-full rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-pressed={active} disabled={isPending} onClick={() => {
+                  setSelectedLineId(line.id); setSelectedMovementId(null); setMovementSearch(""); setMovementPage(1);
+                  if (window.matchMedia("(max-width: 1023px)").matches) {
+                    movementPanelRef.current?.scrollIntoView({ block: "start" });
+                    movementPanelRef.current?.focus({ preventScroll: true });
+                  }
+                }}>
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-medium">{line.description}</p>
+                      <p className="mt-1 break-words text-xs text-muted-foreground">{formatDate(line.lineDate)} · {line.direction === "CREDIT" ? "Crédito" : "Débito"}{line.reference ? ` · ${line.reference}` : ""}</p>
+                      <p className="mt-1 text-xs font-medium">{line.match ? "Conciliada" : "Pendiente"}</p>
+                      {line.match && <p className="mt-1 break-words text-xs text-muted-foreground">Emparejado: {line.match.movement.description} · {formatDate(line.match.movement.valueDate ?? line.match.movement.movementDate)}</p>}
+                    </div>
+                    <p className="break-words font-mono tabular-nums">{formatMoneyAmount(line.amount, session.currency)}</p>
+                  </div>
+                </button>
+                {editable && <div className="mt-2 flex flex-wrap gap-2">
+                  {line.match ? <Button size="sm" className="min-h-11" variant="outline" disabled={isPending} onClick={() => run(() => unmatchBankReconciliationLineAction(line.match!.id, session.id))}>Desconciliar</Button> : <>
+                    <Button size="sm" className="min-h-11" variant="outline" disabled={isPending} onClick={() => {
+                      setMovementFxRate(""); setMovementFxError(null);
+                      setDialog({ kind: "create-movement", lineId: line.id, dirLabel: line.direction === "CREDIT" ? "ingreso" : "egreso", amount: line.amount });
+                    }}>Crear movimiento</Button>
+                    <Button size="sm" className="min-h-11" variant="ghost" disabled={isPending} onClick={() => setDialog({ kind: "remove-line", lineId: line.id })}>Quitar</Button>
+                  </>}
+                </div>}
+              </li>;
+            })}
+          </ul>
+          <ReconciliationPager page={currentLinePage} total={visibleLines.length} pending={isPending} onPage={(page) => { setLinePage(page); clearSelection(); }} />
+        </section>
 
+        <section ref={movementPanelRef} tabIndex={-1} aria-label="Revisar coincidencias" className="min-w-0 scroll-mt-24 rounded-lg border bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <div className="space-y-3 border-b p-4">
+            <h3 className="font-semibold">Movimientos del sistema ({filteredCandidates.length}{selectedLine ? " compatibles" : ""})</h3>
+            {selectedLine ? <div className="space-y-1 rounded-md bg-muted/40 p-3 text-sm">
+              <p className="font-medium">Línea seleccionada del extracto</p>
+              <p className="break-words">{selectedLine.description}</p>
+              <p className="break-words text-xs text-muted-foreground">{formatDate(selectedLine.lineDate)} · {selectedLine.direction === "CREDIT" ? "Crédito" : "Débito"}{selectedLine.reference ? ` · ${selectedLine.reference}` : ""}</p>
+              <p className="font-semibold tabular-nums">{formatMoneyAmount(selectedLine.amount, session.currency)}</p>
+            </div> : <p className="text-sm text-muted-foreground">Elegí una línea del extracto para ver movimientos del mismo importe y dirección, dentro de esta cuenta, moneda y período.</p>}
+            {selectedLine && !selectedLine.match && <p role="status" className="rounded-md border p-3 text-sm">
+              {filteredCandidates.length > 1
+                ? `Hay ${filteredCandidates.length} coincidencias posibles. El importe y la dirección no identifican por sí solos la operación: compará fechas y descripciones antes de elegir.`
+                : filteredCandidates.length === 1
+                  ? "Hay una coincidencia posible. Revisá fecha y descripción antes de confirmar; no se selecciona automáticamente."
+                  : "No hay movimientos confirmados del mismo importe y dirección. Revisá la cuenta, el período y el registro original antes de crear un movimiento."}
+            </p>}
+            {selectedLine?.match && <p className="text-sm text-muted-foreground">Esta línea ya está conciliada. Revisá el emparejamiento en el extracto; para cambiarlo, primero desconciliá.</p>}
+            <Label htmlFor="reconciliation-movement-search">Buscar movimiento</Label>
+            <Input id="reconciliation-movement-search" placeholder="Descripción del movimiento" value={movementSearch} disabled={isPending} onChange={(event) => { setMovementSearch(event.target.value); setMovementPage(1); setSelectedMovementId(null); }} />
+            <p className="text-xs text-muted-foreground">{visibleCandidates.length} resultados de {filteredCandidates.length} · Ordenados por fecha valor o contable · Hasta {PAGE_SIZE} por página.</p>
+          </div>
+          <ul className="divide-y">
+            {visibleCandidates.length === 0 && <li className="px-4 py-6 text-sm text-muted-foreground">{movementSearch.trim() ? "Sin resultados para la búsqueda. Borrala para ver todos los candidatos." : "Sin movimientos disponibles para esta selección."}</li>}
+            {visibleCandidates.slice((currentMovementPage - 1) * PAGE_SIZE, currentMovementPage * PAGE_SIZE).map((m) => {
+              const active = selectedMovementId === m.id;
+              return <li key={m.id} className={`min-w-0 px-4 py-3 text-sm ${active ? "bg-muted/60" : ""}`}>
+                <button type="button" className="min-h-11 w-full rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-pressed={active} onClick={() => setSelectedMovementId(m.id)} disabled={isPending || !editable || !selectedLine || Boolean(selectedLine.match)}>
+                  <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="break-words font-medium">{m.description}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{formatDate(m.valueDate ?? m.movementDate)} · {TYPE_LABEL[m.type] ?? m.type}{m.valueDate ? " · Fecha valor" : " · Fecha contable"}</p>
+                    </div>
+                    <p className="break-words font-mono tabular-nums">{formatMoneyAmount(m.amount, session.currency)}</p>
+                  </div>
+                </button>
+              </li>;
+            })}
+          </ul>
+          <ReconciliationPager page={currentMovementPage} total={visibleCandidates.length} pending={isPending} onPage={(page) => { setMovementPage(page); setSelectedMovementId(null); }} />
+          {editable && selectedLine && !selectedLine.match && selectedMovement && <div className="space-y-3 border-t p-4">
+            <div role="region" aria-label="Par a confirmar" className="space-y-2 rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-semibold">Revisá el par antes de confirmar</p>
+              <p className="break-words"><span className="font-medium">Extracto:</span> {selectedLine.description} · {formatDate(selectedLine.lineDate)}</p>
+              <p className="break-words"><span className="font-medium">Sistema:</span> {selectedMovement.description} · {formatDate(selectedMovement.valueDate ?? selectedMovement.movementDate)}</p>
+              <p className="font-medium tabular-nums">{formatMoneyAmount(selectedLine.amount, session.currency)} · {selectedLine.direction === "CREDIT" ? "Ingreso" : "Egreso"}</p>
+              <p className="text-xs text-muted-foreground">Solo se concilia este par al confirmar. El servicio vuelve a comprobar su disponibilidad.</p>
+            </div>
+            <Button className="min-h-11 w-full whitespace-normal" disabled={isPending} onClick={() => run(() => matchBankReconciliationLineAction({ reconciliationId: session.id, statementLineId: selectedLine.id, accountMovementId: selectedMovement.id }), "Línea emparejada")}>Emparejar seleccionados</Button>
+          </div>}
+        </section>
+      </div>
       <ConfirmAlertDialog
         open={dialog?.kind === "close"}
         onOpenChange={(open) => !open && setDialog(null)}

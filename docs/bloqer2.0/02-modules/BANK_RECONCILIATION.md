@@ -37,6 +37,7 @@ Saldos que no cuadran con banco real; cheques/pagos no acreditados.
 ## 9. Pantallas y vistas necesarias
 - Vista dos columnas: extracto vs sistema.
 - Resumen diferencias.
+- Revisión asistida F2: filtro **Pendientes / Todas**, búsqueda del extracto por descripción/referencia y de candidatos por descripción, listas de diez filas y resumen del par antes de **Emparejar seleccionados**. Los candidatos conservan importe/dirección y alcance de cuenta/moneda/período existentes. Varias coincidencias se presentan como posibilidades para revisar, sin ranking, tolerancias nuevas ni selección automática. Buscar no reduce el conteo de coincidencias posibles ni cambia saldos/condiciones de cierre. Cambiar línea, búsqueda o página descarta la selección correspondiente; un candidato retirado por actualización no se puede confirmar desde la UI. El servicio revalida la operación al ejecutar. En pantallas angostas, elegir una línea lleva al panel de coincidencias con el contexto del extracto visible.
 - **R-020:** tabla estado por cuenta/período en `/tesoreria/conciliacion` + export CSV `/api/reports/tesoreria/conciliacion.csv`.
 
 ## 10. Reglas de negocio
