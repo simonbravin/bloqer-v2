@@ -18,7 +18,7 @@ export const test = base.extend<{ browserDiagnostics: void }>({
     const relevant = (request: Request) => {
       const url = new URL(request.url());
       return url.hostname === "127.0.0.1" &&
-        (url.pathname.startsWith("/proyectos/") || url.pathname === "/dashboard");
+        (url.pathname.startsWith("/proyectos/") || url.pathname.startsWith("/tesoreria/conciliacion/") || url.pathname === "/dashboard");
     };
     page.on("pageerror", (error) => record("pageerror", error.message));
     page.on("console", (message) => {
@@ -44,7 +44,7 @@ export const test = base.extend<{ browserDiagnostics: void }>({
     await page.addInitScript(() => {
       for (const kind of ["pointerdown", "click", "submit", "invalid"]) {
         document.addEventListener(kind, (event) => {
-          if (!(location.pathname.startsWith("/proyectos/") || location.pathname === "/dashboard")) return;
+          if (!(location.pathname.startsWith("/proyectos/") || location.pathname.startsWith("/tesoreria/conciliacion/") || location.pathname === "/dashboard")) return;
           const target = event.target instanceof Element ? event.target.closest("button, a, input, form") : null;
           if (!target) return;
           console.debug("[smoke-interaction] " + JSON.stringify({

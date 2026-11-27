@@ -11,7 +11,8 @@ test("project collection scenario compares applied values, clears drafts and rem
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/, { timeout: 30_000 });
   await page.goto(`${route}?currency=ARS`);
   await page.getByRole("button", { name: "Proyección de caja", exact: true }).click();
-  const panel = page.locator("#proyeccion-caja");
+  // Ignore hidden streamed fragments; require one accessible accordion region.
+  const panel = page.getByRole("region", { name: "Proyección de caja", exact: true });
   const dateInput = panel.getByLabel("Fecha de proyección", { exact: true });
   const compare = panel.getByLabel("Comparar atraso de cobranza", { exact: true });
   const delay = panel.getByLabel("Atraso hipotético (días corridos)", { exact: true });

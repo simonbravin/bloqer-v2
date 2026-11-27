@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 test("reconciliation reviews ambiguous matches, pages and searches without changing the source scope", async ({ page }, testInfo) => {
   const offset = { desktop: 0, tablet: 100, phone: 200 }[testInfo.project.name];
