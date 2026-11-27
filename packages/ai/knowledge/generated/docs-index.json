@@ -1,7 +1,7 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-27T13:43:20.863Z",
-  "sourceHash": "1c2f5ec36fd2d27866510ca335b66bad530cc29e4073489fce6de5aecc61e5ea",
+  "generatedAt": "2026-11-27T13:47:51.143Z",
+  "sourceHash": "9773aa64658c0f0febcb9488131c36bcc57174893657b3bfeb8a8f49f2fbb391",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
@@ -10,93 +10,93 @@
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
-      "sha256": "3963a78feb6f55e40ff0bca6dceb467d7dfd951d970b59810f6a3166d4e668ce",
-      "bytes": 17688
+      "sha256": "8b545e67692d377be86391ea0d041611005977f19c67b0ba62b31ba2d90b1e4a",
+      "bytes": 17687
     },
     {
       "path": "docs/bloqer2.0/00-product/PRODUCT_SCOPE.md",
-      "sha256": "53ce1226bb45cd4718cd64f7e2b7e819cb03af6a0895bbebac4e410f650f0171",
-      "bytes": 8104
+      "sha256": "6cd4d9815dbd95455ea31028dbcbb4ab30e9b08b99a7d1e607aabad88e5bba24",
+      "bytes": 8103
     },
     {
       "path": "docs/bloqer2.0/01-domain/DOMAIN_OVERVIEW.md",
-      "sha256": "a5fe1251e3f817ed8c5c683137d60cfdce1a3c224f949d47684321a7f5bc90b8",
-      "bytes": 8721
+      "sha256": "220296afd57c086daf0f62c3ca4f0192005f8cf8c3b07c1c502113d8699f3877",
+      "bytes": 8720
     },
     {
       "path": "docs/bloqer2.0/02-modules/PROCUREMENT.md",
-      "sha256": "c88737fe3fa90586955b67ace92305fa3032efde6dd0e53c2c9739954933b198",
-      "bytes": 6480
+      "sha256": "75b67b2669d8529a8c5476c347ce682ad44d50ebc024036e3492855117459535",
+      "bytes": 6479
     },
     {
       "path": "docs/bloqer2.0/02-modules/PURCHASE_REQUESTS.md",
-      "sha256": "a167ce61d0a2ed59f3cae70e1537e0a66cd206347920fefd272ade3cecd029c7",
-      "bytes": 14716
+      "sha256": "6af619b02e64e97c7e35f59f1f22a674ed996195d2ed43e53860f9aae558f5d9",
+      "bytes": 14715
     },
     {
       "path": "docs/bloqer2.0/02-modules/PURCHASE_ORDERS_AND_RECEIPTS.md",
-      "sha256": "6b9b6655606677cd35740352a162b313bfb8097a5bdc3b4181b45cb5d9e5d1d3",
-      "bytes": 11997
+      "sha256": "68954c0016f673ad46056678596b743b26fa232a2cd5293b6f9bedccf454b593",
+      "bytes": 11996
     },
     {
       "path": "docs/bloqer2.0/02-modules/INVENTORY.md",
-      "sha256": "30704ac598fa0d6f4863a067bae779455f6285f9127910b7d0aea31da2b58f55",
-      "bytes": 5102
+      "sha256": "4813a76e57de0b6b4b331e69c460d9e40987c05fb942ea7a1f1b1f57bc7b2013",
+      "bytes": 5101
     },
     {
       "path": "docs/bloqer2.0/02-modules/PROJECT_SCHEDULING.md",
-      "sha256": "32a9a68f14cdaf0b8556b5b3302e13c902276bea611d994f080deb4e320c70ab",
-      "bytes": 5268
+      "sha256": "27e60ff66465279723cadaba1ca21d4722832a9ee698d6b2bf5a2b38c6080dd7",
+      "bytes": 5267
     },
     {
       "path": "docs/bloqer2.0/02-modules/JOBSITE_LOG.md",
-      "sha256": "37f0121fece90b1c936f01fb55e5e430e4266618902620eb8001ba55e3cff82f",
-      "bytes": 4068
+      "sha256": "0316362aa27c6f499397371b36f24c2d9f7ab9fcdd4449b1e899fd9d2df1a1d1",
+      "bytes": 4067
     },
     {
       "path": "docs/bloqer2.0/02-modules/CERTIFICATIONS.md",
-      "sha256": "c8b5de99809a106820c1969ec3f737e2ce87bfc2be9760f2f9e6321c8378f590",
-      "bytes": 7466
+      "sha256": "ae2ca9036bee4b63a44223144b26cf81a1235773bd5e98318eb9f14b713ad0cb",
+      "bytes": 7465
     },
     {
       "path": "docs/bloqer2.0/02-modules/SUBCONTRACTS.md",
-      "sha256": "98682115327525aa4fe7d512c4df2affbe4ecebc35c5a48692664ee128e8a677",
-      "bytes": 4477
+      "sha256": "d67101f05f802fdec0fa42802ac43c055e9e422a09d237c2535e3ecca4f1aafa",
+      "bytes": 4476
     },
     {
       "path": "docs/bloqer2.0/02-modules/EXPENSES_AND_PAYMENTS.md",
-      "sha256": "89b3b9d206da3aa6bf04988f8b504952b0a05442f3e4ad0010340219a473e755",
-      "bytes": 9914
+      "sha256": "9e2f154ab2db140e6dc2a45ed49140083856a03bd80cd18f154d1b59cd87f4ce",
+      "bytes": 9913
     },
     {
       "path": "docs/bloqer2.0/02-modules/SALES_AND_COLLECTIONS.md",
-      "sha256": "0f9af6b2970c93d49541da70644dbfef7b79806a1c0f4243af7dff5cfbf70974",
-      "bytes": 8516
+      "sha256": "5c1e6bb8c156058b7db1c4b9eba79b059bf15eec435c3e3bc424e9a6ea342037",
+      "bytes": 8515
     },
     {
       "path": "docs/bloqer2.0/02-modules/TREASURY.md",
-      "sha256": "b95a73af6644b71cfed690dfe0f80069287e0cb3328c438ae2c54e4b97a91a78",
-      "bytes": 3788
+      "sha256": "d795655b2c836302da93202e4b3c9277be90a9a9f70c531d3e4cef32f68d63f2",
+      "bytes": 3787
     },
     {
       "path": "docs/bloqer2.0/03-finance/ACCOUNTS_PAYABLE.md",
-      "sha256": "204c5f6fc1f5534a5f8c4fdebb83b7d4935b3569c567eb40af616742c6e68148",
-      "bytes": 3398
+      "sha256": "9e8ee511dabd71adb95857c8cbacc9b3ab9676753437f762d2c9590d6f440fc5",
+      "bytes": 3397
     },
     {
       "path": "docs/bloqer2.0/03-finance/ACCOUNTS_RECEIVABLE.md",
-      "sha256": "41f809c181494044daf266c29460315100bc5d1c51f7e1487cbf6127314abac0",
-      "bytes": 3773
+      "sha256": "7f9bc67c04e89f723ca427b0444488a20350b6f565c9ff6e191895e167aa9f03",
+      "bytes": 3772
     },
     {
       "path": "docs/bloqer2.0/03-finance/TREASURY_MODEL.md",
-      "sha256": "196450cccde4d539c801f3f9b24116310b90d9ff0a774dc3276bda7bb0f9a5a2",
-      "bytes": 2875
+      "sha256": "e99ae4d98a52b881ac6cfdf994b21c90ccc1cfd024afac48b7d400c37eb9d27c",
+      "bytes": 2874
     },
     {
       "path": "docs/bloqer2.0/08-architecture/HELP_CENTER.md",
-      "sha256": "9b5b2b05f9d2012ddc36a3b4aa3c0f25a77b24f3876fd0ef7cbbaf246046320c",
-      "bytes": 3520
+      "sha256": "6139aa99d6b2588336c3f9a7feed124dae49b528fcd60ebe65566fb5257accdd",
+      "bytes": 3519
     }
   ],
   "chunks": [
