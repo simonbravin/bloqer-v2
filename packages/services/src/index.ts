@@ -137,6 +137,7 @@ export { canViewSubcontractsArea } from "./subcontracts/subcontract-access";
 export * from "./procurement/purchase-order.service";
 export * from "./procurement/purchase-receipt.service";
 export * from "./procurement/project-procurement-hub.service";
+export * from "./procurement/project-procurement-follow-up.service";
 export * from "./materials/project-materials-board.service";
 export * from "./materials/material-commitment";
 export * from "./resources/resource-board-pure";
