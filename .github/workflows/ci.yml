@@ -159,6 +159,24 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Show browser failure context
+        if: failure()
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const root = "apps/web/test-results";
+          if (fs.existsSync(root)) {
+            for (const file of fs.readdirSync(root, { recursive: true })) {
+              if (!file.endsWith("error-context.md")) continue;
+              const full = path.join(root, file);
+              console.log(`::group::Browser failure: ${file}`);
+              console.log(fs.readFileSync(full, "utf8").slice(0, 20000));
+              console.log("::endgroup::");
+            }
+          }
+          NODE
+
       - name: Stop disposable Postgres
         if: always()
         run: |

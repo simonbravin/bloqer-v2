@@ -1,5 +1,5 @@
 import fs from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 
 const projectId = "a0000010-0000-4000-8000-000000000010";
 const indexPath = `/proyectos/${projectId}/documentos/indice-entrega`;
