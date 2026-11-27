@@ -19,6 +19,7 @@ import {
   buildFinanceProjection,
   resolveFinanceCorporateAccess,
   type FinanceProjectionSummary,
+  type FinanceOperationalAlert,
 } from "./finance-corporate-kpis.service";
 import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-access";
 import { canViewCompanyAp } from "../ap/ap-access";
@@ -122,10 +123,7 @@ export type FinanceHubQuickAction = {
   href: string;
 };
 
-export type FinanceHubAlert = {
-  variant: "info" | "warning";
-  message: string;
-};
+export type FinanceHubAlert = FinanceOperationalAlert;
 
 export type FinanceHubOverview = {
   managementBrief: FinanceManagementBrief;

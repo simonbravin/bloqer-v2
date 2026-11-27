@@ -411,6 +411,27 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
 
 export const AP_ARTICLES: HelpArticle[] = [
   {
+    slug: "revisar-avisos-financieros",
+    title: "Revisar avisos de caja y proyección",
+    summary: "Abrí las fuentes de una alerta y distinguí caja actual de una proyección con datos incompletos.",
+    intents: ["tablero-finanzas"], modules: ["finanzas", "tesoreria"], level: "company",
+    typicalRoles: ["OWNER / ADMIN", "Finanzas"],
+    permissionHint: "Cada fuente requiere sus permisos de Tesorería o Cuentas por pagar.",
+    where: { menu: "Finanzas o Transacciones → Avisos para revisar" },
+    hrefs: [{ kind: "company", path: "/finanzas", label: "Finanzas" }],
+    steps: [
+      "Leé el importe y la moneda del aviso. En una proyección, comprobá también el período y las fuentes disponibles.",
+      "Usá Revisar cuentas y movimientos para consultar el saldo real, o Revisar obligaciones corporativas para consultar C×P empresa.",
+      "Los enlaces abren la vista completa. Compará su moneda, fechas y alcance con el aviso; no aplican filtros automáticamente.",
+      "Si aparece Proyección parcial, revisá qué fuente no está disponible antes de decidir. Cualquier corrección se hace por el circuito normal del documento.",
+    ],
+    effects: ["Consultar los avisos no crea ajustes, pagos ni nuevas notificaciones."],
+    pitfalls: ["La proyección usa caja de la organización y C×P corporativas del alcance activo. No incluye cobranzas futuras ni obligaciones de obras.", "Una proyección negativa no es el saldo bancario actual. La ausencia de avisos no acredita una auditoría completa."],
+    relatedSlugs: ["resumen-financiero-para-decidir", "ver-movimientos-de-tesoreria"],
+    keywords: ["avisos", "anomalías", "caja negativa", "proyección parcial", "fuentes", "saldo proyectado"],
+    guideRef: "§12",
+  },
+  {
     slug: "resumen-financiero-para-decidir",
     title: "Revisar qué cobrar y pagar desde Finanzas",
     summary: "Resumen actual de vencimientos con saldos por moneda y acceso a las obligaciones originales.",

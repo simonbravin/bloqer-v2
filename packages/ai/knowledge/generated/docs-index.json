@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-27T14:23:29.197Z",
-  "sourceHash": "8e3a28e55d6d34d2c8dfb8ebddcf5e8410a573c0ea7c98aa04d2d7e6f81b1e13",
+  "generatedAt": "2026-11-27T14:35:50.219Z",
+  "sourceHash": "880503afd2f6a62aef19d06be32fed55a7ba42bb4d2f3fa18e09236c8ab27b47",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "0e7f907532e110632dff045cab123497afcd1c7bae23ae6b38262b73f5598572",
-      "bytes": 241874
+      "sha256": "1989f038baf9696ac0470c100d9d478610caa85c3c1223793f5f60cbb41a43f0",
+      "bytes": 242752
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -1727,7 +1727,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "## 12. Facturar, cobrar y pagar (nivel proyecto y empresa)\n\n**Resumen para decidir (empresa):** en **Finanzas → Tablero** (`/finanzas`), revisá **Por cobrar** y **Por pagar**. Cada bloque permite elegir **Vencidos** o **Hoy y próximos 7 días**; hoy todavía no cuenta como vencido y el último día indicado está incluido. El resumen identifica su fecha de corte y si corresponde a la empresa activa o a toda la organización. Incluye obligaciones corporativas y de obras dentro del alcance financiero autorizado.\n\nCada grupo muestra su cantidad completa y el saldo pendiente separado por moneda, después de pagos y créditos. Debajo aparecen hasta cinco documentos, ordenados por vencimiento, con contraparte, empresa, obra y fecha. Los totales incluyen todo el grupo, no solo esas cinco filas. **Ver obligación** abre la CxC/CxP correspondiente para revisar la factura y continuar el circuito habitual. Una fuente no disponible por permisos/configuración no equivale a deuda cero. Consultar no cobra, paga ni concilia; los saldos son deuda vigente, no caja ni borradores. El rango mensual del gráfico no modifica este resumen actual.\n\n### 12.0 Clase del documento ([D-102])\n\nCada factura, CxC/CxP o movi"
+      "text": "## 12. Facturar, cobrar y pagar (nivel proyecto y empresa)\n\n**Resumen para decidir (empresa):** en **Finanzas → Tablero** (`/finanzas`), revisá **Por cobrar** y **Por pagar**. Cada bloque permite elegir **Vencidos** o **Hoy y próximos 7 días**; hoy todavía no cuenta como vencido y el último día indicado está incluido. El resumen identifica su fecha de corte y si corresponde a la empresa activa o a toda la organización. Incluye obligaciones corporativas y de obras dentro del alcance financiero autorizado.\n\nCada grupo muestra su cantidad completa y el saldo pendiente separado por moneda, después de pagos y créditos. Debajo aparecen hasta cinco documentos, ordenados por vencimiento, con contraparte, empresa, obra y fecha. Los totales incluyen todo el grupo, no solo esas cinco filas. **Ver obligación** abre la CxC/CxP correspondiente para revisar la factura y continuar el circuito habitual. Una fuente no disponible por permisos/configuración no equivale a deuda cero. Consultar no cobra, paga ni concilia; los saldos son deuda vigente, no caja ni borradores. El rango mensual del gráfico no modifica este resumen actual.\n\n**Avisos para revisar (F3):** Finanzas y Transacciones presentan los"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#205",
@@ -1735,7 +1735,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "miento de caja muestra un badge **Clase** (solo lectura). No se elige a mano: se deriva de si hay obra, OC, certificación, etc. En listados de caja, **Pago** va en rojo y **Ingreso / Cobranza** en verde."
+      "text": " mismos avisos con sus fuentes. Ante caja negativa, **Revisar cuentas y movimientos** abre las cuentas de tesorería. Ante saldo proyectado negativo, **Revisar obligaciones corporativas** abre C×P empresa; cada acceso conserva sus permisos. Compará la moneda del aviso con la fuente: los enlaces abren la vista completa, sin un filtro automático de moneda o período. La proyección combina caja de la organización con C×P corporativas del alcance activo, sin cobranzas futuras ni obligaciones de obras. El aviso muestra su período y se identifica como **Proyección parcial** cuando falta una fuente. No demuestra un faltante bancario actual ni corrige documentos automáticamente. Los mensajes de permisos o carga siguen visibles; su ausencia no certifica que se hayan auditado todas las operaciones."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#206",
@@ -1743,7 +1743,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "| Clase | Dónde aparece |\n|---|---|\n| Venta — certificación / Venta de obra | Facturas emitidas de proyecto |\n| Ingreso corporativo | Factura/CxC sin obra (Transacciones → Factura / CxC) |\n| Ingreso solo caja | Transacciones → Solo caja (sin factura) |\n| Compra comprometida | Factura de proveedor con OC |\n| Costo directo de obra | Factura de proveedor de obra **sin** OC |\n| Subcontrato | Factura ligada a certificación de subcontrato |\n| Gasto general | Factura/gasto sin obra (Transacciones AP, Nueva factura de gasto) |\n| Cobranza / Pago | Movimientos de tesorería por cobro/pago |\n\n**Transacciones** (`/finanzas/transacciones`) lista movimientos de caja, **no** facturas impagas. La clase de esas facturas está en **Facturas emitidas** / **Facturas de proveedor** / CxC / CxP. Clic en la **descripción** abre el detalle (texto completo, cuenta, clase, contraparte). Si hay pago o cobranza de obra, desde ahí se abre el documento origen.\n\n### 12.1 Ventas y cobranzas (AR)\n\n```mermaid\nflowchart LR\n  CERT[\"Certificación aprobada\"] --> INV[\"Factura de venta (ISSUED)\"]\n  INV --> AR[\"Cuenta por cobrar (Receivable)\"]\n  AR --> COL[\"Cobranza\"] --> TES[\"Tesorería: movimiento INFLOW\"]\n```\n\n#### Obra ("
+      "text": "### 12.0 Clase del documento ([D-102])\n\nCada factura, CxC/CxP o movimiento de caja muestra un badge **Clase** (solo lectura). No se elige a mano: se deriva de si hay obra, OC, certificación, etc. En listados de caja, **Pago** va en rojo y **Ingreso / Cobranza** en verde.\n\n| Clase | Dónde aparece |\n|---|---|\n| Venta — certificación / Venta de obra | Facturas emitidas de proyecto |\n| Ingreso corporativo | Factura/CxC sin obra (Transacciones → Factura / CxC) |\n| Ingreso solo caja | Transacciones → Solo caja (sin factura) |\n| Compra comprometida | Factura de proveedor con OC |\n| Costo directo de obra | Factura de proveedor de obra **sin** OC |\n| Subcontrato | Factura ligada a certificación de subcontrato |\n| Gasto general | Factura/gasto sin obra (Transacciones AP, Nueva factura de gasto) |\n| Cobranza / Pago | Movimientos de tesorería por cobro/pago |\n\n**Transacciones** (`/finanzas/transacciones`) lista movimientos de caja, **no** facturas impagas. La clase de esas facturas está en **Facturas emitidas** / **Facturas de proveedor** / CxC / CxP. Clic en la **descripción** abre el detalle (texto completo, cuenta, clase, contraparte). Si hay pago o cobranza de obra, desde ahí se abre el do"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#207",
@@ -1751,7 +1751,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "proyecto)\n\n**Exportar → Excel / PDF** en **Facturas emitidas** descarga todos los resultados de la búsqueda y los filtros, aunque ocupen varias páginas. En **Cobranzas** descarga el listado completo autorizado de la obra, incluidos sus estados. Ver §13.2."
+      "text": "cumento origen.\n\n### 12.1 Ventas y cobranzas (AR)\n\n```mermaid\nflowchart LR\n  CERT[\"Certificación aprobada\"] --> INV[\"Factura de venta (ISSUED)\"]\n  INV --> AR[\"Cuenta por cobrar (Receivable)\"]\n  AR --> COL[\"Cobranza\"] --> TES[\"Tesorería: movimiento INFLOW\"]"
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#208",
@@ -1759,7 +1759,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía. En la línea: **Desc. %** opcional (antes de IVA; el precio unitario es de lista). En el pie: **Percepción IIBB** (alícuota editable, default 3% sobre el neto [D-112]). En el listado: buscador por código (`FAC-` / `NC-` / `ND-`) o cliente, y filtro **Tipo de documento**. El campo fiscal de letra es **Letra del comprobante** (A/B/C/E), no “tipo de factura”.\n- **Tipo de documento ([D-115]):** desde una factura **emitida**: **Nota de crédito** (abre diálogo con saldo pendiente y monto; NC parcial ≤ saldo) o **Nota de débito** (confirmá y se crea borrador). Badge **Tipo de documento** distinto de **Clase**. Códigos `NC-…` / `ND-…`. El borrador NC/ND se puede **editar** (monto/líneas) antes de emitir; en edición se muestra el **máximo** = saldo pendiente. En el detalle de la factura padre: panel **Notas vinculadas**. Acciones (Editar / Emitir / NC / ND / Anular) van en el **encabezado** del detalle ("
+      "text": "```\n\n#### Obra (proyecto)\n\n**Exportar → Excel / PDF** en **Facturas emitidas** descarga todos los resultados de la búsqueda y los filtros, aunque ocupen varias páginas. En **Cobranzas** descarga el listado completo autorizado de la obra, incluidos sus estados. Ver §13.2.\n\n- **Facturas emitidas** (`/proyectos/[id]/facturas`, estados Borrador / Emitida / Anulada): una vez emitidas son inmutables; solo se pueden **anular**. Detalle: **Emitir** desde borrador; panel de **adjuntos** del comprobante. Al crear, el cliente se busca por razón social o nombre fantasía. En la línea: **Desc. %** opcional (antes de IVA; el precio unitario es de lista). En el pie: **Percepción IIBB** (alícuota editable, default 3% sobre el neto [D-112]). En el listado: buscador por código (`FAC-` / `NC-` / `ND-`) o cliente, y filtro **Tipo de documento**. El campo fiscal de letra es **Letra del comprobante** (A/B/C/E), no “tipo de factura”.\n- **Tipo de documento ([D-115]):** desde una factura **emitida**: **Nota de crédito** (abre diálogo con saldo pendiente y monto; NC parcial ≤ saldo) o **Nota de débito** (confirmá y se crea borrador). Badge **Tipo de documento** distinto de **Clase**. Códigos `NC-…` / `ND-…`."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#209",
@@ -1767,7 +1767,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "12. Facturar, cobrar y pagar (nivel proyecto y empresa)",
-      "text": "venta y proveedor, obra y empresa). **No** hay NC/ND “desde cero” sin factura de referencia (crédito abierto = fuera de v1). Anular NC restaura el saldo. No anular la factura padre si hay NC/ND emitidas."
+      "text": " El borrador NC/ND se puede **editar** (monto/líneas) antes de emitir; en edición se muestra el **máximo** = saldo pendiente. En el detalle de la factura padre: panel **Notas vinculadas**. Acciones (Editar / Emitir / NC / ND / Anular) van en el **encabezado** del detalle (venta y proveedor, obra y empresa). **No** hay NC/ND “desde cero” sin factura de referencia (crédito abierto = fuera de v1). Anular NC restaura el saldo. No anular la factura padre si hay NC/ND emitidas."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#210",

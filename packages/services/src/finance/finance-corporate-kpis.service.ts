@@ -27,6 +27,8 @@ import type { ServiceContext } from "../types";
 export type FinanceCorporateAlert = {
   variant: "info" | "warning";
   message: string;
+  sources?: { label: string; href: string }[];
+  context?: string;
 };
 
 /** Shared alert shape for hub and transacciones panels. */
@@ -287,12 +289,19 @@ export async function buildFinanceProjection(
         pushUniqueFinanceAlert(alerts, {
           variant: "warning",
           message: `Saldo de caja negativo en ${row.currency} (${fmtDecimalEs(row.cashBalance, row.currency)}).`,
+          context: "Saldo consolidado de las cuentas de tesorería de la organización, por moneda. Revisá las cuentas y sus movimientos antes de registrar un ajuste.",
+          sources: access.canTreasury ? [{ label: "Revisar cuentas y movimientos", href: "/tesoreria/cuentas" }] : [],
         });
       }
       if (row.isNegative) {
         pushUniqueFinanceAlert(alerts, {
           variant: "warning",
-          message: `Saldo proyectado negativo en ${row.currency} (${fmtDecimalEs(row.projectedBalance, row.currency)}) dentro de los próximos 90 días según C×P corporativas pendientes.`,
+          message: `${projection.moduleWarnings.length ? "Proyección parcial: saldo" : "Saldo"} proyectado negativo en ${row.currency} (${fmtDecimalEs(row.projectedBalance, row.currency)}) dentro de los próximos 90 días según C×P corporativas pendientes.`,
+          context: `Período ${projection.dateFrom} a ${projection.dateTo}. Combina caja de la organización con C×P corporativas del alcance activo; no incluye cobranzas futuras ni obligaciones de obras. No es el saldo bancario actual.${projection.moduleWarnings.length ? ` Fuentes incompletas: ${projection.moduleWarnings.join(" ")}` : ""}`,
+          sources: [
+            ...(access.canTreasury ? [{ label: "Revisar cuentas y movimientos", href: "/tesoreria/cuentas" }] : []),
+            ...(access.canAp ? [{ label: "Revisar obligaciones corporativas", href: CORPORATE_OBLIGATIONS_HREF }] : []),
+          ],
         });
       }
     }
