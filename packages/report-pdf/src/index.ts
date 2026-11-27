@@ -2,6 +2,7 @@ export * from "./report-pdf-export.service";
 export * from "./operational-list-pdf-export.service";
 export * from "./purchase-order-pdf-export.service";
 export * from "./field-pending-pdf-export.service";
+export * from "./document-delivery-pdf-export.service";
 export * from "./report-email.service";
 export * from "./scheduled-report-pdf-attachments";
 export * from "./branding/pdf-branding.service";

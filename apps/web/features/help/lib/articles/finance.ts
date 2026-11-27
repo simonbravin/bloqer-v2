@@ -411,6 +411,33 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
 
 export const AP_ARTICLES: HelpArticle[] = [
   {
+    slug: "comparar-atrasos-de-cobranza",
+    title: "Comparar atrasos de cobranza en la obra",
+    summary: "Compará el capital proyectado con un atraso hipotético en días corridos, por moneda y sin cambiar los saldos reales.",
+    intents: ["tablero-finanzas"], modules: ["finanzas"], level: "project",
+    typicalRoles: ["OWNER / ADMIN", "Finanzas", "PM"],
+    permissionHint: "Requiere acceso financiero a la obra y consulta de Cuentas por cobrar. Sin Cuentas por pagar, la comparación indica su alcance parcial.",
+    where: { menu: "Finanzas del proyecto → Flujo de caja → Proyección de caja" },
+    hrefs: [{ kind: "project", suffix: "/flujo-caja", label: "Flujo de caja de la obra" }],
+    steps: [
+      "Abrí Proyección de caja. Elegí Fecha de proyección de hoy o posterior; hoy se calcula con la zona horaria de la organización.",
+      "Activá Comparar atraso de cobranza y completá Atraso hipotético (días corridos). Los días son enteros no negativos; el límite técnico visible es 3650 días.",
+      "Para las CxC vencidas, el atraso empieza hoy. Para las futuras, empieza en su vencimiento. Se aplica a todas las CxC abiertas del alcance; cero días reproduce la base.",
+      "Presioná Aplicar. Compará Capital con atraso y Diferencia frente a la base. CxC desplazadas después de la fecha muestra qué importe y cuántos documentos quedan fuera de la fecha elegida.",
+      "Cambiar un campo deja los resultados anteriores visibles con Cambios sin aplicar hasta que presiones Aplicar. Limpiar quita la proyección y el atraso, conservando los otros filtros de Flujo de caja.",
+      "Ver CxC y Ver CxP abren las fuentes disponibles. Si una entrada es inválida, corregila y volvé a aplicar; el aviso conserva solamente la base.",
+    ],
+    effects: ["La comparación es de consulta: conserva pagos y cobros confirmados, no cambia vencimientos, documentos ni saldos y no guarda un escenario financiero."],
+    pitfalls: [
+      "Los saldos son los actuales, después de pagos y créditos. La base no reconstruye saldos históricos. No se mezclan monedas ni se agregan OC sin facturar.",
+      "Comparación parcial avisa que falta una fuente; no significa saldo cero. Sin Cuentas por cobrar, la comparación no está disponible.",
+      "El importe desplazado sigue siendo deuda; sólo queda después de la fecha simulada. La exportación de Flujo de caja corresponde a movimientos reales, no a este escenario.",
+    ],
+    relatedSlugs: ["cobrar-una-cxc-de-obra", "pagar-una-cuenta-por-pagar", "revisar-avisos-financieros"],
+    keywords: ["escenario de caja", "atraso de cobranza", "días corridos", "proyección de caja", "capital con atraso", "diferencia frente a la base", "cxc desplazadas", "comparación parcial"],
+    guideRef: "§14",
+  },
+  {
     slug: "revisar-avisos-financieros",
     title: "Revisar avisos de caja y proyección",
     summary: "Abrí las fuentes de una alerta y distinguí caja actual de una proyección con datos incompletos.",

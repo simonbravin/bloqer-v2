@@ -79,6 +79,8 @@ jobs:
           pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
           pnpm --filter @bloqer/services exec node --import tsx --test src/procurement/supplier-quote-invitation.live.test.ts
           pnpm --filter @bloqer/services exec node --import tsx --test src/reports/operational-reports-audit.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/schedule/schedule-audit.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/project-cash-flow/project-cash-position-scenario.live.test.ts
 
       - name: Restore rehearsal on disposable SQL and synthetic files
         env:

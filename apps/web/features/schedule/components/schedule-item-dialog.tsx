@@ -31,7 +31,7 @@ import { PROGRESS_DIMENSION_HINTS } from "../adapters/schedule-progress-values";
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
-import { ScheduleProcurementChips } from "./schedule-procurement-chips";
+import { ScheduleProcurementDetails } from "./schedule-procurement-details";
 import {
   addScheduleDependencyAction,
   copyProgressFromPhysicalAction,
@@ -678,8 +678,9 @@ export function ScheduleItemDialog({
                 <ScheduleHint hint="Pasá el mouse por cada valor. En el Gantt: relleno oscuro = Real, borde ámbar = Cert., barra roja = atrasado." />
               </div>
               <ScheduleProgressDimensions item={item} />
-              <ScheduleProcurementChips item={item} />
             </section>
+
+            <ScheduleProcurementDetails projectId={projectId} procurement={item.procurement} />
 
             {m && (
               <section className="space-y-2">

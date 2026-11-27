@@ -39,6 +39,7 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 - Comparativa plan vs físico ([`../06-reports/OPERATIONAL_REPORTS.md`](../06-reports/OPERATIONAL_REPORTS.md)).
 - El cronograma temporal funciona sin presupuesto aprobado; importación/vínculos/métricas EDT son opcionales (D-039). Sin una base autorizada, no se muestran comparaciones económicas ni se inventa moneda.
 - Exportación Gantt/PDF/Excel: límite técnico de **120 meses calendario inclusivos** en el rango efectivo, antes de generar ejes/hojas. Acotar fechas o exportar solo Tabla permite recuperar el flujo; no limita datos persistidos ni cambia reglas de avance.
+- **Abastecimiento (bloque G, 27/11/2026):** detalle de tarea en escritorio y celular con fechas D-104, renglones de OC abiertas y cantidades pedidas, recibidas y pendientes por unidad, con acceso a la OC. Las tarjetas de celular muestran las mismas fechas y advertencia. Una entrega sin fecha conserva sus cantidades con «Sin fecha». La última recepción puede ser parcial; no certifica que la tarea esté abastecida. Los PDF/Excel de **Tabla** o **Ambos** agregan una sección/hoja **Abastecimiento** con todas las líneas del alcance exportado, sin sumarlas ni recortarlas. Una OC puede repetirse en tareas que comparten EDT. **Exportar** en celular toma el cronograma completo (no los filtros de tarjetas) y permite acotarlo por fechas en el diálogo. Solo Gantt conserva su contenido temporal.
 
 ## 10. Reglas de negocio
 - **BR-SCH-001**: un proyecto tiene un único Schedule activo ([BR-SCH-001]).
@@ -48,6 +49,7 @@ Sin cronograma, el costo puede estar “al día” pero la obra retrasada — o 
 - **BR-SCH-005**: al confirmar recepción, completar hitos vinculados a la EDT recibida ([BR-SCH-005], [D-104]).
 - Altura visual = árbol de `ScheduleItem`, no el vínculo EDT ([D-103]).
 - Workspace: fecha prometida de OC y última recepción por EDT; chip de riesgo si la prometida es posterior al inicio de una tarea hermana ([D-104]).
+- Abastecimiento reutiliza esa lectura en escritorio, Field y exportación. Las cantidades pendientes son `max(quantity - receivedQuantity, 0)` por línea de OC `CONFIRMED`/`PARTIALLY_RECEIVED`, a cuatro decimales, como en el detalle canónico. Las recepciones de borrador/anuladas no aportan fecha. Solo se leen relaciones coherentes del tenant, empresa, obra y EDT autorizados; vínculos incompatibles se excluyen y se advierte que la información es parcial. Sin acceso a Presupuestos no se exponen las fuentes EDT. El permiso de solicitudes conserva las fechas D-104 ya autorizadas, pero las cantidades e IDs/enlaces de OC requieren `canViewProcurementProjectArea`; `pendingLines = null` identifica ese acceso restringido, nunca un cero comprobado. No se infiere stock, disponibilidad de materiales, puntualidad del proveedor ni se cambia la regla de completar hitos con recepción parcial D-104.
 - Métricas económicas opcionales: D-122 impide comparar fuentes de distinta moneda; las vistas y fechas temporales conservan su advertencia y disponibilidad. Consumos desconocidos siguen D-124, sin afectar las capas documentales independientes ni suponer costo cero.
 
 ## 11. Validaciones

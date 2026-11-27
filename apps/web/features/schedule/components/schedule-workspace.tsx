@@ -70,6 +70,7 @@ function toFieldItem(
     predecessorNames: item.predecessorIds
       .map((id) => all.find((row) => row.id === id)?.name)
       .filter((name): name is string => Boolean(name)),
+    procurement: item.procurement,
   };
 }
 

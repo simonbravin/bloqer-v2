@@ -7,6 +7,7 @@ import {
   getProjectCashFlowReport,
   getProjectCashProjectionReport,
   getProjectCashPositionProjection,
+  getProjectCashPositionProjectionContext,
   resolveProjectionAsOfDate,
   ServiceError,
 } from "@bloqer/services";
@@ -33,6 +34,7 @@ interface PageProps {
     period?: string;
     currency?: string;
     projectionDate?: string;
+    projectionCollectionDelayDays?: string;
   }>;
 }
 
@@ -98,14 +100,13 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     : { currency: sp.currency };
 
   const projectionActive = Boolean(sp.projectionDate);
-  const appliedProjectionDate = resolveProjectionAsOfDate(sp.projectionDate);
 
   let report;
   let projection;
-  let positionProjection;
+  let positionResult;
 
   try {
-    [report, projection, positionProjection] = await Promise.all([
+    [report, projection, positionResult] = await Promise.all([
       getProjectCashFlowReport(
         id,
         { dateFrom: sp.dateFrom, dateTo: sp.dateTo, period, currency: sp.currency },
@@ -115,10 +116,10 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
       projectionActive
         ? getProjectCashPositionProjection(
             id,
-            { asOfDate: sp.projectionDate, currency: sp.currency },
+            { asOfDate: sp.projectionDate, currency: sp.currency, collectionDelayDays: sp.projectionCollectionDelayDays },
             ctx,
           )
-        : Promise.resolve(null),
+        : getProjectCashPositionProjectionContext(id, ctx),
     ]);
   } catch (err) {
     if (err instanceof ServiceError && (err.code === "NOT_FOUND" || err.code === "FORBIDDEN")) notFound();
@@ -126,6 +127,9 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
     throw err;
   }
 
+  const positionProjection = positionResult.type === "REPORT" ? positionResult : null;
+  const projectionContext = positionResult.type === "REPORT" ? positionResult.context : positionResult;
+  const appliedProjectionDate = resolveProjectionAsOfDate(sp.projectionDate, projectionContext.today);
   const projectionByCurrency = new Map(projection.currencies.map((c) => [c.currency, c] as const));
   const actualByCurrency = new Map(report.currencies.map((c) => [c.currency, c] as const));
   const currencyKeys = [...new Set([...actualByCurrency.keys(), ...projectionByCurrency.keys()])];
@@ -163,6 +167,7 @@ export default async function FlujosDeCajaPage({ params, searchParams }: PagePro
         report={positionProjection}
         active={projectionActive}
         appliedAsOfDate={appliedProjectionDate}
+        context={projectionContext}
       />
 
       {cashCurrencies.length > 1 && (

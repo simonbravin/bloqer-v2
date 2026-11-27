@@ -15,11 +15,12 @@ export function ScheduleProcurementChips({
   const p = item.procurement;
   if (!p) return null;
   const hasAny =
-    p.expectedDeliveryDate || p.latestReceiptDate || p.deliveryAfterSiblingStart;
+    p.expectedDeliveryDate || p.latestReceiptDate || p.deliveryAfterSiblingStart || (p.pendingLines?.length ?? 0) > 0 || p.incompleteSources;
   if (!hasAny) return null;
 
   return (
     <div className={className ?? "flex flex-wrap items-center gap-1"}>
+      {p.incompleteSources ? <Badge variant="outline" className="text-xs text-amber-800 dark:text-amber-300">Abastecimiento parcial: revisar vínculos</Badge> : null}
       {p.expectedDeliveryDate ? (
         <Badge
           variant="outline"
@@ -35,7 +36,7 @@ export function ScheduleProcurementChips({
           className="text-[10px] px-1 py-0 font-normal text-emerald-700 dark:text-emerald-400"
           title="Última recepción confirmada"
         >
-          Recibido {formatDateAr(p.latestReceiptDate)}
+          Última recepción {formatDateAr(p.latestReceiptDate)}
         </Badge>
       ) : null}
       {p.deliveryAfterSiblingStart ? (
@@ -45,6 +46,11 @@ export function ScheduleProcurementChips({
           title="La entrega prometida es posterior al inicio de una tarea hermana con la misma EDT"
         >
           Entrega después del inicio
+        </Badge>
+      ) : null}
+      {(p.pendingLines?.length ?? 0) > 0 ? (
+        <Badge variant="outline" className="text-xs font-normal">
+          {(p.pendingLines?.length ?? 0)} {(p.pendingLines?.length ?? 0) === 1 ? "renglón pendiente" : "renglones pendientes"}
         </Badge>
       ) : null}
     </div>

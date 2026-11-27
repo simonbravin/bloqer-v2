@@ -3,6 +3,7 @@ import { hash } from "bcryptjs";
 import type { PrismaClient } from "@prisma/client";
 import fs from "fs";
 import path from "path";
+import { seedDocsDeliveryIndexFixture } from "./seed-docs-delivery";
 
 /** Previous demo company PK (not a UUID). Remapped once by seedDocsGuideDataset. */
 const LEGACY_DEMO_COMPANY_ID = "seed-company-id";
@@ -2950,6 +2951,7 @@ export async function seedDocsGuideDataset(prisma: PrismaClient): Promise<void> 
   await seedJobsiteLog(prisma, seedCtx);
   await seedSecondDemoProject(prisma, seedCtx);
   await seedFieldPendingEntities(prisma, seedCtx);
+  await seedDocsDeliveryIndexFixture(prisma, { ...seedCtx, projectId: DOCS_GUIDE_IDS.projectId, companyId: company.id });
   await seedTenantInvitation(prisma, seedCtx);
 
   const idsPath = path.resolve(__dirname, "../../../docs/bloqer2.0/guides/docs-demo-ids.json");

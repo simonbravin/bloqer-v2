@@ -8,7 +8,7 @@ import {
   sortTreeOrder,
 } from "@bloqer/utils";
 import { canViewBudgetsArea } from "../project/project-nav-guards";
-import { requireProjectAccess, canViewProcurementCapability } from "../security/access";
+import { requireProjectAccess } from "../security/access";
 import { companyScopeFilter } from "../company-scope";
 import {
   getProjectCostControl,
@@ -35,11 +35,9 @@ import {
   ensureScheduleBaselineForProject,
 } from "./schedule.service";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
-import {
-  computeDeliveryAfterSiblingStart,
-  mergeProcurementDatesByWbs,
-  type ProcurementDateByWbs,
-} from "./schedule-milestone-from-receipt";
+import { computeDeliveryAfterSiblingStart } from "./schedule-milestone-from-receipt";
+import { loadScheduleProcurementByWbs } from "./schedule-procurement.service";
+import { mergeScheduleProcurement, type ScheduleItemProcurement } from "./schedule-procurement";
 
 export type ScheduleWorkspaceFilters = {
   budgetId?: string;
@@ -105,11 +103,7 @@ export type ScheduleWorkspaceItemDto = {
    * Purchase dates for linked WBS ([D-104]).
    * Null when there is nothing to show (no EDT, or no dates/risk).
    */
-  procurement: {
-    expectedDeliveryDate: string | null;
-    latestReceiptDate: string | null;
-    deliveryAfterSiblingStart: boolean;
-  } | null;
+  procurement: ScheduleItemProcurement | null;
 };
 
 /** Full active tree for placement / reorder UI (ignores URL filters). */
@@ -235,77 +229,6 @@ function mergeCategoryTotals(target: ScheduleCostByCategory, source: ScheduleCos
   for (const k of Object.keys(target) as (keyof ScheduleCostByCategory)[]) {
     target[k] = serializeMoney(addDecimal(target[k], source[k]));
   }
-}
-
-/** Batch PO expectedDelivery + confirmed receipt dates per WBS ([D-104]). */
-async function loadProcurementDatesByWbs(
-  projectId: string,
-  ctx: ServiceContext,
-  wbsNodeIds: string[],
-): Promise<Map<string, ProcurementDateByWbs>> {
-  const map = new Map<string, ProcurementDateByWbs>();
-  for (const id of wbsNodeIds) {
-    map.set(id, { expectedDeliveryDate: null, latestReceiptDate: null });
-  }
-  if (wbsNodeIds.length === 0) return map;
-
-  const poLines = await prisma.purchaseOrderLine.findMany({
-    where: {
-      wbsNodeId: { in: wbsNodeIds },
-      purchaseOrder: {
-        tenantId: ctx.tenantId,
-        projectId,
-        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
-        status: { in: ["CONFIRMED", "PARTIALLY_RECEIVED"] },
-        expectedDeliveryDate: { not: null },
-      },
-    },
-    select: {
-      wbsNodeId: true,
-      purchaseOrder: { select: { expectedDeliveryDate: true } },
-    },
-  });
-
-  for (const line of poLines) {
-    if (!line.wbsNodeId || !line.purchaseOrder.expectedDeliveryDate) continue;
-    const iso = formatDateOnly(line.purchaseOrder.expectedDeliveryDate);
-    if (!iso) continue;
-    const row = map.get(line.wbsNodeId);
-    if (!row) continue;
-    if (!row.expectedDeliveryDate || iso < row.expectedDeliveryDate) {
-      row.expectedDeliveryDate = iso;
-    }
-  }
-
-  const receiptLines = await prisma.purchaseReceiptLine.findMany({
-    where: {
-      purchaseOrderLine: { wbsNodeId: { in: wbsNodeIds } },
-      purchaseReceipt: {
-        tenantId: ctx.tenantId,
-        projectId,
-        ...(ctx.companyId ? { companyId: ctx.companyId } : {}),
-        status: "CONFIRMED",
-      },
-    },
-    select: {
-      purchaseOrderLine: { select: { wbsNodeId: true } },
-      purchaseReceipt: { select: { receiptDate: true } },
-    },
-  });
-
-  for (const line of receiptLines) {
-    const wbsId = line.purchaseOrderLine.wbsNodeId;
-    if (!wbsId) continue;
-    const iso = formatDateOnly(line.purchaseReceipt.receiptDate);
-    if (!iso) continue;
-    const row = map.get(wbsId);
-    if (!row) continue;
-    if (!row.latestReceiptDate || iso > row.latestReceiptDate) {
-      row.latestReceiptDate = iso;
-    }
-  }
-
-  return map;
 }
 
 export type ScheduleWorkspaceQueryTimings = {
@@ -617,10 +540,7 @@ export async function getProjectScheduleWorkspace(
   }
 
   const procurementWbsIds = [...new Set([...rollupWbsByItemId.values()].flat())];
-  const procurementByWbs =
-    gate.isEnabled("PROCUREMENT") && canViewProcurementCapability(ctx.roles)
-      ? await loadProcurementDatesByWbs(projectId, ctx, procurementWbsIds)
-      : new Map<string, ProcurementDateByWbs>();
+  const procurementByWbs = await loadScheduleProcurementByWbs(projectId, ctx, procurementWbsIds);
 
   const mapStarted = Date.now();
 
@@ -674,15 +594,7 @@ export async function getProjectScheduleWorkspace(
     }
 
     const wbsIds = wbsLinks.map((l) => l.wbsNodeId);
-    let procurement: ScheduleWorkspaceItemDto["procurement"] = null;
-    if (wbsIds.length > 0) {
-      const dates = mergeProcurementDatesByWbs(wbsIds, procurementByWbs);
-      procurement = {
-        expectedDeliveryDate: dates.expectedDeliveryDate,
-        latestReceiptDate: dates.latestReceiptDate,
-        deliveryAfterSiblingStart: false, // filled after all DTOs + full-tree risk inputs
-      };
-    }
+    const procurement = mergeScheduleProcurement(wbsIds, procurementByWbs);
 
     dtoItems.push({
       id: item.id,
@@ -745,7 +657,9 @@ export async function getProjectScheduleWorkspace(
     if (
       !dto.procurement.expectedDeliveryDate &&
       !dto.procurement.latestReceiptDate &&
-      !dto.procurement.deliveryAfterSiblingStart
+      !dto.procurement.deliveryAfterSiblingStart &&
+      (dto.procurement.pendingLines?.length ?? 0) === 0 &&
+      !dto.procurement.incompleteSources
     ) {
       dto.procurement = null;
     }

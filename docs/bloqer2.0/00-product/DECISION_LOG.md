@@ -2188,3 +2188,12 @@
 - Persistencia aditiva aprobada según ADR-021: `ProcurementQuoteInvitation` con tenant propio, alcance, hash, vencimiento/revocación, snapshot, respuesta inmutable y vínculo a la incorporación. Reintento idéntico no duplica respuesta ni cotización. No modificar cantidades, adjudicar, crear OC ni usar al emisor como actor externo.
 - La incorporación conserva el servicio canónico, clasificación D-118, FX manual, máximos y freeze. Sin nuevos servicios/dependencias, IA ni adjuntos externos en este corte. Capacidad apagada por defecto hasta piloto; la aprobación de diseño no acredita pruebas, migración ni activación.
 - Referencias: Q-097, ADR-021, `PURCHASE_REQUESTS.md`, `STATE_MACHINES.md`, `EVENTS_AND_AUTOMATIONS.md`, `TENANT_ISOLATION_MODEL.md`, `TECHNICAL_ERD.md`, Guía/Help y plan bloque 5/E2.
+
+## D-150 — Escenario de atraso de cobranzas en la proyección de obra
+
+- **Fecha:** 27/11/2026. **Estado:** APROBADA por el Owner en Q-098: «Desde hoy para las vencidas; desde el vencimiento para las futuras (recomendado)».
+- **Alcance:** comparar, en el panel de proyección puntual existente, el capital base con un escenario de atraso global de las CxC abiertas. El usuario ingresa días corridos; el escenario no se activa por abrir la pantalla. Su fecha hipotética de cobro es `max(fecha de vencimiento, hoy) + días`, con hoy según el calendario de la organización.
+- **Comparabilidad:** solo se simula para una fecha de proyección igual o posterior a hoy. Cero días reproduce la proyección base de ese alcance. Cada moneda se presenta por separado, usando los saldos pendientes actuales después de pagos y créditos; no se alteran montos, FX, CxP ni cobros/pagos confirmados. No es una reconstrucción histórica ni una probabilidad de cobro.
+- **Lectura:** base y escenario usan el mismo alcance autorizado y las mismas fuentes. Sin acceso a AR no hay simulación; una fuente AP no disponible conserva el aviso de comparación parcial. El resultado muestra los supuestos aplicados y las cobranzas que quedan después de la fecha elegida.
+- **Efectos:** consulta efímera, sin guardar escenarios, modificar vencimientos, emitir documentos, cobrar/pagar, enviar notificaciones, crear estados/tablas o ejecutar tools de escritura. No agrega servicios ni dependencias.
+- **Referencias:** Q-098, `CASHFLOW_PROJECTION.md`, fórmulas de tesorería, Guía, Help y plan bloque 6/F4. La publicación se acredita con el commit y los checks de su entrega.

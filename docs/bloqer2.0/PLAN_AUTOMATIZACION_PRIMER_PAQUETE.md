@@ -1,15 +1,17 @@
 # Plan de automatización — primer paquete
 
 > **Fecha de apertura:** 19/11/2026.  
-> **Estado:** primer paquete implementado; validación local en §§8–9 y cierre de compilación/verificación mediante CI. Piloto real sin activar. El resultado remoto corresponde al commit y a los checks de su entrega.  
+> **Estado al 27/11/2026:** F1–F3 y compras entregados; F4, G1 y H4 implementados en el corte final seleccionado (§25). Pilotos y diferidos se mantienen separados. La publicación se acredita con el merge y los checks de su entrega.
 > **Origen:** relevamiento «Bloqer: competencia, IA y automatización operativa», 19/11/2026: 40 oportunidades en 10 categorías.  
 > **Relación con otros planes:** complementa el [roadmap técnico](./08-architecture/IMPLEMENTATION_ROADMAP.md) y el [roadmap de Bloqer AI](./BLOQER_AI_ROADMAP.md). Sus etapas P0/P1a son lotes de esta iniciativa; no reemplazan las fases generales 0–5 ni las versiones V1–V4 de AI.
 
-**Seguimiento vigente:** [diez bloques y próximo corte (§12)](#12-seguimiento-de-los-diez-bloques--20112026). Por pedido del Owner, cada cierre de trabajo debe indicar qué se implementó, qué se comprobó, qué falta y los próximos pasos vinculados con los bloques A–J. Conservar estos diez bloques; no reemplazarlos por otra numeración ni confundirlos con las etapas P0/P1a/P1b/P1c.
+**Seguimiento vigente:** [diez bloques y próximo corte (§12)](#12-seguimiento-de-los-diez-bloques--27112026). Por pedido del Owner, cada cierre de trabajo debe indicar qué se implementó, qué se comprobó, qué falta y los próximos pasos vinculados con los bloques A–J. Conservar estos diez bloques; no reemplazarlos por otra numeración ni confundirlos con las etapas P0/P1a/P1b/P1c.
 
-Diseño técnico autorizado: [ADR-019 — lectura asistida efímera de comprobantes y documento individual de OC](./08-architecture/ARCHITECTURE_DECISION_RECORDS.md#adr-019--lectura-asistida-efímera-de-comprobantes-y-documento-individual-de-oc). Su alcance no autoriza deploy, nuevos proveedores, dependencias, persistencia ni reglas financieras.
+Diseño técnico del lote inicial: [ADR-019 — lectura asistida efímera de comprobantes y documento individual de OC](./08-architecture/ARCHITECTURE_DECISION_RECORDS.md#adr-019--lectura-asistida-efímera-de-comprobantes-y-documento-individual-de-oc). Las autorizaciones y entregas posteriores se registran en §§10–25; este ADR inicial no autoriza por sí solo nuevos proveedores, dependencias, persistencia ni reglas financieras.
 
 ## 1. Objetivo y alcance autorizado
+
+> Alcance inicial del 19/11/2026. Para el estado vigente y el cierre seleccionado, consultar §§12 y 25; los apartados históricos no sustituyen esas autorizaciones posteriores.
 
 El primer paquete busca reducir carga y seguimiento manual sobre circuitos existentes: preparar una factura de proveedor para revisión y disponer de una OC individual compartible. Antes de incorporar canales se revisan horarios, entrega de avisos, controles de IA, consultas y coherencia documental. La autorización permite trabajar en ese primer paquete y en sus condiciones previas; el resto de las 40 oportunidades queda visible como backlog para decidir por etapas.
 
@@ -106,50 +108,50 @@ El prototipo autorizado usa el proveedor IA actual; la validación de esta entre
 
 ## 4. Matriz completa de 40 oportunidades
 
-Los identificadores conservan la correspondencia con el relevamiento. **Etapa** expresa secuencia propuesta, no aprobación automática ni un cambio de prioridad del roadmap AI. **Por validar** significa alcance inicial en revisión/ejecución, sin afirmar implementación; **Backlog** significa que requiere un lote posterior. Cada cierre debe enlazar evidencia en §8.
+Los identificadores conservan la correspondencia con el relevamiento. **Etapa** expresa secuencia propuesta, no aprobación automática ni un cambio de prioridad del roadmap AI. La columna Estado se consolidó al 27/11/2026 con las entregas posteriores: implementado no acredita piloto ni activación. Las oportunidades no seleccionadas permanecen como backlog explícito; evidencia histórica en §§8–24 y cierre vigente en §25.
 
 | ID | Categoría | Oportunidad | Etapa / encaje en este paquete | Estado |
 |---|---|---|---|---|
-| A1 | Captura y revisión documental | Bandeja de ingreso por lote, progreso y recuperación | P1a: ingreso mínimo reutilizando uploader; bandeja durable común posterior | Por validar (mínimo) |
-| A2 | Captura y revisión documental | Factura, NC o ND a propuesta de carga | P1a alta manual `INVOICE` ARS; OC/NC/ND/FX posteriores | Implementado local; pruebas fake aprobadas; piloto real pendiente |
-| A3 | Captura y revisión documental | Remito a recepción propuesta | P2; controles de cantidad, unidad, depósito y stock | Backlog |
-| A4 | Captura y revisión documental | Escaneo y deduplicación entre canales | P1a solo archivo/foto legible; escáner, dedupe fiscal y cruce de canales posteriores | Backlog (capacidad completa) |
-| B1 | WhatsApp y comunicaciones operativas | OC individual compartible | P1a; documento y significado de compartir | Implementado y probado localmente; smoke navegador pendiente |
-| B2 | WhatsApp y comunicaciones operativas | Envío oficial trazable | P1b; identidad, consentimiento, canal y resultado | Backlog |
-| B3 | WhatsApp y comunicaciones operativas | Aprobación notificada con enlace autenticado | P1b; aprobar dentro del chat queda para diseño posterior | Backlog |
-| B4 | WhatsApp y comunicaciones operativas | Respuesta vinculada a la operación | P1b/P2; separar propuesta externa de cambio interno | Backlog |
-| C1 | Avisos relevantes y pendientes | Relevancia por responsabilidad y consecuencia | P0: preservar audiencias; priorización nueva posterior | Por validar (base) |
-| C2 | Avisos relevantes y pendientes | Resumen por rol | P0: horario ejecutable y digest actual; ampliar contenidos después | Por validar (base) |
-| C3 | Avisos relevantes y pendientes | Escalamiento y supresión | P0: verificar política/dedupe vigentes; agrupación nueva posterior | Por validar (base) |
-| C4 | Avisos relevantes y pendientes | Salud de comunicaciones | P0: significado real y errores; outbox/entrega durable pendientes | Por validar (parcial) |
-| D1 | Audio y asistente que prepara acciones | Audio a solicitud de compra | P1c; borrador primero, sin adjudicar ni aprobar | Backlog |
-| D2 | Audio y asistente que prepara acciones | Audio/fotos a parte diario | P1c/P2; revisar efectos de avance y consumo | Backlog |
-| D3 | Audio y asistente que prepara acciones | Asistente contextual | P0: consultas READ acotadas; asistencia contextual nueva posterior | Base de consultas probada con fixtures; capacidad completa en backlog |
-| D4 | Audio y asistente que prepara acciones | Confirmación vinculada al contenido | P1a: revisión en flujo autorizado; tools WRITE requieren diseño V3 | Por validar (límite del flujo) |
-| E1 | Compras y proveedores | Cotizaciones a la matriz existente | P2; unidades, vigencia, impuestos y clasificación D-118 | Backlog |
-| E2 | Compras y proveedores | Respuesta por enlace acotado | P2/P3; acceso externo revocable | Backlog |
-| E3 | Compras y proveedores | Desempeño real del proveedor | P2; datos comparables y cobertura visible | Backlog |
-| E4 | Compras y proveedores | Excepciones OC–recepción–factura | Preservar reglas vigentes; el OCR inicial no edita borradores OC | Backlog (nuevas excepciones) |
-| F1 | Dirección, finanzas y análisis | Brief de dirección con fuentes | P2; cifras, alcance, moneda y registros verificables | Backlog |
-| F2 | Dirección, finanzas y análisis | Conciliación asistida | P2; candidatos sobre importación existente y confirmación | Backlog |
-| F3 | Dirección, finanzas y análisis | Anomalías para revisar | P2; evidencia sin acusaciones ni corrección automática | Backlog |
-| F4 | Dirección, finanzas y análisis | Escenarios de caja | P2/P3; supuestos separados del saldo real | Backlog |
-| G1 | Obra, planificación y conectividad | Abastecimiento de próximas semanas | P2; extender vínculos de tareas y recepciones existentes | Backlog |
-| G2 | Obra, planificación y conectividad | Borradores offline acotados | P2; conflicto, dispositivo y revalidación | Backlog |
-| G3 | Obra, planificación y conectividad | Búsqueda documental con citas | P2/P3; permisos, versiones, página e índice propios | Backlog |
-| G4 | Obra, planificación y conectividad | Inspecciones y observaciones | P2/P3; dominio y evidencia de cierre por definir | Backlog |
-| H1 | Contratos, cliente y cierre de obra | RFI formal | P2/P3; Q-057/D-122 y módulo propio | Backlog |
-| H2 | Contratos, cliente y cierre de obra | Cambio de alcance respaldado | P2/P3; contrato, costo/plazo y aprobación separados | Backlog |
-| H3 | Contratos, cliente y cierre de obra | Portal de cliente/subcontratista | P2/P3; un público y permisos propios primero | Backlog |
-| H4 | Contratos, cliente y cierre de obra | Dossier de entrega y garantías | P2/P3; respaldo existente y faltantes explícitos | Backlog |
-| I1 | Integraciones, APIs y ecosistema | Email y conexiones documentales | Después del ingreso web validado; conectores con alcance acotado | Backlog |
-| I2 | Integraciones, APIs y ecosistema | API/webhooks con caso concreto | P3; contratos, credenciales y alcance por integración | Backlog |
-| I3 | Integraciones, APIs y ecosistema | MCP sobre el registry actual | P3 del relevamiento / V4 del roadmap AI | Backlog |
-| I4 | Integraciones, APIs y ecosistema | Fiscal, bancos y BIM por iniciativa | P3; cada integración con su caso y decisión | Backlog |
-| J1 | Confiabilidad, datos y adopción | Operación de IA/canales | P0: flags/controles vigentes; cuotas distribuidas e infraestructura pendientes | Por validar (parcial) |
-| J2 | Confiabilidad, datos y adopción | Datos maestros | P1a: resolver ambigüedad sin fusionar; limpieza integral posterior | Por validar (mínimo) |
-| J3 | Confiabilidad, datos y adopción | Adopción por rol | P1a; responsable del piloto, ayuda y tarea completa | Guía/Help actualizados; piloto pendiente |
-| J4 | Confiabilidad, datos y adopción | Evaluación y continuidad manual | P0/P1a; permisos, fallos, recuperación y medición | Por validar |
+| A1 | Captura y revisión documental | Bandeja de ingreso por lote, progreso y recuperación | P1a: ingreso mínimo reutilizando uploader; bandeja durable común posterior | Ingreso unitario y recuperación de adjunto implementados; bandeja durable por lote no seleccionada |
+| A2 | Captura y revisión documental | Factura, NC o ND a propuesta de carga | P1a alta manual `INVOICE` ARS; OC/NC/ND/FX posteriores | Implementado e integrado; apagado por defecto, piloto real pendiente |
+| A3 | Captura y revisión documental | Remito a recepción propuesta | P2; controles de cantidad, unidad, depósito y stock | No seleccionado para el cierre; requiere definir recepción propuesta |
+| A4 | Captura y revisión documental | Escaneo y deduplicación entre canales | P1a solo archivo/foto legible; escáner, dedupe fiscal y cruce de canales posteriores | Captura de archivo/foto disponible; escáner y deduplicación entre canales no seleccionados |
+| B1 | WhatsApp y comunicaciones operativas | OC individual compartible | P1a; documento y significado de compartir | PDF y mensaje de OC implementados; piloto de compartir/entrega externa pendiente |
+| B2 | WhatsApp y comunicaciones operativas | Envío oficial trazable | P1b; identidad, consentimiento, canal y resultado | Pendiente canal oficial y sus condiciones; envío manual vigente |
+| B3 | WhatsApp y comunicaciones operativas | Aprobación notificada con enlace autenticado | P1b; aprobar dentro del chat queda para diseño posterior | Enlaces autenticados vigentes; nuevo canal oficial pendiente |
+| B4 | WhatsApp y comunicaciones operativas | Respuesta vinculada a la operación | P1b/P2; separar propuesta externa de cambio interno | Respuesta por WhatsApp no seleccionada; enlace acotado de proveedor se cubre en E2 |
+| C1 | Avisos relevantes y pendientes | Relevancia por responsabilidad y consecuencia | P0: preservar audiencias; priorización nueva posterior | Audiencias y controles existentes preservados; nueva priorización no seleccionada |
+| C2 | Avisos relevantes y pendientes | Resumen por rol | P0: horario ejecutable y digest actual; ampliar contenidos después | Resumen diario aprobado e implementado; comprobar recepción efectiva |
+| C3 | Avisos relevantes y pendientes | Escalamiento y supresión | P0: verificar política/dedupe vigentes; agrupación nueva posterior | Política y deduplicación existentes preservadas; agrupación nueva no seleccionada |
+| C4 | Avisos relevantes y pendientes | Salud de comunicaciones | P0: significado real y errores; outbox/entrega durable pendientes | Aceptación y errores visibles; entrega efectiva/outbox/recuperación durable pendientes |
+| D1 | Audio y asistente que prepara acciones | Audio a solicitud de compra | P1c; borrador primero, sin adjudicar ni aprobar | Implementado con revisión humana (D-148); apagado por defecto, piloto pendiente |
+| D2 | Audio y asistente que prepara acciones | Audio/fotos a parte diario | P1c/P2; revisar efectos de avance y consumo | Diferido al elegir solicitud de compra como primer flujo |
+| D3 | Audio y asistente que prepara acciones | Asistente contextual | P0: consultas READ acotadas; asistencia contextual nueva posterior | Consultas READ y aislamiento de conversación implementados; búsqueda privada completa no seleccionada |
+| D4 | Audio y asistente que prepara acciones | Confirmación vinculada al contenido | P1a: revisión en flujo autorizado; tools WRITE requieren diseño V3 | Revisión vinculada a contenido implementada en flujos asistidos; tools WRITE fuera del alcance |
+| E1 | Compras y proveedores | Cotizaciones a la matriz existente | P2; unidades, vigencia, impuestos y clasificación D-118 | Implementado en matriz existente; apagado por defecto, piloto IA pendiente |
+| E2 | Compras y proveedores | Respuesta por enlace acotado | P2/P3; acceso externo revocable | Implementado (D-149/ADR-021): enlace de siete días revocable; activación/piloto pendientes |
+| E3 | Compras y proveedores | Desempeño real del proveedor | P2; datos comparables y cobertura visible | Entregas y cobertura de datos implementadas; sin puntaje de puntualidad/calidad |
+| E4 | Compras y proveedores | Excepciones OC–recepción–factura | Preservar reglas vigentes; el OCR inicial no edita borradores OC | Seguimiento OC–recepción–facturación implementado; sin nuevas reglas financieras |
+| F1 | Dirección, finanzas y análisis | Brief de dirección con fuentes | P2; cifras, alcance, moneda y registros verificables | Resumen para decidir publicado (#37), con cifras y fuentes |
+| F2 | Dirección, finanzas y análisis | Conciliación asistida | P2; candidatos sobre importación existente y confirmación | Revisión de conciliación publicada (#39), con búsqueda/paginación y confirmación manual |
+| F3 | Dirección, finanzas y análisis | Anomalías para revisar | P2; evidencia sin acusaciones ni corrección automática | Avisos con evidencia publicados (#40); sin detector ni umbrales nuevos |
+| F4 | Dirección, finanzas y análisis | Escenarios de caja | P2/P3; supuestos separados del saldo real | Implementado: vencidas desde hoy y futuras desde vencimiento, Q-098/D-150; validación del corte en §25 |
+| G1 | Obra, planificación y conectividad | Abastecimiento de próximas semanas | P2; extender vínculos de tareas y recepciones existentes | Implementado: fechas, cantidades pendientes, advertencias en móvil y PDF/Excel; §25 |
+| G2 | Obra, planificación y conectividad | Borradores offline acotados | P2; conflicto, dispositivo y revalidación | No seleccionado para este cierre; requiere diseño de conflicto y revalidación |
+| G3 | Obra, planificación y conectividad | Búsqueda documental con citas | P2/P3; permisos, versiones, página e índice propios | No seleccionado para este cierre; ayuda AI no equivale a búsqueda de archivos privados |
+| G4 | Obra, planificación y conectividad | Inspecciones y observaciones | P2/P3; dominio y evidencia de cierre por definir | No seleccionado para este cierre; dominio y evidencia de cierre por definir |
+| H1 | Contratos, cliente y cierre de obra | RFI formal | P2/P3; Q-057/D-122 y módulo propio | No seleccionado para este cierre; conserva Q-057/D-122 |
+| H2 | Contratos, cliente y cierre de obra | Cambio de alcance respaldado | P2/P3; contrato, costo/plazo y aprobación separados | No seleccionado para este cierre; requiere contrato y aprobación propios |
+| H3 | Contratos, cliente y cierre de obra | Portal de cliente/subcontratista | P2/P3; un público y permisos propios primero | No seleccionado para este cierre; requiere público y permisos propios |
+| H4 | Contratos, cliente y cierre de obra | Dossier de entrega y garantías | P2/P3; respaldo existente y faltantes explícitos | Índice documental implementado (§25); garantías y cierre contractual completo fuera del alcance |
+| I1 | Integraciones, APIs y ecosistema | Email y conexiones documentales | Después del ingreso web validado; conectores con alcance acotado | Diferido por el Owner |
+| I2 | Integraciones, APIs y ecosistema | API/webhooks con caso concreto | P3; contratos, credenciales y alcance por integración | Diferido por el Owner |
+| I3 | Integraciones, APIs y ecosistema | MCP sobre el registry actual | P3 del relevamiento / V4 del roadmap AI | Diferido por el Owner |
+| I4 | Integraciones, APIs y ecosistema | Fiscal, bancos y BIM por iniciativa | P3; cada integración con su caso y decisión | Diferido por el Owner; cada integración requiere su decisión |
+| J1 | Confiabilidad, datos y adopción | Operación de IA/canales | P0: flags/controles vigentes; cuotas distribuidas e infraestructura pendientes | Flags y controles vigentes; cuotas distribuidas/canales nuevos pendientes |
+| J2 | Confiabilidad, datos y adopción | Datos maestros | P1a: resolver ambigüedad sin fusionar; limpieza integral posterior | Ambigüedad resuelta por revisión manual; limpieza integral no seleccionada |
+| J3 | Confiabilidad, datos y adopción | Adopción por rol | P1a; responsable del piloto, ayuda y tarea completa | Guía/Help actualizados con cada entrega; pilotos reales pendientes |
+| J4 | Confiabilidad, datos y adopción | Evaluación y continuidad manual | P0/P1a; permisos, fallos, recuperación y medición | Pruebas y restauración aislada disponibles; copia independiente y restauración real pendientes |
 
 ## 5. Invariantes del primer paquete
 
@@ -367,24 +369,24 @@ Para el piloto representativo siguen pendientes: entorno remoto comprobado, cuen
 
 El checkout local conserva la rama original y sus cambios porque `.git` es de solo lectura en este entorno. La integración remota preserva las entregas previas de `main`; no se hizo reset, limpieza ni sustitución de los cambios locales. P0 distribuido/outbox/Q-093/Q-094/Q-095 y P1b/P1c mantienen los límites y decisiones de §§3 y 7.
 
-## 12. Seguimiento de los diez bloques — 20/11/2026
+## 12. Seguimiento de los diez bloques — 27/11/2026
 
 Los diez bloques son las categorías A–J del relevamiento original, con cuatro oportunidades cada una (§4). Su estado describe esta iniciativa de automatización, no la ausencia de los módulos operativos que Bloqer ya tiene. La secuencia de entrega sigue siendo P0/P1a, después P1b/P1c y los lotes P2/P3.
 
-| # / bloque | Área original | Avance comprobado de esta iniciativa | Próximo paso sugerido |
+| # / bloque | Área original | Avance comprobado de esta iniciativa | Próximo paso |
 |---|---|---|---|
-| 1 / A | Captura y revisión documental | Factura normal ARS a propuesta revisable implementada e integrada; lectura apagada por defecto. Pruebas aisladas aprobadas; OCR real y guardado/adjunto del piloto pendientes | Comprobar entorno y ejecutar el piloto A2 completo; luego ampliar bandeja, remitos y deduplicación con sus decisiones |
-| 2 / B | WhatsApp y comunicaciones operativas | PDF individual de OC integrado; preparación/descarga autenticada aprobadas en CI en tres tamaños. Share real y entrega externa no acreditados | Cerrar B1 en piloto; luego diseñar B2/B3/B4 con número, consentimiento, plantillas y recuperación |
-| 3 / C | Avisos relevantes y pendientes | Horarios y significado de aceptación documentados; manejo de fallos del runner probado. Scheduler efectivo y recuperación durable pendientes | Verificar los cron desplegados y resolver Q-095/outbox antes de ampliar avisos |
-| 4 / D | Audio y asistente que prepara acciones | Consultas READ acotadas probadas; sin flujo nuevo de audio ni tools WRITE | P1c: elegir audio a SC o parte y mantener revisión/confirmación humana |
-| 5 / E | Compras y proveedores | Sin ampliaciones E1–E4 en este corte; los circuitos vigentes se preservan | P2: cotizaciones a matriz y excepciones sobre los contratos actuales |
-| 6 / F | Dirección, finanzas y análisis | Sin ampliaciones F1–F4 en este corte | P2: brief de dirección con cifras, alcance y fuentes verificables |
-| 7 / G | Obra, planificación y conectividad | Sin ampliaciones G1–G4 en este corte | P2: abastecimiento de próximas semanas; offline/búsqueda/inspecciones por lotes |
-| 8 / H | Contratos, cliente y cierre de obra | Sin ampliaciones H1–H4 en este corte | Definir RFI/cambio formal antes de implementar; luego portal/dossier con permisos propios |
-| 9 / I | Integraciones, APIs y ecosistema | GitHub/CI operativos. Conexión Vercel instalada; acceso a proyectos pendiente de autorización del equipo al inspeccionar. I1–I4 siguen en backlog | Resolver acceso de Vercel para el piloto; email/API/MCP/fiscal/bancos/BIM en iniciativas posteriores |
-| 10 / J | Confiabilidad, datos y adopción | Build, 2.955 pruebas y 18 casos de navegador aprobados; base descartable y credenciales efímeras en CI. Guía/Help disponibles | Medir calidad/costo/tiempo del piloto y cerrar sus límites operativos; cuotas distribuidas y datos maestros siguen separados |
+| 1 / A | Captura y revisión documental | Lectura asistida, versiones y recuperación implementadas; lectura apagada por defecto | Piloto real de documento → borrador → original, con medición de calidad |
+| 2 / B | WhatsApp y comunicaciones operativas | PDF y mensaje individual de OC disponibles; comunicación externa manual | Piloto de compartir; canal oficial pendiente de cuenta/número y condiciones |
+| 3 / C | Avisos relevantes y pendientes | Resumen diario y horarios corregidos; aceptación del proveedor diferenciada de entrega | Comprobar recepción efectiva y recuperación de fallos; outbox no cerrado |
+| 4 / D | Audio y asistente que prepara acciones | Audio → solicitud de compra implementado con revisión (D-148); contexto de chat aislado | Piloto y activación controlada; parte diario diferido |
+| 5 / E | Compras y proveedores | E1–E4 implementados: cotizaciones, enlaces, evidencia de entregas y seguimiento OC–recepción–factura | Pilotos/activación de lectura IA y enlaces; no se promete puntaje de proveedor |
+| 6 / F | Dirección, finanzas y análisis | F1 resumen con fuentes, F2 revisión de conciliación y F3 avisos publicados (#37/#39/#40); F4 implementado con Q-098/D-150 | Cierre del corte F4/G1/H4 según evidencia de su PR (§25); luego piloto de uso |
+| 7 / G | Obra, planificación y conectividad | G1 implementado: fechas, cantidades pendientes por línea, advertencias en móvil y exportación PDF/Excel | Cierre del corte (§25); offline, búsqueda privada e inspecciones no seleccionados |
+| 8 / H | Contratos, cliente y cierre de obra | H4 implementado: índice documental con autores, fechas, revisiones y originales registrados; CSV/Excel/PDF | Cierre del corte (§25); RFI, cambio formal, portal y garantías completas no seleccionados |
+| 9 / I | Integraciones, APIs y ecosistema | Diferido por indicación del Owner; GitHub/CI/Vercel existentes operativos | Mantener diferido; abrir cada integración por su caso de uso |
+| 10 / J | Confiabilidad, datos y adopción | Pruebas, SQL y restauración aislada disponibles; Guía/Help mantenidos | Pilotos, cuotas distribuidas, datos maestros y backup independiente/restauración real |
 
-### Evidencia disponible
+### Evidencia histórica — 20/11/2026
 
 - PR [#16](https://github.com/simonbravin/bloqer-v2/pull/16) integrado mediante `895cf09b`; PR [#18](https://github.com/simonbravin/bloqer-v2/pull/18) mediante `f12c5cdcf6cc0544ba2111975e6d772991766cff`.
 - [CI de #18](https://github.com/simonbravin/bloqer-v2/actions/runs/44663824009): migraciones desde base vacía y seed correctos, lint/tipos, 2.955 pruebas sin fallos/omitidas, índice AI de 623 chunks, build y nueve casos públicos más nueve autenticados. El job E2E de entorno externo quedó omitido por faltar sus secretos y no se cuenta entre los 18 ejecutados.
@@ -392,7 +394,7 @@ Los diez bloques son las categorías A–J del relevamiento original, con cuatro
 - Inspección del 20/11: la conexión Vercel lista el equipo `Simon's projects`, pero la consulta por ID del equipo devuelve cero proyectos; proyecto, alias y deployment responden 404. Se solicitó acceso del equipo mediante el mecanismo oficial de la conexión. No se modificaron flags, credenciales, DB ni datos operativos.
 - Se corrigió la documentación de R2: hay cuatro variables obligatorias y `R2_PUBLIC_URL` es opcional. Se documentaron los gates reales de lectura y el [preflight del piloto](./08-architecture/DEPLOYMENT_SMOKE_TEST.md#primer-paquete--preparación-del-piloto-documental), incluido el latch de producción que también alcanza a Preview con `NODE_ENV=production`.
 
-### Próximo corte concreto
+### Próximo corte propuesto en ese momento — 20/11/2026
 
 1. Confirmar acceso al proyecto Vercel existente, versión/alias y configuración efectiva de IA/R2 y cron, sin copiar secretos ni crear un proyecto alternativo.
 2. Registrar entorno, cuenta, empresa/obra, corpus y responsable del piloto; ejecutar el procedimiento de aceptación y medir la tarea completa. Estos datos aún no están acordados y no se sustituyen por fixtures de CI.
@@ -532,3 +534,27 @@ Verificación local: seis pruebas de fuentes/permisos/fallos y presentación com
 
 Después de este alcance F3 queda **F4** dentro de bloque 6 y los bloques **7/G** y **8/H**. F4 requiere definir supuestos de escenarios explícitos sobre la proyección existente; no hay plazo global defendible mientras 7/8 no estén delimitados. Integraciones, WhatsApp oficial, backup independiente y pilotos de IA/audio conservan sus pendientes; no se declaran finalizados por esta entrega. Las ideas descartadas del relevamiento no se convierten automáticamente en requisitos.
 
+
+## 25. Cierre seleccionado — 27/11/2026
+
+El Owner autorizó continuar las tres entregas sugeridas. El alcance queda delimitado: **F4** compara atraso hipotético de cobranzas sobre la proyección puntual existente; **G1** completa abastecimiento en el cronograma y Field; **H4** prepara un índice de los documentos autorizados de la obra. Las otras oportunidades de G/H permanecen visibles en §4 y no se convierten en requisitos automáticos.
+
+Baseline remoto comprobado: `main cc127ee7527437a58e1c49550bee121139d9f050` (PR #40). La copia de trabajo conservó exactamente sus 2.897 blobs antes de editar, contrastados con los SHA de GitHub. El checkout original `codex/pruebas` y sus 303 cambios previos se preservaron. Tres agentes revisaron los frentes, aplicando la documentación y los componentes existentes; la integración y verificación son comunes.
+
+| Entrega | Alcance concreto | Condición de cierre |
+|---|---|---|
+| F4 | Días de atraso global, comparación por moneda/fecha con capital base, escenario y cobranzas desplazadas. Sin cambiar vencimientos, importes, FX ni saldos reales. | Q-098 resuelta/D-150: vencidas desde hoy, futuras desde vencimiento; verificar permisos, fechas y saldos netos. |
+| G1 | Fechas prometidas/última recepción, cantidades por OC/renglón/unidad y advertencia D-104 en escritorio/celular y exportación. | Misma lectura autorizada y reglas de cantidades existentes, sin sumar unidades distintas ni equiparar última recepción con entrega completa. |
+| H4 | Índice paginado y CSV/Excel/PDF de archivos autorizados: autor, fecha/hora, estado, revisión anterior/siguiente y original registrado. | Aplicar alcance de cada entidad padre y ambos extremos de la revisión; no exportar URLs firmadas ni afirmar verificación física de bytes. |
+
+La Guía, Help y conocimiento AI describen el resultado implementado. La aceptación combina pruebas pertinentes, SQL descartable, lint/tipos, compilación y recorridos responsive en CI. Los resultados efectivos se registran al completar la entrega; esta selección no acredita pruebas ni publicación por sí misma. No incorpora dependencias, entidades persistidas, migraciones ni servicios externos.
+
+**Pendientes separados del desarrollo seleccionado:** pilotos reales de factura/audio/cotización/enlace externo y uso de compartir; entrega efectiva/recuperación de avisos; WhatsApp oficial; integraciones diferidas; cuotas distribuidas, datos maestros y backup independiente real. Las pruebas sintéticas no resuelven estos puntos y los flags existentes no se activan por publicar el código.
+
+**Implementación G1/H4:** lectura de abastecimiento compartida con control de OC separado del permiso a solicitudes; las fuentes incongruentes se identifican como parciales. Índice documental con 25 filas por página y exportación del alcance completo, originales/revisiones autorizados y metadatos históricos sin original identificados. Fixture documental mantenida para CI con 28 registros sintéticos sin bytes almacenados. Pruebas SQL de ambos frentes y recorridos en los tres tamaños acompañan la entrega; no se escriben datos de clientes.
+
+**Verificación local:** 92 casos distintos aprobados entre ayuda (31), documentos/abastecimiento/exportaciones (40), interacción del cronograma (10), render PDF (5) y cálculo de caja (6), además de lint de archivos afectados. Comprobación TypeScript de las fuentes aisladas con declaraciones instaladas aprobada; la comprobación canónica, SQL, build y navegador quedan en CI. Los intentos locales de PDF desde la raíz no tomaban el JSX del paquete; ejecutar con su configuración correcta aprobó los cinco casos. No se alteró el código para eludir esa comprobación.
+
+**F4 implementado con supuesto explícito:** el Owner resolvió Q-098 el 27/11/2026 y se registró D-150 antes de implementar el cálculo. Las vencidas parten de hoy y las futuras de su vencimiento; se compara para hoy o una fecha futura, sin cambiar registros. El panel conserva la base, indica fuentes parciales y requiere Aplicar para cambiar resultados; Limpiar descarta también borradores sin aplicar. Pruebas SQL mantenidas cubren aislamiento, roles, módulos, saldos netos, fechas y ausencia de mutaciones; el recorrido responsive cubre comparación, limpieza y entrada inválida. F4 se incorpora a la misma entrega de G1/H4. Tras publicar las tres capacidades quedarán los pilotos y diferidos descritos arriba, no otras oportunidades implícitamente aprobadas.
+
+**Registro de entrega:** los checks del PR de la rama `codex/competitive-close-f4-g1-h4-20261127` identifican el commit validado, las pruebas SQL/navegador y la compilación. El merge y su estado Vercel acreditan la publicación. No se da por aprobado un check pendiente ni se usa el piloto sintético como evidencia de uso real. Con ese cierre quedan **0 desarrollos pendientes de las tres entregas seleccionadas**, manteniendo los pilotos y diferidos explícitos de esta sección.

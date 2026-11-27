@@ -1,5 +1,5 @@
 import { Prisma, prisma } from "@bloqer/database";
-import { toIsoDateInTimeZone } from "@bloqer/utils";
+import { resolveDisplayTimeZone, toIsoDateInTimeZone } from "@bloqer/utils";
 import {
   assertTenantModuleEnabledWithGate,
   getTenantModuleGate,
@@ -13,7 +13,7 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { ServiceContext, ServiceError } from "../types";
 import { requireProjectAccess } from "../security/access";
 import { canViewProjectCashFlowReport } from "./project-cash-flow.service";
-import { computeProjectedCapital } from "./project-cash-position-projection-pure";
+import { computeDelayedReceivables, computeProjectedCapital, MAX_COLLECTION_DELAY_DAYS, parseCollectionDelayDays } from "./project-cash-position-projection-pure";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -24,14 +24,15 @@ function isValidIsoDate(value: string): boolean {
   return dt.getUTCFullYear() === y && dt.getUTCMonth() === m! - 1 && dt.getUTCDate() === d!;
 }
 
-export function resolveProjectionAsOfDate(value: string | undefined): string {
+export function resolveProjectionAsOfDate(value: string | undefined, today = toIsoDateInTimeZone()): string {
   if (value && isValidIsoDate(value)) return value;
-  return toIsoDateInTimeZone();
+  return today;
 }
 
 export type ProjectCashPositionProjectionFilters = {
   asOfDate?: string;
   currency?: string;
+  collectionDelayDays?: string | number;
 };
 
 export type ProjectCashPositionProjectionCurrency = {
@@ -43,6 +44,22 @@ export type ProjectCashPositionProjectionCurrency = {
   projectedCapital: string;
   receivableOpenCount: number;
   payableOpenCount: number;
+  scenario: {
+    receivablesDue: string;
+    projectedCapital: string;
+    capitalDifference: string;
+    deferredReceivables: string;
+    deferredReceivableCount: number;
+  } | null;
+};
+
+export type ProjectCashPositionProjectionContext = {
+  type: "CONTEXT";
+  today: string;
+  timeZone: string;
+  receivablesAvailable: boolean;
+  payablesAvailable: boolean;
+  maxCollectionDelayDays: number;
 };
 
 export type ProjectCashPositionProjectionReport = {
@@ -52,9 +69,36 @@ export type ProjectCashPositionProjectionReport = {
   currencies: ProjectCashPositionProjectionCurrency[];
   warnings: string[];
   sectionsExcluded: TenantModuleSectionExcludedWarning[];
+  context: ProjectCashPositionProjectionContext;
+  collectionDelayDays: number | null;
+  scenarioError: string | null;
 };
 
 const OPEN_OBLIGATION = ACTIVE_OBLIGATION_STATUSES;
+
+async function readProjectionContext(projectId: string, ctx: ServiceContext) {
+  if (!canViewProjectCashFlowReport(ctx.roles)) {
+    throw new ServiceError("FORBIDDEN", "Sin permisos para ver proyección de caja del proyecto");
+  }
+  await requireProjectAccess(projectId, ctx);
+  const gate = await getTenantModuleGate(ctx);
+  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
+  const tenant = await prisma.tenant.findFirst({ where: { id: ctx.tenantId }, select: { timezone: true } });
+  if (!tenant) throw new ServiceError("NOT_FOUND", "Organización no encontrada");
+  const timeZone = resolveDisplayTimeZone(tenant.timezone);
+  const context: ProjectCashPositionProjectionContext = {
+    type: "CONTEXT", today: toIsoDateInTimeZone(new Date(), timeZone), timeZone,
+    receivablesAvailable: gate.isEnabled("AR") && canViewArProjectArea(ctx.roles),
+    payablesAvailable: gate.isEnabled("AP") && canViewApProjectArea(ctx.roles),
+    maxCollectionDelayDays: MAX_COLLECTION_DELAY_DAYS,
+  };
+  return { gate, context };
+}
+
+/** Calendar and source availability for the collapsed panel; no financial rows are read. */
+export async function getProjectCashPositionProjectionContext(projectId: string, ctx: ServiceContext) {
+  return (await readProjectionContext(projectId, ctx)).context;
+}
 
 /**
  * Proyección puntual de caja del proyecto a una fecha:
@@ -65,16 +109,9 @@ export async function getProjectCashPositionProjection(
   filters: ProjectCashPositionProjectionFilters,
   ctx: ServiceContext,
 ): Promise<ProjectCashPositionProjectionReport> {
-  if (!canViewProjectCashFlowReport(ctx.roles)) {
-    throw new ServiceError("FORBIDDEN", "Sin permisos para ver proyección de caja del proyecto");
-  }
-
-  await requireProjectAccess(projectId, ctx);
-
-  const gate = await getTenantModuleGate(ctx);
-  assertTenantModuleEnabledWithGate(gate, "PROJECTS");
-  const includeAr = gate.isEnabled("AR") && canViewArProjectArea(ctx.roles);
-  const includeAp = gate.isEnabled("AP") && canViewApProjectArea(ctx.roles);
+  const { gate, context } = await readProjectionContext(projectId, ctx);
+  const includeAr = context.receivablesAvailable;
+  const includeAp = context.payablesAvailable;
 
   const warnings: string[] = [
     "Capital proyectado = cobros confirmados − pagos confirmados + saldo CxC actual − saldo CxP actual. Solo considera saldos con vencimiento hasta la fecha elegida y excluye OC sin facturar.",
@@ -98,8 +135,21 @@ export async function getProjectCashPositionProjection(
     warnings.push("Cuentas por pagar no disponible. La proyección incluye solo las fuentes visibles.");
   }
 
-  const asOfDate = resolveProjectionAsOfDate(filters.asOfDate);
+  const asOfDate = resolveProjectionAsOfDate(filters.asOfDate, context.today);
   const asOf = new Date(asOfDate);
+  let collectionDelayDays: number | null = null;
+  let scenarioError: string | null = null;
+  try {
+    collectionDelayDays = parseCollectionDelayDays(filters.collectionDelayDays);
+    if (collectionDelayDays !== null) {
+      if (!includeAr) throw new Error("La comparación requiere acceso a Cuentas por cobrar.");
+      if (filters.asOfDate && !isValidIsoDate(filters.asOfDate)) throw new Error("Elegí una fecha de proyección válida para comparar.");
+      if (asOfDate < context.today) throw new Error("La comparación requiere una fecha de proyección de hoy o posterior.");
+    }
+  } catch (error) {
+    collectionDelayDays = null;
+    scenarioError = error instanceof Error ? error.message : "No se pudo aplicar el escenario.";
+  }
 
   const [collections, payments, receivables, payables] = await Promise.all([
     includeAr
@@ -140,6 +190,7 @@ export async function getProjectCashPositionProjection(
           },
           select: {
             currency: true,
+            dueDate: true,
             originalAmount: true,
             paidAmount: true,
             creditedAmount: true,
@@ -208,6 +259,12 @@ export async function getProjectCashPositionProjection(
       receivablesDue,
       payablesDue,
     );
+    const delayed = collectionDelayDays === null ? null : computeDelayedReceivables(
+      receivables.filter((row) => row.currency === cur), asOfDate, context.today, collectionDelayDays,
+    );
+    const scenarioCapital = delayed === null ? null : computeProjectedCapital(
+      collectionsReceived, paymentsMade, delayed.included, payablesDue,
+    );
 
     currencyRows.push({
       currency: cur,
@@ -218,6 +275,13 @@ export async function getProjectCashPositionProjection(
       projectedCapital: serializeMoneyDecimal(projectedCapital),
       receivableOpenCount,
       payableOpenCount,
+      scenario: delayed && scenarioCapital ? {
+        receivablesDue: serializeMoneyDecimal(delayed.included),
+        projectedCapital: serializeMoneyDecimal(scenarioCapital),
+        capitalDifference: serializeMoneyDecimal(scenarioCapital.minus(projectedCapital)),
+        deferredReceivables: serializeMoneyDecimal(delayed.deferred),
+        deferredReceivableCount: delayed.deferredCount,
+      } : null,
     });
   }
 
@@ -236,6 +300,10 @@ export async function getProjectCashPositionProjection(
       projectedCapital: "0.00",
       receivableOpenCount: 0,
       payableOpenCount: 0,
+      scenario: collectionDelayDays === null ? null : {
+        receivablesDue: "0.00", projectedCapital: "0.00", capitalDifference: "0.00",
+        deferredReceivables: "0.00", deferredReceivableCount: 0,
+      },
     });
   }
 
@@ -246,5 +314,8 @@ export async function getProjectCashPositionProjection(
     currencies: currencyRows,
     warnings,
     sectionsExcluded,
+    context,
+    collectionDelayDays,
+    scenarioError,
   };
 }

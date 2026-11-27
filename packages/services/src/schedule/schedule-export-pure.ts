@@ -2,6 +2,7 @@
  * Pure helpers for cronograma PDF/XLSX export.
  * Date-only ISO (YYYY-MM-DD) is formatted as dd/MM/yyyy without TZ shift.
  */
+import type { ScheduleItemProcurement } from "./schedule-procurement";
 
 const MS_PER_DAY = 86_400_000;
 
@@ -564,4 +565,54 @@ export type ScheduleExportPayload = {
   summaryLine: string;
   rows: ScheduleExportRow[];
   gantt: ScheduleExportGantt | null;
+  procurementRows?: ScheduleProcurementExportRow[];
 };
+
+export type ScheduleProcurementExportRow = {
+  taskId: string;
+  lineId: string;
+  taskName: string;
+  wbsCode: string;
+  orderCode: string;
+  description: string;
+  taskExpectedDelivery: string;
+  expectedDelivery: string;
+  latestReceipt: string;
+  quantity: string;
+  receivedQuantity: string;
+  remainingQuantity: string;
+  unit: string;
+  warning: string;
+};
+
+/** The supplied task set is already filtered like the temporal export. */
+export function buildScheduleProcurementExportRows(
+  items: Array<{ id: string; name: string; procurement: ScheduleItemProcurement | null }>,
+): ScheduleProcurementExportRow[] {
+  return items.flatMap((item) => {
+    const p = item.procurement;
+    if (!p) return [];
+    const common = {
+      taskId: item.id, taskName: item.name,
+      taskExpectedDelivery: formatScheduleExportDate(p.expectedDeliveryDate),
+      latestReceipt: formatScheduleExportDate(p.latestReceiptDate),
+      warning: [p.deliveryAfterSiblingStart ? "Entrega posterior al inicio de tarea hermana" : null,
+        p.incompleteSources ? "Información parcial: vínculos inconsistentes" : null].filter(Boolean).join(". ") || "—",
+    };
+    if (!p.pendingLines?.length) return [{
+      ...common, lineId: "", wbsCode: "—", orderCode: "—",
+      description: p.pendingLines == null ? "Cantidades no disponibles: requiere consultar órdenes de compra"
+        : p.incompleteSources ? "No se pudieron comprobar todas las cantidades pendientes"
+          : "Sin cantidades pendientes en las OC abiertas de estas partidas",
+      expectedDelivery: "—", quantity: "—", receivedQuantity: "—", remainingQuantity: "—", unit: "—",
+    }];
+    return p.pendingLines.map((line) => ({
+      ...common, lineId: line.id, wbsCode: line.wbsCode, orderCode: line.purchaseOrderCode,
+      description: line.description,
+      expectedDelivery: formatScheduleExportDate(line.expectedDeliveryDate),
+      quantity: line.quantity.replace(".", ","),
+      receivedQuantity: line.receivedQuantity.replace(".", ","),
+      remainingQuantity: line.remainingQuantity.replace(".", ","), unit: line.unit,
+    }));
+  });
+}
