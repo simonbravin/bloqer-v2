@@ -5,7 +5,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import * as access from "./field-pending-access";
 import { assertOperationalExportLimit } from "../report-exports/operational-list-export-pure";
-import type { ServiceContext } from "../types";
+import { ServiceError, type ServiceContext } from "../types";
 
 const projectId = "00000000-0000-4000-8000-000000000010";
 const ctx: ServiceContext = { tenantId: "tenant-a", companyId: "company-a", actorUserId: "user-a", roles: ["WAREHOUSE"] };
@@ -19,6 +19,7 @@ function loadInbox(total = 123, denied = false) {
     project: { code: "PR-1", name: "Obra" }, supplierContact: { legalName: "Proveedor", fantasyName: null },
   }));
   const dependencies: Record<string, unknown> = {
+    "../types": { ServiceError },
     "@bloqer/database": { Prisma: {}, prisma: { purchaseOrder: {
       findMany: async (query: typeof queries[number]) => { queries.push(query); return rows.slice(0, query.take); },
       count: async (query: typeof queries[number]) => { queries.push(query); return total; },
@@ -75,4 +76,20 @@ test("count-only reads do not load details; inaccessible project fails before qu
 
 test("over-limit full read rejects instead of silently returning a partial export", async () => {
   await assert.rejects(loadInbox(10_001).api.getMyFieldPendingItems(ctx, { complete: true }), /Acotá los filtros/);
+});
+
+test("oversized inbox retains scoped actions with a warning while exports still reject", async () => {
+  const loaded = loadInbox(10_001);
+  const list = await loaded.api.getMyFieldPendingInbox(ctx, { projectId });
+  assert.equal(list.items.length, 80);
+  assert.equal(list.counts.total, 10_001);
+  assert.match(list.limitWarning!, /selección de pendientes/);
+  assert.ok(loaded.queries.every((query) => query.where.projectId === projectId && query.where.tenantId === ctx.tenantId && query.where.companyId === ctx.companyId));
+  await assert.rejects(loaded.api.getMyFieldPendingItems(ctx, { projectId, complete: true }), /Acotá los filtros/);
+  const normal = await loadInbox().api.getMyFieldPendingInbox(ctx, { projectId });
+  assert.equal(normal.items.length, 123);
+  assert.equal(normal.limitWarning, undefined);
+  const denied = loadInbox(123, true);
+  await assert.rejects(denied.api.getMyFieldPendingInbox(ctx, { projectId }), /Acceso revocado/);
+  assert.equal(denied.queries.length, 0);
 });

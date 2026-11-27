@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getMyFieldPendingItems,
+  getMyFieldPendingInbox,
   getProjectShellInfo,
   parseFieldPendingGroup,
   ServiceError,
@@ -40,7 +40,7 @@ export default async function ProyectoPendientesPage({ params, searchParams }: P
     throw err;
   }
 
-  const list = await getMyFieldPendingItems(ctx, { group, projectId, complete: true });
+  const list = await getMyFieldPendingInbox(ctx, { group, projectId });
 
   return (
     <PageShell variant="default" className="space-y-4">

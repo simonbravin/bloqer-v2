@@ -8,7 +8,7 @@ import {
 import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
-import type { ServiceContext } from "../types";
+import { ServiceError, type ServiceContext } from "../types";
 import { MAX_EXPORT_ROWS } from "../finance/pagination";
 import { assertOperationalExportLimit } from "../report-exports/operational-list-export-pure";
 import { companyScopeFilter } from "../company-scope";
@@ -83,6 +83,7 @@ export type FieldPendingList = {
   items: FieldPendingItem[];
   counts: FieldPendingCounts;
   queryMs: number;
+  limitWarning?: string;
 };
 
 export type FieldPendingFilters = {
@@ -863,5 +864,23 @@ export async function getMyFieldPendingItems(
 
   if (filters?.complete) assertOperationalExportLimit(items.length);
   return { items, counts, queryMs: Date.now() - started };
+}
+
+
+/** Preserve scope controls when the full inbox exceeds the export limit. */
+export async function getMyFieldPendingInbox(
+  ctx: ServiceContext,
+  filters?: FieldPendingFilters,
+): Promise<FieldPendingList> {
+  try {
+    return await getMyFieldPendingItems(ctx, { ...filters, complete: true });
+  } catch (error) {
+    if (!(error instanceof ServiceError) || error.code !== "CONFLICT") throw error;
+    const bounded = await getMyFieldPendingItems(ctx, filters);
+    return {
+      ...bounded,
+      limitWarning: "La consulta supera el límite de lectura completa. Mostramos una selección de pendientes; la búsqueda y los indicadores se aplican a esta selección. Elegí una obra o categoría para acotar la consulta. Las exportaciones que superen el límite se rechazan: no se descargan archivos incompletos.",
+    };
+  }
 }
 

@@ -1,12 +1,12 @@
 {
   "version": "2",
-  "generatedAt": "2026-11-27T13:47:51.143Z",
-  "sourceHash": "9773aa64658c0f0febcb9488131c36bcc57174893657b3bfeb8a8f49f2fbb391",
+  "generatedAt": "2026-11-27T13:57:58.935Z",
+  "sourceHash": "3ced3957c6cd58c32411b25326a69757f2b26f0092f67ac86076351510b1bb77",
   "sources": [
     {
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
-      "sha256": "d5b92246104835ba6a2763d4e0ffc675a4ca9fe6056bfacd88d23c1e3b857af3",
-      "bytes": 239967
+      "sha256": "e9658c1c7e27fc10f38b3201eb4a5dad0210352631ed8a352f05bcdff3bac630",
+      "bytes": 240168
     },
     {
       "path": "docs/bloqer2.0/00-product/GLOSSARY.md",
@@ -351,7 +351,7 @@
       "title": "Guía operativa — Bloqer v2",
       "path": "docs/bloqer2.0/GUIA_OPERATIVA_BLOQER_V2.md",
       "section": "1. Configuración inicial de la empresa (nivel empresa)",
-      "text": "fican generación y contexto. El PDF incluye todas las filas. Por encima de 10.000 acciones, se pide acotar por obra o tipo; no se entrega un archivo parcial. **Monto del documento no es saldo a pagar**: una OC puede aparecer como dos acciones (recibir y facturar); no sumes filas duplicadas ni monedas distintas como deuda."
+      "text": "fican generación y contexto. El PDF incluye todas las filas. Por encima de 10.000 acciones, la bandeja muestra una selección identificada con una advertencia y conserva los filtros para acotar por obra o tipo; la búsqueda y los indicadores se limitan a esa selección. Las exportaciones que exceden el límite se rechazan; no se entrega un archivo parcial. **Monto del documento no es saldo a pagar**: una OC puede aparecer como dos acciones (recibir y facturar); no sumes filas duplicadas ni monedas distintas como deuda."
     },
     {
       "id": "GUIA_OPERATIVA_BLOQER_V2.md#33",

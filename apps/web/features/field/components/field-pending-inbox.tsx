@@ -111,7 +111,7 @@ export function FieldPendingInbox({
     <div className="space-y-3" data-testid="field-pending-inbox" data-query-ms={list.queryMs}>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4">
         <div>
-          <p className="text-lg font-semibold tabular-nums">{list.items.length} pendientes</p>
+          <p className="text-lg font-semibold tabular-nums">{list.items.length} pendientes{list.limitWarning ? " cargados" : ""}</p>
           <p className="text-sm text-muted-foreground">{overdueCount} con indicador de vencimiento · {new Set(list.items.map((item) => item.projectId)).size} obras</p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -122,6 +122,7 @@ export function FieldPendingInbox({
         </div>
         <p className="w-full text-xs text-muted-foreground">Vista: todos los resultados filtrados, incluidas otras páginas y grupos plegados. Todos: sin filtros, dentro de la obra o empresa seleccionada.</p>
       </div>
+      {list.limitWarning && <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{list.limitWarning}</p>}
       <div className="flex flex-wrap gap-2">
         {FILTERS.map((filter) => {
           const active = (group ?? "todos") === filter.id;
