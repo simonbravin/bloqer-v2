@@ -1,3 +1,4 @@
+import { FinanceReviewAlerts } from "@/features/finance/components/finance-review-alerts";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import type { CompanyFinanceOperationsSummary, FinanceHubOverview } from "@bloqer/services";
@@ -102,23 +103,7 @@ export function FinanceHubView({
 
   return (
     <div className="space-y-8">
-      {overview.alerts.length > 0 ? (
-        <div className="space-y-2">
-          {overview.alerts.map((a, i) => (
-            <p
-              key={i}
-              role="note"
-              className={
-                a.variant === "warning"
-                  ? "rounded-md border border-destructive/35 bg-destructive/5 px-3 py-2 text-xs"
-                  : "rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground"
-              }
-            >
-              {a.message}
-            </p>
-          ))}
-        </div>
-      ) : null}
+      <FinanceReviewAlerts alerts={overview.alerts} />
 
       <FinanceManagementBriefPanel brief={overview.managementBrief} />
 
