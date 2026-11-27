@@ -14,6 +14,7 @@ import { TableScroll } from "@/components/ui/table-scroll";
 import { DashboardKpiCard } from "@/features/dashboard/dashboard-kpi-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { FinanceProjectionPanel } from "@/features/finance/components/finance-projection-panel";
+import { FinanceManagementBriefPanel } from "@/features/finance/components/finance-management-brief";
 import { formatDate } from "@/lib/format";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { Inbox } from "lucide-react";
@@ -118,6 +119,8 @@ export function FinanceHubView({
           ))}
         </div>
       ) : null}
+
+      <FinanceManagementBriefPanel brief={overview.managementBrief} />
 
       {overview.hubKpis.length > 0 ? (
         <KpiStatGrid title="Indicadores" columns={4}>

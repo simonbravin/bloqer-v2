@@ -36,6 +36,8 @@ export const AGING_AR_COMPANY_PROJECT_LABEL = "Empresa";
 
 export type AgingItem = {
   id: string;
+  /** Source company label for a cross-project / organization summary. */
+  companyName?: string;
   invoiceId: string;
   invoiceNumber: number;
   projectId: string | null;
@@ -177,7 +179,7 @@ export async function getReceivableAgingReport(
       ...(filters.currency  ? { currency:         filters.currency  } : {}),
     },
     include: {
-      company: { select: { id: true, tenantId: true } },
+      company: { select: { id: true, tenantId: true, name: true } },
       clientContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       salesInvoice: { select: { id: true, number: true, issueDate: true, tenantId: true, companyId: true, projectId: true, clientContactId: true, currency: true, totalAmount: true, documentKind: true, status: true } },
       project: { select: { id: true, tenantId: true, companyId: true, name: true } },
@@ -219,6 +221,7 @@ export async function getReceivableAgingReport(
 
     const item: AgingItem = {
       id:             r.id,
+      companyName:    r.company.name,
       invoiceId:      r.salesInvoice.id,
       invoiceNumber,
       projectId:      r.projectId,
@@ -288,7 +291,7 @@ export async function getPayableAgingReport(
       ...(filters.currency ? { currency: filters.currency } : {}),
     },
     include: {
-      company: { select: { id: true, tenantId: true } },
+      company: { select: { id: true, tenantId: true, name: true } },
       supplierContact: { select: { id: true, tenantId: true, legalName: true, fantasyName: true } },
       supplierInvoice: { select: { id: true, number: true, issueDate: true, tenantId: true, companyId: true, projectId: true, supplierContactId: true, currency: true, totalAmount: true, documentKind: true, status: true } },
       project: { select: { id: true, tenantId: true, companyId: true, name: true } },
@@ -330,6 +333,7 @@ export async function getPayableAgingReport(
 
     const item: AgingItem = {
       id:             p.id,
+      companyName:    p.company.name,
       invoiceId:      p.supplierInvoice.id,
       invoiceNumber,
       projectId:      p.projectId,

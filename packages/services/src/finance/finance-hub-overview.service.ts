@@ -24,6 +24,8 @@ import { canViewCompanyFinanceHub, canViewCompanyTreasury } from "./finance-acce
 import { canViewCompanyAp } from "../ap/ap-access";
 import { canViewCompanyAr } from "../ar/ar-access";
 import { isPositiveMoneyDecimal, serializeMoneyDecimal } from "./money-decimal";
+import { parseObligationAsOfDate } from "./obligation-date";
+import { buildFinanceManagementBrief, type FinanceManagementBrief } from "./finance-management-brief";
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -126,6 +128,7 @@ export type FinanceHubAlert = {
 };
 
 export type FinanceHubOverview = {
+  managementBrief: FinanceManagementBrief;
   arCard?: FinanceHubMoneyCard;
   apCard?: FinanceHubMoneyCard;
   treasuryCard?: FinanceHubTreasuryCard;
@@ -317,6 +320,7 @@ function pushUniqueHubAlert(alerts: FinanceHubAlert[], alert: FinanceHubAlert): 
  */
 export async function getFinanceHubOverview(ctx: ServiceContext): Promise<FinanceHubOverview> {
   const gate = await getTenantModuleGate(ctx);
+  const asOfDate = parseObligationAsOfDate().toISOString().slice(0, 10);
 
   const arMod    = gate.isEnabled("AR");
   const apMod    = gate.isEnabled("AP");
@@ -335,10 +339,10 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
     && ((arMod && arPerm) || (apMod && apPerm) || (trMod && trPerm) || (acctMod && acctPerm));
 
   const [arReport, apReport, apCorporateReport] = await Promise.all([
-    arMod && arPerm ? safeRun(() => getReceivableAgingReport({}, ctx)) : Promise.resolve(null),
-    apMod && apPerm ? safeRun(() => getPayableAgingReport({}, ctx)) : Promise.resolve(null),
+    arMod && arPerm ? safeRun(() => getReceivableAgingReport({ asOfDate }, ctx)) : Promise.resolve(null),
+    apMod && apPerm ? safeRun(() => getPayableAgingReport({ asOfDate }, ctx)) : Promise.resolve(null),
     apMod && apPerm
-      ? safeRun(() => getPayableAgingReport({ corporateOnly: true }, ctx))
+      ? safeRun(() => getPayableAgingReport({ corporateOnly: true, asOfDate }, ctx))
       : Promise.resolve(null),
   ]);
 
@@ -490,6 +494,7 @@ export async function getFinanceHubOverview(ctx: ServiceContext): Promise<Financ
   );
 
   return {
+    managementBrief: buildFinanceManagementBrief({ asOfDate, companyId: ctx.companyId, receivables: arReport, payables: apReport }),
     arCard,
     apCard,
     treasuryCard,

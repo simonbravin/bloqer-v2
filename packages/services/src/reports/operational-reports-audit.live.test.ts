@@ -14,6 +14,8 @@ import { getProjectSupplierReport } from "./project-supplier-report.service";
 import { getPurchaseOrderVarianceReport } from "./purchase-order-variance-report.service";
 import { getSubcontractVarianceReport } from "./subcontract-variance.service";
 import { getProjectProcurementFollowUp } from "../procurement/project-procurement-follow-up.service";
+import { getFinanceHubOverview } from "../finance/finance-hub-overview.service";
+import { parseObligationAsOfDate } from "../finance/obligation-date";
 
 const denied = (error: unknown) => error instanceof ServiceError && error.code === "FORBIDDEN";
 const invalid = (error: unknown) => error instanceof ServiceError && error.code === "VALIDATION";
@@ -209,6 +211,58 @@ describe("AG-12 operational reports on isolated SQL", {
       await prisma.supplierInvoice.delete({ where: { id: inconsistent.id } });
     }
     assert.deepEqual(await prisma.purchaseOrder.findMany({ where: { tenantId }, orderBy: { id: "asc" } }), beforeOrders);
+  });
+
+  it("F1 derives its brief from scoped obligations, preserves credits and marks disabled sources unavailable", async () => {
+    const today = parseObligationAsOfDate();
+    const created: { invoiceId: string; payableId: string }[] = [];
+    try {
+      for (const source of [
+        { companyId: companyA, projectId: shared, number: 1101, amount: "100", credited: "30", paid: "20", currency: "ARS" },
+        { companyId: companyA, projectId: null, number: 1102, amount: "12", credited: "0", paid: "0", currency: "USD" },
+        { companyId: companyB, projectId: shared, number: 1103, amount: "98765", credited: "0", paid: "0", currency: "ARS" },
+      ]) {
+        const invoice = await prisma.supplierInvoice.create({ data: {
+          tenantId, companyId: source.companyId, projectId: source.projectId, supplierContactId: supplierId,
+          number: source.number, currency: source.currency, subtotal: source.amount, totalAmount: source.amount,
+          issueDate: today, dueDate: today, status: "ISSUED",
+        } });
+        const payable = await prisma.payable.create({ data: {
+          tenantId, companyId: source.companyId, projectId: source.projectId, supplierContactId: supplierId,
+          supplierInvoiceId: invoice.id, currency: source.currency, originalAmount: source.amount,
+          paidAmount: source.paid, creditedAmount: source.credited, issueDate: today, dueDate: today, status: "OPEN",
+        } });
+        created.push({ invoiceId: invoice.id, payableId: payable.id });
+      }
+      const before = await prisma.payable.findMany({ where: { tenantId }, orderBy: { id: "asc" } });
+      const overview = await getFinanceHubOverview(admin);
+      const brief = overview.managementBrief;
+      assert.equal(brief.asOfDate, today.toISOString().slice(0, 10));
+      assert.equal(brief.payables.upcoming!.count, 2);
+      assert.deepEqual(brief.payables.upcoming!.totals, [{ currency: "ARS", amount: "50.00" }, { currency: "USD", amount: "12.00" }]);
+      assert.ok(brief.payables.upcoming!.items.every((item) => item.companyName === "Empresa A"));
+      assert.ok(brief.payables.upcoming!.items.some((item) => item.href === `/proyectos/${shared}/cuentas-por-pagar/${created[0]!.payableId}`));
+      assert.ok(brief.payables.upcoming!.items.some((item) => item.href === `/finanzas/cuentas-por-pagar/${created[1]!.payableId}`));
+      assert.ok(!JSON.stringify(brief).includes("98765"));
+      const global = (await getFinanceHubOverview({ ...admin, companyId: null })).managementBrief;
+      assert.equal(global.payables.upcoming!.count, 3);
+      assert.ok(global.payables.upcoming!.items.some((item) => item.companyName === "Empresa B"));
+      const restricted = await getFinanceHubOverview(ctx);
+      assert.equal(restricted.canSeeAnything, false);
+      assert.equal(restricted.managementBrief.payables.available, false);
+      assert.equal(restricted.managementBrief.payables.upcoming, null);
+      const setting = await prisma.tenantModuleSetting.create({ data: { tenantId, moduleKey: "AP", isEnabled: false } });
+      try {
+        const hiddenSource = (await getFinanceHubOverview(admin)).managementBrief;
+        assert.equal(hiddenSource.payables.available, false);
+        assert.equal(hiddenSource.payables.upcoming, null);
+        assert.equal(hiddenSource.receivables.available, true);
+      } finally { await prisma.tenantModuleSetting.delete({ where: { id: setting.id } }); }
+      assert.deepEqual(await prisma.payable.findMany({ where: { tenantId }, orderBy: { id: "asc" } }), before);
+    } finally {
+      await prisma.payable.deleteMany({ where: { id: { in: created.map((entry) => entry.payableId) } } });
+      await prisma.supplierInvoice.deleteMany({ where: { id: { in: created.map((entry) => entry.invoiceId) } } });
+    }
   });
 
   it("groups multi-project procurement by currency and intersects company and assigned projects", async () => {

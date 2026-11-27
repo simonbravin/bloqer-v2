@@ -19,3 +19,11 @@ Ocultar MN y KPIs sensibles según [`PERMISSIONS_MATRIX.md`](../00-product/PERMI
 
 ## Fase
 **Fase 1** layout base; drill-down avanzado **Fase 2**.
+
+## Resumen para decidir — bloque 6 / F1 (2026-11-27)
+
+En `/finanzas`, antes de los indicadores existentes, **Resumen para decidir** presenta **Por cobrar** y **Por pagar**, con grupos **Vencidos** y **Hoy y próximos 7 días**. Reutiliza los reportes de antigüedad AR/AP ya autorizados y cargados por el hub; no consulta otra fuente ni modifica obligaciones. El corte usa el mismo día calendario de producto para ambas fuentes. Hoy no es vencido y el extremo de siete días es inclusivo.
+
+Cada grupo informa la cantidad completa y el saldo abierto por moneda después de pagos/créditos, y muestra los primeros cinco documentos ordenados por vencimiento, con desempate por ID. La lista limitada no recorta los totales. Cada entrada identifica contraparte, empresa, obra o ámbito corporativo, número de comprobante, vencimiento y enlace a la obligación. La selección de empresa limita el alcance; el contexto global se identifica como organización/todas las empresas. El acceso financiero conserva D-056/D-111 y los guards de AR/AP; abrir el documento vuelve a comprobarlo.
+
+Una fuente deshabilitada/sin permiso no es saldo cero. No mezcla monedas, no interpreta deuda como caja, no incluye borradores y no recomienda ejecutar pagos. No es un pronóstico ni genera texto o decisiones mediante IA. Complementa los indicadores y la proyección existentes con documentos concretos para revisar. El rango mensual del gráfico no cambia este resumen actual.
