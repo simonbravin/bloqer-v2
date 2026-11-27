@@ -483,7 +483,7 @@ export const TREASURY_ARTICLES: HelpArticle[] = [
       caption: "Movimientos de caja y empareje del extracto hasta cerrar la sesión.",
     },
     relatedSlugs: ["ajuste-manual-de-caja", "cerrar-el-mes", "ver-movimientos-de-tesoreria"],
-    keywords: ["conciliacion", "extracto", "ofx", "banco", "coincidencias", "emparejar", "pendientes", "referencia", "par a confirmar"],
+    keywords: ["conciliacion", "extracto", "ofx", "banco", "coincidencias", "emparejar", "referencia", "par a confirmar"],
     guideRef: "§4.2",
   },
   {
