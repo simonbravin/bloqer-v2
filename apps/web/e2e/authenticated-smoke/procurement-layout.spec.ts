@@ -92,6 +92,31 @@ test("purchase follow-up exposes quantities and opens the original order at ever
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
+test("finance brief separates due windows and opens the source obligation at every viewport", async ({ page }, testInfo) => {
+  await page.goto("/finanzas");
+  const panel = page.getByRole("region", { name: "Resumen para decidir", exact: true });
+  await expect(panel).toBeVisible();
+  const receivables = panel.getByRole("region", { name: "Por cobrar", exact: true });
+  const overdue = receivables.getByRole("button", { name: /^Vencidos/ });
+  const upcoming = receivables.getByRole("button", { name: /^Hoy y próximos 7 días/ });
+  await upcoming.click();
+  await expect(upcoming).toHaveAttribute("aria-pressed", "true");
+  await expect(overdue).toHaveAttribute("aria-pressed", "false");
+  await overdue.click();
+  await expect(overdue).toHaveAttribute("aria-pressed", "true");
+  const source = receivables.getByRole("link").first();
+  await expect(source).toBeVisible();
+  await expect(source).toContainText("Comprobante n.º");
+  const href = await source.getAttribute("href");
+  expect(href).toMatch(/^\/(?:proyectos\/[^/]+|finanzas)\/cuentas-por-cobrar\//);
+  await expect(panel.getByRole("region", { name: "Por pagar", exact: true })).toBeVisible();
+  await captureLayout(page, testInfo, "finance-management-brief");
+  for (const button of await panel.getByRole("button").all()) expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await source.click();
+  await expect(page).toHaveURL(url => `${url.pathname}${url.search}` === href);
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
 test("purchase forms align controls and preserve long values in light and dark themes", async ({ page }, testInfo) => {
   for (const kind of ["solicitudes-compra", "ordenes-compra"] as const) {
     await page.goto(`${project}/${kind}/nueva`);

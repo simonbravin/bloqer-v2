@@ -411,6 +411,27 @@ export const SUBCONTRACT_AR_ARTICLES: HelpArticle[] = [
 
 export const AP_ARTICLES: HelpArticle[] = [
   {
+    slug: "resumen-financiero-para-decidir",
+    title: "Revisar qué cobrar y pagar desde Finanzas",
+    summary: "Resumen actual de vencimientos con saldos por moneda y acceso a las obligaciones originales.",
+    intents: ["tablero-finanzas", "pagar-cxp", "cobrar"], modules: ["finanzas"], level: "company",
+    typicalRoles: ["OWNER / ADMIN", "Finanzas"],
+    permissionHint: "Requiere acceso al tablero de Finanzas. Cada fuente y documento conserva sus permisos AR/AP.",
+    where: { menu: "Finanzas → Tablero → Resumen para decidir" },
+    hrefs: [{ kind: "company", path: "/finanzas", label: "Tablero de Finanzas" }],
+    steps: [
+      "Comprobá el alcance (empresa activa u organización) y la fecha del resumen.",
+      "En Por cobrar o Por pagar, elegí Vencidos o Hoy y próximos 7 días. Hoy no es vencido; el último día indicado está incluido.",
+      "Leé la cantidad y los saldos por moneda. Incluyen todo el grupo; la lista muestra los primeros cinco documentos por vencimiento.",
+      "Revisá contraparte, empresa y obra. Ver obligación abre la CxC/CxP original para continuar con los controles habituales.",
+    ],
+    effects: ["Reutiliza los saldos vigentes después de pagos y créditos; no modifica documentos ni ejecuta operaciones."],
+    pitfalls: ["No mezcles monedas ni confundas deuda con caja. No incluye facturas en borrador.", "Una fuente no disponible no es un saldo cero.", "Cambiar el rango mensual del gráfico no cambia este resumen actual."],
+    relatedSlugs: ["tablero-finanzas-tendencia", "cobrar-una-cxc-de-obra", "montos-y-decimales"],
+    keywords: ["resumen para decidir", "qué cobrar", "qué pagar", "vencidos", "próximos vencimientos", "siete días", "saldo pendiente", "fuentes", "empresa y obra"],
+    guideRef: "§12",
+  },
+  {
     slug: "pagar-un-sueldo",
     title: "Pagar un sueldo (registro de costo)",
     summary: "El caminito: empleado en Directorio → gasto → pagar ahora o dejar CxP. No es nómina.",
