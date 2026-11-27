@@ -1204,7 +1204,7 @@ describe(
 
       // Shared project does not make another company's OC visible.
       await prisma.project.update({ where: { id: projectId }, data: { companyId: null } });
-      await prisma.purchaseOrder.create({ data: { tenantId, companyId: otherCompanyId, projectId, supplierContactId: contactId, number: 9, issueDate: new Date("2026-11-01"), status: "CONFIRMED", lines: { create: { wbsNodeId: wbsId, description: "Foreign company", quantity: 999, unitPrice: 1 } } } });
+      await prisma.purchaseOrder.create({ data: { tenantId, companyId: otherCompanyId, projectId, supplierContactId: contactId, number: 9, issueDate: new Date("2026-11-01"), status: "CONFIRMED", lines: { create: { wbsNodeId: wbsId, description: "Foreign company", quantity: 999, unitPrice: 1, lineSubtotal: 999, lineTotal: 999 } } } });
       const scoped = await loadScheduleProcurementByWbs(projectId, { ...ctx }, [wbsId]);
       assert.equal(scoped.get(wbsId)!.pendingLines!.length, 1);
       await prisma.purchaseReceipt.create({ data: {
