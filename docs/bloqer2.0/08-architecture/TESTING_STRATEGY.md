@@ -59,6 +59,12 @@ El job `quality` ejecuta también `ai:check-docs-index`, el build de web directo
 
 El CI público no necesita credenciales de usuarios ni habilita el piloto IA. Un job autenticado omitido por falta de secrets no cuenta como aprobado. El build remoto verifica el commit de su corrida; no demuestra que se reparó el permiso de Windows. Este refuerzo de pruebas no cambia flujos visibles, permisos o reglas: **sin impacto documental/AI** en Guía, Help, tools y conocimiento funcional.
 
+### Presupuesto de la suite autenticada aislada
+
+`apps/web/playwright-authenticated.config.ts` comparte servidor base y proyectos de navegador con el smoke público, pero define un **presupuesto global propio de 10 minutos**. El público conserva sus 5 minutos para sus recorridos sin sesión; la suite autenticada incorpora inicio de sesión y flujos con Postgres descartable en escritorio, tablet y teléfono. Heredar el límite global del público podía interrumpir casos sanos cuando la suma de todos los recorridos superaba 300 segundos.
+
+Se mantienen **60 segundos por prueba**, **un worker**, **cero reintentos**, los tres tamaños y todos los casos. El límite global limita la duración acumulada de la suite; no amplía el tiempo permitido a una operación ni convierte pruebas omitidas o sin ejecutar en aprobadas. Ante una nueva interrupción, revisar duración por caso y crecimiento de cobertura antes de modificar este presupuesto. El job conserva además su límite independiente de CI. Validar carga y descubrimiento con `playwright test --config=playwright-authenticated.config.ts --list`, usando únicamente las credenciales sintéticas exigidas por el guard, y validar ejecución real en el job con Postgres descartable.
+
 ## Regresión reutilizable de identidad y acceso — AG-01
 
 `pnpm test` incluye ahora las regresiones de `@bloqer/auth`. Services ejecuta tanto `src/**/*.test.ts` como `src/**/*.test.mts`; los archivos `.mts` de autenticación usan la condición Node `react-server` por el marcador `server-only`. Las suites live se omiten sin activación explícita y no leen `.env` como fallback para decidir dónde escribir.
