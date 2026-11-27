@@ -316,6 +316,7 @@ export * from "./scheduled-reports/scheduled-report-cron.service";
 export * from "./scheduled-reports/scheduled-report-execution.service";
 export * from "./field/field-pending-access";
 export * from "./field/field-pending.service";
+export * from "./field/field-pending-export.service";
 export * from "./field/field-home.service";
 export * from "./ai";
 export * from "./procurement/purchase-order-document.service";
@@ -324,3 +325,4 @@ export type { SupplierInvoiceDocumentPreviewInput } from "./ap/supplier-invoice-
 export { purchaseRequestAudioAvailable, transcribePurchaseRequestAudio, previewPurchaseRequestTranscript } from "./procurement/purchase-request-audio.service";
 export { previewProcurementQuoteDocument, procurementQuoteDocumentAvailable, buildProcurementQuoteDocumentPreview } from "./procurement/procurement-quote-document.service";
 export * from "./procurement/supplier-quote-invitation.service";
+

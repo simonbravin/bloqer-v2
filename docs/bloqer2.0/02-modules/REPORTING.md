@@ -28,6 +28,7 @@ _No aplica._
 - Guardar favoritos / programar envío email (Fase 2).
 
 ## 9. Pantallas y vistas necesarias
+- **Pendientes** (empresa y obra, mejora solicitada el 27/11/2026): exportar CSV, Excel o PDF de todos los pendientes del alcance actual o de la vista filtrada, incluyendo todas sus páginas. Reutiliza las fuentes, permisos y reglas de la bandeja; no incorpora estados ni asignaciones. Búsqueda por documento, obra, descripción/proveedor y solicitante; filtro de vencidos; agrupación por etapa o por obra; orden operativo o antigüedad y vista compacta/detallada, con 25 acciones por página. El límite técnico de lectura completa es el mismo de las exportaciones operativas (10.000); se informa un error para acotar filtros si se excede, nunca se descarga un archivo parcial. PDF sin truncado de filas. Importes identificados como monto del documento, con moneda, sin sumarlos ni tratarlos como saldo a pagar.
 - Biblioteca de reportes por categoría.
 - **Avances del proyecto** (`/proyectos/[id]/reportes/avances`, R-002 / D-120): indicadores, plan y ejecución registrada, certificado, consumo del presupuesto de costo, cobranza, cobertura y pendientes con evidencia. Exportar CSV/Excel/PDF, enviar por email y programar mediante el registro existente.
 - **Proveedores de la obra** (`/proyectos/[id]/reportes/proveedores`, R-AP-03): líderes y tabla.
@@ -70,3 +71,4 @@ D-140: la entrega programada reutiliza el alcance de la configuración, la sesi�
 
 ## 19. Preguntas abiertas
 - UI query builder ([Q-010]).
+

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getMyFieldPendingItems, listFieldProjects, assertPreferredProjectAccess, parseFieldPendingGroup, ServiceError } from "@bloqer/services";
+import { getMyFieldPendingInbox, listFieldProjects, assertPreferredProjectAccess, parseFieldPendingGroup, ServiceError } from "@bloqer/services";
 import { getCurrentUser } from "@/lib/auth";
 import { buildTenantServiceContext } from "@/lib/tenant-service-context";
 import { PageShell } from "@/components/layout/page-shell";
@@ -43,7 +43,7 @@ export default async function PendientesPage({ searchParams }: PageProps) {
   const lastProjectId = isProjectIdValue(last) ? last : null;
 
   const [list, projects] = await Promise.all([
-    getMyFieldPendingItems(ctx, { group, projectId }),
+    getMyFieldPendingInbox(ctx, { group, projectId }),
     listFieldProjects(ctx).catch(() => []),
   ]);
 
@@ -57,6 +57,7 @@ export default async function PendientesPage({ searchParams }: PageProps) {
         </p>
       </div>
       <FieldPendingInbox
+        key={`${group ?? "all"}-${projectId ?? "all"}`}
         list={list}
         group={group}
         projectId={projectId}
@@ -66,3 +67,4 @@ export default async function PendientesPage({ searchParams }: PageProps) {
     </PageShell>
   );
 }
+

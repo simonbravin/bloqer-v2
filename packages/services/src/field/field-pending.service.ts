@@ -9,6 +9,8 @@ import { serializeMoneyDecimal } from "../finance/money-decimal";
 import { getTenantModuleGate } from "../tenant-modules/tenant-module.service";
 import { resolveUserDisplayNames } from "../user/resolve-user-display-names";
 import type { ServiceContext } from "../types";
+import { MAX_EXPORT_ROWS } from "../finance/pagination";
+import { assertOperationalExportLimit, OperationalExportLimitError } from "../report-exports/operational-list-export-pure";
 import { companyScopeFilter } from "../company-scope";
 import {
   FIELD_PENDING_GROUP_BY_SOURCE,
@@ -81,6 +83,7 @@ export type FieldPendingList = {
   items: FieldPendingItem[];
   counts: FieldPendingCounts;
   queryMs: number;
+  limitWarning?: string;
 };
 
 export type FieldPendingFilters = {
@@ -155,7 +158,7 @@ function hasUninvoicedReceipts(order: InvoiceCoverageOrder): boolean {
 }
 
 /** Apply the same coverage to the badge and the first page of eligible orders. */
-async function readPendingPurchaseOrderInvoices(where: Prisma.PurchaseOrderWhereInput, list: boolean) {
+async function readPendingPurchaseOrderInvoices(where: Prisma.PurchaseOrderWhereInput, list: boolean, limit = INBOX_LIMIT) {
   const orderBy = [{ createdAt: "asc" }, { id: "asc" }] as const;
   let after: string | undefined;
   let count = 0;
@@ -171,7 +174,7 @@ async function readPendingPurchaseOrderInvoices(where: Prisma.PurchaseOrderWhere
     for (const order of orders) {
       if (!hasUninvoicedReceipts(order)) continue;
       count++;
-      if (list && eligible.size < INBOX_LIMIT) eligible.set(order.id, order.supplierInvoices.length > 0);
+      if (list && eligible.size < limit) eligible.set(order.id, order.supplierInvoices.length > 0);
     }
     if (orders.length < INVOICE_COVERAGE_BATCH_SIZE) break;
     after = orders.at(-1)!.id;
@@ -215,7 +218,7 @@ export async function getMyFieldPendingCounts(
 
 export async function getMyFieldPendingItems(
   ctx: ServiceContext,
-  filters?: FieldPendingFilters & { countsOnly?: boolean },
+  filters?: FieldPendingFilters & { countsOnly?: boolean; complete?: boolean },
 ): Promise<FieldPendingList> {
   const started = Date.now();
   const gate = await getTenantModuleGate(ctx);
@@ -227,6 +230,8 @@ export async function getMyFieldPendingItems(
   const scope = await resolveAccessibleProjectScope(ctx);
   const groupFilter = filters?.group;
   const countsOnly = filters?.countsOnly === true;
+  // Full inbox/export reads must never silently retain the historical 80-per-source cap.
+  const limit = filters?.complete ? MAX_EXPORT_ROWS + 1 : INBOX_LIMIT;
 
   const activeSources = groupFilter
     ? sources.filter((s) => FIELD_PENDING_GROUP_BY_SOURCE[s] === groupFilter)
@@ -285,7 +290,7 @@ export async function getMyFieldPendingItems(
             lines: { some: { awardedPurchaseOrderId: null } },
           },
           orderBy: [{ submittedAt: "asc" }, { createdAt: "asc" }],
-          take: INBOX_LIMIT * 2,
+          take: limit,
           select: {
             id: true,
             number: true,
@@ -311,7 +316,7 @@ export async function getMyFieldPendingItems(
       ? prisma.purchaseOrder.findMany({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
           orderBy: { createdAt: "asc" },
-          take: INBOX_LIMIT,
+          take: limit,
           select: {
             id: true,
             number: true,
@@ -337,7 +342,7 @@ export async function getMyFieldPendingItems(
           where: { tenantId: ctx.tenantId, status: "APPROVED", ...projectWhere },
           // FIFO by approval time (not OC creation) so recently-approved old drafts don't starve.
           orderBy: [{ approvedAt: "asc" }, { createdAt: "asc" }],
-          take: INBOX_LIMIT,
+          take: limit,
           select: {
             id: true,
             number: true,
@@ -359,7 +364,7 @@ export async function getMyFieldPendingItems(
       ? prisma.purchaseOrder.findMany({
           where: poReceiptWhere,
           orderBy: [{ confirmedAt: "asc" }, { createdAt: "asc" }],
-          take: INBOX_LIMIT,
+          take: limit,
           select: {
             id: true,
             number: true,
@@ -383,7 +388,7 @@ export async function getMyFieldPendingItems(
       ? prisma.jobsiteLog.findMany({
           where: { tenantId: ctx.tenantId, status: "SUBMITTED", ...projectWhere },
           orderBy: { createdAt: "asc" },
-          take: INBOX_LIMIT,
+          take: limit,
           select: {
             id: true,
             title: true,
@@ -401,7 +406,7 @@ export async function getMyFieldPendingItems(
       ? prisma.certification.findMany({
           where: { tenantId: ctx.tenantId, status: "ISSUED", ...certificationProjectWhere },
           orderBy: { createdAt: "asc" },
-          take: INBOX_LIMIT,
+          take: limit,
           select: {
             id: true,
             number: true,
@@ -421,7 +426,7 @@ export async function getMyFieldPendingItems(
       ? prisma.subcontractCertification.findMany({
           where: { tenantId: ctx.tenantId, status: "ISSUED", ...projectWhere },
           orderBy: { createdAt: "asc" },
-          take: INBOX_LIMIT,
+          take: limit,
           select: {
             id: true,
             number: true,
@@ -465,7 +470,7 @@ export async function getMyFieldPendingItems(
     poConfirmListPromise,
     poReceiptListPromise,
     countPoInvoice
-      ? readPendingPurchaseOrderInvoices(poInvoiceWhere, runPoInvoice && !countsOnly)
+      ? readPendingPurchaseOrderInvoices(poInvoiceWhere, runPoInvoice && !countsOnly, limit)
       : Promise.resolve({ count: 0, items: [] }),
     logListPromise,
     certListPromise,
@@ -532,6 +537,13 @@ export async function getMyFieldPendingItems(
   if (countsOnly) {
     return { items: [], counts, queryMs: Date.now() - started };
   }
+  if (filters?.complete) {
+    const selectedTotal = groupFilter === "compras"
+      ? prCount + poCount + poConfirmCount + poReceiptCount + pendingInvoiceOrders.count
+      : groupFilter === "obra" ? logCount
+      : groupFilter === "certificaciones" ? certCount + subCertCount : counts.total;
+    assertOperationalExportLimit(selectedTotal);
+  }
   const posInvoice = pendingInvoiceOrders.items;
 
   const actorIds: Array<string | null> = [];
@@ -567,7 +579,7 @@ export async function getMyFieldPendingItems(
         // Fully awarded SC leave pendientes — follow-through is on the N OCs ([BR-PUR-024]).
         return !(total > 0 && awarded === total);
       })
-      .slice(0, INBOX_LIMIT);
+      .slice(0, limit);
 
     for (const row of openPrs) {
       const occurredAt = row.submittedAt ?? row.createdAt;
@@ -850,5 +862,25 @@ export async function getMyFieldPendingItems(
     return a.occurredAt.getTime() - b.occurredAt.getTime();
   });
 
+  if (filters?.complete) assertOperationalExportLimit(items.length);
   return { items, counts, queryMs: Date.now() - started };
 }
+
+
+/** Preserve scope controls when the full inbox exceeds the export limit. */
+export async function getMyFieldPendingInbox(
+  ctx: ServiceContext,
+  filters?: FieldPendingFilters,
+): Promise<FieldPendingList> {
+  try {
+    return await getMyFieldPendingItems(ctx, { ...filters, complete: true });
+  } catch (error) {
+    if (!(error instanceof OperationalExportLimitError)) throw error;
+    const bounded = await getMyFieldPendingItems(ctx, filters);
+    return {
+      ...bounded,
+      limitWarning: "La consulta supera el límite de lectura completa. Mostramos una selección de pendientes; la búsqueda y los indicadores se aplican a esta selección. Elegí una obra o categoría para acotar la consulta. Las exportaciones que superen el límite se rechazan: no se descargan archivos incompletos.",
+    };
+  }
+}
+

@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import {
-  getMyFieldPendingItems,
+  getMyFieldPendingInbox,
   getProjectShellInfo,
   parseFieldPendingGroup,
   ServiceError,
@@ -40,7 +40,7 @@ export default async function ProyectoPendientesPage({ params, searchParams }: P
     throw err;
   }
 
-  const list = await getMyFieldPendingItems(ctx, { group, projectId });
+  const list = await getMyFieldPendingInbox(ctx, { group, projectId });
 
   return (
     <PageShell variant="default" className="space-y-4">
@@ -49,6 +49,7 @@ export default async function ProyectoPendientesPage({ params, searchParams }: P
         subtitle="Acciones de esta obra, en orden. Compras: SC → OC → confirmar → recibir → factura. No es el historial de notificaciones."
       />
       <FieldPendingInbox
+        key={`${group ?? "all"}-${projectId}`}
         list={list}
         group={group}
         projectId={projectId}
@@ -58,3 +59,4 @@ export default async function ProyectoPendientesPage({ params, searchParams }: P
     </PageShell>
   );
 }
+
