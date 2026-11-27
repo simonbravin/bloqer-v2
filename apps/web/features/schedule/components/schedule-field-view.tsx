@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { ScheduleFieldTaskCard } from "./schedule-field-task-card";
+import { ScheduleExportDialog } from "./schedule-export-dialog";
 
 const CHIPS: { id: ScheduleFieldFilterId; label: string }[] = [
   { id: "today", label: "Hoy" },
@@ -70,6 +71,9 @@ export function ScheduleFieldView({
       data-query-ms={queryMs}
       data-schedule-source="field"
     >
+      <div className="flex justify-end">
+        <ScheduleExportDialog projectId={workspace.projectId} filters={{}} defaultView="table" fullSchedule />
+      </div>
       <div className="grid grid-cols-4 gap-2" data-testid="schedule-field-kpis">
         <FieldKpi
           label="En curso"

@@ -829,6 +829,14 @@
 - **Alternativas:** (a) enlace limitado y revisión interna, con menor fricción y riesgo de reenvío explícito; (b) acceso con cuenta/identidad verificada, con alta y administración de usuarios externos y diseño adicional; (c) diferir E2 y conservar carga interna/lectura de archivo, avanzando E3.
 - **Aprobación solicitada:** opción (a), vencimiento de siete días, respuesta única con revisión interna y la migración aditiva descrita en ADR-021. No contratar servicios, enviar invitaciones reales ni activar el piloto por esta aprobación. Antes de migrar portal, aplicar el procedimiento de producción documentado y verificar el destino.
 
+### Q-098 — Fecha de referencia para cobranzas vencidas en escenarios de caja
+
+- **Fecha:** 27/11/2026. **Estado:** RESUELTA → D-150, por elección explícita del Owner.
+- **Alcance autorizado:** comparar la proyección puntual de obra con un atraso hipotético global de las CxC pendientes, sin modificar obligaciones, caja real ni vencimientos guardados. El Owner autorizó continuar las tres entregas propuestas (F4, abastecimiento G1 e índice documental H4).
+- **Definición aprobada:** «Desde hoy para las vencidas; desde el vencimiento para las futuras (recomendado)». El escenario desplaza cada cobranza pendiente desde el mayor entre hoy y su vencimiento, con el mismo número de días corridos. La proyección elegida debe ser hoy o futura para comparar ese escenario; la consulta base conserva su alcance existente.
+- **Límite:** sin probabilidades, cambios de importes/FX, nuevas tablas ni mutaciones financieras. La elección no autoriza corregir vencimientos reales ni ejecutar cobranzas.
+- **Seguimiento:** [plan, cierre seleccionado](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md#25-cierre-seleccionado--27112026).
+
 ## Cómo se resuelve una pregunta
 
 1. Discusión con Owner / equipo.

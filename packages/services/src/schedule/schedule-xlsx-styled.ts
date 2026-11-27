@@ -341,6 +341,25 @@ function tableSheet(payload: ScheduleExportPayload, styles: StyleBook): string {
   });
 }
 
+function procurementSheet(payload: ScheduleExportPayload, styles: StyleBook): { xml: string; headerRow: number } {
+  const pre = preambleRows(payload, [["Alcance", "OC abiertas por EDT. Última recepción de las EDT vinculadas a la tarea; puede ser parcial. Una misma OC puede aparecer en varias tareas. No sumar unidades ni renglones repetidos."]]);
+  const { xml: preXml, nextRow: headerRow } = writePreambleXml(pre, styles.label);
+  const headers = ["Tarea", "EDT", "OC", "Descripción", "Entrega más próxima de la tarea", "Entrega prevista OC", "Última recepción EDT de la tarea", "Pedido", "Recibido", "Pendiente", "Unidad", "Advertencia"];
+  const head = headers.map((h, i) => inlineStr(`${colLetter(i)}${headerRow}`, h, styles.header)).join("");
+  const data = (payload.procurementRows ?? []).map((row, index) => {
+    const r = headerRow + index + 1;
+    const values = [row.taskName, row.wbsCode, row.orderCode, row.description, row.taskExpectedDelivery, row.expectedDelivery, row.latestReceipt, row.quantity, row.receivedQuantity, row.remainingQuantity, row.unit, row.warning];
+    return `<row r="${r}">${values.map((value, i) => inlineStr(`${colLetter(i)}${r}`, value)).join("")}</row>`;
+  });
+  return { headerRow, xml: sheetXml({
+    freezeCol: 1, freezeRow: headerRow,
+    dimension: `A1:L${headerRow + Math.max(data.length, 1)}`,
+    cols: [35, 14, 14, 48, 22, 22, 22, 18, 18, 18, 14, 46],
+    rowsXml: `${preXml}<row r="${headerRow}">${head}</row>${data.join("")}`,
+    fitWidth: true, tabColor: "#d97706",
+  }) };
+}
+
 function dateOrDash(ref: string, iso: string | null, styles: StyleBook): string {
   const serial = excelSerialFromIsoDateOnly(iso);
   if (serial == null) return inlineStr(ref, "—");
@@ -471,6 +490,10 @@ export function buildStyledScheduleXlsx(payload: ScheduleExportPayload): Buffer 
   const sheets: Array<{ name: string; printTitles: string; xml: string }> = [];
   if (includeTable) {
     sheets.push({ name: "Tabla", printTitles: "Tabla!$1:$8", xml: tableSheet(payload, styles) });
+  }
+  if (includeTable && (payload.procurementRows?.length ?? 0) > 0) {
+    const supply = procurementSheet(payload, styles);
+    sheets.push({ name: "Abastecimiento", printTitles: `Abastecimiento!$${supply.headerRow}:$${supply.headerRow}`, xml: supply.xml });
   }
   if (includeGantt) {
     sheets.push({

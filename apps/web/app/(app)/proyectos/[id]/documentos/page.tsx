@@ -19,6 +19,7 @@ import {
   DocumentUploadDialog,
 } from "@/features/documents";
 import { PageShell } from "@/components/layout/page-shell";
+import { Button } from "@/components/ui/button";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -116,6 +117,9 @@ export default async function DocumentosPage({ params, searchParams }: PageProps
         subtitle={`${folderLabel} · ${docs.length} ${docs.length === 1 ? "documento" : "documentos"}`}
         actions={
           <>
+            <Button asChild variant="outline" className="min-h-11">
+              <a href={`/proyectos/${id}/documentos/indice-entrega`}>Índice de entrega</a>
+            </Button>
             <Suspense fallback={null}>
               <ListViewToggle storageKey={`documentos-${id}`} />
             </Suspense>

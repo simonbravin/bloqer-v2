@@ -163,3 +163,16 @@ test("SchedulePdfDocument renders temporal rows with an optional financial warni
   assert.ok(buffer.length > 500);
   assert.equal(buffer.subarray(0, 4).toString("utf8"), "%PDF");
 });
+
+test("SchedulePdfDocument paginates supply evidence with precise partial quantities and long labels", async () => {
+  const procurementRows = Array.from({ length: 45 }, (_, index) => ({
+    taskId: `task-${index}`, lineId: `line-${index}`, taskName: "Montaje de paneles y terminaciones de la obra",
+    wbsCode: "1.1", orderCode: `OC-${index}`, description: "Panel con descripción extensa para conservar su identificación en la entrega parcial",
+    taskExpectedDelivery: "30/11/2026", expectedDelivery: "—", latestReceipt: "20/11/2026",
+    quantity: "10,1234", receivedQuantity: "2,0001", remainingQuantity: "8,1233", unit: "m2",
+    warning: "Entrega posterior al inicio de tarea hermana",
+  }));
+  const buffer = await renderReportPdfToBuffer(<SchedulePdfDocument payload={{ ...payload, view: "table", procurementRows }} branding={branding} />);
+  assert.equal(buffer.subarray(0, 4).toString("utf8"), "%PDF");
+  assert.ok((buffer.toString("latin1").match(/\/Type \/Page\b/g)?.length ?? 0) > 3);
+});

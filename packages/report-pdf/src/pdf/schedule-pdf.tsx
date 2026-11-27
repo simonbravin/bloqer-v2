@@ -346,6 +346,39 @@ function GanttSection(props: { payload: ScheduleExportPayload; branding: PdfRepo
   );
 }
 
+function ProcurementSection({ payload, branding }: Props) {
+  const rows = payload.procurementRows ?? [];
+  if (rows.length === 0) return null;
+  const columns = [
+    { label: "Tarea / fechas de sus EDT", flex: 2.5 },
+    { label: "OC / EDT / insumo", flex: 2.5 },
+    { label: "Entrega OC", flex: 1 },
+    { label: "Pedido", flex: 0.9 },
+    { label: "Recibido", flex: 0.9 },
+    { label: "Pendiente", flex: 0.9 },
+    { label: "Unidad", flex: 0.8 },
+  ];
+  return (
+    <Page size="A4" orientation="landscape" style={PAGE} wrap>
+      <BrandHeader branding={branding} title="Cronograma — Abastecimiento" filterLine={payload.filterLine}
+        extra="OC abiertas por EDT. La última recepción puede ser parcial. Una misma OC puede aparecer en varias tareas; no sumar unidades ni renglones repetidos." />
+      <View style={reportPdfStyles.headerRow} fixed>
+        {columns.map((column) => <Text key={column.label} style={[reportPdfStyles.cell, { flex: column.flex, fontFamily: "Helvetica-Bold" }]}>{column.label}</Text>)}
+      </View>
+      {rows.map((row) => (
+        <View key={`${row.taskId}-${row.lineId}`} style={reportPdfStyles.row} wrap>
+          {[
+            `${row.taskName}\nEntrega más próxima: ${row.taskExpectedDelivery}\nÚltima recepción EDT: ${row.latestReceipt}${row.warning === "—" ? "" : `\n${row.warning}`}`,
+            `${row.orderCode} · EDT ${row.wbsCode}\n${row.description}`,
+            row.expectedDelivery, row.quantity, row.receivedQuantity, row.remainingQuantity, row.unit,
+          ].map((value, index) => <Text key={index} style={[reportPdfStyles.cell, { flex: columns[index]!.flex }]}>{value}</Text>)}
+        </View>
+      ))}
+      <PdfReportFooter branding={branding} />
+    </Page>
+  );
+}
+
 export function SchedulePdfDocument(props: Props) {
   const showTable = props.payload.view === "table" || props.payload.view === "both";
   const showGantt = props.payload.view === "gantt" || props.payload.view === "both";
@@ -366,6 +399,7 @@ export function SchedulePdfDocument(props: Props) {
             title="Cronograma — Tabla (avance y costos)"
             columns={COLS_METRICS}
           />
+          <ProcurementSection payload={props.payload} branding={props.branding} />
         </>
       ) : null}
       {showGantt ? <GanttSection payload={props.payload} branding={props.branding} /> : null}

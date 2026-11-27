@@ -938,7 +938,7 @@ export const CONCEPTS_REPORTS_ARTICLES: HelpArticle[] = [
       "Preguntá en lenguaje natural (ej. «¿Qué OC están pendientes?» o «¿Cómo creo una SC?»).",
       "Si estás dentro de una obra, el asistente usa ese contexto; si no, puede pedirte aclarar el proyecto.",
       "Usá los enlaces debajo de la respuesta para abrir pantallas respaldadas por los resultados autorizados de esa consulta.",
-      "El asistente usa los últimos mensajes en memoria. Si cambia tu cuenta, organización, empresa, permisos u obra (también al entrar o salir de una obra), cancela la respuesta en curso y empieza una conversación limpia. Volvé a abrir el chat para preguntar. Cambiar de sección dentro de la misma obra conserva el historial.",
+      "El asistente usa los últimos mensajes en memoria. Si cambia tu cuenta, organización, empresa, permisos u obra (también al entrar o salir de una obra), cancela la respuesta en curso y empieza una conversación limpia. Volvé a abrir el chat para preguntar. El historial se conserva al cambiar de sección dentro de la misma obra sin recargar la página. Al recargarla (por ejemplo, al aplicar una proyección de caja o recorrer el índice de entrega), el chat temporal se reinicia.",
       "En preguntas abiertas («¿cómo viene esta obra?») el asistente prioriza 3–5 insights con acciones y links; no enumera todos los KPIs.",
     ],
     effects: [

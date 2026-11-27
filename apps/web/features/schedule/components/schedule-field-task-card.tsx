@@ -6,6 +6,7 @@ import { formatDateRangeShortAr, formatDateShortAr } from "@/lib/gantt-date-form
 import { cn } from "@/lib/utils";
 import { primaryWbsLink, MILESTONE_COLOR, MILESTONE_DONE_COLOR, MILESTONE_LATE_COLOR } from "../adapters/schedule-view-types";
 import { FIELD_STATUS_LABELS, formatProgressPctLabel } from "../adapters/schedule-field-labels";
+import { ScheduleProcurementChips } from "./schedule-procurement-chips";
 
 function statusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "BLOCKED") return "destructive";
@@ -88,6 +89,7 @@ export function ScheduleFieldTaskCard({
           EDT {primary.wbsCode} · {primary.wbsName}
         </p>
       ) : null}
+      <ScheduleProcurementChips item={{ procurement: item.procurement ?? null }} className="mt-2 flex flex-wrap gap-2 [&_span]:text-xs" />
     </button>
   );
 }

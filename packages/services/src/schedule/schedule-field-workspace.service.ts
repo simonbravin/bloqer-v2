@@ -16,6 +16,9 @@ import {
 import { ensureScheduleForProject, findScheduleForProject } from "./schedule.service";
 import { serializeProgressPct } from "./schedule-progress-sync-pure";
 import { summarizeScheduleFieldKpis, type ScheduleFieldKpis } from "./schedule-field";
+import { computeDeliveryAfterSiblingStart } from "./schedule-milestone-from-receipt";
+import { loadScheduleProcurementByWbs } from "./schedule-procurement.service";
+import { mergeScheduleProcurement, type ScheduleItemProcurement } from "./schedule-procurement";
 
 export type ScheduleFieldWbsLinkDto = {
   wbsNodeId: string;
@@ -40,6 +43,7 @@ export type ScheduleFieldItemDto = {
   wbsLinks: ScheduleFieldWbsLinkDto[];
   predecessorIds: string[];
   predecessorNames: string[];
+  procurement?: ScheduleItemProcurement | null;
 };
 
 export type ScheduleFieldWorkspaceQueryTimings = {
@@ -145,6 +149,15 @@ export async function getProjectScheduleFieldWorkspace(
   });
   const itemsMs = Date.now() - t;
 
+  const procurementByWbs = await loadScheduleProcurementByWbs(
+    projectId, ctx, [...new Set(rows.flatMap((row) => row.wbsLinks.map((link) => link.wbsNodeId)))],
+  );
+  const expectedByWbs = new Map([...procurementByWbs].map(([id, row]) => [id, row.expectedDeliveryDate]));
+  const riskPeers = rows.map((row) => ({
+    id: row.id, parentId: row.parentId, type: row.type, status: row.status,
+    startDate: formatDateOnly(row.startDate), wbsNodeIds: row.wbsLinks.map((link) => link.wbsNodeId),
+  }));
+
   const mapStarted = Date.now();
   const nameById = new Map(rows.map((row) => [row.id, row.name]));
   const tree = rows.map((row) => ({
@@ -163,6 +176,13 @@ export async function getProjectScheduleFieldWorkspace(
     const startDate = former ? null : formatDateOnly(row.startDate);
     const endDate = former ? null : formatDateOnly(row.endDate);
     const predecessorIds = row.predecessors.map((p) => p.predecessorId);
+    const procurement = mergeScheduleProcurement(row.wbsLinks.map((link) => link.wbsNodeId), procurementByWbs);
+    if (procurement) {
+      procurement.deliveryAfterSiblingStart = computeDeliveryAfterSiblingStart(
+        { id: row.id, parentId: row.parentId, wbsNodeIds: row.wbsLinks.map((link) => link.wbsNodeId) },
+        riskPeers, (id) => isScheduleLeafItem(tree, id), expectedByWbs,
+      );
+    }
     items.push({
       id: row.id,
       parentId: row.parentId,
@@ -185,6 +205,7 @@ export async function getProjectScheduleFieldWorkspace(
       predecessorNames: predecessorIds
         .map((id) => nameById.get(id))
         .filter((name): name is string => Boolean(name)),
+      procurement,
     });
   }
 

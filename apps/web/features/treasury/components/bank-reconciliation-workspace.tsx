@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { formatMoneyAmount } from "@/lib/format-money";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
@@ -85,7 +84,6 @@ function ReconciliationPager({ page, total, pending, onPage }: { page: number; t
 }
 
 export function BankReconciliationWorkspace({ session, candidates, canEdit }: Props) {
-  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const { pending: isPending, run: runOperation, isBusy } = useOperationalAction({ onError: setError });
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
@@ -153,7 +151,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         setSelectedLineId(null);
         setSelectedMovementId(null);
         if (successToast) toast.success(successToast);
-        router.refresh();
+        // The server action revalidates this session and returns its updated view.
       }
     });
   }
@@ -202,7 +200,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         if (res.skippedDuplicates > 0) parts.push(`${res.skippedDuplicates} duplicadas`);
         const skipMsg = parts.length > 0 ? ` (${parts.join(", ")} omitidas)` : "";
         toast.success(`Importadas ${res.importedCount} líneas${skipMsg}. Sesión en progreso.`);
-        router.refresh();
+        // The server action revalidates this session and returns its updated view.
       } catch {
         setError("No se pudo leer el archivo CSV");
       }
@@ -233,7 +231,7 @@ export function BankReconciliationWorkspace({ session, candidates, canEdit }: Pr
         if (res.skippedDuplicates > 0) parts.push(`${res.skippedDuplicates} duplicadas`);
         const skipMsg = parts.length > 0 ? ` (${parts.join(", ")} omitidas)` : "";
         toast.success(`Importadas ${res.importedCount} líneas OFX${skipMsg}. Sesión en progreso.`);
-        router.refresh();
+        // The server action revalidates this session and returns its updated view.
       } catch {
         setError("No se pudo leer el archivo OFX");
       }

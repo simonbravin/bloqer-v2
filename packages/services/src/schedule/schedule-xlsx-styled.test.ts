@@ -78,3 +78,21 @@ test("gantt-only xlsx omits the Tabla sheet", () => {
   assert.match(asText, /<sheet name="Gantt"/);
   assert.doesNotMatch(asText, /<sheet name="Tabla"/);
 });
+
+test("supply sheet keeps all physical lines, dates, units and escaped text as literal cells", () => {
+  const rows = Array.from({ length: 1001 }, (_, i) => ({
+    taskId: "task", lineId: String(i), taskName: "Montaje", wbsCode: "1.1", orderCode: `OC-${i}`,
+    description: i === 1000 ? '=SUM(1,2) <último> & "panel"' : "Panel",
+    taskExpectedDelivery: "28/11/2026", expectedDelivery: "—", latestReceipt: "20/11/2026",
+    quantity: "10,1234", receivedQuantity: "1,0000", remainingQuantity: "9,1234", unit: "m2", warning: "Entrega posterior al inicio de tarea hermana",
+  }));
+  const text = buildStyledScheduleXlsx({ ...payload, view: "table", procurementRows: rows }).toString("utf8");
+  assert.match(text, /<sheet name="Abastecimiento"/);
+  assert.match(text, /OC-1000/);
+  assert.match(text, /9,1234/);
+  assert.match(text, /&lt;último&gt;/);
+  assert.match(text, /t="inlineStr"><is><t[^>]*>=SUM\(1,2\)/);
+  assert.doesNotMatch(text, /<f>/);
+  const ganttOnly = buildStyledScheduleXlsx({ ...payload, view: "gantt", procurementRows: rows }).toString("utf8");
+  assert.doesNotMatch(ganttOnly, /<sheet name="Abastecimiento"/);
+});

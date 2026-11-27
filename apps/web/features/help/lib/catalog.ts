@@ -6,6 +6,7 @@ import { PLANNING_ARTICLES, PROCUREMENT_ARTICLES } from "./articles/planning-pro
 import { AP_ARTICLES, SUBCONTRACT_AR_ARTICLES } from "./articles/finance";
 import { CONTROL_ARTICLES } from "./articles/control";
 import { CONCEPTS_REPORTS_ARTICLES } from "./articles/concepts-reports";
+import { DOCUMENT_DELIVERY_ARTICLES } from "./articles/documents-delivery";
 
 export const HELP_ARTICLES: HelpArticle[] = [
   ...DIRECTORY_ARTICLES,
@@ -17,6 +18,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   ...AP_ARTICLES,
   ...CONTROL_ARTICLES,
   ...CONCEPTS_REPORTS_ARTICLES,
+  ...DOCUMENT_DELIVERY_ARTICLES,
 ];
 
 /** Home browse (no query/chips): keep the list scannable as the catalog grows. */

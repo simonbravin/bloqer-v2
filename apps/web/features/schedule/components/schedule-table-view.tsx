@@ -132,24 +132,26 @@ export function ScheduleTableView({
                 });
               }
               const proc = item.procurement;
-              if (proc?.expectedDeliveryDate || proc?.latestReceiptDate) {
+              if (proc && (proc.expectedDeliveryDate || proc.latestReceiptDate || (proc.pendingLines?.length ?? 0) > 0 || proc.incompleteSources)) {
                 alerts.push({
                   key: "proc",
-                  label: "Entrega",
+                  label: proc.deliveryAfterSiblingStart ? "Entrega posterior al inicio" : "Abastecimiento",
                   hint: [
                     proc.expectedDeliveryDate
                       ? `Entrega OC ${formatDateAr(proc.expectedDeliveryDate)}`
                       : null,
                     proc.latestReceiptDate
-                      ? `Recibido ${formatDateAr(proc.latestReceiptDate)}`
+                      ? `Última recepción ${formatDateAr(proc.latestReceiptDate)}`
                       : null,
+                    (proc.pendingLines?.length ?? 0) > 0 ? `${(proc.pendingLines?.length ?? 0)} renglones pendientes` : null,
+                    proc.incompleteSources ? "Hay fuentes de abastecimiento que no se pudieron comprobar" : null,
                     proc.deliveryAfterSiblingStart
                       ? "La entrega prometida es posterior al inicio de una tarea hermana"
                       : null,
                   ]
                     .filter(Boolean)
                     .join(". "),
-                  className: "bg-muted text-muted-foreground",
+                  className: proc.deliveryAfterSiblingStart || proc.incompleteSources ? "bg-amber-500/15 text-amber-800 dark:text-amber-300" : "bg-muted text-muted-foreground",
                 });
               }
 

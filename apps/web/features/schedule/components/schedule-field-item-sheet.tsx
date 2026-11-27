@@ -20,6 +20,7 @@ import { formatDateRangeShortAr, formatDateShortAr } from "@/lib/gantt-date-form
 import { moveScheduleItemStatusAction } from "../actions/schedule-actions";
 import { primaryWbsLink } from "../adapters/schedule-view-types";
 import { FIELD_STATUS_LABELS, formatProgressPctDisplay } from "../adapters/schedule-field-labels";
+import { ScheduleProcurementDetails } from "./schedule-procurement-details";
 
 const ACTION_LABELS: Record<string, string> = {
   IN_PROGRESS: "Iniciar",
@@ -138,6 +139,8 @@ export function ScheduleFieldItemSheet({
                 {item.blockReason}
               </p>
             ) : null}
+
+            <ScheduleProcurementDetails projectId={projectId} procurement={item.procurement} />
 
             {predecessors.length > 0 ? (
               <p>

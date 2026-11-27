@@ -32,6 +32,8 @@ Ver [`MVP_TECHNICAL_SCOPE.md`](./MVP_TECHNICAL_SCOPE.md): define **qué debe est
 
 **Automatización, 19/11/2026:** [Plan del primer paquete](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md): condiciones previas a canales (P0), factura de proveedor revisable y OC individual compartible (P1a), con matriz de 40 oportunidades y registro de validación. El plan distingue alcance autorizado, implementación comprobada y despliegue; sus lotes no reemplazan las fases generales 0–5 ni el [roadmap de Bloqer AI](../BLOQER_AI_ROADMAP.md).
 
+**Cierre competitivo, 27/11/2026:** el [seguimiento consolidado](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md#12-seguimiento-de-los-diez-bloques--27112026) conserva las 40 oportunidades y separa implementación, publicación y pilotos. El Owner seleccionó tres entregas de cierre: escenario de cobranzas F4 (Q-098/D-150), abastecimiento de cronograma G1 e índice documental H4. Alcance y evidencia en [§25 del plan](../PLAN_AUTOMATIZACION_PRIMER_PAQUETE.md#25-cierre-seleccionado--27112026); las restantes oportunidades y los diferidos no se declaran completos por esta selección.
+
 Intervención específica posterior: [Plan de mejoras INDARI / Casa Hogar — 21/10/2026](./INDARI_CASA_HOGAR_IMPROVEMENT_PLAN.md). Define correcciones de compras/AP, controles de integridad y decisiones pendientes; sus fases no sustituyen las fases generales 0–5 de este roadmap.
 
 Preparación ejecutada: [Resultados de fase 0 INDARI](./INDARI_CASA_HOGAR_PHASE_0.md). Schema comparado sin diferencias en los objetos revisados; fixtures aislados y 67 pruebas unitarias aprobadas. Integración 3/4: timeout de adjudicación pendiente (P-IND-04), más confirmación del alias del portal antes de publicar.

@@ -55,6 +55,7 @@ import {
 import { cleanupScheduleAuditFixture } from "./schedule-audit-fixture";
 import { getProjectScheduleFieldWorkspace } from "./schedule-field-workspace.service";
 import { getProjectScheduleWorkspace } from "./schedule-workspace.service";
+import { loadScheduleProcurementByWbs } from "./schedule-procurement.service";
 import { buildScheduleExportPayload, exportScheduleXlsx } from "./schedule-export.service";
 
 describe(
@@ -1175,6 +1176,61 @@ describe(
         },
       });
     }
+
+    it("shares authorized pending quantities, date evidence and D-104 risk across desktop, Field and export", async () => {
+      const receipt = await draftReceipt();
+      const before = await loadScheduleProcurementByWbs(projectId, { ...ctx }, [wbsId]);
+      assert.equal(before.get(wbsId)!.pendingLines![0]!.remainingQuantity, "10.0000");
+      assert.equal(before.get(wbsId)!.expectedDeliveryDate, null);
+      assert.equal(before.get(wbsId)!.latestReceiptDate, null); // DRAFT receipt is not evidence.
+      await prisma.purchaseOrder.update({ where: { id: receipt.purchaseOrderId }, data: { expectedDeliveryDate: new Date("2026-11-10") } });
+      await prisma.scheduleItem.update({ where: { id: secondId }, data: { startDate: new Date("2026-11-01") } });
+      await prisma.scheduleItemWbsLink.create({ data: { tenantId, scheduleItemId: secondId, wbsNodeId: wbsId, isPrimary: true } });
+      await confirmPurchaseReceipt(receipt.id, { ...ctx });
+      const desktop = await getProjectScheduleWorkspace(projectId, {}, { ...ctx });
+      assert.equal(desktop.type, "WORKSPACE");
+      if (desktop.type !== "WORKSPACE") return;
+      const supply = desktop.items.find((row) => row.id === firstId)!.procurement!;
+      assert.equal(supply.pendingLines![0]!.remainingQuantity, "9.0000");
+      assert.equal(supply.latestReceiptDate, "2026-11-02");
+      assert.equal(supply.deliveryAfterSiblingStart, true);
+      const foremanDates = await loadScheduleProcurementByWbs(projectId, { ...ctx, roles: ["SITE_FOREMAN"] }, [wbsId]);
+      assert.equal(foremanDates.get(wbsId)!.expectedDeliveryDate, "2026-11-10");
+      assert.equal(foremanDates.get(wbsId)!.pendingLines, null);
+      const field = await getProjectScheduleFieldWorkspace(projectId, { ...ctx });
+      assert.deepEqual(field.items.find((row) => row.id === firstId)!.procurement, supply);
+      const exported = await buildScheduleExportPayload(projectId, { view: "table" }, { ...ctx });
+      assert.equal(exported.procurementRows!.find((row) => row.taskId === firstId)!.remainingQuantity, "9,0000");
+
+      // Shared project does not make another company's OC visible.
+      await prisma.project.update({ where: { id: projectId }, data: { companyId: null } });
+      await prisma.purchaseOrder.create({ data: { tenantId, companyId: otherCompanyId, projectId, supplierContactId: contactId, number: 9, issueDate: new Date("2026-11-01"), status: "CONFIRMED", lines: { create: { wbsNodeId: wbsId, description: "Foreign company", quantity: 999, unitPrice: 1, lineSubtotal: 999, lineTotal: 999 } } } });
+      const scoped = await loadScheduleProcurementByWbs(projectId, { ...ctx }, [wbsId]);
+      assert.equal(scoped.get(wbsId)!.pendingLines!.length, 1);
+      await prisma.purchaseReceipt.create({ data: {
+        tenantId, companyId: otherCompanyId, projectId, supplierContactId: contactId,
+        purchaseOrderId: receipt.purchaseOrderId, status: "CONFIRMED", receiptDate: new Date("2026-12-20"),
+        lines: { create: { purchaseOrderLineId: supply.pendingLines![0]!.id, quantityReceived: 1 } },
+      } });
+      const global = await loadScheduleProcurementByWbs(projectId, { ...ctx, companyId: null }, [wbsId]);
+      assert.equal(global.get(wbsId)!.pendingLines!.length, 1);
+      assert.equal(global.get(wbsId)!.latestReceiptDate, "2026-11-02");
+      assert.equal(global.get(wbsId)!.incompleteSources, true);
+      // A nullable budget company is shared and remains a valid parent for either OC.
+      await prisma.budget.update({ where: { id: budgetId }, data: { companyId: null } });
+      try {
+        const shared = await loadScheduleProcurementByWbs(projectId, { ...ctx, companyId: null }, [wbsId]);
+        assert.equal(shared.get(wbsId)!.pendingLines!.length, 2);
+      } finally {
+        await prisma.budget.update({ where: { id: budgetId }, data: { companyId } });
+      }
+      assert.equal((await loadScheduleProcurementByWbs(otherProjectId, { ...ctx }, [wbsId])).size, 0);
+      await assert.rejects(loadScheduleProcurementByWbs(projectId, { ...ctx, tenantId: randomUUID() }, [wbsId]));
+      assert.equal((await loadScheduleProcurementByWbs(projectId, { ...ctx, roles: [] }, [wbsId])).size, 0);
+      await prisma.tenantModuleSetting.create({ data: { tenantId, moduleKey: "PROCUREMENT", isEnabled: false } });
+      const hidden = await getProjectScheduleFieldWorkspace(projectId, { ...ctx });
+      assert.ok(hidden.items.every((row) => row.procurement === null));
+    });
 
     it("receipt confirmation completes a linked milestone while preserving TASK progress", async () => {
       const milestone = await createScheduleItem(

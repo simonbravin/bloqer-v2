@@ -79,6 +79,8 @@ jobs:
           pnpm --filter @bloqer/services exec node --import tsx --test src/documents/document-access-audit.live.test.ts src/jobsite-log/jobsite-operation-audit.live.test.ts
           pnpm --filter @bloqer/services exec node --import tsx --test src/procurement/supplier-quote-invitation.live.test.ts
           pnpm --filter @bloqer/services exec node --import tsx --test src/reports/operational-reports-audit.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/schedule/schedule-audit.live.test.ts
+          pnpm --filter @bloqer/services exec node --import tsx --test src/project-cash-flow/project-cash-position-scenario.live.test.ts
 
       - name: Restore rehearsal on disposable SQL and synthetic files
         env:
@@ -156,6 +158,24 @@ jobs:
             apps/web/test-results/authenticated-smoke/
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Show browser failure context
+        if: failure()
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const root = "apps/web/test-results";
+          if (fs.existsSync(root)) {
+            for (const file of fs.readdirSync(root, { recursive: true })) {
+              if (!file.endsWith("error-context.md")) continue;
+              const full = path.join(root, file);
+              console.log(`::group::Browser failure: ${file}`);
+              console.log(fs.readFileSync(full, "utf8").slice(0, 20000));
+              console.log("::endgroup::");
+            }
+          }
+          NODE
 
       - name: Stop disposable Postgres
         if: always()

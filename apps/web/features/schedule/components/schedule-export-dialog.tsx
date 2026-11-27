@@ -97,10 +97,12 @@ export function ScheduleExportDialog({
   projectId,
   filters,
   defaultView,
+  fullSchedule = false,
 }: {
   projectId: string;
   filters: FilterParams;
   defaultView?: string;
+  fullSchedule?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [content, setContent] = useState<ScheduleExportView>(() =>
@@ -178,7 +180,7 @@ export function ScheduleExportDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="gap-2">
+        <Button type="button" variant="outline" size="sm" className="min-h-11 gap-2">
           <Download className="h-4 w-4" aria-hidden />
           Exportar
         </Button>
@@ -187,9 +189,11 @@ export function ScheduleExportDialog({
         <DialogHeader>
           <DialogTitle>Exportar cronograma</DialogTitle>
           <DialogDescription>
+            {fullSchedule ? "Exporta el cronograma completo, sin los filtros de las tarjetas. " : ""}
             Elegí tabla, Gantt o ambos, y un lapso opcional. Sin fechas, el eje usa el rango de los
             ítems filtrados. Con Desde/Hasta entran ítems que se solapan con ese período y sus
             capítulos padre.
+            {" "}Tabla y Ambos incluyen el detalle de abastecimiento disponible.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -207,7 +211,7 @@ export function ScheduleExportDialog({
                   size="sm"
                   variant={content === opt.id ? "secondary" : "ghost"}
                   aria-pressed={content === opt.id}
-                  className={cn("flex-1", content !== opt.id && "text-muted-foreground")}
+                  className={cn("min-h-11 flex-1", content !== opt.id && "text-muted-foreground")}
                   onClick={() => setContent(opt.id)}
                 >
                   {opt.label}
@@ -236,16 +240,16 @@ export function ScheduleExportDialog({
             </div>
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="Atajos de lapso">
-            <Button type="button" size="sm" variant="ghost" onClick={() => applyPreset("all")}>
+            <Button type="button" size="sm" className="min-h-11" variant="ghost" onClick={() => applyPreset("all")}>
               Todo
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => applyPreset("month")}>
+            <Button type="button" size="sm" className="min-h-11" variant="ghost" onClick={() => applyPreset("month")}>
               Este mes
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => applyPreset("quarter")}>
+            <Button type="button" size="sm" className="min-h-11" variant="ghost" onClick={() => applyPreset("quarter")}>
               Este trimestre
             </Button>
-            <Button type="button" size="sm" variant="ghost" onClick={() => applyPreset("year")}>
+            <Button type="button" size="sm" className="min-h-11" variant="ghost" onClick={() => applyPreset("year")}>
               Este año
             </Button>
           </div>
@@ -255,7 +259,7 @@ export function ScheduleExportDialog({
             type="button"
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="min-h-11 gap-2"
             disabled={busy}
             onClick={() => void download("xlsx")}
           >
@@ -266,7 +270,7 @@ export function ScheduleExportDialog({
             type="button"
             variant="outline"
             size="sm"
-            className="gap-2"
+            className="min-h-11 gap-2"
             disabled={busy}
             onClick={() => void download("pdf")}
           >

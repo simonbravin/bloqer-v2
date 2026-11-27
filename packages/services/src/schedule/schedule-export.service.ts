@@ -12,6 +12,7 @@ import {
   buildGanttAxisTicks,
   buildGanttPeriods,
   buildScheduleExportFilterLine,
+  buildScheduleProcurementExportRows,
   chooseGanttScale,
   computeExportDateRange,
   filterScheduleItemsForExport,
@@ -261,6 +262,7 @@ export async function buildScheduleExportPayload(
     summaryLine: summaryBits.join(" · "),
     rows,
     gantt,
+    procurementRows: view === "gantt" ? [] : buildScheduleProcurementExportRows(scopedItems),
   };
 }
 

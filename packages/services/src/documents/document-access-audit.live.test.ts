@@ -8,6 +8,7 @@ import { clearProjectAccessModeCache } from "../security/access";
 import { assertAuditDatabaseIdentity } from "../testing/audit-fixture";
 import { withSyntheticStorageObjects, withSyntheticStorageSigning } from "../testing/storage-signing-fixture";
 import { getDocumentVersionLinks } from "./document-versions.service";
+import { buildProjectDocumentDeliveryExport, getProjectDocumentDeliveryIndex } from "./document-delivery-index.service";
 import { ServiceError, type ServiceContext } from "../types";
 import { createDocumentFolder, listProjectDocumentFolders, moveDocumentFolder } from "./document-folder.service";
 import { exportDocumentHistory, getDocumentHistory } from "./document-history.service";
@@ -151,6 +152,41 @@ describe("AG-13 document parent and company scopes on isolated SQL", {
     await assert.rejects(listEntityDocuments("SUPPLIER_INVOICE", corporateInvoice, finance), denied);
     await assert.rejects(initiateDocumentUpload(invoiceUpload(corporateInvoice, null), finance), denied);
     await assert.rejects(getDocumentById(mismatched.id, { ...owner, companyId: null }), missing);
+  });
+
+  it("indexes authorized delivery files and revision provenance without exposing other companies or mutating originals", async () => {
+    const old = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: null });
+    const latest = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: null });
+    const ownInvoice = await addDocument({ linkedEntityType: "SUPPLIER_INVOICE", linkedEntityId: invoiceA, projectId, companyId: null });
+    const foreignInvoice = await addDocument({ linkedEntityType: "SUPPLIER_INVOICE", linkedEntityId: invoiceB, projectId, companyId: null });
+    const pending = await addDocument({ linkedEntityType: "PROJECT", linkedEntityId: projectId, projectId, companyId: null, status: "UPLOADING" });
+    for (const doc of [old, latest, ownInvoice, foreignInvoice, pending]) {
+      await prisma.documentAttachment.update({ where: { id: doc.id }, data: { originalFileName: `H4-${doc.id}.pdf` } });
+    }
+    await prisma.documentAttachment.update({ where: { id: old.id }, data: { status: "ARCHIVED", storageProvider: "R2" } });
+    await prisma.documentAttachment.update({ where: { id: latest.id }, data: { storageProvider: "R2", replacesAttachmentId: old.id } });
+    const beforeAudit = await prisma.auditLog.count({ where: { tenantId } });
+    const index = await getProjectDocumentDeliveryIndex(projectId, { search: "H4-", status: "ALL" }, owner);
+    assert.deepEqual(new Set(index.rows.map(({ id }) => id)), new Set([old.id, latest.id, ownInvoice.id]));
+    assert.equal(index.rows.find(({ id }) => id === latest.id)?.previous?.id, old.id);
+    assert.equal(index.rows.find(({ id }) => id === old.id)?.next?.id, latest.id);
+    assert.equal(index.rows.find(({ id }) => id === ownInvoice.id)?.companyId, companyA);
+    assert.equal(index.rows.find(({ id }) => id === ownInvoice.id)?.originalRegistered, false);
+    assert.equal(index.originalsRegistered, 2);
+    assert.equal(index.rows.find(({ id }) => id === latest.id)?.uploadedByName, "Responsable de prueba");
+    const readerIndex = await getProjectDocumentDeliveryIndex(projectId, { search: "H4-", status: "ALL" }, reader);
+    assert.deepEqual(new Set(readerIndex.rows.map(({ id }) => id)), new Set([old.id, latest.id]));
+    const foreignIndex = await getProjectDocumentDeliveryIndex(projectId, { search: "H4-", status: "ALL" }, sibling);
+    assert.ok(foreignIndex.rows.some(({ id }) => id === foreignInvoice.id));
+    assert.ok(!foreignIndex.rows.some(({ id }) => id === ownInvoice.id));
+    const exported = await buildProjectDocumentDeliveryExport(projectId, { search: "H4-", status: "ALL", page: 100 }, owner);
+    assert.equal(exported.table.rows.length, 3);
+    assert.ok(!JSON.stringify(exported).includes(foreignInvoice.id));
+    assert.ok(!JSON.stringify(exported).includes("storageKey"));
+    await assert.rejects(getProjectDocumentDeliveryIndex(projectId, {}, { ...reader, actorUserId: randomUUID() }), denied);
+    await assert.rejects(getProjectDocumentDeliveryIndex(projectId, {}, { ...owner, tenantId: randomUUID() }), denied);
+    assert.equal(await prisma.auditLog.count({ where: { tenantId } }), beforeAudit);
+    assert.equal((await prisma.documentAttachment.findUniqueOrThrow({ where: { id: old.id } })).status, "ARCHIVED");
   });
 
   it("rejects another uploader's replay and hides old pending attempts without mutating on reads", async () => {
