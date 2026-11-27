@@ -312,5 +312,6 @@ export * from "./scheduled-reports/scheduled-report-cron.service";
 export * from "./scheduled-reports/scheduled-report-execution.service";
 export * from "./field/field-pending-access";
 export * from "./field/field-pending.service";
+export * from "./field/field-pending-export.service";
 export * from "./field/field-home.service";
 export * from "./ai";

@@ -428,6 +428,9 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     ],
     steps: [
       "En el menú lateral, General → Pendientes (/pendientes): todas las obras. El globo rojo es tu recuento (en desktop también en la sección General si está plegada).",
+      "Buscá por documento, proveedor/descripción, obra o solicitante. Solo vencidos filtra por el indicador existente. Agrupar por permite Etapa / tipo u Obra, con contadores y grupos plegables; Ordenar por permite orden operativo, más antiguos o más recientes. La vista compacta muestra 25 acciones por página; podés cambiar a vista detallada.",
+      "Exportar vista descarga CSV, Excel o PDF de todos los resultados filtrados, incluidas otras páginas y grupos plegados. Exportar todos quita los filtros de tipo, búsqueda y vencidos, y conserva la obra o empresa seleccionada. Se revalidan los permisos al descargar. Si supera 10.000 acciones, acotá por obra o tipo; no se descarga un archivo parcial.",
+      "Los montos exportados son del documento, no saldos a pagar. Una OC puede aparecer en más de una acción; no sumes esas filas ni monedas distintas como deuda.",
       "En mobile, el ítem Pendientes de la barra inferior muestra el mismo globo (9+ si hay más de nueve).",
       "Dentro de un proyecto, Resumen → Pendientes lista solo esa obra; el globo de ese ítem es el recuento de esa obra.",
       "Filtro Compras: etapas Cotizar → **Aprobación** → Confirmar → Recibir → Facturar. CTAs: Cotizar / Elegir cotización; **Aprobar** o **Aprobar y comprometer** (si política [D-107]); Confirmar al proveedor (reserva $); Recibir (abre el formulario); **Registrar factura** o **Completar factura** (abre la OC / borrador).",
@@ -460,6 +463,7 @@ export const CONTROL_ARTICLES: HelpArticle[] = [
     keywords: [
       "pendientes",
       "bandeja de pendientes",
+      "exportar pendientes", "pdf pendientes", "excel pendientes", "csv pendientes", "agrupar pendientes", "buscar pendientes", "vista compacta",
       "portero",
       "globo",
       "numero de pendientes",

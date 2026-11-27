@@ -43,7 +43,7 @@ export default async function PendientesPage({ searchParams }: PageProps) {
   const lastProjectId = isProjectIdValue(last) ? last : null;
 
   const [list, projects] = await Promise.all([
-    getMyFieldPendingItems(ctx, { group, projectId }),
+    getMyFieldPendingItems(ctx, { group, projectId, complete: true }),
     listFieldProjects(ctx).catch(() => []),
   ]);
 
@@ -57,6 +57,7 @@ export default async function PendientesPage({ searchParams }: PageProps) {
         </p>
       </div>
       <FieldPendingInbox
+        key={`${group ?? "all"}-${projectId ?? "all"}`}
         list={list}
         group={group}
         projectId={projectId}
