@@ -55,6 +55,7 @@ test("SC-only hub hides order/receipt counts and inaccessible financial shortcut
     ServiceError, getProjectShellInfo: async () => ({}), getProjectProcurementHub: async () => hub, getTenantModuleGate: async () => ({ isEnabled: (module: string) => module !== "SUBCONTRACTS" }), canEditPurchaseRequests: () => true, canEditPurchaseOrders: () => false, canViewProjectCostControlReport: () => false, canViewSubcontractsArea: () => false,
   });
   const tree = await Page({ params: Promise.resolve({ id: "project" }) });
+  assert.equal(elements(tree, "ProcurementFollowUp").length, 0);
   assert.equal(elements(tree, "KpiStatGrid").some((node) => node.props.title === "Órdenes de compra"), false);
   const hrefs = elements(tree, "Link").map((node) => node.props.href);
   for (const restricted of ["/orders", "/receipts", "/suppliers-report", "/analysis"]) assert.ok(!hrefs.includes(restricted));
@@ -71,6 +72,58 @@ test("procurement analysis shortcut respects the budget module required by its d
   const tree = await Page({ params: Promise.resolve({ id: "project" }) });
   const hrefs = elements(tree, "Link").map((node) => node.props.href);
   assert.ok(!hrefs.includes("/analysis")); assert.ok(hrefs.includes("/suppliers-report")); assert.ok(hrefs.includes("/orders"));
+});
+
+function followUpPanel(rows: unknown[], page = 1, total = rows.length) {
+  const { ProcurementFollowUpPanel } = load<{ ProcurementFollowUpPanel: (props: unknown) => Element }>("../components/procurement-follow-up.tsx", {}, {
+    "../lib/procurement-ui": { procurementActionBtnClass: "action" },
+    "./procurement-amber-callout": { ProcurementAmberCallout: "ProcurementAmberCallout" },
+    "./purchase-order-status-badge": { PurchaseOrderStatusBadge: "PurchaseOrderStatusBadge" },
+  });
+  return ProcurementFollowUpPanel({ projectId: "project", data: { rows, page, pageSize: 10, total } });
+}
+
+test("follow-up distinguishes reserved drafts, issued coverage, quantity warnings and unlinked history", () => {
+  const tree = followUpPanel([{
+    id: "order", code: "OC-001", supplierName: "Supplier", status: "PARTIALLY_RECEIVED", lineUnits: { line: "kg" },
+    billing: { currency: "USD", hasReceivedQuantity: true, receivedAmount: "10.00", invoicedAmount: "0.00", draftReservedAmount: "10.00", pendingToInvoice: "0.00",
+      draftInvoiceCount: 1, openDraftInvoiceId: "draft", allReceivedAmountIssued: false, allReceivedInvoiceLinesIssued: false,
+      matchWarningCount: 1, unlinkedInvoiceCount: 1, lineMatches: [{ poLineId: "line", description: "Material", orderQty: "2", receivedQty: "1", invoicedQty: "2", message: "Cantidad superior a la recibida" }],
+    },
+  }]);
+  const content = text(tree);
+  assert.ok(content.includes("Queda entrega pendiente"));
+  assert.ok(content.includes("aún no tiene cobertura completa"));
+  assert.ok(content.includes("1 borrador(es)"));
+  assert.ok(content.includes("no bloquean emitir"));
+  assert.ok(content.includes("ítems sin vínculo"));
+  assert.ok(content.includes("Cantidad superior a la recibida"));
+  assert.ok(content.includes("Unidad: kg"));
+  assert.ok(content.includes("USD 10.00"));
+  assert.equal(elements(tree, "form").length, 0);
+  assert.ok(elements(tree, "Link").some((node) => node.props.href === "/proyectos/project/facturas-proveedor/draft"));
+});
+
+test("follow-up does not infer payment or quantity coverage from received state and monetary coverage alone", () => {
+  const row = { id: "order", code: "OC-001", supplierName: "Supplier", status: "RECEIVED", lineUnits: {}, billing: {
+    currency: "ARS", hasReceivedQuantity: true, allReceivedAmountIssued: true, allReceivedInvoiceLinesIssued: false,
+    receivedAmount: "10.00", invoicedAmount: "10.00", draftReservedAmount: "0.00", pendingToInvoice: "0.00", lineMatches: [],
+  } };
+  assert.ok(text(followUpPanel([row])).includes("aún no tiene cobertura completa"));
+  row.billing.allReceivedInvoiceLinesIssued = true;
+  assert.ok(text(followUpPanel([row])).includes("No equivale a pago"));
+});
+
+test("follow-up preserves unavailable billing and pagination rather than claiming an empty balance", () => {
+  const tree = followUpPanel([{ id: "order", code: "OC-001", supplierName: "Supplier", status: "RECEIVED", billing: null, billingNotice: "Facturación no disponible" }], 2, 25);
+  assert.ok(text(tree).includes("Facturación no disponible"));
+  assert.equal(elements(tree, "Table").length, 0);
+  const hrefs = elements(tree, "Link").map((node) => node.props.href);
+  assert.ok(!hrefs.some((href) => String(href).includes("facturas-proveedor") || String(href).includes("siguiente=facturar")));
+  assert.ok(hrefs.includes("/proyectos/project/compras?ocPage=3#seguimiento-oc"));
+  assert.ok(hrefs.includes("/proyectos/project/compras?ocPage=1#seguimiento-oc"));
+  assert.ok(text(followUpPanel([], 4, 25)).includes("Volvé a la primera página"));
+  assert.ok(text(followUpPanel([])).includes("Todavía no hay órdenes confirmadas"));
 });
 
 function orderServices(overrides: Record<string, unknown> = {}) {

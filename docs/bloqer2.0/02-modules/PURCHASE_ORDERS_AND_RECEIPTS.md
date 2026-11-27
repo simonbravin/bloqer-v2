@@ -60,6 +60,7 @@ DRAFT → SUBMITTED → APPROVED → CONFIRMED → PARTIALLY_RECEIVED / RECEIVED
 - Detalle con orientación de próximo paso y área interviniente según el estado existente, compartida con las OC vinculadas de la SC. Es lectura informativa: no determina permisos/transiciones ni afirma que recibido equivale a pagado.
 - Editor de líneas con WBS, precio, ref. presupuesto, justificación de desvío.
 - Registro de recepción; panel “siguiente paso: facturar desde OC”.
+- En el Tablero de compras, **Recepción y facturación por OC** reúne órdenes confirmadas/parciales/recibidas de la empresa y obra autorizadas, diez por página ordenadas por número descendente. Reutiliza el resumen de facturación y sus avisos D-067/D-108/D-112/D-115/D-145; distingue recepción, cobertura emitida, reservas de borrador e imposibilidad de verificar. Detalle desplegable por línea/unidad, importes en moneda original y enlaces al documento/borrador. No es un contador global de pendientes ni una certificación de pago; no modifica documentos, tolerancias ni estados. Las lecturas se acotan y el tablero principal carga independientemente del seguimiento.
 
 ## 10. Reglas de negocio
 - [BR-PUR-001] compromiso en `CONFIRMED`.

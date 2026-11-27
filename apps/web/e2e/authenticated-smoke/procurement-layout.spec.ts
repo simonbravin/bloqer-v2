@@ -74,6 +74,24 @@ test("supplier delivery evidence opens its source and preserves scope in exports
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
+test("purchase follow-up exposes quantities and opens the original order at every viewport", async ({ page }, testInfo) => {
+  await page.goto(`${project}/compras`);
+  const panel = page.getByRole("region", { name: "Recepción y facturación por OC" });
+  await expect(panel).toBeVisible();
+  const row = panel.getByRole("article").filter({ has: page.locator(`a[href="${order}"]`) });
+  await expect(row).toHaveCount(1);
+  await row.locator("summary").click();
+  await expect(row.getByRole("table")).toBeVisible();
+  await expect(row.getByText(/Reservar en borrador no equivale a emitir/)).toBeVisible();
+  await captureLayout(page, testInfo, "purchase-follow-up");
+  if (testInfo.project.name === "phone") {
+    for (const link of await row.getByRole("link").all()) expect((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  await row.locator(`a[href="${order}"]`).click();
+  await expect(page).toHaveURL(new RegExp(`${order}$`));
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+});
+
 test("purchase forms align controls and preserve long values in light and dark themes", async ({ page }, testInfo) => {
   for (const kind of ["solicitudes-compra", "ordenes-compra"] as const) {
     await page.goto(`${project}/${kind}/nueva`);

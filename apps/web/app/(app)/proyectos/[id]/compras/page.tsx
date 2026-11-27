@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { can } from "@bloqer/domain";
@@ -19,16 +20,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { KpiStatCard } from "@/components/ui/kpi-stat-card";
 import { KpiStatGrid } from "@/components/ui/kpi-stat-grid";
 import { procurementActionBtnClass } from "@/features/procurement/lib/procurement-ui";
+import { ProcurementFollowUp } from "@/features/procurement/components/procurement-follow-up";
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ ocPage?: string }>;
 }
 
-export default async function ProyectoComprasHubPage({ params }: PageProps) {
+export default async function ProyectoComprasHubPage({ params, searchParams }: PageProps) {
   const current = await getCurrentUser();
   if (!current?.tenantCtx) redirect("/login");
 
   const { id: projectId } = await params;
+  const requestedPage = Number((await searchParams)?.ocPage ?? 1);
+  const page = Number.isSafeInteger(requestedPage) && requestedPage >= 1 && requestedPage <= 100_000 ? requestedPage : 1;
   const ctx = {
     actorUserId: current.session.user.id!,
     tenantId: current.tenantCtx.tenantId,
@@ -65,7 +70,7 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
     <PageShell variant="default" className="space-y-6">
       <ProjectPageHeader
         title="Tablero de compras"
-        subtitle="Documentos pendientes (SC → cotización → OC → recepción). El control de $ está en EDT y costos."
+        subtitle="Seguí solicitudes, órdenes, entregas y facturas. El control de $ está en EDT y costos."
         actions={
           showMateriales ? (
             <div className="flex flex-wrap gap-2">
@@ -145,6 +150,10 @@ export default async function ProyectoComprasHubPage({ params }: PageProps) {
           href={hub.links.recepciones}
         />
       </KpiStatGrid> : null}
+
+      {hub.canViewOrders ? <Suspense key={page} fallback={<p role="status" className="rounded-lg border p-4 text-sm text-muted-foreground">Consultando recepción y facturación de las órdenes…</p>}>
+        <ProcurementFollowUp projectId={projectId} ctx={ctx} page={page} />
+      </Suspense> : null}
 
       <Card>
         <CardHeader className="pb-2">

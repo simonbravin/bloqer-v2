@@ -13,6 +13,7 @@ import { getMultiProjectProcurementReport, getProcurementDeviationReport } from 
 import { getProjectSupplierReport } from "./project-supplier-report.service";
 import { getPurchaseOrderVarianceReport } from "./purchase-order-variance-report.service";
 import { getSubcontractVarianceReport } from "./subcontract-variance.service";
+import { getProjectProcurementFollowUp } from "../procurement/project-procurement-follow-up.service";
 
 const denied = (error: unknown) => error instanceof ServiceError && error.code === "FORBIDDEN";
 const invalid = (error: unknown) => error instanceof ServiceError && error.code === "VALIDATION";
@@ -165,6 +166,49 @@ describe("AG-12 operational reports on isolated SQL", {
       clearProjectAccessModeCache();
       await prisma.$disconnect();
     }
+  });
+
+  it("E4 keeps follow-up within company, tenant, membership and module scope without mutations", async () => {
+    const beforeOrders = await prisma.purchaseOrder.findMany({ where: { tenantId }, orderBy: { id: "asc" } });
+    const result = await getProjectProcurementFollowUp(shared, ctx);
+    assert.equal(result.total, 2);
+    assert.deepEqual(result.rows.map((row) => row.code), ["OC-002", "OC-001"]);
+    assert.deepEqual(result.rows.map((row) => row.billing?.currency), ["USD", "ARS"]);
+    assert.ok(result.rows.every((row) => row.billing?.hasReceivedQuantity === false));
+    assert.equal((await getProjectProcurementFollowUp(shared, ctx, 2)).rows.length, 0);
+    assert.equal((await getProjectProcurementFollowUp(shared, ctx, 2)).total, 2);
+    await assert.rejects(getProjectProcurementFollowUp(hidden, ctx), denied);
+    await assert.rejects(getProjectProcurementFollowUp(shared, viewOnly), denied);
+    await assert.rejects(getProjectProcurementFollowUp(shared, { ...ctx, tenantId: randomUUID() }));
+    await assert.rejects(getProjectProcurementFollowUp(shared, ctx, 0), invalid);
+    const setting = await prisma.tenantModuleSetting.create({ data: { tenantId, moduleKey: "AP", isEnabled: false } });
+    try {
+      const unavailable = await getProjectProcurementFollowUp(shared, ctx);
+      assert.ok(unavailable.rows.every((row) => row.billing === null && row.billingNotice?.includes("No se puede comprobar")));
+    } finally {
+      await prisma.tenantModuleSetting.delete({ where: { id: setting.id } });
+    }
+    const orderId = result.rows.find((row) => row.code === "OC-001")!.id;
+    const inconsistent = await prisma.supplierInvoice.create({ data: {
+      tenantId, companyId: companyB, projectId: shared, supplierContactId: otherSupplierId,
+      purchaseOrderId: orderId, number: 91, issueDate: nov, dueDate: nov,
+      currency: "ARS", status: "DRAFT", subtotal: "98765", totalAmount: "98765",
+    } });
+    try {
+      const conflict = await getProjectProcurementFollowUp(shared, ctx);
+      assert.equal(conflict.rows.find((row) => row.id === orderId)?.billing, null);
+      assert.ok(conflict.rows.find((row) => row.id === orderId)?.billingNotice?.includes("No se pudo comprobar"));
+      assert.ok(!JSON.stringify(conflict).includes("98765"));
+      await prisma.supplierInvoice.update({ where: { id: inconsistent.id }, data: {
+        companyId: companyA, supplierContactId: supplierId, currency: "USD",
+      } });
+      const currencyMismatch = await getProjectProcurementFollowUp(shared, ctx);
+      assert.equal(currencyMismatch.rows.find((row) => row.id === orderId)?.billing, null);
+      assert.ok(currencyMismatch.rows.find((row) => row.code === "OC-002")?.billing);
+    } finally {
+      await prisma.supplierInvoice.delete({ where: { id: inconsistent.id } });
+    }
+    assert.deepEqual(await prisma.purchaseOrder.findMany({ where: { tenantId }, orderBy: { id: "asc" } }), beforeOrders);
   });
 
   it("groups multi-project procurement by currency and intersects company and assigned projects", async () => {

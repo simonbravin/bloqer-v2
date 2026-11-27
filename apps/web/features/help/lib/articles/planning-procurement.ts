@@ -2,6 +2,32 @@ import type { HelpArticle } from "../types";
 
 export const PLANNING_ARTICLES: HelpArticle[] = [
   {
+    slug: "revisar-recepcion-facturacion-oc",
+    title: "Revisar recepción y facturación de las OC",
+    summary: "Consultá entregas pendientes, borradores y avisos de cantidad desde el Tablero de compras.",
+    intents: ["orden-compra", "recepcion", "factura-desde-oc", "pendientes"],
+    modules: ["compras", "finanzas"], level: "project", typicalRoles: ["Compras", "PM", "OWNER / ADMIN"],
+    permissionHint: "Requiere acceso a Compras y a la obra. Facturación conserva sus controles de acceso y configuración.",
+    where: { menu: "Compras → Tablero de compras → Recepción y facturación por OC" },
+    hrefs: [{ kind: "project", suffix: "/compras", label: "Tablero de compras" }],
+    steps: [
+      "Revisá por separado Recepción y Facturación en cada OC confirmada, parcial o recibida. Hay hasta diez por página, de mayor a menor número.",
+      "Ver cantidades e importes muestra pedido, recibido y cantidades en facturas y borradores, por ítem y unidad. Los importes son neto + IVA sin percepciones, en la moneda de la OC.",
+      "Revisar documentos indica avisos de exceso de cantidad o facturas con líneas sin vínculo a un ítem de OC.",
+      "Abrir OC y Revisar facturación llevan al detalle. Abrir borrador permite continuar el comprobante existente; comprobá sus datos antes de emitir.",
+      "Usá Anterior, Siguiente o Primera página para recorrer las órdenes. El contador no es un total de pendientes de la obra.",
+    ],
+    effects: ["Consulta los controles existentes sin modificar documentos ni aplicar excepciones financieras."],
+    pitfalls: [
+      "Recibida no equivale a facturada ni pagada. Reservado en borradores tampoco equivale a emitido.",
+      "Los avisos de cantidad no bloquean emitir. Sin vínculo de línea, el importe cuenta pero no prueba cobertura por cantidad.",
+      "Facturación no disponible no significa saldo cero. Las NC/ND no agregan cobertura física; no se suman monedas ni unidades diferentes.",
+    ],
+    relatedSlugs: ["orden-de-compra-y-afectar-edt", "factura-desde-oc", "politicas-de-compras"],
+    keywords: ["seguimiento compras", "diferencias", "matching", "pendiente recibir", "pendiente facturar", "borrador", "recepción y facturación", "líneas sin vínculo"],
+    guideRef: "§9",
+  },
+  {
     slug: "cotizacion-proveedor-por-enlace",
     title: "Recibir una cotización por enlace",
     summary: "El proveedor responde sin cuenta y Compras revisa antes de incorporar la oferta. Capacidad opcional apagada por defecto.",
