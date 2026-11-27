@@ -17,6 +17,9 @@ export default defineConfig({
   testDir: "./e2e/authenticated-smoke",
   outputDir: "test-results/authenticated-smoke",
   timeout: 60_000,
+  // This serial, three-viewport suite includes login and database-backed flows.
+  // Give the whole suite its own budget; retain the existing per-test limits.
+  globalTimeout: 10 * 60_000,
   reporter: [["list"], ["html", { open: "never", outputFolder: "playwright-report-authenticated" }]],
   use: { ...publicSmoke.use, baseURL },
   webServer: {
